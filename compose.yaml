@@ -1,0 +1,8 @@
+services:
+  pjscalltrainer:
+    image: pjscalltrainer
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    ports:
+      - 8000:8000
