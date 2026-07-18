@@ -1,8 +1,8 @@
----
-status: proposed
----
+# ADR 0001: Separate Scenario and Persona Concepts
 
-# Separate Scenario and Persona concepts
+## Status
+
+Proposed
 
 ## Context
 
