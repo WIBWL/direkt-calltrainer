@@ -16,6 +16,7 @@ Only a minimal FastAPI backend skeleton exists (`backend/app.py`, currently just
 - Docker: `docker compose up --build` (serves on `http://localhost:8000`)
 - Docker with debugger attached (debugpy on port 5678): `docker compose -f compose.debug.yaml up --build`
 - Copy `.env.example` to `.env` and fill in real values before running — `.env` is gitignored and read via `env_file` in both compose files.
+- Docs site (arc42 + ADRs): `pip install -r requirements-docs.txt`, then `mkdocs serve` (serves on `http://localhost:8000`; stop the app first or pass `-a localhost:8001` to avoid a port clash). `mkdocs build` writes static output to `site/` (gitignored).
 
 There are no lint or test commands configured yet. Add them here once they exist.
 

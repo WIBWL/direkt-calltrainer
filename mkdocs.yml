@@ -1,0 +1,22 @@
+site_name: Calltrainer
+site_description: AI-powered phone conversation trainer
+docs_dir: docs
+
+nav:
+  - Home: index.md
+  - Architecture (arc42): arc42.md
+  - Architecture Decisions:
+      - ADR 0000 - Record Architecture Decisions: adr/0000-record-architecture-decisions.md
+      - ADR 0001 - Separate Scenario and Persona Concepts: adr/0001-separate-scenario-and-persona.md
+
+theme:
+  name: material
+  language: de
+  features:
+    - navigation.expand
+    - toc.integrate
+
+markdown_extensions:
+  - tables
+  - toc:
+      permalink: true
