@@ -1,0 +1,8 @@
+[flake8]
+# E261: at least two spaces before inline comment
+# W293: blank line contains whitespace
+# W504: line break after binary operator
+# W291: trailing whitespace
+ignore = E261, W293, W504, W291
+max-line-length = 120
+max-complexity = 10

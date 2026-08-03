@@ -1,0 +1,65 @@
+[MAIN]
+# Minimum Python version to use for version dependent checks
+py-version=3.12
+
+ignore=.venv,venv,dist,.git
+
+[MESSAGES CONTROL]
+# Responsibility: logic, design metrics, and docstrings only.
+# PEP8 style and formatting is enforced by flake8 -- disabled here to avoid duplication.
+
+# C: Convention, R: Refactor, W: Warning, E: Error, F: Fatal
+disable=
+    C0301,  # line-too-long   -- flake8 (E501) owns line length
+    C0303,  # trailing-whitespace -- flake8 (W291/W293) owns this
+    C0304,  # missing-final-newline -- flake8 (W292) owns this
+    C0305,  # trailing-newlines -- flake8 (W391) owns this
+    W0311,  # bad-indentation  -- flake8 (E1xx) owns this
+    W0511,  # fixme            -- ignore TODO/FIXME comments
+    W0611,  # unused-import    -- flake8 (F401) owns this
+    W1203,  # logging-fstring-interpolation -- f-strings in logging calls
+
+# Enable specific messages (overrides disable)
+# enable=
+
+[DESIGN]
+# Maximum number of arguments for function / method
+max-args=5
+
+# Maximum number of locals for function / method body
+max-locals=15
+
+# Maximum number of return / yield for function / method body
+max-returns=6
+
+# Maximum number of statements in function / method body
+max-statements=50
+
+# Maximum number of parents for a class
+max-parents=7
+
+# Maximum number of attributes for a class
+max-attributes=10
+
+# Minimum number of public methods for a class
+min-public-methods=2
+
+# Maximum number of public methods for a class
+max-public-methods=20
+
+[SIMILARITIES]
+# Minimum lines number of a similarity
+min-similarity-lines=4
+
+# Ignore comments when computing similarities
+ignore-comments=yes
+
+# Ignore docstrings when computing similarities
+ignore-docstrings=yes
+
+# Ignore imports when computing similarities
+ignore-imports=yes
+
+[REPORTS]
+# Tells whether to display a full report or only the messages
+reports=no

@@ -4,7 +4,40 @@ AI-powered phone conversation trainer that provides real-time analysis and behav
 
 ## Setup
 
-1. `.env.example` nach `.env` kopieren und API-Key eintragen. `.env` ist gitignored.
+1. Install Git
+   - Download and install: https://git-scm.com/install/
+   - Verify: open a new terminal and run `git --version`. It should print the installed Git version
+   - Configure your identity (used for commits):
+      - `git config --global user.name "Your Name"`
+      - `git config --global user.email "your.mail@yourmail.com"`
+   - Set up SSH for GitHub authentication:
+     - Generate a key: `ssh-keygen -t ed25519 -C "your.mail@yourmail.com"`
+     - Add the public key (`~/.ssh/id_ed25519.pub`) to your GitHub account under Settings → SSH and GPG keys
+     - Open a terminal at your desired location and clone the repository: `git clone git@github.com:WIBWL/direkt-calltrainer.git`
+
+2. Install Python 3.12.3 (64-bit): https://www.python.org/downloads/release/python-3123/
+   - Verify: open a new terminal and run `python --version` (`python3 --version` for macOS). It should print the installed Python version
+
+3. Install Docker Desktop
+   - Windows: https://docs.docker.com/desktop/setup/install/windows-install/ (WSL2 backend recommended)
+   - macOS: https://docs.docker.com/desktop/setup/install/mac-install/
+   - Verify: open a new terminal and run `docker --version`. It should print the installed Docker version
+
+4. Open the cloned `direkt-calltrainer` folder in VS Code
+
+5. Create the virtual environment
+   - In VS Code: `Strg+Shift+P`/`Cmd+Shift+P` → `Python: Create Environment` → select `venv` → choose Python 3.12.3
+   - Check `requirements.txt` when VS Code asks which dependencies to install
+   - VS Code creates a `.venv` folder in the project root and automatically sets it as the interpreter
+   - Alternatively via terminal:
+     - Windows: `python -m venv .venv`, then `.venv\Scripts\Activate.ps1`, then `pip install -r requirements.txt`
+     - macOS: `python3 -m venv .venv`, then `source .venv/bin/activate`, then `pip install -r requirements.txt`
+   - Verify: open a new terminal in VS Code. After ~1 second `(.venv)` should appear in front of the prompt, confirming the environment is active
+ 
+6. Install the VS Code extensions `flake8` and `pylint`
+
+7. Copy `.env.example` to `.env` and fill in your API key (`.env` is gitignored)
+
 
 ## Starten (Docker)
 
