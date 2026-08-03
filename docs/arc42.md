@@ -94,9 +94,9 @@ Eine Nutzung am Mobiltelefon ist möglich, aber nicht verpflichtend für den MVP
 
 ## Organisatorische Randbedingungen
 
-### Sprache Deutsch
+### Sprache konfigurierbar
 
-Das Training muss auf Deutsch stattfinden (F-18). Englisch ist zunächst explizit kein Ziel.
+Das Training kann in mehreren Sprachen stattfinden; die Sprache wird vom Nutzer pro Trainings-Session ausgewählt, unabhängig von Scenario und Persona (aktualisiert gegenüber F-18, das ursprünglich ausschließlich Deutsch vorsah und Englisch explizit ausschloss — siehe ADR 0002).
 
 ### Kein Aufbau einer kundenspezifischen Wissensbasis
 

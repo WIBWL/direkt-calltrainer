@@ -7,6 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 
+from backend.languages import DEFAULT_LANGUAGE_ID, LANGUAGES
+from backend.personas import PERSONAS
+from backend.scenarios import DEFAULT_SCENARIO_ID, SCENARIOS
+
 load_dotenv()
 
 app = FastAPI(title="CallTrainer API")
@@ -32,8 +36,33 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/api/personas")
+def list_personas() -> list[dict[str, str]]:
+    return [
+        {"id": p.id, "name": p.name, "training_goal": p.training_goal}
+        for p in PERSONAS.values()
+    ]
+
+
+@app.get("/api/languages")
+def list_languages() -> list[dict[str, str]]:
+    return [{"id": id_, "name": name} for id_, name in LANGUAGES.items()]
+
+
 @app.post("/api/process")
-async def process(file: UploadFile = File(...)) -> dict[str, str]:
+async def process(
+    file: UploadFile = File(...),
+    persona_id: str = Form(...),
+    language_id: str = Form(DEFAULT_LANGUAGE_ID),
+) -> dict[str, str]:
+    persona = PERSONAS.get(persona_id)
+    if persona is None:
+        raise HTTPException(status_code=404, detail=f"Unknown persona_id: {persona_id}")
+    language_name = LANGUAGES.get(language_id)
+    if language_name is None:
+        raise HTTPException(status_code=404, detail=f"Unknown language_id: {language_id}")
+    scenario = SCENARIOS[DEFAULT_SCENARIO_ID]
+
     audio_bytes = await file.read()
     client = OpenAI(base_url=f"{LLM_URL.rstrip('/')}/v1", api_key=LLM_API_KEY)
 
@@ -43,13 +72,12 @@ async def process(file: UploadFile = File(...)) -> dict[str, str]:
             file=(file.filename, audio_bytes, file.content_type),
         ).text
 
-        translation = client.chat.completions.create(
-            model=LLM_MODEL
-        ,
+        reply = client.chat.completions.create(
+            model=LLM_MODEL,
             messages=[
                 {
                     "role": "system",
-                    "content": "Translate the user's message into English. Reply with only the translation, nothing else.",
+                    "content": persona.as_system_prompt(scenario, language_name),
                 },
                 {"role": "user", "content": transcript},
             ],
@@ -58,14 +86,14 @@ async def process(file: UploadFile = File(...)) -> dict[str, str]:
         speech = client.audio.speech.create(
             model=TTS_MODEL,
             voice="alloy",
-            input=translation,
+            input=reply,
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"LLM request failed: {e}") from e
 
     return {
         "transcript": transcript,
-        "translation": translation,
+        "reply": reply,
         "audio_base64": base64.b64encode(speech.content).decode(),
     }
 
