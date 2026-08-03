@@ -2,3 +2,6 @@
 .vscode
 .venv
 .env
+site/
+frontend/node_modules
+frontend/dist

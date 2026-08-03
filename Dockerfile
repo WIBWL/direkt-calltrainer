@@ -1,4 +1,12 @@
 # For more information, please refer to https://aka.ms/vscode-docker-python
+
+FROM node:22-slim AS frontend-build
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
 FROM python:3-slim
 
 EXPOSE 8000
@@ -15,6 +23,7 @@ RUN python -m pip install -r requirements.txt
 
 WORKDIR /app
 COPY . /app
+COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
 
 # Creates a non-root user with an explicit UID and adds permission to access the /app folder
 # For more info, please refer to https://aka.ms/vscode-docker-python-configure-containers

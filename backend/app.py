@@ -3,6 +3,7 @@ import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 
@@ -10,7 +11,14 @@ load_dotenv()
 
 app = FastAPI(title="CallTrainer API")
 
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+FRONTEND_DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
 LLM_URL = os.environ.get("LLM_URL")
 LLM_API_KEY = os.environ.get("LLM_API_KEY")
@@ -62,4 +70,4 @@ async def process(file: UploadFile = File(...)) -> dict[str, str]:
     }
 
 
-app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+app.mount("/", StaticFiles(directory=FRONTEND_DIST_DIR, html=True, check_dir=False), name="frontend")

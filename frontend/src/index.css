@@ -1,0 +1,110 @@
+:root {
+  --navy: #03253e;
+  --navy-light: #325f7f;
+  --blue: #5f8caa;
+  --blue-light: #8cb6df;
+  --bg: #f5f8fb;
+  --border: #e3eaf1;
+  --text-muted: #5b6b78;
+  --success: #2e8064;
+  --danger: #b4453a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Hanken Grotesk", sans-serif;
+  background: var(--bg);
+  color: var(--navy);
+  margin: 0;
+}
+
+#root {
+  max-width: 40rem;
+  margin: 3rem auto;
+  padding: 0 1.5rem;
+}
+
+.eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.7rem;
+  color: var(--blue);
+  margin-bottom: 0.5rem;
+}
+
+h1 {
+  font-family: "Schibsted Grotesk", sans-serif;
+  font-weight: 700;
+  font-size: 1.75rem;
+  letter-spacing: -0.02em;
+  margin: 0 0 1.5rem;
+}
+
+h2 {
+  font-family: "Schibsted Grotesk", sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--navy-light);
+  margin: 0 0 0.35rem;
+}
+
+label.upload {
+  display: block;
+  border: 2px dashed var(--border);
+  border-radius: 20px;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  background: #fff;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+label.upload:hover {
+  border-color: var(--blue-light);
+  color: var(--navy-light);
+}
+
+input[type="file"] {
+  display: none;
+}
+
+#status {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  margin-top: 1rem;
+  min-height: 1.2em;
+}
+
+#status.error {
+  color: var(--danger);
+}
+
+#status.success {
+  color: var(--success);
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.card p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+audio {
+  width: 100%;
+  border-radius: 999px;
+}
