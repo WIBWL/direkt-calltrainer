@@ -26,10 +26,25 @@ FRONTEND_DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "d
 
 LLM_URL = os.environ.get("LLM_URL")
 LLM_API_KEY = os.environ.get("LLM_API_KEY")
-STT_MODEL = os.environ.get("STT_MODEL")
 LLM_MODEL = os.environ.get("LLM_MODEL")
+
+STT_URL = os.environ.get("STT_URL", LLM_URL)
+STT_API_KEY = os.environ.get("STT_API_KEY", "not-needed")
+STT_MODEL = os.environ.get("STT_MODEL")
+
+TTS_URL = os.environ.get("TTS_URL", LLM_URL)
+TTS_API_KEY = os.environ.get("TTS_API_KEY", "not-needed")
 TTS_MODEL = os.environ.get("TTS_MODEL")
 TTS_VOICE = os.environ.get("TTS_VOICE", "vivian")
+
+
+def _client(base_url: str, api_key: str) -> OpenAI:
+    return OpenAI(base_url=f"{base_url.rstrip('/')}/v1", api_key=api_key)
+
+
+llm_client = _client(LLM_URL, LLM_API_KEY)
+stt_client = _client(STT_URL, STT_API_KEY)
+tts_client = _client(TTS_URL, TTS_API_KEY)
 
 
 @app.get("/health")
@@ -65,15 +80,14 @@ async def process(
     scenario = SCENARIOS[DEFAULT_SCENARIO_ID]
 
     audio_bytes = await file.read()
-    client = OpenAI(base_url=f"{LLM_URL.rstrip('/')}/v1", api_key=LLM_API_KEY)
 
     try:
-        transcript = client.audio.transcriptions.create(
+        transcript = stt_client.audio.transcriptions.create(
             model=STT_MODEL,
             file=(file.filename, audio_bytes, file.content_type),
         ).text
 
-        reply = client.chat.completions.create(
+        reply = llm_client.chat.completions.create(
             model=LLM_MODEL,
             messages=[
                 {
@@ -84,7 +98,7 @@ async def process(
             ],
         ).choices[0].message.content
 
-        speech = client.audio.speech.create(
+        speech = tts_client.audio.speech.create(
             model=TTS_MODEL,
             voice=TTS_VOICE,
             input=reply,

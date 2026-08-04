@@ -84,8 +84,64 @@ Damit läuft nur die API auf `http://localhost:8000` (ohne gebautes Frontend). F
 ## Doku-Seite ansehen (arc42 + ADRs)
 
 ```powershell
-pip install -r requirements-docs.txt
 mkdocs serve
 ```
 
 Läuft standardmäßig ebenfalls auf Port 8000 - App vorher stoppen, oder `mkdocs serve -a localhost:8001` verwenden, um den Port-Konflikt zu vermeiden.
+
+## Lokale STT/TTS-Modelle einrichten
+
+Das LLM (Dialoggenerierung) läuft über die gehostete EFRE-Direkt-Schnittstelle (`LLM_URL`/`LLM_API_KEY`/`LLM_MODEL` in `.env`) — dafür ist nichts zu installieren. STT (`openai/whisper-large-v3-turbo`) und TTS (`mistralai/Voxtral-4B-TTS-2603`) stellt EFRE-Direkt nicht bereit; die müssen lokal selbst gehostet werden (siehe ADR 0022).
+
+**Voraussetzung:** eine NVIDIA-GPU. vLLM läuft unter Windows nicht offiziell nativ — der von vLLM selbst dokumentierte und unterstützte Weg ist WSL2 (Windows Subsystem for Linux). Prüfe zuerst, ob WSL2 schon eingerichtet ist:
+
+```powershell
+wsl --status
+```
+
+Falls nicht vorhanden: https://learn.microsoft.com/windows/wsl/install
+
+1. **WSL/Ubuntu starten** (PowerShell oder Windows Terminal):
+   ```powershell
+   wsl
+   ```
+   GPU-Zugriff ist automatisch da (moderne NVIDIA-Windows-Treiber bringen GPU-Passthrough für WSL2 mit).
+
+2. **GPU-Zugriff in WSL prüfen:**
+   ```bash
+   nvidia-smi
+   ```
+   Sollte dieselbe GPU wie unter Windows zeigen.
+
+3. **Eigenes Python-Environment für vLLM anlegen** (nicht das Projekt-`.venv` — vLLM hat eigene, sehr spezifische Torch/CUDA-Abhängigkeiten, und braucht Python 3.12, das neuere Ubuntu-Versionen wie 26.04 nicht mehr per `apt` mitbringen). Dafür [uv](https://docs.astral.sh/uv/) nutzen, das die passende Python-Version selbst herunterlädt statt sich auf `apt` zu verlassen:
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   source $HOME/.local/bin/env
+   uv venv ~/vllm-env --python 3.12
+   source ~/vllm-env/bin/activate
+   uv pip install "vllm[audio]" vllm-omni --upgrade
+   ```
+
+4. **Bei Hugging Face einloggen** (Voxtral ist ggf. lizenzgated):
+   ```bash
+   uv pip install huggingface_hub
+   hf auth login
+   ```
+   Bei einem 403/Gated-Fehler beim ersten Start: auf https://huggingface.co/mistralai/Voxtral-4B-TTS-2603 einloggen und die Lizenz akzeptieren.
+
+5. **STT-Server starten** (lädt beim ersten Start automatisch mehrere GB von Hugging Face herunter):
+   ```bash
+   vllm serve openai/whisper-large-v3-turbo --port 8025 --gpu-memory-utilization 0.8
+   ```
+   (vLLM erkennt Whisper-Modelle automatisch an der Architektur und aktiviert `/v1/audio/transcriptions` von selbst — kein `--task`/`--runner`-Flag nötig. `--gpu-memory-utilization` niedriger als den Default 0.92 setzen, sonst meckert vLLM, dass nicht genug freier VRAM übrig ist, weil Windows/andere Prozesse schon etwas belegen.)
+   Test in einem zweiten WSL-Terminal: `curl http://localhost:8025/v1/models`
+
+6. **TTS-Server starten** (neues WSL-Terminal, gleiches venv aktivieren):
+   ```bash
+   source ~/vllm-env/bin/activate
+   VOXTRAL_YAML=$(python -c 'import vllm_omni, os; print(os.path.join(os.path.dirname(vllm_omni.__file__), "model_executor/stage_configs/voxtral_tts.yaml"))')
+   vllm-omni serve mistralai/Voxtral-4B-TTS-2603 --omni --stage-configs-path "$VOXTRAL_YAML" --enforce-eager --port 8091 --gpu-memory-utilization 0.4
+   ```
+   Falls STT und TTS gleichzeitig laufen sollen, teilen sich beide den VRAM (bei 12 GB z. B. `0.4` je Prozess statt `0.8`) — sonst startet der zweite Server nicht, weil der erste schon zu viel reserviert hat.
+
+7. **Backend starten** — läuft ganz normal unter Windows im Projekt-`.venv`. `STT_URL`/`TTS_URL` in `.env` zeigen schon auf `localhost:8025`/`localhost:8091`. Falls das Windows-Backend die WSL-Server nicht über `localhost` erreicht: WSL-IP verwenden statt `localhost`, ermittelbar mit `wsl hostname -I`.
