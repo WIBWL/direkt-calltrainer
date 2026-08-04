@@ -14,7 +14,7 @@ SCENARIOS: dict[str, Scenario] = {
         name="Follow-up-/Closing-Call nach Kaltakquise",
         description=(
             "Der Nutzer ruft einen Kunden an, der zuvor per externer Kaltakquise "
-            "kontaktiert wurde. Ziel des Calls ist esbdas Gespräch zum Abschluss "
+            "kontaktiert wurde. Ziel des Calls ist es, das Gespräch zum Abschluss "
             "(Closing) zu führen."
         ),
     ),

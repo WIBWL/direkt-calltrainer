@@ -1,23 +1,54 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "";
 
+interface Persona {
+  id: string;
+  name: string;
+  training_goal: string;
+}
+
+interface Language {
+  id: string;
+  name: string;
+}
+
 interface ProcessResult {
   transcript: string;
-  translation: string;
+  reply: string;
   audio_base64: string;
 }
 
 type Status = { kind: "idle" | "loading" | "success" | "error"; message: string };
 
 export default function App() {
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [languages, setLanguages] = useState<Language[]>([]);
+  const [personaId, setPersonaId] = useState<string | null>(null);
+  const [languageId, setLanguageId] = useState<string | null>(null);
+
   const [fileName, setFileName] = useState("🎙️ Audiodatei auswählen");
   const [status, setStatus] = useState<Status>({ kind: "idle", message: "" });
   const [result, setResult] = useState<ProcessResult | null>(null);
 
+  useEffect(() => {
+    fetch(`${API_URL}/api/personas`)
+      .then((r) => r.json())
+      .then((data: Persona[]) => {
+        setPersonas(data);
+        if (data.length > 0) setPersonaId(data[0].id);
+      });
+    fetch(`${API_URL}/api/languages`)
+      .then((r) => r.json())
+      .then((data: Language[]) => {
+        setLanguages(data);
+        if (data.length > 0) setLanguageId(data[0].id);
+      });
+  }, []);
+
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !personaId || !languageId) return;
 
     setFileName(file.name);
     setResult(null);
@@ -25,6 +56,8 @@ export default function App() {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("persona_id", personaId);
+    formData.append("language_id", languageId);
 
     try {
       const response = await fetch(`${API_URL}/api/process`, {
@@ -43,14 +76,52 @@ export default function App() {
     }
   }
 
+  const readyForUpload = personaId !== null && languageId !== null;
+
   return (
     <>
       <div className="eyebrow">Calltrainer</div>
-      <h1>Audiodatei hochladen</h1>
+      <h1>Training starten</h1>
 
-      <label className="upload" htmlFor="file">
+      <h2>Persona</h2>
+      <div className="persona-grid">
+        {personas.map((p) => (
+          <button
+            key={p.id}
+            className={"persona-card" + (p.id === personaId ? " selected" : "")}
+            onClick={() => setPersonaId(p.id)}
+            type="button"
+          >
+            <span className="persona-name">{p.name}</span>
+            <span className="persona-goal">{p.training_goal}</span>
+          </button>
+        ))}
+      </div>
+
+      <h2>Sprache</h2>
+      <div className="language-row">
+        {languages.map((l) => (
+          <button
+            key={l.id}
+            className={"language-pill" + (l.id === languageId ? " selected" : "")}
+            onClick={() => setLanguageId(l.id)}
+            type="button"
+          >
+            {l.name}
+          </button>
+        ))}
+      </div>
+
+      <h2>Audiodatei</h2>
+      <label className={"upload" + (readyForUpload ? "" : " disabled")} htmlFor="file">
         <span>{fileName}</span>
-        <input type="file" id="file" accept="audio/*" onChange={handleFileChange} />
+        <input
+          type="file"
+          id="file"
+          accept="audio/*"
+          onChange={handleFileChange}
+          disabled={!readyForUpload}
+        />
       </label>
 
       <p id="status" className={status.kind}>
@@ -64,8 +135,8 @@ export default function App() {
             <p>{result.transcript}</p>
           </div>
           <div className="card">
-            <h2>Übersetzung (Englisch)</h2>
-            <p>{result.translation}</p>
+            <h2>Antwort der Persona</h2>
+            <p>{result.reply}</p>
           </div>
           <div className="card">
             <h2>Sprachausgabe</h2>
