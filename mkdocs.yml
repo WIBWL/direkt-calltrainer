@@ -12,7 +12,7 @@ nav:
       - ADR 0003 - No Human Trainer, Feedback Fully AI-Generated: adr/0003-feedback-fully-ai-generated.md
       - ADR 0004 - Qualitative Feedback Over Score: adr/0004-qualitative-feedback-over-score.md
       - ADR 0005 - No Automated Enterprise/CRM Integration, No Sales KPIs: adr/0005-no-domain-knowledge-or-sales-kpis.md
-      - ADR 0006 - German Only for the MVP: adr/0006-german-only-for-mvp.md
+      - ADR 0006 - German Only for the MVP (superseded): adr/0006-german-only-for-mvp.md
       - ADR 0007 - Desktop + Headset Primary Access: adr/0007-desktop-headset-primary-access.md
       - ADR 0008 - React + TypeScript Frontend: adr/0008-react-typescript-frontend.md
       - ADR 0009 - Keycloak OIDC Authorization Code Flow + PKCE: adr/0009-keycloak-oidc-pkce-auth.md
@@ -28,6 +28,8 @@ nav:
       - ADR 0019 - Layered Monolith + Async Feedback Worker: adr/0019-layered-monolith-with-async-feedback-worker.md
       - ADR 0020 - Redis + RQ Job Queue: adr/0020-redis-rq-job-queue.md
       - ADR 0021 - University-Hosted Server Deployment: adr/0021-university-server-hosting.md
+      - ADR 0022 - Local Self-Hosted STT/TTS Models: adr/0022-local-stt-tts-models.md
+      - ADR 0023 - Language as Independent Session Parameter: adr/0023-language-independent-session-parameter.md
 
 theme:
   name: material

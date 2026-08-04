@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by ADR 0023 (Language as Independent Session Parameter)
 
 ## Context
 

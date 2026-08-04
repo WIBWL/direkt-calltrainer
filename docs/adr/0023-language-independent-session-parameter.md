@@ -1,12 +1,12 @@
-# ADR 0002: Language as Independent Session Parameter
+# ADR 0023: Language as Independent Session Parameter
 
 ## Status
 
-Accepted
+Accepted (supersedes ADR 0006)
 
 ## Context
 
-The Persona's system prompt originally hard-coded the simulated conversation's language to German. The product now wants the user to choose the language a Session runs in from a setting on the training page, independent of which Persona or Scenario they picked — the same Persona should be usable in German or English without change. This supersedes the arc42 Randbedingung F-18, which stated the training must run in German only, with English "explicitly not a goal."
+The Persona's system prompt originally hard-coded the simulated conversation's language to German. The product now wants the user to choose the language a Session runs in from a setting on the training page, independent of which Persona or Scenario they picked — the same Persona should be usable in German or English without change. This supersedes ADR 0006 (German only for the MVP) and the arc42 Randbedingung F-18, which stated the training must run in German only, with English "explicitly not a goal."
 
 ## Decision
 
