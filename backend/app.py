@@ -1,4 +1,5 @@
 import base64
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -12,6 +13,9 @@ from backend.personas import PERSONAS
 from backend.scenarios import DEFAULT_SCENARIO_ID, SCENARIOS
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger("calltrainer")
 
 app = FastAPI(title="CallTrainer API")
 
@@ -35,7 +39,7 @@ STT_MODEL = os.environ.get("STT_MODEL")
 TTS_URL = os.environ.get("TTS_URL", LLM_URL)
 TTS_API_KEY = os.environ.get("TTS_API_KEY", "not-needed")
 TTS_MODEL = os.environ.get("TTS_MODEL")
-TTS_VOICE = os.environ.get("TTS_VOICE", "vivian")
+TTS_VOICE = os.environ.get("TTS_VOICE", "neutral_female")
 
 
 def _client(base_url: str, api_key: str) -> OpenAI:
@@ -80,13 +84,24 @@ async def process(
     scenario = SCENARIOS[DEFAULT_SCENARIO_ID]
 
     audio_bytes = await file.read()
+    logger.info(
+        "Received audio %r (%d bytes) — persona=%s, language=%s",
+        file.filename, len(audio_bytes), persona_id, language_id,
+    )
 
+    logger.info("[1/3] Transcribing via STT (%s)...", STT_MODEL)
     try:
         transcript = stt_client.audio.transcriptions.create(
             model=STT_MODEL,
             file=(file.filename, audio_bytes, file.content_type),
         ).text
+    except Exception as e:
+        logger.error("STT request failed: %s", e)
+        raise HTTPException(status_code=502, detail=f"STT request failed: {e}") from e
+    logger.info("Transcript: %s", transcript)
 
+    logger.info("[2/3] Generating persona reply via LLM (%s)...", LLM_MODEL)
+    try:
         reply = llm_client.chat.completions.create(
             model=LLM_MODEL,
             messages=[
@@ -97,7 +112,13 @@ async def process(
                 {"role": "user", "content": transcript},
             ],
         ).choices[0].message.content
+    except Exception as e:
+        logger.error("LLM request failed: %s", e)
+        raise HTTPException(status_code=502, detail=f"LLM request failed: {e}") from e
+    logger.info("Reply: %s", reply)
 
+    logger.info("[3/3] Synthesizing speech via TTS (%s, voice=%s)...", TTS_MODEL, TTS_VOICE)
+    try:
         speech = tts_client.audio.speech.create(
             model=TTS_MODEL,
             voice=TTS_VOICE,
@@ -105,7 +126,9 @@ async def process(
             response_format="wav",
         )
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"LLM request failed: {e}") from e
+        logger.error("TTS request failed: %s", e)
+        raise HTTPException(status_code=502, detail=f"TTS request failed: {e}") from e
+    logger.info("Speech synthesized: %d bytes", len(speech.content))
 
     return {
         "transcript": transcript,

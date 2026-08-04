@@ -37,13 +37,19 @@ export default function App() {
       .then((data: Persona[]) => {
         setPersonas(data);
         if (data.length > 0) setPersonaId(data[0].id);
-      });
+      })
+      .catch((e) =>
+        setStatus({ kind: "error", message: `Personas konnten nicht geladen werden: ${e.message}` }),
+      );
     fetch(`${API_URL}/api/languages`)
       .then((r) => r.json())
       .then((data: Language[]) => {
         setLanguages(data);
         if (data.length > 0) setLanguageId(data[0].id);
-      });
+      })
+      .catch((e) =>
+        setStatus({ kind: "error", message: `Sprachen konnten nicht geladen werden: ${e.message}` }),
+      );
   }, []);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {

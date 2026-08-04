@@ -122,26 +122,53 @@ Falls nicht vorhanden: https://learn.microsoft.com/windows/wsl/install
    uv pip install "vllm[audio]" vllm-omni --upgrade
    ```
 
-4. **Bei Hugging Face einloggen** (Voxtral ist ggf. lizenzgated):
+4. **C-Compiler und CUDA-Toolkit installieren** (vLLM kompiliert Kernels zur Laufzeit via Triton, das `gcc` und `nvcc` braucht — beides ist in einem frischen WSL-Ubuntu nicht vorinstalliert):
+   ```bash
+   sudo apt update && sudo apt install -y build-essential
+   ```
+   Passende CUDA-Toolkit-Version zu eurem installierten Torch ermitteln (`python -c 'import torch; print(torch.version.cuda)'` im aktivierten venv, bei uns `13.0`), dann:
+   ```bash
+   wget https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-keyring_1.1-1_all.deb
+   sudo dpkg -i cuda-keyring_1.1-1_all.deb
+   sudo apt-get update
+   apt search cuda-toolkit 2>/dev/null | grep cuda-toolkit-13   # passende Version zur eigenen Torch-CUDA-Version raussuchen
+   sudo apt-get -y install cuda-toolkit-13-0                    # Versionsnummer ggf. anpassen
+   ```
+   **Wichtig:** nur das `-toolkit`-Paket installieren, nicht `cuda`/`cuda-drivers` — die versuchen, einen Linux-GPU-Treiber in WSL2 zu installieren, was mit dem durchgereichten Windows-Treiber kollidiert.
+
+   `nvcc` ist danach installiert, aber nicht im PATH — dauerhaft ergänzen (in jedem WSL-Terminal, das schon offen war, einmal `source ~/.bashrc` nachholen):
+   ```bash
+   echo 'export PATH=/usr/local/cuda/bin:$PATH' >> ~/.bashrc
+   echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
+   source ~/.bashrc
+   nvcc --version   # sollte jetzt eine Versionsnummer zeigen
+   ```
+
+5. **Bei Hugging Face einloggen** (Voxtral ist ggf. lizenzgated):
    ```bash
    uv pip install huggingface_hub
    hf auth login
    ```
    Bei einem 403/Gated-Fehler beim ersten Start: auf https://huggingface.co/mistralai/Voxtral-4B-TTS-2603 einloggen und die Lizenz akzeptieren.
 
-5. **STT-Server starten** (lädt beim ersten Start automatisch mehrere GB von Hugging Face herunter):
+6. **STT-Server starten** (lädt beim ersten Start automatisch mehrere GB von Hugging Face herunter):
    ```bash
-   vllm serve openai/whisper-large-v3-turbo --port 8025 --gpu-memory-utilization 0.8
+   VLLM_USE_V2_MODEL_RUNNER=0 vllm serve openai/whisper-large-v3-turbo --port 8025 --gpu-memory-utilization 0.8
    ```
-   (vLLM erkennt Whisper-Modelle automatisch an der Architektur und aktiviert `/v1/audio/transcriptions` von selbst — kein `--task`/`--runner`-Flag nötig. `--gpu-memory-utilization` niedriger als den Default 0.92 setzen, sonst meckert vLLM, dass nicht genug freier VRAM übrig ist, weil Windows/andere Prozesse schon etwas belegen.)
+   - vLLM erkennt Whisper-Modelle automatisch an der Architektur und aktiviert `/v1/audio/transcriptions` von selbst — kein `--task`/`--runner`-Flag nötig.
+   - `--gpu-memory-utilization` niedriger als den Default 0.92 setzen, sonst meckert vLLM, dass nicht genug freier VRAM übrig ist, weil Windows/andere Prozesse schon etwas belegen.
+   - `VLLM_USE_V2_MODEL_RUNNER=0` ist nötig, weil vLLMs neuer "Model Runner V2" intern UVA (Unified Virtual Addressing) braucht, das unter WSL2 nicht verfügbar ist (`RuntimeError: UVA is not available`) — vLLM deaktiviert Pinned Memory unter WSL2 bewusst, was UVA mit ausschaltet.
+
    Test in einem zweiten WSL-Terminal: `curl http://localhost:8025/v1/models`
 
-6. **TTS-Server starten** (neues WSL-Terminal, gleiches venv aktivieren):
+7. **TTS-Server starten** (neues WSL-Terminal, gleiches venv aktivieren):
    ```bash
    source ~/vllm-env/bin/activate
-   VOXTRAL_YAML=$(python -c 'import vllm_omni, os; print(os.path.join(os.path.dirname(vllm_omni.__file__), "model_executor/stage_configs/voxtral_tts.yaml"))')
-   vllm-omni serve mistralai/Voxtral-4B-TTS-2603 --omni --stage-configs-path "$VOXTRAL_YAML" --enforce-eager --port 8091 --gpu-memory-utilization 0.4
+   VOXTRAL_YAML=$(python -c 'import vllm_omni, os; print(os.path.join(os.path.dirname(vllm_omni.__file__), "deploy/voxtral_tts.yaml"))' | tail -1)
+   VLLM_USE_V2_MODEL_RUNNER=0 vllm-omni serve mistralai/Voxtral-4B-TTS-2603 --omni --stage-configs-path "$VOXTRAL_YAML" --enforce-eager --port 8091 --gpu-memory-utilization 0.4
    ```
+   (`| tail -1` ist nötig, weil `import vllm_omni` automatisch INFO-Logzeilen ausgibt, die sonst mit in `$VOXTRAL_YAML` landen und den Pfad kaputt machen — nur die letzte Zeile ist der eigentliche `print()`-Output.)
+
    Falls STT und TTS gleichzeitig laufen sollen, teilen sich beide den VRAM (bei 12 GB z. B. `0.4` je Prozess statt `0.8`) — sonst startet der zweite Server nicht, weil der erste schon zu viel reserviert hat.
 
-7. **Backend starten** — läuft ganz normal unter Windows im Projekt-`.venv`. `STT_URL`/`TTS_URL` in `.env` zeigen schon auf `localhost:8025`/`localhost:8091`. Falls das Windows-Backend die WSL-Server nicht über `localhost` erreicht: WSL-IP verwenden statt `localhost`, ermittelbar mit `wsl hostname -I`.
+8. **Backend starten** — läuft ganz normal unter Windows im Projekt-`.venv`. `STT_URL`/`TTS_URL` in `.env` zeigen schon auf `localhost:8025`/`localhost:8091`. Falls das Windows-Backend die WSL-Server nicht über `localhost` erreicht: WSL-IP verwenden statt `localhost`, ermittelbar mit `wsl hostname -I`.
