@@ -96,7 +96,7 @@ Eine Nutzung am Mobiltelefon ist möglich, aber nicht verpflichtend für den MVP
 
 ### Sprache konfigurierbar
 
-Das Training kann in mehreren Sprachen stattfinden; die Sprache wird vom Nutzer pro Trainings-Session ausgewählt, unabhängig von Scenario und Persona (aktualisiert gegenüber F-18, das ursprünglich ausschließlich Deutsch vorsah und Englisch explizit ausschloss — siehe ADR 0002).
+Das Training kann in mehreren Sprachen stattfinden; die Sprache wird vom Nutzer pro Trainings-Session ausgewählt, unabhängig von Scenario und Persona (aktualisiert gegenüber F-18, das ursprünglich ausschließlich Deutsch vorsah und Englisch explizit ausschloss — siehe ADR 0023).
 
 ### Kein Aufbau einer kundenspezifischen Wissensbasis
 
