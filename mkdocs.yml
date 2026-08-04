@@ -30,6 +30,7 @@ nav:
       - ADR 0021 - University-Hosted Server Deployment: adr/0021-university-server-hosting.md
       - ADR 0022 - Local Self-Hosted STT/TTS Models: adr/0022-local-stt-tts-models.md
       - ADR 0023 - Language as Independent Session Parameter: adr/0023-language-independent-session-parameter.md
+      - ADR 0024 - No Session Data Persisted Beyond the MVP; Consent-Gated Storage After: adr/0024-no-persistence-in-mvp-consent-gated-after.md
 
 theme:
   name: material

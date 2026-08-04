@@ -259,7 +259,7 @@ Da Sprachaufzeichnungen und personenbezogene Daten verarbeitet werden, muss das 
 - Speicherung von Fortschrittsdaten einzelner Nutzer (F-13)
 - Übertragung von Sprachdaten an externe Dienste (z. B. Speech-to-Text-, Text-to-Speech- oder LLM-APIs)
 
-*Offene Punkte: Wo werden Daten verarbeitet/gespeichert (EU-Hosting)? Wie lange werden Aufzeichnungen aufbewahrt? Wird eine Einwilligung des Nutzers eingeholt? Diese Fragen sollten spätestens mit Kapitel 4 (Lösungsstrategie) konkretisiert werden.*
+Für den MVP werden Sprachdaten, Transkripte und Feedback nicht über das Ende der Session hinaus gespeichert; danach ist die Speicherung auf der uni-gehosteten Datenplattform ausschließlich mit Einwilligung des Nutzers vorgesehen, die dieser jederzeit widerrufen sowie seine Daten selbst löschen kann (siehe ADR 0024).
 
 ## Umgang mit Feedback und Bewertung
 
@@ -401,9 +401,9 @@ Laut Erstgespräch ist eine unklare oder überladene Benutzeroberfläche ein zen
 
 ### Unklare Datenschutz-Umsetzung
 
-DSGVO-Konformität (F-22) ist eine MUST-Anforderung, aber die konkrete technische Umsetzung (Hosting-Ort, Speicherdauer, Einwilligungsprozesse) ist noch nicht festgelegt.
+DSGVO-Konformität (F-22) ist eine MUST-Anforderung. Hosting-Ort, Speicherdauer und Einwilligungsprozess sind inzwischen grundsätzlich entschieden (siehe ADR 0024); die technische Umsetzung der Selbstlösch-Funktion auf der Datenplattform sowie der Einwilligungs-Verwaltung im Frontend steht noch aus.
 
-*Mögliche Gegenmaßnahme: Datenschutzkonzept möglichst parallel zur technischen Lösungsstrategie (Kapitel 4) erarbeiten, nicht erst nachträglich.*
+*Mögliche Gegenmaßnahme: Löschfunktion und Einwilligungs-UI so früh wie möglich mitplanen, nicht erst nachträglich ergänzen.*
 
 ## Technische Schulden
 
