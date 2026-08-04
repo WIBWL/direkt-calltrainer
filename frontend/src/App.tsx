@@ -140,7 +140,7 @@ export default function App() {
           </div>
           <div className="card">
             <h2>Sprachausgabe</h2>
-            <audio controls src={`data:audio/mpeg;base64,${result.audio_base64}`} />
+            <audio controls src={`data:audio/wav;base64,${result.audio_base64}`} />
           </div>
         </>
       )}

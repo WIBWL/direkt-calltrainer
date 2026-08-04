@@ -29,6 +29,7 @@ LLM_API_KEY = os.environ.get("LLM_API_KEY")
 STT_MODEL = os.environ.get("STT_MODEL")
 LLM_MODEL = os.environ.get("LLM_MODEL")
 TTS_MODEL = os.environ.get("TTS_MODEL")
+TTS_VOICE = os.environ.get("TTS_VOICE", "vivian")
 
 
 @app.get("/health")
@@ -85,8 +86,9 @@ async def process(
 
         speech = client.audio.speech.create(
             model=TTS_MODEL,
-            voice="alloy",
+            voice=TTS_VOICE,
             input=reply,
+            response_format="wav",
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"LLM request failed: {e}") from e
