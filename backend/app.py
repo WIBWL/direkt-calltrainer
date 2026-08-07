@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 
+from backend.db import create_db_and_tables, get_training_records, save_training_record
 from backend.languages import DEFAULT_LANGUAGE_ID, LANGUAGES
 from backend.personas import PERSONAS
 from backend.scenarios import DEFAULT_SCENARIO_ID, SCENARIOS
@@ -18,6 +19,11 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("calltrainer")
 
 app = FastAPI(title="CallTrainer API")
+
+try:
+    create_db_and_tables()
+except Exception as e:
+    logger.error("Database unavailable at startup, progress tracking will fail until it is: %s", e)
 
 app.add_middleware(
     CORSMiddleware,
@@ -69,11 +75,21 @@ def list_languages() -> list[dict[str, str]]:
     return [{"id": id_, "name": name} for id_, name in LANGUAGES.items()]
 
 
+@app.get("/api/history")
+def history(user_id: str = "anonymous") -> list[dict]:
+    try:
+        return [r.model_dump(mode="json") for r in get_training_records(user_id)]
+    except Exception as e:
+        logger.error("Failed to read training records: %s", e)
+        raise HTTPException(status_code=503, detail=f"Database unavailable: {e}") from e
+
+
 @app.post("/api/process")
 async def process(
     file: UploadFile = File(...),
     persona_id: str = Form(...),
     language_id: str = Form(DEFAULT_LANGUAGE_ID),
+    user_id: str = Form("anonymous"),
 ) -> dict[str, str]:
     persona = PERSONAS.get(persona_id)
     if persona is None:
@@ -129,6 +145,18 @@ async def process(
         logger.error("TTS request failed: %s", e)
         raise HTTPException(status_code=502, detail=f"TTS request failed: {e}") from e
     logger.info("Speech synthesized: %d bytes", len(speech.content))
+
+    try:
+        save_training_record(
+            user_id=user_id,
+            persona_id=persona_id,
+            scenario_id=scenario.id,
+            language_id=language_id,
+            transcript=transcript,
+            reply=reply,
+        )
+    except Exception as e:
+        logger.error("Failed to save training record (progress won't be tracked for this turn): %s", e)
 
     return {
         "transcript": transcript,

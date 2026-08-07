@@ -132,9 +132,15 @@ Both servers only run for as long as their terminal stays open — restart them 
 docker compose up --build
 ```
 
-Builds the frontend too (multi-stage Dockerfile) and serves everything on `http://localhost:8000`. Note: this does not start the local STT/TTS model servers from section 2 — those still need to run separately if you want the full pipeline.
+Builds the frontend too (multi-stage Dockerfile) and starts the app plus its own PostgreSQL database (ADR 0026) on `http://localhost:8000`. Note: this does not start the local STT/TTS model servers from section 2 — those still need to run separately if you want the full pipeline.
 
 ### 3.2 Local development (backend + frontend separately, with hot reload)
+
+Database (needed for progress tracking, `/api/history` — the rest of the app works without it, see ADR 0026):
+
+```powershell
+docker compose up -d postgres
+```
 
 Backend:
 
@@ -143,7 +149,7 @@ $env:PYTHONUTF8 = "1"
 uvicorn backend.app:app --reload
 ```
 
-`PYTHONUTF8` avoids garbled umlauts in the console (German text like "Gespräch" would otherwise show as "Gespr�ch" — a Windows console encoding quirk, not a data bug). The backend reads `.env` only at startup; restart it after changing `.env`.
+`PYTHONUTF8` avoids garbled umlauts in the console (German text like "Gespräch" would otherwise show as "Gespr�ch" — a Windows console encoding quirk, not a data bug). The backend reads `.env` only at startup; restart it after changing `.env`. If the database isn't running, the backend still starts — only `/api/process`'s progress-saving step and `/api/history` will log/return errors until it is.
 
 Frontend (separate terminal):
 

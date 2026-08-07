@@ -30,7 +30,9 @@ nav:
       - ADR 0021 - University-Hosted Server Deployment: adr/0021-university-server-hosting.md
       - ADR 0022 - Local Self-Hosted STT/TTS Models: adr/0022-local-stt-tts-models.md
       - ADR 0023 - Language as Independent Session Parameter: adr/0023-language-independent-session-parameter.md
-      - ADR 0024 - No Session Data Persisted Beyond the MVP; Consent-Gated Storage After: adr/0024-no-persistence-in-mvp-consent-gated-after.md
+      - ADR 0024 - No Session Data Persisted Beyond the MVP (superseded): adr/0024-no-persistence-in-mvp-consent-gated-after.md
+      - ADR 0025 - User-Authored Scenario and Persona (Post-MVP): adr/0025-user-authored-scenario-and-persona.md
+      - ADR 0026 - Own PostgreSQL Database for Progress Data: adr/0026-own-database-for-progress-data.md
 
 theme:
   name: material

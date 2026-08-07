@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Superseded by ADR 0026 (Own PostgreSQL Database for Application/Progress Data)
 
 ## Context
 
