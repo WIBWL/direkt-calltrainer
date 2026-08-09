@@ -4,7 +4,8 @@ docs_dir: docs
 
 nav:
   - Home: index.md
-  - Architecture (arc42): arc42.md
+  - Initial Requirements: initial_requirements.md
+  - Features: features.md
   - Architecture Decisions:
       - ADR 0000 - Record Architecture Decisions: adr/0000-record-architecture-decisions.md
       - ADR 0001 - Separate Scenario and Persona Concepts: adr/0001-separate-scenario-and-persona.md
@@ -31,13 +32,30 @@ nav:
       - ADR 0022 - Local Self-Hosted STT/TTS Models: adr/0022-local-stt-tts-models.md
       - ADR 0023 - Language as Independent Session Parameter: adr/0023-language-independent-session-parameter.md
       - ADR 0024 - No Session Data Persisted Beyond the MVP; Consent-Gated Storage After: adr/0024-no-persistence-in-mvp-consent-gated-after.md
+      - ADR 0025 - User-Authored Scenario Context and Personas (Post-MVP): adr/0025-user-authored-scenario-and-persona.md
+  # arc42 is one long page; the chapter entries below are anchor links into it.
+  # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
+  # site is served at the root (mkdocs serve / mkdocs build + static server).
+  - Architecture (arc42):
+      - Gesamtdokument: arc42.md
+      - 1. Einführung und Ziele: /arc42/#1-einfuhrung-und-ziele
+      - 2. Randbedingungen: /arc42/#2-randbedingungen
+      - 3. Kontextabgrenzung: /arc42/#3-kontextabgrenzung
+      - 4. Lösungsstrategie: /arc42/#4-losungsstrategie
+      - 5. Bausteinsicht: /arc42/#5-bausteinsicht
+      - 6. Laufzeitsicht: /arc42/#6-laufzeitsicht
+      - 7. Verteilungssicht: /arc42/#7-verteilungssicht
+      - 8. Querschnittliche Konzepte: /arc42/#8-querschnittliche-konzepte
+      - 9. Architekturentscheidungen: /arc42/#9-architekturentscheidungen
+      - 10. Qualitätsanforderungen: /arc42/#10-qualitatsanforderungen
+      - 11. Risiken und technische Schulden: /arc42/#11-risiken-und-technische-schulden
+      - 12. Glossar: /arc42/#12-glossar
 
 theme:
   name: material
   language: de
   features:
     - navigation.expand
-    - toc.integrate
 
 markdown_extensions:
   - tables
