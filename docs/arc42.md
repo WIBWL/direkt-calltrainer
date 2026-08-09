@@ -1,10 +1,10 @@
-# Einführung und Ziele
+# 1. Einführung und Ziele
 
-## Aufgabenstellung
+## 1.1 Aufgabenstellung
 
-„Train to Call with AI" ist ein KI-gestütztes Telefontraining-System, das als Gesprächspartner (Gegenpart) in simulierten Kundengesprächen agiert. Nutzer können damit im Telefonie-Kontext trainieren, mit einer KI-Persona zu kommunizieren, z. B. in Support-Situationen oder beratenden Projektgesprächen (F-03).
+„Train to Call with AI" ist ein KI-gestütztes Telefontraining-System, das als Gesprächspartner (Gegenpart) in simulierten Kundengesprächen agiert. Nutzer können damit im Telefonie-Kontext trainieren, mit einer KI-Persona zu kommunizieren, z. B. in Support-Situationen, beratenden Projektgesprächen oder auch Angebots- und Preisgespräche(F-03).
 
-Im Gegensatz zu klassischen Verkaufstrainern liegt der Fokus nicht auf Abschlussquoten oder Verhandlungstechnik, sondern auf Kommunikation, Klarheit und Wirkung des Sprechenden – ohne dass umfangreiche kundenspezifische Fachkenntnisse vorausgesetzt werden (F-06):
+Im Gegensatz zu klassischen Verkaufstrainern liegt der Fokus nicht auf Abschlussquoten, sondern auf Kommunikation, Klarheit und Wirkung des Sprechenden, ohne dass umfangreiche kundenspezifische Fachkenntnisse vorausgesetzt werden (C-05):
 
 - Kommunikation, Klarheit und Wirkung des Sprechenden
 - Erkennung von Sprechverhalten (Intonation, Tempo, Lautstärke, Artikulation)
@@ -12,133 +12,75 @@ Im Gegensatz zu klassischen Verkaufstrainern liegt der Fokus nicht auf Abschluss
 
 Nach jedem Trainingsgespräch erhält der Nutzer ein qualitatives Wrap-up mit konkreten Verbesserungsvorschlägen statt eines reinen Scores.
 
-## Qualitätsziele
+## 1.2 Qualitätsziele
 
-### Verständlichkeit & Wirkung
+| Prio | Qualitätsziel | Bedeutung | Herkunft |
+|---|---|---|---|
+| 1 | Q-01 Genauigkeit und Nachvollziehbarkeit der Gesprächsanalyse | Die Analyse des Sprechverhaltens muss zutreffend sein und ihre Befunde auf konkrete Gesprächsstellen zurückführen können. Ohne Nachvollziehbarkeit verliert der Nutzer das Vertrauen in die Rückmeldung, insbesondere weil Gespräche subjektiv wahrgenommen werden. | R-19, R-25, R-26 |
+| 2 | Q-02 Bedienbarkeit ohne Einarbeitung | Ein Erstnutzer muss ohne Anleitung ein Training starten können. Eine unklare oder überladene Oberfläche wurde in beiden Erhebungen als zentrales Nutzungshemmnis genannt. | R-32, R-33, R-34 |
+| 3 | Q-03 Echtzeitfähigkeit des Gesprächsflusses | Die Verarbeitungskette aus Spracherkennung, Antwortgenerierung und Sprachsynthese muss schnell genug sein, dass ein natürlicher Gesprächsfluss entsteht. Das Ziel treibt die offenen Technologieentscheidungen. | Systementwurf |
 
-**Priorität:** 1
+Datenschutzkonformität ist kein Qualitätsziel, sondern eine nicht verhandelbare Randbedingung und als C-04 in Kapitel 2 geführt.
 
-Kernziel des Trainings ist es, dem Nutzer zu helfen, klarer und wirkungsvoller zu kommunizieren, nicht Fachwissen zu prüfen.
+Weitere Qualitätsanforderungen geringerer Priorität sind in Kapitel 10 aufgeführt.
 
-### Einfache, intuitive Bedienbarkeit
+## 1.3 Stakeholder
 
-**Priorität:** 2
+| Rolle | Kontakt | Erwartung an das System |
+|---|---|---|
+| Fachlicher Ansprechpartner und Pilotnutzer | Nicolas Heyne, Solox GmbH (Entwicklung und Kundenkontakt) | Möchte eigene blinde Flecken im Sprechverhalten erkennen. Legt Wert auf einfache Bedienung und qualitatives Feedback statt auf Kennzahlen. Lehnt einen vertrieblichen Fokus für seine Rolle ab. |
+| Fachlicher Ansprechpartner und Pilotnutzer | Eckhard Herdt, APPOLLO Systems (CIO und Gründungsmitglied) | Möchte flüssiger und spontaner sprechen und den Umgang mit Einwänden trainieren. Erwartet eine visuelle Auswertung und Verbesserungsvorschläge entlang des eigenen Gesprächsleitfadens. Trainiert Angebots- und Preisgespräche. |
+| Support-Mitarbeitende | Solox GmbH | Nutzen das Training für kurze, lösungsorientierte Kundengespräche, etwa telefonische Problemklärung. |
+| Entwicklungs- und Projektteam | Solox GmbH | Nutzen das Training für längere, beratende Gesprächssituationen, etwa Schnittstellenthemen und Weiterentwicklung. |
+| Technisch geprägte Nutzer ohne vertriebliche Vorerfahrung | APPOLLO Systems | Führen Follow-up-Gespräche nach der Kaltakquise und müssen dabei technische Inhalte adressatengerecht vermitteln. |
+| Umsetzungsteam | Projektgruppe (intern) | Entwickelt das System iterativ, benötigt eine klare Architektur- und Anforderungsgrundlage. |
 
-Laut Stakeholder-Interview ist eine überladene UI ein zentrales Nutzungshemmnis. Pflichteinstellungen sollen minimal und übersichtlich sein.
+# 2. Randbedingungen
 
-### Echtzeitfähigkeit
+## 2.1 Technische Randbedingungen
 
-**Priorität:** 3
+| ID | Randbedingung | Beschreibung | Quelle |
+|---|---|---|---|
+| C-02 | Nutzung am PC mit Headset | Das Training ist am Arbeitsplatzrechner mit angeschlossenem Headset durchführbar; besondere Hardware ist nicht erforderlich. | R-36 |
+| C-03 | Nutzung am Smartphone | Das Training ist auch auf einem mobilen Gerät nutzbar. Mobile Telefonie ist in beiden Pilotunternehmen im Einsatz. | R-37 |
 
-Ein natürlicher Gesprächsfluss erfordert Antworten der KI in Echtzeit.
+## 2.2 Organisatorische Randbedingungen
 
-### Datenschutzkonformität (DSGVO)
+| ID | Randbedingung | Beschreibung | Quelle |
+|---|---|---|---|
+| C-01 | Sprache konfigurierbar | Das Training findet in der Sprache statt, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Die Sprache wird pro Trainings-Session ausgewählt, unabhängig von Szenario und Persona. Belegt sind Deutsch bei Solox sowie Englisch und teilweise Spanisch bei APPOLLO Systems. Siehe ADR 0023. | R-35 |
+| C-04 | Datenschutz nach DSGVO | Alle Daten, insbesondere Sprachaufzeichnungen und personenbezogene Daten, werden DSGVO-konform verarbeitet. Die Randbedingung begrenzt die Umsetzung aller übrigen Ziele und steht nicht als gleichrangiges Ziel neben ihnen. | rechtliche Vorgabe |
+| C-05 | Kein kundenspezifisches Fachwissen vorausgesetzt | Fachliches Know-how zu einzelnen Kunden oder Systemen wird nicht abgebildet, da sich die Fachlichkeit je Kundenlandschaft unterscheidet. Der Fokus liegt auf Kommunikation statt Fachlichkeit. | R-40, R-41 |
+| C-06 | Gesprächsdauer | Die zu trainierenden Gespräche reichen von kurzen Rückfragen bis zu Gesprächen von einer Stunde. | R-03 |
+| C-07 | Zielgruppe | Zur Zielgruppe gehören Personen mit direktem Kundenkontakt in Support- sowie beratenden Projektrollen und Personen mit technischem Hintergrund ohne vertriebliche Vorerfahrung. | R-01, R-02 |
+| C-08 | Rückkopplung mit den Pilotunternehmen | Weitere Anforderungen und Rückmeldungen werden gebündelt mit den Ansprechpartnern beider Pilotunternehmen abgestimmt. Der bevorzugte Kanal unterscheidet sich je Unternehmen. | R-48 |
 
-**Priorität:** 4
+## 2.3 Konventionen
 
-Sprachaufzeichnungen und personenbezogene Daten müssen rechtskonform verarbeitet werden.
+| ID | Konvention | Beschreibung |
+|---|---|---|
+| C-09 | Anforderungsmanagement nach MoSCoW | Funktionale Anforderungen werden nach Must, Should, Could und Won't priorisiert. Priorität und Release-Zuordnung werden getrennt geführt. |
+| C-10 | Anforderungsdokumentation nach ISO/IEC/IEEE 29148 | Anforderungen werden in einer Anforderungsliste in Bedarfssprache geführt, mit Quelle und Typ. Aus dem Typ ergibt sich der Zielort: Funktionen in den Feature-Katalog, Qualitätsziele nach Kapitel 10, Randbedingungen nach Kapitel 2, Nicht-Ziele nach Kapitel 1. |
 
-### Qualitatives statt quantitatives Feedback
+# 3. Kontextabgrenzung
 
-**Priorität:** 5
-
-Der Stakeholder lehnt eine Reduktion auf einen einzelnen Score explizit ab. Feedback muss differenziert und nachvollziehbar sein.
-
-## Stakeholder
-
-### Fachlicher Ansprechpartner / Pilotnutzer
-
-**Kontakt:** Nicolas Heyne (Solox GmbH, Entwicklung/Kundenkontakt)
-
-Möchte eigene „blinde Flecken" im Sprechverhalten erkennen. Legt Wert auf einfache Bedienung und qualitatives Feedback statt KPIs.
-
-### Support-Mitarbeitende
-
-**Kontakt:** Solox GmbH
-
-Nutzen das Training für kurze, lösungsorientierte Kundengespräche (z. B. telefonische Problemklärung).
-
-### Entwicklungs-/Projektteam
-
-**Kontakt:** Solox GmbH
-
-Nutzen das Training für längere, beratende Gesprächssituationen (z. B. Schnittstellenthemen, Weiterentwicklung).
-
-### Umsetzungsteam
-
-**Kontakt:** Projektgruppe (intern)
-
-Entwickelt das System iterativ, benötigt klare Architektur- und Anforderungsgrundlage.
-
-# Randbedingungen
-
-## Technische Randbedingungen
-
-### Echtzeitverarbeitung
-
-**Quelle:** F-21
-
-Das Gespräch muss in Echtzeit verarbeitet werden, um einen natürlichen Gesprächsfluss zu ermöglichen.
-
-### Nutzung am PC mit Headset
-
-**Quelle:** F-19
-
-Das Training muss primär am PC mit Headset durchführbar sein.
-
-### Mobile Nutzung (optional)
-
-**Quelle:** F-20
-
-Eine Nutzung am Mobiltelefon ist möglich, aber nicht verpflichtend für den MVP.
-
-## Organisatorische Randbedingungen
-
-### Sprache konfigurierbar
-
-Das Training kann in mehreren Sprachen stattfinden; die Sprache wird vom Nutzer pro Trainings-Session ausgewählt, unabhängig von Scenario und Persona (aktualisiert gegenüber F-18, das ursprünglich ausschließlich Deutsch vorsah und Englisch explizit ausschloss — siehe ADR 0023).
-
-### Kein Aufbau einer kundenspezifischen Wissensbasis
-
-Fachliches Know-how zu einzelnen Kunden/Systemen wird bewusst nicht abgebildet. Fokus liegt auf Kommunikation statt Fachlichkeit.
-
-### Kein Fokus auf klassische Vertriebs-KPIs
-
-Abschlussquote/Umsatz sind explizit keine Erfolgsmetriken.
-
-### Enge Rückkopplung mit Pilotkunde Solox
-
-Weitere Anforderungen und Feedback sollen gebündelt mit Nicolas Heyne abgestimmt werden (z. B. via Teams).
-
-## Konventionen
-
-### Anforderungsmanagement nach MoSCoW
-
-Anforderungen werden nach Must/Should/Could/Won't priorisiert (bereits in der Feature-Spezifikation etabliert).
-
-### Datenschutz nach DSGVO
-
-Alle Daten, insbesondere Sprachaufzeichnungen und personenbezogene Daten, müssen DSGVO-konform verarbeitet werden (F-22).
-
-# Kontextabgrenzung
-
-## Fachlicher Kontext
+## 3.1 Fachlicher Kontext
 
 Der fachliche Kontext beschreibt, mit welchen Kommunikationspartnern das System aus fachlicher/inhaltlicher Sicht interagiert.
 
 ### Nutzer (Support-Mitarbeitende / Projekt- & Entwicklungsmitarbeitende)
 
-Führt ein simuliertes Telefongespräch mit der KI-Persona, sowohl in kürzeren Support-Szenarien als auch in längeren Beratungsgesprächen (F-03, F-05). Gibt Sprache ein, erhält Sprache/Antworten der KI zurück sowie im Anschluss ein qualitatives Wrap-up mit Verbesserungsvorschlägen.
+Führt ein simuliertes Telefongespräch mit der KI-Persona, sowohl in kürzeren Support-Szenarien als auch in längeren Beratungsgesprächen (F-03). Gibt Sprache ein, erhält Sprache/Antworten der KI zurück sowie im Anschluss ein qualitatives Wrap-up mit Verbesserungsvorschlägen.
 
 ### KI-Gesprächspartner (Persona)
 
-Simuliert einen externen Kunden im Gespräch, u. a. mit kostenkritischer/preisbewusster Reaktion (F-02). Die Persona kann aus einer erweiterbaren Persona-Bibliothek stammen (F-04). Reagiert auf Inhalt, Tonfall und Gesprächsführung des Nutzers.
+Simuliert einen externen Kunden im Gespräch. Die Persona kann aus einer erweiterbaren Persona-Bibliothek stammen (F-04). Reagiert auf Inhalt, Tonfall und Gesprächsführung des Nutzers.
 
 ### Feedback-/Auswertungskomponente
 
-Erstellt nach Gesprächsende das qualitative Wrap-up (F-09) inkl. konkreter Verbesserungsvorschläge (F-10), basierend auf der Analyse des Sprechverhaltens (F-07, F-08).
+Erstellt nach Gesprächsende das qualitative Wrap-up (F-09) inkl. konkreter Verbesserungsvorschläge (F-10), basierend auf der Analyse des Sprechverhaltens (F-35, F-36, F-37, F-38, F-51, F-08).
 
-## Technischer Kontext
+## 3.2 Technischer Kontext
 
 Der technische Kontext beschreibt die technischen Schnittstellen und Kanäle, über die die fachliche Kommunikation stattfindet.
 
@@ -146,13 +88,13 @@ Der technische Kontext beschreibt die technischen Schnittstellen und Kanäle, ü
 
 **Kanal / Schnittstelle:** Audio-Ein-/Ausgabe (Mikrofon, Lautsprecher/Headset)
 
-Primärer Zugangsweg im MVP (F-19). Erfasst Sprachsignal des Nutzers, gibt Sprachausgabe der KI wieder.
+Primärer Zugangsweg im MVP (C-02). Erfasst Sprachsignal des Nutzers, gibt Sprachausgabe der KI wieder.
 
 ### Spracherkennung (Speech-to-Text)
 
 **Kanal / Schnittstelle:** Interne Schnittstelle
 
-Wandelt die gesprochene Nutzereingabe in Text um, als Grundlage für Sprachanalyse (F-07) und KI-Antwortgenerierung.
+Wandelt die gesprochene Nutzereingabe in Text um, als Grundlage für Sprachanalyse (F-35, F-36, F-37, F-38, F-51) und KI-Antwortgenerierung.
 
 ### Sprachsynthese (Text-to-Speech)
 
@@ -170,15 +112,15 @@ Generiert die inhaltlichen Antworten der simulierten Persona sowie das Wrap-up/F
 
 **Kanal / Schnittstelle:** Interne Schnittstelle
 
-Speichert ggf. Gesprächsaufzeichnungen (F-12, SHOULD) und Fortschrittsdaten (F-13, COULD) DSGVO-konform (F-22).
+Speichert ggf. Gesprächsaufzeichnungen (F-12, SHOULD) und Fortschrittsdaten (F-13, COULD) DSGVO-konform (C-04).
 
-# Lösungsstrategie
+# 4. Lösungsstrategie
 
 *TODO: Zentrale Technologie-Entscheidungen und architektonischer Ansatz zur Erreichung der Qualitätsziele (z. B. Echtzeit-Audio-Pipeline, LLM-basierte Feedback-Generierung).*
 
-# Bausteinsicht
+# 5. Bausteinsicht
 
-## Whitebox Gesamtsystem
+## 5.1 Whitebox Gesamtsystem
 
 *TODO: Komponenten der obersten Ebene (z. B. Engine für Anrufsimulation, Sprachanalyse, Feedback-Engine, Frontend).*
 
@@ -190,36 +132,36 @@ Speichert ggf. Gesprächsaufzeichnungen (F-12, SHOULD) und Fortschrittsdaten (F-
 
 *Wichtige Schnittstellen: \<Beschreibung wichtiger Schnittstellen\>*
 
-## Ebene 2
+## 5.2 Ebene 2
 
 *TODO: Detaillierung der einzelnen Bausteine aus Kapitel 5.1.*
 
-## Ebene 3
+## 5.3 Ebene 3
 
 *TODO: Detaillierung der einzelnen Bausteine aus Kapitel 5.2.*
 
-# Laufzeitsicht
+# 6. Laufzeitsicht
 
 *Hinweis: Die Laufzeitsicht baut methodisch auf der Bausteinsicht (Kapitel 5) auf, die noch nicht final ausgearbeitet ist, da hierfür noch technische Grundentscheidungen (u. a. LLM-Anbieter, konkrete Systemarchitektur, siehe Kapitel 4) ausstehen. Die folgenden Szenarien sind daher auf funktionaler Ebene beschrieben und noch nicht an konkrete Bausteine/Komponenten gebunden. Sobald Kapitel 4 und 5 konkretisiert sind, sollten die Szenarien entsprechend angepasst und die Bausteine referenziert werden.*
 
-## Szenario 1: Start und Ablauf eines Trainingsgesprächs
+## 6.1 Szenario 1: Start und Ablauf eines Trainingsgesprächs
 
-- Der Nutzer startet ein neues Training und wählt (minimal) eine Persona bzw. ein Szenario aus (z. B. Support-Fall oder Beratungsgespräch, F-03, F-16/F-17: möglichst wenige Pflichtangaben).
+- Der Nutzer startet ein neues Training und wählt (minimal) eine Persona bzw. ein Szenario aus (z. B. Support-Fall oder Beratungsgespräch, F-03, Q-02: möglichst wenige Pflichtangaben).
 - Das System initiiert die Gesprächssimulation: Der Nutzer spricht über PC/Headset, die Sprache wird in Echtzeit in Text umgewandelt (Speech-to-Text).
-- Das KI-Backend generiert eine Antwort der simulierten Persona (F-01, F-02), die per Text-to-Speech in gesprochene Sprache umgewandelt und ausgegeben wird.
-- Dieser Zyklus (Sprechen → Erkennen → Antworten → Aussprechen) wiederholt sich fortlaufend, bis der Nutzer das Gespräch beendet. Sowohl kurze Support-Calls als auch längere Beratungsgespräche werden dabei unterstützt (F-05).
+- Das KI-Backend generiert eine Antwort der simulierten Persona (F-01, F-04), die per Text-to-Speech in gesprochene Sprache umgewandelt und ausgegeben wird.
+- Dieser Zyklus (Sprechen → Erkennen → Antworten → Aussprechen) wiederholt sich fortlaufend, bis der Nutzer das Gespräch beendet. Sowohl kurze Support-Calls als auch längere Beratungsgespräche werden dabei unterstützt (F-03).
 
-Besonderheiten: Der gesamte Zyklus muss in Echtzeit ablaufen (F-21), da Verzögerungen den natürlichen Gesprächsfluss stören. Parallel zur eigentlichen Konversation läuft die Analyse des Sprechverhaltens (Szenario 2) mit.
+Besonderheiten: Der gesamte Zyklus muss in Echtzeit ablaufen (Q-03), da Verzögerungen den natürlichen Gesprächsfluss stören. Parallel zur eigentlichen Konversation läuft die Analyse des Sprechverhaltens (Szenario 2) mit.
 
-## Szenario 2: Analyse des Sprechverhaltens während des Gesprächs
+## 6.2 Szenario 2: Analyse des Sprechverhaltens während des Gesprächs
 
-- Während der Nutzer spricht, analysiert die Analyse-Komponente laufend Intonation, Sprechtempo, Lautstärke und Artikulation (F-07).
-- Zusätzlich wird erkannt, ob ein Thema zu lang, zu kompliziert oder mit zu vielen Informationen erklärt wird (F-08).
+- Während der Nutzer spricht, analysiert die Analyse-Komponente laufend Intonation (F-35), Sprechtempo (F-36), Lautstärke (F-37) und Artikulation (F-38).
+- Zusätzlich wird erkannt, ob ein Thema zu lang, zu kompliziert oder mit zu vielen Informationen erklärt wird (F-08) oder ob Stockungen, Füllwörtern und Unterbrechungen im Redefluss vorhanden sind (F-51)
 - Auffälligkeiten werden für das spätere Wrap-up gesammelt, nicht sofort während des Gesprächs unterbrochen oder angezeigt.
 
 Besonderheiten: Diese Analyse läuft parallel zur eigentlichen Gesprächssimulation (Szenario 1), ohne den Gesprächsfluss zu unterbrechen. Die gesammelten Daten dienen als Grundlage für Szenario 3.
 
-## Szenario 3: Erstellung des Wrap-ups nach Gesprächsende
+## 6.3 Szenario 3: Erstellung des Wrap-ups nach Gesprächsende
 
 - Nach Beendigung des Gesprächs durch den Nutzer wertet die Feedback-Komponente die gesammelten Analyseergebnisse aus Szenario 2 aus.
 - Es wird eine qualitative Zusammenfassung (Wrap-up) erstellt – keine reine Zahl/Score (F-09).
@@ -228,32 +170,32 @@ Besonderheiten: Diese Analyse läuft parallel zur eigentlichen Gesprächssimulat
 
 Besonderheiten: Die Qualität dieses Szenarios ist zentral für die Akzeptanz des Tools (siehe Qualitätsziele, Kapitel 1). Ein optionaler Score (F-14, COULD) kann ergänzend angezeigt werden, ersetzt aber nie das qualitative Feedback.
 
-## Szenario 4: Aufzeichnung und langfristige Nutzung (optional/should)
+## 6.4 Szenario 4: Aufzeichnung und langfristige Nutzung (optional/should)
 
 - Sofern vorgesehen (F-12, SHOULD), wird das Gespräch aufgezeichnet und dokumentiert.
 - Die Aufzeichnung ermöglicht dem Nutzer eine spätere, fundiertere Reflexion über die reine Erinnerung hinaus.
 - Bei mehrteiligen Projektgesprächen (F-23, COULD) kann diese Aufzeichnung über mehrere Termine hinweg referenziert werden.
-- Alle gespeicherten Daten müssen DSGVO-konform verarbeitet werden (F-22).
+- Alle gespeicherten Daten müssen DSGVO-konform verarbeitet werden (C-04).
 
-Besonderheiten: Dieses Szenario ist für den MVP nicht zwingend erforderlich (SHOULD/COULD), aber relevant für die kontinuierliche Nutzung als Trainingsinstrument (F-11), die Herr Heyne explizit gewünscht hat.
+Besonderheiten: Dieses Szenario ist für den MVP nicht zwingend erforderlich (SHOULD/COULD), aber relevant für die kontinuierliche Nutzung als Trainingsinstrument (F-13), die Herr Heyne explizit gewünscht hat.
 
-# Verteilungssicht
+# 7. Verteilungssicht
 
-## Infrastruktur Ebene 1
+## 7.1 Infrastruktur Ebene 1
 
 *TODO: Übersichtsdiagramm, Begründung, Qualitäts-/Leistungsmerkmale sowie Zuordnung von Bausteinen zu Infrastruktur ergänzen, sobald Kapitel 4/5 vorliegen.*
 
-## Infrastruktur Ebene 2
+## 7.2 Infrastruktur Ebene 2
 
 *TODO: Detaillierung einzelner Infrastrukturelemente (Diagramm + Erläuterungen).*
 
-# Querschnittliche Konzepte
+# 8. Querschnittliche Konzepte
 
 Querschnittliche Konzepte betreffen mehrere Bausteine/Komponenten gleichzeitig und werden deshalb zentral dokumentiert statt in jedem Baustein wiederholt. Basierend auf dem Erstgespräch und der Feature-Liste lassen sich folgende Konzepte bereits jetzt beschreiben:
 
-## Datenschutz und Datensicherheit
+## 8.1 Datenschutz und Datensicherheit
 
-Da Sprachaufzeichnungen und personenbezogene Daten verarbeitet werden, muss das System durchgängig DSGVO-konform gestaltet sein (F-22). Dies betrifft insbesondere:
+Da Sprachaufzeichnungen und personenbezogene Daten verarbeitet werden, muss das System durchgängig DSGVO-konform gestaltet sein (C-04). Dies betrifft insbesondere:
 
 - Verarbeitung und Speicherung von Sprachdaten (Gesprächsaufzeichnungen, F-12)
 - Speicherung von Fortschrittsdaten einzelner Nutzer (F-13)
@@ -261,7 +203,7 @@ Da Sprachaufzeichnungen und personenbezogene Daten verarbeitet werden, muss das 
 
 Für den MVP werden Sprachdaten, Transkripte und Feedback nicht über das Ende der Session hinaus gespeichert; danach ist die Speicherung auf der uni-gehosteten Datenplattform ausschließlich mit Einwilligung des Nutzers vorgesehen, die dieser jederzeit widerrufen sowie seine Daten selbst löschen kann (siehe ADR 0024).
 
-## Umgang mit Feedback und Bewertung
+## 8.2 Umgang mit Feedback und Bewertung
 
 Da Gespräche laut Herrn Heyne subjektiv wahrgenommen werden können, sollte das Feedback-Konzept durchgängig folgende Prinzipien verfolgen (gilt für alle Komponenten, die Feedback erzeugen oder anzeigen):
 
@@ -269,148 +211,117 @@ Da Gespräche laut Herrn Heyne subjektiv wahrgenommen werden können, sollte das
 - Konkrete, nachvollziehbare Verbesserungsvorschläge statt abstrakter Metriken (F-10)
 - Optionaler Score nur ergänzend, nie ersetzend (F-14)
 
-## Benutzerführung und UI-Konsistenz
+## 8.3 Benutzerführung und UI-Konsistenz
 
 Gilt übergreifend für alle Bildschirme/Interaktionspunkte des Systems:
 
-- Pflichteinstellungen vor einem Training werden auf ein Minimum reduziert und deutlich sichtbar dargestellt (F-16, F-17)
-- Zusatz- und Spezialoptionen werden getrennt und weniger prominent angeboten (F-16)
-- Einfache, intuitive Bedienung ohne Einarbeitungsaufwand (F-15)
+- Pflichteinstellungen vor einem Training werden auf ein Minimum reduziert und deutlich sichtbar dargestellt (Q-02)
+- Zusatz- und Spezialoptionen werden getrennt und weniger prominent angeboten (Q-02)
+- Einfache, intuitive Bedienung ohne Einarbeitungsaufwand (Q-02)
 
-## Echtzeitverarbeitung
+## 8.4 Echtzeitverarbeitung
 
 Betrifft alle Komponenten, die am Gesprächsfluss beteiligt sind (Spracherkennung, KI-Antwortgenerierung, Sprachsynthese):
 
-- Durchgängige Anforderung an geringe Latenz, um einen natürlichen Gesprächsfluss zu ermöglichen (F-21)
+- Durchgängige Anforderung an geringe Latenz, um einen natürlichen Gesprächsfluss zu ermöglichen (Q-03)
 - Dieses Konzept wird bei der technischen Umsetzung aller Echtzeit-relevanten Bausteine berücksichtigt werden müssen (relevant für Kapitel 4/5)
 
-# Architekturentscheidungen
+# 9. Architekturentscheidungen
 
-*Hinweis: Architekturentscheidungen (ADRs) dokumentieren normalerweise konkrete technische Entscheidungen aus Kapitel 4 (Lösungsstrategie) im Detail, mit Begründung und Alternativen. Da Kapitel 4 noch nicht ausgearbeitet ist, sind hier nur die grundsätzlichen/fachlichen Entscheidungen erfasst, die bereits aus dem Erstgespräch klar hervorgehen. Technische Architekturentscheidungen (z. B. LLM-Anbieter, Speech-to-Text-/Text-to-Speech-Technologie, Hosting-Modell) fehlen noch und sollten nach Ausarbeitung von Kapitel 4 ergänzt werden.*
+Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordner `docs/adr` geführt, jeweils mit Kontext, Entscheidung, Status und Konsequenzen. Dieses Kapitel indiziert sie nur; die Spalte *Betrifft* verweist auf die berührten Anforderungen, Qualitätsziele und Randbedingungen der übrigen Dokumentation.
 
-Bereits getroffene fachliche Grundsatzentscheidung: Personas werden nicht als feste, einmalige Konfiguration umgesetzt, sondern als erweiterbare Kundenpersona-Bibliothek angelegt (F-04), sodass zukünftig weitere Persönlichkeitstypen ergänzt werden können, ohne die Kernarchitektur zu verändern.
+| Nr. | Titel | Status | Betrifft |
+|---|---|---|---|
+| ADR 0000 | Record Architecture Decisions | angenommen | |
+| ADR 0001 | Separate Scenario and Persona Concepts | angenommen | F-03, F-04 |
+| ADR 0002 | Personas as an Extensible Library | angenommen | F-04, R-07, R-08 |
+| ADR 0003 | No Human Trainer — Feedback Is Fully AI-Generated | angenommen | F-09, F-10 |
+| ADR 0004 | Feedback Is Qualitative, Not Score-Based | angenommen | Q-01, F-09, F-14, R-21 |
+| ADR 0005 | No Automated Enterprise/CRM Integration, No Sales KPIs | angenommen | C-05, F-26, F-45, R-45 |
+| ADR 0006 | Training Language Is German Only for the MVP | abgelöst durch ADR 0023 | C-01, R-35 |
+| ADR 0007 | Primary Access via PC + Headset, Mobile Optional | angenommen | C-02, C-03 |
+| ADR 0008 | Frontend Built with React and TypeScript | angenommen | F-46, F-50 |
+| ADR 0009 | Authentication via Keycloak (OIDC Authorization Code Flow + PKCE) | angenommen | C-04, F-31, F-50 |
+| ADR 0010 | Persistence Delegated to an External Datenplattform | angenommen | C-04, F-12, F-13, F-26, F-31 |
+| ADR 0011 | LLM Backend Is the University-Hosted EFRE-Direkt Gateway, Self-Contained | angenommen (durch ADR 0022 eingegrenzt) | Q-03, C-04, F-01 |
+| ADR 0012 | Backend Built with Python and FastAPI | angenommen | Q-03 |
+| ADR 0013 | Turn-Based, Non-Streaming Pipeline for the MVP | angenommen | Q-03, F-01 |
+| ADR 0014 | Minimal Required Setup, Advanced Options Separate | angenommen | Q-02, F-43, R-34 |
+| ADR 0015 | Speech-Behavior Feedback Surfaces Only in the Post-Call Wrap-Up | angenommen | F-09, F-35, F-36, F-37, F-38, F-51 |
+| ADR 0016 | Persona Selection via Card View, Not a List | angenommen | Q-02, F-04, F-44 |
+| ADR 0017 | One Retry, Then Graceful Session End on Pipeline Failure | angenommen | Q-03, F-46 |
+| ADR 0018 | No Provider Abstraction Layer for STT/LLM/TTS | angenommen | |
+| ADR 0019 | Layered Modular Monolith for the Real-Time Path, Async Feedback Worker | angenommen | Q-03, F-09 |
+| ADR 0020 | Redis + RQ for the Feedback Job Queue | angenommen | F-09 |
+| ADR 0021 | Deployment on a University-Hosted Server | angenommen | C-04 |
+| ADR 0022 | STT and TTS Run as Separately Self-Hosted Local Models | angenommen | Q-03, C-04, F-01 |
+| ADR 0023 | Language as Independent Session Parameter | angenommen (löst ADR 0006 ab) | C-01, R-35 |
+| ADR 0024 | No Session Data Persisted Beyond the MVP; Consent-Gated Storage After | vorgeschlagen | C-04, F-12, F-13, F-48, F-49 |
+| ADR 0025 | User-Authored Scenario Context and Personas (Post-MVP) | angenommen | F-04, F-26, F-34, F-45 |
 
-# Qualitätsanforderungen
+Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug, ADR 0018 eine reine Wartbarkeitsentscheidung ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 
-Dieses Kapitel konkretisiert die Qualitätsziele aus Kapitel 1 in überprüfbare Anforderungen. Häufig wird dafür ein Qualitätsbaum sowie konkrete Szenarien nach dem Muster „Stimulus → Reaktion" verwendet.
+TODO:
+- Veraltete Feature-IDs in den ADRs: ADR 0005 (F-27, F-28), ADR 0013 (F-21), ADR 0023 (F-18) und ADR 0024 (F-11) verweisen auf Nummern, die im heutigen features.md nicht mehr existieren. Im Index habe ich inhaltlich neu zugeordnet; die ADR-Texte selbst zeigen weiterhin ins Leere.
+- K-04 ist noch offen: initial_requirements.md:178 fordert, die Sprachänderung müsse in den Feature-Katalog zurückfließen, „wo F-18 derzeit Deutsch als MUST und F-25 Englisch als COULD führt". Beide IDs sind im Katalog bereits verschwunden, ohne Ersatz-Feature — die Sprache existiert heute nur noch als Randbedingung C-01. Ob das so gewollt ist, wäre zu klären.
 
-## Qualitätsbaum (Übersicht)
+# 10. Qualitätsanforderungen
 
-Die zentralen Qualitätsziele aus Kapitel 1, heruntergebrochen auf konkretere Teilaspekte:
+## 10.1 Quality Requirements Overview
 
-- Verständlichkeit & Wirkung – Erkennung von Sprechverhalten (Intonation, Tempo, Lautstärke, Artikulation); Erkennung von zu komplexen/langen Erklärungen
-- Benutzbarkeit – Einfache, intuitive Bedienung ohne Einarbeitung; minimale, klar sichtbare Pflichteinstellungen
-- Performance – Echtzeitfähigkeit des Gesprächsflusses
-- Datenschutz – DSGVO-Konformität aller Sprach- und Personendaten
-- Feedback-Qualität – Qualitative statt rein quantitative Bewertung; konkrete, umsetzbare Verbesserungsvorschläge
-- Flexibilität der Trainingssituation – Unterstützung unterschiedlicher Szenario-Typen und variabler Gesprächslängen (F-03, F-05)
+| ID | Kategorie | ISO 25010 | Beschreibung | Herkunft |
+|---|---|---|---|---|
+| Q-01 | Genauigkeit und Nachvollziehbarkeit der Gesprächsanalyse | Funktionale Korrektheit | Die Analyse erkennt auffälliges Sprechverhalten zutreffend und führt ihre Befunde auf konkrete Gesprächsstellen zurück. Die Rückmeldung ist als Wirkung auf den Gesprächspartner formuliert, nicht als objektives Urteil. | R-25, R-26 |
+| Q-02 | Bedienbarkeit ohne Einarbeitung | Interaktionsfähigkeit | Ein Erstnutzer startet ein Training ohne Anleitung. Pflichteinstellungen sind minimal und klar sichtbar, Zusatzoptionen treten zurück. | R-32, R-33, R-34 |
+| Q-03 | Echtzeitfähigkeit des Gesprächsflusses | Leistungseffizienz | Die Kette aus Spracherkennung, Antwortgenerierung und Sprachsynthese antwortet ohne wahrnehmbare Verzögerung. | Systementwurf |
+| Q-04 | Qualitative statt quantitative Bewertung | Funktionale Angemessenheit | Die Rückmeldung ist differenziert und reduziert das Ergebnis nicht auf einen einzelnen Zahlenwert. | R-21 |
+| Q-05 | Regelmäßigkeit der Rückmeldung | Interaktionsfähigkeit | Der Nutzer erhält bei fortlaufender Nutzung regelmäßig Rückmeldung. Ohne diese Regelmäßigkeit ist die Annahme des Werkzeugs nicht zu erwarten. | R-27 |
+| Q-06 | Flexibilität der Trainingssituation | Funktionale Angemessenheit | Das System unterstützt unterschiedliche Szenario-Typen und Gesprächslängen von kurzen Support-Fällen bis zu einstündigen Gesprächen. | R-03, R-09, R-10 |
+| Q-07 | Zuverlässigkeit der Verarbeitungskette | Zuverlässigkeit | Der Ausfall einer Komponente führt nicht zum unbemerkten Abbruch des Gesprächs. | Systementwurf |
+| Q-08 | Austauschbarkeit der Sprach- und Modellkomponenten | Wartbarkeit | Sprachmodell, Spracherkennung und Sprachsynthese sind wechselbar, ohne die übrige Anwendung anzupassen. | Systementwurf, C-11 |
+| Q-09 | Schutz der Sprach- und Personendaten | Sicherheit | Sprachdaten werden nur innerhalb des dokumentierten Rahmens verarbeitet. Konkretisiert die Randbedingung C-04. | C-04 |
 
-## Qualitätsszenarien
+## 10.2 Qualitätsszenarien
 
-*Hinweis: Die nachfolgenden Qualitätsszenarien beschreiben die Qualitätsziele derzeit auf qualitativer Ebene und sind noch nicht durchgängig messbar formuliert. Konkrete Schwellwerte und Messpunkte setzen voraus, dass die offenen Technologieentscheidungen (LLM-Anbieter, STT/TTS-Technologie, Hosting-Modell) getroffen sind, da sich Messpunkte an den daraus resultierenden Architekturgrenzen ergeben. Die Szenarien werden nach Klärung dieser Entscheidungen auf Testbarkeit überarbeitet und um überprüfbare Kriterien ergänzt. Dies betrifft insbesondere F-21 (Latenz), dessen Zielkorridor derzeit noch nicht belastbar bestimmt werden kann.*
+TODO
 
-### Verständlichkeit & Wirkung
-
-#### Sprechverhalten erkennen
-
-**Stimulus:** Nutzer spricht während eines Trainingsgesprächs mit auffälliger Lautstärke oder Sprechtempo
-
-**Erwartete Reaktion:** System erfasst dies und berücksichtigt es im späteren Wrap-up (F-07)
-
-#### Überkomplexe Erklärung
-
-**Stimulus:** Nutzer erklärt einen Sachverhalt sehr lang oder mit vielen Informationen
-
-**Erwartete Reaktion:** System erkennt dies und weist im Wrap-up konkret darauf hin (F-08)
-
-### Benutzbarkeit
-
-#### Erststart ohne Einarbeitung
-
-**Stimulus:** Neuer Nutzer öffnet das Tool zum ersten Mal
-
-**Erwartete Reaktion:** Nutzer kann ohne Anleitung ein Training starten (F-15)
-
-#### Minimale Pflichtangaben
-
-**Stimulus:** Nutzer möchte ein Training starten
-
-**Erwartete Reaktion:** Nur notwendige Einstellungen werden abgefragt; Spezialoptionen sind separat und unauffällig (F-16, F-17)
-
-### Performance
-
-#### Echtzeit-Antwort
-
-**Stimulus:** Nutzer spricht einen Satz im simulierten Gespräch
-
-**Erwartete Reaktion:** KI antwortet ohne wahrnehmbare Verzögerung, sodass ein natürlicher Gesprächsfluss entsteht (F-21)
-
-### Datenschutz
-
-#### Verarbeitung von Sprachdaten
-
-**Stimulus:** Sprachdaten werden erfasst, übertragen oder gespeichert
-
-**Erwartete Reaktion:** Verarbeitung erfolgt durchgehend DSGVO-konform (F-22)
-
-### Feedback-Qualität
-
-#### Gesprächsende
-
-**Stimulus:** Nutzer beendet ein Trainingsgespräch
-
-**Erwartete Reaktion:** System liefert ein qualitatives Wrap-up mit konkreten Verbesserungsvorschlägen statt eines reinen Scores (F-09, F-10)
-
-### Flexibilität der Trainingssituation
-
-#### Szenario-Auswahl
-
-**Stimulus:** Nutzer startet ein Training und wählt einen Gesprächskontext (Support vs. Beratung)
-
-**Erwartete Reaktion:** System stellt passende Szenario-Typen bereit und passt Ablauf/Dauer entsprechend an (F-03, F-05)
-
-# Risiken und technische Schulden
+# 11. Risiken und technische Schulden
 
 Da die technische Lösungsstrategie (Kapitel 4) noch nicht final festgelegt ist, sind einige Risiken hier bewusst allgemeiner formuliert und sollten nach Konkretisierung von Kapitel 4/5 präzisiert werden.
 
-## Risiken
+## 11.1 Risiken
 
-### Echtzeitfähigkeit von LLM-/Sprach-APIs
+### Technische Risiken
 
-Die Kombination aus Speech-to-Text, LLM-Antwortgenerierung und Text-to-Speech muss in Echtzeit ablaufen (F-21). Externe APIs können Latenzschwankungen aufweisen, die einen natürlichen Gesprächsfluss beeinträchtigen.
+| Nr. | Risiko | Beschreibung | Gegenmaßnahme |
+|---|---|---|---|
+| RI-01 | Echtzeitfähigkeit der Sprach- und LLM-Schnittstellen | Die Kombination aus Spracherkennung, Antwortgenerierung und Sprachsynthese muss in Echtzeit ablaufen (Q-03). Externe Schnittstellen können Latenzschwankungen aufweisen, die den natürlichen Gesprächsfluss beeinträchtigen. | Latenz je Teilstrecke getrennt messen, um den Engpass zu bestimmen. Frühzeitige Tests mit den infrage kommenden Anbietern vor der finalen technischen Festlegung (Kapitel 4). |
+| RI-02 | Unklare Datenschutz-Umsetzung | Datenschutzkonformität ist eine nicht verhandelbare Randbedingung (C-04). Hosting-Ort, Speicherdauer und Einwilligungsprozess sind grundsätzlich entschieden (ADR 0024). Offen ist die technische Umsetzung der Selbstlösch-Funktion auf der Datenplattform sowie der Einwilligungsverwaltung im Frontend. | Löschfunktion und Einwilligungsoberfläche früh mitplanen, nicht nachträglich ergänzen. |
 
-*Mögliche Gegenmaßnahme: Frühzeitige Latenz-Tests mit den infrage kommenden Anbietern vor finaler technischer Festlegung (Kapitel 4).*
+### Fachliche Risiken
 
-### Fehlende kundenspezifische Fachlichkeit
+| Nr. | Risiko | Beschreibung | Gegenmaßnahme |
+|---|---|---|---|
+| RI-03 | Widersprüchliche Erwartungen der Pilotunternehmen | Solox lehnt einen vertrieblichen Fokus für die eigenen Rollen ab, APPOLLO Systems will ausdrücklich Angebots- und Preisgespräche sowie Einwandbehandlung trainieren (Konflikt K-01). Beide sind Pilotnutzer. Ohne Entscheidung besteht die Gefahr, dass das System für beide Seiten unpassend zugeschnitten wird. | Entscheidung als ADR festhalten. Naheliegend ist, Vertrieb als einen Szenario-Typ unter mehreren zu führen und die Abgrenzung auf fachliche Tiefe statt auf die Gesprächsart zu beziehen. |
+| RI-04 | Fehlende kundenspezifische Fachlichkeit | Der bewusste Verzicht auf eine kundenspezifische Wissensbasis (C-05) vereinfacht die Umsetzung, könnte aber dazu führen, dass Gespräche für erfahrene Nutzer zu oberflächlich oder unrealistisch wirken. Zusätzlich ist die Abgrenzung nicht mehr unstrittig: APPOLLO Systems will einen eigenen Gesprächsleitfaden als Bewertungsgrundlage einbringen (R-43, Konflikt K-03). | Frühes Nutzerfeedback beider Pilotunternehmen einholen. Die Unterscheidung zwischen fachlichem Wissen und Gesprächsleitfaden schriftlich festhalten. |
+| RI-05 | Subjektivität des Feedbacks | Gespräche werden von den Beteiligten unterschiedlich wahrgenommen (R-25). Ein maschinell erzeugtes qualitatives Feedback (F-09, F-10) könnte als unpassend, ungenau oder demotivierend empfunden werden, wenn es nicht sorgfältig formuliert ist. Betrifft unmittelbar Q-01, da Nachvollziehbarkeit die Voraussetzung für Vertrauen in die Rückmeldung ist. | Feedback als Wirkung auf den Gesprächspartner formulieren, nicht als objektives Urteil. Tonalität und Formulierungsrichtlinien festlegen und iterativ anhand echten Nutzerfeedbacks verfeinern. |
+| RI-06 | Geringe Akzeptanz bei komplexer Bedienung | In beiden Erhebungen wurde eine unklare oder überladene Benutzeroberfläche als zentrales Nutzungshemmnis genannt. Wird Q-02 nicht ausreichend beachtet, sinkt die Akzeptanz erheblich, unabhängig von der fachlichen Qualität des Trainings. | Frühzeitige Usability-Tests. Minimale Pflichteinstellungen bereits im ersten benutzbaren Prototyp umsetzen. |
 
-Der bewusste Verzicht auf eine kundenspezifische Wissensbasis (siehe Kapitel 9) vereinfacht die Umsetzung, könnte aber dazu führen, dass Gespräche für erfahrene Nutzer wie Herrn Heyne zu oberflächlich oder unrealistisch wirken, wenn Fachinhalte fehlen.
+## 11.2 Technische Schulden
 
-*Mögliche Gegenmaßnahme: Frühes Nutzerfeedback (z. B. durch Herrn Heyne als Pilotnutzer) einholen, ob der Fokus auf Kommunikation ohne Fachtiefe im Trainingsalltag als ausreichend realistisch empfunden wird.*
+TODO
+Erste Implementierung hat begonnen. Technische Schulden sind einzutragen.
 
-### Subjektivität von Feedback
-
-Herr Heyne wies selbst darauf hin, dass Gespräche subjektiv wahrgenommen werden. Ein KI-generiertes qualitatives Feedback (F-09, F-10) könnte von Nutzern als unpassend, ungenau oder demotivierend empfunden werden, wenn es nicht sorgfältig formuliert ist.
-
-*Mögliche Gegenmaßnahme: Iterative Verfeinerung der Feedback-Formulierung basierend auf echtem Nutzerfeedback; ggf. Tonalität und Formulierungsrichtlinien für die Feedback-Komponente definieren.*
-
-### Geringe Akzeptanz bei komplexer Bedienung
-
-Laut Erstgespräch ist eine unklare oder überladene Benutzeroberfläche ein zentrales Nutzungshemmnis. Wird dies im MVP nicht ausreichend beachtet, sinkt die Akzeptanz bei den Mitarbeitenden erheblich.
-
-*Mögliche Gegenmaßnahme: Frühzeitige Usability-Tests, Fokus auf minimale Pflichteinstellungen (F-16, F-17) bereits im ersten Prototyp.*
-
-### Unklare Datenschutz-Umsetzung
-
-DSGVO-Konformität (F-22) ist eine MUST-Anforderung. Hosting-Ort, Speicherdauer und Einwilligungsprozess sind inzwischen grundsätzlich entschieden (siehe ADR 0024); die technische Umsetzung der Selbstlösch-Funktion auf der Datenplattform sowie der Einwilligungs-Verwaltung im Frontend steht noch aus.
-
-*Mögliche Gegenmaßnahme: Löschfunktion und Einwilligungs-UI so früh wie möglich mitplanen, nicht erst nachträglich ergänzen.*
-
-## Technische Schulden
-
-Aktuell keine, da sich das Projekt noch in der Konzeptionsphase befindet und noch keine Implementierung begonnen wurde.
-
-# Glossar
+# 12. Glossar
 
 | Begriff | Definition |
 |---|---|
-| TODO | TODO |
+| Architecture Decision Record (ADR) | Kurzes, fortlaufend nummeriertes Dokument, das genau eine architektonisch bedeutsame Entscheidung mit Kontext, Status und Konsequenzen festhält. Wird eine Entscheidung revidiert, bleibt der alte Eintrag bestehen und wird als abgelöst gekennzeichnet. |
+| Datenplattform | Extern betriebener, über OIDC authentifizierter Dienst, an den das System hochgeladene Dokumente und Session-Daten zur Speicherung übergibt. Das Produkt hält keine eigene Datenhaltung vor. |
+| EFRE-Direkt | Von der Hochschule bereitgestellter Dienst zur Erzeugung der Persona-Dialoge. Seine Nutzung ist eine Rahmenbedingung des Projekts und nicht das Ergebnis einer Auswahl unter konkurrierenden Anbietern. |
+| Feedback | Qualitative, verhaltensbezogene Rückmeldung zu einer abgeschlossenen Session mit konkreten Verbesserungsvorschlägen. Sie wird vollständig vom KI-System erzeugt; eine menschliche Trainerrolle ist im Produkt nicht vorgesehen. |
+| Persona | Charakterprofil des KI-Gesprächspartners einer Session, das dessen Rolle, Verhalten und Schwierigkeitsgrad beschreibt. Die Persona ist unabhängig vom Szenario konfigurierbar. |
+| Persona-Bibliothek | Offene, erweiterbare Sammlung der auswählbaren Personas. Neue Personas können aufgenommen werden, ohne die Session- oder Szenario-Logik zu verändern. |
+| Session | Ein einzelnes simuliertes Telefongespräch zwischen Nutzer und KI-Gesprächspartner, konfiguriert über Szenario, Persona und Sprache. Die Session ist die zentrale Trainings- und Auswertungseinheit, auf die sich das Feedback bezieht. |
+| Sprache | Eigenständiger, vom Nutzer wählbarer Session-Parameter, der festlegt, in welcher Sprache das Trainingsgespräch geführt wird. Die Sprache ist keine Eigenschaft einer einzelnen Persona. |
+| Szenario | Situativer Rahmen einer Session, also Anlass und beabsichtigter Verlauf des Gesprächs. Das Szenario ist unabhängig von der Persona konfigurierbar. |
