@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from backend.languages import DEFAULT_LANGUAGE_ID, LANGUAGES
 from backend.personas import PERSONAS
@@ -28,27 +28,21 @@ app.add_middleware(
 
 FRONTEND_DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
-LLM_URL = os.environ.get("LLM_URL")
-LLM_API_KEY = os.environ.get("LLM_API_KEY")
-LLM_MODEL = os.environ.get("LLM_MODEL")
+EFRE_URL = os.environ.get("EFRE_URL")
+EFRE_API_KEY = os.environ.get("EFRE_API_KEY")
 
-STT_URL = os.environ.get("STT_URL", LLM_URL)
-STT_API_KEY = os.environ.get("STT_API_KEY", "not-needed")
 STT_MODEL = os.environ.get("STT_MODEL")
-
-TTS_URL = os.environ.get("TTS_URL", LLM_URL)
-TTS_API_KEY = os.environ.get("TTS_API_KEY", "not-needed")
+LLM_MODEL = os.environ.get("LLM_MODEL")
 TTS_MODEL = os.environ.get("TTS_MODEL")
-TTS_VOICE = os.environ.get("TTS_VOICE", "neutral_female")
+
+TTS_VOICE = os.environ.get("TTS_VOICE")
 
 
-def _client(base_url: str, api_key: str) -> OpenAI:
-    return OpenAI(base_url=f"{base_url.rstrip('/')}/v1", api_key=api_key)
-
-
-llm_client = _client(LLM_URL, LLM_API_KEY)
-stt_client = _client(STT_URL, STT_API_KEY)
-tts_client = _client(TTS_URL, TTS_API_KEY)
+# Async client: these calls run inside `async def` routes under Uvicorn/Gunicorn.
+# A blocking sync client freezes the event loop for the call's whole duration,
+# which starves Gunicorn's worker heartbeat and can trigger a false WORKER TIMEOUT
+# well before the configured --timeout is reached.
+CLIENT = AsyncOpenAI(base_url=f"{EFRE_URL}/v1", api_key=EFRE_API_KEY)
 
 
 @app.get("/health")
@@ -91,10 +85,11 @@ async def process(
 
     logger.info("[1/3] Transcribing via STT (%s)...", STT_MODEL)
     try:
-        transcript = stt_client.audio.transcriptions.create(
+        transcription = await CLIENT.audio.transcriptions.create(
             model=STT_MODEL,
             file=(file.filename, audio_bytes, file.content_type),
-        ).text
+        )
+        transcript = transcription.text
     except Exception as e:
         logger.error("STT request failed: %s", e)
         raise HTTPException(status_code=502, detail=f"STT request failed: {e}") from e
@@ -102,7 +97,7 @@ async def process(
 
     logger.info("[2/3] Generating persona reply via LLM (%s)...", LLM_MODEL)
     try:
-        reply = llm_client.chat.completions.create(
+        completion = await CLIENT.chat.completions.create(
             model=LLM_MODEL,
             messages=[
                 {
@@ -111,7 +106,8 @@ async def process(
                 },
                 {"role": "user", "content": transcript},
             ],
-        ).choices[0].message.content
+        )
+        reply = completion.choices[0].message.content
     except Exception as e:
         logger.error("LLM request failed: %s", e)
         raise HTTPException(status_code=502, detail=f"LLM request failed: {e}") from e
@@ -119,7 +115,7 @@ async def process(
 
     logger.info("[3/3] Synthesizing speech via TTS (%s, voice=%s)...", TTS_MODEL, TTS_VOICE)
     try:
-        speech = tts_client.audio.speech.create(
+        speech = await CLIENT.audio.speech.create(
             model=TTS_MODEL,
             voice=TTS_VOICE,
             input=reply,

@@ -8,7 +8,7 @@ Calltrainer is an AI-powered phone conversation trainer that provides real-time 
 
 ## Current State
 
-FastAPI backend (`backend/app.py`) serves the API and, once built, the React + TypeScript frontend (`frontend/`, built with Vite; the backend serves `frontend/dist`). `/health` is a plain health check; `/api/process` takes an uploaded audio file, transcribes it, translates the transcript to English, and synthesizes speech from the translation — all three steps call the university-hosted, OpenAI-compatible `efre-direkt` LLM endpoint configured via `.env` (`LLM_URL`, `LLM_API_KEY`, `STT_MODEL`, `LLM_MODEL`, `TTS_MODEL`; see ADR 0011). This audio-translate flow is a throwaway spike used to validate the LLM integration, not a core Calltrainer feature (see ADR list) — expect it to be replaced by the real Session pipeline. There is still no persistence in this backend (Session/document data is meant to go to an external Datenplattform, see ADR 0010) and no tests. `docs/arc42.md` is filled in.
+FastAPI backend (`backend/app.py`) serves the API and, once built, the React + TypeScript frontend (`frontend/`, built with Vite; the backend serves `frontend/dist`). `/health` is a plain health check; `/api/process` takes an uploaded audio file, transcribes it, generates an in-character Persona reply, and synthesizes that reply as speech — all three steps call the same university-hosted, OpenAI-compatible `efre-direkt` endpoint, configured via a single `.env` base URL/key pair (`EFRE_URL`, `EFRE_API_KEY`) plus one model name per step (`STT_MODEL`, `LLM_MODEL`, `TTS_MODEL`). This is a spike used to validate the LLM integration, not a core Calltrainer feature (see ADR list) — expect it to be replaced by the real Session pipeline. There is still no persistence in this backend (Session/document data is meant to go to an external Datenplattform, see ADR 0010) and no tests. `docs/arc42.md` is filled in.
 
 ## Build / Run
 
@@ -16,7 +16,7 @@ FastAPI backend (`backend/app.py`) serves the API and, once built, the React + T
 - Local backend: `pip install -r requirements.txt`, then `uvicorn backend.app:app --reload`
 - Docker: `docker compose up --build` (builds the frontend too, via a multi-stage Dockerfile; serves on `http://localhost:8000`)
 - Copy `.env.example` to `.env` and fill in real values before running — `.env` is gitignored and read via `env_file` in the compose file (and by Vite, via `envDir` pointing at the repo root).
-- Testing without a real `LLM_API_KEY`: run `python scripts/mock_llm_server.py`, then start the app with `LLM_URL` pointed at it (`http://localhost:9000` locally, `http://host.docker.internal:9000` from inside a container). The mock returns fixed transcript/translation/audio values for all three pipeline steps.
+- Testing without a real `EFRE_API_KEY`: run `python scripts/mock_llm_server.py`, then start the app with `EFRE_URL` pointed at it (`http://localhost:9000` locally, `http://host.docker.internal:9000` from inside a container). The mock returns fixed transcript/reply/audio values for all three pipeline steps.
 - Docs site (arc42 + ADRs): `pip install -r requirements-docs.txt`, then `mkdocs serve` (serves on `http://localhost:8000`; stop the app first or pass `-a localhost:8001` to avoid a port clash). `mkdocs build` writes static output to `site/` (gitignored).
 
 There are no lint or test commands configured yet. Add them here once they exist.

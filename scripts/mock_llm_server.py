@@ -1,8 +1,8 @@
-"""Fake OpenAI-compatible server for testing the app without a real LLM_API_KEY.
+"""Fake OpenAI-compatible server for testing the app without a real EFRE_API_KEY.
 
 Run: python scripts/mock_llm_server.py
-Then in .env, temporarily set: LLM_URL=http://localhost:9000
-(LLM_API_KEY and the model names can stay whatever they are — this server ignores them.)
+Then in .env, temporarily set: EFRE_URL=http://localhost:9000
+(EFRE_API_KEY and the model names can stay whatever they are — this server ignores them.)
 """
 
 import io
