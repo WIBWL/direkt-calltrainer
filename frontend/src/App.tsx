@@ -97,9 +97,14 @@ export default function App() {
             className={"persona-card" + (p.id === personaId ? " selected" : "")}
             onClick={() => setPersonaId(p.id)}
             type="button"
+            aria-pressed={p.id === personaId}
           >
             <span className="persona-name">{p.name}</span>
             <span className="persona-goal">{p.training_goal}</span>
+
+            {p.id === personaId && (
+              <span className="selected-label">✓ Test Ausgewählt</span>
+              )}
           </button>
         ))}
       </div>
