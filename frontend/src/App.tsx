@@ -103,7 +103,7 @@ export default function App() {
             <span className="persona-goal">{p.training_goal}</span>
 
             {p.id === personaId && (
-              <span className="selected-label">✓ Test Ausgewählt</span>
+              <span className="selected-label">✓ Ausgewählt</span>
               )}
           </button>
         ))}
