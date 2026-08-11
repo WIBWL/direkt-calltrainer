@@ -2,9 +2,6 @@
 
 AI-powered phone conversation trainer with real-time speech analysis and behavioral feedback.
 
-![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white)
-![React](https://img.shields.io/badge/React-TypeScript-61DAFB?logo=react&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Status](https://img.shields.io/badge/status-active--development-yellow)
 
@@ -15,13 +12,6 @@ Calltrainer is a use case built within [EFRE-DiReKT](https://www.wiwi.uni-wuerzb
 ## Architecture
 
 FastAPI backend, React + TypeScript frontend, one Docker image. Speech-to-text, dialogue generation, and text-to-speech all run through [EFRE-DiReKT](https://efre-direkt.de/), a university-hosted, OpenAI-compatible model gateway - no separate provider accounts or local models needed to run the app.
-
-## Prerequisites
-
-| Requirement | Notes |
-|---|---|
-| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | Includes Docker Compose |
-| `EFRE_API_KEY` | Access key for the EFRE-DiReKT gateway |
 
 ## 1. Setup
 
