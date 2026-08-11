@@ -1,6 +1,8 @@
+name: direkt-calltrainer
+
 services:
-  pjscalltrainer:
-    image: pjscalltrainer
+  app:
+    image: direkt-calltrainer
     build:
       context: .
       dockerfile: ./Dockerfile
