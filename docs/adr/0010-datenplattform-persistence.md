@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by ADR 0026 (Own PostgreSQL Instance for Session Persistence) for Session-related data
 
 ## Context
 
