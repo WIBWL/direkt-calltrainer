@@ -36,24 +36,3 @@ mkdocs serve
 ```
 
 > Also runs on port 8000 by default - stop the app first, or use `mkdocs serve -a localhost:8001` to avoid the port clash.
-
-## 4. Testing without a real API-Key
-
-If no valid `EFRE_API_KEY` is available, or the EFRE-DiReKT server has some other model-provisioning problem, the pipeline can be tested against a local mock server instead.
-
-**Terminal 1:**
-
-```powershell
-python scripts/mock_llm_server.py
-```
-
-**Terminal 2:**
-
-```powershell
-$env:EFRE_URL = "http://localhost:9000"
-uvicorn backend.app:app --reload
-```
-
-This runs only the API on `http://localhost:8000`. For the full UI, also run `npm run dev` in `frontend/` and open `http://localhost:5173`.
-
-> **Note:** Once real credentials are back in `.env`, unset `$env:EFRE_URL` - otherwise it keeps overriding `.env` and pointing the app at the mock server, which likely isn't running anymore.
