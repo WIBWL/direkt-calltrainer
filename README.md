@@ -13,6 +13,8 @@ Calltrainer is a use case built within [EFRE-DiReKT](https://www.wiwi.uni-wuerzb
 
 FastAPI backend, React + TypeScript frontend, one Docker image. Speech-to-text, dialogue generation, and text-to-speech all run through [EFRE-DiReKT](https://efre-direkt.de/), a university-hosted, OpenAI-compatible model gateway - no separate provider accounts or local models needed to run the app.
 
+> **Note:** The EFRE-DiReKT gateway is only reachable from within the University of Würzburg network - connect via campus network or [VPN](https://www.rz.uni-wuerzburg.de/en/services/it-security/vpn/) before running the app.
+
 ## 1. Setup
 
 Copy `.env.example` to `.env` and fill in the real `EFRE_API_KEY`.
