@@ -63,7 +63,7 @@ export default function App() {
   const playback = useStreamedAudioPlayback();
 
   const handleEnded = useCallback(
-    (_reason: "user" | "error", turns: TurnRecord[]) => {
+    (_reason: "user" | "error" | "completed", turns: TurnRecord[]) => {
       playback.reset();
       setTranscript(turns);
       setScreen("transcript");

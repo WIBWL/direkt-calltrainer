@@ -32,7 +32,7 @@ async def session_ws(websocket: WebSocket) -> None:
     persona, language_id, language_name, scenario = handshake
 
     session_id = str(uuid.uuid4())
-    orchestrator = SessionOrchestrator(persona, scenario, language_id, language_name)
+    orchestrator = SessionOrchestrator(persona, scenario, language_id)
     logger.info("Session %s started: persona=%s language=%s", session_id, persona.id, language_name)
 
     await websocket.send_json({"type": "session.started", "session_id": session_id})
@@ -40,8 +40,11 @@ async def session_ws(websocket: WebSocket) -> None:
     try:
         # The Persona opens the call (a freshly generated, varied line) before
         # the client ever gets a chance to send a Turn.
-        if await _forward_turn_events(websocket, orchestrator.run_opening_turn()):
+        outcome = await _forward_turn_events(websocket, orchestrator.run_opening_turn())
+        if outcome == "failed":
             reason = "error"
+        elif outcome == "completed":
+            reason = "completed"
         else:
             reason = await _run_session(websocket, orchestrator)
     except WebSocketDisconnect:
@@ -79,8 +82,9 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, str, str, Scenario]
 
 
 async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) -> str:
-    """Runs Turns until the client ends the Session or a Turn fails. Returns
-    the Session's end reason ("user" or "error")."""
+    """Runs Turns until the client ends the Session, a Turn fails, or the
+    Persona ends the call naturally. Returns the Session's end reason
+    ("user", "error", or "completed")."""
     while True:
         envelope = await _receive_json(websocket)
         if envelope is None or envelope.get("type") == "session.end":
@@ -93,13 +97,15 @@ async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) 
             return "user"
 
         turn = orchestrator.run_turn(audio_bytes, "turn.webm", envelope.get("mime_type"))
-        if await _forward_turn_events(websocket, turn):
-            return "error"
+        outcome = await _forward_turn_events(websocket, turn)
+        if outcome != "ok":
+            return "error" if outcome == "failed" else "completed"
 
 
-async def _forward_turn_events(websocket: WebSocket, events: AsyncIterator[TurnEvent]) -> bool:
-    """Forwards one Turn's events over the wire. Returns True if the Turn
-    failed (an ADR 0017/0026 retry was exhausted)."""
+async def _forward_turn_events(websocket: WebSocket, events: AsyncIterator[TurnEvent]) -> str:
+    """Forwards one Turn's events over the wire. Returns "failed" if the Turn
+    failed (an ADR 0017/0026 retry was exhausted), "completed" if the Persona
+    (or the user, via a farewell) ended the call naturally, else "ok"."""
     async for event in events:
         if isinstance(event, StateChanged):
             await websocket.send_json({"type": "state", "value": event.state})
@@ -110,10 +116,12 @@ async def _forward_turn_events(websocket: WebSocket, events: AsyncIterator[TurnE
             await websocket.send_bytes(event.audio)
         elif isinstance(event, TurnCompleted):
             await websocket.send_json({"type": "turn.completed", "turn_seq": event.turn_seq})
+            if event.ends_call:
+                return "completed"
         elif isinstance(event, Failed):
             await websocket.send_json({"type": "error", "code": event.code, "message": event.message})
-            return True
-    return False
+            return "failed"
+    return "ok"
 
 
 async def _receive_json(websocket: WebSocket) -> dict | None:

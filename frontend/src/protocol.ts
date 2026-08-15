@@ -61,7 +61,7 @@ export interface ErrorMessage {
 
 export interface SessionEndedMessage {
   type: "session.ended";
-  reason: "user" | "error";
+  reason: "user" | "error" | "completed";
   transcript: TurnRecord[];
 }
 

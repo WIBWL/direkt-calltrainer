@@ -13,7 +13,7 @@ interface UseSessionSocketOptions {
    * current one ends. */
   generation: number;
   onAudioChunk: (data: ArrayBuffer) => void;
-  onEnded: (reason: "user" | "error", transcript: TurnRecord[]) => void;
+  onEnded: (reason: "user" | "error" | "completed", transcript: TurnRecord[]) => void;
 }
 
 /**
