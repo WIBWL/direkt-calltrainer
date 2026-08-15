@@ -34,6 +34,10 @@ class TurnCompleted:
     """The current Turn finished successfully; no more chunks will follow."""
 
     turn_seq: int
+    ends_call: bool = False
+    """True if the Persona (or the user, via the Persona's reply to a
+    farewell) naturally concluded the call — the Session should end here
+    rather than return to listening for another Turn."""
 
 
 @dataclass
