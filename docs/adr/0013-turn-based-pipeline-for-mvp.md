@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by ADR 0026 (Streaming Session Pipeline via Chunked TTS over WebSocket)
 
 ## Context
 
