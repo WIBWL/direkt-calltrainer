@@ -25,6 +25,19 @@ export function useMicrophoneVAD(onTurnAudio: (blob: Blob, mimeType: string) => 
         baseAssetPath: "/vad/",
         onnxWASMBasePath: "/vad/",
         startOnLoad: false,
+        // vad-web's own defaults (0.3 / 0.25) leave only a 0.05 gap between
+        // the positive/negative thresholds — narrower than Silero's own
+        // authors recommend (a 0.15 gap, per vad-web's frame-processor
+        // typedoc). With that narrow a gap, real-room background noise
+        // (headset hiss, faint hum) can keep nudging the speech probability
+        // back above negativeSpeechThreshold, so the end-of-speech
+        // "redemption" countdown never completes and onSpeechEnd never
+        // fires — the mic just never registers the user as done talking.
+        // Widening the gap back to Silero's recommended spacing trades a
+        // little sensitivity to very quiet speech for reliably detecting
+        // end-of-speech in a normal (not dead-silent) room.
+        positiveSpeechThreshold: 0.5,
+        negativeSpeechThreshold: 0.35,
         onSpeechStart: () => console.debug("[VAD] speech start"),
         onVADMisfire: () => console.debug("[VAD] misfire (too short, ignored)"),
         onSpeechEnd: (audio: Float32Array) => {
