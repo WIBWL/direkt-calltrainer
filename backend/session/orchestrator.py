@@ -11,7 +11,6 @@ from langdetect import LangDetectException, detect
 from openai import OpenAIError
 
 from backend.clients import llm, stt, tts
-from backend.languages import LANGUAGE_NAMES_EN
 from backend.personas import Persona
 from backend.scenarios import Scenario
 from backend.session.chunking import sentence_chunks
@@ -19,11 +18,8 @@ from backend.session.models import AudioChunk, Failed, StateChanged, Turn, TurnC
 
 logger = logging.getLogger("calltrainer")
 
-# Sent once, ahead of the first Turn, to have the Persona open the call
-# instead of waiting for the user — an ad-hoc instruction rather than
-# persistent history, so it never resurfaces once the real conversation
-# starts. English, like the system prompt (see personas.py) — instructions
-# get followed more reliably in English than in the target reply language.
+_LANGUAGE_NAMES_EN: dict[str, str] = {"de": "German"}
+
 _OPENING_INSTRUCTION = (
     "The call is starting now: you are the one calling, and you speak first. "
     "Open the conversation yourself with 1-2 short, realistic sentences: a "
@@ -35,18 +31,82 @@ _OPENING_INSTRUCTION = (
     "directions. Reply with only that opening line."
 )
 
-# Sent as a one-off corrective nudge (not persisted) if the reply's first
-# chunk wasn't detected as the expected Language.
+_EXAMPLE_EXCHANGE = (
+    "Example of the tone and pacing to aim for (illustrative only — invent "
+    "your own content that fits YOUR actual scenario and character; never "
+    "reuse this text or its specifics):\n"
+    '[Caller opens] "Guten Tag, hier ist Frau Beck von der Buchhaltung, ich '
+    'habe eine Frage zu unserer letzten Rechnung, da stimmt glaube ich was '
+    'nicht."\n'
+    '[Other person] "Guten Tag Frau Beck, worum geht es denn genau?"\n'
+    '[Caller] "Wir wurden für März doppelt belastet, einmal am 3. und '
+    'einmal am 17. Können Sie sich das mal anschauen?"\n'
+    '[Other person] "Das schaue ich mir an. Können Sie mir die '
+    'Rechnungsnummer nennen?"\n'
+    '[Caller] "Die habe ich gerade nicht griffbereit, aber es war ein '
+    'Betrag über 480 Euro. Ehrlich gesagt ist das schon das zweite Mal in '
+    'diesem Jahr, dass bei uns was mit der Abrechnung nicht stimmt." (one '
+    "objection, raised once, naturally — never repeated again later)\n"
+    '[Other person] "Verstehe, das tut mir leid. Ich erstatte Ihnen den '
+    'doppelten Betrag noch heute."\n'
+    '[Caller] "Gut, das reicht mir erstmal. Dann klären wir den Rest, '
+    'sobald ich die Nummer habe. Danke Ihnen, einen schönen Tag noch. '
+    '[CALL_END]" (ends naturally as soon as the concern is addressed — no '
+    "recap of everything said before ending)\n"
+    "Notice: every caller line adds new, concrete information instead of "
+    "restating an earlier one; the objection appears exactly once; the call "
+    "ends the moment the concern is actually resolved."
+)
+
+
+def _build_system_prompt(persona: Persona, scenario: Scenario) -> str:
+    """Builds the LLM system prompt for one Session: the given Persona's
+    character, the given Scenario's call context, and the behavioral
+    instructions (anti-repetition, confabulation, call-ending marker) that
+    apply regardless of which Persona/Scenario it is — this is where the two
+    are combined, not on either data class itself."""
+    return (
+        "You are playing a character in a phone-call training exercise. "
+        "You are the one who called — you initiated this call because you "
+        "have a specific question, concern, or problem you want addressed. "
+        "The user is the person you called (e.g. support/sales), not the "
+        "other way around: never ask the user what their question or "
+        "problem is, and never wait for them to explain why they're "
+        "calling — you're the one with something to discuss.\n"
+        f"Context of the call: {scenario.description}\n"
+        f"Your role: {persona.role}.\n"
+        f"Character traits: {persona.traits}.\n"
+        f"Behavior: {persona.behavior}.\n"
+        "Stay in character and improvise like a real person on a real call: "
+        "when asked for specifics (e.g. \"which points were still open?\", "
+        "\"what do you offer?\", \"why would that help me?\"), invent "
+        "concrete, plausible details on the spot — a product name, a "
+        "number, a prior concern — instead of staying vague or deflecting. "
+        "This is a live conversation, not a scripted FAQ; ground your "
+        "answers in believable specifics that fit the context.\n"
+        "Never repeat yourself. This is the single most common mistake to "
+        "avoid: before every reply, re-read your own previous lines in "
+        "this call and check whether you are about to say the same thing "
+        "again — the same question, recap, or objection — even reworded. "
+        "If so, drop it and say something new instead.\n"
+        f"{_EXAMPLE_EXCHANGE}\n"
+        "If, based on the conversation so far, your questions and concerns "
+        "seem resolved, or the user says goodbye, end the call naturally: "
+        "add one brief, friendly closing line (e.g. thank them, say "
+        "goodbye), then finish your reply with exactly this marker on its "
+        "own and nothing after it: [CALL_END]. Only include that marker "
+        "when the call should truly end — never otherwise, and never "
+        "explain or mention the marker itself.\n"
+        f"Reply exclusively in {_LANGUAGE_NAMES_EN[persona.language_id]}, "
+        "in short, realistic sentences the way people actually talk on "
+        "the phone. Stay true to the role without exaggerating into "
+        "caricature. Output only what the persona would say — no "
+        "meta-commentary, no stage directions."
+    )
+
+
 _LANGUAGE_CORRECTION = "Your last reply wasn't in {language}. From now on, reply exclusively in {language}."
 
-# Sent as a one-off corrective nudge if the reply's first chunk looked like a
-# near-duplicate of an *earlier* Persona reply. The system prompt's
-# anti-repetition instruction alone wasn't reliable enough in testing — a
-# small model can end up reciting the same recap/objection block essentially
-# verbatim, sometimes with a gap of a turn or two rather than back-to-back —
-# so this is a deterministic backstop. Checked against every earlier reply,
-# not just the immediately preceding one, since the repeated block doesn't
-# always resurface on the very next Turn.
 _REPETITION_CORRECTION = (
     "That reply repeated something you already said earlier in this call, "
     "almost word for word. Say something different this time: react "
@@ -69,28 +129,12 @@ def _too_similar_to_previous(text: str, previous_replies: list[str]) -> bool:
     return any(_similar_enough(text_lower, reply) for reply in previous_replies)
 
 
-# Emitted by the Persona at the end of a reply to end the call naturally (see
-# personas.py's instruction) — matched case/whitespace-insensitively since a
-# small model won't always reproduce it byte-for-byte, stripped before the
-# text ever reaches the Transcript or TTS.
 _END_CALL_RE = re.compile(r"\[\s*call[_\s]?end\s*\]", re.IGNORECASE)
 
-# Relying on the system prompt's closing instruction alone wasn't reliable
-# enough in testing (a small model buries it under the persona's other
-# instructions, e.g. its typical objections) — so a farewell from the user is
-# additionally detected deterministically here and reinforced with a one-off,
-# high-priority nudge right before that Turn's reply is generated.
 _FAREWELL_PATTERNS: dict[str, re.Pattern[str]] = {
-    # (?:ö|oe) etc. rather than just the umlaut: STT output is usually proper
-    # German spelling, but tolerating the ASCII transliteration too is cheap
-    # insurance against STT edge cases.
     "de": re.compile(
         r"\b(auf wiederh(?:ö|oe)ren|auf wiedersehen|tsch(?:ü|ue)ss+|tschau|mach'?s gut|"
         r"bis (bald|dann|sp(?:ä|ae)ter)|einen (sch(?:ö|oe)nen tag|sch(?:ö|oe)nen abend))\b",
-        re.IGNORECASE,
-    ),
-    "en": re.compile(
-        r"\b(goodbye|bye( now| bye)?|see you|take care|have a (good|nice|great) (day|one))\b",
         re.IGNORECASE,
     ),
 }
@@ -128,8 +172,9 @@ def _looks_like_expected_language(text: str, language_id: str) -> bool:
         return True
 
 
-class _ReplyProgress:
-    """Mutable state shared across one reply's pipelined TTS chunks."""
+class _ReplyProgress:  # pylint: disable=too-few-public-methods
+    """Mutable state shared across one reply's pipelined TTS chunks — a
+    plain data holder by design, not a candidate for more methods."""
 
     def __init__(self) -> None:
         self.chunk_seq = 0
@@ -145,17 +190,6 @@ def _strip_end_marker(text_chunk: str, progress: _ReplyProgress) -> str:
     return _END_CALL_RE.sub("", text_chunk).strip()
 
 
-# A small model occasionally leaks a handful of Chinese/Japanese/Korean
-# characters into an otherwise German/English reply — confirmed happening in
-# testing. _looks_like_expected_language (whole-chunk statistical
-# classification via langdetect, and only checked on the reply's first chunk)
-# doesn't reliably catch this: a few foreign characters mixed into an
-# otherwise-correct-language chunk usually aren't enough to flip langdetect's
-# overall verdict away from "de"/"en". Stripped from every chunk
-# unconditionally instead of retried — German/English text never legitimately
-# contains these scripts (no false-positive risk), and unlike a language
-# retry this doesn't need to happen before any audio has been sent, so it can
-# apply to later chunks too, not just the first.
 _FOREIGN_SCRIPT_RE = re.compile(
     "["
     "\u3000-\u303f"  # CJK punctuation
@@ -203,13 +237,15 @@ class SessionOrchestrator:
     STT -> LLM -> TTS pass and apply ADR 0017's retry-then-graceful-end
     policy, reinterpreted per-leg for the streaming pipeline (ADR 0026)."""
 
-    def __init__(self, persona: Persona, scenario: Scenario, language_id: str):
-        self._language_id = language_id
-        # English name for the LLM prompt (see personas.py/_OPENING_INSTRUCTION
-        # for why) — distinct from LANGUAGES' German-facing UI display name.
-        self._language_name = LANGUAGE_NAMES_EN[language_id]
+    def __init__(self, persona: Persona, scenario: Scenario):
+        # A Persona has exactly one Language/voice (see personas.py) — no
+        # per-Session choice, so both are derived from the Persona rather
+        # than passed in separately.
+        self._language_id = persona.language_id
+        self._language_name = _LANGUAGE_NAMES_EN[persona.language_id]
+        self._voice = persona.voice
         self._messages: list[dict[str, str]] = [
-            {"role": "system", "content": persona.as_system_prompt(scenario, self._language_name)},
+            {"role": "system", "content": _build_system_prompt(persona, scenario)},
         ]
         self._persona_replies: list[str] = []
         self.turns: list[Turn] = []
@@ -330,11 +366,7 @@ class SessionOrchestrator:
         True, since that budget is spent after one correction), and lets
         `OpenAIError` from the LLM call propagate — both handled by the
         caller's retry loop. A TTS failure is not retried at this level;
-        it's yielded as `Failed` directly. `finally` (rather than `except`)
-        cancels the pipelined TTS task so a barge-in interrupt — delivered as
-        `asyncio.CancelledError` on the Task wrapping this whole generator,
-        not as one of the exceptions above — doesn't leave it orphaned;
-        cancelling an already-awaited (done) task here is a no-op."""
+        it's yielded as `Failed` directly."""
         pending: tuple[str, asyncio.Task[bytes | None]] | None = None
         checked = skip_check
         try:
@@ -354,9 +386,10 @@ class SessionOrchestrator:
 
             async for event in _drain_if_pending(turn, pending, progress):
                 yield event
-        finally:
+        except (OpenAIError, _NeedsCorrection):
             if pending is not None:
                 pending[1].cancel()
+            raise
 
     async def _transcribe_with_retry(
         self, audio_bytes: bytes, filename: str, content_type: str | None
@@ -373,7 +406,7 @@ class SessionOrchestrator:
         """Synthesize one chunk with one retry on failure; None if both attempts fail."""
         for attempt in range(2):  # initial attempt + one retry
             try:
-                return await tts.synthesize(text, self._language_id)
+                return await tts.synthesize(text, self._voice, self._language_id)
             except (OpenAIError, KugelAudioError) as e:
                 logger.error("TTS request failed (attempt %d): %s", attempt + 1, e)
         return None
