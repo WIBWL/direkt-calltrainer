@@ -16,6 +16,7 @@ export interface SessionStartMessage {
   type: "session.start";
   persona_id: string;
   language_id: string;
+  scenario_id: string;
 }
 
 export interface TurnAudioMetaMessage {
@@ -24,11 +25,19 @@ export interface TurnAudioMetaMessage {
   mime_type: string;
 }
 
+export interface TurnInterruptMessage {
+  type: "turn.interrupt";
+}
+
 export interface SessionEndMessage {
   type: "session.end";
 }
 
-export type ClientMessage = SessionStartMessage | TurnAudioMetaMessage | SessionEndMessage;
+export type ClientMessage =
+  | SessionStartMessage
+  | TurnAudioMetaMessage
+  | TurnInterruptMessage
+  | SessionEndMessage;
 
 // --- Server -> Client ---
 

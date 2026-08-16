@@ -8,6 +8,7 @@ const WS_URL = `${API_URL.replace(/^http/, "ws")}/ws/session`;
 interface UseSessionSocketOptions {
   personaId: string | null;
   languageId: string | null;
+  scenarioId: string | null;
   /** Bump to force a fresh connection even when personaId/languageId didn't
    * change — e.g. to start pre-warming the next Session right after the
    * current one ends. */
@@ -27,6 +28,7 @@ interface UseSessionSocketOptions {
 export function useSessionSocket({
   personaId,
   languageId,
+  scenarioId,
   generation,
   onAudioChunk,
   onEnded,
@@ -37,7 +39,7 @@ export function useSessionSocket({
   const turnSeqRef = useRef(0);
 
   useEffect(() => {
-    if (personaId === null || languageId === null) return;
+    if (personaId === null || languageId === null || scenarioId === null) return;
 
     setError(null);
     setCallState("thinking");
@@ -57,7 +59,12 @@ export function useSessionSocket({
     ws.onopen = () => {
       if (!isCurrent()) return;
       console.debug("[WS] connected, sending session.start");
-      const start: ClientMessage = { type: "session.start", persona_id: personaId, language_id: languageId };
+      const start: ClientMessage = {
+        type: "session.start",
+        persona_id: personaId,
+        language_id: languageId,
+        scenario_id: scenarioId,
+      };
       ws.send(JSON.stringify(start));
     };
 
@@ -103,7 +110,7 @@ export function useSessionSocket({
       ws.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reconnecting on every callback identity change would tear down the call
-  }, [personaId, languageId, generation]);
+  }, [personaId, languageId, scenarioId, generation]);
 
   const sendTurnAudio = useCallback((blob: Blob, mimeType: string) => {
     const ws = wsRef.current;
@@ -116,6 +123,20 @@ export function useSessionSocket({
     const meta: ClientMessage = { type: "turn.audio.meta", turn_seq: turnSeqRef.current, mime_type: mimeType };
     ws.send(JSON.stringify(meta));
     void blob.arrayBuffer().then((buf) => ws.send(buf));
+  }, []);
+
+  // Sent as soon as the user starts talking over the Persona (barge-in, see
+  // ADR 0026's follow-up) — a lightweight signal to abandon the in-flight
+  // reply server-side. Harmless if nothing is in flight (e.g. sent right as
+  // the user's own Turn begins): the server just no-ops. Actually silencing
+  // local playback is handled separately and immediately, client-side (see
+  // useStreamedAudioPlayback's stopAll) — this message doesn't gate that.
+  const sendInterrupt = useCallback(() => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    console.debug("[WS] -> turn.interrupt");
+    const interrupt: ClientMessage = { type: "turn.interrupt" };
+    ws.send(JSON.stringify(interrupt));
   }, []);
 
   const endSession = useCallback(() => {
@@ -136,5 +157,5 @@ export function useSessionSocket({
     }
   }, [onEnded]);
 
-  return { callState, error, sendTurnAudio, endSession };
+  return { callState, error, sendTurnAudio, sendInterrupt, endSession };
 }
