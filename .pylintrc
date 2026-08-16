@@ -18,6 +18,11 @@ disable=
     W0511,  # fixme            -- ignore TODO/FIXME comments
     W0611,  # unused-import    -- flake8 (F401) owns this
     W1203,  # logging-fstring-interpolation -- f-strings in logging calls
+    C0114,  # missing-module-docstring -- not required for plain data/config modules
+            # (personas.py, scenarios.py etc.) where the data speaks for itself;
+            # function/method docstrings (C0116) are still enforced for actual logic.
+    C0115,  # missing-class-docstring -- same reasoning, for simple dataclasses
+            # (Persona, Scenario, PersonaVoice) whose fields are self-explanatory.
 
 # Enable specific messages (overrides disable)
 # enable=

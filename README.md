@@ -7,13 +7,13 @@ AI-powered phone conversation trainer with real-time speech analysis and behavio
 
 ## About
 
-Calltrainer is a use case built within [EFRE-DiReKT](https://www.wiwi.uni-wuerzburg.de/wibwl/forschungsprojekte/efre-direkt/), an applied-AI research project at the University of Würzburg's Chair for Business Administration and Business Informatics (WIBWL), funded by the Bavarian Ministry of Science through the EU's European Regional Development Fund. Users practice phone calls against an AI counterpart (a Persona, picked from an extensible library) in a configurable Scenario, then get qualitative feedback on how they communicated, e.g. clarity, tone, structure.
+Calltrainer is a use case built within [EFRE-DiReKT](https://efre-direkt.de/), an applied-AI research project at the University of Würzburg's Chair for Business Administration and Business Informatics, funded by the Bavarian Ministry of Science through the EU's European Regional Development Fund. Users practice phone calls against an AI counterpart (a Persona, picked from an extensible library) in a configurable Scenario, then get qualitative feedback on how they communicated, e.g. clarity, tone, structure.
 
 ## Architecture
 
-FastAPI backend, React + TypeScript frontend, one Docker image. Speech-to-text, dialogue generation, and text-to-speech all run through [EFRE-DiReKT](https://efre-direkt.de/), a university-hosted, OpenAI-compatible model gateway - no separate provider accounts or local models needed to run the app.
+FastAPI backend, React + TypeScript frontend, one Docker image. Speech-to-text, dialogue generation, and text-to-speech all run through a university-hosted, OpenAI-compatible model gateway - no separate provider accounts or local models needed to run the app.
 
-> **Note:** The EFRE-DiReKT gateway is only reachable from within the University of Würzburg network - connect via campus network or [VPN](https://www.rz.uni-wuerzburg.de/en/services/it-security/vpn/) before running the app.
+> **Note:** The EFRE-DiReKT gateway is only reachable from within the University of Würzburg network - connect via campus network or VPN before running the app.
 
 ## 1. Setup
 
@@ -32,6 +32,7 @@ Builds the frontend too (multi-stage Dockerfile) and serves everything on `http:
 The full architecture documentation - arc42 and every Architecture Decision Record (ADR) - is served via [MkDocs](https://www.mkdocs.org):
 
 ```powershell
+pip install -r requirements-docs.txt
 mkdocs serve
 ```
 
