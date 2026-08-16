@@ -13,12 +13,7 @@ const API_URL = import.meta.env.VITE_API_URL ?? "";
 interface Persona {
   id: string;
   name: string;
-  training_goal: string;
-}
-
-interface Language {
-  id: string;
-  name: string;
+  role: string;
 }
 
 interface Scenario {
@@ -31,10 +26,8 @@ type Screen = "setup" | "mic-check" | "call" | "transcript";
 
 export default function App() {
   const [personas, setPersonas] = useState<Persona[]>([]);
-  const [languages, setLanguages] = useState<Language[]>([]);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [personaId, setPersonaId] = useState<string | null>(null);
-  const [languageId, setLanguageId] = useState<string | null>(null);
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [screen, setScreen] = useState<Screen>("setup");
@@ -45,7 +38,7 @@ export default function App() {
     reason: "user" | "error" | "completed";
     turns: TurnRecord[];
   } | null>(null);
-  // Forces a fresh Session even when persona/language didn't change — bumped
+  // Forces a fresh Session even when persona/scenario didn't change — bumped
   // right when a call ends normally, so the *next* Session (and its opening
   // line) starts pre-warming immediately, before the user has asked for it.
   const [generation, setGeneration] = useState(0);
@@ -65,13 +58,6 @@ export default function App() {
         if (data.length > 0) setPersonaId(data[0].id);
       })
       .catch((e) => setLoadError(`Personas konnten nicht geladen werden: ${e.message}`));
-    fetch(`${API_URL}/api/languages`)
-      .then((r) => r.json())
-      .then((data: Language[]) => {
-        setLanguages(data);
-        if (data.length > 0) setLanguageId(data[0].id);
-      })
-      .catch((e) => setLoadError(`Sprachen konnten nicht geladen werden: ${e.message}`));
     fetch(`${API_URL}/api/scenarios`)
       .then((r) => r.json())
       .then((data: Scenario[]) => {
@@ -83,7 +69,7 @@ export default function App() {
 
   // The Session (WebSocket + VAD + audio playback) lives here, at the App
   // level, not inside whichever screen happens to be showing — it connects
-  // as soon as personaId/languageId are known (i.e. on app load, well before
+  // as soon as personaId/scenarioId are known (i.e. on app load, well before
   // "Session starten" is ever clicked) and its opening line is buffered
   // (see useStreamedAudioPlayback's hold/activate) until the call screen
   // actually appears. Speed matters more than a literal "screen order"
@@ -102,7 +88,6 @@ export default function App() {
 
   const socket = useSessionSocket({
     personaId,
-    languageId,
     scenarioId,
     generation,
     onAudioChunk: playback.enqueue,
@@ -123,23 +108,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- playback is stable-shaped; only isPlaying/pendingEnd should retrigger this
   }, [pendingEnd, playback.isPlaying]);
 
-  // Kept as a defensive no-op rather than removed: with the strict gating
-  // below, the mic is never actually armed except during the user's own
-  // "listening" Turn, so this should never fire against a live Persona
-  // reply. It previously also drove an early-barge-in-during-"thinking"
-  // feature, but that let the user's own trailing speech/background noise
-  // re-trigger onSpeechStart *after* their Turn was already sent, cancelling
-  // their own in-flight reply mid-generation — confusing and unreliable in
-  // practice, and full mid-speech barge-in was already ruled out separately
-  // (acoustic feedback without a headset, see useMicrophoneVAD). Simplified
-  // back to strict turn-taking: the mic is only ever live while "Du bist am
-  // Zug" is genuinely true.
-  const handleSpeechStart = useCallback(() => {
-    playback.stopAll();
-    socket.sendInterrupt();
-  }, [playback, socket]);
-
-  const vad = useMicrophoneVAD(socket.sendTurnAudio, handleSpeechStart);
+  const vad = useMicrophoneVAD(socket.sendTurnAudio);
 
   useEffect(() => {
     vad.preload();
@@ -174,7 +143,7 @@ export default function App() {
     setScreen("setup");
   }, [needsReconnect]);
 
-  const readyForCall = personaId !== null && languageId !== null && scenarioId !== null;
+  const readyForCall = personaId !== null && scenarioId !== null;
 
   // The server sends state:"listening" the moment the Turn completes
   // server-side — but the Persona's last audio chunk(s) can still be
@@ -219,7 +188,7 @@ export default function App() {
             type="button"
           >
             <span className="persona-name">{p.name}</span>
-            <span className="persona-goal">{p.training_goal}</span>
+            <span className="card-subtitle">{p.role}</span>
           </button>
         ))}
       </div>
@@ -234,21 +203,7 @@ export default function App() {
             type="button"
           >
             <span className="persona-name">{s.name}</span>
-            <span className="persona-goal">{s.description}</span>
-          </button>
-        ))}
-      </div>
-
-      <h2>Sprache</h2>
-      <div className="language-row">
-        {languages.map((l) => (
-          <button
-            key={l.id}
-            className={"language-pill" + (l.id === languageId ? " selected" : "")}
-            onClick={() => setLanguageId(l.id)}
-            type="button"
-          >
-            {l.name}
+            <span className="card-subtitle">{s.description}</span>
           </button>
         ))}
       </div>

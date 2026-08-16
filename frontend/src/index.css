@@ -89,7 +89,7 @@ h2 {
   font-size: 0.95rem;
 }
 
-.persona-goal {
+.card-subtitle {
   font-size: 0.8rem;
   color: var(--text-muted);
   line-height: 1.4;
