@@ -20,14 +20,11 @@ export function useStreamedAudioPlayback() {
   const scheduleChainRef = useRef<Promise<void>>(Promise.resolve());
   const heldRef = useRef(true);
   const heldChunksRef = useRef<ArrayBuffer[]>([]);
+  // Tracked so reset() can actually silence whatever's still playing when a
+  // call ends — without this, audio already scheduled (e.g. the Persona's
+  // closing line) would keep playing out through the speakers even after
+  // the app has moved on to the transcript screen.
   const activeSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
-  // Bumped by stopAll() to invalidate chunks already sitting in
-  // scheduleChainRef's promise chain (decodeAudioData is async, so a chunk
-  // enqueued just before an interrupt can still resolve afterwards — a plain
-  // reassignment of scheduleChainRef.current wouldn't stop an already-chained
-  // .then() callback from running). Each scheduled chunk captures the epoch
-  // it was enqueued under and checks it's still current before playing.
-  const epochRef = useRef(0);
 
   const getContext = useCallback(() => {
     if (!audioContextRef.current) {
@@ -43,23 +40,14 @@ export function useStreamedAudioPlayback() {
 
   const scheduleChunk = useCallback(
     (data: ArrayBuffer) => {
-      const epoch = epochRef.current;
       pendingCountRef.current += 1;
       setIsPlaying(true);
       // Chained so chunks are decoded+scheduled in arrival order even though
       // decodeAudioData is async and could otherwise resolve out of order.
       scheduleChainRef.current = scheduleChainRef.current.then(async () => {
-        if (epoch !== epochRef.current) {
-          finishPending();
-          return;
-        }
         const ctx = getContext();
         try {
           const audioBuffer = await ctx.decodeAudioData(data.slice(0));
-          if (epoch !== epochRef.current) {
-            finishPending();
-            return;
-          }
           const source = ctx.createBufferSource();
           source.buffer = audioBuffer;
           source.connect(ctx.destination);
@@ -99,11 +87,7 @@ export function useStreamedAudioPlayback() {
     for (const data of held) scheduleChunk(data);
   }, [scheduleChunk]);
 
-  /** Immediately silences whatever's currently playing or queued — used both
-   * for barge-in (user starts talking over the Persona) and to make sure
-   * nothing keeps playing after the call has ended. */
-  const stopAll = useCallback(() => {
-    epochRef.current += 1;
+  const reset = useCallback(() => {
     for (const source of activeSourcesRef.current) {
       source.onended = null; // avoid a double pendingCount decrement below
       try {
@@ -116,14 +100,10 @@ export function useStreamedAudioPlayback() {
     scheduleChainRef.current = Promise.resolve();
     nextStartTimeRef.current = 0;
     pendingCountRef.current = 0;
+    heldRef.current = true;
     heldChunksRef.current = [];
     setIsPlaying(false);
   }, []);
-
-  const reset = useCallback(() => {
-    stopAll();
-    heldRef.current = true;
-  }, [stopAll]);
 
   useEffect(() => {
     return () => {
@@ -131,5 +111,5 @@ export function useStreamedAudioPlayback() {
     };
   }, []);
 
-  return { enqueue, activate, reset, stopAll, isPlaying };
+  return { enqueue, activate, reset, isPlaying };
 }

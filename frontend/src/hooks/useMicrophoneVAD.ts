@@ -13,18 +13,8 @@ const SAMPLE_RATE = 16000;
  * scripts/copy-vad-assets.mjs) — a real trained speech/non-speech model
  * instead of a hand-rolled amplitude threshold, which proved too unreliable
  * (missed or badly-timed end-of-speech detection).
- *
- * Listens continuously once armed — including while the Persona is
- * "thinking"/"speaking" — rather than pausing itself after each utterance,
- * so the user can barge in over the Persona's reply (see ADR 0026's
- * follow-up on interruption support). `onSpeechStart` fires the instant
- * speech is detected (used to interrupt playback immediately); `onTurnAudio`
- * fires once the utterance finishes, exactly as before.
  */
-export function useMicrophoneVAD(
-  onTurnAudio: (blob: Blob, mimeType: string) => void,
-  onSpeechStart?: () => void,
-) {
+export function useMicrophoneVAD(onTurnAudio: (blob: Blob, mimeType: string) => void) {
   const [micError, setMicError] = useState<string | null>(null);
   const vadRef = useRef<Awaited<ReturnType<typeof MicVAD.new>> | null>(null);
   const initRef = useRef<Promise<void> | null>(null);
@@ -48,16 +38,11 @@ export function useMicrophoneVAD(
         // end-of-speech in a normal (not dead-silent) room.
         positiveSpeechThreshold: 0.5,
         negativeSpeechThreshold: 0.35,
-        onSpeechStart: () => {
-          console.debug("[VAD] speech start");
-          onSpeechStart?.();
-        },
+        onSpeechStart: () => console.debug("[VAD] speech start"),
         onVADMisfire: () => console.debug("[VAD] misfire (too short, ignored)"),
         onSpeechEnd: (audio: Float32Array) => {
           console.debug("[VAD] speech end, samples:", audio.length);
-          // No pause()/restart here: stays armed so it can immediately pick
-          // up the *next* utterance, whether that's the next normal Turn or
-          // another barge-in.
+          void vadRef.current?.pause();
           onTurnAudio(encodeWav(audio, SAMPLE_RATE), "audio/wav");
         },
       })
@@ -69,7 +54,7 @@ export function useMicrophoneVAD(
         });
     }
     await initRef.current;
-  }, [onTurnAudio, onSpeechStart]);
+  }, [onTurnAudio]);
 
   // Fire-and-forget: starts fetching/initializing the ~15MB VAD model in the
   // background (e.g. during mic-check) so it's already warm by the time
