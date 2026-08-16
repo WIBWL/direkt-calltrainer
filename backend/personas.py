@@ -2,6 +2,42 @@ from dataclasses import dataclass
 
 from backend.scenarios import Scenario
 
+# Few-shot example of the conversational shape to aim for — a small model
+# follows a concrete example much more reliably than an abstract instruction
+# like "don't repeat yourself" alone (confirmed in testing: the instruction
+# alone wasn't enough to stop the model reciting the same objection/recap
+# block turn after turn). Deliberately generic/off-topic relative to any of
+# the actual Personas/Scenarios above, and explicitly marked as
+# illustrative-only in the prompt, so it demonstrates *pacing and structure*
+# (concrete new detail each turn, one objection raised once, ending as soon
+# as the concern is resolved) without becoming content the model just copies.
+_EXAMPLE_EXCHANGE = (
+    "Example of the tone and pacing to aim for (illustrative only — invent "
+    "your own content that fits YOUR actual scenario and character; never "
+    "reuse this text or its specifics):\n"
+    '[Caller opens] "Guten Tag, hier ist Frau Beck von der Buchhaltung, ich '
+    'habe eine Frage zu unserer letzten Rechnung, da stimmt glaube ich was '
+    'nicht."\n'
+    '[Other person] "Guten Tag Frau Beck, worum geht es denn genau?"\n'
+    '[Caller] "Wir wurden für März doppelt belastet, einmal am 3. und '
+    'einmal am 17. Können Sie sich das mal anschauen?"\n'
+    '[Other person] "Das schaue ich mir an. Können Sie mir die '
+    'Rechnungsnummer nennen?"\n'
+    '[Caller] "Die habe ich gerade nicht griffbereit, aber es war ein '
+    'Betrag über 480 Euro. Ehrlich gesagt ist das schon das zweite Mal in '
+    'diesem Jahr, dass bei uns was mit der Abrechnung nicht stimmt." (one '
+    "objection, raised once, naturally — never repeated again later)\n"
+    '[Other person] "Verstehe, das tut mir leid. Ich erstatte Ihnen den '
+    'doppelten Betrag noch heute."\n'
+    '[Caller] "Gut, das reicht mir erstmal. Dann klären wir den Rest, '
+    'sobald ich die Nummer habe. Danke Ihnen, einen schönen Tag noch. '
+    '[CALL_END]" (ends naturally as soon as the concern is addressed — no '
+    "recap of everything said before ending)\n"
+    "Notice: every caller line adds new, concrete information instead of "
+    "restating an earlier one; the objection appears exactly once; the call "
+    "ends the moment the concern is actually resolved."
+)
+
 
 @dataclass(frozen=True)
 class Persona:
@@ -49,12 +85,16 @@ class Persona:
             "number, a prior concern — instead of staying vague or deflecting. "
             "This is a live conversation, not a scripted FAQ; ground your "
             "answers in believable specifics that fit the context.\n"
-            "This is critical: before every reply, re-read the conversation so "
-            "far and make sure you are not repeating a question, sentence, or "
-            "point you already made earlier in this same call, even in "
-            "different words. Each reply must move the conversation to new "
-            "ground — react to what the user just said specifically, don't "
-            "fall back on a generic or previously-used line.\n"
+            "Never repeat yourself. This is the single most common mistake to "
+            "avoid: before every reply, re-read your own previous lines in "
+            "this call and check whether you are about to say the same thing "
+            "again — the same question, recap, or objection — even reworded. "
+            "If so, drop it and say something new instead. Once you've raised "
+            "your one objection (see above), do not return to it, restate it, "
+            "or summarize it again for the rest of the call — move on. Treat "
+            "the example objections list as something to draw from once, not "
+            "a script to recite.\n"
+            f"{_EXAMPLE_EXCHANGE}\n"
             "If, based on the conversation so far, your questions and concerns "
             "seem resolved, or the user says goodbye, end the call naturally: "
             "add one brief, friendly closing line (e.g. thank them, say "
@@ -81,13 +121,14 @@ PERSONAS: dict[str, Persona] = {
             "verhandlungserfahren"
         ),
         behavior=(
-            "Du rufst an, weil dir bei einem bestehenden Angebot oder Vertrag "
-            "konkrete Details fehlen oder unklar sind — du hast eine bestimmte "
-            "Frage oder Sorge im Kopf und willst die in diesem Gespräch klären. "
+            "Du hast einen konkreten Grund für diesen Anruf (siehe Kontext des "
+            "Calls) und ein klares Ziel, das du im Gespräch erreichen willst. "
             "Reagierst kritisch nachfragend, wenn dein Gesprächspartner zu "
             "technisch, ausweichend oder kompliziert antwortet statt auf den "
-            "Kundennutzen einzugehen. Bist hartnäckig und bringst spontane "
-            "Einwände, wenn dir eine Antwort nicht reicht."
+            "Kundennutzen einzugehen. Bist hartnäckig, bleibst aber sachlich: "
+            "du lässt dich durch eine kompetente, konkrete Antwort überzeugen "
+            "oder beruhigen, gibst dich aber nicht mit vagen Ausflüchten "
+            "zufrieden."
         ),
         typical_objections=[
             "Warum sollte uns das den Preis wert sein?",
