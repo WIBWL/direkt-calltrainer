@@ -40,7 +40,7 @@ export function useMicrophoneLevel() {
       analyserRef.current = analyser;
       poll();
     } catch (e) {
-      setError((e as Error).message);
+      setError(e instanceof Error ? e.message : String(e));
     }
   }, [poll]);
 
