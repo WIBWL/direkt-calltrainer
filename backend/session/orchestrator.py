@@ -40,10 +40,13 @@ _OPENING_INSTRUCTION = (
 _LANGUAGE_CORRECTION = "Your last reply wasn't in {language}. From now on, reply exclusively in {language}."
 
 # Sent as a one-off corrective nudge if the reply's first chunk looked like a
-# near-duplicate of the Persona's immediately preceding reply. The system
-# prompt's anti-repetition instruction alone wasn't reliable enough in
-# testing — a small model can end up reciting the same recap/objection block
-# essentially verbatim, turn after turn — so this is a deterministic backstop.
+# near-duplicate of an *earlier* Persona reply. The system prompt's
+# anti-repetition instruction alone wasn't reliable enough in testing — a
+# small model can end up reciting the same recap/objection block essentially
+# verbatim, sometimes with a gap of a turn or two rather than back-to-back —
+# so this is a deterministic backstop. Checked against every earlier reply,
+# not just the immediately preceding one, since the repeated block doesn't
+# always resurface on the very next Turn.
 _REPETITION_CORRECTION = (
     "That reply repeated something you already said earlier in this call, "
     "almost word for word. Say something different this time: react "
@@ -53,10 +56,17 @@ _SIMILARITY_THRESHOLD = 0.6
 _MIN_CHARS_FOR_SIMILARITY_CHECK = 30  # too short to compare meaningfully below this
 
 
-def _too_similar_to_previous(text: str, previous_reply: str) -> bool:
-    if len(text) < _MIN_CHARS_FOR_SIMILARITY_CHECK or len(previous_reply) < _MIN_CHARS_FOR_SIMILARITY_CHECK:
+def _similar_enough(text_lower: str, reply: str) -> bool:
+    if len(reply) < _MIN_CHARS_FOR_SIMILARITY_CHECK:
         return False
-    return SequenceMatcher(None, text.lower(), previous_reply.lower()).ratio() > _SIMILARITY_THRESHOLD
+    return SequenceMatcher(None, text_lower, reply.lower()).ratio() > _SIMILARITY_THRESHOLD
+
+
+def _too_similar_to_previous(text: str, previous_replies: list[str]) -> bool:
+    if len(text) < _MIN_CHARS_FOR_SIMILARITY_CHECK:
+        return False
+    text_lower = text.lower()
+    return any(_similar_enough(text_lower, reply) for reply in previous_replies)
 
 
 # Emitted by the Persona at the end of a reply to end the call naturally (see
@@ -135,6 +145,32 @@ def _strip_end_marker(text_chunk: str, progress: _ReplyProgress) -> str:
     return _END_CALL_RE.sub("", text_chunk).strip()
 
 
+# A small model occasionally leaks a handful of Chinese/Japanese/Korean
+# characters into an otherwise German/English reply — confirmed happening in
+# testing. _looks_like_expected_language (whole-chunk statistical
+# classification via langdetect, and only checked on the reply's first chunk)
+# doesn't reliably catch this: a few foreign characters mixed into an
+# otherwise-correct-language chunk usually aren't enough to flip langdetect's
+# overall verdict away from "de"/"en". Stripped from every chunk
+# unconditionally instead of retried — German/English text never legitimately
+# contains these scripts (no false-positive risk), and unlike a language
+# retry this doesn't need to happen before any audio has been sent, so it can
+# apply to later chunks too, not just the first.
+_FOREIGN_SCRIPT_RE = re.compile(
+    "["
+    "\u3000-\u303f"  # CJK punctuation
+    "\u3040-\u30ff"  # Hiragana + Katakana
+    "\u3400-\u4dbf"  # CJK Unified Ideographs Extension A
+    "\u4e00-\u9fff"  # CJK Unified Ideographs
+    "\uac00-\ud7a3"  # Hangul syllables
+    "]+"
+)
+
+
+def _strip_foreign_script(text_chunk: str) -> str:
+    return _FOREIGN_SCRIPT_RE.sub("", text_chunk).strip()
+
+
 async def _drain_if_pending(
     turn: Turn, pending: tuple[str, "asyncio.Task[bytes | None]"] | None, progress: _ReplyProgress
 ) -> AsyncIterator[TurnEvent]:
@@ -175,7 +211,7 @@ class SessionOrchestrator:
         self._messages: list[dict[str, str]] = [
             {"role": "system", "content": persona.as_system_prompt(scenario, self._language_name)},
         ]
-        self._last_persona_reply: str | None = None
+        self._persona_replies: list[str] = []
         self.turns: list[Turn] = []
 
     async def run_opening_turn(self) -> AsyncIterator[TurnEvent]:
@@ -259,7 +295,7 @@ class SessionOrchestrator:
 
         turn.persona_text = turn.persona_text.strip()
         self._messages.append({"role": "assistant", "content": turn.persona_text})
-        self._last_persona_reply = turn.persona_text
+        self._persona_replies.append(turn.persona_text)
 
         ends_call = progress.ends_call or force_end_call
         yield TurnCompleted(turn_seq=turn.seq, ends_call=ends_call)
@@ -275,7 +311,7 @@ class SessionOrchestrator:
         if not _looks_like_expected_language(text_chunk, self._language_id):
             logger.warning("Reply looked like the wrong language, retrying with a correction")
             raise _NeedsCorrection(_LANGUAGE_CORRECTION.format(language=self._language_name))
-        if self._last_persona_reply and _too_similar_to_previous(text_chunk, self._last_persona_reply):
+        if _too_similar_to_previous(text_chunk, self._persona_replies):
             logger.warning("Reply looked too similar to the previous one, retrying with a correction")
             raise _NeedsCorrection(_REPETITION_CORRECTION)
         return True
@@ -294,13 +330,18 @@ class SessionOrchestrator:
         True, since that budget is spent after one correction), and lets
         `OpenAIError` from the LLM call propagate — both handled by the
         caller's retry loop. A TTS failure is not retried at this level;
-        it's yielded as `Failed` directly."""
+        it's yielded as `Failed` directly. `finally` (rather than `except`)
+        cancels the pipelined TTS task so a barge-in interrupt — delivered as
+        `asyncio.CancelledError` on the Task wrapping this whole generator,
+        not as one of the exceptions above — doesn't leave it orphaned;
+        cancelling an already-awaited (done) task here is a no-op."""
         pending: tuple[str, asyncio.Task[bytes | None]] | None = None
         checked = skip_check
         try:
             async for text_chunk in sentence_chunks(llm.stream_reply(messages)):
                 checked = self._check_first_chunk_once(checked, text_chunk)
                 text_chunk = _strip_end_marker(text_chunk, progress)
+                text_chunk = _strip_foreign_script(text_chunk)
 
                 if text_chunk:
                     turn.persona_text += text_chunk + " "
@@ -313,10 +354,9 @@ class SessionOrchestrator:
 
             async for event in _drain_if_pending(turn, pending, progress):
                 yield event
-        except (OpenAIError, _NeedsCorrection):
+        finally:
             if pending is not None:
                 pending[1].cancel()
-            raise
 
     async def _transcribe_with_retry(
         self, audio_bytes: bytes, filename: str, content_type: str | None
