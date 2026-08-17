@@ -22,18 +22,38 @@ from backend.db.base import Base
 class Persona(Base):
     __tablename__ = "persona"
     persona_id: Mapped[int] = mapped_column(primary_key=True)
+    schluessel: Mapped[str] = mapped_column(String(60), unique=True)  # tech-averse-management
     name: Mapped[str] = mapped_column(String(120))
     rolle: Mapped[str] = mapped_column(String(120))
     haltung: Mapped[str] = mapped_column(String(120))
+    verhalten: Mapped[str] = mapped_column(Text)
+    trainingsziel: Mapped[str] = mapped_column(Text)
     schwierigkeitsgrad: Mapped[str] = mapped_column(String(40))
     aktiv: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    einwaende: Mapped[list["PersonaEinwand"]] = relationship(
+        back_populates="persona", order_by="PersonaEinwand.reihenfolge"
+    )
     sessions: Mapped[list["Session"]] = relationship(back_populates="persona")
+
+
+class PersonaEinwand(Base):
+    """Ein typischer Einwand einer Persona. Eigene Tabelle statt Liste in der
+    persona-Zeile, damit das Schema normalisiert bleibt (ADR 0028)."""
+
+    __tablename__ = "persona_einwand"
+    einwand_id: Mapped[int] = mapped_column(primary_key=True)
+    persona_id: Mapped[int] = mapped_column(ForeignKey("persona.persona_id"))
+    reihenfolge: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+
+    persona: Mapped["Persona"] = relationship(back_populates="einwaende")
 
 
 class Szenario(Base):
     __tablename__ = "szenario"
     szenario_id: Mapped[int] = mapped_column(primary_key=True)
+    schluessel: Mapped[str] = mapped_column(String(60), unique=True)  # cold-call-followup
     typ: Mapped[str] = mapped_column(String(60))
     titel: Mapped[str] = mapped_column(String(160))
     beschreibung: Mapped[str] = mapped_column(Text)

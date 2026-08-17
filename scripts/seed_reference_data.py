@@ -26,7 +26,13 @@ sys.path.insert(0, PROJECT_ROOT)
 # liest DATABASE_URL beim Import aus der Umgebung.
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
-from backend.db.models import MetrikTyp, Persona, Sprache, Szenario  # noqa: E402
+from backend.db.models import (  # noqa: E402
+    MetrikTyp,
+    Persona,
+    PersonaEinwand,
+    Sprache,
+    Szenario,
+)
 from backend.db.session import session_scope  # noqa: E402
 from backend.languages import LANGUAGES  # noqa: E402
 from backend.personas import PERSONAS  # noqa: E402
@@ -67,60 +73,104 @@ METRIK_TYPEN = [
 ]
 
 
-def upsert(db, model, natural_key: dict, werte: dict) -> bool:
+def upsert(db, model, natural_key: dict, werte: dict):
     """Legt den Datensatz an oder bringt ihn auf den Seed-Stand.
 
-    Gibt True zurueck, wenn neu angelegt wurde, sonst False.
+    Gibt (objekt, neu_angelegt) zurueck.
     """
     obj = db.query(model).filter_by(**natural_key).one_or_none()
     if obj is None:
-        db.add(model(**natural_key, **werte))
-        return True
+        obj = model(**natural_key, **werte)
+        db.add(obj)
+        return obj, True
     for feld, wert in werte.items():
         setattr(obj, feld, wert)
-    return False
+    return obj, False
 
 
 def seed_sprachen(db) -> int:
     neu = 0
     for code, bezeichnung in LANGUAGES.items():
-        neu += upsert(db, Sprache, {"sprache_code": code}, {"bezeichnung": bezeichnung})
+        _, angelegt = upsert(
+            db, Sprache, {"sprache_code": code}, {"bezeichnung": bezeichnung}
+        )
+        neu += angelegt
     return neu
+
+
+def seed_einwaende(db, persona: Persona, einwaende: list[str]) -> None:
+    """Bringt die Einwaende einer Persona auf den Seed-Stand.
+
+    Abgleich ueber (persona_id, reihenfolge): vorhandene Positionen werden
+    aktualisiert, ueberzaehlige entfernt. So bleiben die IDs ueber mehrere
+    Laeufe stabil, statt bei jedem Lauf neu vergeben zu werden.
+    """
+    for position, text in enumerate(einwaende):
+        vorhanden = (
+            db.query(PersonaEinwand)
+            .filter_by(persona_id=persona.persona_id, reihenfolge=position)
+            .one_or_none()
+        )
+        if vorhanden is None:
+            db.add(
+                PersonaEinwand(
+                    persona_id=persona.persona_id, reihenfolge=position, text=text
+                )
+            )
+        else:
+            vorhanden.text = text
+
+    db.query(PersonaEinwand).filter(
+        PersonaEinwand.persona_id == persona.persona_id,
+        PersonaEinwand.reihenfolge >= len(einwaende),
+    ).delete(synchronize_session=False)
 
 
 def seed_personas(db) -> int:
     neu = 0
     for p in PERSONAS.values():
-        neu += upsert(
+        persona, angelegt = upsert(
             db,
             Persona,
-            {"name": p.name},
+            {"schluessel": p.id},
             {
+                "name": p.name,
                 "rolle": p.role,
                 "haltung": p.traits,
+                "verhalten": p.behavior,
+                "trainingsziel": p.training_goal,
                 "schwierigkeitsgrad": DEFAULT_SCHWIERIGKEITSGRAD,
                 "aktiv": True,
             },
         )
+        neu += angelegt
+        # persona_id wird erst beim Flush vergeben, die Einwaende brauchen sie.
+        db.flush()
+        seed_einwaende(db, persona, p.typical_objections)
     return neu
 
 
 def seed_szenarien(db) -> int:
     neu = 0
     for s in SCENARIOS.values():
-        neu += upsert(
+        _, angelegt = upsert(
             db,
             Szenario,
-            {"titel": s.name},
-            {"typ": DEFAULT_SZENARIO_TYP, "beschreibung": s.description},
+            {"schluessel": s.id},
+            {
+                "typ": DEFAULT_SZENARIO_TYP,
+                "titel": s.name,
+                "beschreibung": s.description,
+            },
         )
+        neu += angelegt
     return neu
 
 
 def seed_metrik_typen(db) -> int:
     neu = 0
     for schluessel, bezeichnung, einheit, feature_id, aktiv in METRIK_TYPEN:
-        neu += upsert(
+        _, angelegt = upsert(
             db,
             MetrikTyp,
             {"schluessel": schluessel},
@@ -131,6 +181,7 @@ def seed_metrik_typen(db) -> int:
                 "aktiv": aktiv,
             },
         )
+        neu += angelegt
     return neu
 
 
@@ -149,6 +200,7 @@ def main() -> None:
         print("Bestand:     "
               f"Sprache: {db.query(Sprache).count()}, "
               f"Persona: {db.query(Persona).count()}, "
+              f"PersonaEinwand: {db.query(PersonaEinwand).count()}, "
               f"Szenario: {db.query(Szenario).count()}, "
               f"MetrikTyp: {db.query(MetrikTyp).count()}")
 
