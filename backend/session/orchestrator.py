@@ -1,4 +1,4 @@
-"""Session/Turn orchestration: the STT -> LLM -> TTS pipeline and its retry policy."""
+"""Session orchestration: STT -> LLM -> TTS pipeline and retry policy."""
 
 import asyncio
 import logging
@@ -60,11 +60,7 @@ _EXAMPLE_EXCHANGE = (
 
 
 def _build_system_prompt(persona: Persona, scenario: Scenario) -> str:
-    """Builds the LLM system prompt for one Session: the given Persona's
-    character, the given Scenario's call context, and the behavioral
-    instructions (anti-repetition, confabulation, call-ending marker) that
-    apply regardless of which Persona/Scenario it is — this is where the two
-    are combined, not on either data class itself."""
+    """Builds the LLM system prompt."""
     return (
         "You are playing a character in a phone-call training exercise. "
         "You are the one who called — you initiated this call because you "
@@ -152,8 +148,7 @@ def _sounds_like_farewell(text: str, language_id: str) -> bool:
 
 class _NeedsCorrection(Exception):
     """Internal control-flow signal: the reply's first chunk needs a
-    corrective retry (wrong Language, or too similar to the previous reply)
-    — carries the one-off nudge message to retry with."""
+    corrective retry (wrong language or too similar to previous reply)."""
 
     def __init__(self, correction: str):
         super().__init__(correction)
