@@ -1,4 +1,4 @@
-"""FastAPI app: REST endpoints for setup data, WebSocket route for the live Session, static frontend."""
+"""FastAPI app: REST endpoints for setup data, WebSocket route for the live session, static frontend."""
 
 import logging
 import os
@@ -21,13 +21,7 @@ logger = logging.getLogger("calltrainer")
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     """EFRE_URL is only reachable via the university network. Without it,
-    every single STT/LLM/TTS call fails with a 403 that looks like a
-    credentials problem, easy to miss buried in per-request logs, and (before
-    this check existed) triggered a reconnect loop on the frontend since each
-    failed opening Turn immediately re-triggered a fresh pre-warm attempt.
-    This logs one clear, actionable error right at startup instead — a
-    non-2xx response still means the host was reached (network is fine, there's
-    just no handler at "/"), so only an actual connection failure counts."""
+    every call fails with a 403 that looks like a credentials problem."""
     efre_url = os.environ["EFRE_URL"]
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -41,10 +35,8 @@ app = FastAPI(title="CallTrainer API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    # Only relevant for `npm run dev` (Vite dev server on its own origin);
-    # the Docker/production build is same-origin (this app serves the
-    # frontend itself), so CORS doesn't come into play there.
-    allow_origins=[os.environ.get("CORS_ORIGIN", "http://localhost:5173")],
+    # Only relevant for dev server
+    allow_origins=["http://localhost:5173"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -62,14 +54,13 @@ def health() -> dict[str, str]:
 
 @app.get("/api/personas")
 def list_personas() -> list[dict[str, str]]:
-    """List Personas available for Session setup."""
+    """List personas available for session setup."""
     return [{"id": p.id, "name": p.name, "role": p.role} for p in PERSONAS]
 
 
 @app.get("/api/scenarios")
 def list_scenarios() -> list[dict[str, str]]:
-    """List Scenarios available for Session setup. Any Scenario can be run
-    with any Persona — there's no restriction to filter by."""
+    """List scenarios available for session setup."""
     return [{"id": s.id, "name": s.name, "description": s.description} for s in SCENARIOS]
 
 

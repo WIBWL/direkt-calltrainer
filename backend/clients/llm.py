@@ -7,7 +7,13 @@ from backend.clients.config import LLM_BACKEND, LLM_CLIENT, LLM_MODEL
 
 logger = logging.getLogger("calltrainer")
 
-_MAX_REPLY_TOKENS = 300
+# Upper bound on worst-case latency and cost per reply, not a target length:
+# the system prompt already constrains replies to short, realistic sentences,
+# and observed completion-token usage stays well within double digits. This
+# cap only matters if that constraint is ever violated (e.g. a degenerate
+# repetition loop), so it's set generously above normal usage rather than
+# tuned tightly against it.
+_MAX_REPLY_TOKENS = 250
 
 
 async def stream_reply(messages: list[dict[str, str]]) -> AsyncIterator[str]:

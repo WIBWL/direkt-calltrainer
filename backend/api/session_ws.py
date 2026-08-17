@@ -1,4 +1,4 @@
-"""WebSocket API route for the live Session: wire protocol <-> SessionOrchestrator."""
+"""WebSocket API route for the live session: wire protocol <-> SessionOrchestrator."""
 
 import json
 import logging
@@ -19,10 +19,8 @@ router = APIRouter()
 
 @router.websocket("/ws/session")
 async def session_ws(websocket: WebSocket) -> None:
-    """One WebSocket connection per Session. Wire protocol: JSON control
-    messages; binary audio sent as a raw WS binary frame immediately following
-    its JSON "meta" message — WS delivery order on one connection is
-    guaranteed, so client and server pair them positionally."""
+    """One WebSocket connection per session. Control messages are JSON;
+    audio is sent as a raw binary frame right after its "turn.audio.meta" message."""
     await websocket.accept()
 
     handshake = await _handshake(websocket)
@@ -37,8 +35,7 @@ async def session_ws(websocket: WebSocket) -> None:
     await websocket.send_json({"type": "session.started", "session_id": session_id})
 
     try:
-        # The Persona opens the call (a freshly generated, varied line) before
-        # the client ever gets a chance to send a Turn.
+        # Persona opens the call
         outcome = await _forward_turn_events(websocket, orchestrator.run_opening_turn())
         if outcome == "failed":
             reason = "error"
@@ -58,12 +55,8 @@ async def session_ws(websocket: WebSocket) -> None:
         await websocket.send_json({"type": "session.ended", "reason": reason, "transcript": transcript})
         await websocket.close()
     except (WebSocketDisconnect, RuntimeError):
-        # The client can disconnect in the narrow window between _run_session
-        # returning and this final send — observed in testing as uvicorn's
-        # ASGI layer raising a plain RuntimeError ("Unexpected ASGI message
-        # 'websocket.send', after sending 'websocket.close'"), not the
-        # higher-level WebSocketDisconnect the rest of this module catches.
-        # Nothing to recover: the client is already gone.
+        # Client can disconnect between _run_session and final send
+        # e.g. ASGI message 'websocket.send' after 'websocket.close'
         logger.info("Session %s: client disconnected before session.ended could be sent", session_id)
         return
     logger.info("Session %s ended (%s)", session_id, reason)
@@ -71,14 +64,13 @@ async def session_ws(websocket: WebSocket) -> None:
 
 async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
     """Reads the required `session.start` message, closing the socket and
-    returning None on any malformed or unknown input. Any Persona can run
-    any Scenario — Language isn't part of this handshake at all, since each
-    Persona has exactly one fixed Language (see personas.py)."""
+    returning None on any malformed or unknown input."""
     try:
         start = await websocket.receive_json()
     except WebSocketDisconnect:
         return None
     if start.get("type") != "session.start":
+        # Protocol Error (1002; https://websocket.org/reference/close-codes/)
         await websocket.close(code=1002, reason="Expected session.start")
         return None
 
@@ -87,15 +79,15 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
     persona = next((p for p in PERSONAS if p.id == persona_id), None)
     scenario = next((s for s in SCENARIOS if s.id == scenario_id), None)
     if persona is None or scenario is None:
+        # Protocol Error (1002; https://websocket.org/reference/close-codes/)
         await websocket.close(code=1002, reason="Unknown persona_id/scenario_id")
         return None
     return persona, scenario
 
 
 async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) -> str:
-    """Runs Turns until the client ends the Session, a Turn fails, or the
-    Persona ends the call naturally. Returns the Session's end reason
-    ("user", "error", or "completed")."""
+    """Session runs until the user ends the session, a turn fails, or the
+    persona ends the call naturally ("user", "error", or "completed")."""
     while True:
         envelope = await _receive_json(websocket)
         if envelope is None or envelope.get("type") == "session.end":
@@ -114,9 +106,8 @@ async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) 
 
 
 async def _forward_turn_events(websocket: WebSocket, events: AsyncIterator[TurnEvent]) -> str:
-    """Forwards one Turn's events over the wire. Returns "failed" if the Turn
-    failed (an ADR 0017/0026 retry was exhausted), "completed" if the Persona
-    (or the user, via a farewell) ended the call naturally, else "ok"."""
+    """Forwards the events of a turn. Returns "failed" if the turn failed,
+    "completed" if the persona or the user ended the call naturally, else "ok"."""
     async for event in events:
         if isinstance(event, StateChanged):
             await websocket.send_json({"type": "state", "value": event.state})

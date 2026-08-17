@@ -4,24 +4,22 @@ import io
 import logging
 import wave
 
-from backend.clients.config import CLIENT, KUGELAUDIO_CLIENT, KUGELAUDIO_MODEL, TTS_BACKEND, TTS_MODEL
+from backend.clients.config import TTS_BACKEND, TTS_CLIENT, TTS_MODEL
 from backend.personas import PersonaVoice
 
 logger = logging.getLogger("calltrainer")
 
 
 async def synthesize(text: str, voice: PersonaVoice, language_id: str) -> bytes:
-    """Synthesize one chunk of reply text to speech."""
+    """Synthesize one chunk of text reply to speech."""
     if TTS_BACKEND == "kugelaudio":
         return await _synthesize_kugelaudio(text, voice, language_id)
-    return await _synthesize_efre(text, voice)
+    return await _synthesize(text, voice)
 
 
-async def _synthesize_efre(text: str, voice: PersonaVoice) -> bytes:
-    assert TTS_MODEL is not None
-
+async def _synthesize(text: str, voice: PersonaVoice) -> bytes:
     logger.info("Synthesizing speech via TTS (%s, voice=%s): %r", TTS_MODEL, voice.tts_voice, text)
-    speech = await CLIENT.audio.speech.create(
+    speech = await TTS_CLIENT.audio.speech.create(
         model=TTS_MODEL,
         voice=voice.tts_voice,
         input=text,
@@ -31,22 +29,17 @@ async def _synthesize_efre(text: str, voice: PersonaVoice) -> bytes:
 
 
 async def _synthesize_kugelaudio(text: str, voice: PersonaVoice, language_id: str) -> bytes:
-    assert KUGELAUDIO_CLIENT is not None
-    assert KUGELAUDIO_MODEL is not None
-
     logger.info(
         "Synthesizing speech via KugelAudio (%s, voice=%s, language=%s): %r",
-        KUGELAUDIO_MODEL, voice.kugelaudio_voice_id, language_id, text,
+        TTS_MODEL, voice.kugelaudio_voice_id, language_id, text,
     )
-    response = await KUGELAUDIO_CLIENT.tts.generate_async(
+    response = await TTS_CLIENT.tts.generate_async(
         text=text,
-        model_id=KUGELAUDIO_MODEL,
+        model_id=TTS_MODEL,
         voice_id=voice.kugelaudio_voice_id,
         language=language_id,
     )
-    # KugelAudio returns raw headerless PCM16 (response.audio) — wrap it as a
-    # WAV file so the client's decodeAudioData() can play it, same as the
-    # ready-made WAV the EFRE_URL leg returns directly.
+    # KugelAudio returns headerless PCM16 (response.audio)
     return _pcm16_to_wav(response.audio, response.sample_rate)
 
 
