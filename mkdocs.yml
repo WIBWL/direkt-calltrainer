@@ -2,10 +2,17 @@ site_name: Calltrainer
 site_description: AI-powered phone conversation trainer
 docs_dir: docs
 
+# Erzeugt das ER-Diagramm vor jedem Build neu aus backend/db/models.py, damit
+# docs/datenmodell.md nicht veraltet. Schlaegt das fehl (kein Graphviz), baut
+# die Doku mit dem eingecheckten Diagramm weiter.
+hooks:
+  - scripts/mkdocs_hooks.py
+
 nav:
   - Home: index.md
   - Initial Requirements: initial_requirements.md
   - Features: features.md
+  - Datenmodell: datenmodell.md
   - Architecture Decisions:
       - ADR 0000 - Record Architecture Decisions: adr/0000-record-architecture-decisions.md
       - ADR 0001 - Separate Scenario and Persona Concepts: adr/0001-separate-scenario-and-persona.md

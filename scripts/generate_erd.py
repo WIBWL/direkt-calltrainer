@@ -12,7 +12,7 @@ Aufruf (Projekt-Wurzel, aktive .venv):
     python scripts/generate_erd.py
 
 Voraussetzungen:
-    pip install -r requirements-dev.txt      (sqlalchemy-schemadisplay, pydot)
+    pip install -r requirements.txt          (sqlalchemy-schemadisplay, pydot)
     brew install graphviz                    (Programm "dot")
     brew install --cask font-ibm-plex-mono   (optional, fuer exakte Schrift)
 """
