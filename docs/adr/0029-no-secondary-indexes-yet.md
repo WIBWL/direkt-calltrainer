@@ -1,4 +1,4 @@
-# ADR 0030: No Secondary Indexes Beyond Primary/Foreign Keys Yet
+# ADR 0029: No Secondary Indexes Beyond Primary/Foreign Keys Yet
 
 ## Status
 
@@ -6,7 +6,7 @@ Proposed
 
 ## Context
 
-Defining the initial schema (ADR 0028), each table needed a decision on which columns to index beyond what a primary key implicitly provides. Candidate additional indexes were already visible at this stage — e.g. `session.subject_id` (looked up per user), or `turn.session_id`/`messung.turn_id`/`befund.turn_id` (looked up per Session when assembling Feedback) — but none of the actual read/query code for these tables exists yet; the backend does not query this schema at all so far.
+Defining the initial schema (ADR 0027), each table needed a decision on which columns to index beyond what a primary key implicitly provides. Candidate additional indexes were already visible at this stage — e.g. `session.subject_id` (looked up per user), or `turn.session_id`/`messung.turn_id`/`befund.turn_id` (looked up per Session when assembling Feedback) — but none of the actual read/query code for these tables exists yet; the backend does not query this schema at all so far.
 
 ## Decision
 

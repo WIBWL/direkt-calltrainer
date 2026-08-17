@@ -1,4 +1,4 @@
-# ADR 0033: Pseudonymous subject_id Placeholder Instead of a User Foreign Key
+# ADR 0032: Pseudonymous subject_id Placeholder Instead of a User Foreign Key
 
 ## Status
 
@@ -14,4 +14,4 @@ ADR 0009 decided on Keycloak/OIDC for user authentication, but that integration 
 
 ## Consequences
 
-The persistence schema (ADR 0028) doesn't need to wait on, or couple to, the Keycloak integration (ADR 0009) landing first, and can be built and migrated independently of it. The cost is that nothing today enforces that `subject_id` values are valid, unique per person, or even present — no referential integrity ties Sessions to actual identities yet. This is expected to be revisited, adding the real foreign key and constraint, once ADR 0009's auth integration exists.
+The persistence schema (ADR 0027) doesn't need to wait on, or couple to, the Keycloak integration (ADR 0009) landing first, and can be built and migrated independently of it. The cost is that nothing today enforces that `subject_id` values are valid, unique per person, or even present — no referential integrity ties Sessions to actual identities yet. This is expected to be revisited, adding the real foreign key and constraint, once ADR 0009's auth integration exists.

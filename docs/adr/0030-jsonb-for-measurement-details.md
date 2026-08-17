@@ -1,4 +1,4 @@
-# ADR 0031: JSONB for Flexible Per-Measurement Detail Data
+# ADR 0030: JSONB for Flexible Per-Measurement Detail Data
 
 ## Status
 
@@ -14,4 +14,4 @@ We added `Messung.detail_json` as a nullable `JSONB` column, using `sqlalchemy.d
 
 ## Consequences
 
-This gives schema-less storage for whatever a given analysis metric wants to attach to a measurement, without requiring a migration each time a new metric type ships a different detail shape, and Postgres can still index or query into `JSONB` fields later if needed. In exchange, this column is Postgres-specific — consistent with ADR 0026, where Postgres is a project-owned choice rather than something requiring database portability — but it does mean the schema can no longer be trivially ported to another SQL dialect.
+This gives schema-less storage for whatever a given analysis metric wants to attach to a measurement, without requiring a migration each time a new metric type ships a different detail shape, and Postgres can still index or query into `JSONB` fields later if needed. In exchange, this column is Postgres-specific — consistent with ADR 0010, where Postgres is a project-owned choice rather than something requiring database portability — but it does mean the schema can no longer be trivially ported to another SQL dialect.

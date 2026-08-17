@@ -1,4 +1,4 @@
-# ADR 0032: ER Diagram Generated from ORM Metadata
+# ADR 0031: ER Diagram Generated from ORM Metadata
 
 ## Status
 
@@ -6,7 +6,7 @@ Proposed
 
 ## Context
 
-With the schema now defined in code (ADR 0028), the project's documentation needs an ER diagram (feeding arc42's Bausteinsicht/data model). A hand-drawn diagram risks drifting from the actual schema as `models.py` evolves.
+With the schema now defined in code (ADR 0027), the project's documentation needs an ER diagram (feeding arc42's Bausteinsicht/data model). A hand-drawn diagram risks drifting from the actual schema as `models.py` evolves.
 
 ## Decision
 
