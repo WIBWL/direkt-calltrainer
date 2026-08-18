@@ -6,11 +6,11 @@ Accepted
 
 ## Context
 
-Users need to be authenticated before performing Sessions, and their identity needs to travel with requests to the external Datenplattform. Keycloak is the project's designated identity provider.
+Users need to be authenticated before performing Sessions, and their identity needs to travel with requests to the external Data Platform. Keycloak is the project's designated identity provider.
 
 ## Decision
 
-We will authenticate users via the OIDC Authorization Code Flow with PKCE, with Keycloak as the identity provider. The frontend performs the login redirect directly against Keycloak, not proxied through the backend, and receives a JWT that the backend later forwards when calling the Datenplattform.
+We will authenticate users via the OIDC Authorization Code Flow with PKCE, with Keycloak as the identity provider. The frontend performs the login redirect directly against Keycloak, not proxied through the backend, and receives a JWT that the backend later forwards when calling the Data Platform.
 
 ## Consequences
 
