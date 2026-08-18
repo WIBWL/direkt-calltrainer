@@ -1,36 +1,48 @@
 """
-Datenbank-Anbindung: Engine + Session-Factory.
+Database access: engine and session factory.
 
-Zentrale Stelle, ueber die App und Worker mit Postgres sprechen. Die
-Verbindungs-URL kommt aus der Umgebung (DATABASE_URL) — so kann sie je
-nach Kontext unterschiedlich gesetzt werden (Mac: localhost, Container: db).
-
-Voraussetzung: DATABASE_URL muss gesetzt sein. Im Container liefert das
-das env_file (.env); in lokalen Skripten vorher load_dotenv() aufrufen.
+Single entry point through which app and worker talk to Postgres. The
+connection URL comes from DATABASE_URL and is read on first use, not at
+import time, so importing this module never requires a loaded environment.
 """
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
+from functools import lru_cache
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import Engine, create_engine
+# Aliased because "Session" is also an entity of this schema (models.Session).
+from sqlalchemy.orm import Session as DbSession
+from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = os.environ["DATABASE_URL"]
 
-# pool_pre_ping prueft eine Verbindung vor Gebrauch -> keine "stale connections".
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+@lru_cache(maxsize=1)
+def get_engine() -> Engine:
+    """The process-wide engine, created on first call."""
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        raise RuntimeError(
+            "DATABASE_URL is not set. Inside the container it comes from the "
+            "env_file (.env); locally, call load_dotenv() first."
+        )
+    # pool_pre_ping checks a connection before use -> no stale connections.
+    return create_engine(url, pool_pre_ping=True)
 
-SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+@lru_cache(maxsize=1)
+def _session_factory() -> sessionmaker[DbSession]:
+    return sessionmaker(bind=get_engine(), autoflush=False, expire_on_commit=False)
 
 
 @contextmanager
-def session_scope() -> "Session":
-    """Session mit automatischem commit / rollback / close.
+def session_scope() -> Iterator[DbSession]:
+    """Session with automatic commit / rollback / close.
 
-    Nutzung:
+    Usage:
         with session_scope() as db:
             db.add(obj)
     """
-    db = SessionLocal()
+    db = _session_factory()()
     try:
         yield db
         db.commit()

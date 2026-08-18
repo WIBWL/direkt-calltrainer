@@ -10,7 +10,7 @@ Defining the initial schema (ADR 0027), each table needed a decision on which co
 
 ## Decision
 
-The initial schema and migration declare only the constraints SQLAlchemy needs for data integrity — primary keys, foreign keys, and the two uniqueness constraints that encode real business rules (`metrik_typ.schluessel` unique; `feedback.session_id` unique, for its 1:1 relationship to Session) — and no additional secondary indexes.
+The initial schema and migration declare only the constraints SQLAlchemy needs for data integrity — primary keys, foreign keys, and the uniqueness constraints that encode real business rules (the stable natural keys `persona.schluessel`, `szenario.schluessel` and `metrik_typ.schluessel`, plus `feedback.session_id` for its 1:1 relationship to Session), and no additional secondary indexes.
 
 ## Consequences
 

@@ -1,10 +1,8 @@
 """
-Zentrale Declarative Base für alle ORM-Entitäten.
+Declarative base for all ORM entities.
 
-Von dieser Klasse erbt jede Entität in models.py. Alembic importiert
-später ihre .metadata, um daraus die Migrationen abzuleiten. Sie liegt
-bewusst allein in einer eigenen Datei, damit Modelle, DB-Session und
-Alembic sie unabhängig voneinander importieren können, ohne Import-Kreise.
+Kept in its own module so that models, session and Alembic can import it
+independently, without import cycles (ADR 0026).
 """
 from sqlalchemy.orm import DeclarativeBase
 

@@ -1,17 +1,16 @@
 """
-Befuellt die Referenztabellen: Sprache, Persona, Szenario, MetrikTyp.
+Fills the reference tables: Sprache, Persona, Szenario, MetrikTyp.
 
-Idempotent: jeder Datensatz wird ueber seinen natuerlichen Schluessel
-gesucht und bei Bedarf angelegt, sonst auf den Seed-Stand aktualisiert.
-Mehrfaches Ausfuehren erzeugt daher keine Duplikate.
+Idempotent: every record is looked up by its natural key and either created
+or brought back to the seed state, so repeated runs produce no duplicates.
 
-Quellen der Inhalte:
+Content sources:
     Sprache/Persona/Szenario -> backend/languages.py, personas.py, scenarios.py
-    MetrikTyp                -> docs/features.md (Abschnitt "Sprach- und
-                                Kommunikationsanalyse"), Spalte Prio steuert
-                                das aktiv-Flag: MUST -> True, sonst False.
+    MetrikTyp                -> docs/features.md, section "Sprach- und
+                                Kommunikationsanalyse"; its Prio column drives
+                                the aktiv flag (MUST -> True, otherwise False).
 
-Aufruf (Projekt-Wurzel, aktive .venv, laufende Postgres):
+Run from the project root, with an active .venv and a running Postgres:
     python scripts/seed_reference_data.py
 """
 import os
@@ -19,12 +18,10 @@ import sys
 
 from dotenv import load_dotenv
 
+# A script, not a package: the project root has to be on the search path
+# before the backend imports, hence the noqa markers on them.
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
-
-# .env laden, BEVOR backend.db.session importiert wird: dessen Modulcode
-# liest DATABASE_URL beim Import aus der Umgebung.
-load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
 from backend.db.models import (  # noqa: E402
     MetrikTyp,
@@ -39,32 +36,30 @@ from backend.personas import PERSONAS  # noqa: E402
 from backend.scenarios import SCENARIOS  # noqa: E402
 
 
-# --- Annahmen ------------------------------------------------------------
-# Die ORM-Modelle verlangen Spalten, fuer die es in den hartcodierten
-# Quellmodulen keinen Wert gibt. Defaults hier zentral und benannt:
+# --- Assumptions ---------------------------------------------------------
+# Columns the ORM requires but the hardcoded source modules do not provide:
 #
-# Persona.schwierigkeitsgrad: in personas.py nicht modelliert. Default
-#   "mittel" — die einzige vorhandene Persona ist fordernd, aber nicht als
-#   Eskalationsfall angelegt.
-# Szenario.typ: in scenarios.py nicht modelliert. Abgeleitet aus F-03
-#   ("Angebots- und Preisgespräche"), da das Szenario auf das Closing zielt.
+# Persona.schwierigkeitsgrad: not modelled in personas.py. "mittel" because
+#   the one existing Persona is demanding, but not an escalation case.
+# Szenario.typ: not modelled in scenarios.py. Derived from F-03 ("Angebots-
+#   und Preisgespräche"), as the scenario aims at the closing.
 DEFAULT_SCHWIERIGKEITSGRAD = "mittel"
 DEFAULT_SZENARIO_TYP = "Angebots- und Preisgespräch"
 
 
-# --- MetrikTyp: paraverbale Dimensionen aus docs/features.md -------------
+# --- MetrikTyp: paraverbal dimensions from docs/features.md --------------
 # (schluessel, bezeichnung, einheit, feature_id, aktiv)
-# einheit nur dort gesetzt, wo die Dimension eine eindeutige physikalische
-# Messgroesse hat; qualitative Dimensionen bleiben bewusst ohne Einheit.
+# einheit is set only where the dimension has an unambiguous physical unit;
+# qualitative dimensions stay without one.
 METRIK_TYPEN = [
-    # MUST — MVP-Umfang
+    # MUST — part of the MVP
     ("intonation", "Analyse der Intonation", "Hz", "F-35", True),
     ("tempo", "Analyse des Sprechtempos", "Wörter/min", "F-36", True),
     ("lautstaerke", "Analyse der Lautstärke", "dB", "F-37", True),
     ("artikulation", "Analyse der Artikulation", None, "F-38", True),
     ("sprechfluessigkeit", "Analyse der Sprechflüssigkeit", None, "F-51", True),
     ("redundanz", "Erkennung überlanger oder überkomplexer Erklärungen", None, "F-08", True),
-    # SHOULD / COULD — bewusst inaktiv, damit die MVP-Menge klar bleibt
+    # SHOULD / COULD — inactive, so the MVP scope stays unambiguous
     ("konkretheit", "Analyse der sprachlichen Konkretheit", None, "F-40", False),
     ("phasengerechte_sprache", "Phasengerechte Sprache", None, "F-42", False),
     ("redeanteile", "Analyse der Redeanteile", "%", "F-24", False),
@@ -72,64 +67,72 @@ METRIK_TYPEN = [
     ("kongruenz", "Kongruenz von Inhalt und Stimme", None, "F-39", False),
 ]
 
+# Order of the inventory line printed at the end.
+INVENTORY_TABLES = [
+    ("Sprache", Sprache),
+    ("Persona", Persona),
+    ("PersonaEinwand", PersonaEinwand),
+    ("Szenario", Szenario),
+    ("MetrikTyp", MetrikTyp),
+]
 
-def upsert(db, model, natural_key: dict, werte: dict):
-    """Legt den Datensatz an oder bringt ihn auf den Seed-Stand.
 
-    Gibt (objekt, neu_angelegt) zurueck.
+def upsert(db, model, natural_key: dict, values: dict):
+    """Creates the record or brings it back to the seed state.
+
+    Returns (object, created).
     """
     obj = db.query(model).filter_by(**natural_key).one_or_none()
     if obj is None:
-        obj = model(**natural_key, **werte)
+        obj = model(**natural_key, **values)
         db.add(obj)
         return obj, True
-    for feld, wert in werte.items():
-        setattr(obj, feld, wert)
+    for field, value in values.items():
+        setattr(obj, field, value)
     return obj, False
 
 
 def seed_sprachen(db) -> int:
-    neu = 0
+    created = 0
     for code, bezeichnung in LANGUAGES.items():
-        _, angelegt = upsert(
+        _, is_new = upsert(
             db, Sprache, {"sprache_code": code}, {"bezeichnung": bezeichnung}
         )
-        neu += angelegt
-    return neu
+        created += is_new
+    return created
 
 
-def seed_einwaende(db, persona: Persona, einwaende: list[str]) -> None:
-    """Bringt die Einwaende einer Persona auf den Seed-Stand.
+def seed_einwaende(db, persona: Persona, objections: list[str]) -> None:
+    """Brings a Persona's objections back to the seed state.
 
-    Abgleich ueber (persona_id, reihenfolge): vorhandene Positionen werden
-    aktualisiert, ueberzaehlige entfernt. So bleiben die IDs ueber mehrere
-    Laeufe stabil, statt bei jedem Lauf neu vergeben zu werden.
+    Matched on (persona_id, reihenfolge) so that existing positions are
+    updated and surplus ones deleted, which keeps the IDs stable across runs.
     """
-    for position, text in enumerate(einwaende):
-        vorhanden = (
+    for position, text in enumerate(objections):
+        existing = (
             db.query(PersonaEinwand)
             .filter_by(persona_id=persona.persona_id, reihenfolge=position)
             .one_or_none()
         )
-        if vorhanden is None:
+        if existing is None:
             db.add(
                 PersonaEinwand(
                     persona_id=persona.persona_id, reihenfolge=position, text=text
                 )
             )
         else:
-            vorhanden.text = text
+            existing.text = text
 
     db.query(PersonaEinwand).filter(
         PersonaEinwand.persona_id == persona.persona_id,
-        PersonaEinwand.reihenfolge >= len(einwaende),
+        PersonaEinwand.reihenfolge >= len(objections),
     ).delete(synchronize_session=False)
 
 
 def seed_personas(db) -> int:
-    neu = 0
+    created = 0
     for p in PERSONAS.values():
-        persona, angelegt = upsert(
+        persona, is_new = upsert(
             db,
             Persona,
             {"schluessel": p.id},
@@ -143,17 +146,17 @@ def seed_personas(db) -> int:
                 "aktiv": True,
             },
         )
-        neu += angelegt
-        # persona_id wird erst beim Flush vergeben, die Einwaende brauchen sie.
+        created += is_new
+        # persona_id is only assigned on flush, and the objections need it.
         db.flush()
         seed_einwaende(db, persona, p.typical_objections)
-    return neu
+    return created
 
 
 def seed_szenarien(db) -> int:
-    neu = 0
+    created = 0
     for s in SCENARIOS.values():
-        _, angelegt = upsert(
+        _, is_new = upsert(
             db,
             Szenario,
             {"schluessel": s.id},
@@ -163,14 +166,14 @@ def seed_szenarien(db) -> int:
                 "beschreibung": s.description,
             },
         )
-        neu += angelegt
-    return neu
+        created += is_new
+    return created
 
 
 def seed_metrik_typen(db) -> int:
-    neu = 0
+    created = 0
     for schluessel, bezeichnung, einheit, feature_id, aktiv in METRIK_TYPEN:
-        _, angelegt = upsert(
+        _, is_new = upsert(
             db,
             MetrikTyp,
             {"schluessel": schluessel},
@@ -181,28 +184,25 @@ def seed_metrik_typen(db) -> int:
                 "aktiv": aktiv,
             },
         )
-        neu += angelegt
-    return neu
+        created += is_new
+    return created
 
 
 def main() -> None:
+    load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
     with session_scope() as db:
-        neu_sprache = seed_sprachen(db)
-        neu_persona = seed_personas(db)
-        neu_szenario = seed_szenarien(db)
-        neu_metrik = seed_metrik_typen(db)
-
-        # Zaehlen in derselben Session, nach dem Flush der Inserts.
+        created = {
+            "Sprache": seed_sprachen(db),
+            "Persona": seed_personas(db),
+            "Szenario": seed_szenarien(db),
+            "MetrikTyp": seed_metrik_typen(db),
+        }
+        # Count in the same session, after the inserts have been flushed.
         db.flush()
-        print("Neu angelegt: "
-              f"Sprache {neu_sprache}, Persona {neu_persona}, "
-              f"Szenario {neu_szenario}, MetrikTyp {neu_metrik}")
-        print("Bestand:     "
-              f"Sprache: {db.query(Sprache).count()}, "
-              f"Persona: {db.query(Persona).count()}, "
-              f"PersonaEinwand: {db.query(PersonaEinwand).count()}, "
-              f"Szenario: {db.query(Szenario).count()}, "
-              f"MetrikTyp: {db.query(MetrikTyp).count()}")
+        inventory = {name: db.query(model).count() for name, model in INVENTORY_TABLES}
+
+    print("Created:  ", ", ".join(f"{k} {v}" for k, v in created.items()))
+    print("Inventory:", ", ".join(f"{k} {v}" for k, v in inventory.items()))
 
 
 if __name__ == "__main__":
