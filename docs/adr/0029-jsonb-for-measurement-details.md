@@ -1,4 +1,4 @@
-# ADR 0030: JSONB for Flexible Per-Measurement Detail Data
+# ADR 0029: JSONB for Flexible Per-Measurement Detail Data
 
 ## Status
 

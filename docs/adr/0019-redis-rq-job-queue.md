@@ -1,4 +1,4 @@
-# ADR 0020: Redis + RQ for the Feedback Job Queue
+# ADR 0019: Redis + RQ for the Feedback Job Queue
 
 ## Status
 
@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-ADR 0019 decouples Feedback/wrap-up generation from the real-time Session loop via a `SessionCompleted` event on a job queue, consumed by a separate async worker. A concrete queue technology was still open. Candidates considered: Celery with RabbitMQ/Redis, FastAPI's built-in `BackgroundTasks`, or Redis with RQ.
+ADR 0018 decouples Feedback/wrap-up generation from the real-time Session loop via a `SessionCompleted` event on a job queue, consumed by a separate async worker. A concrete queue technology was still open. Candidates considered: Celery with RabbitMQ/Redis, FastAPI's built-in `BackgroundTasks`, or Redis with RQ.
 
 ## Decision
 

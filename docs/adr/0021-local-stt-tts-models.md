@@ -1,4 +1,4 @@
-# ADR 0022: STT and TTS Run as Separately Self-Hosted Local Models
+# ADR 0021: STT and TTS Run as Separately Self-Hosted Local Models
 
 ## Status
 
@@ -14,4 +14,4 @@ We will run STT and TTS as separately hosted model servers — plain vLLM for Wh
 
 ## Consequences
 
-The application-level call pattern barely changes, since all three targets stay OpenAI-compatible — ADR 0018 (no provider-abstraction layer) still holds, these are direct calls per capability, just against different base URLs now. The project takes on hosting and GPU capacity for two more models that EFRE-Direkt does not provide, which still needs a concrete home (see ADR 0021 — the university server, if it has sufficient GPU capacity, is the natural candidate, but this is not yet confirmed for STT/TTS specifically). Data residency for audio now depends on wherever these two servers actually run, separately from the dialogue-generation leg covered by ADR 0011.
+The application-level call pattern barely changes, since all three targets stay OpenAI-compatible — ADR 0017 (no provider-abstraction layer) still holds, these are direct calls per capability, just against different base URLs now. The project takes on hosting and GPU capacity for two more models that EFRE-Direkt does not provide, which still needs a concrete home (see ADR 0020 — the university server, if it has sufficient GPU capacity, is the natural candidate, but this is not yet confirmed for STT/TTS specifically). Data residency for audio now depends on wherever these two servers actually run, separately from the dialogue-generation leg covered by ADR 0011.

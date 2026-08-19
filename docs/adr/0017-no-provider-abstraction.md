@@ -1,4 +1,4 @@
-# ADR 0018: No Provider Abstraction Layer for STT/LLM/TTS
+# ADR 0017: No Provider Abstraction Layer for STT/LLM/TTS
 
 ## Status
 
