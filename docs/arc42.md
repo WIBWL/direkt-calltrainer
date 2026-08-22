@@ -48,7 +48,7 @@ Weitere Qualitätsanforderungen geringerer Priorität sind in Kapitel 10 aufgef�
 
 | ID | Randbedingung | Beschreibung | Quelle |
 |---|---|---|---|
-| C-01 | Sprache konfigurierbar | Das Training findet in der Sprache statt, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Die Sprache wird pro Trainings-Session ausgewählt, unabhängig von Szenario und Persona. Belegt sind Deutsch bei Solox sowie Englisch und teilweise Spanisch bei APPOLLO Systems. Siehe ADR 0023. | R-35 |
+| C-01 | Sprache konfigurierbar | Das Training findet in der Sprache statt, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Die Sprache wird pro Trainings-Session ausgewählt, unabhängig von Szenario und Persona. Belegt sind Deutsch bei Solox sowie Englisch und teilweise Spanisch bei APPOLLO Systems. Siehe ADR 0022. | R-35 |
 | C-04 | Datenschutz nach DSGVO | Alle Daten, insbesondere Sprachaufzeichnungen und personenbezogene Daten, werden DSGVO-konform verarbeitet. Die Randbedingung begrenzt die Umsetzung aller übrigen Ziele und steht nicht als gleichrangiges Ziel neben ihnen. | rechtliche Vorgabe |
 | C-05 | Kein kundenspezifisches Fachwissen vorausgesetzt | Fachliches Know-how zu einzelnen Kunden oder Systemen wird nicht abgebildet, da sich die Fachlichkeit je Kundenlandschaft unterscheidet. Der Fokus liegt auf Kommunikation statt Fachlichkeit. | R-40, R-41 |
 | C-06 | Gesprächsdauer | Die zu trainierenden Gespräche reichen von kurzen Rückfragen bis zu Gesprächen von einer Stunde. | R-03 |
@@ -201,7 +201,7 @@ Da Sprachaufzeichnungen und personenbezogene Daten verarbeitet werden, muss das 
 - Speicherung von Fortschrittsdaten einzelner Nutzer (F-13)
 - Übertragung von Sprachdaten an externe Dienste (z. B. Speech-to-Text-, Text-to-Speech- oder LLM-APIs)
 
-Für den MVP werden Sprachdaten, Transkripte und Feedback nicht über das Ende der Session hinaus gespeichert; danach ist die Speicherung in der projekteigenen, uni-gehosteten PostgreSQL-Datenbank (ADR 0010) sowie der Datenplattform ausschließlich mit Einwilligung des Nutzers vorgesehen, die dieser jederzeit widerrufen sowie seine Daten selbst löschen kann (siehe ADR 0024).
+Für den MVP werden Sprachdaten, Transkripte und Feedback nicht über das Ende der Session hinaus gespeichert; danach ist die Speicherung in der projekteigenen, uni-gehosteten PostgreSQL-Datenbank (ADR 0010) sowie der Datenplattform ausschließlich mit Einwilligung des Nutzers vorgesehen, die dieser jederzeit widerrufen sowie seine Daten selbst löschen kann (siehe ADR 0023).
 
 ## 8.2 Umgang mit Feedback und Bewertung
 
@@ -238,36 +238,35 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0003 | No Human Trainer — Feedback Is Fully AI-Generated | angenommen | F-09, F-10 |
 | ADR 0004 | Feedback Is Qualitative, Not Score-Based | angenommen | Q-01, F-09, F-14, R-21 |
 | ADR 0005 | No Automated Enterprise/CRM Integration, No Sales KPIs | angenommen | C-05, F-26, F-45, R-45 |
-| ADR 0006 | Training Language Is German Only for the MVP | abgelöst durch ADR 0023 | C-01, R-35 |
+| ADR 0006 | Training Language Is German Only for the MVP | abgelöst durch ADR 0022 | C-01, R-35 |
 | ADR 0007 | Primary Access via PC + Headset, Mobile Optional | angenommen | C-02, C-03 |
 | ADR 0008 | Frontend Built with React and TypeScript | angenommen | F-46, F-50 |
 | ADR 0009 | Authentication via Keycloak (OIDC Authorization Code Flow + PKCE) | angenommen | C-04, F-31, F-50 |
 | ADR 0010 | Own PostgreSQL Instance for Session Persistence | angenommen | C-04, F-12, F-13 |
-| ADR 0011 | LLM Backend Is the University-Hosted EFRE-Direkt Gateway, Self-Contained | angenommen (durch ADR 0022 eingegrenzt) | Q-03, C-04, F-01 |
+| ADR 0011 | LLM Backend Is the University-Hosted EFRE-Direkt Gateway, Self-Contained | angenommen (durch ADR 0021 eingegrenzt) | Q-03, C-04, F-01 |
 | ADR 0012 | Backend Built with Python and FastAPI | angenommen | Q-03 |
-| ADR 0013 | Turn-Based, Non-Streaming Pipeline for the MVP | angenommen | Q-03, F-01 |
-| ADR 0014 | Minimal Required Setup, Advanced Options Separate | angenommen | Q-02, F-43, R-34 |
-| ADR 0015 | Speech-Behavior Feedback Surfaces Only in the Post-Call Wrap-Up | angenommen | F-09, F-35, F-36, F-37, F-38, F-51 |
-| ADR 0016 | Persona Selection via Card View, Not a List | angenommen | Q-02, F-04, F-44 |
-| ADR 0017 | One Retry, Then Graceful Session End on Pipeline Failure | angenommen | Q-03, F-46 |
-| ADR 0018 | No Provider Abstraction Layer for STT/LLM/TTS | angenommen | |
-| ADR 0019 | Layered Modular Monolith for the Real-Time Path, Async Feedback Worker | angenommen | Q-03, F-09 |
-| ADR 0020 | Redis + RQ for the Feedback Job Queue | angenommen | F-09 |
-| ADR 0021 | Deployment on a University-Hosted Server | angenommen | C-04 |
-| ADR 0022 | STT and TTS Run as Separately Self-Hosted Local Models | angenommen | Q-03, C-04, F-01 |
-| ADR 0023 | Language as Independent Session Parameter | angenommen (löst ADR 0006 ab) | C-01, R-35 |
-| ADR 0024 | No Session Data Persisted Beyond the MVP; Consent-Gated Storage After | angenommen | C-04, F-12, F-13, F-48, F-49 |
-| ADR 0025 | User-Authored Scenario Context and Personas (Post-MVP) | angenommen | F-04, F-26, F-34, F-45 |
-| ADR 0026 | SQLAlchemy 2.0 as ORM | angenommen | |
-| ADR 0027 | Normalized Relational Schema for Session Persistence | angenommen | F-12, F-13 |
-| ADR 0028 | Alembic Migrations Autogenerated from ORM Metadata | angenommen | |
-| ADR 0029 | No Secondary Indexes Beyond Primary/Foreign Keys Yet | angenommen | |
-| ADR 0030 | JSONB for Flexible Per-Measurement Detail Data | angenommen | |
-| ADR 0031 | ER Diagram Generated from ORM Metadata | angenommen | |
-| ADR 0032 | Pseudonymous subject_id Placeholder Instead of a User Foreign Key | angenommen | C-04, F-31 |
-| ADR 0033 | AnalysisJob as a Persisted Entity for Async Job Status | angenommen | Q-07, F-09 |
+| ADR 0013 | Minimal Required Setup, Advanced Options Separate | angenommen | Q-02, F-43, R-34 |
+| ADR 0014 | Speech-Behavior Feedback Surfaces Only in the Post-Call Wrap-Up | angenommen | F-09, F-35, F-36, F-37, F-38, F-51 |
+| ADR 0015 | Persona Selection via Card View, Not a List | angenommen | Q-02, F-04, F-44 |
+| ADR 0016 | One Retry, Then Graceful Session End on Pipeline Failure | angenommen | Q-03, F-46 |
+| ADR 0017 | No Provider Abstraction Layer for STT/LLM/TTS | angenommen | |
+| ADR 0018 | Layered Modular Monolith for the Real-Time Path, Async Feedback Worker | angenommen | Q-03, F-09 |
+| ADR 0019 | Redis + RQ for the Feedback Job Queue | angenommen | F-09 |
+| ADR 0020 | Deployment on a University-Hosted Server | angenommen | C-04 |
+| ADR 0021 | STT and TTS Run as Separately Self-Hosted Local Models | angenommen | Q-03, C-04, F-01 |
+| ADR 0022 | Language as Independent Session Parameter | angenommen (löst ADR 0006 ab) | C-01, R-35 |
+| ADR 0023 | No Session Data Persisted Beyond the MVP; Consent-Gated Storage After | angenommen | C-04, F-12, F-13, F-48, F-49 |
+| ADR 0024 | User-Authored Scenario Context and Personas (Post-MVP) | angenommen | F-04, F-26, F-34, F-45 |
+| ADR 0025 | SQLAlchemy 2.0 as ORM | angenommen | |
+| ADR 0026 | Normalized Relational Schema for Session Persistence | angenommen | F-12, F-13 |
+| ADR 0027 | Alembic Migrations Autogenerated from ORM Metadata | angenommen | |
+| ADR 0028 | No Secondary Indexes Beyond Primary/Foreign Keys Yet | angenommen | |
+| ADR 0029 | JSONB for Flexible Per-Measurement Detail Data | angenommen | |
+| ADR 0030 | ER Diagram Generated from ORM Metadata | angenommen | |
+| ADR 0031 | Pseudonymous subject_id Placeholder Instead of a User Foreign Key | angenommen | C-04, F-31 |
+| ADR 0032 | AnalysisJob as a Persisted Entity for Async Job Status | angenommen | Q-07, F-09 |
 
-Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug, ADR 0018 eine reine Wartbarkeitsentscheidung ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
+Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug, ADR 0017 eine reine Wartbarkeitsentscheidung ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 
 # 10. Qualitätsanforderungen
 
@@ -300,7 +299,7 @@ Da die technische Lösungsstrategie (Kapitel 4) noch nicht final festgelegt ist,
 | Nr. | Risiko | Beschreibung | Gegenmaßnahme |
 |---|---|---|---|
 | RI-01 | Echtzeitfähigkeit der Sprach- und LLM-Schnittstellen | Die Kombination aus Spracherkennung, Antwortgenerierung und Sprachsynthese muss in Echtzeit ablaufen (Q-03). Externe Schnittstellen können Latenzschwankungen aufweisen, die den natürlichen Gesprächsfluss beeinträchtigen. | Latenz je Teilstrecke getrennt messen, um den Engpass zu bestimmen. Frühzeitige Tests mit den infrage kommenden Anbietern vor der finalen technischen Festlegung (Kapitel 4). |
-| RI-02 | Unklare Datenschutz-Umsetzung | Datenschutzkonformität ist eine nicht verhandelbare Randbedingung (C-04). Hosting-Ort, Speicherdauer und Einwilligungsprozess sind grundsätzlich entschieden (ADR 0024). Offen ist die technische Umsetzung der Selbstlösch-Funktion in der eigenen Datenbank (ADR 0010) und der Datenplattform sowie der Einwilligungsverwaltung im Frontend. | Löschfunktion und Einwilligungsoberfläche früh mitplanen, nicht nachträglich ergänzen. |
+| RI-02 | Unklare Datenschutz-Umsetzung | Datenschutzkonformität ist eine nicht verhandelbare Randbedingung (C-04). Hosting-Ort, Speicherdauer und Einwilligungsprozess sind grundsätzlich entschieden (ADR 0023). Offen ist die technische Umsetzung der Selbstlösch-Funktion in der eigenen Datenbank (ADR 0010) und der Datenplattform sowie der Einwilligungsverwaltung im Frontend. | Löschfunktion und Einwilligungsoberfläche früh mitplanen, nicht nachträglich ergänzen. |
 
 ### Fachliche Risiken
 

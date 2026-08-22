@@ -1,4 +1,4 @@
-# ADR 0023: Language as Independent Session Parameter
+# ADR 0022: Language as Independent Session Parameter
 
 ## Status
 

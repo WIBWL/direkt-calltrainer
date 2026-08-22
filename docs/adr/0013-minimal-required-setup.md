@@ -1,4 +1,4 @@
-# ADR 0014: Minimal Required Setup, Advanced Options Separate
+# ADR 0013: Minimal Required Setup, Advanced Options Separate
 
 ## Status
 
