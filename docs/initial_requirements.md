@@ -2,12 +2,14 @@
 
 **Stand:** Entwurf
 
-**Geltungsbereich:** Anforderungen aus den bisher durchgeführten Erstgesprächen mit Solox und APPOLLO Systems
+**Geltungsbereich:** Anforderungen aus den bisher durchgeführten Erhebungen mit Solox und APPOLLO Systems, bestehend aus den Erstgesprächen und dem schriftlichen Rückfragenlauf vom 21.08.2026
 
-| Erhebung                     | Kürzel | Datum      | Ansprechpartner |
-| :--------------------------- | :----- | :--------- | :-------------- |
-| Erstgespräch Solox GmbH      | `SO`   | 24.06.2026 | Nicolas Heyne   |
-| Erstgespräch APPOLLO Systems | `AP`   | 22.07.2026 | Eckhard Herdt   |
+| Erhebung                        | Kürzel | Datum      | Ansprechpartner |
+| :------------------------------ | :----- | :--------- | :-------------- |
+| Erstgespräch Solox GmbH         | `SO`   | 24.06.2026 | Nicolas Heyne   |
+| Erstgespräch APPOLLO Systems    | `AP`   | 22.07.2026 | Eckhard Herdt   |
+| Schriftverkehr Solox GmbH       | `SO-S` | 21.08.2026 | Nicolas Heyne   |
+| Schriftverkehr APPOLLO Systems  | `AP-S` | 21.08.2026 | Eckhard Herdt   |
 
 ## Zweck
 
@@ -28,7 +30,17 @@ Sie ist zugleich die Quelle, aus der die nachgelagerte Dokumentation hervorgeht:
 
 Verwiesen wird nach dem Muster `SO <Kapitel>.<Frage>` beziehungsweise `AP <Kapitel>.<Frage>`. Die Fragennummer ergibt sich aus der bestehenden Reihenfolge im jeweiligen Protokoll. So bezeichnet `SO 4.5` die fünfte Frage in Kapitel 4. Eine Anpassung der Protokolle ist dafür nicht erforderlich.
 
-Anforderungen mit zwei Quellenangaben sind unabhängig durch beide Erhebungen belegt.
+Für den Schriftverkehr vom 21.08.2026 gilt das Muster `SO-S <Frage>` beziehungsweise `AP-S <Frage>`. Die Nummer bezeichnet den Fragenblock der Rückfragen-Mail:
+
+| Nr. | Fragenblock                                         |
+| :-- | :-------------------------------------------------- |
+| 1   | Feedback nach dem Gespräch, insbesondere Kennzahlen |
+| 2   | Sprache der Benutzeroberfläche                      |
+| 3   | Transkript des Gesprächs                            |
+| 4   | Gesprächssituationen und Kundenprofile              |
+| 5   | Nutzergesteuerte Szenarien und Dokumenten-Upload    |
+
+Anforderungen mit Quellenangaben aus beiden Unternehmen sind unabhängig belegt.
 
 Die Spalte *Bezug* verweist auf das Element, das aus der Anforderung abgeleitet wurde: Feature-ID (`F-xx`), Qualitätsziel (`Q-xx`), Randbedingung (`C-xx`) oder Nicht-Ziel. Der Typ bestimmt den Zielort, siehe C-10.
 
@@ -69,16 +81,19 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 | R-17 | Nutzer wollen Missverständnisse erkennen, die im Gespräch entstehen, obwohl beide Seiten sich vermeintlich klar ausgedrückt haben.                 | SO 3.1, 3.2    | F   | F-08                   |
 | R-18 | Nutzer wollen flüssiger und spontaner sprechen können, denn wie flüssig ein Gespräch verläuft, gilt als zentraler Erfolgsmaßstab.                       | AP 2.1, 5.2    | F   | F-51                |
 | R-19 | Nutzer wollen verstehen, wie sie beim Gegenüber ankommen.                                                                                          | SO 4.10, 6.1   | F   | F-09, F-39             |
+| R-49 | Nutzer wollen erkennen, ob sie im Gespräch nervös wirken. Als Indikatoren gelten Intonation und deutliche Aussprache.                              | SO-S 1         | F   | F-35, F-38, F-39       |
+| R-50 | Der Anteil der Fragen im Gespräch soll ausgewiesen werden, da die fragende Seite das Gespräch führt.                                               | SO-S 1         | F   | F-53                   |
 
 ### Feedback und Auswertung
 
 | ID   | Anforderung                                                                                                                                                   | Quelle         | Typ | Bezug      |
 | :--- | :------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------------- | :-- | :--------- |
 | R-20 | Nutzer wollen nach einem Gespräch eine zusammenfassende Rückmeldung erhalten.                                                                                 | SO 6.3, AP 5.3 | F   | F-09       |
-| R-21 | Die Rückmeldung soll qualitativ und differenziert ausfallen und sich nicht auf einen einzelnen Zahlenwert reduzieren.                                         | SO 6.2, 6.3    | Q   | Q-04, F-09, F-14 |
+| R-21 | Die Rückmeldung soll qualitativ und differenziert ausfallen und sich nicht auf einen einzelnen Zahlenwert reduzieren. Quantitative Kennzahlen sind als Ergänzung erwünscht, nicht als Ersatz. | SO 6.2, 6.3, SO-S 1, AP-S 1 | Q   | Q-04, F-09, F-14 |
 | R-22 | Nutzer wollen konkrete, anwendbare Verbesserungsvorschläge, die sich auf bestimmte Stellen im Gespräch beziehen.                                              | SO 6.3         | F   | F-10, F-47 |
 | R-23 | Verbesserungsvorschläge sollen strukturiert sein. | AP 5.3         | F   | F-10       |
 | R-24 | Nutzer wollen die Auswertung visuell im Stil eines Dashboards dargestellt bekommen.                                                                           | AP 5.3         | F   | F-53    |
+| R-51 | Als Kennzahlen sind Redeanteil, Fragenanteil, Sprechtempo, Anzahl der Wörter, Reaktionszeit bis zur Antwort und Pausenzeiten belegt. Als ungeeignet wurde von keiner Seite eine Kennzahl benannt. Die Menge ist nicht abschließend und kann um weitere sinnvolle Kennzahlen erweitert werden. | SO-S 1, AP-S 1 | F   | F-53, F-24 |
 | R-25 | Die Rückmeldung soll berücksichtigen, dass ein Gespräch von den Beteiligten unterschiedlich wahrgenommen wird.                                                | SO 6.3         | Q   | Q-01, F-09    |
 | R-26 | Der Erfolg soll qualitativ gemessen werden: an Verständlichkeit, hilfreicher Gesprächsführung, Vertrauen, Kompetenzwirkung und der Flüssigkeit des Gesprächs. | SO 6.2, AP 5.2 | Q   | Q-01      |
 | R-27 | Regelmäßiges Feedback ist Voraussetzung dafür, dass das Werkzeug angenommen wird.                                                                             | AP 3.10        | Q   | Q-05, F-13       |
@@ -91,6 +106,7 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 | R-29 | Das Training soll kontinuierlich über längere Zeiträume nutzbar sein, weil blinde Flecken sich erst mit der Zeit einschleifen.                   | SO 4.7, AP 3.7 | F   | F-13, F-48 |
 | R-30 | Nutzer wollen die Entwicklung des eigenen Gesprächsverhaltens über mehrere Gespräche hinweg nachvollziehen.                                      | SO 4.7         | F   | F-13       |
 | R-31 | Nutzer wollen das gemeinsame Verständnis nach einem Gespräch absichern, wie es bisher über eine zusammenfassende E-Mail an den Kunden geschieht. | SO 2.3, 3.3    | F   | F-09, F-54    |
+| R-52 | Das Transkript soll unmittelbar nach dem Gespräch vollständig und in Textform vorliegen. Ein während des Gesprächs nur teilweise fertiges Transkript gilt als verwirrend.                         | SO-S 3, AP-S 3 | F   | F-12          |
 
 ### Bedienung und Akzeptanz
 
@@ -99,6 +115,9 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 | R-32 | Der Nutzen des Trainers soll unmittelbar erkennbar und die Bedienung einfach sein. | SO 4.8, 4.10, AP 3.9 | Q   | Q-02           |
 | R-33 | Eine unklare oder überladene Oberfläche soll die Nutzung nicht erschweren.         | SO 4.9, AP 3.9       | Q   | Q-02             |
 | R-34 | Notwendige Einstellungen sollen klar sichtbar sein, Spezialoptionen zurücktreten.  | SO 4.9, 4.10         | Q   | Q-02, F-43            |
+| R-53 | Die Sprache der Benutzeroberfläche soll sich leicht wechseln lassen. Deutsch und Englisch sind dafür zu Beginn ausreichend. Für Solox ist Mehrsprachigkeit nicht zwingend, da mit den Kunden auf Deutsch kommuniziert wird. | SO-S 2, AP-S 2       | F   | *offen*          |
+| R-54 | Die Beschriftungen der Oberfläche sollen vollständig und eindeutig sein, sodass die Bedeutung eines Bereichs ohne Suchen und Überlegen erkennbar ist. | SO-S 2               | Q   | Q-02             |
+| R-55 | Wo sich die Bedeutung nicht bereits aus den Vorlauftexten der Eingabefelder ergibt, sollen Tooltips und Hinweise weiterführende Informationen bereitstellen. | SO-S 2               | F   | *offen*          |
 
 ### Sprache, Geräte und Umfeld
 
@@ -116,7 +135,16 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 | :--- | :----------------------------------------------------------------------------------------------------------------------------------------------- | :---------- | :-- | :--------- |
 | R-40 | Das Training soll ohne kundenspezifisches Produkt- und Fachwissen durchführbar sein, da sich die Fachlichkeit je Kundenlandschaft unterscheidet. | SO 5.3, 5.4 | C   | C-05       |
 | R-41 | Für einen ersten Prototyp soll keine vollständige Wissensbasis vorausgesetzt werden.                                                             | SO 5.4      | C   | C-05      |
-| R-42 | Nutzer sollen bei Bedarf eigene Dokumente bereitstellen können, um den fachlichen Rahmen zu prägen.                                              | SO 5.3      | F   | F-26, F-45 |
+| R-42 | Nutzer sollen bei Bedarf eigene Dokumente bereitstellen können, um den fachlichen Rahmen zu prägen. Ein solches Dokument soll darüber hinaus ein individuelles Szenario tragen können, um Gespräche mit stärkerem Unternehmensbezug zu üben. | SO 5.3, SO-S 5 | F   | F-26, F-45 |
+
+### Nutzergesteuerte Szenarien
+
+| ID   | Anforderung                                                                                                                                                                                                                     | Quelle         | Typ | Bezug   |
+| :--- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------- | :-- | :------ |
+| R-56 | Nutzer sollen die zu trainierende Gesprächssituation kurz beschreiben können, etwa Kunde, Projekt und Ausgangslage, woraus das System den passenden Gesprächspartner für die Sitzung ableitet. Das soll neben den vorgefertigten Szenarien stehen, nicht an deren Stelle. | SO-S 5, AP-S 5 | F   | *offen* |
+| R-57 | Ein Beispiel soll zeigen, wie ein Szenario zu beschreiben ist, damit die Hürde gegenüber fertigen Szenarien nicht zu hoch ausfällt.                                                                                             | SO-S 5         | F   | *offen* |
+| R-58 | Selbst erstellte Szenarien sollen nicht nur sitzungsbezogen, sondern mandantenbezogen gespeichert werden, sodass Kollegen ohne erneute Erfassung damit trainieren können.                                                        | SO-S 5         | F   | *offen* |
+| R-59 | Ein hinterlegtes Szenario soll nachträglich bearbeitbar sein, um es nach- und feinjustieren zu können.                                                                                                                          | SO-S 5         | F   | *offen* |
 
 ### Erweiterung über die Simulation hinaus
 
@@ -143,10 +171,10 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 
 | Typ               | Anzahl |
 | :---------------- | :----- |
-| Funktion (F)      | 28     |
-| Qualitätsziel (Q) | 7      |
+| Funktion (F)      | 38     |
+| Qualitätsziel (Q) | 8      |
 | Randbedingung (C) | 9      |
 | Nicht-Ziel (N)    | 4      |
-| **Gesamt**        | **48** |
+| **Gesamt**        | **59** |
 
-Dreizehn Anforderungen sind durch beide Erhebungen unabhängig belegt.
+Achtzehn Anforderungen sind unabhängig durch beide Unternehmen belegt.
