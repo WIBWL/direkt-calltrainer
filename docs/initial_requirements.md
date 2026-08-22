@@ -115,9 +115,9 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 | R-32 | Der Nutzen des Trainers soll unmittelbar erkennbar und die Bedienung einfach sein. | SO 4.8, 4.10, AP 3.9 | Q   | Q-02           |
 | R-33 | Eine unklare oder überladene Oberfläche soll die Nutzung nicht erschweren.         | SO 4.9, AP 3.9       | Q   | Q-02             |
 | R-34 | Notwendige Einstellungen sollen klar sichtbar sein, Spezialoptionen zurücktreten.  | SO 4.9, 4.10         | Q   | Q-02, F-43            |
-| R-53 | Die Sprache der Benutzeroberfläche soll sich leicht wechseln lassen. Deutsch und Englisch sind dafür zu Beginn ausreichend. Für Solox ist Mehrsprachigkeit nicht zwingend, da mit den Kunden auf Deutsch kommuniziert wird. | SO-S 2, AP-S 2       | F   | *offen*          |
+| R-53 | Die Sprache der Benutzeroberfläche soll sich leicht wechseln lassen. Deutsch und Englisch sind dafür zu Beginn ausreichend. Für Solox ist Mehrsprachigkeit nicht zwingend, da mit den Kunden auf Deutsch kommuniziert wird. | SO-S 2, AP-S 2       | F   | F-56             |
 | R-54 | Die Beschriftungen der Oberfläche sollen vollständig und eindeutig sein, sodass die Bedeutung eines Bereichs ohne Suchen und Überlegen erkennbar ist. | SO-S 2               | Q   | Q-02             |
-| R-55 | Wo sich die Bedeutung nicht bereits aus den Vorlauftexten der Eingabefelder ergibt, sollen Tooltips und Hinweise weiterführende Informationen bereitstellen. | SO-S 2               | F   | *offen*          |
+| R-55 | Wo sich die Bedeutung nicht bereits aus den Vorlauftexten der Eingabefelder ergibt, sollen Tooltips und Hinweise weiterführende Informationen bereitstellen. | SO-S 2               | F   | F-57             |
 
 ### Sprache, Geräte und Umfeld
 
@@ -135,7 +135,7 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 | :--- | :----------------------------------------------------------------------------------------------------------------------------------------------- | :---------- | :-- | :--------- |
 | R-40 | Das Training soll ohne kundenspezifisches Produkt- und Fachwissen durchführbar sein, da sich die Fachlichkeit je Kundenlandschaft unterscheidet. | SO 5.3, 5.4 | C   | C-05       |
 | R-41 | Für einen ersten Prototyp soll keine vollständige Wissensbasis vorausgesetzt werden.                                                             | SO 5.4      | C   | C-05      |
-| R-42 | Nutzer sollen bei Bedarf eigene Dokumente bereitstellen können, um den fachlichen Rahmen zu prägen. Ein solches Dokument soll darüber hinaus ein individuelles Szenario tragen können, um Gespräche mit stärkerem Unternehmensbezug zu üben. | SO 5.3, SO-S 5 | F   | F-26, F-45 |
+| R-42 | Nutzer sollen bei Bedarf eigene Dokumente bereitstellen können, um den fachlichen Rahmen zu prägen. Ein solches Dokument soll darüber hinaus ein individuelles Szenario tragen können, um Gespräche mit stärkerem Unternehmensbezug zu üben. | SO 5.3, SO-S 5 | F   | F-26, F-45, F-58 |
 
 ### Nutzergesteuerte Szenarien
 
@@ -143,7 +143,7 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 | :--- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------- | :-- | :------ |
 | R-56 | Nutzer sollen die zu trainierende Gesprächssituation kurz beschreiben können, etwa Kunde, Projekt und Ausgangslage, woraus das System den passenden Gesprächspartner für die Sitzung ableitet. Das soll neben den vorgefertigten Szenarien stehen, nicht an deren Stelle. | SO-S 5, AP-S 5 | F   | *offen* |
 | R-57 | Ein Beispiel soll zeigen, wie ein Szenario zu beschreiben ist, damit die Hürde gegenüber fertigen Szenarien nicht zu hoch ausfällt.                                                                                             | SO-S 5         | F   | *offen* |
-| R-58 | Selbst erstellte Szenarien sollen nicht nur sitzungsbezogen, sondern mandantenbezogen gespeichert werden, sodass Kollegen ohne erneute Erfassung damit trainieren können.                                                        | SO-S 5         | F   | *offen* |
+| R-58 | Selbst erstellte Szenarien sollen nicht nur sitzungsbezogen, sondern mandantenbezogen gespeichert werden, sodass Kollegen ohne erneute Erfassung damit trainieren können.                                                        | SO-S 5         | F   | F-59    |
 | R-59 | Ein hinterlegtes Szenario soll nachträglich bearbeitbar sein, um es nach- und feinjustieren zu können.                                                                                                                          | SO-S 5         | F   | *offen* |
 
 ### Erweiterung über die Simulation hinaus
