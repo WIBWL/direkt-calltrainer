@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-ADR 0010 and ADR 0025 established Postgres plus SQLAlchemy for Session persistence, but not the actual shape of that data: what a Session, Turn, Persona, Szenario, or Feedback look like as durable rows. The domain glossary (`CONTEXT.md`) already defines Session, Persona, Scenario, and Feedback as first-class concepts, and ADR 0023 anticipates reading Feedback back per-Session and aggregated across Sessions (F-11, F-13) once persistence exists.
+ADR 0010 and ADR 0025 established Postgres plus SQLAlchemy for Session persistence, but not the actual shape of that data: what a Session, Turn, Persona, Szenario, or Feedback look like as durable rows. The domain glossary (`CONTEXT.md`) already defines Session, Persona, Scenario, and Feedback as first-class concepts, and ADR 0023 anticipates reading Feedback back per-Session and aggregated across Sessions (F-13, F-48) once persistence exists.
 
 ## Decision
 

@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Session setup today means picking from the curated Persona library (ADR 0002) via cards (ADR 0015) and choosing a Scenario, kept to a minimal required flow (ADR 0013). ADR 0005 already anticipates one form of user-driven customization: an optional, Session-scoped document upload for context (F-26, SHOULD; F-45), stored on the external Data Platform — distinct from the ruled-out automatic CRM/domain-knowledge integration (F-27/F-28, WON'T).
+Session setup today means picking from the curated Persona library (ADR 0002) via cards (ADR 0015) and choosing a Scenario, kept to a minimal required flow (ADR 0013). ADR 0005 already anticipates one form of user-driven customization: an optional, Session-scoped document upload for context (F-26, SHOULD; F-45), stored on the external Data Platform — distinct from the ruled-out automatic CRM/domain-knowledge integration (C-05; R-45, R-46).
 
 The product should go further than file upload alone: the user should also be able to type free-text instructions that shape the Scenario directly — how the conversation should unfold, and what opening line or question the simulated counterpart starts with — and to author their own Persona via free-text instructions describing how the AI counterpart should behave, rather than only selecting from the curated library. None of this is needed for the MVP; it targets the roadmap toward the finished product.
 

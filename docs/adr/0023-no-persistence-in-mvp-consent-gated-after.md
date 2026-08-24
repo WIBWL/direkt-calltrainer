@@ -16,6 +16,6 @@ Beyond the MVP, we will persist Session data to the project's own PostgreSQL ins
 
 ## Consequences
 
-For the MVP, there is no retained-data DSGVO surface to manage at all, no retention period, deletion workflow, or access-control question, since nothing survives the Session. The tradeoff is that feedback aggregated across sessions and long-term progress tracking (F-11, F-13) are not yet possible: an user only ever sees the feedback for the session they just completed.
+For the MVP, there is no retained-data DSGVO surface to manage at all, no retention period, deletion workflow, or access-control question, since nothing survives the Session. The tradeoff is that feedback aggregated across sessions and long-term progress tracking (F-13, F-48) are not yet possible: an user only ever sees the feedback for the session they just completed.
 
 Once persistence is introduced, consent is the sole legal basis for storage — there is no separate "legitimate interest" path, so a User who never opts in simply never has Session data retained beyond the call itself, even under the post-MVP model. Self-service deletion requires a corresponding delete path across the persistence schema, which is not yet designed. Because the whole chain (application server, EFRE-Direkt gateway, database) stays within the university's own hosted infrastructure, this decision introduces no cross-border transfer question or third-party processor beyond what ADR 0010, ADR 0011, and ADR 0020 already established.

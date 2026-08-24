@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The tool could instead have been built to pull in domain knowledge automatically from the company's own systems (CRM, product databases) and to assess sales outcomes, similar to classic sales trainers. Stakeholder interviews and the feature specification (F-27, WON'T; F-28, WON'T) explicitly ruled both out. This does not rule out a user manually providing session-specific context: the feature specification separately plans an optional, user-driven document upload (F-26, SHOULD; F-45), which is a Session-scoped convenience, not an ambient enterprise knowledge base.
+The tool could instead have been built to pull in domain knowledge automatically from the company's own systems (CRM, product databases) and to assess sales outcomes, similar to classic sales trainers. Stakeholder interviews and the requirements list (C-05; R-45, R-46) explicitly ruled both out. This does not rule out a user manually providing session-specific context: the feature specification separately plans an optional, user-driven document upload (F-26, SHOULD; F-45), which is a Session-scoped convenience, not an ambient enterprise knowledge base.
 
 ## Decision
 
