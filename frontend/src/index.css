@@ -89,7 +89,7 @@ h2 {
   font-size: 0.95rem;
 }
 
-.persona-goal {
+.card-subtitle {
   font-size: 0.8rem;
   color: var(--text-muted);
   line-height: 1.4;
@@ -180,4 +180,129 @@ input[type="file"] {
 audio {
   width: 100%;
   border-radius: 999px;
+}
+
+.start-call-button,
+.end-call-button,
+.restart-button {
+  display: block;
+  width: 100%;
+  border: none;
+  border-radius: 999px;
+  padding: 0.9rem 1.5rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--navy);
+  color: #fff;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.start-call-button:hover,
+.restart-button:hover {
+  background: var(--navy-light);
+}
+
+.start-call-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.end-call-button {
+  background: var(--danger);
+  margin-top: 2.5rem;
+}
+
+.end-call-button:hover {
+  opacity: 0.85;
+}
+
+.restart-button {
+  margin-top: 1.5rem;
+}
+
+.cancel-button {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 0.9rem 1.5rem;
+  margin-top: 0.75rem;
+  font: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.cancel-button:hover {
+  color: var(--navy);
+}
+
+.call-animation {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 4rem 0 2rem;
+}
+
+.call-orb {
+  width: 8rem;
+  height: 8rem;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.call-orb-listening {
+  background: var(--blue-light);
+  animation: orb-pulse 2.2s ease-in-out infinite;
+}
+
+.call-orb-thinking {
+  background: var(--navy-light);
+  animation: orb-pulse 0.9s ease-in-out infinite;
+}
+
+.call-orb-speaking {
+  background: var(--success);
+  animation: orb-pulse 0.6s ease-in-out infinite;
+}
+
+@keyframes orb-pulse {
+  0%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.call-state-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+.mic-check-hint {
+  color: var(--text-muted);
+  margin: 0 0 1.5rem;
+}
+
+.mic-meter {
+  height: 1rem;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+
+.mic-meter-fill {
+  height: 100%;
+  background: var(--success);
+  border-radius: 999px;
+  transition: width 0.08s linear;
 }
