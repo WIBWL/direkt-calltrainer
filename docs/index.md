@@ -21,6 +21,7 @@ Sie sind in der Leitung. Wählen Sie eine Option:
 - [ADR 0008 — React + TypeScript Frontend](adr/0008-react-typescript-frontend.md)
 - [ADR 0009 — Keycloak OIDC Authorization Code Flow + PKCE](adr/0009-keycloak-oidc-pkce-auth.md)
 - [ADR 0010 — Own PostgreSQL Instance for Session Persistence](adr/0010-own-postgresql-instance-for-session-persistence.md)
+- [ADR 0010 — Own PostgreSQL Instance for Session Persistence](adr/0010-own-postgresql-instance-for-session-persistence.md)
 - [ADR 0011 — EFRE-Direkt LLM Backend, Self-Contained](adr/0011-efre-direkt-llm-backend.md)
 - [ADR 0012 — Python + FastAPI Backend](adr/0012-python-fastapi-backend.md)
 - [ADR 0013 — Minimal Required Setup, Advanced Options Separate](adr/0013-minimal-required-setup.md)

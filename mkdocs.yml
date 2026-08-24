@@ -2,10 +2,17 @@ site_name: Calltrainer
 site_description: AI-powered phone conversation trainer
 docs_dir: docs
 
+# Erzeugt das ER-Diagramm vor jedem Build neu aus backend/db/models.py, damit
+# docs/datenmodell.md nicht veraltet. Schlaegt das fehl (kein Graphviz), baut
+# die Doku mit dem eingecheckten Diagramm weiter.
+hooks:
+  - scripts/mkdocs_hooks.py
+
 nav:
   - Home: index.md
   - Initial Requirements: initial_requirements.md
   - Features: features.md
+  - Datenmodell: datenmodell.md
   - Architecture Decisions:
       - ADR 0000 - Record Architecture Decisions: adr/0000-record-architecture-decisions.md
       - ADR 0001 - Separate Scenario and Persona Concepts: adr/0001-separate-scenario-and-persona.md
@@ -17,6 +24,7 @@ nav:
       - ADR 0007 - Desktop + Headset Primary Access: adr/0007-desktop-headset-primary-access.md
       - ADR 0008 - React + TypeScript Frontend: adr/0008-react-typescript-frontend.md
       - ADR 0009 - Keycloak OIDC Authorization Code Flow + PKCE: adr/0009-keycloak-oidc-pkce-auth.md
+      - ADR 0010 - Own PostgreSQL Instance for Session Persistence: adr/0010-own-postgresql-instance-for-session-persistence.md
       - ADR 0010 - Own PostgreSQL Instance for Session Persistence: adr/0010-own-postgresql-instance-for-session-persistence.md
       - ADR 0011 - EFRE-Direkt LLM Backend, Self-Contained: adr/0011-efre-direkt-llm-backend.md
       - ADR 0012 - Python + FastAPI Backend: adr/0012-python-fastapi-backend.md
