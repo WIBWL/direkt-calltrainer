@@ -34,7 +34,7 @@ For development, add `--watch` (`docker compose up --build --watch`) to have the
 The full architecture documentation - arc42 and every Architecture Decision Record (ADR) - is served via [MkDocs](https://www.mkdocs.org):
 
 ```powershell
-pip install -r requirements-docs.txt
+pip install -r requirements.txt
 mkdocs serve
 ```
 
