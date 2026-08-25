@@ -1,5 +1,7 @@
 """WebSocket API route for the live session: wire protocol <-> SessionOrchestrator."""
 
+import asyncio
+import contextlib
 import json
 import logging
 import uuid
@@ -36,13 +38,11 @@ async def session_ws(websocket: WebSocket) -> None:
 
     try:
         # Persona opens the call
-        outcome = await _forward_turn_events(websocket, orchestrator.run_opening_turn())
-        if outcome == "failed":
-            reason = "error"
-        elif outcome == "completed":
-            reason = "completed"
-        else:
+        outcome = await _run_turn_interruptible(websocket, orchestrator.run_opening_turn())
+        if outcome == "ok":
             reason = await _run_session(websocket, orchestrator)
+        else:
+            reason = "error" if outcome == "failed" else outcome
     except WebSocketDisconnect:
         logger.info("Session %s: client disconnected", session_id)
         return
@@ -100,9 +100,36 @@ async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) 
             return "user"
 
         turn = orchestrator.run_turn(audio_bytes, "turn.webm", envelope.get("mime_type"))
-        outcome = await _forward_turn_events(websocket, turn)
+        outcome = await _run_turn_interruptible(websocket, turn)
         if outcome != "ok":
-            return "error" if outcome == "failed" else "completed"
+            return "error" if outcome == "failed" else outcome
+
+
+async def _run_turn_interruptible(websocket: WebSocket, events: AsyncIterator[TurnEvent]) -> str:
+    """Forwards one turn's events while racing session.end/disconnect, so
+    hanging up mid-reply doesn't wait for it to finish generating."""
+    forward_task = asyncio.create_task(_forward_turn_events(websocket, events))
+    end_task = asyncio.create_task(_wait_for_session_end(websocket))
+    done, _ = await asyncio.wait({forward_task, end_task}, return_when=asyncio.FIRST_COMPLETED)
+
+    if end_task in done:
+        forward_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await forward_task
+        return "user"
+
+    end_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await end_task
+    return forward_task.result()
+
+
+async def _wait_for_session_end(websocket: WebSocket) -> None:
+    """Waits until the client sends session.end or disconnects."""
+    while True:
+        envelope = await _receive_json(websocket)
+        if envelope is None or envelope.get("type") == "session.end":
+            return
 
 
 async def _forward_turn_events(websocket: WebSocket, events: AsyncIterator[TurnEvent]) -> str:

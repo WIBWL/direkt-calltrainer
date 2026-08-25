@@ -81,7 +81,9 @@ export default function App() {
   // moment the reply's Turn completes, independent of local audio playback
   // timing. Don't tear the Session down immediately: stash it and let the
   // effect below act on it once the tail audio has actually finished, so
-  // the goodbye is heard instead of getting cut off mid-sentence.
+  // the goodbye is heard instead of getting cut off mid-sentence. This only
+  // applies to natural/error endings — when the user clicks "Anruf
+  // beenden", the call ends immediately instead (see the effect below).
   const handleEnded = useCallback((reason: "user" | "error" | "completed", turns: TurnRecord[]) => {
     setPendingEnd({ reason, turns });
   }, []);
@@ -95,7 +97,11 @@ export default function App() {
   });
 
   useEffect(() => {
-    if (pendingEnd === null || playback.isPlaying) return;
+    if (pendingEnd === null) return;
+    // A user-initiated end should cut the call immediately, not let the
+    // Persona's audio keep playing out — only natural/error endings wait
+    // for the tail audio to finish (see handleEnded above).
+    if (pendingEnd.reason !== "user" && playback.isPlaying) return;
     playback.reset();
     setTranscript(pendingEnd.turns);
     setScreen("transcript");
@@ -170,7 +176,8 @@ export default function App() {
   }
 
   if (screen === "transcript") {
-    return <TranscriptView transcript={transcript} onRestart={handleRestart} />;
+    const personaName = personas.find((p) => p.id === personaId)?.name ?? "Persona";
+    return <TranscriptView transcript={transcript} personaName={personaName} onRestart={handleRestart} />;
   }
 
   return (
