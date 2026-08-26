@@ -10,7 +10,7 @@ const SAMPLE_RATE = 16000;
  * "thinking"/"speaking" — so the user can barge in at any time.
  */
 export function useMicrophoneVAD(
-  onSpeechStart: () => void,
+  onSpeechRealStart: () => void,
   onTurnAudio: (blob: Blob, mimeType: string) => void,
 ) {
   const [micError, setMicError] = useState<string | null>(null);
@@ -36,9 +36,13 @@ export function useMicrophoneVAD(
         // end-of-speech in a normal (not dead-silent) room.
         positiveSpeechThreshold: 0.5,
         negativeSpeechThreshold: 0.35,
-        onSpeechStart: () => {
-          console.debug("[VAD] speech start");
-          onSpeechStart();
+        // Raised from vad-web's 400ms default to filter out quiet/brief "hmm"s.
+        minSpeechMs: 500,
+        onSpeechStart: () => console.debug("[VAD] speech start (unconfirmed)"),
+        // Fires once sustained past minSpeechMs -- use this for barge-in, not onSpeechStart above.
+        onSpeechRealStart: () => {
+          console.debug("[VAD] speech confirmed real");
+          onSpeechRealStart();
         },
         onVADMisfire: () => console.debug("[VAD] misfire (too short, ignored)"),
         // No pause() here — keeps listening so the user can barge in again right away.
@@ -55,7 +59,7 @@ export function useMicrophoneVAD(
         });
     }
     await initRef.current;
-  }, [onSpeechStart, onTurnAudio]);
+  }, [onSpeechRealStart, onTurnAudio]);
 
   // Fire-and-forget: starts fetching/initializing the ~15MB VAD model in the
   // background (e.g. during mic-check) so it's already warm by the time

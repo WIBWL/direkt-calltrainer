@@ -124,11 +124,8 @@ export default function App() {
   const displayStateRef = useRef(displayState);
   displayStateRef.current = displayState;
 
-  // Barge-in: the mic stays armed through "thinking"/"speaking" too (see
-  // useMicrophoneVAD); if the user starts talking then, stop the Persona and
-  // tell the server to cancel/reconcile the in-flight Turn.
-  // Stable ([]): a churning identity here would make startListening/
-  // stopListening churn too, restarting VAD on every render (see below).
+  // Barge-in trigger (see useMicrophoneVAD for the actual filtering).
+  // Stable ([]) so startListening/stopListening below don't churn either.
   const handleBargeIn = useCallback(() => {
     if (displayStateRef.current === "listening") return;
     playback.interrupt();

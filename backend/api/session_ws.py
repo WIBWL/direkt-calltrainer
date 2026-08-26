@@ -111,7 +111,7 @@ async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) 
 
 async def _run_turn_interruptible(websocket: WebSocket, events: AsyncIterator[TurnEvent]) -> str:
     """Forwards one turn's events while racing session.end/disconnect/a user
-    barge-in, so hanging up mid-reply doesn't wait for it to finish generating."""
+    barge-in, so talking over the persona doesn't wait for it to finish."""
     forward_task = asyncio.create_task(_forward_turn_events(websocket, events))
     control_task = asyncio.create_task(_wait_for_control_message(websocket))
     done, _ = await asyncio.wait({forward_task, control_task}, return_when=asyncio.FIRST_COMPLETED)
