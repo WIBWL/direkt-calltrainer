@@ -1,11 +1,20 @@
-"""Dialogue-generation client call."""
+"""Dialogue-generation client calls."""
 
 import logging
 from collections.abc import AsyncIterator
 
+from openai import OpenAIError
+
 from backend.clients.config import LLM_BACKEND, LLM_CLIENT, LLM_MODEL
 
 logger = logging.getLogger("calltrainer")
+
+_CLOSING_CLASSIFIER_PROMPT = (
+    "Answer with exactly one word, \"yes\" or \"no\": does this message from a "
+    "phone call signal that the caller wants to end the call now, or continue "
+    "it another time (e.g. a farewell, a wrap-up, or a request to pick this "
+    "up later)?"
+)
 
 # Upper bound on worst-case latency and cost per reply, not a target length:
 # the system prompt already constrains replies to short, realistic sentences,
@@ -33,3 +42,26 @@ async def stream_reply(messages: list[dict[str, str]]) -> AsyncIterator[str]:
         delta = chunk.choices[0].delta.content if chunk.choices else None
         if delta:
             yield delta
+
+
+async def signals_closing(user_text: str) -> bool:
+    """Semantic check: does this turn's transcript signal the user wants to
+    end or postpone the call? On failure, assumes no (the call just continues)."""
+    extra_body = {}
+    if LLM_BACKEND == "efre":
+        extra_body["chat_template_kwargs"] = {"enable_thinking": False}
+    try:
+        response = await LLM_CLIENT.chat.completions.create(
+            model=LLM_MODEL,
+            messages=[
+                {"role": "system", "content": _CLOSING_CLASSIFIER_PROMPT},
+                {"role": "user", "content": user_text},
+            ],
+            max_tokens=5,
+            extra_body=extra_body,
+        )
+    except OpenAIError as e:
+        logger.error("Closing-signal check failed: %s", e)
+        return False
+    answer = response.choices[0].message.content or ""
+    return "yes" in answer.lower()

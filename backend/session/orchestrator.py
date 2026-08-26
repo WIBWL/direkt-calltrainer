@@ -105,49 +105,11 @@ def _build_system_prompt(persona: Persona, scenario: Scenario) -> str:
 
 _END_CALL_RE = re.compile(r"\[\s*call[_\s]?end\s*\]", re.IGNORECASE)
 
-# Closing detection, per Schegloff & Sacks (1973) "Opening Up Closings": a
-# call typically ends via a terminal exchange (an explicit farewell), often
-# preceded by a pre-closing turn — a short "okay"/"alright"-type utterance
-# that occupies the floor without raising anything new. We treat the first
-# as a strong signal anywhere in the turn; the second only counts when it's
-# essentially the whole (short, question-free) turn, so it doesn't fire on
-# an aside like "Danke, aber ich habe noch eine Frage."
-_TERMINAL_FAREWELL_RE: dict[str, re.Pattern[str]] = {
-    "de": re.compile(
-        r"\b(auf wiederh(?:ö|oe)ren|auf wiedersehen|tsch(?:ü|ue)ss+|tschau|ciao|"
-        r"mach'?s gut|bis (bald|dann|sp(?:ä|ae)ter)|"
-        r"(sch(?:ö|oe)nen|guten) (tag|abend)( noch)?)\b",
-        re.IGNORECASE,
-    ),
-}
-_PRE_CLOSING_RE: dict[str, re.Pattern[str]] = {
-    "de": re.compile(
-        r"^(alles klar|passt( so)?|(das )?(w(?:ä|ae)r'?s|reicht( mir)?( so)?|"
-        r"kl(?:ä|ae)rt (alles|es|die sache))|(vielen )?dank(e)?( sch(?:ö|oe)n)?|"
-        r"(super|gut|okay|ok)[,.]? dann)\b",
-        re.IGNORECASE,
-    ),
-}
-_MAX_CHARS_FOR_PRE_CLOSING = 40
-
 _CLOSING_NUDGE = (
     "The user just signaled the call is over. End it now: add one brief, "
     "friendly closing line, then finish your reply with exactly this "
     "marker and nothing after it: [CALL_END]."
 )
-
-
-def _sounds_like_closing(text: str, language_id: str) -> bool:
-    """True for an explicit farewell anywhere in the turn, or a short
-    pre-closing wrap-up with no new question (see module comment above)."""
-    text = text.strip()
-    terminal = _TERMINAL_FAREWELL_RE.get(language_id)
-    if terminal is not None and terminal.search(text):
-        return True
-    pre_closing = _PRE_CLOSING_RE.get(language_id)
-    if pre_closing is None or "?" in text or len(text) > _MAX_CHARS_FOR_PRE_CLOSING:
-        return False
-    return bool(pre_closing.match(text))
 
 
 class _ReplyProgress:
@@ -260,7 +222,7 @@ class SessionOrchestrator:
                 turn.user_text = user_text
                 self._messages.append({"role": "user", "content": user_text})
 
-            closing = _sounds_like_closing(user_text, self._language_id)
+            closing = await llm.signals_closing(user_text)
             messages = self._messages
             if closing:
                 messages = [*messages, {"role": "system", "content": _CLOSING_NUDGE}]
