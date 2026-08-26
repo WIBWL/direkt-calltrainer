@@ -229,8 +229,8 @@ async def _emit_pending(
 class SessionOrchestrator:
     """Owns one Session's conversation state: the LLM message history and the
     Turn-by-Turn Transcript. `run_opening_turn`/`run_turn` each drive one
-    STT -> LLM -> TTS pass and apply ADR 0017's retry-then-graceful-end
-    policy, reinterpreted per-leg for the streaming pipeline (ADR 0026)."""
+    STT -> LLM -> TTS pass and apply ADR 0016's retry-then-graceful-end
+    policy, reinterpreted per-leg for the streaming pipeline (ADR 0033)."""
 
     def __init__(self, persona: Persona, scenario: Scenario):
         # A Persona has exactly one Language/voice (see personas.py) — no
@@ -286,7 +286,7 @@ class SessionOrchestrator:
     async def _generate_reply(
         self, turn: Turn, messages: list[dict[str, str]], force_end_call: bool = False
     ) -> AsyncIterator[TurnEvent]:
-        """Drive one reply attempt (plus, per ADR 0017/0026, one retry — also
+        """Drive one reply attempt (plus, per ADR 0016/0033, one retry — also
         covering a reply that needs a correction, i.e. came back in the wrong
         Language or repeated the previous reply). Appends the finished reply
         to persistent history and yields the Turn's completion/state events.
@@ -315,8 +315,8 @@ class SessionOrchestrator:
                     logger.error("LLM request failed (attempt %d): %s", llm_attempt + 1, e)
                 # Audio for part of this reply was already sent/played — a
                 # fresh completion would diverge from what the user just heard,
-                # so we don't retry past that point (ADR 0026) or past the one
-                # retry attempt ADR 0017 allows.
+                # so we don't retry past that point (ADR 0033) or past the one
+                # retry attempt ADR 0016 allows.
                 if progress.spoke_yet or llm_attempt == 1:
                     yield Failed(code="llm_failed", message=str(e) or "Reply needed a correction.")
                     return

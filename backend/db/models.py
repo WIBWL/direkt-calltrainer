@@ -1,5 +1,5 @@
 """
-Persistence schema of the Calltrainer (ADR 0027).
+Persistence schema of the Calltrainer (ADR 0026).
 
 Single source of truth: both the Alembic migrations and the ER diagram are
 derived from these classes, so neither can drift from the schema.
@@ -43,7 +43,7 @@ class Persona(Base):
 
 class PersonaEinwand(Base):
     """A typical objection of a Persona, kept as ordered rows rather than as a
-    repeating group inside the persona row (ADR 0027)."""
+    repeating group inside the persona row (ADR 0026)."""
 
     __tablename__ = "persona_einwand"
     einwand_id: Mapped[int] = mapped_column(primary_key=True)
@@ -89,7 +89,7 @@ class MetrikTyp(Base):
 class Session(Base):
     __tablename__ = "session"
     session_id: Mapped[int] = mapped_column(primary_key=True)
-    subject_id: Mapped[str] = mapped_column(String(64))  # pseudonym, later the Keycloak "sub" claim (ADR 0032)
+    subject_id: Mapped[str] = mapped_column(String(64))  # pseudonym, later the Keycloak "sub" claim (ADR 0031)
     persona_id: Mapped[int] = mapped_column(ForeignKey("persona.persona_id"))
     szenario_id: Mapped[int] = mapped_column(ForeignKey("szenario.szenario_id"))
     sprache_code: Mapped[str] = mapped_column(ForeignKey("sprache.sprache_code"))

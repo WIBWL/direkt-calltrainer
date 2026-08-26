@@ -25,7 +25,6 @@ nav:
       - ADR 0008 - React + TypeScript Frontend: adr/0008-react-typescript-frontend.md
       - ADR 0009 - Keycloak OIDC Authorization Code Flow + PKCE: adr/0009-keycloak-oidc-pkce-auth.md
       - ADR 0010 - Own PostgreSQL Instance for Session Persistence: adr/0010-own-postgresql-instance-for-session-persistence.md
-      - ADR 0010 - Own PostgreSQL Instance for Session Persistence: adr/0010-own-postgresql-instance-for-session-persistence.md
       - ADR 0011 - EFRE-Direkt LLM Backend, Self-Contained: adr/0011-efre-direkt-llm-backend.md
       - ADR 0012 - Python + FastAPI Backend: adr/0012-python-fastapi-backend.md
       - ADR 0013 - Minimal Required Setup, Advanced Options Separate: adr/0013-minimal-required-setup.md
@@ -48,6 +47,7 @@ nav:
       - ADR 0030 - ER Diagram Generated from ORM Metadata: adr/0030-erd-generated-from-orm-metadata.md
       - ADR 0031 - Pseudonymous subject_id Placeholder Instead of a User FK: adr/0031-pseudonymous-subject-id-placeholder.md
       - ADR 0032 - AnalysisJob as a Persisted Entity for Async Job Status: adr/0032-analysis-job-persisted-status.md
+      - ADR 0033 - Streaming Session Pipeline via Chunked TTS over WebSocket: adr/0033-streaming-session-pipeline.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
   # site is served at the root (mkdocs serve / mkdocs build + static server).

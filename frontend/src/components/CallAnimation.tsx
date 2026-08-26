@@ -7,7 +7,7 @@ const LABELS: Record<CallState, string> = {
 };
 
 /**
- * Pure state indicator for the live call — no transcript text, ever (ADR 0015
+ * Pure state indicator for the live call — no transcript text, ever (ADR 0014
  * extended to cover live text, not just live behavioral feedback).
  */
 export default function CallAnimation({ state }: { state: CallState }) {

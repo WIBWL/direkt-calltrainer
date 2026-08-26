@@ -1,5 +1,5 @@
 // Mirrors the backend's WebSocket wire protocol (backend/api/session_ws.py,
-// see ADR 0026). JSON control messages; binary audio frames are sent/received
+// see ADR 0033). JSON control messages; binary audio frames are sent/received
 // separately, immediately after the "meta"/"chunk" message that describes them.
 
 export type CallState = "listening" | "thinking" | "speaking";

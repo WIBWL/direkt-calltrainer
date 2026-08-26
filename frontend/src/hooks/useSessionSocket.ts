@@ -17,7 +17,7 @@ interface UseSessionSocketOptions {
 }
 
 /**
- * Owns the per-Session WebSocket connection (see ADR 0026's wire protocol):
+ * Owns the per-Session WebSocket connection (see ADR 0033's wire protocol):
  * sends the initial handshake, forwards Turn audio, and translates incoming
  * state/audio-chunk/error/session.ended messages into hook state. Connects
  * as soon as personaId/scenarioId are known — not gated behind any screen —

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * Plays back incoming TTS audio chunks back-to-back, gapless, as they arrive.
  * Each chunk is a small, complete WAV file (not a continuously-appended
  * stream), so scheduled AudioBufferSourceNodes are enough — no need for
- * MediaSource Extensions (see ADR 0026).
+ * MediaSource Extensions (see ADR 0033).
  *
  * Starts "held": chunks arriving before `activate()` is called are buffered,
  * not played — the opening Turn is generated in the background while the

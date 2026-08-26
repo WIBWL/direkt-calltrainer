@@ -265,6 +265,7 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0030 | ER Diagram Generated from ORM Metadata | angenommen | |
 | ADR 0031 | Pseudonymous subject_id Placeholder Instead of a User Foreign Key | angenommen | C-04, F-31 |
 | ADR 0032 | AnalysisJob as a Persisted Entity for Async Job Status | angenommen | Q-07, F-09 |
+| ADR 0033 | Streaming Session Pipeline via Chunked TTS over WebSocket | angenommen | Q-03, F-01, F-46 |
 
 Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug, ADR 0017 eine reine Wartbarkeitsentscheidung ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 
@@ -320,7 +321,6 @@ Erste Implementierung hat begonnen. Technische Schulden sind einzutragen.
 | Begriff | Definition |
 |---|---|
 | Architecture Decision Record (ADR) | Kurzes, fortlaufend nummeriertes Dokument, das genau eine architektonisch bedeutsame Entscheidung mit Kontext, Status und Konsequenzen festhält. Wird eine Entscheidung revidiert, bleibt der alte Eintrag bestehen und wird als abgelöst gekennzeichnet. |
-| Data Platform | Extern betriebener, über OIDC authentifizierter Dienst, an den das System hochgeladene Dokumente und große Dateien wie Gesprächsaufzeichnungen zur Speicherung übergibt. Strukturierte Session-Daten hält das Produkt dagegen in einer eigenen PostgreSQL-Datenbank (ADR 0010). |
 | Data Platform | Extern betriebener, über OIDC authentifizierter Dienst, an den das System hochgeladene Dokumente und große Dateien wie Gesprächsaufzeichnungen zur Speicherung übergibt. Strukturierte Session-Daten hält das Produkt dagegen in einer eigenen PostgreSQL-Datenbank (ADR 0010). |
 | EFRE-Direkt | Von der Hochschule bereitgestellter Dienst zur Erzeugung der Persona-Dialoge. Seine Nutzung ist eine Rahmenbedingung des Projekts und nicht das Ergebnis einer Auswahl unter konkurrierenden Anbietern. |
 | Feedback | Qualitative, verhaltensbezogene Rückmeldung zu einer abgeschlossenen Session mit konkreten Verbesserungsvorschlägen. Sie wird vollständig vom KI-System erzeugt; eine menschliche Trainerrolle ist im Produkt nicht vorgesehen. |

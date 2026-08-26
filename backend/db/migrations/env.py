@@ -29,7 +29,7 @@ config.set_main_option("sqlalchemy.url", DATABASE_URL.replace("%", "%%"))
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Autogenerate diffs the models against the database (ADR 0028).
+# Autogenerate diffs the models against the database (ADR 0027).
 target_metadata = Base.metadata
 
 

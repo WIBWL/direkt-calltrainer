@@ -6,7 +6,7 @@ interface TranscriptViewProps {
 }
 
 /** The plain, unannotated post-call log of what was said (see CONTEXT.md's
- * "Transcript" entry) — not the AI-generated Feedback from ADR 0004/0015. */
+ * "Transcript" entry) — not the AI-generated Feedback from ADR 0004/0014. */
 export default function TranscriptView({ transcript, onRestart }: TranscriptViewProps) {
   return (
     <>
