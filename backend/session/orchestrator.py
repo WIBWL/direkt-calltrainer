@@ -221,8 +221,8 @@ class SessionOrchestrator:
             else:
                 turn.user_text = user_text
                 self._messages.append({"role": "user", "content": user_text})
+            closing = await llm.signals_closing(self._messages)
 
-            closing = await llm.signals_closing(user_text)
             messages = self._messages
             if closing:
                 messages = [*messages, {"role": "system", "content": _CLOSING_NUDGE}]

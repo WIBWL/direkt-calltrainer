@@ -10,10 +10,13 @@ from backend.clients.config import LLM_BACKEND, LLM_CLIENT, LLM_MODEL
 logger = logging.getLogger("calltrainer")
 
 _CLOSING_CLASSIFIER_PROMPT = (
-    "Answer with exactly one word, \"yes\" or \"no\": does this message from a "
-    "phone call signal that the caller wants to end the call now, or continue "
-    "it another time (e.g. a farewell, a wrap-up, or a request to pick this "
-    "up later)?"
+    "This is a phone call transcript: \"assistant\" is the caller, \"user\" is "
+    "the person they called. Answer with exactly one word, \"yes\" or \"no\": "
+    "does the user's LAST message signal the call should end now, or be "
+    "picked up another time — e.g. a farewell, a genuine wrap-up once the "
+    "caller's concern is actually addressed, or a request to continue later? "
+    "Answer \"no\" if it doesn't actually address or resolve what's being "
+    "discussed, even if it sounds conclusive on its own."
 )
 
 # Upper bound on worst-case latency and cost per reply, not a target length:
@@ -44,19 +47,20 @@ async def stream_reply(messages: list[dict[str, str]]) -> AsyncIterator[str]:
             yield delta
 
 
-async def signals_closing(user_text: str) -> bool:
-    """Semantic check: does this turn's transcript signal the user wants to
-    end or postpone the call? On failure, assumes no (the call just continues)."""
+async def signals_closing(messages: list[dict[str, str]]) -> bool:
+    """Semantic check, given full context: does the user's latest message
+    signal they want to end/postpone the call, or does it just sound like it?"""
     extra_body = {}
     if LLM_BACKEND == "efre":
         extra_body["chat_template_kwargs"] = {"enable_thinking": False}
+    classifier_messages = [
+        {"role": "system", "content": _CLOSING_CLASSIFIER_PROMPT},
+        *messages[1:],  # skip the persona's own system prompt
+    ]
     try:
         response = await LLM_CLIENT.chat.completions.create(
             model=LLM_MODEL,
-            messages=[
-                {"role": "system", "content": _CLOSING_CLASSIFIER_PROMPT},
-                {"role": "user", "content": user_text},
-            ],
+            messages=classifier_messages,
             max_tokens=5,
             extra_body=extra_body,
         )
