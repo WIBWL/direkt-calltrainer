@@ -119,6 +119,7 @@ class _ReplyProgress:
         self.chunk_seq = 0
         self.spoke_yet = False
         self.ends_call = False
+        self.spoken_text = ""
 
 
 def _strip_end_marker(text_chunk: str, progress: _ReplyProgress) -> str:
@@ -145,12 +146,15 @@ def _strip_foreign_script(text_chunk: str) -> str:
 
 
 async def _drain_if_pending(
-    turn: Turn, pending: "asyncio.Task[bytes | None] | None", progress: _ReplyProgress
+    turn: Turn,
+    pending: "tuple[str, asyncio.Task[bytes | None]] | None",
+    progress: _ReplyProgress,
 ) -> AsyncIterator[TurnEvent]:
     """Awaits+yields the pipelined TTS task's events, if there is one."""
     if pending is None:
         return
-    audio = await pending
+    text, task = pending
+    audio = await task
     if audio is None:
         yield Failed(code="tts_failed", message="Synthesis failed after one retry.")
         return
@@ -158,6 +162,7 @@ async def _drain_if_pending(
         yield StateChanged(state="speaking")
         progress.spoke_yet = True
     progress.chunk_seq += 1
+    progress.spoken_text += text + " "
     yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=audio)
 
 
@@ -272,10 +277,10 @@ class SessionOrchestrator:
             yield StateChanged(state="listening")
 
     def _finalize_interrupted(self, turn: Turn, progress: _ReplyProgress) -> None:
-        """Commits the persona's partial reply if it had started speaking,
-        else discards it and leaves the turn open to reopen (see run_turn)."""
+        """Commits only the words actually sent as audio (unheard ones stay
+        unsaid); else discards everything and leaves the turn open to reopen."""
         if progress.spoke_yet:
-            turn.persona_text = turn.persona_text.strip()
+            turn.persona_text = progress.spoken_text.strip()
             self._messages.append({"role": "assistant", "content": turn.persona_text})
             self._reopen_turn = None
         else:
@@ -286,7 +291,7 @@ class SessionOrchestrator:
     ) -> AsyncIterator[TurnEvent]:
         """Stream one LLM completion, synthesizing+yielding it chunk by chunk,
         pipelined one chunk deep so synthesis overlaps generation instead of blocking it."""
-        pending: asyncio.Task[bytes | None] | None = None
+        pending: tuple[str, asyncio.Task[bytes | None]] | None = None
         try:
             async for text_chunk in sentence_chunks(llm.stream_reply(messages)):
                 text_chunk = _strip_end_marker(text_chunk, progress)
@@ -296,7 +301,7 @@ class SessionOrchestrator:
                     turn.persona_text += text_chunk + " "
                     async for event in _drain_if_pending(turn, pending, progress):
                         yield event
-                    pending = asyncio.create_task(self._synthesize_with_retry(text_chunk))
+                    pending = (text_chunk, asyncio.create_task(self._synthesize_with_retry(text_chunk)))
 
                 if progress.ends_call:
                     break  # nothing meaningful should follow the marker
@@ -305,7 +310,7 @@ class SessionOrchestrator:
                 yield event
         except (OpenAIError, asyncio.CancelledError, GeneratorExit):
             if pending is not None:
-                pending.cancel()
+                pending[1].cancel()
             raise
 
     async def _transcribe_with_retry(
