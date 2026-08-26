@@ -87,7 +87,7 @@ export function useStreamedAudioPlayback() {
     for (const data of held) scheduleChunk(data);
   }, [scheduleChunk]);
 
-  const reset = useCallback(() => {
+  const stopActiveSources = useCallback(() => {
     for (const source of activeSourcesRef.current) {
       source.onended = null; // avoid a double pendingCount decrement below
       try {
@@ -100,10 +100,21 @@ export function useStreamedAudioPlayback() {
     scheduleChainRef.current = Promise.resolve();
     nextStartTimeRef.current = 0;
     pendingCountRef.current = 0;
-    heldRef.current = true;
-    heldChunksRef.current = [];
     setIsPlaying(false);
   }, []);
+
+  const reset = useCallback(() => {
+    stopActiveSources();
+    heldRef.current = true;
+    heldChunksRef.current = [];
+  }, [stopActiveSources]);
+
+  /** Like reset(), but for a mid-call barge-in: stays live (not held) so
+   * the next Turn's chunks play immediately instead of buffering forever. */
+  const interrupt = useCallback(() => {
+    stopActiveSources();
+    heldChunksRef.current = [];
+  }, [stopActiveSources]);
 
   useEffect(() => {
     return () => {
@@ -111,5 +122,5 @@ export function useStreamedAudioPlayback() {
     };
   }, []);
 
-  return { enqueue, activate, reset, isPlaying };
+  return { enqueue, activate, reset, interrupt, isPlaying };
 }

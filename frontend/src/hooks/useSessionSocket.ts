@@ -122,6 +122,17 @@ export function useSessionSocket({
     void blob.arrayBuffer().then((buf) => ws.send(buf));
   }, []);
 
+  /** Tells the server to stop the in-flight Turn (a user barge-in) and
+   * optimistically flips local state to "listening" right away. */
+  const sendInterrupt = useCallback(() => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    console.debug("[WS] -> turn.interrupt");
+    const interrupt: ClientMessage = { type: "turn.interrupt" };
+    ws.send(JSON.stringify(interrupt));
+    setCallState("listening");
+  }, []);
+
   const endSession = useCallback(() => {
     const ws = wsRef.current;
     if (!ws) return;
@@ -140,5 +151,5 @@ export function useSessionSocket({
     }
   }, [onEnded]);
 
-  return { callState, error, sendTurnAudio, endSession };
+  return { callState, error, sendTurnAudio, sendInterrupt, endSession };
 }

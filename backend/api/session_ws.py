@@ -39,7 +39,7 @@ async def session_ws(websocket: WebSocket) -> None:
     try:
         # Persona opens the call
         outcome = await _run_turn_interruptible(websocket, orchestrator.run_opening_turn())
-        if outcome == "ok":
+        if outcome in ("ok", "interrupted"):
             reason = await _run_session(websocket, orchestrator)
         else:
             reason = "error" if outcome == "failed" else outcome
@@ -92,6 +92,8 @@ async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) 
         envelope = await _receive_json(websocket)
         if envelope is None or envelope.get("type") == "session.end":
             return "user"
+        if envelope.get("type") == "turn.interrupt":
+            continue
         if envelope.get("type") != "turn.audio.meta":
             continue
 
@@ -101,35 +103,46 @@ async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) 
 
         turn = orchestrator.run_turn(audio_bytes, "turn.webm", envelope.get("mime_type"))
         outcome = await _run_turn_interruptible(websocket, turn)
+        if outcome == "interrupted":
+            continue
         if outcome != "ok":
             return "error" if outcome == "failed" else outcome
 
 
 async def _run_turn_interruptible(websocket: WebSocket, events: AsyncIterator[TurnEvent]) -> str:
-    """Forwards one turn's events while racing session.end/disconnect, so
-    hanging up mid-reply doesn't wait for it to finish generating."""
+    """Forwards one turn's events while racing session.end/disconnect/a user
+    barge-in, so hanging up mid-reply doesn't wait for it to finish generating."""
     forward_task = asyncio.create_task(_forward_turn_events(websocket, events))
-    end_task = asyncio.create_task(_wait_for_session_end(websocket))
-    done, _ = await asyncio.wait({forward_task, end_task}, return_when=asyncio.FIRST_COMPLETED)
+    control_task = asyncio.create_task(_wait_for_control_message(websocket))
+    done, _ = await asyncio.wait({forward_task, control_task}, return_when=asyncio.FIRST_COMPLETED)
 
-    if end_task in done:
+    if control_task in done:
         forward_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await forward_task
+        # Cancelling forward_task doesn't reliably tear down the turn
+        # generator itself (see SessionOrchestrator._generate_reply); this does.
+        await events.aclose()
+        if control_task.result() == "interrupt":
+            await websocket.send_json({"type": "state", "value": "listening"})
+            return "interrupted"
         return "user"
 
-    end_task.cancel()
+    control_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
-        await end_task
+        await control_task
     return forward_task.result()
 
 
-async def _wait_for_session_end(websocket: WebSocket) -> None:
-    """Waits until the client sends session.end or disconnects."""
+async def _wait_for_control_message(websocket: WebSocket) -> str:
+    """Waits for a client message that should interrupt the in-flight turn:
+    session.end/disconnect ends the session, turn.interrupt is a barge-in."""
     while True:
         envelope = await _receive_json(websocket)
         if envelope is None or envelope.get("type") == "session.end":
-            return
+            return "end"
+        if envelope.get("type") == "turn.interrupt":
+            return "interrupt"
 
 
 async def _forward_turn_events(websocket: WebSocket, events: AsyncIterator[TurnEvent]) -> str:

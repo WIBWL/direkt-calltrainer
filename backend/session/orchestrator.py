@@ -1,6 +1,7 @@
 """Session orchestration: STT -> LLM -> TTS pipeline and retry policy."""
 
 import asyncio
+import contextlib
 import logging
 import re
 from collections.abc import AsyncIterator
@@ -209,53 +210,86 @@ class SessionOrchestrator:
             {"role": "system", "content": _build_system_prompt(persona, scenario)},
         ]
         self.turns: list[Turn] = []
+        self._reopen_turn: Turn | None = None
+
+    def _new_or_reopened_turn(self) -> tuple[Turn, bool]:
+        """Reuses a still-open turn from a prior barge-in, else creates a
+        fresh one; marks it unresolved so an early interruption still counts."""
+        reopening = self._reopen_turn is not None
+        turn = self._reopen_turn if reopening else Turn(seq=len(self.turns) + 1)
+        if not reopening:
+            self.turns.append(turn)
+        self._reopen_turn = turn
+        return turn, reopening
 
     async def run_opening_turn(self) -> AsyncIterator[TurnEvent]:
         """Have the Persona speak first: a freshly generated, varied call opener."""
-        turn = Turn(seq=len(self.turns) + 1)
-        self.turns.append(turn)
-
-        yield StateChanged(state="thinking")
-        kickoff_messages = [*self._messages, {"role": "user", "content": _OPENING_INSTRUCTION}]
-        async for event in self._generate_reply(turn, kickoff_messages):
-            yield event
+        turn, _ = self._new_or_reopened_turn()
+        progress = _ReplyProgress()
+        try:
+            yield StateChanged(state="thinking")
+            kickoff_messages = [*self._messages, {"role": "user", "content": _OPENING_INSTRUCTION}]
+            async with contextlib.aclosing(self._generate_reply(turn, kickoff_messages, progress)) as replies:
+                async for event in replies:
+                    yield event
+            self._reopen_turn = None
+        except (asyncio.CancelledError, GeneratorExit):
+            self._finalize_interrupted(turn, progress)
+            raise
 
     async def run_turn(
         self, audio_bytes: bytes, filename: str, content_type: str | None
     ) -> AsyncIterator[TurnEvent]:
         """Run one turn: transcribe, stream a reply, synthesize+yield it chunk by chunk."""
-        turn = Turn(seq=len(self.turns) + 1)
-        self.turns.append(turn)
+        turn, reopening = self._new_or_reopened_turn()
+        progress = _ReplyProgress()
+        try:
+            yield StateChanged(state="thinking")
 
-        yield StateChanged(state="thinking")
+            user_text = await self._transcribe_with_retry(audio_bytes, filename, content_type)
+            if user_text is None:
+                yield Failed(code="stt_failed", message="Transcription failed after one retry.")
+                return
 
-        user_text = await self._transcribe_with_retry(audio_bytes, filename, content_type)
-        if user_text is None:
-            yield Failed(code="stt_failed", message="Transcription failed after one retry.")
-            return
-        turn.user_text = user_text
-        self._messages.append({"role": "user", "content": user_text})
+            # A still-open turn from a barge-in gets the new text appended
+            # onto its question instead of starting a fresh turn.
+            if reopening and turn.user_text:
+                turn.user_text = f"{turn.user_text} {user_text}".strip()
+                self._messages[-1]["content"] = turn.user_text
+            else:
+                turn.user_text = user_text
+                self._messages.append({"role": "user", "content": user_text})
 
-        closing = _sounds_like_closing(user_text, self._language_id)
-        messages = self._messages
-        if closing:
-            messages = [*messages, {"role": "system", "content": _CLOSING_NUDGE}]
+            closing = _sounds_like_closing(user_text, self._language_id)
+            messages = self._messages
+            if closing:
+                messages = [*messages, {"role": "system", "content": _CLOSING_NUDGE}]
 
-        async for event in self._generate_reply(turn, messages, force_end_call=closing):
-            yield event
+            async with contextlib.aclosing(
+                self._generate_reply(turn, messages, progress, force_end_call=closing)
+            ) as replies:
+                async for event in replies:
+                    yield event
+            self._reopen_turn = None
+        except (asyncio.CancelledError, GeneratorExit):
+            # User barged in; aclosing above ensures this runs even if
+            # cancellation landed between yields, not inside a network await.
+            self._finalize_interrupted(turn, progress)
+            raise
 
     async def _generate_reply(
-        self, turn: Turn, messages: list[dict[str, str]], force_end_call: bool = False
+        self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress, force_end_call: bool = False
     ) -> AsyncIterator[TurnEvent]:
         """Drive one reply attempt plus one retry on an LLM error.
         Appends the finished reply to history and yields events."""
-        progress = _ReplyProgress()
         for llm_attempt in range(2):  # initial attempt + one retry
             try:
-                async for event in self._stream_and_synthesize(turn, messages, progress):
-                    yield event
-                    if isinstance(event, Failed):
-                        return
+                stream = self._stream_and_synthesize(turn, messages, progress)
+                async with contextlib.aclosing(stream) as chunks:
+                    async for event in chunks:
+                        yield event
+                        if isinstance(event, Failed):
+                            return
                 break  # streamed to completion without an LLM-side error
             except OpenAIError as e:
                 logger.error("LLM request failed (attempt %d): %s", llm_attempt + 1, e)
@@ -274,6 +308,16 @@ class SessionOrchestrator:
         yield TurnCompleted(turn_seq=turn.seq, ends_call=ends_call)
         if not ends_call:
             yield StateChanged(state="listening")
+
+    def _finalize_interrupted(self, turn: Turn, progress: _ReplyProgress) -> None:
+        """Commits the persona's partial reply if it had started speaking,
+        else discards it and leaves the turn open to reopen (see run_turn)."""
+        if progress.spoke_yet:
+            turn.persona_text = turn.persona_text.strip()
+            self._messages.append({"role": "assistant", "content": turn.persona_text})
+            self._reopen_turn = None
+        else:
+            turn.persona_text = ""
 
     async def _stream_and_synthesize(
         self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress
@@ -297,7 +341,7 @@ class SessionOrchestrator:
 
             async for event in _drain_if_pending(turn, pending, progress):
                 yield event
-        except OpenAIError:
+        except (OpenAIError, asyncio.CancelledError, GeneratorExit):
             if pending is not None:
                 pending.cancel()
             raise
