@@ -119,6 +119,11 @@ _CLOSING_NUDGE = (
     "marker and nothing after it: [CALL_END]."
 )
 
+# Said in place of trusting the model's own reply to have included a
+# goodbye -- for a backstopped ending (a repeat, or the model ending
+# unprompted) that trust hasn't been earned (confirmed in testing).
+_FALLBACK_CLOSING_LINE = "Vielen Dank für Ihre Zeit. Auf Wiederhören."
+
 
 class _ReplyProgress:
     """Mutable state shared across one reply's pipelined TTS chunks."""
@@ -151,6 +156,23 @@ _FOREIGN_SCRIPT_RE = re.compile(
 
 def _strip_foreign_script(text_chunk: str) -> str:
     return _FOREIGN_SCRIPT_RE.sub("", text_chunk).strip()
+
+
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
+
+
+def _has_repeated_sentence(text: str) -> bool:
+    """True if the same non-trivial sentence appears twice in text -- a
+    sign of degenerate generation within a single reply."""
+    seen = set()
+    for sentence in _SENTENCE_SPLIT_RE.split(text):
+        sentence = sentence.strip().lower()
+        if len(sentence) < 15:
+            continue
+        if sentence in seen:
+            return True
+        seen.add(sentence)
+    return False
 
 
 async def _drain_if_pending(
@@ -275,14 +297,53 @@ class SessionOrchestrator:
                 turn.persona_text = ""  # retrying from scratch
 
         turn.persona_text = turn.persona_text.strip()
+        repeated_reply = bool(turn.persona_text) and (
+            self._repeats_last_reply(turn.persona_text) or _has_repeated_sentence(turn.persona_text)
+        )
         self._messages.append({"role": "assistant", "content": turn.persona_text})
 
         # force_end_call backstops [CALL_END]: a small model won't always
         # include the marker even when told to (confirmed in testing).
-        ends_call = progress.ends_call or force_end_call
+        ends_call = progress.ends_call or force_end_call or repeated_reply
+        if ends_call:
+            logger.info(
+                "Turn %d ends the call (model marker=%s, closing-intent check=%s, repeated reply=%s)",
+                turn.seq,
+                progress.ends_call,
+                force_end_call,
+                repeated_reply,
+            )
+            # Only the closing-intent path actually asked the model for a
+            # goodbye (_CLOSING_NUDGE); a repeat or an unprompted ending
+            # didn't, so it can't be trusted to have included one.
+            if repeated_reply or (progress.ends_call and not force_end_call):
+                async for event in self._speak_fallback_closing(turn, progress):
+                    yield event
         yield TurnCompleted(turn_seq=turn.seq, ends_call=ends_call)
         if not ends_call:
             yield StateChanged(state="listening")
+
+    async def _speak_fallback_closing(self, turn: Turn, progress: _ReplyProgress) -> AsyncIterator[TurnEvent]:
+        """Synthesizes a guaranteed sign-off for a backstopped ending,
+        instead of trusting the Persona's own reply to have included one."""
+        audio = await self._synthesize_with_retry(_FALLBACK_CLOSING_LINE)
+        if audio is None:
+            return
+        if not progress.spoke_yet:
+            yield StateChanged(state="speaking")
+            progress.spoke_yet = True
+        progress.chunk_seq += 1
+        yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=audio)
+        turn.persona_text = f"{turn.persona_text} {_FALLBACK_CLOSING_LINE}".strip()
+        self._messages[-1]["content"] = turn.persona_text
+
+    def _repeats_last_reply(self, text: str) -> bool:
+        """True if text matches the persona's most recent reply verbatim
+        (mod case/whitespace) -- a sign it's stuck repeating itself."""
+        for message in reversed(self._messages):
+            if message["role"] == "assistant":
+                return message["content"].strip().lower() == text.strip().lower()
+        return False
 
     def _finalize_interrupted(self, turn: Turn, progress: _ReplyProgress) -> None:
         """Commits only the words actually sent as audio (unheard ones stay

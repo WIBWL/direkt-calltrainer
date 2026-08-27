@@ -47,6 +47,9 @@ async def stream_reply(messages: list[dict[str, str]]) -> AsyncIterator[str]:
         messages=messages,
         stream=True,
         max_tokens=_MAX_REPLY_TOKENS,
+        # Without this the model can degenerate into repeating a sentence
+        # within one reply (confirmed in testing).
+        frequency_penalty=0.5,
         extra_body=extra_body,
     )
     async for chunk in stream:
