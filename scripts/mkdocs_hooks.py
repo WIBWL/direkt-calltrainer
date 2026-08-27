@@ -32,11 +32,17 @@ def _generator_main():
     return modul.main
 
 
-def on_pre_build(config) -> None:
+def on_pre_build(config) -> None:  # pylint: disable=unused-argument
+    """MkDocs hook: regenerate the ER diagram before each docs build.
+
+    `config` is part of the hook signature MkDocs calls, not something this
+    hook needs.
+    """
     try:
         _generator_main()()
         log.info("ER-Diagramm aus backend/db/models.py neu erzeugt.")
-    except Exception as exc:  # bewusst breit: der Build darf hieran nicht scheitern
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        # Bewusst breit: der Build darf hieran nicht scheitern.
         log.warning(
             "ER-Diagramm konnte nicht neu erzeugt werden (%s: %s). Die Doku zeigt "
             "das zuletzt eingecheckte docs/er_modell.svg, das veraltet sein kann. "

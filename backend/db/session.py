@@ -30,7 +30,9 @@ def get_engine() -> Engine:
 
 
 @lru_cache(maxsize=1)
-def _session_factory() -> sessionmaker[DbSession]:
+def _session_factory() -> sessionmaker[DbSession]:  # pylint: disable=unsubscriptable-object
+    """The process-wide session factory. The disable above is a pylint blind
+    spot: sessionmaker is generic at type-check time but not at runtime."""
     return sessionmaker(bind=get_engine(), autoflush=False, expire_on_commit=False)
 
 

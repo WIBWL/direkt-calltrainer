@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 
 # A script, not a package: the project root has to be on the search path
 # before the backend imports, hence the noqa markers on them.
+# pylint: disable=wrong-import-position
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
@@ -99,6 +100,7 @@ def upsert(db, model, natural_key: dict, values: dict):
 
 
 def seed_sprachen(db) -> int:
+    """Upserts the Sprachen the Personas actually reference. Returns how many were created."""
     created = 0
     for code in sorted({p.language_id for p in PERSONAS}):
         _, is_new = upsert(
@@ -141,6 +143,7 @@ def seed_einwaende(db, persona: Persona, objections: list[str]) -> None:
 
 
 def seed_personas(db) -> int:
+    """Upserts every Persona from personas.py, including its Language and voice."""
     created = 0
     for p in PERSONAS:
         persona, is_new = upsert(
@@ -168,6 +171,7 @@ def seed_personas(db) -> int:
 
 
 def seed_szenarien(db) -> int:
+    """Upserts every Szenario from scenarios.py."""
     created = 0
     for s in SCENARIOS:
         _, is_new = upsert(
@@ -208,6 +212,7 @@ def deactivate_missing(db) -> dict[str, int]:
 
 
 def seed_metrik_typen(db) -> int:
+    """Upserts the paraverbal metric types from docs/features.md."""
     created = 0
     for schluessel, bezeichnung, einheit, feature_id, aktiv in METRIK_TYPEN:
         _, is_new = upsert(
@@ -226,6 +231,7 @@ def seed_metrik_typen(db) -> int:
 
 
 def main() -> None:
+    """Seeds every reference table, then reports what changed."""
     load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
     with session_scope() as db:
         created = {

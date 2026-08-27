@@ -22,6 +22,8 @@ import sys
 from sqlalchemy import create_engine
 from sqlalchemy_schemadisplay import create_schema_graph
 
+# pylint: disable=wrong-import-position  # same sys.path reason as the noqa markers below
+# pylint: disable=no-member  # pydot's Dot builds its set_*/write_* methods at runtime
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
@@ -40,6 +42,7 @@ FONT    = "IBM Plex Mono"
 
 
 def main() -> None:
+    """Renders docs/er_modell.png and .svg from the ORM metadata (ADR 0030)."""
     os.makedirs(os.path.dirname(OUTPUT_PNG), exist_ok=True)
 
     engine = create_engine("sqlite://")  # leer -> nur die Python-Modelle zaehlen

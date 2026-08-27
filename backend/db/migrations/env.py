@@ -7,6 +7,7 @@ from alembic import context
 from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 
+# pylint: disable=wrong-import-position  # sys.path has to be set up first
 # Make the project root importable ("backend.db...") and load .env for DATABASE_URL.
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))

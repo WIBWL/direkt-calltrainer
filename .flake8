@@ -3,6 +3,20 @@
 # W293: blank line contains whitespace
 # W504: line break after binary operator
 # W291: trailing whitespace
-ignore = E261, W293, W504, W291
+# E221: multiple spaces before operator -- allows aligning a block of related
+#       constant assignments into columns, same taste as E261 above
+ignore = E261, W293, W504, W291, E221
 max-line-length = 120
 max-complexity = 10
+
+# Alembic writes the files under versions/ itself, in its own layout — its
+# continuation-line style trips E122/E128 on every single revision. Reformatting
+# generated code by hand would just be undone by the next `alembic revision`.
+# The migrations are still reviewed by a human before they are applied; see
+# CLAUDE.md, "Schema changes".
+exclude =
+    .git,
+    .venv,
+    __pycache__,
+    frontend/node_modules,
+    backend/db/migrations/versions
