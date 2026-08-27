@@ -1,6 +1,5 @@
-"""Model config for STT, LLM, and TTS — OpenAI-compatible by
-default (EFRE_URL/Gemini), with an optional non-OpenAI-compatible TTS
-provider (KugelAudio) behind the TTS_BACKEND toggle."""
+"""Model config for STT, LLM (both single-backend, no fallback) and TTS
+(KugelAudio by default, the EFRE model as a fallback only)."""
 
 import os
 
@@ -23,24 +22,24 @@ def _required_env(name: str) -> str:
 
 CLIENT = AsyncOpenAI(base_url=f"{_required_env('EFRE_URL')}/v1", api_key=_required_env("EFRE_API_KEY"))
 
+# Forces TTS to always use the EFRE fallback instead of KugelAudio, e.g. for
+# local testing without KugelAudio credentials.
+DEBUG = os.environ.get("DEBUG", "").lower() in ("1", "true", "yes")
+
 # STT config
 STT_CLIENT = CLIENT
 STT_MODEL = _required_env("STT_MODEL")
 
 # LLM config
-LLM_BACKEND = os.environ.get("LLM_BACKEND", "efre").lower()
-if LLM_BACKEND == "gemini":
-    LLM_CLIENT = AsyncOpenAI(base_url=_required_env("GEMINI_URL"), api_key=_required_env("GEMINI_API_KEY"))
-    LLM_MODEL = _required_env("GEMINI_MODEL")
-else:
-    LLM_CLIENT = CLIENT
-    LLM_MODEL = _required_env("LLM_MODEL")
+LLM_CLIENT = CLIENT
+LLM_MODEL = _required_env("LLM_MODEL")
 
-# TTS config
-TTS_BACKEND = os.environ.get("TTS_BACKEND", "efre").lower()
-if TTS_BACKEND == "kugelaudio":
-    TTS_CLIENT = KugelAudio(api_key=_required_env("KUGELAUDIO_API_KEY"))
-    TTS_MODEL = _required_env("KUGELAUDIO_MODEL")
+# TTS config: KugelAudio is the default; TTS_MODEL (EFRE) is only a
+# fallback, used if KugelAudio fails or if DEBUG is set.
+TTS_MODEL = _required_env("TTS_MODEL")
+if DEBUG:
+    KUGELAUDIO_CLIENT = None
+    KUGELAUDIO_MODEL = None
 else:
-    TTS_CLIENT = CLIENT
-    TTS_MODEL = _required_env("TTS_MODEL")
+    KUGELAUDIO_CLIENT = KugelAudio(api_key=_required_env("KUGELAUDIO_API_KEY"))
+    KUGELAUDIO_MODEL = _required_env("KUGELAUDIO_MODEL")
