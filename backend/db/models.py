@@ -112,14 +112,32 @@ class Session(Base):
 
 
 class Turn(Base):
+    """One exchange within a Session: the user's utterance and the Persona's
+    reply to it (see CONTEXT.md's "Turn" entry) — both halves in one row, not
+    one row per speaker.
+
+    The Session's opening Turn has no user half, because the Persona speaks
+    first: its `nutzer_transkript` is empty and `nutzer_dauer_ms` is NULL.
+    The same holds for a final Turn cut short by a pipeline failure (ADR 0016),
+    where the Persona half stays empty instead.
+
+    Ordering comes from `seq_index` alone (per Session, starting at 1); no
+    absolute offset into the Session is stored, since a paired Turn has two
+    start times and nothing reads them — the Session's audio is not persisted
+    (ADR 0034), so there is no timeline to align against.
+    """
+
     __tablename__ = "turn"
     turn_id: Mapped[int] = mapped_column(primary_key=True)
     session_id: Mapped[int] = mapped_column(ForeignKey("session.session_id"))
-    sprecher: Mapped[str] = mapped_column(String(10))    # nutzer, persona
     seq_index: Mapped[int] = mapped_column(Integer)
-    start_offset_ms: Mapped[int] = mapped_column(Integer)
-    dauer_ms: Mapped[int] = mapped_column(Integer)
-    transkript: Mapped[str] = mapped_column(Text)
+    nutzer_transkript: Mapped[str] = mapped_column(Text)
+    persona_transkript: Mapped[str] = mapped_column(Text)
+    # Nullable because a half can be absent (see above). Needed for speaking
+    # rate (F-36), talk-time share (F-24) and fluency (F-51), none of which
+    # can be derived from the transcript text.
+    nutzer_dauer_ms: Mapped[int | None] = mapped_column(Integer)
+    persona_dauer_ms: Mapped[int | None] = mapped_column(Integer)
 
     session: Mapped["Session"] = relationship(back_populates="turns")
     feedbackpunkte: Mapped[list["Feedbackpunkt"]] = relationship(back_populates="turn")
@@ -132,6 +150,14 @@ class Turn(Base):
 
 
 class Messung(Base):
+    """One metric measured on the *user's* half of a Turn.
+
+    Every paraverbal metric (F-35 to F-38, F-51) describes how the trainee
+    spoke; the Persona's half is synthesized speech, so measuring it says
+    nothing about the user. That is what lets a Turn hold both speakers in one
+    row without `turn_id` becoming ambiguous here.
+    """
+
     __tablename__ = "messung"
     messung_id: Mapped[int] = mapped_column(primary_key=True)
     turn_id: Mapped[int] = mapped_column(ForeignKey("turn.turn_id"))
@@ -149,6 +175,8 @@ class Befund(Base):
     turn_id: Mapped[int] = mapped_column(ForeignKey("turn.turn_id"))
     metrik_typ_id: Mapped[int | None] = mapped_column(ForeignKey("metrik_typ.metrik_typ_id"))
     kategorie: Mapped[str] = mapped_column(String(60))
+    # Relative to the start of the user's utterance in this Turn, for the same
+    # reason Messung attaches to the user's half only (see Messung).
     offset_ms: Mapped[int] = mapped_column(Integer)
     beschreibung: Mapped[str] = mapped_column(Text)
 
