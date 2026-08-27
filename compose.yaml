@@ -12,9 +12,27 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     ports:
       - 8000:8000
+    volumes:
+      - ./logs:/app/logs
     depends_on:
       db:
         condition: service_healthy
+    develop:
+      watch:
+        # Backend code changes: synced into the running container and the
+        # gunicorn process restarted, without a full image rebuild.
+        - action: sync+restart
+          path: ./backend
+          target: /app/backend
+        # Anything that needs `pip install` or the frontend build re-run:
+        # cheap enough to just rebuild the image from scratch.
+        - action: rebuild
+          path: ./requirements.txt
+        - action: rebuild
+          path: ./frontend
+          ignore:
+            - node_modules/
+            - dist/
 
   db:
     image: postgres:17

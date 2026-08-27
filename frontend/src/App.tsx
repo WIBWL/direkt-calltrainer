@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import CallView from "./components/CallView";
 import MicCheck from "./components/MicCheck";
@@ -81,7 +81,9 @@ export default function App() {
   // moment the reply's Turn completes, independent of local audio playback
   // timing. Don't tear the Session down immediately: stash it and let the
   // effect below act on it once the tail audio has actually finished, so
-  // the goodbye is heard instead of getting cut off mid-sentence.
+  // the goodbye is heard instead of getting cut off mid-sentence. This only
+  // applies to natural/error endings — when the user clicks "Anruf
+  // beenden", the call ends immediately instead (see the effect below).
   const handleEnded = useCallback((reason: "user" | "error" | "completed", turns: TurnRecord[]) => {
     setPendingEnd({ reason, turns });
   }, []);
@@ -95,7 +97,11 @@ export default function App() {
   });
 
   useEffect(() => {
-    if (pendingEnd === null || playback.isPlaying) return;
+    if (pendingEnd === null) return;
+    // A user-initiated end should cut the call immediately, not let the
+    // Persona's audio keep playing out — only natural/error endings wait
+    // for the tail audio to finish (see handleEnded above).
+    if (pendingEnd.reason !== "user" && playback.isPlaying) return;
     playback.reset();
     setTranscript(pendingEnd.turns);
     setScreen("transcript");
@@ -108,25 +114,42 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- playback is stable-shaped; only isPlaying/pendingEnd should retrigger this
   }, [pendingEnd, playback.isPlaying]);
 
-  const vad = useMicrophoneVAD(socket.sendTurnAudio);
+  // The server sends state:"listening" the moment the Turn completes, but
+  // the Persona's last audio chunk(s) can still be playing out locally —
+  // hold the displayed state at "speaking" until playback actually finishes.
+  const displayState = socket.callState === "listening" && playback.isPlaying ? "speaking" : socket.callState;
+
+  // useMicrophoneVAD wires onSpeechStart into MicVAD only once (see its
+  // initRef guard), so handleBargeIn below must read fresh state via a ref.
+  const displayStateRef = useRef(displayState);
+  displayStateRef.current = displayState;
+
+  // Barge-in trigger (see useMicrophoneVAD for the actual filtering).
+  // Stable ([]) so startListening/stopListening below don't churn either.
+  const handleBargeIn = useCallback(() => {
+    if (displayStateRef.current === "listening") return;
+    playback.interrupt();
+    socket.sendInterrupt();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment above
+  }, []);
+
+  const vad = useMicrophoneVAD(handleBargeIn, socket.sendTurnAudio);
 
   useEffect(() => {
     vad.preload();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- preload once, on mount
   }, []);
 
-  // Strict turn-taking: armed only while it's genuinely the user's turn —
-  // callState is "listening" AND the Persona's audio has fully finished
-  // playing (not just server-side Turn completion, see displayState below).
-  // Everywhere else (including "thinking"), the mic stays off.
+  // Armed for the whole call, not just while it's nominally the user's turn
+  // — see the barge-in handling above.
   useEffect(() => {
-    if (screen !== "call" || socket.callState !== "listening" || playback.isPlaying) {
+    if (screen !== "call") {
       vad.stopListening();
       return;
     }
     void vad.startListening();
     return () => vad.stopListening();
-  }, [screen, socket.callState, playback.isPlaying, vad.startListening, vad.stopListening]);
+  }, [screen, vad.startListening, vad.stopListening]);
 
   const handleConfirmed = useCallback(() => {
     // Reveal whatever's already been generated (possibly the whole opening
@@ -145,16 +168,6 @@ export default function App() {
 
   const readyForCall = personaId !== null && scenarioId !== null;
 
-  // The server sends state:"listening" the moment the Turn completes
-  // server-side — but the Persona's last audio chunk(s) can still be
-  // playing out locally for a bit after that (same root cause as the
-  // session.ended/pendingEnd race above, just on every Turn instead of only
-  // the last one). Showing "listening" ("Du bist am Zug") already at that
-  // point is misleading — the mic isn't even armed yet either, since that's
-  // separately gated on !playback.isPlaying — so the displayed state holds
-  // at "speaking" until playback actually finishes.
-  const displayState = socket.callState === "listening" && playback.isPlaying ? "speaking" : socket.callState;
-
   if (screen === "mic-check") {
     return <MicCheck onConfirmed={handleConfirmed} onCancel={() => setScreen("setup")} />;
   }
@@ -170,7 +183,8 @@ export default function App() {
   }
 
   if (screen === "transcript") {
-    return <TranscriptView transcript={transcript} onRestart={handleRestart} />;
+    const personaName = personas.find((p) => p.id === personaId)?.name ?? "Persona";
+    return <TranscriptView transcript={transcript} personaName={personaName} onRestart={handleRestart} />;
   }
 
   return (

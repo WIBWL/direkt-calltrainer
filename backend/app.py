@@ -11,11 +11,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.api.session_ws import router as session_ws_router
+from backend.clients.health import check_backends
+from backend.logging_config import configure_logging
 from backend.personas import PERSONAS
 from backend.scenarios import SCENARIOS
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("calltrainer")
+configure_logging()
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -28,6 +30,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
             await client.get(efre_url)
     except httpx.HTTPError as e:
         logger.error("Could not reach EFRE_URL (%s): %s — are you connected to the university network", efre_url, e)
+    await check_backends()
     yield
 
 

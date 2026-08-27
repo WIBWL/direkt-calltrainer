@@ -1,5 +1,7 @@
 """WebSocket API route for the live session: wire protocol <-> SessionOrchestrator."""
 
+import asyncio
+import contextlib
 import json
 import logging
 import uuid
@@ -7,12 +9,13 @@ from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from backend.logging_config import reset_session_log, session_id_scope
 from backend.personas import PERSONAS, Persona
 from backend.scenarios import SCENARIOS, Scenario
 from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted, TurnEvent
 from backend.session.orchestrator import SessionOrchestrator
 
-logger = logging.getLogger("calltrainer")
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -29,37 +32,37 @@ async def session_ws(websocket: WebSocket) -> None:
     persona, scenario = handshake
 
     session_id = str(uuid.uuid4())
-    orchestrator = SessionOrchestrator(persona, scenario)
-    logger.info("Session %s started: persona=%s language=%s", session_id, persona.id, persona.language_id)
+    reset_session_log()
+    with session_id_scope(session_id):
+        orchestrator = SessionOrchestrator(persona, scenario)
+        logger.info("Session started: persona=%s language=%s", persona.id, persona.language_id)
 
-    await websocket.send_json({"type": "session.started", "session_id": session_id})
+        await websocket.send_json({"type": "session.started", "session_id": session_id})
 
-    try:
-        # Persona opens the call
-        outcome = await _forward_turn_events(websocket, orchestrator.run_opening_turn())
-        if outcome == "failed":
-            reason = "error"
-        elif outcome == "completed":
-            reason = "completed"
-        else:
-            reason = await _run_session(websocket, orchestrator)
-    except WebSocketDisconnect:
-        logger.info("Session %s: client disconnected", session_id)
-        return
+        try:
+            # Persona opens the call
+            outcome = await _run_turn_interruptible(websocket, orchestrator.run_opening_turn())
+            if outcome in ("ok", "interrupted"):
+                reason = await _run_session(websocket, orchestrator)
+            else:
+                reason = "error" if outcome == "failed" else outcome
+        except WebSocketDisconnect:
+            logger.info("Client disconnected")
+            return
 
-    transcript = [
-        {"turn_seq": t.seq, "user_text": t.user_text, "persona_text": t.persona_text}
-        for t in orchestrator.turns
-    ]
-    try:
-        await websocket.send_json({"type": "session.ended", "reason": reason, "transcript": transcript})
-        await websocket.close()
-    except (WebSocketDisconnect, RuntimeError):
-        # Client can disconnect between _run_session and final send
-        # e.g. ASGI message 'websocket.send' after 'websocket.close'
-        logger.info("Session %s: client disconnected before session.ended could be sent", session_id)
-        return
-    logger.info("Session %s ended (%s)", session_id, reason)
+        transcript = [
+            {"turn_seq": t.seq, "user_text": t.user_text, "persona_text": t.persona_text}
+            for t in orchestrator.turns
+        ]
+        try:
+            await websocket.send_json({"type": "session.ended", "reason": reason, "transcript": transcript})
+            await websocket.close()
+        except (WebSocketDisconnect, RuntimeError):
+            # Client can disconnect between _run_session and final send
+            # e.g. ASGI message 'websocket.send' after 'websocket.close'
+            logger.info("Client disconnected before session.ended could be sent")
+            return
+        logger.info("Session ended (%s)", reason)
 
 
 async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
@@ -70,6 +73,7 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
     except WebSocketDisconnect:
         return None
     if start.get("type") != "session.start":
+        logger.warning("Handshake failed: expected session.start, got %r", start.get("type"))
         # Protocol Error (1002; https://websocket.org/reference/close-codes/)
         await websocket.close(code=1002, reason="Expected session.start")
         return None
@@ -79,6 +83,7 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
     persona = next((p for p in PERSONAS if p.id == persona_id), None)
     scenario = next((s for s in SCENARIOS if s.id == scenario_id), None)
     if persona is None or scenario is None:
+        logger.warning("Handshake failed: unknown persona_id=%r/scenario_id=%r", persona_id, scenario_id)
         # Protocol Error (1002; https://websocket.org/reference/close-codes/)
         await websocket.close(code=1002, reason="Unknown persona_id/scenario_id")
         return None
@@ -92,6 +97,8 @@ async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) 
         envelope = await _receive_json(websocket)
         if envelope is None or envelope.get("type") == "session.end":
             return "user"
+        if envelope.get("type") == "turn.interrupt":
+            continue
         if envelope.get("type") != "turn.audio.meta":
             continue
 
@@ -100,9 +107,48 @@ async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) 
             return "user"
 
         turn = orchestrator.run_turn(audio_bytes, "turn.webm", envelope.get("mime_type"))
-        outcome = await _forward_turn_events(websocket, turn)
+        outcome = await _run_turn_interruptible(websocket, turn)
+        if outcome == "interrupted":
+            continue
         if outcome != "ok":
-            return "error" if outcome == "failed" else "completed"
+            return "error" if outcome == "failed" else outcome
+
+
+async def _run_turn_interruptible(websocket: WebSocket, events: AsyncIterator[TurnEvent]) -> str:
+    """Forwards one turn's events while racing session.end/disconnect/a user
+    barge-in, so talking over the persona doesn't wait for it to finish."""
+    forward_task = asyncio.create_task(_forward_turn_events(websocket, events))
+    control_task = asyncio.create_task(_wait_for_control_message(websocket))
+    done, _ = await asyncio.wait({forward_task, control_task}, return_when=asyncio.FIRST_COMPLETED)
+
+    if control_task in done:
+        forward_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await forward_task
+        # Cancelling forward_task doesn't reliably tear down the turn
+        # generator itself (see SessionOrchestrator._generate_reply); this does.
+        await events.aclose()
+        if control_task.result() == "interrupt":
+            logger.info("User barged in")
+            await websocket.send_json({"type": "state", "value": "listening"})
+            return "interrupted"
+        return "user"
+
+    control_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await control_task
+    return forward_task.result()
+
+
+async def _wait_for_control_message(websocket: WebSocket) -> str:
+    """Waits for a client message that should interrupt the in-flight turn:
+    session.end/disconnect ends the session, turn.interrupt is a barge-in."""
+    while True:
+        envelope = await _receive_json(websocket)
+        if envelope is None or envelope.get("type") == "session.end":
+            return "end"
+        if envelope.get("type") == "turn.interrupt":
+            return "interrupt"
 
 
 async def _forward_turn_events(websocket: WebSocket, events: AsyncIterator[TurnEvent]) -> str:

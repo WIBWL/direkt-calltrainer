@@ -28,7 +28,15 @@ export interface SessionEndMessage {
   type: "session.end";
 }
 
-export type ClientMessage = SessionStartMessage | TurnAudioMetaMessage | SessionEndMessage;
+export interface TurnInterruptMessage {
+  type: "turn.interrupt";
+}
+
+export type ClientMessage =
+  | SessionStartMessage
+  | TurnAudioMetaMessage
+  | SessionEndMessage
+  | TurnInterruptMessage;
 
 // --- Server -> Client ---
 

@@ -4,22 +4,28 @@ import io
 import logging
 import wave
 
-from backend.clients.config import TTS_BACKEND, TTS_CLIENT, TTS_MODEL
+from kugelaudio.exceptions import KugelAudioError
+
+from backend.clients.config import CLIENT, DEBUG, KUGELAUDIO_CLIENT, KUGELAUDIO_MODEL, TTS_MODEL
 from backend.personas import PersonaVoice
 
-logger = logging.getLogger("calltrainer")
+logger = logging.getLogger(__name__)
 
 
 async def synthesize(text: str, voice: PersonaVoice, language_id: str) -> bytes:
-    """Synthesize one chunk of text reply to speech."""
-    if TTS_BACKEND == "kugelaudio":
-        return await _synthesize_kugelaudio(text, voice, language_id)
+    """Synthesize one chunk of text to speech: KugelAudio by default,
+    falling back to the EFRE model if it fails or DEBUG is set."""
+    if not DEBUG:
+        try:
+            return await _synthesize_kugelaudio(text, voice, language_id)
+        except (KugelAudioError, TimeoutError, OSError) as e:
+            logger.warning("KugelAudio TTS failed, falling back to EFRE: %s", e)
     return await _synthesize(text, voice)
 
 
 async def _synthesize(text: str, voice: PersonaVoice) -> bytes:
     logger.info("Synthesizing speech via TTS (%s, voice=%s): %r", TTS_MODEL, voice.tts_voice, text)
-    speech = await TTS_CLIENT.audio.speech.create(
+    speech = await CLIENT.audio.speech.create(
         model=TTS_MODEL,
         voice=voice.tts_voice,
         input=text,
@@ -31,11 +37,11 @@ async def _synthesize(text: str, voice: PersonaVoice) -> bytes:
 async def _synthesize_kugelaudio(text: str, voice: PersonaVoice, language_id: str) -> bytes:
     logger.info(
         "Synthesizing speech via KugelAudio (%s, voice=%s, language=%s): %r",
-        TTS_MODEL, voice.kugelaudio_voice_id, language_id, text,
+        KUGELAUDIO_MODEL, voice.kugelaudio_voice_id, language_id, text,
     )
-    response = await TTS_CLIENT.tts.generate_async(
+    response = await KUGELAUDIO_CLIENT.tts.generate_async(
         text=text,
-        model_id=TTS_MODEL,
+        model_id=KUGELAUDIO_MODEL,
         voice_id=voice.kugelaudio_voice_id,
         language=language_id,
     )

@@ -27,12 +27,14 @@ docker compose up --build
 
 Builds the frontend too (multi-stage Dockerfile) and serves everything on `http://localhost:8000`.
 
+For development, add `--watch` (`docker compose up --build --watch`) to have the container pick up code changes automatically: backend edits are synced in and the app restarts without a full rebuild, while frontend edits and `requirements.txt` changes trigger a rebuild.
+
 ## 3. Documentation
 
 The full architecture documentation - arc42 and every Architecture Decision Record (ADR) - is served via [MkDocs](https://www.mkdocs.org):
 
 ```powershell
-pip install -r requirements-docs.txt
+pip install -r requirements.txt
 mkdocs serve
 ```
 

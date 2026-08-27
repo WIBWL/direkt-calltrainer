@@ -4,7 +4,7 @@ import logging
 
 from backend.clients.config import STT_CLIENT, STT_MODEL
 
-logger = logging.getLogger("calltrainer")
+logger = logging.getLogger(__name__)
 
 
 async def transcribe(audio_bytes: bytes, filename: str, content_type: str | None, language_id: str) -> str:
