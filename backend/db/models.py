@@ -11,10 +11,11 @@ subtree with it while the shared reference entities stay.
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, String, Integer, Numeric, Text, DateTime, Boolean
+from sqlalchemy import ForeignKey, String, Integer, Numeric, Text, DateTime, Boolean, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -107,9 +108,23 @@ class MetrikTyp(Base):
 
 
 class Session(Base):
+    """One simulated conversation. Written once, after it has ended (ADR 0034);
+    a Session that the client abandoned mid-call never reaches this table."""
+
     __tablename__ = "session"
     session_id: Mapped[int] = mapped_column(primary_key=True)
-    subject_id: Mapped[str] = mapped_column(String(64))  # pseudonym, later the Keycloak "sub" claim (ADR 0031)
+    # The id the client sees. Separate from the primary key so the wire never
+    # exposes a guessable sequence number, and so the row can still be written
+    # at the end of the Session rather than having to exist at its start.
+    # Defaulted so a caller that has no public id yet still gets a valid one.
+    # The live Session path does pass its own: session_ws.py has to hand the id
+    # to the client when the socket opens, long before this row is written.
+    extern_id: Mapped[uuid.UUID] = mapped_column(Uuid, unique=True, default=uuid.uuid4)
+    # Pseudonym, not an anonymisation: a random UUID per Session keeps Sessions
+    # unlinkable, but the transcript itself can still identify a person, so this
+    # stays personal data (ADR 0031). Becomes the Keycloak "sub" claim once
+    # ADR 0009's authentication exists.
+    subject_id: Mapped[str] = mapped_column(String(64))
     persona_id: Mapped[int] = mapped_column(ForeignKey("persona.persona_id"))
     szenario_id: Mapped[int] = mapped_column(ForeignKey("szenario.szenario_id"))
     # Deliberately duplicated from Persona.sprache_code rather than derived:
@@ -121,8 +136,10 @@ class Session(Base):
     # Persona ended normally, "abgebrochen" one cut short by a pipeline
     # failure (ADR 0016).
     status: Mapped[str] = mapped_column(String(20))
-    gestartet_am: Mapped[datetime] = mapped_column(DateTime)
-    beendet_am: Mapped[datetime | None] = mapped_column(DateTime)
+    # timezone=True throughout: the server's local time is not a property worth
+    # storing, and a naive column silently loses the offset on read.
+    gestartet_am: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    beendet_am: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     persona: Mapped["Persona"] = relationship(back_populates="sessions")
     szenario: Mapped["Szenario"] = relationship(back_populates="sessions")
@@ -218,7 +235,7 @@ class Feedback(Base):
     session_id: Mapped[int] = mapped_column(ForeignKey("session.session_id"), unique=True)
     zusammenfassung: Mapped[str] = mapped_column(Text)
     score: Mapped[int | None] = mapped_column(Integer)
-    erstellt_am: Mapped[datetime] = mapped_column(DateTime)
+    erstellt_am: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     session: Mapped["Session"] = relationship(back_populates="feedback")
     punkte: Mapped[list["Feedbackpunkt"]] = relationship(
@@ -247,6 +264,6 @@ class AnalysisJob(Base):
     status: Mapped[str] = mapped_column(String(20))      # queued, running, done, failed
     versuche: Mapped[int] = mapped_column(Integer, default=0)
     fehlertext: Mapped[str | None] = mapped_column(Text)
-    aktualisiert_am: Mapped[datetime] = mapped_column(DateTime)
+    aktualisiert_am: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     session: Mapped["Session"] = relationship(back_populates="jobs")

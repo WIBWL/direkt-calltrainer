@@ -22,6 +22,15 @@ export interface TurnAudioMetaMessage {
   type: "turn.audio.meta";
   turn_seq: number;
   mime_type: string;
+  /**
+   * How long the user actually spoke, in milliseconds, as measured by the VAD.
+   *
+   * The server only ever receives the finished recording and cannot derive
+   * this itself, but it needs it for speaking rate (F-36), talk-time share
+   * (F-24) and fluency (F-51). Optional so the backend can ship ahead of the
+   * client: a Turn without it is still stored, just without speaking-rate data.
+   */
+  duration_ms?: number;
 }
 
 export interface SessionEndMessage {

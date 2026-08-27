@@ -5,6 +5,7 @@ import json
 import logging
 import uuid
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy.exc import SQLAlchemyError
@@ -13,7 +14,14 @@ from backend.db import repository
 from backend.db.session import session_scope
 from backend.personas import Persona
 from backend.scenarios import Scenario
-from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted, TurnEvent
+from backend.session.models import (
+    AudioChunk,
+    Failed,
+    FinishedSession,
+    StateChanged,
+    TurnCompleted,
+    TurnEvent,
+)
 from backend.session.orchestrator import SessionOrchestrator
 
 logger = logging.getLogger("calltrainer")
@@ -32,11 +40,11 @@ async def session_ws(websocket: WebSocket) -> None:
         return
     persona, scenario = handshake
 
-    session_id = str(uuid.uuid4())
+    session_id = uuid.uuid4()
     orchestrator = SessionOrchestrator(persona, scenario)
     logger.info("Session %s started: persona=%s language=%s", session_id, persona.id, persona.language_id)
 
-    await websocket.send_json({"type": "session.started", "session_id": session_id})
+    await websocket.send_json({"type": "session.started", "session_id": str(session_id)})
 
     try:
         # Persona opens the call
@@ -48,8 +56,12 @@ async def session_ws(websocket: WebSocket) -> None:
         else:
             reason = await _run_session(websocket, orchestrator)
     except WebSocketDisconnect:
-        logger.info("Session %s: client disconnected", session_id)
+        # Deliberately not persisted: ADR 0034 writes a Session once, at its
+        # regular end. A Session the client abandoned mid-call leaves no row.
+        logger.info("Session %s: client disconnected, not persisted", session_id)
         return
+
+    await _persist(session_id, persona, scenario, orchestrator, reason)
 
     transcript = [
         {"turn_seq": t.seq, "user_text": t.user_text, "persona_text": t.persona_text}
@@ -105,6 +117,53 @@ def _load_setup(persona_id: str | None, scenario_id: str | None) -> tuple[Person
     return persona, scenario
 
 
+async def _persist(
+    session_id: uuid.UUID,
+    persona: Persona,
+    scenario: Scenario,
+    orchestrator: SessionOrchestrator,
+    reason: str,
+) -> None:
+    """Stores the finished Session, off the event loop and never fatally.
+
+    Failing to record a Session must not cost the user their wrap-up: the
+    Transcript is already in memory and gets sent either way, so a database
+    problem degrades to "the Session ran but was not recorded" (ADR 0034).
+    """
+    try:
+        await asyncio.to_thread(
+            _write_session, session_id, persona, scenario, orchestrator, reason
+        )
+    except (SQLAlchemyError, LookupError):
+        logger.exception("Session %s could not be persisted", session_id)
+
+
+def _write_session(
+    session_id: uuid.UUID,
+    persona: Persona,
+    scenario: Scenario,
+    orchestrator: SessionOrchestrator,
+    reason: str,
+) -> None:
+    finished = FinishedSession(
+        extern_id=session_id,
+        # A fresh pseudonym per Session, deliberately not reused across
+        # Sessions: it keeps them unlinkable while there is no account to
+        # attach them to (ADR 0031). Not an anonymisation — the Transcript
+        # can still identify a person.
+        subject_id=str(uuid.uuid4()),
+        persona_key=persona.id,
+        scenario_key=scenario.id,
+        language_code=persona.language_id,
+        reason=reason,
+        started_at=orchestrator.started_at,
+        ended_at=datetime.now(UTC),
+        turns=orchestrator.turns,
+    )
+    with session_scope() as db:
+        repository.save_session(db, finished)
+
+
 async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) -> str:
     """Session runs until the user ends the session, a turn fails, or the
     persona ends the call naturally ("user", "error", or "completed")."""
@@ -119,7 +178,12 @@ async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) 
         if audio_bytes is None:
             return "user"
 
-        turn = orchestrator.run_turn(audio_bytes, "turn.webm", envelope.get("mime_type"))
+        turn = orchestrator.run_turn(
+            audio_bytes,
+            "turn.webm",
+            envelope.get("mime_type"),
+            _optional_int(envelope.get("duration_ms")),
+        )
         outcome = await _forward_turn_events(websocket, turn)
         if outcome != "ok":
             return "error" if outcome == "failed" else "completed"
@@ -156,6 +220,14 @@ async def _receive_json(websocket: WebSocket) -> dict | None:
         return json.loads(raw)
     except (json.JSONDecodeError, TypeError):
         return None
+
+
+def _optional_int(value: object) -> int | None:
+    """Reads an optional numeric wire field. Anything unusable becomes None:
+    a bad duration should cost the Turn its speaking-rate data, not the call."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return int(value) if value >= 0 else None
 
 
 async def _receive_bytes(websocket: WebSocket) -> bytes | None:

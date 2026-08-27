@@ -4,6 +4,7 @@ import asyncio
 import logging
 import re
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from difflib import SequenceMatcher
 
 from kugelaudio.exceptions import KugelAudioError
@@ -223,6 +224,12 @@ async def _emit_pending(
         yield StateChanged(state="speaking")
         progress.spoke_yet = True
     progress.chunk_seq += 1
+    # The reply is synthesized chunk by chunk (ADR 0033), so the Turn's persona
+    # duration is the sum over its chunks. An unreadable chunk contributes
+    # nothing rather than voiding the whole Turn's measurement.
+    chunk_ms = tts.duration_ms(audio)
+    if chunk_ms is not None:
+        turn.persona_duration_ms = (turn.persona_duration_ms or 0) + chunk_ms
     yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=audio)
 
 
@@ -244,6 +251,9 @@ class SessionOrchestrator:
         ]
         self._persona_replies: list[str] = []
         self.turns: list[Turn] = []
+        # Recorded here rather than when the Session is persisted, because the
+        # row is only written once the Session has ended (ADR 0034).
+        self.started_at = datetime.now(UTC)
 
     async def run_opening_turn(self) -> AsyncIterator[TurnEvent]:
         """Have the Persona speak first: a freshly generated, varied call opener."""
@@ -260,10 +270,21 @@ class SessionOrchestrator:
             yield event
 
     async def run_turn(
-        self, audio_bytes: bytes, filename: str, content_type: str | None
+        self,
+        audio_bytes: bytes,
+        filename: str,
+        content_type: str | None,
+        duration_ms: int | None = None,
     ) -> AsyncIterator[TurnEvent]:
-        """Run one Turn: transcribe, stream a reply, synthesize+yield it chunk by chunk."""
-        turn = Turn(seq=len(self.turns) + 1)
+        """Run one Turn: transcribe, stream a reply, synthesize+yield it chunk by chunk.
+
+        `duration_ms` is how long the user actually spoke, as measured by the
+        client's voice-activity detection — the server only ever sees the
+        finished recording, so it cannot derive this itself. None when the
+        client does not send it, in which case the Turn is stored without
+        speaking-rate data rather than not stored at all.
+        """
+        turn = Turn(seq=len(self.turns) + 1, user_duration_ms=duration_ms)
         self.turns.append(turn)
 
         yield StateChanged(state="thinking")

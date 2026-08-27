@@ -43,6 +43,25 @@ async def _synthesize_kugelaudio(text: str, voice: PersonaVoice, language_id: st
     return _pcm16_to_wav(response.audio, response.sample_rate)
 
 
+def duration_ms(audio: bytes) -> int | None:
+    """Length of one synthesized chunk, or None if it cannot be read.
+
+    Both backends above hand back WAV — KugelAudio's headerless PCM is wrapped
+    by `_pcm16_to_wav` — so the length comes straight from the header and needs
+    no decoding. Returns None rather than raising: a Turn whose duration could
+    not be measured is worth storing, it just carries no speaking-rate data.
+    """
+    try:
+        with wave.Wave_read(io.BytesIO(audio)) as wav:
+            framerate = wav.getframerate()
+            if not framerate:
+                return None
+            return round(wav.getnframes() / framerate * 1000)
+    except (wave.Error, EOFError):
+        logger.warning("Could not read duration from a synthesized chunk (%d bytes)", len(audio))
+        return None
+
+
 def _pcm16_to_wav(pcm_bytes: bytes, sample_rate: int) -> bytes:
     buf = io.BytesIO()
     with wave.Wave_write(buf) as wav:

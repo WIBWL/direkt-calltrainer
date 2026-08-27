@@ -2,6 +2,7 @@
 
 import logging
 import os
+import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -79,6 +80,48 @@ def list_scenarios() -> list[dict[str, str]]:
         logger.error("Loading scenarios failed: %s", e)
         raise HTTPException(status_code=503, detail="Database unavailable") from e
     return [{"id": s.id, "name": s.name, "description": s.description} for s in scenarios]
+
+
+@app.get("/api/sessions/{extern_id}")
+def get_session(extern_id: uuid.UUID) -> dict[str, object]:
+    """Read one stored Session back, so its Transcript survives a page reload.
+
+    Only reachable with the Session's own id — there is no listing endpoint,
+    because `subject_id` is a fresh pseudonym per Session (ADR 0031) and the
+    server therefore cannot tell which Sessions belong to the same person. The
+    client is what remembers its own ids.
+
+    `transcript` deliberately has the same shape as the one the WebSocket sends
+    in `session.ended`, so the same view renders a live and a reloaded Session.
+    """
+    try:
+        with session_scope() as db:
+            stored = repository.find_session(db, extern_id)
+    except SQLAlchemyError as e:
+        logger.error("Loading session %s failed: %s", extern_id, e)
+        raise HTTPException(status_code=503, detail="Database unavailable") from e
+
+    if stored is None:
+        raise HTTPException(status_code=404, detail="Unknown session")
+
+    return {
+        "session_id": str(stored.extern_id),
+        "persona_name": stored.persona_name,
+        "scenario_name": stored.scenario_name,
+        "status": stored.status,
+        "started_at": stored.started_at.isoformat(),
+        "ended_at": stored.ended_at.isoformat() if stored.ended_at else None,
+        "transcript": [
+            {
+                "turn_seq": turn.seq,
+                "user_text": turn.user_text,
+                "persona_text": turn.persona_text,
+                "user_duration_ms": turn.user_duration_ms,
+                "persona_duration_ms": turn.persona_duration_ms,
+            }
+            for turn in stored.turns
+        ],
+    }
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIST_DIR, html=True, check_dir=False), name="frontend")
