@@ -274,11 +274,11 @@ class SessionOrchestrator:
             self._finalize_interrupted(turn, progress)
             raise
 
-    async def _generate_reply(
-        self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress, force_end_call: bool = False
+    async def _attempt_reply_with_retry(
+        self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress
     ) -> AsyncIterator[TurnEvent]:
-        """Drive one reply attempt plus one retry on an LLM error.
-        Appends the finished reply to history and yields events."""
+        """One reply attempt plus one retry on an LLM error. Yields the reply's
+        events; yields a Failed event and stops if it can't be delivered."""
         for llm_attempt in range(2):  # initial attempt + one retry
             try:
                 stream = self._stream_and_synthesize(turn, messages, progress)
@@ -287,7 +287,7 @@ class SessionOrchestrator:
                         yield event
                         if isinstance(event, Failed):
                             return
-                break  # streamed to completion without an LLM-side error
+                return  # streamed to completion without an LLM-side error
             except OpenAIError as e:
                 logger.error("LLM request failed (attempt %d): %s", llm_attempt + 1, e)
                 # Audio for part of this reply was already played
@@ -295,6 +295,17 @@ class SessionOrchestrator:
                     yield Failed(code="llm_failed", message=str(e))
                     return
                 turn.persona_text = ""  # retrying from scratch
+
+    async def _generate_reply(
+        self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress, force_end_call: bool = False
+    ) -> AsyncIterator[TurnEvent]:
+        """Drive one reply attempt plus one retry on an LLM error.
+        Appends the finished reply to history and yields events."""
+        async with contextlib.aclosing(self._attempt_reply_with_retry(turn, messages, progress)) as events:
+            async for event in events:
+                yield event
+                if isinstance(event, Failed):
+                    return
 
         turn.persona_text = turn.persona_text.strip()
         repeated_reply = bool(turn.persona_text) and (
