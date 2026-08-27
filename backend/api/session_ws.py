@@ -9,12 +9,13 @@ from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from backend.logging_config import reset_session_log, session_id_scope
 from backend.personas import PERSONAS, Persona
 from backend.scenarios import SCENARIOS, Scenario
 from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted, TurnEvent
 from backend.session.orchestrator import SessionOrchestrator
 
-logger = logging.getLogger("calltrainer")
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -31,35 +32,37 @@ async def session_ws(websocket: WebSocket) -> None:
     persona, scenario = handshake
 
     session_id = str(uuid.uuid4())
-    orchestrator = SessionOrchestrator(persona, scenario)
-    logger.info("Session %s started: persona=%s language=%s", session_id, persona.id, persona.language_id)
+    reset_session_log()
+    with session_id_scope(session_id):
+        orchestrator = SessionOrchestrator(persona, scenario)
+        logger.info("Session started: persona=%s language=%s", persona.id, persona.language_id)
 
-    await websocket.send_json({"type": "session.started", "session_id": session_id})
+        await websocket.send_json({"type": "session.started", "session_id": session_id})
 
-    try:
-        # Persona opens the call
-        outcome = await _run_turn_interruptible(websocket, orchestrator.run_opening_turn())
-        if outcome in ("ok", "interrupted"):
-            reason = await _run_session(websocket, orchestrator)
-        else:
-            reason = "error" if outcome == "failed" else outcome
-    except WebSocketDisconnect:
-        logger.info("Session %s: client disconnected", session_id)
-        return
+        try:
+            # Persona opens the call
+            outcome = await _run_turn_interruptible(websocket, orchestrator.run_opening_turn())
+            if outcome in ("ok", "interrupted"):
+                reason = await _run_session(websocket, orchestrator)
+            else:
+                reason = "error" if outcome == "failed" else outcome
+        except WebSocketDisconnect:
+            logger.info("Client disconnected")
+            return
 
-    transcript = [
-        {"turn_seq": t.seq, "user_text": t.user_text, "persona_text": t.persona_text}
-        for t in orchestrator.turns
-    ]
-    try:
-        await websocket.send_json({"type": "session.ended", "reason": reason, "transcript": transcript})
-        await websocket.close()
-    except (WebSocketDisconnect, RuntimeError):
-        # Client can disconnect between _run_session and final send
-        # e.g. ASGI message 'websocket.send' after 'websocket.close'
-        logger.info("Session %s: client disconnected before session.ended could be sent", session_id)
-        return
-    logger.info("Session %s ended (%s)", session_id, reason)
+        transcript = [
+            {"turn_seq": t.seq, "user_text": t.user_text, "persona_text": t.persona_text}
+            for t in orchestrator.turns
+        ]
+        try:
+            await websocket.send_json({"type": "session.ended", "reason": reason, "transcript": transcript})
+            await websocket.close()
+        except (WebSocketDisconnect, RuntimeError):
+            # Client can disconnect between _run_session and final send
+            # e.g. ASGI message 'websocket.send' after 'websocket.close'
+            logger.info("Client disconnected before session.ended could be sent")
+            return
+        logger.info("Session ended (%s)", reason)
 
 
 async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
@@ -70,6 +73,7 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
     except WebSocketDisconnect:
         return None
     if start.get("type") != "session.start":
+        logger.warning("Handshake failed: expected session.start, got %r", start.get("type"))
         # Protocol Error (1002; https://websocket.org/reference/close-codes/)
         await websocket.close(code=1002, reason="Expected session.start")
         return None
@@ -79,6 +83,7 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
     persona = next((p for p in PERSONAS if p.id == persona_id), None)
     scenario = next((s for s in SCENARIOS if s.id == scenario_id), None)
     if persona is None or scenario is None:
+        logger.warning("Handshake failed: unknown persona_id=%r/scenario_id=%r", persona_id, scenario_id)
         # Protocol Error (1002; https://websocket.org/reference/close-codes/)
         await websocket.close(code=1002, reason="Unknown persona_id/scenario_id")
         return None
@@ -124,6 +129,7 @@ async def _run_turn_interruptible(websocket: WebSocket, events: AsyncIterator[Tu
         # generator itself (see SessionOrchestrator._generate_reply); this does.
         await events.aclose()
         if control_task.result() == "interrupt":
+            logger.info("User barged in")
             await websocket.send_json({"type": "state", "value": "listening"})
             return "interrupted"
         return "user"

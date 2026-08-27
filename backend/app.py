@@ -12,11 +12,12 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.api.session_ws import router as session_ws_router
 from backend.clients.health import check_backends
+from backend.logging_config import configure_logging
 from backend.personas import PERSONAS
 from backend.scenarios import SCENARIOS
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("calltrainer")
+configure_logging()
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager

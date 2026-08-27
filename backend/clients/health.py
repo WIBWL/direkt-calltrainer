@@ -19,7 +19,7 @@ from backend.clients import llm, stt, tts
 from backend.clients.config import LLM_MODEL, STT_MODEL, TTS_MODEL
 from backend.personas import PERSONAS
 
-logger = logging.getLogger("calltrainer")
+logger = logging.getLogger(__name__)
 
 # Real persona voice/language, so the TTS check uses values a session would.
 _CHECK_VOICE = PERSONAS[0].voice

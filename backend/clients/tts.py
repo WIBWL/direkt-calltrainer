@@ -7,7 +7,7 @@ import wave
 from backend.clients.config import TTS_BACKEND, TTS_CLIENT, TTS_MODEL
 from backend.personas import PersonaVoice
 
-logger = logging.getLogger("calltrainer")
+logger = logging.getLogger(__name__)
 
 
 async def synthesize(text: str, voice: PersonaVoice, language_id: str) -> bytes:

@@ -15,7 +15,7 @@ from backend.scenarios import Scenario
 from backend.session.chunking import sentence_chunks
 from backend.session.models import AudioChunk, Failed, StateChanged, Turn, TurnCompleted, TurnEvent
 
-logger = logging.getLogger("calltrainer")
+logger = logging.getLogger(__name__)
 
 _LANGUAGE_NAMES_EN: dict[str, str] = {"de": "German"}
 

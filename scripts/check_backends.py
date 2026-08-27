@@ -12,7 +12,6 @@ Exit code is 0 only if all three backends respond.
 """
 
 import asyncio
-import logging
 import os
 import sys
 
@@ -24,12 +23,13 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
 from backend.clients.health import check_backends  # noqa: E402  # pylint: disable=wrong-import-position
+from backend.logging_config import configure_logging  # noqa: E402  # pylint: disable=wrong-import-position
 
 
 def main() -> int:
     """Check every backend, log a line each, return a shell exit code."""
     load_dotenv()
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    configure_logging()
     return 0 if asyncio.run(check_backends()) else 1
 
 
