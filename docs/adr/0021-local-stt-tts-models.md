@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (TTS half superseded by ADR 0040 — TTS now defaults to the hosted KugelAudio API, not a self-hosted model; STT's move onto the shared EFRE-Direkt gateway, see ADR 0011, is not otherwise documented)
 
 ## Context
 
