@@ -6,13 +6,14 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import SQLAlchemyError
 
 from backend.api.session_ws import router as session_ws_router
-from backend.personas import PERSONAS
-from backend.scenarios import SCENARIOS
+from backend.db import repository
+from backend.db.session import session_scope
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("calltrainer")
@@ -54,14 +55,30 @@ def health() -> dict[str, str]:
 
 @app.get("/api/personas")
 def list_personas() -> list[dict[str, str]]:
-    """List personas available for session setup."""
-    return [{"id": p.id, "name": p.name, "role": p.role} for p in PERSONAS]
+    """List personas available for session setup.
+
+    Sync def on purpose: FastAPI runs these in a threadpool, so the blocking
+    database read does not touch the event loop that serves live sessions.
+    """
+    try:
+        with session_scope() as db:
+            personas = repository.list_personas(db)
+    except SQLAlchemyError as e:
+        logger.error("Loading personas failed: %s", e)
+        raise HTTPException(status_code=503, detail="Database unavailable") from e
+    return [{"id": p.id, "name": p.name, "role": p.role} for p in personas]
 
 
 @app.get("/api/scenarios")
 def list_scenarios() -> list[dict[str, str]]:
-    """List scenarios available for session setup."""
-    return [{"id": s.id, "name": s.name, "description": s.description} for s in SCENARIOS]
+    """List scenarios available for session setup. Sync def — see list_personas."""
+    try:
+        with session_scope() as db:
+            scenarios = repository.list_scenarios(db)
+    except SQLAlchemyError as e:
+        logger.error("Loading scenarios failed: %s", e)
+        raise HTTPException(status_code=503, detail="Database unavailable") from e
+    return [{"id": s.id, "name": s.name, "description": s.description} for s in scenarios]
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIST_DIR, html=True, check_dir=False), name="frontend")

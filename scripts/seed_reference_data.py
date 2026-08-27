@@ -45,6 +45,13 @@ DEFAULT_TRAININGSZIEL = ""
 DEFAULT_SZENARIO_TYP = "Angebots- und Preisgespräch"
 SPRACH_BEZEICHNUNGEN = {"de": "Deutsch", "en": "English"}
 
+# Sprachen are never deactivated: they are a closed code list, and a Session
+# keeps pointing at the code it ran in even once no Persona uses it any more.
+DEACTIVATABLE = [
+    ("Persona", Persona, lambda: {p.id for p in PERSONAS}),
+    ("Szenario", Szenario, lambda: {s.id for s in SCENARIOS}),
+]
+
 
 # --- MetrikTyp: paraverbal dimensions from docs/features.md --------------
 # (schluessel, bezeichnung, einheit, feature_id, aktiv)
@@ -147,6 +154,9 @@ def seed_personas(db) -> int:
                 "verhalten": p.behavior,
                 "trainingsziel": DEFAULT_TRAININGSZIEL,
                 "schwierigkeitsgrad": DEFAULT_SCHWIERIGKEITSGRAD,
+                "sprache_code": p.language_id,
+                "tts_voice": p.voice.tts_voice,
+                "kugelaudio_voice_id": p.voice.kugelaudio_voice_id,
                 "aktiv": True,
             },
         )
@@ -168,10 +178,33 @@ def seed_szenarien(db) -> int:
                 "typ": DEFAULT_SZENARIO_TYP,
                 "titel": s.name,
                 "beschreibung": s.description,
+                "aktiv": True,
             },
         )
         created += is_new
     return created
+
+
+def deactivate_missing(db) -> dict[str, int]:
+    """Deactivates Personas/Szenarien that the seed no longer contains.
+
+    Deliberately not a delete: `session` references both by foreign key, and a
+    past Session has to stay readable even once the Persona it used is retired.
+
+    Note for ADR 0024 (User-authored Personas/Szenarien): once Users can create
+    their own, this would wrongly deactivate them too, because nothing yet
+    distinguishes a seeded row from a user-created one. That needs a provenance
+    column before user authoring lands.
+    """
+    deactivated = {}
+    for label, model, seed_keys in DEACTIVATABLE:
+        count = (
+            db.query(model)
+            .filter(model.schluessel.notin_(seed_keys()), model.aktiv.is_(True))
+            .update({"aktiv": False}, synchronize_session=False)
+        )
+        deactivated[label] = count
+    return deactivated
 
 
 def seed_metrik_typen(db) -> int:
@@ -201,12 +234,15 @@ def main() -> None:
             "Szenario": seed_szenarien(db),
             "MetrikTyp": seed_metrik_typen(db),
         }
+        # After the upserts, so a record that is both present and active stays so.
+        deactivated = deactivate_missing(db)
         # Count in the same session, after the inserts have been flushed.
         db.flush()
         inventory = {name: db.query(model).count() for name, model in INVENTORY_TABLES}
 
-    print("Created:  ", ", ".join(f"{k} {v}" for k, v in created.items()))
-    print("Inventory:", ", ".join(f"{k} {v}" for k, v in inventory.items()))
+    print("Created:     ", ", ".join(f"{k} {v}" for k, v in created.items()))
+    print("Deactivated: ", ", ".join(f"{k} {v}" for k, v in deactivated.items()))
+    print("Inventory:   ", ", ".join(f"{k} {v}" for k, v in inventory.items()))
 
 
 if __name__ == "__main__":

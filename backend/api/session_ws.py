@@ -1,14 +1,18 @@
 """WebSocket API route for the live session: wire protocol <-> SessionOrchestrator."""
 
+import asyncio
 import json
 import logging
 import uuid
 from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from sqlalchemy.exc import SQLAlchemyError
 
-from backend.personas import PERSONAS, Persona
-from backend.scenarios import SCENARIOS, Scenario
+from backend.db import repository
+from backend.db.session import session_scope
+from backend.personas import Persona
+from backend.scenarios import Scenario
 from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted, TurnEvent
 from backend.session.orchestrator import SessionOrchestrator
 
@@ -76,12 +80,28 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
 
     persona_id = start.get("persona_id")
     scenario_id = start.get("scenario_id")
-    persona = next((p for p in PERSONAS if p.id == persona_id), None)
-    scenario = next((s for s in SCENARIOS if s.id == scenario_id), None)
+    try:
+        # Off the event loop: session_scope() is a synchronous SQLAlchemy
+        # session, and this coroutine goes on to stream live audio.
+        persona, scenario = await asyncio.to_thread(_load_setup, persona_id, scenario_id)
+    except SQLAlchemyError as e:
+        logger.error("Loading session setup failed: %s", e)
+        # Internal Error (1011; https://websocket.org/reference/close-codes/)
+        await websocket.close(code=1011, reason="Database unavailable")
+        return None
+
     if persona is None or scenario is None:
         # Protocol Error (1002; https://websocket.org/reference/close-codes/)
         await websocket.close(code=1002, reason="Unknown persona_id/scenario_id")
         return None
+    return persona, scenario
+
+
+def _load_setup(persona_id: str | None, scenario_id: str | None) -> tuple[Persona | None, Scenario | None]:
+    """Resolves the client's Persona/Scenario keys against the database."""
+    with session_scope() as db:
+        persona = repository.find_persona(db, persona_id) if persona_id else None
+        scenario = repository.find_scenario(db, scenario_id) if scenario_id else None
     return persona, scenario
 
 

@@ -22,6 +22,14 @@ from backend.db.base import Base
 
 
 class Persona(Base):
+    """The simulated conversation partner. This table — not `backend/personas.py`
+    — is the source of truth; that module only seeds it (ADR 0024 has Users
+    authoring their own Personas, which have to live here).
+
+    A Persona has exactly one Language and one voice, so both are attributes
+    here rather than something a User picks per Session.
+    """
+
     __tablename__ = "persona"
     persona_id: Mapped[int] = mapped_column(primary_key=True)
     schluessel: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. tech-averse-management
@@ -31,8 +39,13 @@ class Persona(Base):
     verhalten: Mapped[str] = mapped_column(Text)
     trainingsziel: Mapped[str] = mapped_column(Text)
     schwierigkeitsgrad: Mapped[str] = mapped_column(String(40))
+    sprache_code: Mapped[str] = mapped_column(ForeignKey("sprache.sprache_code"))
+    tts_voice: Mapped[str] = mapped_column(String(60))
+    # Only used when TTS_BACKEND=kugelaudio, hence nullable.
+    kugelaudio_voice_id: Mapped[int | None] = mapped_column(Integer)
     aktiv: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    sprache: Mapped["Sprache"] = relationship(back_populates="personas")
     einwaende: Mapped[list["PersonaEinwand"]] = relationship(
         back_populates="persona",
         order_by="PersonaEinwand.reihenfolge",
@@ -55,12 +68,18 @@ class PersonaEinwand(Base):
 
 
 class Szenario(Base):
+    """The situational context of a Session. Like Persona, this table is the
+    source of truth and `backend/scenarios.py` only seeds it."""
+
     __tablename__ = "szenario"
     szenario_id: Mapped[int] = mapped_column(primary_key=True)
     schluessel: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. cold-call-followup
     typ: Mapped[str] = mapped_column(String(60))
     titel: Mapped[str] = mapped_column(String(160))
     beschreibung: Mapped[str] = mapped_column(Text)
+    # Retired Szenarien are deactivated, never deleted: Session rows reference
+    # them, and a past Session has to stay readable.
+    aktiv: Mapped[bool] = mapped_column(Boolean, default=True)
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="szenario")
 
@@ -70,6 +89,7 @@ class Sprache(Base):
     sprache_code: Mapped[str] = mapped_column(String(8), primary_key=True)
     bezeichnung: Mapped[str] = mapped_column(String(60))
 
+    personas: Mapped[list["Persona"]] = relationship(back_populates="sprache")
     sessions: Mapped[list["Session"]] = relationship(back_populates="sprache")
 
 
@@ -92,8 +112,15 @@ class Session(Base):
     subject_id: Mapped[str] = mapped_column(String(64))  # pseudonym, later the Keycloak "sub" claim (ADR 0031)
     persona_id: Mapped[int] = mapped_column(ForeignKey("persona.persona_id"))
     szenario_id: Mapped[int] = mapped_column(ForeignKey("szenario.szenario_id"))
+    # Deliberately duplicated from Persona.sprache_code rather than derived:
+    # this records the Language the Session actually ran in, which must stay
+    # correct even if the Persona is later edited (ADR 0024) or deactivated.
     sprache_code: Mapped[str] = mapped_column(ForeignKey("sprache.sprache_code"))
-    status: Mapped[str] = mapped_column(String(20))      # laufend, beendet, abgebrochen
+    # A Session row is written once, after the Session has ended (ADR 0034),
+    # so "laufend" never occurs: "beendet" covers a Session the user or the
+    # Persona ended normally, "abgebrochen" one cut short by a pipeline
+    # failure (ADR 0016).
+    status: Mapped[str] = mapped_column(String(20))
     gestartet_am: Mapped[datetime] = mapped_column(DateTime)
     beendet_am: Mapped[datetime | None] = mapped_column(DateTime)
 
