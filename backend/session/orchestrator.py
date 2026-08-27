@@ -113,6 +113,29 @@ def _build_system_prompt(persona: Persona, scenario: Scenario) -> str:
 
 _END_CALL_RE = re.compile(r"\[\s*call[_\s]?end\s*\]", re.IGNORECASE)
 
+# Catches an explicit farewell or a request to postpone/continue elsewhere --
+# the two categories of user signal the persona's own judgment (the system
+# prompt above) was observed to miss. Deliberately narrow and regex-based,
+# not an LLM classifier: that approach's own chain-of-thought reasoning
+# would occasionally degenerate into a non-sequitur and land on the wrong
+# verdict (confirmed in testing). A missed signal here just costs one extra
+# turn; a false one cuts the call short mid-conversation, which is worse.
+_FAREWELL_RE = re.compile(r"\b(tschüss|auf wiederhören|auf wiedersehen|wiederhören|ciao)\b", re.IGNORECASE)
+_POSTPONE_RE = re.compile(
+    r"(ein andere[rs]? mal|andermal|anders (fortsetzen|weiterführen|weitermachen)|"
+    r"später (nochmal|weiter|zurückrufen)|melde mich (nochmal|später|wieder)|"
+    r"rufe? (sie |dich )?(nochmal|später|zurück)|keine zeit (mehr|gerade)|"
+    r"muss (jetzt |gleich )?(auflegen|los|schluss machen)|gespräch (beenden|abbrechen))",
+    re.IGNORECASE,
+)
+
+
+def _signals_closing(user_text: str) -> bool:
+    """True if the user's message is an explicit farewell or a request to
+    postpone/continue the call elsewhere."""
+    return bool(_FAREWELL_RE.search(user_text) or _POSTPONE_RE.search(user_text))
+
+
 _CLOSING_NUDGE = (
     "The user just signaled the call is over. End it now: add one brief, "
     "friendly closing line, then finish your reply with exactly this "
@@ -256,7 +279,7 @@ class SessionOrchestrator:
             else:
                 turn.user_text = user_text
                 self._messages.append({"role": "user", "content": user_text})
-            closing = await llm.signals_closing(self._messages)
+            closing = _signals_closing(turn.user_text)
 
             messages = self._messages
             if closing:
