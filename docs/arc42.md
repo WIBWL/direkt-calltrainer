@@ -201,7 +201,7 @@ Da Sprachaufzeichnungen und personenbezogene Daten verarbeitet werden, muss das 
 - Speicherung von Fortschrittsdaten einzelner Nutzer (F-13)
 - Übertragung von Sprachdaten an externe Dienste (z. B. Speech-to-Text-, Text-to-Speech- oder LLM-APIs)
 
-Für den MVP werden Sprachdaten, Transkripte und Feedback nicht über das Ende der Session hinaus gespeichert; danach ist die Speicherung in der projekteigenen, uni-gehosteten PostgreSQL-Datenbank (ADR 0010) sowie der Datenplattform ausschließlich mit Einwilligung des Nutzers vorgesehen, die dieser jederzeit widerrufen sowie seine Daten selbst löschen kann (siehe ADR 0023).
+Sessiondaten werden bereits im MVP dauerhaft gespeichert, und zwar einmalig am Ende der Session in die projekteigene, uni-gehostete PostgreSQL-Datenbank (ADR 0010): Session-Metadaten, Transkripte und — sobald der asynchrone Worker existiert — Messungen und Feedback. Sprachaufzeichnungen werden nicht gespeichert und existieren nur für die Dauer der laufenden Session. Sobald Nutzerkonten existieren (ADR 0009), ist die Einwilligung des Nutzers die alleinige Grundlage dafür, eine Session einer identifizierten Person zuzuordnen; der Nutzer kann sie jederzeit widerrufen und seine Daten selbst löschen. Solange es keine Konten gibt, ist der Datenschutzhinweis vor der ersten Aufzeichnung (F-49) Voraussetzung für die Nutzung (siehe ADR 0034, der ADR 0023 ablöst).
 
 ## 8.2 Umgang mit Feedback und Bewertung
 
@@ -255,7 +255,7 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0020 | Deployment on a University-Hosted Server | angenommen | C-04 |
 | ADR 0021 | STT and TTS Run as Separately Self-Hosted Local Models | angenommen | Q-03, C-04, F-01 |
 | ADR 0022 | Language as Independent Session Parameter | angenommen (löst ADR 0006 ab) | C-01, R-35 |
-| ADR 0023 | No Session Data Persisted Beyond the MVP; Consent-Gated Storage After | angenommen | C-04, F-12, F-13, F-48, F-49 |
+| ADR 0023 | No Session Data Persisted Beyond the MVP; Consent-Gated Storage After | abgelöst durch ADR 0034 | C-04, F-12, F-13, F-48, F-49 |
 | ADR 0024 | User-Authored Scenario Context and Personas (Post-MVP) | angenommen | F-04, F-26, F-34, F-45 |
 | ADR 0025 | SQLAlchemy 2.0 as ORM | angenommen | |
 | ADR 0026 | Normalized Relational Schema for Session Persistence | angenommen | F-12, F-13 |
@@ -266,6 +266,7 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0031 | Pseudonymous subject_id Placeholder Instead of a User Foreign Key | angenommen | C-04, F-31 |
 | ADR 0032 | AnalysisJob as a Persisted Entity for Async Job Status | angenommen | Q-07, F-09 |
 | ADR 0033 | Streaming Session Pipeline via Chunked TTS over WebSocket | angenommen | Q-03, F-01, F-46 |
+| ADR 0034 | Session Data Is Persisted in the MVP, Written Once at Session End | angenommen (löst ADR 0023 ab) | C-04, Q-03, F-12, F-13, F-48, F-49 |
 
 Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug, ADR 0017 eine reine Wartbarkeitsentscheidung ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 
@@ -300,7 +301,7 @@ Da die technische Lösungsstrategie (Kapitel 4) noch nicht final festgelegt ist,
 | Nr. | Risiko | Beschreibung | Gegenmaßnahme |
 |---|---|---|---|
 | RI-01 | Echtzeitfähigkeit der Sprach- und LLM-Schnittstellen | Die Kombination aus Spracherkennung, Antwortgenerierung und Sprachsynthese muss in Echtzeit ablaufen (Q-03). Externe Schnittstellen können Latenzschwankungen aufweisen, die den natürlichen Gesprächsfluss beeinträchtigen. | Latenz je Teilstrecke getrennt messen, um den Engpass zu bestimmen. Frühzeitige Tests mit den infrage kommenden Anbietern vor der finalen technischen Festlegung (Kapitel 4). |
-| RI-02 | Unklare Datenschutz-Umsetzung | Datenschutzkonformität ist eine nicht verhandelbare Randbedingung (C-04). Hosting-Ort, Speicherdauer und Einwilligungsprozess sind grundsätzlich entschieden (ADR 0023). Offen ist die technische Umsetzung der Selbstlösch-Funktion in der eigenen Datenbank (ADR 0010) und der Datenplattform sowie der Einwilligungsverwaltung im Frontend. | Löschfunktion und Einwilligungsoberfläche früh mitplanen, nicht nachträglich ergänzen. |
+| RI-02 | Unklare Datenschutz-Umsetzung | Datenschutzkonformität ist eine nicht verhandelbare Randbedingung (C-04). Hosting-Ort und Einwilligungsprozess sind grundsätzlich entschieden (ADR 0034). Das Risiko ist gestiegen, seit Sessiondaten bereits im MVP gespeichert werden: Es gibt damit auch im MVP dauerhaft gespeicherte Daten, aber noch keine festgelegte Speicherdauer, keinen funktionierenden Löschpfad (die Kaskaden sind nur im ORM deklariert, die Migration enthält kein `ON DELETE`) und mangels Nutzerkonten keine Einwilligungsverwaltung. | Speicherdauer festlegen und Löschfunktion umsetzen, bevor Nutzer außerhalb der Pilotgruppe das System verwenden. Datenschutzhinweis (F-49) vor der ersten Aufzeichnung als Voraussetzung behandeln. Einwilligungsoberfläche zusammen mit der Authentifizierung (ADR 0009) planen, nicht nachträglich ergänzen. |
 
 ### Fachliche Risiken
 

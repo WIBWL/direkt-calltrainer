@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by ADR 0034 (Session Data Is Persisted in the MVP, Written Once at Session End)
 
 ## Context
 

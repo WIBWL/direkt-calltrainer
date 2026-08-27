@@ -37,7 +37,7 @@ nav:
       - ADR 0020 - University-Hosted Server Deployment: adr/0020-university-server-hosting.md
       - ADR 0021 - Local Self-Hosted STT/TTS Models: adr/0021-local-stt-tts-models.md
       - ADR 0022 - Language as Independent Session Parameter: adr/0022-language-independent-session-parameter.md
-      - ADR 0023 - No Session Data Persisted Beyond the MVP; Consent-Gated Storage After: adr/0023-no-persistence-in-mvp-consent-gated-after.md
+      - ADR 0023 - No Session Data Persisted Beyond the MVP; Consent-Gated Storage After (superseded): adr/0023-no-persistence-in-mvp-consent-gated-after.md
       - ADR 0024 - User-Authored Scenario Context and Personas (Post-MVP): adr/0024-user-authored-scenario-and-persona.md
       - ADR 0025 - SQLAlchemy 2.0 as ORM: adr/0025-sqlalchemy-orm.md
       - ADR 0026 - Normalized Relational Schema for Session Persistence: adr/0026-normalized-schema-for-session-persistence.md
@@ -48,6 +48,7 @@ nav:
       - ADR 0031 - Pseudonymous subject_id Placeholder Instead of a User FK: adr/0031-pseudonymous-subject-id-placeholder.md
       - ADR 0032 - AnalysisJob as a Persisted Entity for Async Job Status: adr/0032-analysis-job-persisted-status.md
       - ADR 0033 - Streaming Session Pipeline via Chunked TTS over WebSocket: adr/0033-streaming-session-pipeline.md
+      - ADR 0034 - Session Data Persisted in the MVP, Written Once at Session End: adr/0034-persist-session-data-at-session-end.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
   # site is served at the root (mkdocs serve / mkdocs build + static server).

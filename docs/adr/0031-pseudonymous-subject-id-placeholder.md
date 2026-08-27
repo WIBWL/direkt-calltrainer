@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-ADR 0009 decided on Keycloak/OIDC for user authentication, but that integration is not yet built, and this schema has no persisted User/Account entity at all. Session persistence still needs to record whose Session a given row belongs to, both for ADR 0023's per-user consent and self-service-deletion model, and for eventual per-user Feedback aggregation (F-13, F-48).
+ADR 0009 decided on Keycloak/OIDC for user authentication, but that integration is not yet built, and this schema has no persisted User/Account entity at all. Session persistence still needs to record whose Session a given row belongs to, both for ADR 0023's per-user consent and self-service-deletion model (carried forward by ADR 0034), and for eventual per-user Feedback aggregation (F-13, F-48).
 
 ## Decision
 
