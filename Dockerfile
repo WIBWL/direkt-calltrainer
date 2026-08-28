@@ -7,7 +7,9 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM python:3-slim
+# Pinned: python:3-slim moved to 3.14, which the pinned SQLAlchemy 2.0.36
+# cannot import (typing.Union.__getitem__ changed). Bump both together.
+FROM python:3.13-slim
 
 EXPOSE 8000
 
