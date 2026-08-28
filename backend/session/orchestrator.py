@@ -70,6 +70,8 @@ def _build_system_prompt(persona: Persona, scenario: Scenario) -> str:
         "problem is, and never wait for them to explain why they're "
         "calling — you're the one with something to discuss.\n"
         f"Context of the call: {scenario.description}\n"
+        f"Your name: {persona.name}. Introduce yourself by that name and "
+        "use it whenever you say who you are — never invent a different one.\n"
         f"Your role: {persona.role}.\n"
         f"Character traits: {persona.traits}.\n"
         f"Behavior: {persona.behavior}.\n"
