@@ -5,13 +5,18 @@ import type { CallState, ClientMessage, ServerMessage, TurnRecord } from "../pro
 const API_URL = import.meta.env.VITE_API_URL ?? "";
 const WS_URL = `${API_URL.replace(/^http/, "ws")}/ws/session`;
 
+/** The Session the user has committed to, as far as the connection is
+ * concerned. A fresh object stands for a fresh Session: the connection is
+ * keyed on this object's *identity*, not on its contents, so committing to
+ * the same Persona/Scenario pairing twice still reconnects rather than
+ * reusing the finished Session's socket. Don't memoize it. */
+export interface CommittedSession {
+  personaId: string;
+  scenarioId: string;
+}
+
 interface UseSessionSocketOptions {
-  personaId: string | null;
-  scenarioId: string | null;
-  /** Bump to force a fresh connection even when personaId/scenarioId didn't
-   * change — e.g. to start pre-warming the next Session right after the
-   * current one ends. */
-  generation: number;
+  session: CommittedSession | null;
   onAudioChunk: (data: ArrayBuffer) => void;
   onEnded: (reason: "user" | "error" | "completed", transcript: TurnRecord[]) => void;
 }
@@ -20,24 +25,19 @@ interface UseSessionSocketOptions {
  * Owns the per-Session WebSocket connection (see ADR 0033's wire protocol):
  * sends the initial handshake, forwards Turn audio, and translates incoming
  * state/audio-chunk/error/session.ended messages into hook state. Connects
- * as soon as personaId/scenarioId are known — not gated behind any screen —
- * so the Persona's opening line can start generating in the background
- * before the user has done anything beyond loading the app.
+ * as soon as a Session is committed to — which per ADR 0042 is the moment
+ * the user leaves the selection screen, not the moment a Persona/Scenario
+ * is picked — so the Persona's opening line generates in the background
+ * while the user is still on the microphone check.
  */
-export function useSessionSocket({
-  personaId,
-  scenarioId,
-  generation,
-  onAudioChunk,
-  onEnded,
-}: UseSessionSocketOptions) {
+export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionSocketOptions) {
   const [callState, setCallState] = useState<CallState>("thinking");
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const turnSeqRef = useRef(0);
 
   useEffect(() => {
-    if (personaId === null || scenarioId === null) return;
+    if (session === null) return;
 
     setError(null);
     setCallState("thinking");
@@ -59,8 +59,8 @@ export function useSessionSocket({
       console.debug("[WS] connected, sending session.start");
       const start: ClientMessage = {
         type: "session.start",
-        persona_id: personaId,
-        scenario_id: scenarioId,
+        persona_id: session.personaId,
+        scenario_id: session.scenarioId,
       };
       ws.send(JSON.stringify(start));
     };
@@ -107,7 +107,7 @@ export function useSessionSocket({
       ws.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reconnecting on every callback identity change would tear down the call
-  }, [personaId, scenarioId, generation]);
+  }, [session]);
 
   const sendTurnAudio = useCallback((blob: Blob, mimeType: string) => {
     const ws = wsRef.current;
