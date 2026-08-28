@@ -45,5 +45,6 @@ Sie sind in der Leitung. Wählen Sie eine Option:
 - [ADR 0032 — AnalysisJob as a Persisted Entity for Async Job Status](adr/0032-analysis-job-persisted-status.md)
 - [ADR 0033 — Streaming Session Pipeline via Chunked TTS over WebSocket](adr/0033-streaming-session-pipeline.md)
 - [ADR 0034 — Session Data Persisted in the MVP, Written Once at Session End](adr/0034-persist-session-data-at-session-end.md)
+- [ADR 0041 — Personas and Scenarios Loaded from the Database](adr/0041-personas-scenarios-from-database.md)
 
 *Vielen Dank für Ihren Anruf. Bitte legen Sie nach der Lektüre nicht auf — es warten noch mehr ADRs auf Sie.*
