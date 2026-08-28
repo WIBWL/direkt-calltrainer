@@ -5,8 +5,10 @@ Idempotent: every record is looked up by its natural key and either created
 or brought back to the seed state, so repeated runs produce no duplicates.
 
 Content sources:
-    Persona/Szenario -> backend/personas.py, backend/scenarios.py
-    Sprache          -> the language_ids the Personas use
+    Persona/Szenario -> this file (ADR 0041: the database is the source of
+                        truth, and this script holds its initial content;
+                        the backend no longer hardcodes either)
+    Sprache          -> the sprache_code values the Personas use
     MetrikTyp        -> docs/features.md, section "Sprach- und Kommunikationsanalyse"; 
                         its Prio column drives the aktiv flag (MUST -> True, otherwise False).
 
@@ -25,25 +27,79 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from backend.db.models import MetrikTyp, Persona, PersonaEinwand, Sprache, Szenario # noqa: E402
 from backend.db.session import session_scope  # noqa: E402
-from backend.personas import PERSONAS  # noqa: E402
-from backend.scenarios import SCENARIOS  # noqa: E402
 
 
-# --- Assumptions ---------------------------------------------------------
-# Columns the ORM requires but the hardcoded source modules do not provide:
-#
-# Persona.schwierigkeitsgrad: not modelled in personas.py. "mittel" because
-#   the one existing Persona is demanding, but not an escalation case.
-# Persona.trainingsziel: not modelled in personas.py. Left empty rather than
-#   invented here — the Personas carry no training goal today.
-# Szenario.typ: not modelled in scenarios.py. Derived from F-03 ("Angebots-
-#   und Preisgespräche"), as the scenario aims at the closing.
-# Sprache.bezeichnung: personas.py only carries the language code, so the
-#   display names live here, for the codes the Personas actually use.
-DEFAULT_SCHWIERIGKEITSGRAD = "mittel"
-DEFAULT_TRAININGSZIEL = ""
-DEFAULT_SZENARIO_TYP = "Angebots- und Preisgespräch"
-SPRACH_BEZEICHNUNGEN = {"de": "Deutsch", "en": "English"}
+# --- Personas -----------------------------------------------------------
+# Every Persona has exactly one Language and one voice (ADR 0041). Only German
+# is supported for now, so sprache_code is "de" throughout. Two voice values
+# per Persona: kugelaudio_stimme_id for the default TTS backend, tts_stimme
+# for the EFRE fallback (ADR 0040).
+SPRACH_BEZEICHNUNGEN = {"de": "Deutsch"}
+
+PERSONAS = [
+    {
+        "schluessel": "thomas-brandt-ceo",
+        "name": "Thomas Brandt",
+        "rolle": "Geschäftsführer, Fokus auf Strategie & Budget",
+        "haltung": (
+            "sachlich, zeitbewusst, ungeduldig bei zu technischen Ausführungen, "
+            "verhandlungserfahren"
+        ),
+        "verhalten": (
+            "Du hast einen konkreten Grund für diesen Anruf (siehe Kontext des "
+            "Anrufs) und ein klares Ziel, das du im Gespräch erreichen willst. "
+            "Du reagierst kritisch und ungeduldig, wenn dein Gesprächspartner zu "
+            "technisch, ausweichend oder kompliziert antwortet, statt klar auf "
+            "deinen Nutzen einzugehen — du erwartest einfache, konkrete "
+            "Antworten statt Fachjargon. Besonders beim Preis bist du "
+            "hartnäckig und hakst nach, wenn eine Kostenrechtfertigung vage "
+            "bleibt. Du lässt dich durch eine kompetente, konkrete Antwort "
+            "überzeugen oder beruhigen, gibst dich aber nicht mit vagen "
+            "Ausflüchten zufrieden."
+        ),
+        # Not modelled before this script took over the content: "mittel"
+        # because this Persona is demanding but not an escalation case, and
+        # no training goal has been written for it yet.
+        "trainingsziel": "",
+        "schwierigkeitsgrad": "mittel",
+        "sprache_code": "de",
+        "tts_stimme": "de_male",
+        "kugelaudio_stimme_id": 1885,
+        "einwaende": [],
+    },
+]
+
+# --- Szenarien ----------------------------------------------------------
+# `typ` follows F-03's categories of Szenario-Typen.
+SZENARIEN = [
+    {
+        "schluessel": "cold-call-followup",
+        "typ": "Angebots- und Preisgespräch",
+        "titel": "Offenes Anliegen zu bestehendem Vertrag",
+        "beschreibung": (
+            "Der Kunde (die Persona) ruft den Nutzer an, der im Support "
+            "arbeitet. Der Kunde hat eine konkrete Frage oder ein offenes "
+            "Anliegen zu einem bestehenden Angebot oder Vertrag und ruft an, um "
+            "das zu klären. Ziel des Anrufs ist es, das Anliegen zu klären und "
+            "das Gespräch zu einem Abschluss zu führen."
+        ),
+    },
+    {
+        "schluessel": "price-cancellation-risk",
+        "typ": "Angebots- und Preisgespräch",
+        "titel": "Kündigungsabsicht wegen Preis",
+        "beschreibung": (
+            "Der Kunde (die Persona) ruft an, um mitzuteilen, dass er über "
+            "eine Kündigung oder ein Downgrade nachdenkt, weil ihm die "
+            "laufenden Kosten im Verhältnis zum Nutzen zu hoch erscheinen. Der "
+            "Kunde ist grundsätzlich noch offen für ein Gespräch, erwartet "
+            "aber eine überzeugende, nutzenorientierte Begründung, warum sich "
+            "die Ausgabe weiterhin lohnt. Ziel des Calls ist es, den Kunden "
+            "durch Preisverhandlung bzw. Einwandbehandlung zum Bleiben zu "
+            "bewegen."
+        ),
+    },
+]
 
 
 # --- MetrikTyp: paraverbal dimensions from docs/features.md --------------
@@ -93,7 +149,7 @@ def upsert(db, model, natural_key: dict, values: dict):
 
 def seed_sprachen(db) -> int:
     created = 0
-    for code in sorted({p.language_id for p in PERSONAS}):
+    for code in sorted({p["sprache_code"] for p in PERSONAS}):
         _, is_new = upsert(
             db,
             Sprache,
@@ -109,8 +165,8 @@ def seed_einwaende(db, persona: Persona, objections: list[str]) -> None:
 
     Matched on (persona_id, reihenfolge) so that existing positions are
     updated and surplus ones deleted, which keeps the IDs stable across runs.
-    personas.py no longer models objections, so the list is empty today and
-    this only prunes rows left over from earlier seed runs.
+    No Persona carries objections today, so the list is empty and this only
+    prunes rows left over from earlier seed runs.
     """
     for position, text in enumerate(objections):
         existing = (
@@ -135,41 +191,23 @@ def seed_einwaende(db, persona: Persona, objections: list[str]) -> None:
 
 def seed_personas(db) -> int:
     created = 0
-    for p in PERSONAS:
+    for entry in PERSONAS:
+        values = {k: v for k, v in entry.items() if k not in ("schluessel", "einwaende")}
         persona, is_new = upsert(
-            db,
-            Persona,
-            {"schluessel": p.id},
-            {
-                "name": p.name,
-                "rolle": p.role,
-                "haltung": p.traits,
-                "verhalten": p.behavior,
-                "trainingsziel": DEFAULT_TRAININGSZIEL,
-                "schwierigkeitsgrad": DEFAULT_SCHWIERIGKEITSGRAD,
-                "aktiv": True,
-            },
+            db, Persona, {"schluessel": entry["schluessel"]}, {**values, "aktiv": True}
         )
         created += is_new
         # persona_id is only assigned on flush, and the objections need it.
         db.flush()
-        seed_einwaende(db, persona, [])
+        seed_einwaende(db, persona, entry["einwaende"])
     return created
 
 
 def seed_szenarien(db) -> int:
     created = 0
-    for s in SCENARIOS:
-        _, is_new = upsert(
-            db,
-            Szenario,
-            {"schluessel": s.id},
-            {
-                "typ": DEFAULT_SZENARIO_TYP,
-                "titel": s.name,
-                "beschreibung": s.description,
-            },
-        )
+    for entry in SZENARIEN:
+        values = {k: v for k, v in entry.items() if k != "schluessel"}
+        _, is_new = upsert(db, Szenario, {"schluessel": entry["schluessel"]}, values)
         created += is_new
     return created
 

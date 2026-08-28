@@ -1,3 +1,9 @@
+"""The Persona value objects the backend works with.
+
+The Personas themselves live in the database and are loaded through
+`backend/library.py` (ADR 0041); this module only defines their shape, so
+that `backend/session/` can depend on it without pulling in database access.
+"""
 from dataclasses import dataclass
 
 
@@ -16,30 +22,3 @@ class Persona:
     role: str
     traits: str
     behavior: str
-
-
-PERSONAS: list[Persona] = [
-    Persona(
-        id="thomas-brandt-ceo",
-        name="Thomas Brandt",
-        language_id="de",
-        voice=PersonaVoice(tts_voice="de_male", kugelaudio_voice_id=1885),
-        role=("Geschäftsführer, Fokus auf Strategie & Budget"),
-        traits=(
-            "sachlich, zeitbewusst, ungeduldig bei zu technischen Ausführungen, "
-            "verhandlungserfahren"
-        ),
-        behavior=(
-            "Du hast einen konkreten Grund für diesen Anruf (siehe Kontext des "
-            "Anrufs) und ein klares Ziel, das du im Gespräch erreichen willst. "
-            "Du reagierst kritisch und ungeduldig, wenn dein Gesprächspartner zu "
-            "technisch, ausweichend oder kompliziert antwortet, statt klar auf "
-            "deinen Nutzen einzugehen — du erwartest einfache, konkrete "
-            "Antworten statt Fachjargon. Besonders beim Preis bist du "
-            "hartnäckig und hakst nach, wenn eine Kostenrechtfertigung vage "
-            "bleibt. Du lässt dich durch eine kompetente, konkrete Antwort "
-            "überzeugen oder beruhigen, gibst dich aber nicht mit vagen "
-            "Ausflüchten zufrieden."
-        ),
-    ),
-]

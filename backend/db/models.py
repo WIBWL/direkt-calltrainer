@@ -32,7 +32,15 @@ class Persona(Base):
     trainingsziel: Mapped[str] = mapped_column(Text)
     schwierigkeitsgrad: Mapped[str] = mapped_column(String(40))
     aktiv: Mapped[bool] = mapped_column(Boolean, default=True)
+    # A Persona has exactly one Language and one voice (ADR 0041); there is no
+    # per-Session choice, so both hang off the Persona rather than the Session.
+    # Both voice columns are required: KugelAudio is the default TTS backend
+    # and EFRE its fallback (ADR 0040), so a Persona needs an identity in each.
+    sprache_code: Mapped[str] = mapped_column(ForeignKey("sprache.sprache_code"))
+    tts_stimme: Mapped[str] = mapped_column(String(40))
+    kugelaudio_stimme_id: Mapped[int] = mapped_column(Integer)
 
+    sprache: Mapped["Sprache"] = relationship(back_populates="personas")
     einwaende: Mapped[list["PersonaEinwand"]] = relationship(
         back_populates="persona",
         order_by="PersonaEinwand.reihenfolge",
@@ -70,6 +78,7 @@ class Sprache(Base):
     sprache_code: Mapped[str] = mapped_column(String(8), primary_key=True)
     bezeichnung: Mapped[str] = mapped_column(String(60))
 
+    personas: Mapped[list["Persona"]] = relationship(back_populates="sprache")
     sessions: Mapped[list["Session"]] = relationship(back_populates="sprache")
 
 

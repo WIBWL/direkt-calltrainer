@@ -13,8 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.api.session_ws import router as session_ws_router
 from backend.clients.health import check_backends
 from backend.logging_config import configure_logging
-from backend.personas import PERSONAS
-from backend.scenarios import SCENARIOS
+from backend import library
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -58,13 +57,16 @@ def health() -> dict[str, str]:
 @app.get("/api/personas")
 def list_personas() -> list[dict[str, str]]:
     """List personas available for session setup."""
-    return [{"id": p.id, "name": p.name, "role": p.role} for p in PERSONAS]
+    return [{"id": p.id, "name": p.name, "role": p.role} for p in library.list_personas()]
 
 
 @app.get("/api/scenarios")
 def list_scenarios() -> list[dict[str, str]]:
     """List scenarios available for session setup."""
-    return [{"id": s.id, "name": s.name, "description": s.description} for s in SCENARIOS]
+    return [
+        {"id": s.id, "name": s.name, "description": s.description}
+        for s in library.list_scenarios()
+    ]
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIST_DIR, html=True, check_dir=False), name="frontend")
