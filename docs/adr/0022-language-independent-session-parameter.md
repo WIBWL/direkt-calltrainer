@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (supersedes ADR 0006)
+Superseded by ADR 0043 (English Prompt Content, Session Language Bound to the Persona); supersedes ADR 0006
 
 ## Context
 

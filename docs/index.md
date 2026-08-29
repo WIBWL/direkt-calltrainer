@@ -32,7 +32,7 @@ Sie sind in der Leitung. Wählen Sie eine Option:
 - [ADR 0019 — Redis + RQ Job Queue](adr/0019-redis-rq-job-queue.md)
 - [ADR 0020 — University-Hosted Server Deployment](adr/0020-university-server-hosting.md)
 - [ADR 0021 — Local Self-Hosted STT/TTS Models](adr/0021-local-stt-tts-models.md)
-- [ADR 0022 — Language as Independent Session Parameter](adr/0022-language-independent-session-parameter.md)
+- [ADR 0022 — Language as Independent Session Parameter (superseded)](adr/0022-language-independent-session-parameter.md)
 - [ADR 0023 — No Session Data Persisted Beyond the MVP; Consent-Gated Storage After (superseded)](adr/0023-no-persistence-in-mvp-consent-gated-after.md)
 - [ADR 0024 — User-Authored Scenario Context and Personas (Post-MVP)](adr/0024-user-authored-scenario-and-persona.md)
 - [ADR 0025 — SQLAlchemy 2.0 as ORM](adr/0025-sqlalchemy-orm.md)
@@ -46,5 +46,6 @@ Sie sind in der Leitung. Wählen Sie eine Option:
 - [ADR 0033 — Streaming Session Pipeline via Chunked TTS over WebSocket](adr/0033-streaming-session-pipeline.md)
 - [ADR 0034 — Session Data Persisted in the MVP, Written Once at Session End](adr/0034-persist-session-data-at-session-end.md)
 - [ADR 0041 — Personas and Scenarios Loaded from the Database](adr/0041-personas-scenarios-from-database.md)
+- [ADR 0043 — English Prompt Content, Session Language Bound to the Persona](adr/0043-english-prompt-content-persona-bound-language.md)
 
 *Vielen Dank für Ihren Anruf. Bitte legen Sie nach der Lektüre nicht auf — es warten noch mehr ADRs auf Sie.*
