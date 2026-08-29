@@ -13,11 +13,10 @@ from backend.clients import llm, stt, tts
 from backend.personas import Persona
 from backend.scenarios import Scenario
 from backend.session.chunking import sentence_chunks
+from backend.session.language_packs import LanguagePack, get_pack
 from backend.session.models import AudioChunk, Failed, StateChanged, Turn, TurnCompleted, TurnEvent
 
 logger = logging.getLogger(__name__)
-
-_LANGUAGE_NAMES_EN: dict[str, str] = {"de": "German"}
 
 _OPENING_INSTRUCTION = (
     "The call is starting now: you are the one calling, and you speak first. "
@@ -30,37 +29,13 @@ _OPENING_INSTRUCTION = (
     "directions. Reply with only that opening line."
 )
 
-_EXAMPLE_EXCHANGE = (
-    "Example of the tone and pacing to aim for (illustrative only — invent "
-    "your own content that fits YOUR actual scenario and character; never "
-    "reuse this text or its specifics):\n"
-    '[Caller opens] "Guten Tag, hier ist Frau Beck von der Buchhaltung, ich '
-    'habe eine Frage zu unserer letzten Rechnung, da stimmt glaube ich was '
-    'nicht."\n'
-    '[Other person] "Guten Tag Frau Beck, worum geht es denn genau?"\n'
-    '[Caller] "Wir wurden für März doppelt belastet, einmal am 3. und '
-    'einmal am 17. Können Sie sich das mal anschauen?"\n'
-    '[Other person] "Das schaue ich mir an. Können Sie mir die '
-    'Rechnungsnummer nennen?"\n'
-    '[Caller] "Die habe ich gerade nicht griffbereit, aber es war ein '
-    'Betrag über 480 Euro. Ehrlich gesagt ist das schon das zweite Mal in '
-    'diesem Jahr, dass bei uns was mit der Abrechnung nicht stimmt." (one '
-    "objection, raised once, naturally — never repeated again later)\n"
-    '[Other person] "Verstehe, das tut mir leid. Ich erstatte Ihnen den '
-    'doppelten Betrag noch heute."\n'
-    '[Caller] "Gut, das reicht mir erstmal. Dann klären wir den Rest, '
-    'sobald ich die Nummer habe. Danke Ihnen, einen schönen Tag noch. '
-    '[CALL_END]" (ends naturally as soon as the concern is addressed — no '
-    "recap of everything said before ending)\n"
-    "Notice: every caller line adds new, concrete information instead of "
-    "restating an earlier one; the objection appears exactly once; the call "
-    "ends the moment the concern is actually resolved."
-)
 
+def _build_system_prompt(persona: Persona, scenario: Scenario, pack: LanguagePack) -> str:
+    """Builds the LLM system prompt.
 
-def _build_system_prompt(persona: Persona, scenario: Scenario) -> str:
-    """Builds the LLM system prompt."""
-    language = _LANGUAGE_NAMES_EN[persona.language_id]
+    Instructions are English throughout; only the Persona's language decides
+    what the model speaks, and only `pack` carries what has to follow it
+    (ADR 0043)."""
     return (
         "You are playing a character in a phone-call training exercise. "
         "You are the one who called — you initiated this call because you "
@@ -87,25 +62,25 @@ def _build_system_prompt(persona: Persona, scenario: Scenario) -> str:
         "this call and check whether you are about to say the same thing "
         "again — the same question, recap, or objection — even reworded. "
         "If so, drop it and say something new instead.\n"
-        f"{_EXAMPLE_EXCHANGE}\n"
+        f"{pack.example_exchange}\n"
         "If your concern has been concretely addressed — a clear answer, or "
         "a specific commitment with an actual action, amount, or timeframe "
-        "(like the refund example above) — or the user signals the call is "
-        "over — a goodbye, a wrap-up like \"das reicht mir\"/\"das wär's\", "
+        "(a refund, a callback, a fixed date) — or the user signals the call is "
+        f"over — a goodbye, a wrap-up like {pack.user_closing_examples}, "
         "or any other natural way people end a phone call — end it "
         "yourself: add one brief, friendly closing line (e.g. thank them, "
         "say goodbye), then finish your reply with exactly this marker on "
         "its own and nothing after it: [CALL_END]. Never end the call "
         "while you still consider your concern unresolved, are still "
         "pressing for information, or have only gotten a vague reassurance "
-        "with no specifics (\"ich kümmere mich darum\", \"ich stelle das "
-        "klar\") — a frustrated reply, or an empty promise with no actual "
+        f"with no specifics ({pack.vague_reassurance_examples}) — a "
+        "frustrated reply, or an empty promise with no actual "
         "content, is not by itself a reason to hang up; keep pushing for "
         "specifics instead, the way a real caller would. Only include the "
         "marker when the call should truly end — never otherwise, never in the "
         "same reply as a question or a statement that the issue isn't "
         "resolved yet, and never explain or mention the marker itself.\n"
-        f"Reply exclusively in {language}, every single time regardless of "
+        f"Reply exclusively in {pack.name_en}, every single time regardless of "
         "what language the user writes in, in short, realistic sentences "
         "the way people actually talk on the phone. Stay true to the role "
         "without exaggerating into caricature. Output only what the "
@@ -115,27 +90,12 @@ def _build_system_prompt(persona: Persona, scenario: Scenario) -> str:
 
 _END_CALL_RE = re.compile(r"\[\s*call[_\s]?end\s*\]", re.IGNORECASE)
 
-# Catches an explicit farewell or a request to postpone/continue elsewhere --
-# the two categories of user signal the persona's own judgment (the system
-# prompt above) was observed to miss. Deliberately narrow and regex-based,
-# not an LLM classifier: that approach's own chain-of-thought reasoning
-# would occasionally degenerate into a non-sequitur and land on the wrong
-# verdict (confirmed in testing). A missed signal here just costs one extra
-# turn; a false one cuts the call short mid-conversation, which is worse.
-_FAREWELL_RE = re.compile(r"\b(tschüss|auf wiederhören|auf wiedersehen|wiederhören|ciao)\b", re.IGNORECASE)
-_POSTPONE_RE = re.compile(
-    r"(ein andere[rs]? mal|andermal|anders (fortsetzen|weiterführen|weitermachen)|"
-    r"später (nochmal|weiter|zurückrufen)|melde mich (nochmal|später|wieder)|"
-    r"rufe? (sie |dich )?(nochmal|später|zurück)|keine zeit (mehr|gerade)|"
-    r"muss (jetzt |gleich )?(auflegen|los|schluss machen)|gespräch (beenden|abbrechen))",
-    re.IGNORECASE,
-)
 
-
-def _signals_closing(user_text: str) -> bool:
+def _signals_closing(user_text: str, pack: LanguagePack) -> bool:
     """True if the user's message is an explicit farewell or a request to
-    postpone/continue the call elsewhere."""
-    return bool(_FAREWELL_RE.search(user_text) or _POSTPONE_RE.search(user_text))
+    postpone/continue the call elsewhere. Matched against the user's own
+    speech, so the patterns come from the language pack, not from here."""
+    return bool(pack.farewell_re.search(user_text) or pack.postpone_re.search(user_text))
 
 
 _CLOSING_NUDGE = (
@@ -143,11 +103,6 @@ _CLOSING_NUDGE = (
     "friendly closing line, then finish your reply with exactly this "
     "marker and nothing after it: [CALL_END]."
 )
-
-# Said in place of trusting the model's own reply to have included a
-# goodbye -- for a backstopped ending (a repeat, or the model ending
-# unprompted) that trust hasn't been earned (confirmed in testing).
-_FALLBACK_CLOSING_LINE = "Vielen Dank für Ihre Zeit. Auf Wiederhören."
 
 
 class _ReplyProgress:
@@ -227,9 +182,10 @@ class SessionOrchestrator:
 
     def __init__(self, persona: Persona, scenario: Scenario):
         self._language_id = persona.language_id
+        self._pack = get_pack(persona.language_id)
         self._voice = persona.voice
         self._messages: list[dict[str, str]] = [
-            {"role": "system", "content": _build_system_prompt(persona, scenario)},
+            {"role": "system", "content": _build_system_prompt(persona, scenario, self._pack)},
         ]
         self.turns: list[Turn] = []
         self._reopen_turn: Turn | None = None
@@ -281,7 +237,7 @@ class SessionOrchestrator:
             else:
                 turn.user_text = user_text
                 self._messages.append({"role": "user", "content": user_text})
-            closing = _signals_closing(turn.user_text)
+            closing = _signals_closing(turn.user_text, self._pack)
 
             messages = self._messages
             if closing:
@@ -362,7 +318,7 @@ class SessionOrchestrator:
     async def _speak_fallback_closing(self, turn: Turn, progress: _ReplyProgress) -> AsyncIterator[TurnEvent]:
         """Synthesizes a guaranteed sign-off for a backstopped ending,
         instead of trusting the Persona's own reply to have included one."""
-        audio = await self._synthesize_with_retry(_FALLBACK_CLOSING_LINE)
+        audio = await self._synthesize_with_retry(self._pack.fallback_closing_line)
         if audio is None:
             return
         if not progress.spoke_yet:
@@ -370,7 +326,7 @@ class SessionOrchestrator:
             progress.spoke_yet = True
         progress.chunk_seq += 1
         yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=audio)
-        turn.persona_text = f"{turn.persona_text} {_FALLBACK_CLOSING_LINE}".strip()
+        turn.persona_text = f"{turn.persona_text} {self._pack.fallback_closing_line}".strip()
         self._messages[-1]["content"] = turn.persona_text
 
     def _repeats_last_reply(self, text: str) -> bool:

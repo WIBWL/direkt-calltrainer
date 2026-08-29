@@ -56,15 +56,26 @@ def health() -> dict[str, str]:
 
 @app.get("/api/personas")
 def list_personas() -> list[dict[str, str]]:
-    """List personas available for session setup."""
-    return [{"id": p.id, "name": p.name, "role": p.role} for p in library.list_personas()]
+    """List personas available for session setup.
+
+    Display fields only (ADR 0043) — the English prompt fields stay on the
+    server. The language comes along because it is a property of the Persona
+    and not a separate choice, so the card has to say which one it speaks.
+    """
+    return [
+        {"id": p.id, "name": p.name, "role": p.role_label, "language": p.language_name}
+        for p in library.list_personas()
+    ]
 
 
 @app.get("/api/scenarios")
 def list_scenarios() -> list[dict[str, str]]:
-    """List scenarios available for session setup."""
+    """List scenarios available for session setup.
+
+    Serves the short teaser, not the English call context the model reads.
+    """
     return [
-        {"id": s.id, "name": s.name, "description": s.description}
+        {"id": s.id, "name": s.name, "short_description": s.short_description}
         for s in library.list_scenarios()
     ]
 

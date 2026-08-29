@@ -26,6 +26,11 @@ class Persona(Base):
     persona_id: Mapped[int] = mapped_column(primary_key=True)
     schluessel: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. tech-averse-management
     name: Mapped[str] = mapped_column(String(120))
+    # Display field: shown on the selection card, written in the UI language.
+    # The prompt fields below are English instead (ADR 0043), so the two roles
+    # this column used to serve at once are now separate columns.
+    rolle_anzeige: Mapped[str] = mapped_column(String(120))
+    # Prompt fields: English, fed into the system prompt, never served by the API.
     rolle: Mapped[str] = mapped_column(String(120))
     haltung: Mapped[str] = mapped_column(String(120))
     verhalten: Mapped[str] = mapped_column(Text)
@@ -68,6 +73,12 @@ class Szenario(Base):
     schluessel: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. cold-call-followup
     typ: Mapped[str] = mapped_column(String(60))
     titel: Mapped[str] = mapped_column(String(160))
+    # Display field: the one-line teaser under the title on the selection card,
+    # in the UI language. Deliberately short — it is read at a glance, not by
+    # the model.
+    kurzbeschreibung: Mapped[str] = mapped_column(String(240))
+    # Prompt field: the English call context handed to the model (ADR 0043).
+    # Scenarios carry no language of their own; the Persona decides that.
     beschreibung: Mapped[str] = mapped_column(Text)
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="szenario")

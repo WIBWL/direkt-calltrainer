@@ -14,12 +14,16 @@ interface Persona {
   id: string;
   name: string;
   role: string;
+  // A Persona speaks exactly one language and the user cannot change it
+  // (ADR 0043), so the card has to say which one it is.
+  language: string;
 }
 
 interface Scenario {
   id: string;
   name: string;
-  description: string;
+  // The short teaser, not the call context the model gets.
+  short_description: string;
 }
 
 type Screen = "setup" | "mic-check" | "call" | "transcript";
@@ -215,6 +219,7 @@ export default function App() {
           >
             <span className="persona-name">{p.name}</span>
             <span className="card-subtitle">{p.role}</span>
+            <span className="language-badge">{p.language}</span>
           </button>
         ))}
       </div>
@@ -229,7 +234,7 @@ export default function App() {
             type="button"
           >
             <span className="persona-name">{s.name}</span>
-            <span className="card-subtitle">{s.description}</span>
+            <span className="card-subtitle">{s.short_description}</span>
           </button>
         ))}
       </div>
