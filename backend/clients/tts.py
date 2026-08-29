@@ -14,7 +14,12 @@ logger = logging.getLogger(__name__)
 
 async def synthesize(text: str, voice: PersonaVoice, language_id: str) -> bytes:
     """Synthesize one chunk of text to speech: KugelAudio by default,
-    falling back to the EFRE model if it fails or DEBUG is set."""
+    falling back to the EFRE model if it fails or DEBUG is set.
+
+    KugelAudio wants the bare language code ("de", "en") here, not a full
+    locale tag -- it rejects "de-DE"/"en-GB" with "Invalid request", which
+    then degrades silently into the EFRE fallback voice.
+    """
     if not DEBUG:
         try:
             return await _synthesize_kugelaudio(text, voice, language_id)

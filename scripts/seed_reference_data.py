@@ -30,16 +30,21 @@ from backend.db.session import session_scope  # noqa: E402
 
 
 # --- Personas -----------------------------------------------------------
-# Every Persona has exactly one Language and one voice (ADR 0041). Only German
-# is supported for now, so sprache_code is "de" throughout. Two voice values
-# per Persona: kugelaudio_stimme_id for the default TTS backend, tts_stimme
-# for the EFRE fallback (ADR 0040).
+# Every Persona has exactly one Language and one voice (ADR 0041). Two voice
+# values per Persona: kugelaudio_stimme_id for the default TTS backend,
+# tts_stimme for the EFRE fallback (ADR 0040).
+#
+# Known gap: the EFRE fallback model only carries German voices — de_male and
+# de_female work, every English voice name it was probed with returns a 500.
+# An English Persona therefore has no usable fallback voice and effectively
+# depends on KugelAudio being up; its tts_stimme is set to a German voice only
+# so the NOT NULL column has a value.
 #
 # Two kinds of text per entry (ADR 0043): "rolle_anzeige" is the label shown on
 # the selection card and is written in the UI language; "rolle"/"haltung"/
 # "verhalten" are read only by the model and are English, so that the language
 # the Persona speaks is decided by sprache_code alone.
-SPRACH_BEZEICHNUNGEN = {"de": "Deutsch"}
+SPRACH_BEZEICHNUNGEN = {"de": "Deutsch", "en": "Englisch"}
 
 PERSONAS = [
     {
@@ -70,6 +75,36 @@ PERSONAS = [
         "sprache_code": "de",
         "tts_stimme": "de_male",
         "kugelaudio_stimme_id": 1885,
+        "einwaende": [],
+    },
+    {
+        "schluessel": "samantha-ferris-marketing",
+        "name": "Samantha Ferris",
+        "rolle_anzeige": "Marketing-Managerin bei einem Kundenunternehmen",
+        "rolle": "Marketing manager at a company that is a customer of the user's",
+        "haltung": (
+            "very polite, courteous, calm and composed, never pushy, easy and "
+            "pleasant to talk to"
+        ),
+        "verhalten": (
+            "You have a concrete reason for this call (see the context of the "
+            "call) and a clear goal you want to reach in the conversation. You "
+            "are consistently friendly and considerate: you greet properly, "
+            "you give the person you are talking to time to answer, you never "
+            "interrupt or press, and you stay pleasant even when an answer "
+            "takes a while. Being polite does not mean being satisfied, "
+            "though — you still want your concern actually resolved, so when "
+            "an answer stays vague you ask again, calmly and courteously, "
+            "until you get something concrete. You never get loud or "
+            "reproachful; you simply keep asking in a friendly way."
+        ),
+        "trainingsziel": "",
+        "schwierigkeitsgrad": "leicht",
+        "sprache_code": "en",
+        # tts_stimme is a German voice because the EFRE fallback has no
+        # English one — see the note above.
+        "tts_stimme": "de_female",
+        "kugelaudio_stimme_id": 1071,
         "einwaende": [],
     },
 ]

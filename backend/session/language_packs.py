@@ -78,7 +78,45 @@ _GERMAN = LanguagePack(
 )
 
 
-LANGUAGE_PACKS: dict[str, LanguagePack] = {"de": _GERMAN}
+_ENGLISH = LanguagePack(
+    name_en="English",
+    example_exchange=(
+        "Example of the register, sentence length and pacing to aim for — this "
+        "says nothing about how a call should unfold, only how it should "
+        "sound. Invent your own content that fits YOUR actual scenario and "
+        "character; never reuse this text or its specifics. The dialogue is in "
+        "the language you must speak:\n"
+        '[Caller opens] "Good morning, this is Claire Hughes from accounts, '
+        'I have got a question about our last invoice."\n'
+        '[Other person] "Good morning Ms Hughes, what is it about exactly?"\n'
+        '[Caller] "We were charged twice for March, once on the 3rd and once '
+        'on the 17th."\n'
+        '[Other person] "Let me look into that. Could you give me the invoice '
+        'number?"\n'
+        '[Caller] "I have not got it to hand, but it was around 480 pounds."'
+    ),
+    user_closing_examples='"that\'s all I needed"/"that\'ll do"',
+    vague_reassurance_examples='"I\'ll look into it", "I\'ll get that sorted"',
+    # Same rationale as the German patterns above: narrow, regex-based, and
+    # matched against the user's own transcribed speech.
+    farewell_re=re.compile(
+        r"\b(goodbye|good bye|bye|take care|have a (good|nice) (day|one)|"
+        r"speak (to you )?soon|talk to you later)\b",
+        re.IGNORECASE,
+    ),
+    postpone_re=re.compile(
+        r"(another time|some other time|call (you )?back|ring (you )?back|"
+        r"get back to you|later (today|this week)|"
+        r"no time (right now|at the moment|today)|"
+        r"(have|need) to (go|run|hang up|dash)|wrap (this |it )?up|"
+        r"end (the|this) call)",
+        re.IGNORECASE,
+    ),
+    fallback_closing_line="Thank you for your time. Goodbye.",
+)
+
+
+LANGUAGE_PACKS: dict[str, LanguagePack] = {"de": _GERMAN, "en": _ENGLISH}
 
 
 def get_pack(language_id: str) -> LanguagePack:
