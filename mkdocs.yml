@@ -2,9 +2,9 @@ site_name: Calltrainer
 site_description: AI-powered phone conversation trainer
 docs_dir: docs
 
-# Erzeugt das ER-Diagramm vor jedem Build neu aus backend/db/models.py, damit
-# docs/datenmodell.md nicht veraltet. Schlaegt das fehl (kein Graphviz), baut
-# die Doku mit dem eingecheckten Diagramm weiter.
+# Regenerates the ER diagram from backend/db/models.py before every build, so
+# that docs/datenmodell.md never goes stale. If that fails (no Graphviz), the
+# docs are built with the checked-in diagram instead.
 hooks:
   - scripts/mkdocs_hooks.py
 

@@ -1,15 +1,15 @@
 """
-MkDocs-Hooks fuer die Projektdoku.
+MkDocs hooks for the project documentation.
 
-Zweck: Das ER-Diagramm auf docs/datenmodell.md soll nie veralten. Statt sich
-darauf zu verlassen, dass jemand nach einer Schemaaenderung von Hand
-scripts/generate_erd.py aufruft, erzeugt dieser Hook das Diagramm vor jedem
-Doku-Build neu aus backend/db/models.py.
+Purpose: the ER diagram on docs/datenmodell.md should never go stale. Rather
+than relying on someone running scripts/generate_erd.py by hand after a schema
+change, this hook regenerates the diagram from backend/db/models.py before
+every docs build.
 
-Faellt die Erzeugung aus — fehlendes Graphviz-Programm "dot", fehlende
-Python-Pakete —, bricht der Build NICHT ab. Es bleibt dann beim zuletzt
-eingecheckten docs/er_modell.svg, und im Build-Log steht eine Warnung. Die
-Doku laesst sich damit auch auf Rechnern ohne Graphviz bauen.
+If generating it fails — a missing Graphviz "dot" binary, missing Python
+packages — the build does NOT abort. The last checked-in docs/er_modell.svg
+is used instead and a warning goes into the build log, so the docs can still be
+built on machines without Graphviz.
 """
 import importlib.util
 import logging
@@ -22,9 +22,9 @@ GENERATOR = os.path.join(PROJECT_ROOT, "scripts", "generate_erd.py")
 
 
 def _generator_main():
-    """Laedt scripts/generate_erd.py ueber seinen Pfad und gibt main() zurueck.
+    """Loads scripts/generate_erd.py by its path and returns its main().
 
-    Ueber den Pfad statt per Import, weil scripts/ kein Python-Paket ist.
+    By path rather than by import, because scripts/ is not a Python package.
     """
     spec = importlib.util.spec_from_file_location("generate_erd", GENERATOR)
     modul = importlib.util.module_from_spec(spec)
@@ -42,7 +42,7 @@ def on_pre_build(config) -> None:  # pylint: disable=unused-argument
         _generator_main()()
         log.info("ER-Diagramm aus backend/db/models.py neu erzeugt.")
     except Exception as exc:  # pylint: disable=broad-exception-caught
-        # Bewusst breit: der Build darf hieran nicht scheitern.
+        # Deliberately broad: the build must not fail because of this.
         log.warning(
             "ER-Diagramm konnte nicht neu erzeugt werden (%s: %s). Die Doku zeigt "
             "das zuletzt eingecheckte docs/er_modell.svg, das veraltet sein kann. "
