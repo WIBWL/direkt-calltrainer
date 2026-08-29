@@ -48,7 +48,7 @@ Weitere Qualitätsanforderungen geringerer Priorität sind in Kapitel 10 aufgef�
 
 | ID | Randbedingung | Beschreibung | Quelle |
 |---|---|---|---|
-| C-01 | Sprache konfigurierbar | Das Training findet in der Sprache statt, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Die Sprache wird pro Trainings-Session ausgewählt, unabhängig von Szenario und Persona. Belegt sind Deutsch bei Solox sowie Englisch und teilweise Spanisch bei APPOLLO Systems. Siehe ADR 0022. | R-35 |
+| C-01 | Sprache konfigurierbar | Das Training findet in der Sprache statt, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Die Sprache ist an die Persona gebunden und ergibt sich aus deren Auswahl; Szenarien sind sprachneutral und mit jeder Persona kombinierbar. Belegt sind Deutsch bei Solox sowie Englisch und teilweise Spanisch bei APPOLLO Systems. Siehe ADR 0043 (löst ADR 0022 ab). | R-35 |
 | C-04 | Datenschutz nach DSGVO | Alle Daten, insbesondere Sprachaufzeichnungen und personenbezogene Daten, werden DSGVO-konform verarbeitet. Die Randbedingung begrenzt die Umsetzung aller übrigen Ziele und steht nicht als gleichrangiges Ziel neben ihnen. | rechtliche Vorgabe |
 | C-05 | Kein kundenspezifisches Fachwissen vorausgesetzt | Fachliches Know-how zu einzelnen Kunden oder Systemen wird nicht abgebildet, da sich die Fachlichkeit je Kundenlandschaft unterscheidet. Der Fokus liegt auf Kommunikation statt Fachlichkeit. | R-40, R-41 |
 | C-06 | Gesprächsdauer | Die zu trainierenden Gespräche reichen von kurzen Rückfragen bis zu Gesprächen von einer Stunde. | R-03 |
@@ -254,7 +254,7 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0019 | Redis + RQ for the Feedback Job Queue | angenommen | F-09 |
 | ADR 0020 | Deployment on a University-Hosted Server | angenommen | C-04 |
 | ADR 0021 | STT and TTS Run as Separately Self-Hosted Local Models | angenommen | Q-03, C-04, F-01 |
-| ADR 0022 | Language as Independent Session Parameter | angenommen (löst ADR 0006 ab) | C-01, R-35 |
+| ADR 0022 | Language as Independent Session Parameter | abgelöst durch ADR 0043 (löst ADR 0006 ab) | C-01, R-35 |
 | ADR 0023 | No Session Data Persisted Beyond the MVP; Consent-Gated Storage After | abgelöst durch ADR 0034 | C-04, F-12, F-13, F-48, F-49 |
 | ADR 0024 | User-Authored Scenario Context and Personas (Post-MVP) | angenommen | F-04, F-26, F-34, F-45 |
 | ADR 0025 | SQLAlchemy 2.0 as ORM | angenommen | |
@@ -268,6 +268,7 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0033 | Streaming Session Pipeline via Chunked TTS over WebSocket | angenommen | Q-03, F-01, F-46 |
 | ADR 0034 | Session Data Is Persisted in the MVP, Written Once at Session End | angenommen (löst ADR 0023 ab) | C-04, Q-03, F-12, F-13, F-48, F-49 |
 | ADR 0041 | Personas and Scenarios Loaded from the Database | angenommen | F-03, F-04 |
+| ADR 0043 | English Prompt Content, Session Language Bound to the Persona | angenommen (löst ADR 0022 ab) | C-01, R-35, F-03, F-04 |
 
 Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug, ADR 0017 eine reine Wartbarkeitsentscheidung ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 
@@ -326,8 +327,8 @@ Erste Implementierung hat begonnen. Technische Schulden sind einzutragen.
 | Data Platform | Extern betriebener, über OIDC authentifizierter Dienst, an den das System hochgeladene Dokumente und große Dateien wie Gesprächsaufzeichnungen zur Speicherung übergibt. Strukturierte Session-Daten hält das Produkt dagegen in einer eigenen PostgreSQL-Datenbank (ADR 0010). |
 | EFRE-Direkt | Von der Hochschule bereitgestellter Dienst zur Erzeugung der Persona-Dialoge. Seine Nutzung ist eine Rahmenbedingung des Projekts und nicht das Ergebnis einer Auswahl unter konkurrierenden Anbietern. |
 | Feedback | Qualitative, verhaltensbezogene Rückmeldung zu einer abgeschlossenen Session mit konkreten Verbesserungsvorschlägen. Sie wird vollständig vom KI-System erzeugt; eine menschliche Trainerrolle ist im Produkt nicht vorgesehen. |
-| Persona | Charakterprofil des KI-Gesprächspartners einer Session, das dessen Rolle, Verhalten und Schwierigkeitsgrad beschreibt. Die Persona ist unabhängig vom Szenario konfigurierbar. |
+| Persona | Charakterprofil des KI-Gesprächspartners einer Session, das dessen Rolle, Verhalten und Schwierigkeitsgrad beschreibt. Die Persona ist unabhängig vom Szenario konfigurierbar und legt zugleich die Sprache und die Stimme des Gesprächs fest. |
 | Persona-Bibliothek | Offene, erweiterbare Sammlung der auswählbaren Personas. Neue Personas können aufgenommen werden, ohne die Session- oder Szenario-Logik zu verändern. |
-| Session | Ein einzelnes simuliertes Telefongespräch zwischen Nutzer und KI-Gesprächspartner, konfiguriert über Szenario, Persona und Sprache. Die Session ist die zentrale Trainings- und Auswertungseinheit, auf die sich das Feedback bezieht. |
-| Sprache | Eigenständiger, vom Nutzer wählbarer Session-Parameter, der festlegt, in welcher Sprache das Trainingsgespräch geführt wird. Die Sprache ist keine Eigenschaft einer einzelnen Persona. |
+| Session | Ein einzelnes simuliertes Telefongespräch zwischen Nutzer und KI-Gesprächspartner, konfiguriert über Szenario und Persona. Die Sprache ergibt sich aus der Persona und ist kein eigener Auswahlparameter. Die Session ist die zentrale Trainings- und Auswertungseinheit, auf die sich das Feedback bezieht. |
+| Sprache | Die Sprache, in der das Trainingsgespräch geführt wird. Sie ist eine Eigenschaft der Persona und wird mit deren Auswahl festgelegt (ADR 0043); Szenarien sind sprachneutral. Davon zu unterscheiden ist die Sprache der Prompt-Inhalte, die einheitlich Englisch ist. |
 | Szenario | Situativer Rahmen einer Session, also Anlass und beabsichtigter Verlauf des Gesprächs. Das Szenario ist unabhängig von der Persona konfigurierbar. |
