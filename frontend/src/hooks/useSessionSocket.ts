@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { currentAccessToken } from "../auth";
 import type { CallState, ClientMessage, ServerMessage, TurnRecord } from "../protocol";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "";
@@ -54,13 +55,22 @@ export function useSessionSocket({
     // "connection lost" message even though the real connection is fine.
     const isCurrent = () => wsRef.current === ws;
 
-    ws.onopen = () => {
+    ws.onopen = async () => {
       if (!isCurrent()) return;
+      const token = await currentAccessToken();
+      if (!isCurrent()) return;
+      if (!token) {
+        console.warn("[WS] no access token; closing");
+        ws.close();
+        setError("Sitzung abgelaufen. Bitte neu anmelden.");
+        return;
+      }
       console.debug("[WS] connected, sending session.start");
       const start: ClientMessage = {
         type: "session.start",
         persona_id: personaId,
         scenario_id: scenarioId,
+        token,
       };
       ws.send(JSON.stringify(start));
     };

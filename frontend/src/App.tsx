@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { apiFetch } from "./api";
 import CallView from "./components/CallView";
 import MicCheck from "./components/MicCheck";
 import TranscriptView from "./components/TranscriptView";
@@ -7,8 +8,6 @@ import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useSessionSocket } from "./hooks/useSessionSocket";
 import { useStreamedAudioPlayback } from "./hooks/useStreamedAudioPlayback";
 import type { TurnRecord } from "./protocol";
-
-const API_URL = import.meta.env.VITE_API_URL ?? "";
 
 interface Persona {
   id: string;
@@ -51,16 +50,14 @@ export default function App() {
   const [needsReconnect, setNeedsReconnect] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/personas`)
-      .then((r) => r.json())
-      .then((data: Persona[]) => {
+    apiFetch<Persona[]>("/api/personas")
+      .then((data) => {
         setPersonas(data);
         if (data.length > 0) setPersonaId(data[0].id);
       })
       .catch((e) => setLoadError(`Personas konnten nicht geladen werden: ${e.message}`));
-    fetch(`${API_URL}/api/scenarios`)
-      .then((r) => r.json())
-      .then((data: Scenario[]) => {
+    apiFetch<Scenario[]>("/api/scenarios")
+      .then((data) => {
         setScenarios(data);
         if (data.length > 0) setScenarioId(data[0].id);
       })

@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from backend.auth import AuthContext, authenticate_ws
 from backend.logging_config import reset_session_log, session_id_scope
 from backend.personas import PERSONAS, Persona
 from backend.scenarios import SCENARIOS, Scenario
@@ -29,13 +30,15 @@ async def session_ws(websocket: WebSocket) -> None:
     handshake = await _handshake(websocket)
     if handshake is None:
         return
-    persona, scenario = handshake
+    persona, scenario, auth = handshake
 
     session_id = str(uuid.uuid4())
     reset_session_log()
     with session_id_scope(session_id):
-        orchestrator = SessionOrchestrator(persona, scenario)
-        logger.info("Session started: persona=%s language=%s", persona.id, persona.language_id)
+        orchestrator = SessionOrchestrator(persona, scenario, subject_id=auth.sub)
+        logger.info(
+            "Session started: subject=%s persona=%s language=%s", auth.sub, persona.id, persona.language_id
+        )
 
         await websocket.send_json({"type": "session.started", "session_id": session_id})
 
@@ -65,9 +68,9 @@ async def session_ws(websocket: WebSocket) -> None:
         logger.info("Session ended (%s)", reason)
 
 
-async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
+async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario, AuthContext] | None:
     """Reads the required `session.start` message, closing the socket and
-    returning None on any malformed or unknown input."""
+    returning None on any malformed, unauthenticated or unknown input."""
     try:
         start = await websocket.receive_json()
     except WebSocketDisconnect:
@@ -76,6 +79,15 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
         logger.warning("Handshake failed: expected session.start, got %r", start.get("type"))
         # Protocol Error (1002; https://websocket.org/reference/close-codes/)
         await websocket.close(code=1002, reason="Expected session.start")
+        return None
+
+    # A browser can't set an Authorization header on a WebSocket, so the token
+    # rides in the handshake message (ADR 0009).
+    auth = authenticate_ws(start)
+    if auth is None:
+        logger.warning("Handshake failed: missing or invalid token")
+        # Policy Violation (1008; https://websocket.org/reference/close-codes/)
+        await websocket.close(code=1008, reason="Authentication required")
         return None
 
     persona_id = start.get("persona_id")
@@ -87,7 +99,7 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
         # Protocol Error (1002; https://websocket.org/reference/close-codes/)
         await websocket.close(code=1002, reason="Unknown persona_id/scenario_id")
         return None
-    return persona, scenario
+    return persona, scenario, auth
 
 
 async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) -> str:

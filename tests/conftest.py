@@ -26,15 +26,35 @@ os.environ.setdefault("KUGELAUDIO_MODEL", "test-kugelaudio-model")
 os.environ.setdefault("KUGELAUDIO_API_KEY", "test-kugelaudio-key")
 os.environ.setdefault("DEBUG", "true")
 os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
+os.environ.setdefault("OIDC_ISSUER", "http://keycloak.test.invalid/realms/direkt")
 
 import pytest  # noqa: E402
 from kugelaudio.exceptions import KugelAudioError  # noqa: E402
 from openai import OpenAIError  # noqa: E402
 
+from backend import auth  # noqa: E402
+from backend.app import app  # noqa: E402
 from backend.clients import llm, stt, tts  # noqa: E402
 from backend.personas import PERSONAS  # noqa: E402
 from backend.scenarios import SCENARIOS  # noqa: E402
 from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted  # noqa: E402
+
+# A fixed caller for tests that don't care about auth (most of them).
+TEST_AUTH = auth.AuthContext(sub="test-subject", roles=[], token="test-token")
+
+
+@pytest.fixture
+def auth_ctx():
+    return TEST_AUTH
+
+
+@pytest.fixture(autouse=True)
+def _override_auth():
+    """Every test runs as `TEST_AUTH` unless it clears the override itself
+    (see `test_setup_api.py`'s unauthenticated cases)."""
+    app.dependency_overrides[auth.require_user] = lambda: TEST_AUTH
+    yield
+    app.dependency_overrides.pop(auth.require_user, None)
 
 
 @pytest.fixture

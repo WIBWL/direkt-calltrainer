@@ -206,9 +206,13 @@ class SessionOrchestrator:
     """Owns one session's LLM message history and Turn-by-Turn Transcript;
     drives one STT -> LLM -> TTS pass per turn."""
 
-    def __init__(self, persona: Persona, scenario: Scenario):
+    def __init__(self, persona: Persona, scenario: Scenario, subject_id: str | None = None):
         self._language_id = persona.language_id
         self._voice = persona.voice
+        # The authenticated Keycloak `sub` (ADR 0009). Held for when ADR 0034's
+        # persist-at-session-end path lands — it becomes `session.subject_id`
+        # (ADR 0031). Unused until then.
+        self._subject_id = subject_id
         self._messages: list[dict[str, str]] = [
             {"role": "system", "content": _build_system_prompt(persona, scenario)},
         ]

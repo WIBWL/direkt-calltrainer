@@ -16,6 +16,9 @@ export interface SessionStartMessage {
   type: "session.start";
   persona_id: string;
   scenario_id: string;
+  // The Keycloak access token. A browser can't set an Authorization header on a
+  // WebSocket, so it travels in the handshake message (ADR 0009).
+  token: string;
 }
 
 export interface TurnAudioMetaMessage {

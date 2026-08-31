@@ -7,7 +7,8 @@ proper feature tests (and this guard removed).
                 into app.py / session_ws.py
   F-09 / F-10   AI-generated feedback + concrete suggestions: the async
                 worker of ADR 0018/0019 is not built
-  F-13 / F-48   progress history across sessions: needs auth (ADR 0009)
+  F-13 / F-48   progress history across sessions: auth (ADR 0009) is now built,
+                but persistence (ADR 0034) and per-user history are not
   F-53          evaluation dashboard: not built
   F-56          UI language switch (DE/EN): not built
   F-58 / F-34   user-authored / document-derived scenarios: not built

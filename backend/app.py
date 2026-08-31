@@ -6,11 +6,12 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.api.session_ws import router as session_ws_router
+from backend.auth import probe_realm, require_user
 from backend.clients import tts
 from backend.clients.health import check_backends
 from backend.logging_config import configure_logging
@@ -33,6 +34,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
         logger.error("Could not reach EFRE_URL (%s): %s — are you connected to the university network", efre_url, e)
     await check_backends()
     await tts.prewarm()
+    await probe_realm()
     yield
 
 
@@ -53,17 +55,19 @@ FRONTEND_DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "d
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    """Plain health check."""
+    """Plain health check — open, it's an infrastructure probe."""
     return {"status": "ok"}
 
 
-@app.get("/api/personas")
+# The setup lists require a valid Keycloak token (ADR 0009). The static SPA
+# mount below stays open so the login screen can load in the first place.
+@app.get("/api/personas", dependencies=[Depends(require_user)])
 def list_personas() -> list[dict[str, str]]:
     """List personas available for session setup."""
     return [{"id": p.id, "name": p.name, "role": p.role} for p in PERSONAS]
 
 
-@app.get("/api/scenarios")
+@app.get("/api/scenarios", dependencies=[Depends(require_user)])
 def list_scenarios() -> list[dict[str, str]]:
     """List scenarios available for session setup."""
     return [{"id": s.id, "name": s.name, "description": s.description} for s in SCENARIOS]
