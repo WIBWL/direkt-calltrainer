@@ -58,6 +58,7 @@ nav:
       - ADR 0041 - Personas and Scenarios Loaded from the Database: adr/0041-personas-scenarios-from-database.md
       - ADR 0042 - Opening Turn Pre-Warmed at Session Commitment: adr/0042-prewarm-opening-turn-at-commitment.md
       - ADR 0043 - English Prompt Content, Session Language Bound to the Persona: adr/0043-english-prompt-content-persona-bound-language.md
+      - ADR 0044 - Forward KugelAudio's Audio Sub-Chunks; No Persistent Streaming Session: adr/0044-streaming-tts-forward-subchunks.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
   # site is served at the root (mkdocs serve / mkdocs build + static server).

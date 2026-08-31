@@ -12,7 +12,6 @@ import asyncio
 
 import pytest
 
-from backend.clients import tts
 from backend.session.models import AudioChunk, StateChanged
 from backend.session.orchestrator import SessionOrchestrator
 from tests.conftest import collect
@@ -30,16 +29,10 @@ async def _drain_until(gen, predicate):
     return seen
 
 
-async def test_interrupt_before_any_audio_reopens_the_same_turn(persona, scenario, fake_pipeline, monkeypatch):
+async def test_interrupt_before_any_audio_reopens_the_same_turn(persona, scenario, fake_pipeline):
     """No audio was sent yet -> the turn stays open and the follow-up
     utterance is merged onto the same question."""
-    hang = asyncio.Event()
-
-    async def hanging_synthesize(_text, _voice, _language_id):
-        await hang.wait()
-        return b"AUDIO"
-
-    monkeypatch.setattr(tts, "synthesize", hanging_synthesize)
+    fake_pipeline.tts.hang = asyncio.Event()  # park synthesis so no audio is ever produced
 
     fake_pipeline.stt.transcripts = ["Erste Haelfte der Frage.", "Und jetzt der Rest davon."]
     fake_pipeline.llm.replies = ["Antwort die nie gehoert wird.", "Die richtige, vollstaendige Antwort."]
@@ -59,7 +52,7 @@ async def test_interrupt_before_any_audio_reopens_the_same_turn(persona, scenari
     assert orch.turns[0].user_text == "Erste Haelfte der Frage."
 
     # Continuation turn with a working synth.
-    monkeypatch.setattr(tts, "synthesize", fake_pipeline.tts.synthesize)
+    fake_pipeline.tts.hang = None
     events = await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
 
     assert len(orch.turns) == 1, "the continuation reuses the same turn"

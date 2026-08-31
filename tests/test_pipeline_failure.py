@@ -1,11 +1,13 @@
 """Pipeline fault tolerance.
 
 Covers ADR 0016 (one retry, then graceful end) as reinterpreted per leg by
-ADR 0033:
+ADR 0033 / ADR 0044:
   * STT: one retry; a second failure -> `stt_failed`, turn ends
   * LLM: retried only while nothing has been sent; -> `llm_failed`
-  * TTS: one retry per chunk; a second failure -> `tts_failed`
-A transient blip (one failure then success) is absorbed silently.
+  * TTS: KugelAudio failing before audio falls back to the EFRE model for that
+    chunk; if that also fails -> `tts_failed`. A failure *after* audio has been
+    sent ends the turn (a fresh synth would diverge from what was heard).
+A transient blip (one failure then a fallback covers it) is absorbed silently.
 """
 
 import pytest
@@ -77,16 +79,16 @@ async def test_persistent_tts_failure_ends_the_turn_with_tts_failed(orch, fake_p
     assert fail is not None and fail.code == "tts_failed"
 
 
-async def test_transient_tts_failure_is_retried_per_chunk(orch, fake_pipeline):
+async def test_transient_tts_failure_falls_back_and_is_absorbed(orch, fake_pipeline):
     fake_pipeline.stt.transcripts = ["Sagen Sie etwas."]
     fake_pipeline.llm.replies = ["Kurze Antwort."]
-    fake_pipeline.tts.fail_times = 1  # first synth call fails, retry succeeds
+    fake_pipeline.tts.fail_times = 1  # KugelAudio blips once; the EFRE fallback covers it
 
     events = await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
 
     assert failure(events) is None
     assert audio_chunks(events)
-    assert len(fake_pipeline.tts.calls) == 2
+    assert len(fake_pipeline.tts.calls) == 2  # one failed attempt + the fallback
 
 
 def test_wire_error_codes_are_the_three_known_legs():

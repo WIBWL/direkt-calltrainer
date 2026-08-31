@@ -47,5 +47,6 @@ Sie sind in der Leitung. Wählen Sie eine Option:
 - [ADR 0034 — Session Data Persisted in the MVP, Written Once at Session End](adr/0034-persist-session-data-at-session-end.md)
 - [ADR 0041 — Personas and Scenarios Loaded from the Database](adr/0041-personas-scenarios-from-database.md)
 - [ADR 0043 — English Prompt Content, Session Language Bound to the Persona](adr/0043-english-prompt-content-persona-bound-language.md)
+- [ADR 0044 — Forward KugelAudio's Audio Sub-Chunks; No Persistent Streaming Session](adr/0044-streaming-tts-forward-subchunks.md)
 
 *Vielen Dank für Ihren Anruf. Bitte legen Sie nach der Lektüre nicht auf — es warten noch mehr ADRs auf Sie.*
