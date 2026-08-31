@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (extends ADR 0001; builds on ADR 0041 and ADR 0043)
+Accepted (extends ADR 0001; builds on ADR 0041 and ADR 0043)
 
 ## Context
 
