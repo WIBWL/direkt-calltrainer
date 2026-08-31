@@ -77,9 +77,20 @@ class Szenario(Base):
     # in the UI language. Deliberately short — it is read at a glance, not by
     # the model.
     kurzbeschreibung: Mapped[str] = mapped_column(String(240))
-    # Prompt field: the English call context handed to the model (ADR 0043).
-    # Scenarios carry no language of their own; the Persona decides that.
+    # Prompt fields: English, handed to the model (ADR 0043). Scenarios carry
+    # no language of their own; the Persona decides that.
+    #
+    # `beschreibung` is the situation alone. The three below carry the case
+    # (ADR 0045): what is true of it, what the caller wants, and when the
+    # caller considers the matter settled. They are about the *case*, never
+    # about the caller -- that is what lets any Persona run any Scenario
+    # (ADR 0001, ADR 0015). All three may be empty: a Scenario without them
+    # falls back to the improvisation the frame asked for before, which is
+    # what the user-authored Scenarios of ADR 0024 will need.
     beschreibung: Mapped[str] = mapped_column(Text)
+    fallfakten: Mapped[str] = mapped_column(Text)
+    anrufziel: Mapped[str] = mapped_column(Text)
+    erfolgsbedingung: Mapped[str] = mapped_column(Text)
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="szenario")
 

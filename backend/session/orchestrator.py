@@ -43,6 +43,69 @@ def _opening_instruction(pack: LanguagePack) -> str:
     )
 
 
+def _case_block(scenario: Scenario) -> str:
+    """The case the Scenario carries (ADR 0045), or nothing.
+
+    Each of the three is optional on its own: a Scenario predating ADR 0045,
+    or a user-authored one (ADR 0024), can leave any of them blank, and an
+    empty field must not produce a dangling heading."""
+    parts = []
+    if scenario.case_facts:
+        parts.append(f"Facts of the case: {scenario.case_facts}")
+    if scenario.call_goal:
+        parts.append(f"What you want from this call: {scenario.call_goal}")
+    if scenario.success_condition:
+        parts.append(
+            f"You consider the matter settled when: {scenario.success_condition}"
+        )
+    return "".join(f"{part}\n" for part in parts)
+
+
+def _objections_block(persona: Persona) -> str:
+    """The Persona's typical objections (R-12, ADR 0045), or nothing.
+
+    Framed as a repertoire rather than an agenda: the same model that copied a
+    single opening example into every call will work a list through end to end
+    if it is handed one."""
+    if not persona.objections:
+        return ""
+    listed = "; ".join(persona.objections)
+    return (
+        f"Objections you tend to raise: {listed}. These are the shapes your "
+        "pushback takes, not lines to recite — put them in your own words, and "
+        "only where the conversation actually gives you the opening. Raise at "
+        "most one per reply, never work through them as a list, and drop the "
+        "ones the user has already answered.\n"
+    )
+
+
+def _improvisation_rule(scenario: Scenario) -> str:
+    """How much the Persona may make up.
+
+    With a case (ADR 0045) improvisation is bounded: fill the gaps the facts
+    leave, never overwrite them. Without one the Scenario has nothing to point
+    at, so the original instruction stands."""
+    if scenario.case_facts:
+        return (
+            "Stay in character and improvise like a real person on a real "
+            "call, but use the facts of the case above as given: quote them "
+            "when you are asked, invent only what they leave open — a name, a "
+            "date, a detail nobody has pinned down — and never contradict "
+            "them or replace a figure they already state. Do not recite them "
+            "unprompted either; they are what you know, not what you came to "
+            "read out.\n"
+        )
+    return (
+        "Stay in character and improvise like a real person on a real call: "
+        "when asked for specifics (e.g. \"which points were still open?\", "
+        "\"what do you offer?\", \"why would that help me?\"), invent "
+        "concrete, plausible details on the spot — a product name, a "
+        "number, a prior concern — instead of staying vague or deflecting. "
+        "This is a live conversation, not a scripted FAQ; ground your "
+        "answers in believable specifics that fit the context.\n"
+    )
+
+
 def _build_system_prompt(persona: Persona, scenario: Scenario, pack: LanguagePack) -> str:
     """Builds the LLM system prompt.
 
@@ -58,18 +121,14 @@ def _build_system_prompt(persona: Persona, scenario: Scenario, pack: LanguagePac
         "problem is, and never wait for them to explain why they're "
         "calling — you're the one with something to discuss.\n"
         f"Context of the call: {scenario.description}\n"
+        f"{_case_block(scenario)}"
         f"Your name: {persona.name}. Introduce yourself by that name and "
         "use it whenever you say who you are — never invent a different one.\n"
         f"Your role: {persona.role}.\n"
         f"Character traits: {persona.traits}.\n"
         f"Behavior: {persona.behavior}.\n"
-        "Stay in character and improvise like a real person on a real call: "
-        "when asked for specifics (e.g. \"which points were still open?\", "
-        "\"what do you offer?\", \"why would that help me?\"), invent "
-        "concrete, plausible details on the spot — a product name, a "
-        "number, a prior concern — instead of staying vague or deflecting. "
-        "This is a live conversation, not a scripted FAQ; ground your "
-        "answers in believable specifics that fit the context.\n"
+        f"{_objections_block(persona)}"
+        f"{_improvisation_rule(scenario)}"
         "Never repeat yourself. This is the single most common mistake to "
         "avoid: before every reply, re-read your own previous lines in "
         "this call and check whether you are about to say the same thing "

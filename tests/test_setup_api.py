@@ -90,6 +90,18 @@ async def test_scenarios_endpoint_withholds_the_english_call_context(client):
         assert "description" not in entry
 
 
+async def test_scenarios_endpoint_withholds_the_case(client):
+    """ADR 0045: the case facts, the call goal and the success condition are
+    prompt input. Serving them would hand the user the answer key to the
+    exercise they are about to practise."""
+    body = (await client.get("/api/scenarios")).json()
+    for entry in body:
+        assert set(entry) == {"id", "name", "short_description"}
+        assert "case_facts" not in entry
+        assert "call_goal" not in entry
+        assert "success_condition" not in entry
+
+
 async def test_persona_and_scenario_are_chosen_independently(client):
     """ADR 0001: any persona can run any scenario — the two lists carry no
     cross-reference or compatibility filter."""

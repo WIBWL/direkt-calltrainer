@@ -8,6 +8,10 @@ Two kinds of text hang off a Persona (ADR 0043): the prompt fields the model
 reads, which are English, and the display fields the setup UI shows, which are
 in the UI language. `language_id` names neither of those — it is the language
 the Persona actually speaks in.
+
+A Persona carries the *manner* and nothing about the situation (ADR 0045):
+how it conducts itself, and the objections it tends to raise. What the call is
+about belongs to the Scenario.
 """
 from dataclasses import dataclass
 
@@ -31,3 +35,9 @@ class Persona:
     role: str
     traits: str
     behavior: str
+    # The objections this Persona tends to raise (R-12, ADR 0045). Ordered,
+    # English, and phrased as moves rather than as quotable lines: the model
+    # reuses quoted examples verbatim, and `persona_einwand` has no language
+    # column while a Persona's language is fixed. A tuple because the Persona
+    # is frozen.
+    objections: tuple[str, ...] = ()

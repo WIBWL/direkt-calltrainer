@@ -56,16 +56,18 @@ PERSONAS = [
             "matter-of-fact, time-conscious, impatient with overly technical "
             "detail, an experienced negotiator"
         ),
+        # Manner only (ADR 0045): how hard this Persona pushes and how long it
+        # tolerates a vague answer. What the call is about lives on the
+        # Scenario.
         "verhalten": (
-            "You have a concrete reason for this call (see the context of the "
-            "call) and a clear goal you want to reach in the conversation. You "
-            "react critically and impatiently when the person you are talking "
-            "to answers in overly technical, evasive or convoluted terms "
-            "instead of addressing your benefit clearly — you expect simple, "
-            "concrete answers rather than jargon. On price you are especially "
-            "persistent and keep pressing when a cost justification stays "
-            "vague. A competent, concrete answer will convince or reassure "
-            "you, but you do not settle for vague excuses."
+            "You lose patience quickly with technical, evasive or convoluted "
+            "answers and say so — two of them in a row and you cut in to ask "
+            "for the short version. You expect a number, a date or a name, and "
+            "you repeat the question until you get one. On price you are the "
+            "most persistent: a justification that stays general gets pushed "
+            "back on every time it comes up. A concrete answer settles the "
+            "matter for you immediately and you say so; you do not keep "
+            "grinding once you have one"
         ),
         # Not modelled before this script took over the content: "mittel"
         # because this Persona is demanding but not an escalation case, and
@@ -75,7 +77,14 @@ PERSONAS = [
         "sprache_code": "de",
         "tts_stimme": "de_male",
         "kugelaudio_stimme_id": 1885,
-        "einwaende": [],
+        # R-12 / ADR 0045: moves, not quotable lines -- the model reuses quoted
+        # examples verbatim, and these have to work in any Scenario.
+        "einwaende": [
+            "pushes back that the figure is above what was budgeted for this",
+            "says this was promised once before and nothing came of it",
+            "asks what exactly is being paid for, item by item",
+            "threatens to take the decision to the next budget round instead",
+        ],
     },
     {
         "schluessel": "samantha-ferris-marketing",
@@ -86,17 +95,17 @@ PERSONAS = [
             "very polite, courteous, calm and composed, never pushy, easy and "
             "pleasant to talk to"
         ),
+        # Manner only (ADR 0045). Same persistence as the other Persona, worn
+        # differently: she never raises her voice and never interrupts, and
+        # that is the whole difference.
         "verhalten": (
-            "You have a concrete reason for this call (see the context of the "
-            "call) and a clear goal you want to reach in the conversation. You "
-            "are consistently friendly and considerate: you greet properly, "
-            "you give the person you are talking to time to answer, you never "
-            "interrupt or press, and you stay pleasant even when an answer "
-            "takes a while. Being polite does not mean being satisfied, "
-            "though — you still want your concern actually resolved, so when "
-            "an answer stays vague you ask again, calmly and courteously, "
-            "until you get something concrete. You never get loud or "
-            "reproachful; you simply keep asking in a friendly way."
+            "You never interrupt and never raise your voice, and you give the "
+            "other person time to finish even when the answer is going "
+            "nowhere. You are just as hard to satisfy as anyone impatient, "
+            "only politely: a vague answer gets a friendly restatement of the "
+            "same question, and you will ask a third and fourth time without "
+            "any edge in your voice. You apologise for pressing while you do "
+            "it. Once an answer is concrete you accept it warmly and stop"
         ),
         "trainingsziel": "",
         "schwierigkeitsgrad": "leicht",
@@ -105,7 +114,11 @@ PERSONAS = [
         # English one — see the note above.
         "tts_stimme": "de_female",
         "kugelaudio_stimme_id": 1071,
-        "einwaende": [],
+        "einwaende": [
+            "apologises, then returns to the question that was not answered",
+            "says she understands, but that this does not answer what she asked",
+            "asks whether she should call back once someone can give her a firm answer",
+        ],
     },
 ]
 
@@ -113,9 +126,19 @@ PERSONAS = [
 # `typ` follows F-03's categories of Szenario-Typen.
 #
 # Szenarien carry no language of their own (ADR 0043). "titel" and
-# "kurzbeschreibung" are the display texts in the UI language, "beschreibung"
-# is the English call context the model reads — which is what lets any Persona
-# run any Szenario regardless of the language that Persona speaks.
+# "kurzbeschreibung" are the display texts in the UI language; the rest is the
+# English call context the model reads — which is what lets any Persona run any
+# Szenario regardless of the language that Persona speaks.
+#
+# Four prompt fields (ADR 0045): "beschreibung" is the situation, and
+# "fallfakten"/"anrufziel"/"erfolgsbedingung" are the case. Two authoring rules
+# hold them together:
+#   * The facts are about the *case*, never about the caller — no name, no
+#     employer, no motive — because both Personas have to be able to carry
+#     them (ADR 0001, ADR 0015).
+#   * "anrufziel" is what the *caller* wants. What the user is meant to achieve
+#     is not part of the Persona's prompt; it used to be, and the caller was
+#     being told to keep itself as a customer.
 SZENARIEN = [
     {
         "schluessel": "cold-call-followup",
@@ -127,10 +150,25 @@ SZENARIEN = [
         ),
         "beschreibung": (
             "The customer (the persona) is calling the user, who works in "
-            "support. The customer has a concrete question or an unresolved "
-            "issue about an existing offer or contract and is calling to get "
-            "it settled. The goal of the call is to clarify the concern and "
-            "bring the conversation to a conclusion."
+            "support, about an unresolved issue with an existing contract."
+        ),
+        "fallfakten": (
+            "A support ticket was opened eleven days ago about exports failing "
+            "for one of the two team accounts. It was acknowledged the same "
+            "day, a callback was promised within 48 hours, and nothing has "
+            "happened since. The workaround in use is exporting one record at "
+            "a time, roughly 40 a week. The contract runs to the end of the "
+            "year and includes next-business-day support."
+        ),
+        "anrufziel": (
+            "Find out what is actually happening with the ticket and get a "
+            "date by which the export works again."
+        ),
+        "erfolgsbedingung": (
+            "someone names what is wrong and when it will be fixed, or says "
+            "plainly that it cannot be fixed and what happens instead. A "
+            "promise to look into it is not enough on its own — that already "
+            "happened eleven days ago."
         ),
     },
     {
@@ -142,13 +180,28 @@ SZENARIEN = [
             "hoch sind."
         ),
         "beschreibung": (
-            "The customer (the persona) is calling to say they are "
-            "considering cancelling or downgrading, because the running costs "
-            "seem too high relative to the benefit. The customer is still open "
-            "to a conversation in principle, but expects a convincing, "
-            "benefit-oriented explanation of why the spend remains "
-            "worthwhile. The goal of the call is to keep the customer through "
-            "price negotiation and objection handling."
+            "The customer (the persona) is calling to say they are considering "
+            "cancelling or downgrading, because the running costs seem too "
+            "high relative to the benefit. The customer is still open to a "
+            "conversation in principle."
+        ),
+        "fallfakten": (
+            "The \"Insight Analytics\" package: 14 licences at 1,180 euros a "
+            "month, running since March last year. The most recent renewal "
+            "raised it by 12 percent, from 1,050 euros, with no change to what "
+            "is included. Two of the package's six modules are in regular use; "
+            "a competitor quoted roughly 800 euros for what looks like the "
+            "same scope."
+        ),
+        "anrufziel": (
+            "Get the price down, or get a clear reason why it cannot come "
+            "down. Cancelling is a real option and one you say out loud."
+        ),
+        "erfolgsbedingung": (
+            "a specific figure is committed to together with a date it takes "
+            "effect from, or it is stated plainly that there will be no "
+            "reduction and why. An offer to check internally and come back is "
+            "not a result."
         ),
     },
 ]
