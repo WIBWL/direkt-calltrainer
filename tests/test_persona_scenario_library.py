@@ -1,82 +1,189 @@
-"""The persona and scenario libraries themselves (the data, not the endpoint).
+"""The Persona and Scenario library: the mapping, and the seeded content.
+
+Since ADR 0041 the library is database-backed, so there are two separate
+things to check and this module keeps them apart:
+
+  * `backend/library.py` maps a database row onto the frozen value object the
+    rest of the backend passes around. Tested on rows built in memory — no
+    database, per this suite's no-infrastructure rule.
+  * `scripts/seed_reference_data.py` carries the library's initial content
+    (ADR 0041), so the requirements about *what* the library covers are
+    asserted against the seed data, which is importable without a database.
 
 Covers:
   F-04  Kundenpersona-Bibliothek  (extensible; cost-critical customers,
         managing directors / IT leads focused on strategy & budget)
   F-03  Szenario-Typen  (support cases, pricing/offer talks, ...)
   F-01  the counterpart reflects conversational dynamics, not just facts
-  ADR 0006 / R-35  German only for the MVP
-  ADR 0022  language is a per-persona parameter, not a global setting
+  R-07  cost-critical customer   R-08  budget-focused decision maker
+  R-09  support + consulting     R-10  offer/price negotiation
+  ADR 0041  Personas and Scenarios are loaded from the database
+  ADR 0043  prompt fields are English, display fields are in the UI language;
+            a Persona's language is its own, a Scenario carries none
 """
 
 import pytest
 
-from backend.personas import PERSONAS, Persona, PersonaVoice
-from backend.scenarios import SCENARIOS, Scenario
+from backend.db import models
+from backend.library import _to_persona, _to_scenario
+from backend.personas import Persona, PersonaVoice
+from backend.scenarios import Scenario
+from backend.session.language_packs import LANGUAGE_PACKS
+from tests.conftest import load_seed_module
 
-# pylint: disable=missing-function-docstring
+# _to_persona/_to_scenario are the mapping this module is about.
+# pylint: disable=missing-function-docstring,protected-access
 
-
-def test_persona_library_is_non_empty_and_well_formed():
-    assert PERSONAS, "F-04: the library ships at least one persona"
-    for p in PERSONAS:
-        assert isinstance(p, Persona)
-        assert p.id and p.name and p.role
-        assert p.traits, "F-01: a persona carries character traits"
-        assert p.behavior, "F-01: a persona carries a behaviour description"
-        assert isinstance(p.voice, PersonaVoice)
+SEED = load_seed_module()
 
 
-def test_persona_ids_are_unique():
-    ids = [p.id for p in PERSONAS]
-    assert len(ids) == len(set(ids))
+# --- the mapping: database row -> value object --------------------------
 
 
-def test_library_covers_the_budget_focused_decision_maker_persona():
+def _persona_row(**overrides):
+    fields = {
+        "schluessel": "row-persona",
+        "name": "Thomas Brandt",
+        "rolle_anzeige": "Geschäftsführer, Fokus auf Strategie & Budget",
+        "rolle": "Managing director of a mid-sized company",
+        "haltung": "matter-of-fact, time-conscious",
+        "verhalten": "You press for concrete answers.",
+        "trainingsziel": "",
+        "schwierigkeitsgrad": "mittel",
+        "sprache_code": "de",
+        "tts_stimme": "de_male",
+        "kugelaudio_stimme_id": 1885,
+        "aktiv": True,
+        "sprache": models.Sprache(sprache_code="de", bezeichnung="Deutsch"),
+    }
+    return models.Persona(**{**fields, **overrides})
+
+
+def test_persona_row_maps_onto_the_value_object():
+    """ADR 0041: the German column names stop at `library.py`; callers get a
+    plain dataclass."""
+    persona = _to_persona(_persona_row())
+    assert isinstance(persona, Persona)
+    assert persona.id == "row-persona"
+    assert persona.name == "Thomas Brandt"
+    assert persona.role == "Managing director of a mid-sized company"
+    assert persona.traits == "matter-of-fact, time-conscious"
+    assert persona.behavior == "You press for concrete answers."
+
+
+def test_persona_mapping_keeps_display_and_prompt_fields_apart():
+    """ADR 0043: `rolle_anzeige` is the card's label, `rolle` is prompt input.
+    One column each, and they must not be swapped."""
+    persona = _to_persona(_persona_row())
+    assert persona.role_label == "Geschäftsführer, Fokus auf Strategie & Budget"
+    assert persona.role != persona.role_label
+
+
+def test_persona_mapping_carries_language_and_both_voices():
+    """ADR 0041/0043: the language is the Persona's own, and it names a voice
+    for each TTS backend (ADR 0040: KugelAudio default, EFRE fallback)."""
+    persona = _to_persona(_persona_row())
+    assert persona.language_id == "de"
+    assert persona.language_name == "Deutsch"
+    assert isinstance(persona.voice, PersonaVoice)
+    assert persona.voice.tts_voice == "de_male"
+    assert persona.voice.kugelaudio_voice_id == 1885
+
+
+def test_scenario_row_maps_onto_the_value_object():
+    """ADR 0043: `kurzbeschreibung` is the teaser shown, `beschreibung` the
+    English call context the model reads."""
+    scenario = _to_scenario(
+        models.Szenario(
+            schluessel="row-scenario",
+            typ="Angebots- und Preisgespräch",
+            titel="Kündigungsabsicht wegen Preis",
+            kurzbeschreibung="Der Kunde erwägt zu kündigen.",
+            beschreibung="The customer is calling to say they are considering cancelling.",
+        )
+    )
+    assert isinstance(scenario, Scenario)
+    assert scenario.id == "row-scenario"
+    assert scenario.name == "Kündigungsabsicht wegen Preis"
+    assert scenario.short_description == "Der Kunde erwägt zu kündigen."
+    assert scenario.description.startswith("The customer")
+
+
+# --- the seeded content -------------------------------------------------
+
+
+def test_seeded_persona_library_is_non_empty_and_well_formed():
+    assert SEED.PERSONAS, "F-04: the library ships at least one persona"
+    for entry in SEED.PERSONAS:
+        assert entry["schluessel"] and entry["name"]
+        assert entry["rolle"], "F-04: a persona carries a role"
+        assert entry["rolle_anzeige"], "ADR 0043: and a label to show on the card"
+        assert entry["haltung"], "F-01: a persona carries character traits"
+        assert entry["verhalten"], "F-01: a persona carries a behaviour description"
+
+
+def test_seeded_persona_keys_are_unique():
+    keys = [p["schluessel"] for p in SEED.PERSONAS]
+    assert len(keys) == len(set(keys))
+
+
+def test_seeded_library_covers_the_budget_focused_decision_maker():
     """F-04 / R-08: a managing director or IT lead with a strategy & budget
-    focus is representable."""
-    joined = " ".join(f"{p.role} {p.traits} {p.behavior}".lower() for p in PERSONAS)
-    assert "geschäftsführer" in joined or "it-leiter" in joined
-    assert "budget" in joined or "strategie" in joined
+    focus is representable. Asserted in English — ADR 0043 moved the prompt
+    fields off German."""
+    joined = " ".join(
+        f"{p['rolle']} {p['haltung']} {p['verhalten']}".lower() for p in SEED.PERSONAS
+    )
+    assert "managing director" in joined or "it lead" in joined
+    assert "budget" in joined or "strategy" in joined
 
 
-def test_persona_behaviour_encodes_price_pushback():
+def test_seeded_persona_behaviour_encodes_price_pushback():
     """F-04 / R-07: a cost-critical counterpart that presses on price."""
-    joined = " ".join(p.behavior.lower() for p in PERSONAS)
-    assert "preis" in joined
+    joined = " ".join(p["verhalten"].lower() for p in SEED.PERSONAS)
+    assert "price" in joined
 
 
-def test_scenario_library_is_non_empty_and_well_formed():
-    assert SCENARIOS, "F-03: the library ships at least one scenario"
-    for s in SCENARIOS:
-        assert isinstance(s, Scenario)
-        assert s.id and s.name
-        assert len(s.description) > 40
+def test_seeded_scenario_library_is_non_empty_and_well_formed():
+    assert SEED.SZENARIEN, "F-03: the library ships at least one scenario"
+    for entry in SEED.SZENARIEN:
+        assert entry["schluessel"] and entry["titel"] and entry["typ"]
+        assert entry["kurzbeschreibung"], "ADR 0043: the card shows a teaser"
+        assert len(entry["beschreibung"]) > 40, "the model gets a real call context"
 
 
-def test_scenario_ids_are_unique():
-    ids = [s.id for s in SCENARIOS]
-    assert len(ids) == len(set(ids))
+def test_seeded_scenario_keys_are_unique():
+    keys = [s["schluessel"] for s in SEED.SZENARIEN]
+    assert len(keys) == len(set(keys))
 
 
-def test_scenarios_cover_support_and_pricing_contexts():
+def test_seeded_scenarios_cover_support_and_pricing_contexts():
     """F-03 / R-09 / R-10: at least a support-style case and a
     price/cancellation negotiation are trainable."""
-    blob = " ".join(f"{s.name} {s.description}".lower() for s in SCENARIOS)
+    blob = " ".join(f"{s['titel']} {s['beschreibung']}".lower() for s in SEED.SZENARIEN)
     assert "support" in blob
-    assert "kündigung" in blob or "preis" in blob
+    assert "cancel" in blob or "price" in blob
 
 
-@pytest.mark.parametrize("persona", PERSONAS, ids=lambda p: p.id)
-def test_every_persona_is_german(persona):
-    """ADR 0006 / R-35: German is the only supported session language for the
-    MVP, so every persona is pinned to 'de'."""
-    assert persona.language_id == "de"
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["schluessel"])
+def test_every_seeded_persona_speaks_a_language_that_has_a_pack(entry):
+    """ADR 0043: a Persona's `sprache_code` decides the spoken language, and
+    `get_pack` raises for one without a pack — a configuration error that
+    would only surface once a Session starts."""
+    assert entry["sprache_code"] in LANGUAGE_PACKS
 
 
-@pytest.mark.parametrize("persona", PERSONAS, ids=lambda p: p.id)
-def test_every_persona_has_its_own_voice(persona):
-    """ADR 0022: voice/language is a per-persona property. Each persona names
-    both an EFRE fallback voice and a KugelAudio voice id."""
-    assert persona.voice.tts_voice
-    assert isinstance(persona.voice.kugelaudio_voice_id, int)
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["schluessel"])
+def test_every_seeded_persona_has_its_own_voice(entry):
+    """ADR 0040/0041: voice is a per-Persona property, and both backends need
+    an identity — KugelAudio by default, the EFRE model as fallback."""
+    assert entry["tts_stimme"]
+    assert isinstance(entry["kugelaudio_stimme_id"], int)
+
+
+def test_seeded_scenarios_carry_no_language_of_their_own():
+    """ADR 0043: Scenarios stay language-neutral, which is what keeps every
+    Persona x Scenario pairing valid (ADR 0001, ADR 0015)."""
+    for entry in SEED.SZENARIEN:
+        assert "sprache_code" not in entry
+        assert "sprache" not in entry

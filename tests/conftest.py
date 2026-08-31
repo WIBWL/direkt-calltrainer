@@ -15,7 +15,10 @@ covered in `test_tts_fallback.py` by patching the tts module directly.
 # pylint: disable=wrong-import-position,missing-function-docstring
 # pylint: disable=too-few-public-methods,redefined-outer-name
 
+import importlib.util
 import os
+import sys
+from pathlib import Path
 
 os.environ.setdefault("EFRE_URL", "http://efre.test.invalid")
 os.environ.setdefault("EFRE_API_KEY", "test-efre-key")
@@ -31,20 +34,106 @@ import pytest  # noqa: E402
 from kugelaudio.exceptions import KugelAudioError  # noqa: E402
 from openai import OpenAIError  # noqa: E402
 
+from backend import library  # noqa: E402
 from backend.clients import llm, stt, tts  # noqa: E402
-from backend.personas import PERSONAS  # noqa: E402
-from backend.scenarios import SCENARIOS  # noqa: E402
+from backend.personas import Persona, PersonaVoice  # noqa: E402
+from backend.scenarios import Scenario  # noqa: E402
 from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted  # noqa: E402
+
+# Personas and Scenarios live in the database since ADR 0041, so the suite can
+# no longer import a hardcoded library -- and must not need a database to run.
+# These are test doubles: value objects of the same shape, owned by the suite.
+# Whether the *seeded* content is any good is a separate question, checked in
+# test_persona_scenario_library.py against the seed script.
+TEST_PERSONAS = [
+    Persona(
+        id="test-persona-de",
+        name="Thomas Brandt",
+        language_id="de",
+        language_name="Deutsch",
+        voice=PersonaVoice(tts_voice="de_male", kugelaudio_voice_id=1885),
+        role_label="Geschäftsführer, Fokus auf Strategie & Budget",
+        role="Managing director of a mid-sized company, focused on strategy and budget",
+        traits="matter-of-fact, time-conscious, an experienced negotiator",
+        behavior="You press for concrete answers and never settle for a vague one.",
+    ),
+    Persona(
+        id="test-persona-en",
+        name="Samantha Ferris",
+        language_id="en",
+        language_name="Englisch",
+        voice=PersonaVoice(tts_voice="de_female", kugelaudio_voice_id=1071),
+        role_label="Marketing-Managerin bei einem Kundenunternehmen",
+        role="Marketing manager at a company that is a customer of the user's",
+        traits="very polite, calm and composed, never pushy",
+        behavior="You stay friendly throughout, but keep asking until an answer is concrete.",
+    ),
+]
+
+TEST_SCENARIOS = [
+    Scenario(
+        id="test-scenario-support",
+        name="Offenes Anliegen zu bestehendem Vertrag",
+        short_description="Der Kunde ruft mit einer offenen Frage zu einem bestehenden Vertrag an.",
+        description=(
+            "The customer (the persona) is calling the user, who works in support, "
+            "about an unresolved issue with an existing contract."
+        ),
+    ),
+    Scenario(
+        id="test-scenario-price",
+        name="Kündigungsabsicht wegen Preis",
+        short_description="Der Kunde erwägt zu kündigen, weil ihm die Kosten zu hoch sind.",
+        description=(
+            "The customer (the persona) is calling to say they are considering "
+            "cancelling, because the running costs seem too high for the benefit."
+        ),
+    ),
+]
+
+
+REPO = Path(__file__).resolve().parent.parent
+
+
+def load_seed_module():
+    """Import `scripts/seed_reference_data.py`, which is a script, not a
+    package. ADR 0041 makes it the source of the library's initial content, so
+    tests about *what* the library ships read it from here. It only touches the
+    environment inside `main()`, so importing it needs no database and no
+    `.env`."""
+    path = REPO / "scripts" / "seed_reference_data.py"
+    spec = importlib.util.spec_from_file_location("seed_reference_data", path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 @pytest.fixture
 def persona():
-    return PERSONAS[0]
+    return TEST_PERSONAS[0]
 
 
 @pytest.fixture
 def scenario():
-    return SCENARIOS[0]
+    return TEST_SCENARIOS[0]
+
+
+@pytest.fixture
+def fake_library(monkeypatch):
+    """Serve the test doubles in place of the database-backed library.
+
+    ADR 0041 put the database on the Session's start path, so anything that
+    goes through `/api/personas` or the `/ws/session` handshake would otherwise
+    need one. Patched on the `library` module itself, which is how both call
+    sites look the functions up."""
+    by_id = {p.id: p for p in TEST_PERSONAS}
+    by_key = {s.id: s for s in TEST_SCENARIOS}
+    monkeypatch.setattr(library, "list_personas", lambda: list(TEST_PERSONAS))
+    monkeypatch.setattr(library, "list_scenarios", lambda: list(TEST_SCENARIOS))
+    monkeypatch.setattr(library, "get_persona", by_id.get)
+    monkeypatch.setattr(library, "get_scenario", by_key.get)
+    return library
 
 
 class FakeLLM:

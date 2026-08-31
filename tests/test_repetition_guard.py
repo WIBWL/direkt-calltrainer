@@ -5,17 +5,18 @@ Covers ADR 0038:
     sentence within itself, is treated as "the model has nothing left to
     say" and ends the call
   * on a backstopped ending (repetition, or an unprompted [CALL_END] that
-    was never nudged) a fixed German sign-off is synthesised and appended
+    was never nudged) a fixed sign-off is synthesised and appended -- taken
+    from the Persona's language pack since ADR 0043, because it is spoken
+    aloud and so cannot follow the prompt frame into English
 """
 
 import pytest
 
-from backend.session.orchestrator import (
-    _FALLBACK_CLOSING_LINE,
-    SessionOrchestrator,
-    _has_repeated_sentence,
-)
+from backend.session.language_packs import get_pack
+from backend.session.orchestrator import SessionOrchestrator, _has_repeated_sentence
 from tests.conftest import audio_chunks, collect, completed, states
+
+FALLBACK_LINE = get_pack("de").fallback_closing_line
 
 # pylint: disable=missing-function-docstring
 
@@ -57,9 +58,9 @@ async def test_backstopped_ending_appends_the_fixed_closing_line(persona, scenar
     events = await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
 
     assert completed(events).ends_call is True
-    assert _FALLBACK_CLOSING_LINE in orch.turns[-1].persona_text
+    assert FALLBACK_LINE in orch.turns[-1].persona_text
     # the fixed line was actually synthesised, not just appended to text
-    assert any(_FALLBACK_CLOSING_LINE.encode("utf-8") in c.audio for c in audio_chunks(events))
+    assert any(FALLBACK_LINE.encode("utf-8") in c.audio for c in audio_chunks(events))
 
 
 async def test_nudged_ending_trusts_the_models_own_goodbye(persona, scenario, fake_pipeline):
@@ -72,4 +73,4 @@ async def test_nudged_ending_trusts_the_models_own_goodbye(persona, scenario, fa
     events = await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
 
     assert completed(events).ends_call is True
-    assert _FALLBACK_CLOSING_LINE not in orch.turns[-1].persona_text
+    assert FALLBACK_LINE not in orch.turns[-1].persona_text

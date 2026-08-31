@@ -11,6 +11,10 @@ proper feature tests (and this guard removed).
   F-53          evaluation dashboard: not built
   F-56          UI language switch (DE/EN): not built
   F-58 / F-34   user-authored / document-derived scenarios: not built
+  R-12          spontaneous objections: `persona_einwand` exists (ADR 0026)
+                but is seeded empty and never read -- ADR 0045 closes this
+  ADR 0045      the Scenario carries no case facts, call goal or success
+                condition yet
 """
 
 from pathlib import Path
@@ -18,6 +22,8 @@ from pathlib import Path
 import pytest
 
 from backend.app import app
+from backend.db import models
+from tests.conftest import load_seed_module
 
 # pylint: disable=missing-function-docstring
 
@@ -53,22 +59,27 @@ def test_no_rq_or_redis_worker_is_configured():
     assert "redis" not in reqs
 
 
-def test_only_german_is_supported():
-    """ADR 0006: English was removed, not hidden. No language map beyond 'de'."""
+def test_personas_carry_no_objections_yet():
+    """R-12 / ADR 0045: `persona_einwand` has existed since ADR 0026, but every
+    seeded Persona gets an empty list and `library.py` never loads the
+    relation, so no objection can reach a call."""
+    seed = load_seed_module()
+    assert seed.PERSONAS, "the seed ships personas at all"
+    assert all(entry["einwaende"] == [] for entry in seed.PERSONAS)
+    assert "einwaende" not in _read("backend/library.py")
+
+
+def test_scenarios_carry_no_case_facts_yet():
+    """ADR 0045: the Scenario is a situation, not a case — it has no facts, no
+    call goal and no success condition, so the model improvises the case anew
+    on every Session."""
+    for column in ("fallfakten", "anrufziel", "erfolgsbedingung"):
+        assert not hasattr(models.Szenario, column)
+
+
+def test_the_prompt_frame_still_tells_the_model_to_invent_the_case():
+    """ADR 0045: until case facts exist, the frame has nothing to point the
+    model at and asks it to make the specifics up instead."""
     orch = _read("backend/session/orchestrator.py")
-    assert '_LANGUAGE_NAMES_EN: dict[str, str] = {"de": "German"}' in orch
-
-
-def test_frontend_has_no_ui_language_switch_yet():
-    """F-56: the DE/EN UI toggle is not implemented."""
-    src_files = list((REPO / "frontend" / "src").rglob("*.ts*"))
-    joined = "\n".join(_read(p.relative_to(REPO)) for p in src_files).lower()
-    assert "i18n" not in joined
-    assert "usetranslation" not in joined
-
-
-@pytest.mark.parametrize("endpoint", ["/api/feedback", "/api/sessions", "/api/history"])
-def test_no_history_or_feedback_endpoints_are_registered(endpoint):
-    """F-13/F-48/F-53: nothing serves past-session data yet."""
-    routes = {getattr(r, "path", None) for r in app.routes}
-    assert endpoint not in routes
+    assert "invent" in orch and "concrete, plausible details" in orch
+    assert "never contradict" not in orch.lower()

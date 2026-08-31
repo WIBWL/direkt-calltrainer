@@ -14,12 +14,15 @@ import pytest
 from kugelaudio.exceptions import KugelAudioError
 
 from backend.clients import tts
-from backend.personas import PERSONAS
+from backend.personas import PersonaVoice
 
 # tts._synthesize* are the internal backend legs this module deliberately spies on.
 # pylint: disable=missing-function-docstring,redefined-outer-name,protected-access
 
-VOICE = PERSONAS[0].voice
+# A Persona's voice pair (ADR 0040/0041): the KugelAudio id and the EFRE
+# fallback voice. Built here rather than read from the library, which is
+# database-backed since ADR 0041.
+VOICE = PersonaVoice(tts_voice="de_male", kugelaudio_voice_id=1885)
 
 
 @pytest.fixture
