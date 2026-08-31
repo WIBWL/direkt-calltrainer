@@ -1,13 +1,40 @@
 :root {
-  --navy: #03253e;
-  --navy-light: #325f7f;
-  --blue: #5f8caa;
-  --blue-light: #8cb6df;
-  --bg: #f5f8fb;
-  --border: #e3eaf1;
-  --text-muted: #5b6b78;
-  --success: #2e8064;
-  --danger: #b4453a;
+  /* Colors from the Figma design */
+  --color-navy-900: #03253e;
+  --color-navy-700: #0b3a5b;
+  --color-blue-600: #325f7f;
+  --color-blue-300: #9bb8cd;
+  --color-blue-100: #e7f5ff;
+  --color-background: #f5f8fb;
+  --color-surface: #ffffff;
+  --color-surface-selected: #f3f9fd;
+  --color-surface-filter: #eaf4fa;
+  --color-border: #d7e2eb;
+  --color-border-subtle: #d3e1eb;
+  --color-text-muted: #5b6b78;
+  --color-text-muted-secondary: #5f7180;
+  --color-success: #2e8064;
+  --color-danger: #b4453a;
+
+  /* Shared font families */
+  --font-sans: "Inter", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+
+  /* Frequently used border radii */
+  --radius-card: 22px;
+  --radius-choice: 16px;
+  --radius-control: 10px;
+
+  /* Compatibility aliases for the existing styles */
+  --navy: var(--color-navy-900);
+  --navy-light: var(--color-blue-600);
+  --blue: var(--color-blue-600);
+  --blue-light: var(--color-blue-300);
+  --bg: var(--color-background);
+  --border: var(--color-border);
+  --text-muted: var(--color-text-muted);
+  --success: var(--color-success);
+  --danger: var(--color-danger);
 }
 
 * {
@@ -15,7 +42,7 @@
 }
 
 body {
-  font-family: "Hanken Grotesk", sans-serif;
+  font-family: var(--font-sans);
   background: var(--bg);
   color: var(--navy);
   margin: 0;
@@ -28,7 +55,7 @@ body {
 }
 
 .eyebrow {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.18em;
   font-size: 0.7rem;
@@ -37,7 +64,7 @@ body {
 }
 
 h1 {
-  font-family: "Schibsted Grotesk", sans-serif;
+  font-family: var(--font-sans);
   font-weight: 700;
   font-size: 1.75rem;
   letter-spacing: -0.02em;
@@ -45,7 +72,7 @@ h1 {
 }
 
 h2 {
-  font-family: "Schibsted Grotesk", sans-serif;
+  font-family: var(--font-sans);
   font-size: 1rem;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -84,7 +111,7 @@ h2 {
 }
 
 .persona-name {
-  font-family: "Schibsted Grotesk", sans-serif;
+  font-family: var(--font-sans);
   font-weight: 600;
   font-size: 0.95rem;
 }
@@ -148,7 +175,7 @@ input[type="file"] {
 }
 
 #status {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   letter-spacing: 0.02em;
   color: var(--text-muted);
@@ -281,7 +308,7 @@ audio {
 }
 
 .call-state-label {
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   letter-spacing: 0.02em;
   color: var(--text-muted);
