@@ -23,7 +23,9 @@ FastAPI backend (`backend/app.py`) serves the API and, once built, the React + T
 - Schema changes: edit `backend/db/models.py`, then `alembic revision --autogenerate -m "..."`. **Always read the generated migration before applying it** — autogenerate adds `NOT NULL` columns without backfilling, which fails on non-empty tables, and it leaves unique constraints unnamed, which makes `downgrade()` unrunnable. The ER diagram is regenerated automatically on every docs build (see below); `python scripts/generate_erd.py` refreshes `docs/er_modell.png`/`.svg` on demand and needs the Graphviz `dot` binary (`brew install graphviz`).
 - Docs site (arc42 + ADRs): `mkdocs serve` (serves on `http://localhost:8000`; stop the app first or pass `-a localhost:8001` to avoid a port clash). `mkdocs build` writes static output to `site/` (gitignored).
 
-There are no lint or test commands configured yet. Add them here once they exist.
+- Tests: `pip install -r requirements.txt` then `pytest` (config in `pytest.ini`, suite in `tests/`). Feature-traceable backend tests — every file cites the `F-xx`/`R-xx`/ADR it proves; see `tests/README.md` for the traceability matrix. No network, DB, credentials or browser needed: the STT/LLM/TTS pipeline backends are faked in `tests/conftest.py` and the REST layer runs over an in-process ASGI transport. `tests/test_documented_gaps.py` deliberately asserts the *current* MVP state (no feedback worker, no persistence wiring, German-only, …) so a test there starts failing when that gap closes. Frontend has no JS test runner configured.
+
+There is no lint command configured yet. Add it here once it exists.
 
 ## Agent skills
 
