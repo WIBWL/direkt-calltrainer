@@ -1,9 +1,10 @@
-__pycache__
-.vscode
-.venv
+.DS_Store
 .env
-frontend/node_modules
+.venv
+.vscode
+__pycache__
 frontend/dist
+frontend/node_modules
 frontend/public/vad
-test/
 logs/
+test/

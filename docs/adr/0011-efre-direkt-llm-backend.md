@@ -12,7 +12,7 @@ In practice, EFRE-Direkt turned out to provide API access for the dialogue/reaso
 
 ## Decision
 
-We will use the university-hosted efre-direkt gateway as the backend for Persona dialogue generation. No text data leaves this gateway during that processing; the only external data flow in the system is uploaded documents going to the Data Platform, plus audio going to the separately self-hosted STT/TTS models (ADR 0021). Session data itself stays in the project's own database (ADR 0010).
+We will use the university-hosted efre-direkt gateway as the backend for Persona dialogue generation. No text data leaves this gateway during that processing; the only external data flow in the system is uploaded documents travelling through the Data Platform, plus audio going to the separately self-hosted STT/TTS models (ADR 0021). Session data itself is stored in the project's own database (ADR 0010).
 
 ## Consequences
 
