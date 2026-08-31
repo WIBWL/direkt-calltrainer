@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import AppHeader from "./components/AppHeader";
 import CallView from "./components/CallView";
 import MicCheck from "./components/MicCheck";
 import TranscriptView from "./components/TranscriptView";
@@ -169,73 +170,104 @@ export default function App() {
   const readyForCall = personaId !== null && scenarioId !== null;
 
   if (screen === "mic-check") {
-    return <MicCheck onConfirmed={handleConfirmed} onCancel={() => setScreen("setup")} />;
+    return (
+      <>
+        <AppHeader activeStep="prepare" />
+
+        <main className="app-page app-page-narrow">
+          <MicCheck onConfirmed={handleConfirmed} onCancel={() => setScreen("setup")} />
+        </main>
+      </>
+    );
   }
 
   if (screen === "call") {
     return (
-      <CallView
-        callState={displayState}
-        error={socket.error ?? vad.micError}
-        onEndCall={socket.endSession}
-      />
+      <>
+        <AppHeader activeStep="call" />
+
+        <main className="app-page app-page-narrow">
+          <CallView
+            callState={displayState}
+            error={socket.error ?? vad.micError}
+            onEndCall={socket.endSession}
+          />
+        </main>
+      </>
     );
   }
 
   if (screen === "transcript") {
     const personaName = personas.find((p) => p.id === personaId)?.name ?? "Persona";
-    return <TranscriptView transcript={transcript} personaName={personaName} onRestart={handleRestart} />;
+
+    return (
+      <>
+        <AppHeader activeStep="feedback" />
+
+        <main className="app-page app-page-narrow">
+          <TranscriptView
+            transcript={transcript}
+            personaName={personaName}
+            onRestart={handleRestart}
+          />
+        </main>
+      </>
+    );
   }
 
   return (
     <>
-      <div className="eyebrow">Calltrainer</div>
-      <h1>Training starten</h1>
+      <AppHeader activeStep="prepare" />
 
-      <h2>Persona</h2>
-      <div className="persona-grid">
-        {personas.map((p) => (
-          <button
-            key={p.id}
-            className={"persona-card" + (p.id === personaId ? " selected" : "")}
-            onClick={() => setPersonaId(p.id)}
-            type="button"
-          >
-            <span className="persona-name">{p.name}</span>
-            <span className="card-subtitle">{p.role}</span>
-          </button>
-        ))}
-      </div>
+      <main className="app-page setup-page">
+        <div className="eyebrow">Calltrainer</div>
+        <h1>Training starten</h1>
 
-      <h2>Szenario</h2>
-      <div className="persona-grid">
-        {scenarios.map((s) => (
-          <button
-            key={s.id}
-            className={"persona-card" + (s.id === scenarioId ? " selected" : "")}
-            onClick={() => setScenarioId(s.id)}
-            type="button"
-          >
-            <span className="persona-name">{s.name}</span>
-            <span className="card-subtitle">{s.description}</span>
-          </button>
-        ))}
-      </div>
+        <h2>Persona</h2>
+        <div className="persona-grid">
+          {personas.map((p) => (
+            <button
+              key={p.id}
+              className={"persona-card" + (p.id === personaId ? " selected" : "")}
+              onClick={() => setPersonaId(p.id)}
+              type="button"
+            >
+              <span className="persona-name">{p.name}</span>
+              <span className="card-subtitle">{p.role}</span>
+            </button>
+          ))}
+        </div>
 
-      <button
-        className="start-call-button"
-        type="button"
-        disabled={!readyForCall}
-        onClick={() => setScreen("mic-check")}
-      >
-        Session starten
-      </button>
+        <h2>Szenario</h2>
+        <div className="persona-grid">
+          {scenarios.map((s) => (
+            <button
+              key={s.id}
+              className={"persona-card" + (s.id === scenarioId ? " selected" : "")}
+              onClick={() => setScenarioId(s.id)}
+              type="button"
+            >
+              <span className="persona-name">{s.name}</span>
+              <span className="card-subtitle">{s.description}</span>
+            </button>
+          ))}
+        </div>
 
-      {loadError && (
-        <p id="status" className="error">
-          {loadError}
-        </p>
-      )}
+        <button
+          className="start-call-button"
+          type="button"
+          disabled={!readyForCall}
+          onClick={() => setScreen("mic-check")}
+        >
+          Session starten
+        </button>
+
+        {loadError && (
+          <p id="status" className="error">
+            {loadError}
+          </p>
+        )}
+      </main>
     </>
   );
 }
