@@ -49,5 +49,6 @@ Sie sind in der Leitung. Wählen Sie eine Option:
 - [ADR 0043 — English Prompt Content, Session Language Bound to the Persona](adr/0043-english-prompt-content-persona-bound-language.md)
 - [ADR 0044 — Forward KugelAudio's Audio Sub-Chunks; No Persistent Streaming Session](adr/0044-streaming-tts-forward-subchunks.md)
 - [ADR 0045 — Case Facts, Call Goal and Success Condition on the Scenario; Objections on the Persona](adr/0045-case-facts-on-scenario-objections-on-persona.md)
+- [ADR 0046 — Liveliness Is Pursued at the Prompt Layer Before the Turn-Taking Layer (proposed)](adr/0046-liveliness-at-the-prompt-layer.md)
 
 *Vielen Dank für Ihren Anruf. Bitte legen Sie nach der Lektüre nicht auf — es warten noch mehr ADRs auf Sie.*
