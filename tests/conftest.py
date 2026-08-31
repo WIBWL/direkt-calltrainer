@@ -28,6 +28,7 @@ os.environ.setdefault("DEBUG", "true")
 os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
 
 import pytest  # noqa: E402
+from kugelaudio.exceptions import KugelAudioError  # noqa: E402
 from openai import OpenAIError  # noqa: E402
 
 from backend.clients import llm, stt, tts  # noqa: E402
@@ -91,17 +92,43 @@ class FakeSTT:
 
 
 class FakeTTS:
-    """Stand-in for `backend.clients.tts.synthesize`."""
+    """Stand-in for `backend.clients.tts.synthesize_stream` (+ one-shot
+    `synthesize`).
+
+    `synthesize_stream` mimics the real KugelAudio->EFRE fallback as a
+    two-attempt sequence: a `fail_times` of 1 is "KugelAudio blipped, EFRE
+    covered it" (absorbed, 2 recorded calls); a higher count exhausts both and
+    raises (-> `tts_failed`). Set `.hang` to an `asyncio.Event` to park
+    synthesis (barge-in tests). `.chunks_per_call` controls how many audio
+    sub-chunks one text chunk yields.
+    """
 
     def __init__(self):
         self.calls = []
         self.fail_times = 0
+        self.hang = None
+        self.chunks_per_call = 1
+
+    async def synthesize_stream(self, text, voice, language_id):
+        for _ in range(2):  # KugelAudio attempt, then the EFRE fallback
+            self.calls.append((text, voice, language_id))
+            if self.hang is not None:
+                await self.hang.wait()
+            if self.fail_times > 0:
+                self.fail_times -= 1
+                continue
+            for _ in range(self.chunks_per_call):
+                yield b"AUDIO:" + text.encode("utf-8")
+            return
+        raise KugelAudioError("simulated TTS failure")
 
     async def synthesize(self, text, voice, language_id):
         self.calls.append((text, voice, language_id))
+        if self.hang is not None:
+            await self.hang.wait()
         if self.fail_times > 0:
             self.fail_times -= 1
-            raise OpenAIError("simulated TTS failure")
+            raise KugelAudioError("simulated TTS failure")
         return b"AUDIO:" + text.encode("utf-8")
 
 
@@ -115,6 +142,7 @@ def fake_pipeline(monkeypatch):
 
     monkeypatch.setattr(llm, "stream_reply", llm_fake.stream_reply)
     monkeypatch.setattr(stt, "transcribe", stt_fake.transcribe)
+    monkeypatch.setattr(tts, "synthesize_stream", tts_fake.synthesize_stream)
     monkeypatch.setattr(tts, "synthesize", tts_fake.synthesize)
 
     class Pipeline:

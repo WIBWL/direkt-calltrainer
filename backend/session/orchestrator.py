@@ -168,27 +168,6 @@ def _has_repeated_sentence(text: str) -> bool:
     return False
 
 
-async def _drain_if_pending(
-    turn: Turn,
-    pending: "tuple[str, asyncio.Task[bytes | None]] | None",
-    progress: _ReplyProgress,
-) -> AsyncIterator[TurnEvent]:
-    """Awaits+yields the pipelined TTS task's events, if there is one."""
-    if pending is None:
-        return
-    text, task = pending
-    audio = await task
-    if audio is None:
-        yield Failed(code="tts_failed", message="Synthesis failed after one retry.")
-        return
-    if not progress.spoke_yet:
-        yield StateChanged(state="speaking")
-        progress.spoke_yet = True
-    progress.chunk_seq += 1
-    progress.spoken_text += text + " "
-    yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=audio)
-
-
 class SessionOrchestrator:
     """Owns one session's LLM message history and Turn-by-Turn Transcript;
     drives one STT -> LLM -> TTS pass per turn."""
@@ -334,8 +313,12 @@ class SessionOrchestrator:
     async def _speak_fallback_closing(self, turn: Turn, progress: _ReplyProgress) -> AsyncIterator[TurnEvent]:
         """Synthesizes a guaranteed sign-off for a backstopped ending,
         instead of trusting the Persona's own reply to have included one."""
-        audio = await self._synthesize_with_retry(self._pack.fallback_closing_line)
-        if audio is None:
+        try:
+            audio = await tts.synthesize(
+                self._pack.fallback_closing_line, self._voice, self._language_id
+            )
+        except (KugelAudioError, OpenAIError, TimeoutError, OSError) as e:
+            logger.warning("Fallback closing line could not be synthesized: %s", e)
             return
         if not progress.spoke_yet:
             yield StateChanged(state="speaking")
@@ -366,29 +349,38 @@ class SessionOrchestrator:
     async def _stream_and_synthesize(
         self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress
     ) -> AsyncIterator[TurnEvent]:
-        """Stream one LLM completion, synthesizing+yielding it chunk by chunk,
-        pipelined one chunk deep so synthesis overlaps generation instead of blocking it."""
-        pending: tuple[str, asyncio.Task[bytes | None]] | None = None
+        """Stream one LLM completion; feed each sentence-sized chunk to TTS and
+        forward its audio sub-chunks to the client as they are generated."""
+        async for text_chunk in sentence_chunks(llm.stream_reply(messages)):
+            text_chunk = _strip_end_marker(text_chunk, progress)
+            text_chunk = _strip_foreign_script(text_chunk)
+
+            if text_chunk:
+                turn.persona_text += text_chunk + " "
+                async for event in self._speak(turn, text_chunk, progress):
+                    yield event
+                    if isinstance(event, Failed):
+                        return
+
+            if progress.ends_call:
+                break  # nothing meaningful should follow the marker
+
+    async def _speak(self, turn: Turn, text_chunk: str, progress: _ReplyProgress) -> AsyncIterator[TurnEvent]:
+        """Synthesize one text chunk and yield its audio, sub-chunk by sub-chunk."""
+        voiced = False
         try:
-            async for text_chunk in sentence_chunks(llm.stream_reply(messages)):
-                text_chunk = _strip_end_marker(text_chunk, progress)
-                text_chunk = _strip_foreign_script(text_chunk)
-
-                if text_chunk:
-                    turn.persona_text += text_chunk + " "
-                    async for event in _drain_if_pending(turn, pending, progress):
-                        yield event
-                    pending = (text_chunk, asyncio.create_task(self._synthesize_with_retry(text_chunk)))
-
-                if progress.ends_call:
-                    break  # nothing meaningful should follow the marker
-
-            async for event in _drain_if_pending(turn, pending, progress):
-                yield event
-        except (OpenAIError, asyncio.CancelledError, GeneratorExit):
-            if pending is not None:
-                pending[1].cancel()
-            raise
+            async for wav in tts.synthesize_stream(text_chunk, self._voice, self._language_id):
+                if not voiced:
+                    voiced = True
+                    progress.spoken_text += text_chunk + " "
+                if not progress.spoke_yet:
+                    yield StateChanged(state="speaking")
+                    progress.spoke_yet = True
+                progress.chunk_seq += 1
+                yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=wav)
+        except (KugelAudioError, OpenAIError, TimeoutError, OSError) as e:
+            logger.error("TTS synthesis failed: %s", e)
+            yield Failed(code="tts_failed", message=str(e))
 
     async def _transcribe_with_retry(
         self, audio_bytes: bytes, filename: str, content_type: str | None
@@ -399,13 +391,4 @@ class SessionOrchestrator:
                 return await stt.transcribe(audio_bytes, filename, content_type, self._language_id)
             except OpenAIError as e:
                 logger.error("STT request failed (attempt %d): %s", attempt + 1, e)
-        return None
-
-    async def _synthesize_with_retry(self, text: str) -> bytes | None:
-        """Synthesize one chunk with one retry on failure; None if both attempts fail."""
-        for attempt in range(2):  # initial attempt + one retry
-            try:
-                return await tts.synthesize(text, self._voice, self._language_id)
-            except (OpenAIError, KugelAudioError) as e:
-                logger.error("TTS request failed (attempt %d): %s", attempt + 1, e)
         return None

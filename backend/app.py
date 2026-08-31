@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.api.session_ws import router as session_ws_router
+from backend.clients import tts
 from backend.clients.health import check_backends
 from backend.logging_config import configure_logging
 from backend import library
@@ -30,6 +31,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     except httpx.HTTPError as e:
         logger.error("Could not reach EFRE_URL (%s): %s — are you connected to the university network", efre_url, e)
     await check_backends()
+    await tts.prewarm()
     yield
 
 

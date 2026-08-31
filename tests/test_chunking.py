@@ -4,7 +4,12 @@ Covers ADR 0033: token stream -> sentence/clause-sized chunks so synthesis
 (and playback) can start before the full reply is generated.
 """
 
-from backend.session.chunking import _MAX_CHUNK_CHARS, _MIN_CHUNK_CHARS, sentence_chunks
+from backend.session.chunking import (
+    _FIRST_CHUNK_MIN_CHARS,
+    _MAX_CHUNK_CHARS,
+    _MIN_CHUNK_CHARS,
+    sentence_chunks,
+)
 
 # pylint: disable=missing-function-docstring
 
@@ -36,6 +41,26 @@ async def test_does_not_split_a_short_sentence_below_the_minimum():
     # None of the intermediate sentence ends triggers a flush (buffer stays
     # under the minimum), so it all arrives as one final chunk.
     assert chunks == ["Kurz. Auch kurz. Und noch was."]
+
+
+async def test_first_chunk_flushes_early_at_the_first_sentence(  # ADR 0033: first chunk sets perceived latency
+):
+    # First sentence is 40 chars — below _MIN_CHUNK_CHARS (80) but above the
+    # first-chunk floor — so it is flushed immediately instead of waiting for
+    # the second sentence.
+    first = "Guten Tag, hier ist Herr Brandt am Apparat."
+    assert _FIRST_CHUNK_MIN_CHARS <= len(first) < _MIN_CHUNK_CHARS
+    chunks = await _chunks(first + " ", "Ich habe eine kurze Frage an Sie.")
+    assert chunks[0] == first
+    # the *second* chunk then needs the full minimum again, so this short
+    # follow-on sentence only arrives as the trailing remainder
+    assert chunks[1] == "Ich habe eine kurze Frage an Sie."
+
+
+async def test_first_chunk_floor_still_rules_out_a_bare_greeting():
+    # "Guten Tag." (10 chars) is below the first-chunk floor -> no early flush
+    chunks = await _chunks("Guten Tag. ", "Was kann ich fuer Sie tun, bitte schoen?")
+    assert chunks == ["Guten Tag. Was kann ich fuer Sie tun, bitte schoen?"]
 
 
 async def test_long_unpunctuated_run_is_force_split_at_a_word_boundary():
