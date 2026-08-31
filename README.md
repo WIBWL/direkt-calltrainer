@@ -25,7 +25,7 @@ Copy `.env.example` to `.env` and fill in the real `EFRE_API_KEY`.
 docker compose up --build
 ```
 
-Builds the frontend too (multi-stage Dockerfile) and serves everything on `http://localhost:8000`.
+Builds the frontend too (multi-stage Dockerfile) and serves everything on `http://localhost:8391`.
 
 For development, add `--watch` (`docker compose up --build --watch`) to have the container pick up code changes automatically: backend edits are synced in and the app restarts without a full rebuild, while frontend edits and `requirements.txt` changes trigger a rebuild.
 
@@ -37,5 +37,3 @@ The full architecture documentation - arc42 and every Architecture Decision Reco
 pip install -r requirements.txt
 mkdocs serve
 ```
-
-> Also runs on port 8000 by default - stop the app first, or use `mkdocs serve -a localhost:8001` to avoid the port clash.
