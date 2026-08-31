@@ -20,6 +20,8 @@ Covers:
   ADR 0041  Personas and Scenarios are loaded from the database
   ADR 0043  prompt fields are English, display fields are in the UI language;
             a Persona's language is its own, a Scenario carries none
+  ADR 0045  the Scenario carries the case, the Persona carries the objections
+  R-12  spontaneous objections
 """
 
 import pytest
@@ -187,3 +189,93 @@ def test_seeded_scenarios_carry_no_language_of_their_own():
     for entry in SEED.SZENARIEN:
         assert "sprache_code" not in entry
         assert "sprache" not in entry
+
+
+# --- ADR 0045: the case on the Scenario, the objections on the Persona ---
+
+
+def test_scenario_row_maps_the_case_fields():
+    """ADR 0045: three columns, three fields — the case is addressable, not
+    buried in the prose of `beschreibung`."""
+    scenario = _to_scenario(
+        models.Szenario(
+            schluessel="row-case",
+            typ="Angebots- und Preisgespräch",
+            titel="Kündigungsabsicht wegen Preis",
+            kurzbeschreibung="Der Kunde erwägt zu kündigen.",
+            beschreibung="The customer is calling to say they are considering cancelling.",
+            fallfakten="14 licences, 1,180 euros a month since March last year.",
+            anrufziel="Get the price down, or a clear reason why not.",
+            erfolgsbedingung="Settled once a specific figure with a date is committed to.",
+        )
+    )
+    assert scenario.case_facts == "14 licences, 1,180 euros a month since March last year."
+    assert scenario.call_goal == "Get the price down, or a clear reason why not."
+    assert scenario.success_condition == (
+        "Settled once a specific figure with a date is committed to."
+    )
+
+
+def test_persona_row_maps_its_objections_in_order():
+    """R-12 / ADR 0026: the objections are ordered rows, and `reihenfolge` is
+    what orders them — `library.py` has to load and keep that order."""
+    row = _persona_row(
+        einwaende=[
+            models.PersonaEinwand(reihenfolge=1, text="second objection"),
+            models.PersonaEinwand(reihenfolge=0, text="first objection"),
+        ]
+    )
+    persona = _to_persona(row)
+    assert persona.objections == ("first objection", "second objection")
+
+
+def test_persona_without_objections_maps_to_an_empty_tuple():
+    """A Persona need not have objections; the prompt then omits the block."""
+    assert _to_persona(_persona_row(einwaende=[])).objections == ()
+
+
+def test_objections_carry_no_language_of_their_own():
+    """ADR 0043/0045: a Persona has a fixed language, and `persona_einwand` has
+    no language column — which is why objections are authored in English, as
+    moves rather than as quotable lines."""
+    assert not hasattr(models.PersonaEinwand, "sprache_code")
+    assert not hasattr(models.PersonaEinwand, "sprache")
+
+
+def test_seeded_scenarios_carry_the_case():
+    """ADR 0045: every shipped Scenario states its facts, the caller's goal and
+    the condition under which the matter is settled."""
+    for entry in SEED.SZENARIEN:
+        assert entry["fallfakten"].strip(), f"{entry['schluessel']}: no case facts"
+        assert entry["anrufziel"].strip(), f"{entry['schluessel']}: no call goal"
+        assert entry["erfolgsbedingung"].strip(), f"{entry['schluessel']}: no success condition"
+
+
+def test_seeded_scenario_context_does_not_carry_the_trainer_objective():
+    """ADR 0045, the defect that prompted it: `beschreibung` used to end with
+    what the *user* is meant to achieve ("keep the customer through price
+    negotiation"), addressed to the Persona — who is the customer. The caller's
+    own goal lives in `anrufziel` now, and nothing hands it the trainee's."""
+    for entry in SEED.SZENARIEN:
+        lowered = entry["beschreibung"].lower()
+        assert "the goal of the call is" not in lowered, entry["schluessel"]
+        assert "goal of the call" not in lowered, entry["schluessel"]
+
+
+def test_seeded_personas_carry_objections():
+    """R-12: `persona_einwand` has been empty since ADR 0026 created it. Three
+    to four per Persona is what ADR 0045 asks for."""
+    for entry in SEED.PERSONAS:
+        objections = entry["einwaende"]
+        assert 3 <= len(objections) <= 4, f"{entry['schluessel']}: {len(objections)} objections"
+        assert all(text.strip() for text in objections)
+
+
+def test_seeded_persona_behaviour_carries_no_situation():
+    """ADR 0045: `verhalten` is manner only. Both Personas used to open it with
+    the same sentence about having a reason for the call — a statement about
+    the Session's setup that the prompt frame already makes."""
+    for entry in SEED.PERSONAS:
+        lowered = entry["verhalten"].lower()
+        assert "reason for this call" not in lowered, entry["schluessel"]
+        assert "context of the call" not in lowered, entry["schluessel"]

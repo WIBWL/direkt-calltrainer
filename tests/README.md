@@ -29,8 +29,8 @@ source of that content, and which imports without a database.
 | Area | Feature / ADR | Test file |
 |---|---|---|
 | Setup screen: persona/scenario REST endpoints | F-43, F-44, F-15, F-01/03/04, ADR 0001, ADR 0041, ADR 0043 | `test_setup_api.py` |
-| Persona & scenario library: row mapping + seeded content | F-01, F-03, F-04, R-07, R-08, R-09, R-10, ADR 0041, ADR 0043 | `test_persona_scenario_library.py` |
-| Counterpart behaviour (LLM system prompt) | F-01, F-03, F-04, F-12, ADR 0043, ADR 0033/0037/0038 | `test_system_prompt.py` |
+| Persona & scenario library: row mapping + seeded content | F-01, F-03, F-04, R-07..R-10, R-12, ADR 0041, ADR 0043, ADR 0045 | `test_persona_scenario_library.py` |
+| Counterpart behaviour (LLM system prompt) | F-01, F-03, F-04, F-12, R-12, ADR 0043, ADR 0045, ADR 0033/0037/0038 | `test_system_prompt.py` |
 | Live session loop & state model | F-46, F-01, F-12, F-52, R-52, ADR 0033 | `test_session_pipeline.py` |
 | Streaming TTS chunking | ADR 0033 | `test_chunking.py` |
 | Closing-intent detection (both language packs) | ADR 0037, ADR 0043, F-01 | `test_closing_intent.py` |
@@ -54,9 +54,13 @@ source of that content, and which imports without a database.
   playback) — no JS test runner is configured. VAD confirmed-speech filtering
   is a browser-only concern.
 * **Spontaneous objections (R-12)** and the case a Scenario should carry
-  (ADR 0045: `fallfakten`, `anrufziel`, `erfolgsbedingung`) — neither exists
-  yet. `test_documented_gaps.py` guards their absence, so those guards fail
-  the day ADR 0045 is implemented and real tests take over.
+  (ADR 0045: `fallfakten`, `anrufziel`, `erfolgsbedingung`) are **specified
+  but not implemented**. The tests for them are written and currently fail —
+  they are the specification ADR 0045 is to be built against. When they go
+  green, the three current-state guards in `test_documented_gaps.py`
+  (`test_personas_carry_no_objections_yet`, `test_scenarios_carry_no_case_facts_yet`,
+  `test_the_prompt_frame_still_tells_the_model_to_invent_the_case`)
+  go red and must be deleted, not repaired.
 * **Real backend connectivity** — `scripts/check_backends.py` already does a
   live OK/FAIL probe against the configured STT/LLM/TTS models.
 * **Whether the model actually follows the frame** — every prompt test here

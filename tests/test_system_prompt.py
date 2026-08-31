@@ -14,13 +14,16 @@ Covers:
             Persona, and what cannot follow into English lives in the
             language pack
   ADR 0033 / ADR 0037 / ADR 0038  the [CALL_END] closing protocol
-
-R-12 (spontaneous objections) is *not* covered here: no objection is fed into
-the prompt yet. `test_documented_gaps.py` guards that gap until ADR 0045 lands.
+  ADR 0045  the Scenario carries the case (facts, call goal, success
+            condition), the Persona carries the objections
+  R-12  spontaneous objections
 """
+
+from dataclasses import replace
 
 import pytest
 
+from backend.scenarios import Scenario
 from backend.session.language_packs import get_pack
 from backend.session.orchestrator import _build_system_prompt, _opening_instruction
 from tests.conftest import TEST_PERSONAS, TEST_SCENARIOS
@@ -133,3 +136,126 @@ def test_opening_instruction_offers_several_openers_from_the_language_pack():
     assert GERMAN.opening_examples in instruction
     assert len(GERMAN.opening_examples.splitlines()) > 1
     assert "Do not reuse" in instruction
+
+
+# --- ADR 0045: the case on the Scenario, the objections on the Persona ---
+#
+# The faustregel these tests encode: the situation belongs to the Scenario and
+# the manner to the Persona, so both Personas running one Scenario get the same
+# facts, goal and success condition, and differ only in how they push back.
+
+
+def _case_scenario(**overrides):
+    """A Scenario carrying the case ADR 0045 puts on it."""
+    fields = {
+        "id": "test-scenario-case",
+        "name": "Kündigungsabsicht wegen Preis",
+        "short_description": "Der Kunde erwägt zu kündigen, weil die Kosten zu hoch sind.",
+        "description": (
+            "The customer (the persona) is calling to say they are considering "
+            "cancelling, because the running costs seem too high for the benefit."
+        ),
+        "case_facts": (
+            'Package "Insight Analytics", 14 licences, 1,180 euros a month, running '
+            "since March last year. The last renewal raised it by 12 percent, from "
+            "1,050 euros. Two of its six modules are in use."
+        ),
+        "call_goal": (
+            "Get the price down, or get a clear reason why not. Cancelling is a "
+            "real option and one you say out loud."
+        ),
+        "success_condition": (
+            "Settled once a specific figure with a date has been committed to. "
+            '"I will look into it" is not enough.'
+        ),
+    }
+    return Scenario(**{**fields, **overrides})
+
+
+OBJECTIONS = (
+    "pushes back that the figure is above what was budgeted",
+    "points out this was promised once before and nothing came of it",
+    "asks what the two unused modules are being paid for",
+)
+
+
+def test_prompt_carries_the_case_facts(persona):
+    """ADR 0045: the case stops being improvised — the facts are handed to the
+    model instead of invented anew every Session."""
+    scenario = _case_scenario()
+    prompt = _build_system_prompt(persona, scenario, GERMAN)
+    assert scenario.case_facts in prompt
+    assert "Facts of the case" in prompt
+
+
+def test_prompt_carries_the_call_goal(persona):
+    """ADR 0045: what the *caller* wants, in the caller's own terms — not the
+    trainee's objective."""
+    scenario = _case_scenario()
+    prompt = _build_system_prompt(persona, scenario, GERMAN)
+    assert scenario.call_goal in prompt
+    assert "What you want from this call" in prompt
+
+
+def test_prompt_carries_the_success_condition(persona):
+    """ADR 0045: the observable condition under which the caller considers the
+    matter settled — the criterion [CALL_END] can be weighed against."""
+    scenario = _case_scenario()
+    prompt = _build_system_prompt(persona, scenario, GERMAN)
+    assert scenario.success_condition in prompt
+    assert "settled when" in prompt
+
+
+def test_prompt_binds_the_model_to_the_case_facts(persona):
+    """ADR 0045: with facts present, improvisation is bounded — fill the gaps,
+    never overwrite what the case already states."""
+    prompt = _build_system_prompt(persona, _case_scenario(), GERMAN)
+    lowered = prompt.lower()
+    assert "invent only what they leave open" in lowered
+    assert "never contradict" in lowered
+
+
+def test_prompt_falls_back_to_improvisation_without_case_facts(persona):
+    """ADR 0045 / ADR 0024: a Scenario without facts — a user-authored one, say
+    — keeps the old instruction, because there is nothing to point the model
+    at."""
+    prompt = _build_system_prompt(persona, _case_scenario(case_facts=""), GERMAN)
+    lowered = prompt.lower()
+    assert "concrete, plausible details" in lowered
+    assert "facts of the case" not in lowered
+
+
+def test_prompt_lists_the_personas_objections(persona):
+    """R-12 / ADR 0045: `persona_einwand` finally reaches the call."""
+    with_objections = replace(persona, objections=OBJECTIONS)
+    prompt = _build_system_prompt(with_objections, _case_scenario(), GERMAN)
+    for objection in OBJECTIONS:
+        assert objection in prompt
+
+
+def test_prompt_limits_objections_to_one_per_reply(persona):
+    """ADR 0045: quoted examples get parroted and lists get worked through, so
+    the frame has to say how the objections are meant to be used."""
+    with_objections = replace(persona, objections=OBJECTIONS)
+    prompt = _build_system_prompt(with_objections, _case_scenario(), GERMAN)
+    lowered = prompt.lower()
+    assert "at most one" in lowered
+    assert "never work through them as a list" in lowered
+
+
+def test_prompt_omits_the_objection_block_for_a_persona_without_objections(persona):
+    """A Persona with no objections must not get an empty heading."""
+    prompt = _build_system_prompt(replace(persona, objections=()), _case_scenario(), GERMAN)
+    assert "Objections you tend to raise" not in prompt
+
+
+def test_the_case_is_identical_for_every_persona_running_the_scenario():
+    """ADR 0045's faustregel, and what keeps ADR 0001/0015 intact: the Scenario
+    supplies the situation, the Persona only the manner. Both Personas get the
+    same facts, goal and condition."""
+    scenario = _case_scenario()
+    for persona in TEST_PERSONAS:
+        prompt = _build_system_prompt(persona, scenario, get_pack(persona.language_id))
+        assert scenario.case_facts in prompt
+        assert scenario.call_goal in prompt
+        assert scenario.success_condition in prompt
