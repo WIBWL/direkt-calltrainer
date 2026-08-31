@@ -29,6 +29,13 @@ class LanguagePack:
     # The language's English name, interpolated into the English prompt frame.
     name_en: str
     example_exchange: str
+    # Several structurally different ways to open a call, in the target
+    # language. The frame used to carry a single English one ('e.g. "Hi, this
+    # is..."'), which the model copied verbatim into every opening -- including
+    # into German calls, producing "Hi, this is Thomas Brandt, ich habe eine
+    # Frage...". Several varied openers spread that distribution; one anchor
+    # collapses it.
+    opening_examples: str
     # Quoted user phrases the English frame points at, in the target language.
     user_closing_examples: str
     vague_reassurance_examples: str
@@ -54,6 +61,15 @@ _GERMAN = LanguagePack(
         'Rechnungsnummer nennen?"\n'
         '[Caller] "Die habe ich gerade nicht griffbereit, aber es war ein '
         'Betrag über 480 Euro."'
+    ),
+    opening_examples=(
+        "Guten Tag, Beck mein Name, ich rufe an wegen unserer letzten Rechnung.\n"
+        "Ja, guten Tag — hier ist Markus Lehmann von der Ostwald GmbH. Ich "
+        "hätte eine Frage zu unserem Vertrag.\n"
+        "Schönen guten Tag, Petra Winkler. Es geht um das Angebot von letzter "
+        "Woche.\n"
+        "Hallo, Sebastian Reuter hier. Ich wollte nochmal wegen der Lieferung "
+        "nachhaken."
     ),
     user_closing_examples='"das reicht mir"/"das wär\'s"',
     vague_reassurance_examples='"ich kümmere mich darum", "ich stelle das klar"',
@@ -94,6 +110,16 @@ _ENGLISH = LanguagePack(
         '[Other person] "Let me look into that. Could you give me the invoice '
         'number?"\n'
         '[Caller] "I have not got it to hand, but it was around 480 pounds."'
+    ),
+    opening_examples=(
+        "Hello, my name's Claire Hughes — I'm ringing about last month's "
+        "invoice.\n"
+        "Good afternoon, Daniel Okafor here from Ridgeway. I've got a question "
+        "about our contract.\n"
+        "Morning — Nina Alvarez speaking. It's about the quote you sent over "
+        "last week.\n"
+        "Hi, Peter Ross calling. I wanted to follow up on the delivery we "
+        "discussed."
     ),
     user_closing_examples='"that\'s all I needed"/"that\'ll do"',
     vague_reassurance_examples='"I\'ll look into it", "I\'ll get that sorted"',

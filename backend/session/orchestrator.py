@@ -18,16 +18,29 @@ from backend.session.models import AudioChunk, Failed, StateChanged, Turn, TurnC
 
 logger = logging.getLogger(__name__)
 
-_OPENING_INSTRUCTION = (
-    "The call is starting now: you are the one calling, and you speak first. "
-    "Open the conversation yourself with 1-2 short, realistic sentences: a "
-    "greeting, who you are, and — briefly — what you're calling about (the "
-    "question/concern from your role above). Invent plausible details as you "
-    "go — different every time. Start directly with the spoken line itself, "
-    "e.g. \"Hi, this is...\" — no announcement before it like \"Here is the "
-    "opening\", no quotation marks around it, no meta-commentary or stage "
-    "directions. Reply with only that opening line."
-)
+def _opening_instruction(pack: LanguagePack) -> str:
+    """Asks the Persona for the line that opens the call.
+
+    The openers come from the language pack rather than the frame: a single
+    English example here was copied verbatim into every call, German ones
+    included."""
+    return (
+        "The call is starting now: you are the one calling, and you speak "
+        "first. Open the conversation yourself with 1-2 short, realistic "
+        "sentences: a greeting, who you are, and — briefly — what you're "
+        "calling about (the question/concern from your role above). Invent "
+        "plausible details as you go.\n"
+        "Real callers do not all open a call the same way. These show the "
+        "range of how an opening can be built — where the greeting sits, "
+        "where the name sits, how the reason is introduced. Do not reuse "
+        "their wording, and do not settle on one of these shapes as your "
+        "default:\n"
+        f"{pack.opening_examples}\n"
+        "Start directly with the spoken line itself — no announcement before "
+        "it like \"Here is the opening\", no quotation marks around it, no "
+        "meta-commentary or stage directions. Reply with only that opening "
+        "line."
+    )
 
 
 def _build_system_prompt(persona: Persona, scenario: Scenario, pack: LanguagePack) -> str:
@@ -206,7 +219,10 @@ class SessionOrchestrator:
         progress = _ReplyProgress()
         try:
             yield StateChanged(state="thinking")
-            kickoff_messages = [*self._messages, {"role": "user", "content": _OPENING_INSTRUCTION}]
+            kickoff_messages = [
+                *self._messages,
+                {"role": "user", "content": _opening_instruction(self._pack)},
+            ]
             async with contextlib.aclosing(self._generate_reply(turn, kickoff_messages, progress)) as replies:
                 async for event in replies:
                     yield event
