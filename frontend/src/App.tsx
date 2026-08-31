@@ -220,8 +220,16 @@ export default function App() {
       <AppHeader activeStep="prepare" />
 
       <main className="app-page setup-page">
-        <div className="eyebrow">Calltrainer</div>
-        <h1>Training starten</h1>
+        <section className="setup-intro" aria-labelledby="setup-page-title">
+          <div className="eyebrow">Training vorbereiten</div>
+
+          <h1 id="setup-page-title">Wählen Sie Ihr Kundengespräch</h1>
+
+          <p className="setup-intro-description">
+            Wählen Sie die Gesprächssituation und den passenden Gesprächspartner. Sprache und
+            Stimme übernimmt die ausgewählte Persona.
+          </p>
+        </section>
 
         <h2>Persona</h2>
         <div className="persona-grid">

@@ -239,6 +239,45 @@ h1 {
   margin: 0 0 1.5rem;
 }
 
+/* The setup introduction explains the purpose of the first training step. */
+.setup-intro {
+  margin-bottom: 24px;
+}
+
+.setup-intro .eyebrow {
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.12em;
+}
+
+.setup-intro h1 {
+  margin: 0 0 10px;
+  font-size: 48px;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.setup-intro-description {
+  max-width: 800px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 17px;
+  line-height: 26px;
+}
+
+@media (max-width: 720px) {
+  .setup-intro h1 {
+    font-size: 36px;
+  }
+
+  .setup-intro-description {
+    font-size: 16px;
+    line-height: 24px;
+  }
+}
+
 h2 {
   font-family: var(--font-sans);
   font-size: 1rem;
