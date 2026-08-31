@@ -1,5 +1,4 @@
 name: direkt-calltrainer
-
 services:
   app:
     image: direkt-calltrainer
@@ -8,5 +7,50 @@ services:
       dockerfile: ./Dockerfile
     env_file:
       - .env
+    environment:
+      # Within the compose network the database host is "db", not localhost.
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     ports:
-      - 8000:8000
+      # Host port is deliberately non-standard to avoid clashes (e.g. mkdocs,
+      # other uvicorn/Django apps, all default to 8000). Container stays 8000.
+      - 8391:8000
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    develop:
+      watch:
+        # Backend code changes: synced into the running container and the
+        # gunicorn process restarted, without a full image rebuild.
+        - action: sync+restart
+          path: ./backend
+          target: /app/backend
+        # Anything that needs `pip install` or the frontend build re-run:
+        # cheap enough to just rebuild the image from scratch.
+        - action: rebuild
+          path: ./requirements.txt
+        - action: rebuild
+          path: ./frontend
+          ignore:
+            - node_modules/
+            - dist/
+
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - 5432:5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

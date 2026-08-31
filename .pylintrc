@@ -4,6 +4,12 @@ py-version=3.12
 
 ignore=.venv,venv,dist,.git
 
+# Project root is the import root, so `backend.*` resolves in scripts/ (which
+# add it to sys.path themselves at runtime). Uses source-roots rather than an
+# init-hook that prepends "." to sys.path -- the latter shadows stdlib modules
+# like collections.abc when pylint runs with a different working directory.
+source-roots=.
+
 [MESSAGES CONTROL]
 # Responsibility: logic, design metrics, and docstrings only.
 # PEP8 style and formatting is enforced by flake8 -- disabled here to avoid duplication.
@@ -18,6 +24,11 @@ disable=
     W0511,  # fixme            -- ignore TODO/FIXME comments
     W0611,  # unused-import    -- flake8 (F401) owns this
     W1203,  # logging-fstring-interpolation -- f-strings in logging calls
+    C0114,  # missing-module-docstring -- not required for plain data/config modules
+            # (personas.py, scenarios.py etc.) where the data speaks for itself;
+            # function/method docstrings (C0116) are still enforced for actual logic.
+    C0115,  # missing-class-docstring -- same reasoning, for simple dataclasses
+            # (Persona, Scenario, PersonaVoice) whose fields are self-explanatory.
 
 # Enable specific messages (overrides disable)
 # enable=
