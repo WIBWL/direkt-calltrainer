@@ -53,13 +53,14 @@ export default function App() {
     apiFetch<Persona[]>("/api/personas")
       .then((data) => {
         setPersonas(data);
-        if (data.length > 0) setPersonaId(data[0].id);
+        // Preselect the first entry (ADR 0015); no-op on an empty list.
+        if (data[0]) setPersonaId(data[0].id);
       })
       .catch((e) => setLoadError(`Personas konnten nicht geladen werden: ${e.message}`));
     apiFetch<Scenario[]>("/api/scenarios")
       .then((data) => {
         setScenarios(data);
-        if (data.length > 0) setScenarioId(data[0].id);
+        if (data[0]) setScenarioId(data[0].id);
       })
       .catch((e) => setLoadError(`Szenarien konnten nicht geladen werden: ${e.message}`));
   }, []);

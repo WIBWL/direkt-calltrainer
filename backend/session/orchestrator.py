@@ -1,4 +1,12 @@
-"""Session orchestration: STT -> LLM -> TTS pipeline and retry policy."""
+"""One Session's conversation: the STT → dialogue → TTS pass per Turn.
+
+`SessionOrchestrator` owns the LLM message history and the Turn list for one
+call. The guards around the pipeline exist because Qwen3-4B misbehaves in
+specific, tested ways — copying the English prompt example (ADR 0043), ending
+calls too eagerly or not at all (ADR 0037), looping (ADR 0038); each guard's
+own comment names what it catches. Retry policy: one retry per leg, then end
+the Session cleanly (ADR 0016, ADR 0033).
+"""
 
 import asyncio
 import contextlib
@@ -63,7 +71,11 @@ _EXAMPLE_EXCHANGE = (
 
 
 def _build_system_prompt(persona: Persona, scenario: Scenario) -> str:
-    """Builds the LLM system prompt."""
+    """Most of the requirements on how the counterpart behaves live here (F-01,
+    F-04): caller framing, "invent detail rather than deflect", anti-repetition,
+    the `[CALL_END]` protocol (ADR 0037, ADR 0038). English frame for
+    instruction-following on this model (ADR 0043); persona and scenario text
+    stay in the target language."""
     language = _LANGUAGE_NAMES_EN[persona.language_id]
     return (
         "You are playing a character in a phone-call training exercise. "
@@ -117,13 +129,9 @@ def _build_system_prompt(persona: Persona, scenario: Scenario) -> str:
 
 _END_CALL_RE = re.compile(r"\[\s*call[_\s]?end\s*\]", re.IGNORECASE)
 
-# Catches an explicit farewell or a request to postpone/continue elsewhere --
-# the two categories of user signal the persona's own judgment (the system
-# prompt above) was observed to miss. Deliberately narrow and regex-based,
-# not an LLM classifier: that approach's own chain-of-thought reasoning
-# would occasionally degenerate into a non-sequitur and land on the wrong
-# verdict (confirmed in testing). A missed signal here just costs one extra
-# turn; a false one cuts the call short mid-conversation, which is worse.
+# The farewell / postpone phrases _signals_closing matches (ADR 0037). Narrow
+# by design: a missed phrase costs one extra turn, where the old LLM classifier
+# could cut a call short mid-conversation.
 _FAREWELL_RE = re.compile(r"\b(tschüss|auf wiederhören|auf wiedersehen|wiederhören|ciao)\b", re.IGNORECASE)
 _POSTPONE_RE = re.compile(
     r"(ein andere[rs]? mal|andermal|anders (fortsetzen|weiterführen|weitermachen)|"
@@ -135,8 +143,8 @@ _POSTPONE_RE = re.compile(
 
 
 def _signals_closing(user_text: str) -> bool:
-    """True if the user's message is an explicit farewell or a request to
-    postpone/continue the call elsewhere."""
+    """True if the user's latest message is an explicit farewell or a request to
+    postpone / continue elsewhere — signals the persona itself misses (ADR 0037)."""
     return bool(_FAREWELL_RE.search(user_text) or _POSTPONE_RE.search(user_text))
 
 
@@ -146,14 +154,15 @@ _CLOSING_NUDGE = (
     "marker and nothing after it: [CALL_END]."
 )
 
-# Said in place of trusting the model's own reply to have included a
-# goodbye -- for a backstopped ending (a repeat, or the model ending
-# unprompted) that trust hasn't been earned (confirmed in testing).
+# Spoken on a backstopped ending (a detected repeat, or an unprompted
+# `[CALL_END]`) — paths where the model was never asked for a closing line, so
+# can't be trusted to have produced one (ADR 0038).
 _FALLBACK_CLOSING_LINE = "Vielen Dank für Ihre Zeit. Auf Wiederhören."
 
 
 class _ReplyProgress:
-    """Mutable state shared across one reply's pipelined TTS chunks."""
+    """Mutable state threaded through one reply's synthesis: chunks sent, whether
+    any was, whether the reply ends the call, the voiced text (for barge-in)."""
 
     def __init__(self) -> None:
         self.chunk_seq = 0
@@ -163,13 +172,16 @@ class _ReplyProgress:
 
 
 def _strip_end_marker(text_chunk: str, progress: _ReplyProgress) -> str:
-    """Strips the [CALL_END] marker if present, flagging progress.ends_call."""
+    """Strip the `[CALL_END]` marker before TTS and flag `progress.ends_call`.
+    Loose regex (whitespace, case, `_`) — the model doesn't always emit it exactly."""
     if not _END_CALL_RE.search(text_chunk):
         return text_chunk
     progress.ends_call = True
     return _END_CALL_RE.sub("", text_chunk).strip()
 
 
+# The small model occasionally slips a stray CJK / Hangul character into a
+# German reply; left in, TTS mispronounces it or glitches. Scrubbed before synthesis.
 _FOREIGN_SCRIPT_RE = re.compile(
     "["
     "\u3000-\u303f"  # CJK punctuation
@@ -189,8 +201,8 @@ _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
 
 def _has_repeated_sentence(text: str) -> bool:
-    """True if the same non-trivial sentence appears twice in text -- a
-    sign of degenerate generation within a single reply."""
+    """True if a non-trivial sentence repeats within one reply — the model
+    looping (ADR 0038). Short fragments ("Ja.", "Okay.") don't count."""
     seen = set()
     for sentence in _SENTENCE_SPLIT_RE.split(text):
         sentence = sentence.strip().lower()
@@ -203,8 +215,9 @@ def _has_repeated_sentence(text: str) -> bool:
 
 
 class SessionOrchestrator:
-    """Owns one session's LLM message history and Turn-by-Turn Transcript;
-    drives one STT -> LLM -> TTS pass per turn."""
+    """One instance per Session. Holds the LLM message history and the Turn
+    list, driving one STT → dialogue → TTS pass per Turn. A barge-in can leave a
+    Turn open (`_reopen_turn`) for the next utterance to continue (ADR 0035)."""
 
     def __init__(self, persona: Persona, scenario: Scenario, subject_id: str | None = None):
         self._language_id = persona.language_id
@@ -300,11 +313,12 @@ class SessionOrchestrator:
                 return  # streamed to completion without an LLM-side error
             except OpenAIError as e:
                 logger.error("LLM request failed (attempt %d): %s", llm_attempt + 1, e)
-                # Audio for part of this reply was already played
+                # Retry only before any audio has gone out (ADR 0033): a fresh
+                # completion would diverge from what the user already heard.
                 if progress.spoke_yet or llm_attempt == 1:
                     yield Failed(code="llm_failed", message=str(e))
                     return
-                turn.persona_text = ""  # retrying from scratch
+                turn.persona_text = ""  # retry from scratch
 
     async def _generate_reply(
         self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress, force_end_call: bool = False
@@ -361,16 +375,17 @@ class SessionOrchestrator:
         self._messages[-1]["content"] = turn.persona_text
 
     def _repeats_last_reply(self, text: str) -> bool:
-        """True if text matches the persona's most recent reply verbatim
-        (mod case/whitespace) -- a sign it's stuck repeating itself."""
+        """True if this reply repeats its predecessor verbatim (modulo case and
+        whitespace) — the cross-Turn form of `_has_repeated_sentence` (ADR 0038)."""
         for message in reversed(self._messages):
             if message["role"] == "assistant":
                 return message["content"].strip().lower() == text.strip().lower()
         return False
 
     def _finalize_interrupted(self, turn: Turn, progress: _ReplyProgress) -> None:
-        """Commits only the words actually sent as audio (unheard ones stay
-        unsaid); else discards everything and leaves the turn open to reopen."""
+        """Barge-in cleanup (ADR 0035). If audio was voiced, commit exactly that
+        text to history and close the Turn. If not, discard the text and leave
+        the Turn open so the next utterance continues the same question."""
         if progress.spoke_yet:
             turn.persona_text = progress.spoken_text.strip()
             self._messages.append({"role": "assistant", "content": turn.persona_text})
@@ -398,7 +413,8 @@ class SessionOrchestrator:
                 break  # nothing meaningful should follow the marker
 
     async def _speak(self, turn: Turn, text_chunk: str, progress: _ReplyProgress) -> AsyncIterator[TurnEvent]:
-        """Synthesize one text chunk and yield its audio, sub-chunk by sub-chunk."""
+        """Synthesize one chunk and forward its audio as KugelAudio produces it,
+        piece by piece (ADR 0044). A failure past the fallback ends the Turn."""
         voiced = False
         try:
             async for wav in tts.synthesize_stream(text_chunk, self._voice, self._language_id):

@@ -1,7 +1,5 @@
 import { currentAccessToken } from "./auth";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "";
-
 /** A non-2xx reply from the backend. */
 export class ApiError extends Error {
   readonly status: number;
@@ -13,16 +11,18 @@ export class ApiError extends Error {
 }
 
 /**
- * Authenticated JSON request. The bearer token is read from the live OIDC
- * session at call time (see auth.ts), so a rotated token is picked up
- * automatically and callers never pass one. Mirrors direkt-dataplatform's api.ts.
+ * Authenticated JSON request. `path` is a same-origin absolute path ("/api/…"):
+ * the backend serves this SPA, so there is no separate API host (see CLAUDE.md).
+ * The bearer token is read from the live OIDC session at call time (see auth.ts),
+ * so a rotated token is picked up automatically and callers never pass one.
+ * Mirrors direkt-dataplatform's api.ts.
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = await currentAccessToken();
   if (!token) {
     throw new ApiError(401, "no active session");
   }
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(path, {
     ...init,
     headers: {
       ...(init?.body === undefined ? {} : { "Content-Type": "application/json" }),

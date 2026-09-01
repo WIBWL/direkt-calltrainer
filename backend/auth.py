@@ -1,16 +1,14 @@
 """Keycloak / OIDC bearer-token authentication (ADR 0009).
 
 The SPA logs in against Keycloak directly (Authorization Code + PKCE, public
-client, no secret) and sends the resulting access token as a bearer token:
-in the `Authorization` header on REST calls, and inside the `session.start`
-handshake message on the WebSocket (browsers can't set headers on a
-`WebSocket`). This module verifies that token against the realm's JWKS.
+client) and sends the access token as a bearer token — in the `Authorization`
+header on REST, and inside the `session.start` message on the WebSocket
+(browsers can't header a `WebSocket`). This module verifies it against the
+realm's JWKS.
 
-Mirrors `direkt-dataplatform`'s `shared-backend/src/index.ts`: resolve the
-JWKS from the issuer's OIDC discovery document, verify signature + `iss` +
-`aud`, and expose `sub` and the client roles. Deliberately no role *check* —
-any valid realm token may use the app (see the plan / ADR 0009); `roles` is
-carried so a check can be added later without reshaping this.
+Mirrors `direkt-dataplatform`'s `shared-backend/src/index.ts`. Deliberately no
+role *check* (docs/adr/0009): any valid realm token may use the app. `roles` is
+still carried so a check can be added later without reshaping this.
 """
 
 import logging
@@ -29,10 +27,10 @@ logger = logging.getLogger(__name__)
 def _issuer() -> str:
     value = os.environ.get("OIDC_ISSUER")
     if not value:
-        raise RuntimeError(
-            "Missing required environment variable 'OIDC_ISSUER'. Copy .env.example to .env "
-            "and fill in real values (e.g. http://localhost:18081/realms/direkt)."
-        )
+        # No default: the SPA and backend must name the same realm, and a
+        # default that disagrees doesn't fail at boot — discovery succeeds, then
+        # every request 401s far from the cause.
+        raise RuntimeError("OIDC_ISSUER is required (see .env.example)")
     return value.rstrip("/")
 
 
@@ -99,6 +97,10 @@ def verify_token(token: str) -> AuthContext:
             audience=OIDC_AUDIENCE,
         )
     except jwt.PyJWTError as e:
+        # Only token-level failures land here. A failed JWKS fetch (Keycloak
+        # down) raises something else and is left to 5xx on purpose — a 401 tells
+        # the client to retry, which can't help, and hides the outage among
+        # ordinary token-expiry 401s.
         logger.warning("bearer token rejected: %s", e)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid or expired token") from e
 
@@ -133,9 +135,9 @@ def authenticate_ws(message: dict) -> AuthContext | None:
         return None
 
 
-async def probe_realm() -> None:
+async def check_realm() -> None:
     """Log an error if the realm's keys are unreachable at startup. Does not
-    stop the app (matches how `lifespan` treats EFRE)."""
+    stop the app (matches how `lifespan` treats DiReKT)."""
     url = OIDC_JWKS_URL or f"{OIDC_ISSUER}/.well-known/openid-configuration"
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:

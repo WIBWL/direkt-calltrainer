@@ -51,4 +51,9 @@ throwaway RSA key and a stubbed JWKS.
   playback) — no JS test runner is configured. VAD confirmed-speech filtering
   is a browser-only concern.
 * **Real backend connectivity** — `scripts/check_backends.py` already does a
-  live OK/FAIL probe against the configured STT/LLM/TTS models.
+  live OK/FAIL check against the configured STT/LLM/TTS models.
+* **Library breadth (F-03/F-04)** — the tests check that the persona/scenario
+  *shapes* are well-formed and that one budget-focused, price-pushing persona
+  and the support + pricing scenarios are representable. They do not assert a
+  broad catalogue: the code ships one persona and two of the three scenario
+  contexts in `docs/features.md`.

@@ -68,7 +68,7 @@
       "emailVerified": true,
       "email": "alice@example.test",
       "firstName": "Alice",
-      "lastName": "Beispiel",
+      "lastName": "Example",
       "credentials": [{ "type": "password", "value": "alice", "temporary": false }]
     },
     {
@@ -77,7 +77,7 @@
       "emailVerified": true,
       "email": "bob@example.test",
       "firstName": "Bob",
-      "lastName": "Beispiel",
+      "lastName": "Example",
       "credentials": [{ "type": "password", "value": "bob", "temporary": false }]
     },
     {
@@ -86,7 +86,7 @@
       "emailVerified": true,
       "email": "carol@example.test",
       "firstName": "Carol",
-      "lastName": "Beispiel",
+      "lastName": "Example",
       "credentials": [{ "type": "password", "value": "carol", "temporary": false }]
     }
   ]

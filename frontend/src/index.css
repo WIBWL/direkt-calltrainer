@@ -156,6 +156,14 @@ input[type="file"] {
   min-height: 1.2em;
 }
 
+.call-duration {
+  font-family: "IBM Plex Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.1rem;
+  color: var(--blue);
+  margin-top: 0.75rem;
+}
+
 #status.error {
   color: var(--danger);
 }

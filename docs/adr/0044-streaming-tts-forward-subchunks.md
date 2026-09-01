@@ -53,9 +53,8 @@ first chunk's first-audio cost is on the critical path. If the SDK's
 mid-Turn, revisiting this is a contained change — the call site is one method.
 
 The KugelAudio client is constructed with `region="eu"`
-(`backend/clients/config.py`): the pilot is hosted on the Würzburg campus
-(ADR 0020), so the EU endpoint is the nearest and shaves round-trip latency
-from every synthesis call.
+(`backend/clients/config.py`): the app is deployed in the EU (ADR 0020), so its
+EU endpoint is used. Region-to-region round-trip time was not measured.
 
 The one-shot `synthesize()` (buffered) stays for the startup health check and
 the fixed fallback-closing line (ADR 0038), where first-audio latency is
@@ -63,7 +62,7 @@ irrelevant.
 
 Failure handling follows ADR 0016 / ADR 0033 per this shape: if KugelAudio
 fails **before** a chunk has produced any audio, that chunk falls back to one
-EFRE Voxtral batch call (ADR 0040), retried once; if it fails **after** audio
+DiReKT Voxtral batch call (ADR 0040), retried once; if it fails **after** audio
 for the chunk has already been sent, the Turn ends with `tts_failed` — a fresh
 synthesis would diverge from what the user already heard. Barge-in (ADR 0035)
 is unchanged in contract: closing the Turn generator abandons the in-flight
@@ -87,10 +86,10 @@ cost; it would deserve reconsideration under real load, at which point the
 persistent-session path — or KugelAudio shipping a lower `send()` poll — is the
 lever.
 
-`synthesize_stream`'s per-chunk EFRE fallback keeps ADR 0040's "lose KugelAudio,
+`synthesize_stream`'s per-chunk DiReKT fallback keeps ADR 0040's "lose KugelAudio,
 keep talking" property, but a mid-utterance KugelAudio failure now ends the
-Turn rather than silently finishing it on EFRE, because the streamed audio
-already committed to a voice and pace that a batch EFRE call would break.
+Turn rather than silently finishing it on DiReKT, because the streamed audio
+already committed to a voice and pace that a batch DiReKT call would break.
 
 The orchestrator's one-chunk-deep synthesis pipeline (`_drain_if_pending`, the
 `asyncio.Task` per chunk) is gone: `stream_async` already overlaps generation
