@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AppHeader from "./components/AppHeader";
 import CallView from "./components/CallView";
 import MicCheck from "./components/MicCheck";
+import SelectionSummary from "./components/SelectionSummary";
 import SetupSection from "./components/SetupSection";
 import TranscriptView from "./components/TranscriptView";
 import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
@@ -168,7 +169,10 @@ export default function App() {
     setScreen("setup");
   }, [needsReconnect]);
 
-  const readyForCall = personaId !== null && scenarioId !== null;
+  // Resolve the complete objects so their labels can be reused in the summary.
+  const selectedPersona = personas.find((persona) => persona.id === personaId);
+  const selectedScenario = scenarios.find((scenario) => scenario.id === scenarioId);
+  const readyForCall = selectedPersona !== undefined && selectedScenario !== undefined;
 
   if (screen === "mic-check") {
     return (
@@ -276,14 +280,28 @@ export default function App() {
           </div>
         </SetupSection>
 
-        <button
-          className="start-call-button"
-          type="button"
-          disabled={!readyForCall}
-          onClick={() => setScreen("mic-check")}
+                {/* The summary lets users review their choices before continuing. */}
+        <SetupSection
+          index="03"
+          title="Auswahl prüfen"
+          description="Ihre Trainingsauswahl steht fest."
         >
-          Session starten
-        </button>
+          <SelectionSummary
+            scenario={selectedScenario?.name ?? "Noch nicht ausgewählt"}
+            persona={selectedPersona?.name ?? "Noch nicht ausgewählt"}
+            language="DE · Deutsch"
+            voice="Durch Persona festgelegt"
+          />
+
+          <button
+            className="start-call-button"
+            type="button"
+            disabled={!readyForCall}
+            onClick={() => setScreen("mic-check")}
+          >
+            Weiter zum Mikrofontest
+          </button>
+        </SetupSection>
 
         {loadError && (
           <p id="status" className="error">
