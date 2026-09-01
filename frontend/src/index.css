@@ -646,4 +646,9 @@ audio {
   .setup-section-heading-text h2 {
     font-size: 22px;
   }
+
+  /* The summary switches to two columns when four columns become too narrow. */
+  .selection-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
