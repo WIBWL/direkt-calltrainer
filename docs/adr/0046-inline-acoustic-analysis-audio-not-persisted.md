@@ -1,8 +1,8 @@
-# ADR 0045: Paraverbal Analysis Runs Inline on In-Memory Audio; Audio Is Never Persisted
+# ADR 0046: Paraverbal Analysis Runs Inline on In-Memory Audio; Audio Is Never Persisted
 
 ## Status
 
-Accepted. ADR 0048 keeps the measurement here but moves the *interpretation* to the end of the call: what is produced inline are raw per-Turn quantities, not finished statistics.
+Accepted. ADR 0049 keeps the measurement here but moves the *interpretation* to the end of the call: what is produced inline are raw per-Turn quantities, not finished statistics.
 
 ## Context
 

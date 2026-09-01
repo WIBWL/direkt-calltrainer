@@ -41,5 +41,8 @@ if DEBUG:
     KUGELAUDIO_CLIENT = None
     KUGELAUDIO_MODEL = None
 else:
-    KUGELAUDIO_CLIENT = KugelAudio(api_key=_required_env("KUGELAUDIO_API_KEY"))
+    # region="eu" pins to api.eu.kugelaudio.com — the pilot is hosted on the
+    # Würzburg campus (ADR 0020), so the EU endpoint is the closest and cuts
+    # round-trip latency on every synthesis call.
+    KUGELAUDIO_CLIENT = KugelAudio(api_key=_required_env("KUGELAUDIO_API_KEY"), region="eu")
     KUGELAUDIO_MODEL = _required_env("KUGELAUDIO_MODEL")

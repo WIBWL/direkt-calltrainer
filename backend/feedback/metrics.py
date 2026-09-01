@@ -5,7 +5,7 @@ reference data (what backend/db/provision.py writes into the metrik_typ table)
 and how its value is derived. Adding a metric is one entry here, not a change
 spread over a seed and an analysis path.
 
-Every metric describes the whole call, not one utterance (ADR 0048): the
+Every metric describes the whole call, not one utterance (ADR 0049): the
 inventory follows F-53's list of Kennzahlen -- Redeanteil, Fragen, Sprechtempo,
 Wortanzahl, Reaktionszeit, Pausen -- plus the loudness curve of F-37. The Prio
 column of docs/features.md drives `aktiv`; an inactive metric carries no
@@ -38,7 +38,7 @@ class Conversation:
     """One finished call, reduced to the facts the statistics are derived from.
 
     Assembled by backend/session/models.py, which owns the Turn timeline and
-    keeps the machine's latency out of both speakers' windows (ADR 0048).
+    keeps the machine's latency out of both speakers' windows (ADR 0049).
     """
 
     user_text: str = ""
@@ -99,7 +99,7 @@ def _redeanteil(call: Conversation) -> Measurement | None:
     time, not wall-clock, so the model's own latency dilutes neither share."""
     spoken = call.user_speech_ms + call.persona_speech_ms
     # Words with no measured speaking time behind them mean the measurement
-    # failed (ADR 0045), not that the speaker stayed silent. Reporting the
+    # failed (ADR 0046), not that the speaker stayed silent. Reporting the
     # share anyway would put a 0% or a 100% in front of the user as though it
     # had been measured -- exactly what `measure` refuses to do elsewhere.
     if not spoken or (call.user_text and not call.user_speech_ms):
@@ -197,7 +197,7 @@ def _pausen(call: Conversation) -> Measurement | None:
 def _lautstaerke(call: Conversation) -> Measurement | None:
     """F-37. Dynamic range across the whole call as the measure of vocal
     presence, with the curve behind it. A range rather than a level, for the
-    reason given on TurnAcoustics.loudness_db (ADR 0044)."""
+    reason given on TurnAcoustics.loudness_db (ADR 0045)."""
     audible = sorted(v for v in call.loudness_db if v is not None)
     if len(audible) < 3:
         return None
@@ -214,7 +214,7 @@ def _lautstaerke(call: Conversation) -> Measurement | None:
 METRICS: tuple[MetricDef, ...] = (
     # Active -- F-53's Kennzahlen, plus F-37's loudness curve. No metric
     # carries a target range: there is no validated norm for this population,
-    # and a made-up threshold is a score in disguise (ADR 0004/0048).
+    # and a made-up threshold is a score in disguise (ADR 0004/0049).
     MetricDef("redeanteil", "Redeanteil", "%", "F-24", True, _redeanteil),
     MetricDef("fragen", "Fragen an den Gesprächspartner", "Anzahl", "F-41", True, _fragen),
     MetricDef("tempo", "Sprechtempo", "Wörter/min", "F-36", True, _tempo),

@@ -34,7 +34,7 @@ class Turn:
     persona_offset_ms: int | None = None
     persona_end_ms: int | None = None
 
-    # Paraverbal facts about the user's speech (ADR 0045), taken while the
+    # Paraverbal facts about the user's speech (ADR 0046), taken while the
     # audio was still in memory and already rebased onto the Session's
     # timeline -- so a Turn reopened after a barge-in, and therefore spoken in
     # several fragments, needs no special case once the Session is folded up.
@@ -85,7 +85,7 @@ def conversation(turns: Sequence[Turn]) -> Conversation:
     Reaction time is the one measure that spans two Turns: the user's reply in
     Turn N answers the Persona line of Turn N-1, so it is counted from that
     line's end. Everything the machine did in between -- generating, then
-    synthesizing -- is outside the window by construction (ADR 0048).
+    synthesizing -- is outside the window by construction (ADR 0049).
     """
     reactions: list[int] = []
     pauses: list[Pause] = []

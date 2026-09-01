@@ -25,7 +25,7 @@ UQ_SESSION_OEFFENTLICHE_ID = "uq_session_oeffentliche_id"
 
 def upgrade() -> None:
     # Lockerungen zuerst -- sie koennen nicht fehlschlagen.
-    # Nur Nutzer-Turns werden gemessen (ADR 0045), und ein Befund ueber die
+    # Nur Nutzer-Turns werden gemessen (ADR 0046), und ein Befund ueber die
     # ganze Aeusserung hat keine Position darin.
     op.alter_column("turn", "dauer_ms", existing_type=sa.INTEGER(), nullable=True)
     op.alter_column("befund", "offset_ms", existing_type=sa.INTEGER(), nullable=True)

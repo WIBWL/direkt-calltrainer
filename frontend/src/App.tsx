@@ -9,8 +9,6 @@ import { useSessionSocket } from "./hooks/useSessionSocket";
 import { useStreamedAudioPlayback } from "./hooks/useStreamedAudioPlayback";
 import type { TranscriptEntry } from "./protocol";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "";
-
 // Survives a reload but not the tab closing, which is exactly the scope the
 // wrap-up has: it is reachable while this tab is, and is not linkable or
 // listed anywhere. Without it, refreshing the results page — the natural
@@ -93,14 +91,14 @@ export default function App() {
   const [needsReconnect, setNeedsReconnect] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/personas`)
+    fetch("/api/personas")
       .then((r) => r.json())
       .then((data: Persona[]) => {
         setPersonas(data);
         if (data.length > 0) setPersonaId(data[0].id);
       })
       .catch((e) => setLoadError(`Personas konnten nicht geladen werden: ${e.message}`));
-    fetch(`${API_URL}/api/scenarios`)
+    fetch("/api/scenarios")
       .then((r) => r.json())
       .then((data: Scenario[]) => {
         setScenarios(data);
@@ -202,7 +200,7 @@ export default function App() {
     // Reveal whatever's already been generated (possibly the whole opening
     // line by now) and switch to live playback for everything after. The
     // server is told at the same moment, because this — not the connect —
-    // is where the Session's timeline starts (ADR 0048).
+    // is where the Session's timeline starts (ADR 0049).
     playback.activate();
     socket.sendActivate();
     setScreen("call");

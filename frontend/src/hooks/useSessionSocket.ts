@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { CallState, ClientMessage, ServerMessage, TranscriptEntry } from "../protocol";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "";
-const WS_URL = `${API_URL.replace(/^http/, "ws")}/ws/session`;
+// Same origin: the backend serves frontend/dist, so there is no separate
+// API host to point at.
+const WS_URL = `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws/session`;
 
 interface UseSessionSocketOptions {
   personaId: string | null;

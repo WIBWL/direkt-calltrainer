@@ -21,14 +21,18 @@ logger = logging.getLogger(__name__)
 
 _LANGUAGE_NAMES_EN: dict[str, str] = {"de": "German"}
 
+# The spoken-line example is deliberately in the target language: with an
+# English example ("Hi, this is...") the small model copies it and opens the
+# call in English despite the German instruction (8/8 in testing). Key it by
+# language_id along with _EXAMPLE_EXCHANGE if a second language is added (ADR 0043).
 _OPENING_INSTRUCTION = (
     "The call is starting now: you are the one calling, and you speak first. "
     "Open the conversation yourself with 1-2 short, realistic sentences: a "
     "greeting, who you are, and — briefly — what you're calling about (the "
     "question/concern from your role above). Invent plausible details as you "
     "go — different every time. Start directly with the spoken line itself, "
-    "e.g. \"Hi, this is...\" — no announcement before it like \"Here is the "
-    "opening\", no quotation marks around it, no meta-commentary or stage "
+    "e.g. \"Guten Tag, hier ist...\" — no announcement before it like \"Here is "
+    "the opening\", no quotation marks around it, no meta-commentary or stage "
     "directions. Reply with only that opening line."
 )
 
@@ -153,7 +157,7 @@ _FALLBACK_CLOSING_LINE = "Vielen Dank für Ihre Zeit. Auf Wiederhören."
 async def _attach_measurements(
     turn: Turn, acoustics: asyncio.Task[TurnAcoustics], ended_ms: int
 ) -> None:
-    """Record the Turn's paraverbal measurements, on the Session's timeline (ADR 0045).
+    """Record the Turn's paraverbal measurements, on the Session's timeline (ADR 0046).
 
     The audio arrived once the user had stopped talking, so `ended_ms` is where
     this fragment ends and the measured duration is what walks it back to its
@@ -286,34 +290,12 @@ class SessionOrchestrator:
         a chunk ready before the previous one has finished extends the window
         rather than starting a new one; one that arrives after a stall starts
         from now. This is what the user's reaction time is counted from, and
-        what keeps the model's own latency out of it (ADR 0048).
+        what keeps the model's own latency out of it (ADR 0049).
         """
         now = self._elapsed_ms()
         if turn.persona_offset_ms is None:
             turn.persona_offset_ms = now
         turn.persona_end_ms = max(now, turn.persona_end_ms or now) + tts.duration_ms(audio)
-
-    async def _drain_if_pending(
-        self,
-        turn: Turn,
-        pending: "tuple[str, asyncio.Task[bytes | None]] | None",
-        progress: _ReplyProgress,
-    ) -> AsyncIterator[TurnEvent]:
-        """Awaits+yields the pipelined TTS task's events, if there is one."""
-        if pending is None:
-            return
-        text, task = pending
-        audio = await task
-        if audio is None:
-            yield Failed(code="tts_failed", message="Synthesis failed after one retry.")
-            return
-        if not progress.spoke_yet:
-            yield StateChanged(state="speaking")
-            progress.spoke_yet = True
-        progress.chunk_seq += 1
-        progress.spoken_text += text + " "
-        self._note_persona_audio(turn, audio)
-        yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=audio)
 
     def _new_or_reopened_turn(self) -> tuple[Turn, bool]:
         """Reuses a still-open turn from a prior barge-in, else creates a
@@ -348,7 +330,7 @@ class SessionOrchestrator:
         progress = _ReplyProgress()
         # Measured on a worker thread alongside the STT round trip, not after
         # it: Praat is local and fast, the gateway is neither, so the analysis
-        # is finished by the time the transcript comes back (ADR 0045).
+        # is finished by the time the transcript comes back (ADR 0046).
         acoustics = asyncio.create_task(asyncio.to_thread(analyze, audio_bytes))
         # The audio arrives once the user has stopped talking, so this marks
         # the utterance's end; _attach_measurements walks it back to its start.
@@ -460,8 +442,10 @@ class SessionOrchestrator:
     async def _speak_fallback_closing(self, turn: Turn, progress: _ReplyProgress) -> AsyncIterator[TurnEvent]:
         """Synthesizes a guaranteed sign-off for a backstopped ending,
         instead of trusting the Persona's own reply to have included one."""
-        audio = await self._synthesize_with_retry(_FALLBACK_CLOSING_LINE)
-        if audio is None:
+        try:
+            audio = await tts.synthesize(_FALLBACK_CLOSING_LINE, self._voice, self._language_id)
+        except (KugelAudioError, OpenAIError, TimeoutError, OSError) as e:
+            logger.warning("Fallback closing line could not be synthesized: %s", e)
             return
         if not progress.spoke_yet:
             yield StateChanged(state="speaking")
@@ -493,29 +477,39 @@ class SessionOrchestrator:
     async def _stream_and_synthesize(
         self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress
     ) -> AsyncIterator[TurnEvent]:
-        """Stream one LLM completion, synthesizing+yielding it chunk by chunk,
-        pipelined one chunk deep so synthesis overlaps generation instead of blocking it."""
-        pending: tuple[str, asyncio.Task[bytes | None]] | None = None
+        """Stream one LLM completion; feed each sentence-sized chunk to TTS and
+        forward its audio sub-chunks to the client as they are generated."""
+        async for text_chunk in sentence_chunks(llm.stream_reply(messages)):
+            text_chunk = _strip_end_marker(text_chunk, progress)
+            text_chunk = _strip_foreign_script(text_chunk)
+
+            if text_chunk:
+                turn.persona_text += text_chunk + " "
+                async for event in self._speak(turn, text_chunk, progress):
+                    yield event
+                    if isinstance(event, Failed):
+                        return
+
+            if progress.ends_call:
+                break  # nothing meaningful should follow the marker
+
+    async def _speak(self, turn: Turn, text_chunk: str, progress: _ReplyProgress) -> AsyncIterator[TurnEvent]:
+        """Synthesize one text chunk and yield its audio, sub-chunk by sub-chunk."""
+        voiced = False
         try:
-            async for text_chunk in sentence_chunks(llm.stream_reply(messages)):
-                text_chunk = _strip_end_marker(text_chunk, progress)
-                text_chunk = _strip_foreign_script(text_chunk)
-
-                if text_chunk:
-                    turn.persona_text += text_chunk + " "
-                    async for event in self._drain_if_pending(turn, pending, progress):
-                        yield event
-                    pending = (text_chunk, asyncio.create_task(self._synthesize_with_retry(text_chunk)))
-
-                if progress.ends_call:
-                    break  # nothing meaningful should follow the marker
-
-            async for event in self._drain_if_pending(turn, pending, progress):
-                yield event
-        except (OpenAIError, asyncio.CancelledError, GeneratorExit):
-            if pending is not None:
-                pending[1].cancel()
-            raise
+            async for wav in tts.synthesize_stream(text_chunk, self._voice, self._language_id):
+                if not voiced:
+                    voiced = True
+                    progress.spoken_text += text_chunk + " "
+                if not progress.spoke_yet:
+                    yield StateChanged(state="speaking")
+                    progress.spoke_yet = True
+                progress.chunk_seq += 1
+                self._note_persona_audio(turn, wav)
+                yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=wav)
+        except (KugelAudioError, OpenAIError, TimeoutError, OSError) as e:
+            logger.error("TTS synthesis failed: %s", e)
+            yield Failed(code="tts_failed", message=str(e))
 
     async def _transcribe_with_retry(
         self, audio_bytes: bytes, filename: str, content_type: str | None
@@ -526,13 +520,4 @@ class SessionOrchestrator:
                 return await stt.transcribe(audio_bytes, filename, content_type, self._language_id)
             except OpenAIError as e:
                 logger.error("STT request failed (attempt %d): %s", attempt + 1, e)
-        return None
-
-    async def _synthesize_with_retry(self, text: str) -> bytes | None:
-        """Synthesize one chunk with one retry on failure; None if both attempts fail."""
-        for attempt in range(2):  # initial attempt + one retry
-            try:
-                return await tts.synthesize(text, self._voice, self._language_id)
-            except (OpenAIError, KugelAudioError) as e:
-                logger.error("TTS request failed (attempt %d): %s", attempt + 1, e)
         return None

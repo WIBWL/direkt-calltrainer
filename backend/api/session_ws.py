@@ -211,7 +211,7 @@ async def _wait_for_control_message(
     session.end/disconnect ends the session, turn.interrupt is a barge-in.
 
     session.activate is neither -- it usually arrives *during* the opening
-    turn, which is exactly the point (ADR 0048) -- so it starts the clock and
+    turn, which is exactly the point (ADR 0049) -- so it starts the clock and
     the wait continues.
     """
     while True:

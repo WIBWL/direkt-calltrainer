@@ -1,4 +1,4 @@
-# ADR 0047: A Session Is Addressed by an Unguessable Id
+# ADR 0048: A Session Is Addressed by an Unguessable Id
 
 ## Status
 

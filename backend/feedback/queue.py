@@ -1,7 +1,7 @@
 """The job queue between the live Session and the Feedback worker (ADR 0019).
 
 Deliberately thin: one queue, one job type. Everything the worker needs is
-already in Postgres by the time the job runs (ADR 0034/0045), so the payload is
+already in Postgres by the time the job runs (ADR 0034/0046), so the payload is
 just a Session's primary key -- no transcript, and above all no audio.
 """
 

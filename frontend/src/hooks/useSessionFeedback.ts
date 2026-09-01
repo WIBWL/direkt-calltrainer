@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 
 import type { SessionDetail } from "../protocol";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "";
 const POLL_INTERVAL_MS = 2000;
 // Generation is one LLM call and normally lands in a few seconds. Well past
 // that, the worker is not coming; say so rather than leave a spinner running.
@@ -40,7 +39,7 @@ export function useSessionFeedback(sessionId: string | null) {
 
     const poll = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/sessions/${sessionId}`);
+        const response = await fetch(`/api/sessions/${sessionId}`);
         if (cancelled) return;
         if (response.status === 404) return setState("missing");
         if (!response.ok) throw new Error(`HTTP ${response.status}`);

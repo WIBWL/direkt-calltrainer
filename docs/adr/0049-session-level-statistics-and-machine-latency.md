@@ -1,12 +1,12 @@
-# ADR 0048: Statistics Describe the Whole Session and Carry No Invented Norms
+# ADR 0049: Statistics Describe the Whole Session and Carry No Invented Norms
 
 ## Status
 
-Accepted. Narrows ADR 0014 (which statistics), ADR 0044 (what is measured) and ADR 0045 (when it is evaluated).
+Accepted. Narrows ADR 0014 (which statistics), ADR 0045 (what is measured) and ADR 0046 (when it is evaluated).
 
 ## Context
 
-ADR 0044 and ADR 0045 govern *how* and *when* measurement happens, not *what* a statistic is a statement about. The first working version answered that implicitly with "about a single utterance", because that is where the measurement takes place. Three problems followed.
+ADR 0045 and ADR 0046 govern *how* and *when* measurement happens, not *what* a statistic is a statement about. The first working version answered that implicitly with "about a single utterance", because that is where the measurement takes place. Three problems followed.
 
 **The frame of reference was too small.** Eight utterances yielded eight speaking rates whose spread is mostly the measurement noise of short samples. A share of the talking time is not defined over a single Turn at all. F-53 states the expectation as statistics *of a conversation*.
 

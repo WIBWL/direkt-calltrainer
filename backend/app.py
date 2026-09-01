@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.api.session_ws import router as session_ws_router
 from backend.api.sessions import router as sessions_router
+from backend.clients import tts
 from backend.clients.health import check_backends
 from backend.db.provision import provision
 from backend.logging_config import configure_logging
@@ -34,6 +35,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     except httpx.HTTPError as e:
         logger.error("Could not reach EFRE_URL (%s): %s — are you connected to the university network", efre_url, e)
     await check_backends()
+    await tts.prewarm()
     # Off the event loop: Alembic and the ORM are both synchronous.
     await asyncio.to_thread(_provision_database)
     yield

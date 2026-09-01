@@ -10,7 +10,7 @@ const HEIGHT = 28;
 
 /**
  * The course of one metric across the whole call, drawn from the curve Praat
- * measured (ADR 0044/0048) and stored in Messung.detail_json (ADR 0029).
+ * measured (ADR 0045/0049) and stored in Messung.detail_json (ADR 0029).
  *
  * Inline SVG rather than a charting library: it is one polyline, and the app
  * has no chart dependency to justify for it. Gaps are breaks in the line, not

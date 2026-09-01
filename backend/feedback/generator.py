@@ -1,8 +1,8 @@
-"""Generating the post-call wrap-up (ADR 0046).
+"""Generating the post-call wrap-up (ADR 0047).
 
 The model is given the transcript and the statistics already measured, and is
 asked to interpret them -- never to produce numbers of its own, and never to
-judge one against a norm nobody measured (ADR 0048). Its citations are checked
+judge one against a norm nobody measured (ADR 0049). Its citations are checked
 against the Session, which is what ADR 0004's "traceable" and F-10's "Bezug auf
 konkrete Gesprächsstellen" require.
 
@@ -97,9 +97,9 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
 
     Two blocks: the call's measured statistics and the transcript on its
     timeline, both rendered as plain statements of fact so the model's job is
-    visibly to explain the numbers rather than to produce them (ADR 0046).
+    visibly to explain the numbers rather than to produce them (ADR 0047).
 
-    No target ranges are supplied, because none were measured (ADR 0048). The
+    No target ranges are supplied, because none were measured (ADR 0049). The
     model is told as much, so it reports a figure it cannot place instead of
     inventing the norm we declined to invent.
     """
@@ -134,7 +134,7 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
     answers an abstract brief with the safest thing it can say -- a generality
     nobody can dispute. So the brief names the parts a point is made of, shows
     a rejected and an accepted one, and gives the model a test to throw its
-    own points out with. The limits of ADR 0046 and ADR 0048 are unchanged.
+    own points out with. The limits of ADR 0047 and ADR 0049 are unchanged.
 
     Form follows from the same fact. A small model loses a rule that sits in
     the middle of a paragraph, so each rule is numbered and lives under the
@@ -284,7 +284,7 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
 
 
 async def _ask(dossier: str, language: str) -> _Wrapup:
-    """One attempt plus one retry, then a narrative-only fallback (ADR 0046).
+    """One attempt plus one retry, then a narrative-only fallback (ADR 0047).
 
     A response that never validates still produces Feedback -- the summary
     without its evidence links -- because showing the user nothing is worse.

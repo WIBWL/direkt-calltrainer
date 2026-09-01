@@ -20,9 +20,9 @@ const NOTICE: Record<string, string> = {
  * the statistics it was written from.
  *
  * The two are shown together deliberately. ADR 0004 makes the qualitative text
- * the feedback itself, and ADR 0046 keeps every number out of the model's
+ * the feedback itself, and ADR 0047 keeps every number out of the model's
  * hands — so the figures here are the evidence behind the text, never a score.
- * Each one describes the whole call rather than a single utterance (ADR 0048).
+ * Each one describes the whole call rather than a single utterance (ADR 0049).
  *
  * Owns the polling itself, so it is only running while this screen is mounted.
  */
@@ -103,7 +103,7 @@ function PointList({
 
 function Metric({ messung }: { messung: Messung }) {
   // The one metric with a course rather than a single number: loudness across
-  // the whole call, as Praat measured it at a fixed rate (ADR 0044/0048).
+  // the whole call, as Praat measured it at a fixed rate (ADR 0045/0049).
   const verlauf = messung.detail?.verlauf_db as (number | null)[] | undefined;
   const decimals = DECIMALS[messung.schluessel] ?? 1;
   return (

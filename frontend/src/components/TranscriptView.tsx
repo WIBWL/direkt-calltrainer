@@ -22,7 +22,7 @@ function timestamp(offsetMs: number): string {
  *
  * One line per utterance, in the order spoken, each stamped with when it
  * started. The server flattens the exchanges, so the ordering lives in one
- * place rather than being reconstructed here (ADR 0048). */
+ * place rather than being reconstructed here (ADR 0049). */
 export default function TranscriptView({
   transcript,
   personaName,

@@ -1,8 +1,8 @@
-# ADR 0044: Praat via Parselmouth as the Paraverbal Measurement Engine
+# ADR 0045: Praat via Parselmouth as the Paraverbal Measurement Engine
 
 ## Status
 
-Accepted, narrowed by ADR 0048: Praat remains the engine, but only for duration, pauses and loudness. The pitch and voice-quality analysis this ADR originally covered (F-35, F-38) is no longer collected.
+Accepted, narrowed by ADR 0049: Praat remains the engine, but only for duration, pauses and loudness. The pitch and voice-quality analysis this ADR originally covered (F-35, F-38) is no longer collected.
 
 ## Context
 

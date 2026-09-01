@@ -30,7 +30,7 @@ export interface TurnAudioMetaMessage {
 /** Sent the moment the client starts playing the Persona's opening line.
  * The server generates that line as soon as the socket connects (ADR 0042),
  * long before the user reaches the call screen, so this is what tells it where
- * t=0 on the Session's timeline actually is (ADR 0048). */
+ * t=0 on the Session's timeline actually is (ADR 0049). */
 export interface SessionActivateMessage {
   type: "session.activate";
 }
@@ -134,7 +134,7 @@ export interface SessionDetail {
   szenario: string;
   status: FeedbackStatus;
   turns: SessionTurn[];
-  /** Statistics for the whole call, not per utterance (ADR 0048). */
+  /** Statistics for the whole call, not per utterance (ADR 0049). */
   messungen: Messung[];
   feedback: SessionFeedback | null;
 }

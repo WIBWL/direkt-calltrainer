@@ -111,7 +111,7 @@ class Session(Base):
         back_populates="session", cascade="all, delete-orphan"
     )
     # Measurements and findings describe the whole call, not one utterance
-    # (ADR 0048), so they hang off the Session rather than off a Turn.
+    # (ADR 0049), so they hang off the Session rather than off a Turn.
     messungen: Mapped[list["Messung"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )

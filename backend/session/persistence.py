@@ -92,7 +92,7 @@ def _write_analysis(
 
     No `Befund` rows are written: marking a value as remarkable takes a norm to
     compare it against, and none of these metrics has one that was measured
-    rather than guessed (ADR 0048). The table waits for pilot data.
+    rather than guessed (ADR 0049). The table waits for pilot data.
 
     A metric the seed does not know is dropped rather than written against a
     guessed reference row -- provision.py seeds the inventory from the same

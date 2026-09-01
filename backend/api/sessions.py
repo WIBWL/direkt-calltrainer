@@ -5,7 +5,7 @@ readable before its wrap-up exists. `status` says which of the two states the
 client is looking at, and the client polls until it settles.
 
 Measurements sit next to the Turns rather than inside them: each one describes
-the whole call (ADR 0048). What stays per Turn is the Transcript itself, with
+the whole call (ADR 0049). What stays per Turn is the Transcript itself, with
 the offset that makes it a timestamped Gesprächsprotokoll.
 
 A Session is addressed by its `oeffentliche_id`, never by its primary key: with

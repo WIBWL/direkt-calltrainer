@@ -26,7 +26,7 @@ FK_BEFUND_TURN = "fk_befund_turn_id"
 
 
 def upgrade() -> None:
-    # ADR 0048: Kennzahlen beschreiben das ganze Gespraech. Messung und Befund
+    # ADR 0049: Kennzahlen beschreiben das ganze Gespraech. Messung und Befund
     # haengen deshalb an der Session statt an einem einzelnen Turn.
     #
     # Dreistufig, weil die Tabellen bereits Zeilen enthalten koennen: Spalte

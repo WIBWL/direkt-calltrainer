@@ -1,4 +1,4 @@
-"""Paraverbal measurement of one Turn's audio via Praat (ADR 0044).
+"""Paraverbal measurement of one Turn's audio via Praat (ADR 0045).
 
 The only module that imports parselmouth: everything else in the backend sees
 plain numbers. Pure and synchronous -- no network, no database, no domain
@@ -8,7 +8,7 @@ What it produces is deliberately raw and additive: a duration, the silent
 stretches inside the utterance, and a loudness curve sampled at a fixed rate.
 All three concatenate across Turns without weighting or interpolation, which
 is what lets the Session's statistics describe the whole call rather than one
-utterance at a time (ADR 0048).
+utterance at a time (ADR 0049).
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from parselmouth.praat import call
 
 
 class AcousticsError(Exception):
-    """The audio could not be measured. Never fatal to a Session (ADR 0045)."""
+    """The audio could not be measured. Never fatal to a Session (ADR 0046)."""
 
 
 # Praat's intensity analysis windows are derived from a pitch floor; this one
@@ -71,7 +71,7 @@ class TurnAcoustics:
     pauses: tuple[Pause, ...]
     # One sample per _SAMPLE_INTERVAL_MS; None while the speaker was silent.
     # Relative by nature: the browser's automatic gain control makes an
-    # absolute level a statement about the user's headset (ADR 0044).
+    # absolute level a statement about the user's headset (ADR 0045).
     loudness_db: tuple[float | None, ...]
 
 
