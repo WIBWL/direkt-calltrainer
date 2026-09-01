@@ -29,7 +29,6 @@ export default function AppHeader({ activeStep }: AppHeaderProps) {
           </span>
 
           <span className="app-brand-name">Calltrainer</span>
-          <span className="prototype-badge">UI-Prototyp</span>
         </div>
 
         <ol className="training-progress" aria-label="Trainingsfortschritt">
