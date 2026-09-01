@@ -10,6 +10,7 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from backend.api.session_ws import router as session_ws_router
@@ -50,8 +51,24 @@ FRONTEND_DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "d
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    """Plain health check."""
+    """Liveness: the process is up. Deliberately touches nothing else, so a
+    restart loop cannot be caused by a dependency being briefly unavailable."""
     return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def readiness() -> dict[str, str]:
+    """Readiness: the app can actually serve. Separate from liveness because
+    every endpoint below needs the database — an instance that answers "ok"
+    while Postgres is unreachable would keep receiving traffic it can only
+    answer with 503."""
+    try:
+        with session_scope() as db:
+            db.execute(text("SELECT 1"))
+    except SQLAlchemyError as e:
+        logger.error("Readiness check failed: %s", e)
+        raise HTTPException(status_code=503, detail="Database unavailable") from e
+    return {"status": "ready"}
 
 
 @app.get("/api/personas")

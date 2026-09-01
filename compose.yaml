@@ -8,13 +8,26 @@ services:
     env_file:
       - .env
     environment:
-      # Within the compose network the database host is "db", not localhost.
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # The only part of the connection that differs from the host default:
+      # within the compose network the database is reachable as "db". User,
+      # password and database name come from the env_file, and the URL itself
+      # is assembled in backend/db/session.py.
+      POSTGRES_HOST: db
     ports:
       - 8000:8000
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      # Readiness, not liveness: an instance that cannot reach the database can
+      # only answer 503, so it should not count as healthy. Uses Python because
+      # the image has no curl. start_period covers migrations and seeding.
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
 
   db:
     image: postgres:17
