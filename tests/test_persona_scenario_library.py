@@ -1,9 +1,9 @@
 """The persona and scenario libraries themselves (the data, not the endpoint).
 
 Covers:
-  F-04  Kundenpersona-Bibliothek  (extensible; cost-critical customers,
+  F-04  customer persona library  (extensible; cost-critical customers,
         managing directors / IT leads focused on strategy & budget)
-  F-03  Szenario-Typen  (support cases, pricing/offer talks, ...)
+  F-03  scenario types  (support cases, pricing/offer talks, ...)
   F-01  the counterpart reflects conversational dynamics, not just facts
   ADR 0006 / R-35  German only for the MVP
   ADR 0022  language is a per-persona parameter, not a global setting
@@ -77,6 +77,6 @@ def test_every_persona_is_german(persona):
 @pytest.mark.parametrize("persona", PERSONAS, ids=lambda p: p.id)
 def test_every_persona_has_its_own_voice(persona):
     """ADR 0022: voice/language is a per-persona property. Each persona names
-    both an EFRE fallback voice and a KugelAudio voice id."""
+    both a DiReKT fallback voice and a KugelAudio voice id."""
     assert persona.voice.tts_voice
     assert isinstance(persona.voice.kugelaudio_voice_id, int)

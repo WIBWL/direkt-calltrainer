@@ -21,7 +21,7 @@ The character traits of the AI-simulated conversation partner within a Session â
 _Avoid_: Scenario, character, counterpart
 
 **Language**:
-The language a Session's simulated conversation is conducted in. Configured independently of Scenario and Persona, per Session.
+The language a Session's simulated conversation is conducted in. Not a Session parameter of its own: it follows from the selected Persona, which carries exactly one language and voice (docs/adr/0043, superseding the earlier per-Session model). Only German is supported so far.
 _Avoid_: Locale
 
 **Feedback**:

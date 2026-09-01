@@ -1,3 +1,10 @@
+"""The Persona library (see CONTEXT.md).
+
+Code for now; ADR 0041 moves it into the database. Each Persona is bound to one
+language and one voice per backend (ADR 0043) — `tts_voice` on the DiReKT
+fallback, `kugelaudio_voice_id` on KugelAudio.
+"""
+
 from dataclasses import dataclass
 
 

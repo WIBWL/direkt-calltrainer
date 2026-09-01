@@ -6,11 +6,11 @@ Accepted
 
 ## Context
 
-arc42's Bausteinsicht is still open. The backend today is a single file; the real Session pipeline needs a clear structure for orchestration (turns, retries per ADR 0016, Persona/Scenario), the EFRE-Direkt client (ADR 0011), and access to the project's own database (ADR 0010). Separately, Feedback generation (ADR 0004, ADR 0014) only ever runs after a Session ends and does not need to share the same request/response cycle as the live conversation.
+arc42's Bausteinsicht is still open. The backend today is a single file; the real Session pipeline needs a clear structure for orchestration (turns, retries per ADR 0016, Persona/Scenario), the DiReKT client (ADR 0011), and access to the project's own database (ADR 0010). Separately, Feedback generation (ADR 0004, ADR 0014) only ever runs after a Session ends and does not need to share the same request/response cycle as the live conversation.
 
 ## Decision
 
-We will structure the real-time Session backend as a layered modular monolith — an API/interface layer, a dialog/orchestration logic layer, and a data-access layer (the EFRE-Direkt client and database access) — each independently swappable, within one deployable service (ADR 0012's FastAPI app). We will not split the real-time path into microservices. Feedback/wrap-up generation, however, runs as a separate asynchronous worker: ending a Session places a `SessionCompleted` event on a job queue, and the worker consumes it independently of the live conversation loop. Which model handles STT/LLM/TTS behind the EFRE-Direkt gateway (ADR 0011, ADR 0017) remains a configuration concern, not a service boundary.
+We will structure the real-time Session backend as a layered modular monolith — an API/interface layer, a dialog/orchestration logic layer, and a data-access layer (the DiReKT client and database access) — each independently swappable, within one deployable service (ADR 0012's FastAPI app). We will not split the real-time path into microservices. Feedback/wrap-up generation, however, runs as a separate asynchronous worker: ending a Session places a `SessionCompleted` event on a job queue, and the worker consumes it independently of the live conversation loop. Which model handles STT/LLM/TTS behind the DiReKT gateway (ADR 0011, ADR 0017) remains a configuration concern, not a service boundary.
 
 ## Consequences
 

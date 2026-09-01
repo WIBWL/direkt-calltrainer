@@ -1,4 +1,10 @@
-"""WebSocket API route for the live session: wire protocol <-> SessionOrchestrator."""
+"""The `/ws/session` route: wire protocol on one side, `SessionOrchestrator` on
+the other.
+
+A WebSocket, not REST, because the live call streams audio both ways and the
+user can talk over the persona (ADR 0033, ADR 0035). The token rides in the
+first message — a browser cannot header a WebSocket (ADR 0009).
+"""
 
 import asyncio
 import contextlib
@@ -6,9 +12,11 @@ import json
 import logging
 import uuid
 from collections.abc import AsyncIterator
+from typing import Literal
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from backend.auth import AuthContext, authenticate_ws
 from backend.logging_config import reset_session_log, session_id_scope
 from backend.personas import PERSONAS, Persona
 from backend.scenarios import SCENARIOS, Scenario
@@ -29,22 +37,28 @@ async def session_ws(websocket: WebSocket) -> None:
     handshake = await _handshake(websocket)
     if handshake is None:
         return
-    persona, scenario = handshake
+    persona, scenario, auth = handshake
 
     session_id = str(uuid.uuid4())
     reset_session_log()
     with session_id_scope(session_id):
-        orchestrator = SessionOrchestrator(persona, scenario)
-        logger.info("Session started: persona=%s language=%s", persona.id, persona.language_id)
+        orchestrator = SessionOrchestrator(persona, scenario, subject_id=auth.sub)
+        logger.info(
+            "Session started: subject=%s persona=%s language=%s", auth.sub, persona.id, persona.language_id
+        )
 
         await websocket.send_json({"type": "session.started", "session_id": session_id})
 
         try:
-            # Persona opens the call
+            # The persona speaks first (F-01): the opening Turn has no user
+            # utterance, but is otherwise a normal interruptible Turn.
             outcome = await _run_turn_interruptible(websocket, orchestrator.run_opening_turn())
             if outcome in ("ok", "interrupted"):
                 reason = await _run_session(websocket, orchestrator)
             else:
+                # The opening Turn itself ended the Session: "failed" is the Turn
+                # vocabulary for what the client is told as "error"; "completed"
+                # and "user" carry over unchanged.
                 reason = "error" if outcome == "failed" else outcome
         except WebSocketDisconnect:
             logger.info("Client disconnected")
@@ -58,16 +72,18 @@ async def session_ws(websocket: WebSocket) -> None:
             await websocket.send_json({"type": "session.ended", "reason": reason, "transcript": transcript})
             await websocket.close()
         except (WebSocketDisconnect, RuntimeError):
-            # Client can disconnect between _run_session and final send
-            # e.g. ASGI message 'websocket.send' after 'websocket.close'
+            # The client can drop before this final send; Starlette then raises
+            # RuntimeError ("send after close"), not WebSocketDisconnect. The
+            # transcript is lost with the connection — the accepted trade in
+            # ADR 0034 (a mid-call disconnect leaves no record).
             logger.info("Client disconnected before session.ended could be sent")
             return
         logger.info("Session ended (%s)", reason)
 
 
-async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
+async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario, AuthContext] | None:
     """Reads the required `session.start` message, closing the socket and
-    returning None on any malformed or unknown input."""
+    returning None on any malformed, unauthenticated or unknown input."""
     try:
         start = await websocket.receive_json()
     except WebSocketDisconnect:
@@ -76,6 +92,15 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
         logger.warning("Handshake failed: expected session.start, got %r", start.get("type"))
         # Protocol Error (1002; https://websocket.org/reference/close-codes/)
         await websocket.close(code=1002, reason="Expected session.start")
+        return None
+
+    # A browser can't set an Authorization header on a WebSocket, so the token
+    # rides in the handshake message (ADR 0009).
+    auth = authenticate_ws(start)
+    if auth is None:
+        logger.warning("Handshake failed: missing or invalid token")
+        # Policy Violation (1008; https://websocket.org/reference/close-codes/)
+        await websocket.close(code=1008, reason="Authentication required")
         return None
 
     persona_id = start.get("persona_id")
@@ -87,18 +112,28 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
         # Protocol Error (1002; https://websocket.org/reference/close-codes/)
         await websocket.close(code=1002, reason="Unknown persona_id/scenario_id")
         return None
-    return persona, scenario
+    return persona, scenario, auth
 
 
-async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) -> str:
+# The three vocabularies threaded through the turn/session helpers, spelled out
+# so a typo in a return or comparison is a type error rather than a silent
+# fall-through:
+_TurnResult = Literal["ok", "failed", "completed"]           # what _forward_turn_events reports
+_ControlMessage = Literal["end", "interrupt"]                 # what pre-empted an in-flight turn
+_TurnOutcome = Literal["ok", "failed", "completed", "interrupted", "user"]  # after the control race
+_SessionEndReason = Literal["user", "error", "completed"]     # sent to the client in session.ended
+
+
+async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) -> _SessionEndReason:
     """Session runs until the user ends the session, a turn fails, or the
     persona ends the call naturally ("user", "error", or "completed")."""
     while True:
         envelope = await _receive_json(websocket)
         if envelope is None or envelope.get("type") == "session.end":
             return "user"
-        if envelope.get("type") == "turn.interrupt":
-            continue
+        # Between Turns nothing is playing, so a stray `turn.interrupt` — or any
+        # unrecognised message — is skipped, not an error (client and server
+        # versions need not match exactly).
         if envelope.get("type") != "turn.audio.meta":
             continue
 
@@ -114,7 +149,9 @@ async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) 
             return "error" if outcome == "failed" else outcome
 
 
-async def _run_turn_interruptible(websocket: WebSocket, events: AsyncIterator[TurnEvent]) -> str:
+async def _run_turn_interruptible(
+    websocket: WebSocket, events: AsyncIterator[TurnEvent]
+) -> _TurnOutcome:
     """Forwards one turn's events while racing session.end/disconnect/a user
     barge-in, so talking over the persona doesn't wait for it to finish."""
     forward_task = asyncio.create_task(_forward_turn_events(websocket, events))
@@ -140,7 +177,7 @@ async def _run_turn_interruptible(websocket: WebSocket, events: AsyncIterator[Tu
     return forward_task.result()
 
 
-async def _wait_for_control_message(websocket: WebSocket) -> str:
+async def _wait_for_control_message(websocket: WebSocket) -> _ControlMessage:
     """Waits for a client message that should interrupt the in-flight turn:
     session.end/disconnect ends the session, turn.interrupt is a barge-in."""
     while True:
@@ -151,9 +188,12 @@ async def _wait_for_control_message(websocket: WebSocket) -> str:
             return "interrupt"
 
 
-async def _forward_turn_events(websocket: WebSocket, events: AsyncIterator[TurnEvent]) -> str:
-    """Forwards the events of a turn. Returns "failed" if the turn failed,
-    "completed" if the persona or the user ended the call naturally, else "ok"."""
+async def _forward_turn_events(
+    websocket: WebSocket, events: AsyncIterator[TurnEvent]
+) -> _TurnResult:
+    """Translate one Turn's `TurnEvent`s to wire messages — the only place that
+    mapping lives (see session/models.py). Returns "failed" on a failed leg,
+    "completed" if the call ended naturally, else "ok"."""
     async for event in events:
         if isinstance(event, StateChanged):
             await websocket.send_json({"type": "state", "value": event.state})
