@@ -387,6 +387,7 @@ h2 {
 }
 
 .persona-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -394,11 +395,28 @@ h2 {
   background: #fff;
   border: 2px solid var(--border);
   border-radius: 16px;
-  padding: 1rem;
+  padding: 1rem 3.25rem 1rem 1rem;
   cursor: pointer;
   font: inherit;
   color: inherit;
   transition: border-color 0.2s;
+}
+
+/* The indicator remains visible as an empty circle for unselected choices. */
+.choice-check {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--color-blue-300);
+  border-radius: 50%;
+  color: transparent;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .persona-card:hover {
