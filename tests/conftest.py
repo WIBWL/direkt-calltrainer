@@ -6,7 +6,7 @@ module is imported. Values are dummies: no test in this suite makes a real
 network call — every pipeline backend (STT / LLM / TTS) is faked.
 
 `DEBUG=true` keeps TTS config fully offline (no KugelAudio client is
-constructed); the KugelAudio-default / EFRE-fallback dispatch is still
+constructed); the KugelAudio-default / DiReKT-fallback dispatch is still
 covered in `test_tts_fallback.py` by patching the tts module directly.
 """
 
@@ -17,8 +17,8 @@ covered in `test_tts_fallback.py` by patching the tts module directly.
 
 import os
 
-os.environ.setdefault("EFRE_URL", "http://efre.test.invalid")
-os.environ.setdefault("EFRE_API_KEY", "test-efre-key")
+os.environ.setdefault("DIREKT_URL", "http://direkt.test.invalid")
+os.environ.setdefault("DIREKT_API_KEY", "test-direkt-key")
 os.environ.setdefault("STT_MODEL", "test-stt-model")
 os.environ.setdefault("LLM_MODEL", "test-llm-model")
 os.environ.setdefault("TTS_MODEL", "test-tts-model")
@@ -26,15 +26,35 @@ os.environ.setdefault("KUGELAUDIO_MODEL", "test-kugelaudio-model")
 os.environ.setdefault("KUGELAUDIO_API_KEY", "test-kugelaudio-key")
 os.environ.setdefault("DEBUG", "true")
 os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
+os.environ.setdefault("OIDC_ISSUER", "http://keycloak.test.invalid/realms/direkt")
 
 import pytest  # noqa: E402
 from kugelaudio.exceptions import KugelAudioError  # noqa: E402
 from openai import OpenAIError  # noqa: E402
 
+from backend import auth  # noqa: E402
+from backend.app import app  # noqa: E402
 from backend.clients import llm, stt, tts  # noqa: E402
 from backend.personas import PERSONAS  # noqa: E402
 from backend.scenarios import SCENARIOS  # noqa: E402
 from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted  # noqa: E402
+
+# A fixed caller for tests that don't care about auth (most of them).
+TEST_AUTH = auth.AuthContext(sub="test-subject", roles=[], token="test-token")
+
+
+@pytest.fixture
+def auth_ctx():
+    return TEST_AUTH
+
+
+@pytest.fixture(autouse=True)
+def _override_auth():
+    """Every test runs as `TEST_AUTH` unless it clears the override itself
+    (see `test_setup_api.py`'s unauthenticated cases)."""
+    app.dependency_overrides[auth.require_user] = lambda: TEST_AUTH
+    yield
+    app.dependency_overrides.pop(auth.require_user, None)
 
 
 @pytest.fixture
@@ -95,8 +115,8 @@ class FakeTTS:
     """Stand-in for `backend.clients.tts.synthesize_stream` (+ one-shot
     `synthesize`).
 
-    `synthesize_stream` mimics the real KugelAudio->EFRE fallback as a
-    two-attempt sequence: a `fail_times` of 1 is "KugelAudio blipped, EFRE
+    `synthesize_stream` mimics the real KugelAudio->DiReKT fallback as a
+    two-attempt sequence: a `fail_times` of 1 is "KugelAudio blipped, DiReKT
     covered it" (absorbed, 2 recorded calls); a higher count exhausts both and
     raises (-> `tts_failed`). Set `.hang` to an `asyncio.Event` to park
     synthesis (barge-in tests). `.chunks_per_call` controls how many audio
@@ -110,7 +130,7 @@ class FakeTTS:
         self.chunks_per_call = 1
 
     async def synthesize_stream(self, text, voice, language_id):
-        for _ in range(2):  # KugelAudio attempt, then the EFRE fallback
+        for _ in range(2):  # KugelAudio attempt, then the DiReKT fallback
             self.calls.append((text, voice, language_id))
             if self.hang is not None:
                 await self.hang.wait()

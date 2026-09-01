@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { currentAccessToken } from "../auth";
 import type { CallState, ClientMessage, ServerMessage, TurnRecord } from "../protocol";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "";
-const WS_URL = `${API_URL.replace(/^http/, "ws")}/ws/session`;
+// The backend serves this SPA, so the WebSocket is same-origin (see CLAUDE.md).
+// Derived from window.location rather than a base-URL env var, which no longer
+// exists.
+const WS_URL =
+  typeof window === "undefined"
+    ? "/ws/session"
+    : `${window.location.origin.replace(/^http/, "ws")}/ws/session`;
 
 interface UseSessionSocketOptions {
   personaId: string | null;
@@ -19,10 +25,15 @@ interface UseSessionSocketOptions {
 /**
  * Owns the per-Session WebSocket connection (see ADR 0033's wire protocol):
  * sends the initial handshake, forwards Turn audio, and translates incoming
- * state/audio-chunk/error/session.ended messages into hook state. Connects
- * as soon as personaId/scenarioId are known — not gated behind any screen —
- * so the Persona's opening line can start generating in the background
- * before the user has done anything beyond loading the app.
+ * state/audio-chunk/error/session.ended messages into hook state.
+ *
+ * Currently connects as soon as personaId/scenarioId are known — i.e. at app
+ * load, since the cards preselect (ADR 0015) — to pre-warm the opening Turn.
+ * ADR 0042 supersedes this: the connection should bind to Session *commitment*
+ * (leaving the selection screen for the mic check), and the audio buffer should
+ * be discarded whenever the connection is replaced. Not yet implemented — until
+ * it is, changing a Persona/Scenario reconnects, and the "opening line heard
+ * twice" bug in ADR 0042's Context can still occur.
  */
 export function useSessionSocket({
   personaId,
@@ -54,13 +65,22 @@ export function useSessionSocket({
     // "connection lost" message even though the real connection is fine.
     const isCurrent = () => wsRef.current === ws;
 
-    ws.onopen = () => {
+    ws.onopen = async () => {
       if (!isCurrent()) return;
+      const token = await currentAccessToken();
+      if (!isCurrent()) return;
+      if (!token) {
+        console.warn("[WS] no access token; closing");
+        ws.close();
+        setError("Sitzung abgelaufen. Bitte neu anmelden.");
+        return;
+      }
       console.debug("[WS] connected, sending session.start");
       const start: ClientMessage = {
         type: "session.start",
         persona_id: personaId,
         scenario_id: scenarioId,
+        token,
       };
       ws.send(JSON.stringify(start));
     };

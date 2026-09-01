@@ -5,11 +5,20 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
+      args:
+        # The SPA needs these at `npm run build` time (see Dockerfile).
+        VITE_OIDC_ISSUER: ${VITE_OIDC_ISSUER:-http://localhost:18081/realms/direkt}
+        VITE_OIDC_CLIENT_ID: ${VITE_OIDC_CLIENT_ID:-calltrainer-frontend}
     env_file:
       - .env
     environment:
       # Within the compose network the database host is "db", not localhost.
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # The token `iss` and the browser's authority — reachable at localhost:18081
+      # from the host. The container can't reach that, so it fetches the keys
+      # over the compose network instead (backend/auth.py's OIDC_JWKS_URL).
+      OIDC_ISSUER: http://localhost:18081/realms/direkt
+      OIDC_JWKS_URL: http://keycloak:8080/realms/direkt/protocol/openid-connect/certs
     ports:
       # Host port is deliberately non-standard to avoid clashes (e.g. mkdocs,
       # other uvicorn/Django apps, all default to 8000). Container stays 8000.
@@ -18,6 +27,8 @@ services:
       - ./logs:/app/logs
     depends_on:
       db:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     develop:
       watch:
@@ -52,5 +63,38 @@ services:
       timeout: 5s
       retries: 5
 
+  # Local identity provider (ADR 0009). `start-dev` keeps realms in an embedded
+  # H2 file, so no DB of its own. `--import-realm` reads keycloak/direkt-realm.json
+  # at boot: the calltrainer-frontend client and the dev users alice/bob/carol
+  # (password = username). Import is SKIPPED if the realm already exists, so
+  # after editing the JSON: `docker compose down -v && docker compose up`.
+  # KC_HOSTNAME fixes the issuer to localhost:18081 no matter which host the
+  # token request arrived on; --hostname-strict=false lets the app container
+  # reach it as `keycloak:8080` for the JWKS. Host port 18081, not 18080, so it
+  # can run alongside direkt-dataplatform's Keycloak.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7
+    command: start-dev --import-realm --hostname-strict=false
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: http://localhost:18081
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - 18081:8080
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ./keycloak:/opt/keycloak/data/import:ro
+    healthcheck:
+      # KC 26 images carry no curl/wget; bash's /dev/tcp checks the HTTP port is
+      # accepting connections. Realm import finishes within `start_period`.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
 volumes:
   pgdata:
+  keycloak-data:
+    name: direkt-calltrainer-keycloak-data

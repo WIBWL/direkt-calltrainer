@@ -1,9 +1,9 @@
-"""TTS backend selection: KugelAudio by default, EFRE model as fallback.
+"""TTS backend selection: KugelAudio by default, DiReKT model as fallback.
 
 Covers ADR 0040:
   * normal path -> KugelAudio
-  * KugelAudio error -> transparently falls back to the EFRE TTS model
-  * DEBUG=True -> always the EFRE model, KugelAudio is never called
+  * KugelAudio error -> transparently falls back to the DiReKT TTS model
+  * DEBUG=True -> always the DiReKT model, KugelAudio is never called
 And the PCM16 -> WAV wrapping KugelAudio output needs.
 """
 
@@ -24,18 +24,18 @@ VOICE = PERSONAS[0].voice
 
 @pytest.fixture
 def spy_backends(monkeypatch):
-    calls = {"kugelaudio": 0, "efre": 0}
+    calls = {"kugelaudio": 0, "direkt": 0}
 
     async def fake_kugelaudio(_text, _voice, _language_id):
         calls["kugelaudio"] += 1
         return b"KUGEL-WAV"
 
-    async def fake_efre(_text, _voice):
-        calls["efre"] += 1
-        return b"EFRE-WAV"
+    async def fake_direkt(_text, _voice):
+        calls["direkt"] += 1
+        return b"DIREKT-WAV"
 
     monkeypatch.setattr(tts, "_synthesize_kugelaudio", fake_kugelaudio)
-    monkeypatch.setattr(tts, "_synthesize", fake_efre)
+    monkeypatch.setattr(tts, "_synthesize", fake_direkt)
     return calls
 
 
@@ -43,10 +43,10 @@ async def test_default_path_uses_kugelaudio(spy_backends, monkeypatch):
     monkeypatch.setattr(tts, "DEBUG", False)
     out = await tts.synthesize("Hallo.", VOICE, "de")
     assert out == b"KUGEL-WAV"
-    assert spy_backends == {"kugelaudio": 1, "efre": 0}
+    assert spy_backends == {"kugelaudio": 1, "direkt": 0}
 
 
-async def test_falls_back_to_efre_when_kugelaudio_fails(spy_backends, monkeypatch):
+async def test_falls_back_to_direkt_when_kugelaudio_fails(spy_backends, monkeypatch):
     monkeypatch.setattr(tts, "DEBUG", False)
 
     async def boom(_text, _voice, _language_id):
@@ -56,15 +56,15 @@ async def test_falls_back_to_efre_when_kugelaudio_fails(spy_backends, monkeypatc
     monkeypatch.setattr(tts, "_synthesize_kugelaudio", boom)
 
     out = await tts.synthesize("Hallo.", VOICE, "de")
-    assert out == b"EFRE-WAV"
-    assert spy_backends == {"kugelaudio": 1, "efre": 1}
+    assert out == b"DIREKT-WAV"
+    assert spy_backends == {"kugelaudio": 1, "direkt": 1}
 
 
-async def test_debug_mode_always_uses_efre_and_never_calls_kugelaudio(spy_backends, monkeypatch):
+async def test_debug_mode_always_uses_direkt_and_never_calls_kugelaudio(spy_backends, monkeypatch):
     monkeypatch.setattr(tts, "DEBUG", True)
     out = await tts.synthesize("Hallo.", VOICE, "de")
-    assert out == b"EFRE-WAV"
-    assert spy_backends == {"kugelaudio": 0, "efre": 1}
+    assert out == b"DIREKT-WAV"
+    assert spy_backends == {"kugelaudio": 0, "direkt": 1}
 
 
 def test_pcm16_to_wav_produces_a_valid_mono_16bit_wav():

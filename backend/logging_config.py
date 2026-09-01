@@ -1,5 +1,10 @@
-"""Central logging setup: colored console + file, both showing which
-Session a line belongs to. Call configure_logging() once at startup."""
+"""Central logging setup: colored console + a per-Session file, both stamping
+every line with its Session (ADR 0039). Call `configure_logging()` once at startup.
+
+The file holds only the current call — truncated on Session start, not appended.
+Useless for multi-Session monitoring and unsafe under concurrent calls, both
+accepted in ADR 0039 for one-call-at-a-time development.
+"""
 
 import contextlib
 import contextvars
@@ -106,8 +111,8 @@ def configure_logging(log_file: str | Path = "logs/calltrainer.log") -> None:
 
 
 def reset_session_log() -> None:
-    """Truncates the log file so it only ever holds the current/last
-    conversation, called when a new Session starts (see session_ws.py)."""
+    """Empty the log file at the start of a Session (see session_ws.py) so it
+    always shows exactly one call. ADR 0039 covers why append was rejected."""
     handler = _state.file_handler
     if handler is None:
         return

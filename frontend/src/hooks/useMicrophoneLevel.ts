@@ -19,8 +19,8 @@ export function useMicrophoneLevel() {
     const data = new Uint8Array(analyser.fftSize);
     analyser.getByteTimeDomainData(data);
     let sumSquares = 0;
-    for (let i = 0; i < data.length; i++) {
-      const normalized = (data[i] - 128) / 128;
+    for (const sample of data) {
+      const normalized = (sample - 128) / 128;
       sumSquares += normalized * normalized;
     }
     setLevel(Math.sqrt(sumSquares / data.length));

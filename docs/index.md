@@ -21,7 +21,7 @@ Sie sind in der Leitung. Wählen Sie eine Option:
 - [ADR 0008 — React + TypeScript Frontend](adr/0008-react-typescript-frontend.md)
 - [ADR 0009 — Keycloak OIDC Authorization Code Flow + PKCE](adr/0009-keycloak-oidc-pkce-auth.md)
 - [ADR 0010 — Own PostgreSQL Instance for Session Persistence](adr/0010-own-postgresql-instance-for-session-persistence.md)
-- [ADR 0011 — EFRE-Direkt LLM Backend, Self-Contained](adr/0011-efre-direkt-llm-backend.md)
+- [ADR 0011 — DiReKT LLM Backend, Self-Contained](adr/0011-direkt-llm-backend.md)
 - [ADR 0012 — Python + FastAPI Backend](adr/0012-python-fastapi-backend.md)
 - [ADR 0013 — Minimal Required Setup, Advanced Options Separate](adr/0013-minimal-required-setup.md)
 - [ADR 0014 — Feedback Only in the Post-Call Wrap-Up](adr/0014-feedback-only-after-call.md)
@@ -48,5 +48,7 @@ Sie sind in der Leitung. Wählen Sie eine Option:
 - [ADR 0041 — Personas and Scenarios Loaded from the Database](adr/0041-personas-scenarios-from-database.md)
 - [ADR 0043 — English Prompt Content, Session Language Bound to the Persona](adr/0043-english-prompt-content-persona-bound-language.md)
 - [ADR 0044 — Forward KugelAudio's Audio Sub-Chunks; No Persistent Streaming Session](adr/0044-streaming-tts-forward-subchunks.md)
+- [ADR 0045 — Case Facts, Call Goal and Success Condition on the Scenario; Objections on the Persona](adr/0045-case-facts-on-scenario-objections-on-persona.md)
+- [ADR 0046 — Liveliness Is Pursued at the Prompt Layer Before the Turn-Taking Layer (proposed)](adr/0046-liveliness-at-the-prompt-layer.md)
 
 *Vielen Dank für Ihren Anruf. Bitte legen Sie nach der Lektüre nicht auf — es warten noch mehr ADRs auf Sie.*

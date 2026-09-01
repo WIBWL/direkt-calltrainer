@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The backend needs to orchestrate calls to the EFRE-Direkt LLM gateway (ADR 0011) over HTTP and to talk to the project's own PostgreSQL instance (ADR 0010). The OpenAI-compatible client used for the LLM gateway is a Python library.
+The backend needs to orchestrate calls to the DiReKT LLM gateway (ADR 0011) over HTTP and to talk to the project's own PostgreSQL instance (ADR 0010). The OpenAI-compatible client used for the LLM gateway is a Python library.
 
 ## Decision
 

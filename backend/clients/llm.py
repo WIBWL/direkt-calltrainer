@@ -1,4 +1,9 @@
-"""Dialogue-generation client calls."""
+"""Dialogue generation: the persona's reply, streamed token by token.
+
+One backend, no fallback (ADR 0011). Streaming lets the orchestrator chunk the
+reply and synthesise audio before it finishes (ADR 0033). The sampling
+parameters below are Qwen3-specific, tuned by measurement (docs/model-parameters.md).
+"""
 
 import logging
 from collections.abc import AsyncIterator

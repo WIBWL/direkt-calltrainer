@@ -11,13 +11,13 @@ Calltrainer is a use case built within [EFRE-DiReKT](https://efre-direkt.de/), a
 
 ## Architecture
 
-FastAPI backend, React + TypeScript frontend, one Docker image. Speech-to-text, dialogue generation, and text-to-speech all run through a university-hosted, OpenAI-compatible model gateway - no separate provider accounts or local models needed to run the app.
+FastAPI backend, React + TypeScript frontend, one Docker image. Speech-to-text, dialogue generation, and text-to-speech all run through the EFRE-DiReKT gateway, an OpenAI-compatible model gateway - no separate provider accounts or local models needed to run the app.
 
-> **Note:** The EFRE-DiReKT gateway is only reachable from within the University of Würzburg network - connect via campus network or VPN before running the app.
+> **Note:** The EFRE-DiReKT gateway is only reachable from its own network - connect via VPN before running the app.
 
 ## 1. Setup
 
-Copy `.env.example` to `.env` and fill in the real `EFRE_API_KEY`.
+Copy `.env.example` to `.env` and fill in the real `DIREKT_API_KEY`.
 
 ## 2. Run the App
 
@@ -29,7 +29,27 @@ Builds the frontend too (multi-stage Dockerfile) and serves everything on `http:
 
 For development, add `--watch` (`docker compose up --build --watch`) to have the container pick up code changes automatically: backend edits are synced in and the app restarts without a full rebuild, while frontend edits and `requirements.txt` changes trigger a rebuild.
 
-## 3. Documentation
+## 3. Login (Keycloak)
+
+`docker compose up` brings its own Keycloak on `http://localhost:18081` and imports `keycloak/direkt-realm.json` — the `calltrainer-frontend` client and three fixed users:
+
+| user | password |
+|---|---|
+| `alice` | `alice` |
+| `bob` | `bob` |
+| `carol` | `carol` |
+
+Opening `http://localhost:8391` redirects to Keycloak; log in as any of them. There is nothing to configure and no roles — a valid token is all the app checks (ADR 0009).
+
+**To change the realm, edit the JSON and wipe the volume** — import is skipped for a realm that already exists:
+
+```powershell
+docker compose down -v ; docker compose up --build
+```
+
+The Keycloak admin console is at <http://localhost:18081> with `admin` / `admin`. Production uses the shared `direkt` realm at `keycloak.efre-direkt.de`, administered by hand (the import file is dev-only).
+
+## 4. Documentation
 
 The full architecture documentation - arc42 and every Architecture Decision Record (ADR) - is served via [MkDocs](https://www.mkdocs.org):
 
