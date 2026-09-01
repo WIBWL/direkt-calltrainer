@@ -280,7 +280,7 @@ export default function App() {
           </div>
         </SetupSection>
 
-                {/* The summary lets users review their choices before continuing. */}
+        {/* The summary lets users review their choices before continuing. */}
         <SetupSection
           index="03"
           title="Auswahl prüfen"
