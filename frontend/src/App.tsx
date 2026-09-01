@@ -250,7 +250,12 @@ export default function App() {
                 onClick={() => setScenarioId(s.id)}
                 type="button"
                 aria-pressed={s.id === scenarioId}
-              >
+                >
+                {/* The visual indicator complements the aria-pressed state. */}
+                <span className="choice-check" aria-hidden="true">
+                  {s.id === scenarioId ? "✓" : ""}
+                </span>
+
                 <span className="persona-name">{s.name}</span>
                 <span className="card-subtitle">{s.description}</span>
               </button>
