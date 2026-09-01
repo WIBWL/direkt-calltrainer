@@ -71,6 +71,10 @@ def _build_system_prompt(persona: Persona, scenario: Scenario) -> str:
         "problem is, and never wait for them to explain why they're "
         "calling — you're the one with something to discuss.\n"
         f"Context of the call: {scenario.description}\n"
+        # Without this the model invents a fresh name on every call, and the
+        # stored Transcript then contradicts the Persona it belongs to.
+        f"Your name: {persona.name}. Introduce yourself with this name and no "
+        "other, and keep it consistent for the whole call.\n"
         f"Your role: {persona.role}.\n"
         f"Character traits: {persona.traits}.\n"
         f"Behavior: {persona.behavior}.\n"
