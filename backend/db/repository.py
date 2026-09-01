@@ -1,12 +1,12 @@
 """Reads reference data out of the database and hands it to the rest of the
 backend as plain domain objects.
 
-The `persona`/`szenario` tables are the source of truth; `backend/personas.py`
+The `persona`/`scenario` tables are the source of truth; `backend/personas.py`
 and `backend/scenarios.py` only seed them and contribute the dataclasses used
 here (ADR 0024 has Users authoring their own, which have to come from the
 database). Mapping to those dataclasses at this boundary keeps the API layer
-and the SessionOrchestrator free of ORM objects, so neither has to care that
-the columns are named in German or that rows can be deactivated.
+and the SessionOrchestrator free of ORM objects, so neither has to care how the
+schema spells a field or that rows can be deactivated.
 
 Every function takes an open session; opening one is the caller's job, because
 the caller knows whether it is on the event loop (see session_ws.py) or in
@@ -18,46 +18,47 @@ from sqlalchemy.orm import Session as DbSession
 
 from backend.db.models import Persona as PersonaRow
 from backend.db.models import Session as SessionRow
-from backend.db.models import Szenario as SzenarioRow
+from backend.db.models import STATUS_ABORTED, STATUS_COMPLETED
+from backend.db.models import Scenario as ScenarioRow
 from backend.db.models import Turn as TurnRow
 from backend.personas import Persona, PersonaVoice
 from backend.scenarios import Scenario
 from backend.session.models import FinishedSession, StoredSession, Turn
 
 # How a Session ended, as reported by the WebSocket layer, mapped onto the
-# `session.status` vocabulary. There is no "laufend": the row is written once,
+# `session.status` vocabulary. There is no "running": the row is written once,
 # after the Session is over (ADR 0034).
 _STATUS_BY_REASON = {
-    "user": "beendet",       # the user hung up
-    "completed": "beendet",  # the Persona ended the call
-    "error": "abgebrochen",  # a pipeline leg failed past its retry (ADR 0016)
+    "user": STATUS_COMPLETED,       # the user hung up
+    "completed": STATUS_COMPLETED,  # the Persona ended the call
+    "error": STATUS_ABORTED,        # a leg failed past its retry (ADR 0016)
 }
 
 
 def _to_persona(row: PersonaRow) -> Persona:
     return Persona(
-        id=row.schluessel,
+        id=row.key,
         name=row.name,
-        language_id=row.sprache_code,
+        language_id=row.language_code,
         voice=PersonaVoice(
             tts_voice=row.tts_voice,
             kugelaudio_voice_id=row.kugelaudio_voice_id,
         ),
-        role=row.rolle,
-        traits=row.haltung,
-        behavior=row.verhalten,
+        role=row.role,
+        traits=row.traits,
+        behavior=row.behavior,
     )
 
 
-def _to_scenario(row: SzenarioRow) -> Scenario:
-    return Scenario(id=row.schluessel, name=row.titel, description=row.beschreibung)
+def _to_scenario(row: ScenarioRow) -> Scenario:
+    return Scenario(id=row.key, name=row.title, description=row.description)
 
 
 def list_personas(db: DbSession) -> list[Persona]:
     """The Personas offered for a new Session, deactivated ones excluded."""
     rows = (
         db.query(PersonaRow)
-        .filter(PersonaRow.aktiv.is_(True))
+        .filter(PersonaRow.active.is_(True))
         .order_by(PersonaRow.name)
         .all()
     )
@@ -67,30 +68,30 @@ def list_personas(db: DbSession) -> list[Persona]:
 def list_scenarios(db: DbSession) -> list[Scenario]:
     """The Scenarios offered for a new Session, deactivated ones excluded."""
     rows = (
-        db.query(SzenarioRow)
-        .filter(SzenarioRow.aktiv.is_(True))
-        .order_by(SzenarioRow.titel)
+        db.query(ScenarioRow)
+        .filter(ScenarioRow.active.is_(True))
+        .order_by(ScenarioRow.title)
         .all()
     )
     return [_to_scenario(row) for row in rows]
 
 
-def find_persona(db: DbSession, schluessel: str) -> Persona | None:
+def find_persona(db: DbSession, key: str) -> Persona | None:
     """Looks up a Persona for a starting Session. Deactivated Personas are not
     found, so a stale client cannot start a Session against a retired one."""
     row = (
         db.query(PersonaRow)
-        .filter(PersonaRow.schluessel == schluessel, PersonaRow.aktiv.is_(True))
+        .filter(PersonaRow.key == key, PersonaRow.active.is_(True))
         .one_or_none()
     )
     return _to_persona(row) if row else None
 
 
-def find_scenario(db: DbSession, schluessel: str) -> Scenario | None:
+def find_scenario(db: DbSession, key: str) -> Scenario | None:
     """Looks up a Scenario for a starting Session; see `find_persona`."""
     row = (
-        db.query(SzenarioRow)
-        .filter(SzenarioRow.schluessel == schluessel, SzenarioRow.aktiv.is_(True))
+        db.query(ScenarioRow)
+        .filter(ScenarioRow.key == key, ScenarioRow.active.is_(True))
         .one_or_none()
     )
     return _to_scenario(row) if row else None
@@ -122,17 +123,17 @@ def find_session(db: DbSession, extern_id: uuid.UUID) -> StoredSession | None:
     return StoredSession(
         extern_id=row.extern_id,
         persona_name=row.persona.name,
-        scenario_name=row.szenario.titel,
+        scenario_name=row.scenario.title,
         status=row.status,
-        started_at=row.gestartet_am,
-        ended_at=row.beendet_am,
+        started_at=row.started_at,
+        ended_at=row.ended_at,
         turns=[
             Turn(
                 seq=turn.seq_index,
-                persona_text=turn.persona_transkript,
-                user_text=turn.nutzer_transkript,
-                user_duration_ms=turn.nutzer_dauer_ms,
-                persona_duration_ms=turn.persona_dauer_ms,
+                persona_text=turn.persona_transcript,
+                user_text=turn.user_transcript,
+                user_duration_ms=turn.user_duration_ms,
+                persona_duration_ms=turn.persona_duration_ms,
             )
             for turn in turns
         ],
@@ -145,18 +146,18 @@ def save_session(db: DbSession, finished: FinishedSession) -> int:
     Called once, after the Session has ended — never during it. Returns the new
     `session_id`.
 
-    Personas and Szenarien are looked up without the `aktiv` filter that
+    Personas and Scenarios are looked up without the `active` filter that
     `find_persona`/`find_scenario` apply: one can be retired while a Session is
     still running, and that Session still has to be recordable against it.
     """
     persona_id = (
         db.query(PersonaRow.persona_id)
-        .filter(PersonaRow.schluessel == finished.persona_key)
+        .filter(PersonaRow.key == finished.persona_key)
         .scalar()
     )
     scenario_id = (
-        db.query(SzenarioRow.szenario_id)
-        .filter(SzenarioRow.schluessel == finished.scenario_key)
+        db.query(ScenarioRow.scenario_id)
+        .filter(ScenarioRow.key == finished.scenario_key)
         .scalar()
     )
     if persona_id is None or scenario_id is None:
@@ -169,11 +170,11 @@ def save_session(db: DbSession, finished: FinishedSession) -> int:
         extern_id=finished.extern_id,
         subject_id=finished.subject_id,
         persona_id=persona_id,
-        szenario_id=scenario_id,
-        sprache_code=finished.language_code,
-        status=_STATUS_BY_REASON.get(finished.reason, "abgebrochen"),
-        gestartet_am=finished.started_at,
-        beendet_am=finished.ended_at,
+        scenario_id=scenario_id,
+        language_code=finished.language_code,
+        status=_STATUS_BY_REASON.get(finished.reason, STATUS_ABORTED),
+        started_at=finished.started_at,
+        ended_at=finished.ended_at,
     )
     db.add(session_row)
     db.flush()  # assigns session_id, which the Turns need
@@ -182,13 +183,13 @@ def save_session(db: DbSession, finished: FinishedSession) -> int:
         TurnRow(
             session_id=session_row.session_id,
             seq_index=turn.seq,
-            nutzer_transkript=turn.user_text,
-            persona_transkript=turn.persona_text,
-            nutzer_dauer_ms=turn.user_duration_ms,
-            persona_dauer_ms=turn.persona_duration_ms,
+            user_transcript=turn.user_text,
+            persona_transcript=turn.persona_text,
+            user_duration_ms=turn.user_duration_ms,
+            persona_duration_ms=turn.persona_duration_ms,
         )
         # A Turn where both legs failed carries no transcript at all; the fact
-        # that it failed is already in the Session's "abgebrochen" status, so an
+        # that it failed is already in the Session's "aborted" status, so an
         # empty row would add nothing.
         for turn in finished.turns
         if turn.user_text or turn.persona_text

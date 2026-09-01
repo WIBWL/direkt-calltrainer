@@ -16,7 +16,7 @@ from backend.db.models import Turn as TurnRow
 from backend.session.models import Turn
 from tests.conftest import SESSION_ENDED, SESSION_STARTED, make_finished_session
 
-# Every test here needs the Persona/Szenario a Session points at, but none of
+# Every test here needs the Persona/Scenario a Session points at, but none of
 # them look at the fixture's return value.
 pytestmark = pytest.mark.usefixtures("reference_data")
 
@@ -48,9 +48,9 @@ def test_saves_the_session_and_its_turns(db_session: DbSession) -> None:
     _save(db_session)
 
     session = db_session.query(Session).one()
-    assert session.status == "beendet"
-    assert session.gestartet_am == SESSION_STARTED
-    assert session.beendet_am == SESSION_ENDED
+    assert session.status == "completed"
+    assert session.started_at == SESSION_STARTED
+    assert session.ended_at == SESSION_ENDED
     assert db_session.query(TurnRow).count() == 2
 
 
@@ -70,10 +70,10 @@ def test_opening_turn_is_stored_with_an_empty_user_half(db_session: DbSession) -
     _save(db_session)
 
     opening = db_session.query(TurnRow).filter(TurnRow.seq_index == 1).one()
-    assert opening.nutzer_transkript == ""
-    assert opening.persona_transkript == "Guten Tag, Brandt hier."
-    assert opening.nutzer_dauer_ms is None
-    assert opening.persona_dauer_ms == 1800
+    assert opening.user_transcript == ""
+    assert opening.persona_transcript == "Guten Tag, Brandt hier."
+    assert opening.user_duration_ms is None
+    assert opening.persona_duration_ms == 1800
 
 
 def test_turns_keep_both_halves_and_their_durations(db_session: DbSession) -> None:
@@ -81,10 +81,10 @@ def test_turns_keep_both_halves_and_their_durations(db_session: DbSession) -> No
     _save(db_session)
 
     second = db_session.query(TurnRow).filter(TurnRow.seq_index == 2).one()
-    assert second.nutzer_transkript == "Wie kann ich helfen?"
-    assert second.persona_transkript == "Mir ist das zu teuer."
-    assert second.nutzer_dauer_ms == 1200
-    assert second.persona_dauer_ms == 2400
+    assert second.user_transcript == "Wie kann ich helfen?"
+    assert second.persona_transcript == "Mir ist das zu teuer."
+    assert second.user_duration_ms == 1200
+    assert second.persona_duration_ms == 2400
 
 
 def test_missing_durations_are_stored_as_null(db_session: DbSession) -> None:
@@ -92,18 +92,18 @@ def test_missing_durations_are_stored_as_null(db_session: DbSession) -> None:
     _save(db_session, turns=[Turn(seq=1, user_text="Hallo", persona_text="Guten Tag")])
 
     turn = db_session.query(TurnRow).one()
-    assert turn.nutzer_dauer_ms is None
-    assert turn.persona_dauer_ms is None
+    assert turn.user_duration_ms is None
+    assert turn.persona_duration_ms is None
 
 
 @pytest.mark.parametrize(
     ("reason", "expected"),
-    [("user", "beendet"), ("completed", "beendet"), ("error", "abgebrochen")],
+    [("user", "completed"), ("completed", "completed"), ("error", "aborted")],
 )
 def test_end_reason_maps_onto_the_status_vocabulary(
     db_session: DbSession, reason: str, expected: str
 ) -> None:
-    """"laufend" never occurs, because the row is written after the fact."""
+    """"running" never occurs, because the row is written after the fact."""
     _save(db_session, reason=reason)
 
     assert db_session.query(Session).one().status == expected
@@ -111,7 +111,7 @@ def test_end_reason_maps_onto_the_status_vocabulary(
 
 def test_turns_without_any_text_are_skipped(db_session: DbSession) -> None:
     """A Turn whose legs all failed carries no transcript; the Session's
-    "abgebrochen" status already records that it went wrong."""
+    "aborted" status already records that it went wrong."""
     _save(
         db_session,
         reason="error",
@@ -134,7 +134,7 @@ def test_unknown_persona_is_refused_rather_than_written_partially(db_session: Db
 def test_a_deactivated_persona_can_still_receive_a_session(db_session: DbSession) -> None:
     """A Persona retired while a call was running must not make that call
     unrecordable — unlike the lookup used when starting one."""
-    db_session.query(Persona).update({"aktiv": False})
+    db_session.query(Persona).update({"active": False})
     db_session.commit()
 
     _save(db_session)

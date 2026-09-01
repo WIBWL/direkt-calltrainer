@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by ADR 0035 (Index Every Foreign-Key Column)
 
 ## Context
 

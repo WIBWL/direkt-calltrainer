@@ -44,7 +44,7 @@ def test_reads_back_what_was_written(db_session: DbSession) -> None:
 
     assert stored is not None
     assert stored.extern_id == extern_id
-    assert stored.status == "beendet"
+    assert stored.status == "completed"
     assert stored.started_at == SESSION_STARTED
     assert stored.ended_at == SESSION_ENDED
     assert len(stored.turns) == 2

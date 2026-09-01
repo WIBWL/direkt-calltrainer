@@ -5,20 +5,21 @@ afterwards, so a failing test can never leave the development database in a
 half-migrated state and tests cannot see each other's rows. That costs a few
 hundred milliseconds per test and buys complete isolation.
 
-The connection details come from `DATABASE_URL` in `.env` — the same variable
-the application uses — but only the server part of it: the database name is
-replaced with a generated one. Without `DATABASE_URL`, or without a reachable
-server, these tests skip rather than fail, so a checkout without Postgres
-running still gets a green run of everything else.
+The connection details come from the same POSTGRES_* settings the application
+uses, but only the server part of them: the database name is replaced with a
+generated one. Without those settings, or without a reachable server, these
+tests skip rather than fail, so a checkout without Postgres running still gets
+a green run of everything else.
 """
 import os
 import uuid
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import httpx
 import pytest
 from alembic import command
 from alembic.config import Config
@@ -29,7 +30,8 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session as DbSession
 from sqlalchemy.orm import sessionmaker
 
-from backend.db.models import MetrikTyp, Persona, Sprache, Szenario
+from backend.db.models import Language, MetricType, Persona, Scenario
+from backend.db.session import build_database_url, reset_engine
 from backend.session.models import FinishedSession, Turn
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -43,39 +45,43 @@ def _render(url: URL) -> str:
 
 
 def _server_url() -> URL:
-    raw = os.environ.get("DATABASE_URL")
-    if not raw:
-        pytest.skip("DATABASE_URL is not set — skipping database tests")
-    return make_url(raw)
+    """The configured database server, or a skip if the settings are incomplete."""
+    try:
+        return build_database_url()
+    except RuntimeError as exc:
+        # `return` only so every path returns an expression: skip() raises.
+        return pytest.skip(f"Database settings incomplete: {exc}")
 
 
 @contextmanager
-def database_url_env(url: str) -> Iterator[None]:
-    """Points `DATABASE_URL` at `url` for the duration of the block.
+def database_env(url: str) -> Iterator[None]:
+    """Points POSTGRES_DB at the database in `url` for the duration of the block.
 
-    Alembic's env.py and the seed script both read the variable from the
-    environment, so this is how a test aims them at its own database.
+    Alembic's env.py and the seed script both assemble their connection from
+    the POSTGRES_* settings, so overriding the database name is how a test aims
+    them at its own throwaway database.
     """
-    previous = os.environ.get("DATABASE_URL")
-    os.environ["DATABASE_URL"] = url
+    name = make_url(url).database
+    previous = os.environ.get("POSTGRES_DB")
+    os.environ["POSTGRES_DB"] = name
     try:
         yield
     finally:
         if previous is None:
-            os.environ.pop("DATABASE_URL", None)
+            os.environ.pop("POSTGRES_DB", None)
         else:
-            os.environ["DATABASE_URL"] = previous
+            os.environ["POSTGRES_DB"] = previous
 
 
 def alembic_upgrade(url: str, revision: str = "head") -> None:
     """Migrates `url` up to `revision`."""
-    with database_url_env(url):
+    with database_env(url):
         command.upgrade(Config(str(PROJECT_ROOT / "alembic.ini")), revision)
 
 
 def alembic_downgrade(url: str, revision: str) -> None:
     """Migrates `url` back down to `revision`."""
-    with database_url_env(url):
+    with database_env(url):
         command.downgrade(Config(str(PROJECT_ROOT / "alembic.ini")), revision)
 
 
@@ -124,7 +130,7 @@ def db_session(migrated_database: str) -> Iterator[DbSession]:
 
 PERSONA_KEY = "thomas-brandt-ceo"
 SCENARIO_KEY = "price-cancellation-risk"
-METRIK_KEY = "tempo"
+METRIC_KEY = "speaking_rate"
 
 SESSION_STARTED = datetime(2026, 8, 27, 10, 0, 0, tzinfo=UTC)
 SESSION_ENDED = datetime(2026, 8, 27, 10, 4, 0, tzinfo=UTC)
@@ -162,9 +168,9 @@ class ReferenceRows:
     starting world instead of each building their own."""
 
     persona: Persona
-    szenario: Szenario
-    sprache: Sprache
-    metrik_typ: MetrikTyp
+    scenario: Scenario
+    language: Language
+    metric_type: MetricType
 
 
 @pytest.fixture
@@ -172,31 +178,56 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
     """Seeds the minimum reference data a Session needs, by hand rather than
     through the seed script, so these tests do not depend on what personas.py
     happens to contain."""
-    sprache = Sprache(sprache_code="de", bezeichnung="Deutsch")
+    language = Language(code="de", name="Deutsch")
     persona = Persona(
-        schluessel=PERSONA_KEY,
+        key=PERSONA_KEY,
         name="Thomas Brandt",
-        rolle="Geschäftsführer",
-        haltung="sachlich",
-        verhalten="Verhalten",
-        trainingsziel="",
-        schwierigkeitsgrad="mittel",
-        sprache_code="de",
+        role="Geschäftsführer",
+        traits="sachlich",
+        behavior="Verhalten",
+        training_goal="",
+        difficulty="mittel",
+        language_code="de",
         tts_voice="de_male",
-        aktiv=True,
+        active=True,
     )
-    szenario = Szenario(
-        schluessel=SCENARIO_KEY,
-        typ="Preisgespräch",
-        titel="Kündigungsabsicht",
-        beschreibung="Beschreibung",
-        aktiv=True,
+    scenario = Scenario(
+        key=SCENARIO_KEY,
+        scenario_type="Preisgespräch",
+        title="Kündigungsabsicht",
+        description="Beschreibung",
+        active=True,
     )
-    metrik_typ = MetrikTyp(
-        schluessel=METRIK_KEY, bezeichnung="Sprechtempo", einheit="Wörter/min", aktiv=True
+    metric_type = MetricType(
+        key=METRIC_KEY, name="Sprechtempo", unit="Wörter/min", active=True
     )
-    db_session.add_all([sprache, persona, szenario, metrik_typ])
+    db_session.add_all([language, persona, scenario, metric_type])
     db_session.commit()
     return ReferenceRows(
-        persona=persona, szenario=szenario, sprache=sprache, metrik_typ=metrik_typ
+        persona=persona, scenario=scenario, language=language, metric_type=metric_type
     )
+
+
+@pytest.fixture
+async def api_client(migrated_database: str) -> AsyncIterator[httpx.AsyncClient]:
+    """The FastAPI app, wired to this test's throwaway database.
+
+    Driven through httpx's ASGI transport rather than Starlette's TestClient:
+    the pinned starlette (0.35) passes `app=` to httpx.Client, which httpx 0.28
+    no longer accepts. Going through the transport exercises the same ASGI
+    stack without touching either pin.
+
+    The application memoises its engine, so the settings override alone would
+    not reach it — reset_engine() is what makes it pick up the test database,
+    and again afterwards so the next test is unaffected.
+    """
+    with database_env(migrated_database):
+        reset_engine()
+        # Imported here, not at module scope: importing the app is what builds
+        # the routes, and it must happen with the test settings in place.
+        from backend.app import app  # pylint: disable=import-outside-toplevel
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            yield client
+    reset_engine()

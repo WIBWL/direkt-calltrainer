@@ -10,6 +10,7 @@ import subprocess
 import sys
 
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
 from tests.conftest import PROJECT_ROOT
 
@@ -18,9 +19,9 @@ def _run_seed(database_url: str) -> str:
     result = subprocess.run(
         [sys.executable, "scripts/seed_reference_data.py"],
         cwd=PROJECT_ROOT,
-        # DATABASE_URL must win over the .env the script itself loads; python-dotenv
+        # POSTGRES_DB must win over the .env the script itself loads; python-dotenv
         # does not override variables that are already set, so this is enough.
-        env={**os.environ, "DATABASE_URL": database_url},
+        env={**os.environ, "POSTGRES_DB": make_url(database_url).database},
         capture_output=True,
         text=True,
         # Asserted below instead, so a failure shows the seed's own output.
@@ -32,7 +33,7 @@ def _run_seed(database_url: str) -> str:
 
 def _counts(url: str) -> dict[str, int]:
     engine = create_engine(url)
-    tables = ["sprache", "persona", "persona_einwand", "szenario", "metrik_typ"]
+    tables = ["language", "persona", "persona_objection", "scenario", "metric_type"]
     try:
         with engine.connect() as conn:
             return {t: conn.execute(text(f"SELECT count(*) FROM {t}")).scalar_one() for t in tables}
@@ -46,9 +47,9 @@ def test_seed_populates_the_reference_tables(migrated_database: str) -> None:
 
     counts = _counts(migrated_database)
     assert counts["persona"] > 0
-    assert counts["szenario"] > 0
-    assert counts["sprache"] > 0
-    assert counts["metrik_typ"] > 0
+    assert counts["scenario"] > 0
+    assert counts["language"] > 0
+    assert counts["metric_type"] > 0
 
 
 def test_seed_is_idempotent(migrated_database: str) -> None:
@@ -60,7 +61,7 @@ def test_seed_is_idempotent(migrated_database: str) -> None:
     after_second = _counts(migrated_database)
 
     assert after_second == after_first
-    assert "Persona 0, Szenario 0" in second_run, second_run
+    assert "Persona 0, Scenario 0" in second_run, second_run
 
 
 def test_seed_fills_language_and_voice_on_every_persona(migrated_database: str) -> None:
@@ -74,7 +75,7 @@ def test_seed_fills_language_and_voice_on_every_persona(migrated_database: str) 
             incomplete = conn.execute(
                 text(
                     "SELECT count(*) FROM persona "
-                    "WHERE sprache_code IS NULL OR tts_voice IS NULL OR tts_voice = ''"
+                    "WHERE language_code IS NULL OR tts_voice IS NULL OR tts_voice = ''"
                 )
             ).scalar_one()
     finally:
@@ -92,8 +93,8 @@ def test_seed_deactivates_personas_it_no_longer_contains(migrated_database: str)
         with engine.begin() as conn:
             conn.execute(
                 text(
-                    "INSERT INTO persona (schluessel, name, rolle, haltung, verhalten,"
-                    " trainingsziel, schwierigkeitsgrad, sprache_code, tts_voice, aktiv)"
+                    "INSERT INTO persona (key, name, role, traits, behavior,"
+                    " training_goal, difficulty, language_code, tts_voice, active)"
                     " VALUES ('retired-persona', 'Alt', 'Alt', 'alt', 'alt', '', 'mittel',"
                     " 'de', 'de_male', true)"
                 )
@@ -103,7 +104,7 @@ def test_seed_deactivates_personas_it_no_longer_contains(migrated_database: str)
 
         with engine.connect() as conn:
             still_there = conn.execute(
-                text("SELECT aktiv FROM persona WHERE schluessel = 'retired-persona'")
+                text("SELECT active FROM persona WHERE key = 'retired-persona'")
             ).scalar_one()
     finally:
         engine.dispose()

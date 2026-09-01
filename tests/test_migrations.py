@@ -6,7 +6,7 @@ drop, and NOT NULL columns added without a backfill. These tests run the whole
 chain rather than the newest revision, so a later revision cannot quietly break
 an earlier one's downgrade.
 """
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 
 from backend.db.models import Base
 from tests.conftest import alembic_downgrade, alembic_upgrade
@@ -64,8 +64,76 @@ def test_turn_holds_both_speakers_in_one_row(empty_database: str) -> None:
     alembic_upgrade(empty_database)
 
     columns = _columns(empty_database, "turn")
-    assert {"nutzer_transkript", "persona_transkript"} <= columns
-    assert {"nutzer_dauer_ms", "persona_dauer_ms"} <= columns
+    assert {"user_transcript", "persona_transcript"} <= columns
+    assert {"user_duration_ms", "persona_duration_ms"} <= columns
     # Dropped with the pairing: a paired Turn has no single speaker or start.
     assert "sprecher" not in columns
     assert "start_offset_ms" not in columns
+
+
+def _constraint_names(url: str) -> list[tuple[str, str, str]]:
+    """(table, kind, name) for every constraint the application owns."""
+    engine = create_engine(url)
+    try:
+        with engine.connect() as conn:
+            return [
+                (row.table_name, row.kind, row.name)
+                for row in conn.execute(
+                    text(
+                        "SELECT conrelid::regclass::text AS table_name, contype AS kind, "
+                        "conname AS name FROM pg_constraint "
+                        "WHERE connamespace = 'public'::regnamespace "
+                        "AND contype IN ('p','u','f','c') "
+                        # Alembic's own bookkeeping table, not part of the schema.
+                        "AND conrelid <> 'alembic_version'::regclass"
+                    )
+                )
+            ]
+    finally:
+        engine.dispose()
+
+
+def test_every_constraint_follows_the_naming_convention(empty_database: str) -> None:
+    """The convention on Base.metadata is what stops autogenerate emitting
+    unnamed constraints, whose downgrade cannot run. A constraint that slipped
+    through with a database-assigned name would silently reintroduce that."""
+    alembic_upgrade(empty_database)
+
+    expected_prefix = {"p": "pk_", "u": "uq_", "f": "fk_", "c": "ck_"}
+    offenders = [
+        (table, name)
+        for table, kind, name in _constraint_names(empty_database)
+        if not name.startswith(expected_prefix[kind])
+    ]
+    assert not offenders, f"Constraints not following the convention: {offenders}"
+
+
+def test_every_foreign_key_column_is_indexed(empty_database: str) -> None:
+    """Postgres indexes the referenced primary key but never the referencing
+    side, so an unindexed foreign key turns every parent delete into a
+    sequential scan of the child table."""
+    alembic_upgrade(empty_database)
+    engine = create_engine(empty_database)
+    try:
+        with engine.connect() as conn:
+            unindexed = list(
+                conn.execute(
+                    text(
+                        """
+                        SELECT c.conrelid::regclass::text AS tbl, a.attname AS col
+                          FROM pg_constraint c
+                          JOIN pg_attribute a
+                            ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+                         WHERE c.contype = 'f'
+                           AND NOT EXISTS (
+                               SELECT 1 FROM pg_index i
+                                WHERE i.indrelid = c.conrelid
+                                  AND a.attnum = i.indkey[0]
+                           )
+                        """
+                    )
+                )
+            )
+    finally:
+        engine.dispose()
+    assert not unindexed, f"Foreign keys without an index: {unindexed}"
