@@ -297,6 +297,41 @@ h1 {
   margin-bottom: 0;
 }
 
+/* The heading aligns the section number with its title and description. */
+.setup-section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.setup-section-index {
+  flex-shrink: 0;
+  color: #000000;
+  font-size: 17px;
+  line-height: 26px;
+}
+
+.setup-section-heading-text {
+  min-width: 0;
+}
+
+.setup-section-heading-text h2 {
+  margin: 0 0 4px;
+  color: var(--color-navy-900);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.setup-section-heading-text p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 16px;
+  line-height: 24px;
+}
+
 h2 {
   font-family: var(--font-sans);
   font-size: 1rem;
