@@ -277,7 +277,12 @@ export default function App() {
                 onClick={() => setPersonaId(p.id)}
                 type="button"
                 aria-pressed={p.id === personaId}
-              >
+                >
+                {/* The visual indicator complements the aria-pressed state. */}
+                <span className="choice-check" aria-hidden="true">
+                  {p.id === personaId ? "✓" : ""}
+                </span>
+
                 <span className="persona-name">{p.name}</span>
                 <span className="card-subtitle">{p.role}</span>
               </button>
