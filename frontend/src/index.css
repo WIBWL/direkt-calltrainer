@@ -306,3 +306,91 @@ audio {
   border-radius: 999px;
   transition: width 0.08s linear;
 }
+
+/* --- Post-call wrap-up (F-09/F-10) ------------------------------------- */
+
+.muted {
+  color: var(--text-muted);
+}
+
+/* Marks a point as a strength or an improvement. Colour alone never carries
+   the meaning -- the two lists have their own headings. */
+.bullet {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 10px;
+  vertical-align: middle;
+}
+
+.bullet.success {
+  background: var(--success);
+}
+
+.bullet.danger {
+  background: var(--danger);
+}
+
+/* The call's statistics (F-53). A grid, not a row: every figure describes the
+   whole conversation, so they read as one block rather than as a sequence. */
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metric-name {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.metric-value {
+  font-size: 1.05rem;
+  color: var(--navy);
+}
+
+.sparkline {
+  margin-top: 4px;
+  stroke: var(--blue);
+  overflow: visible;
+}
+
+/* The note under the statistics saying they carry no target range (ADR 0048).
+   Kept visually quieter than the narrative -- it qualifies, it does not claim. */
+.metric-disclaimer {
+  margin: 8px 0 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--blue-light);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* --- Gesprächsprotokoll (F-12) ----------------------------------------- */
+
+.transcript-line {
+  margin: 0 0 0.6rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.transcript-line:last-child {
+  margin-bottom: 0;
+}
+
+/* Fixed width so the timestamps line up into a readable column. */
+.transcript-time {
+  flex: 0 0 3rem;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}

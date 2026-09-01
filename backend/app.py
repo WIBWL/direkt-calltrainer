@@ -1,5 +1,6 @@
 """FastAPI app: REST endpoints for setup data, WebSocket route for the live session, static frontend."""
 
+import asyncio
 import logging
 import os
 from collections.abc import AsyncGenerator
@@ -11,7 +12,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.api.session_ws import router as session_ws_router
+from backend.api.sessions import router as sessions_router
 from backend.clients.health import check_backends
+from backend.db.provision import provision
 from backend.logging_config import configure_logging
 from backend.personas import PERSONAS
 from backend.scenarios import SCENARIOS
@@ -31,7 +34,22 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     except httpx.HTTPError as e:
         logger.error("Could not reach EFRE_URL (%s): %s — are you connected to the university network", efre_url, e)
     await check_backends()
+    # Off the event loop: Alembic and the ORM are both synchronous.
+    await asyncio.to_thread(_provision_database)
     yield
+
+
+def _provision_database() -> None:
+    """Migrate and seed on startup, so a fresh `docker compose up` is usable.
+
+    Non-fatal, like the backend check above: without it every Session fails to
+    persist and silently loses its Feedback, but the call itself still works,
+    so a database problem must not stop the app from booting.
+    """
+    try:
+        logger.info("Database provisioned, reference rows created: %s", provision())
+    except Exception:
+        logger.exception("Database provisioning failed - Sessions will not be persisted")
 
 
 app = FastAPI(title="CallTrainer API", lifespan=lifespan)
@@ -45,6 +63,7 @@ app.add_middleware(
 )
 
 app.include_router(session_ws_router)
+app.include_router(sessions_router)
 
 FRONTEND_DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 

@@ -1,47 +1,58 @@
-import type { TurnRecord } from "../protocol";
+import type React from "react";
+
+import type { TranscriptEntry } from "../protocol";
 
 interface TranscriptViewProps {
-  transcript: TurnRecord[];
+  transcript: TranscriptEntry[];
   personaName: string;
   onRestart: () => void;
+  /** The AI-generated wrap-up, shown above the log. Passed in rather than
+   * fetched here, so this component stays the plain Transcript it is. */
+  feedback?: React.ReactNode;
+}
+
+/** A position on the Session's timeline, as mm:ss. */
+function timestamp(offsetMs: number): string {
+  const seconds = Math.round(offsetMs / 1000);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 /** The plain, unannotated post-call log of what was said (see CONTEXT.md's
- * "Transcript" entry) — not the AI-generated Feedback from ADR 0004/0014. */
-export default function TranscriptView({ transcript, personaName, onRestart }: TranscriptViewProps) {
+ * "Transcript" entry) — not the AI-generated Feedback from ADR 0004/0014.
+ *
+ * One line per utterance, in the order spoken, each stamped with when it
+ * started. The server flattens the exchanges, so the ordering lives in one
+ * place rather than being reconstructed here (ADR 0048). */
+export default function TranscriptView({
+  transcript,
+  personaName,
+  onRestart,
+  feedback,
+}: TranscriptViewProps) {
   return (
     <>
       <div className="eyebrow">Calltrainer</div>
-      <h1>Gesprächsprotokoll</h1>
+      <h1>Ihr Feedback</h1>
+      {feedback}
 
-      {transcript.length === 0 && (
+      <h2>Gesprächsprotokoll</h2>
+
+      {transcript.length === 0 ? (
         <div className="card">
           <p>Es wurden keine Turns aufgezeichnet.</p>
         </div>
+      ) : (
+        <div className="card">
+          {transcript.map((entry, i) => (
+            <p className="transcript-line" key={i}>
+              <span className="transcript-time">{timestamp(entry.offset_ms)}</span>
+              <span>
+                <strong>{entry.sprecher === "nutzer" ? "Du" : personaName}:</strong> {entry.text}
+              </span>
+            </p>
+          ))}
+        </div>
       )}
-
-      {transcript.map((turn, i) => {
-        // Each Turn record stores the user's reply to the *previous* Turn's
-        // persona line alongside its own (new) persona line (see Turn's
-        // docstring in backend/session/models.py) — so a card that reads
-        // naturally as one exchange pairs this Turn's persona line with the
-        // *next* Turn's user_text, not its own.
-        const userReply = transcript[i + 1]?.user_text;
-        return (
-          <div className="card" key={turn.turn_seq}>
-            {turn.persona_text && (
-              <p>
-                <strong>{personaName}:</strong> {turn.persona_text}
-              </p>
-            )}
-            {userReply && (
-              <p>
-                <strong>Du:</strong> {userReply}
-              </p>
-            )}
-          </div>
-        );
-      })}
 
       <button className="restart-button" type="button" onClick={onRestart}>
         Neue Session starten

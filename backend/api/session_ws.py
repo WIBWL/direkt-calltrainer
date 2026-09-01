@@ -5,14 +5,23 @@ import contextlib
 import json
 import logging
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
+from datetime import datetime
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from backend.logging_config import reset_session_log, session_id_scope
 from backend.personas import PERSONAS, Persona
 from backend.scenarios import SCENARIOS, Scenario
-from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted, TurnEvent
+from backend.session import persistence
+from backend.session.models import (
+    AudioChunk,
+    Failed,
+    StateChanged,
+    TurnCompleted,
+    TurnEvent,
+    utterances,
+)
 from backend.session.orchestrator import SessionOrchestrator
 
 logger = logging.getLogger(__name__)
@@ -31,29 +40,39 @@ async def session_ws(websocket: WebSocket) -> None:
         return
     persona, scenario = handshake
 
-    session_id = str(uuid.uuid4())
+    session_id = uuid.uuid4()
+    started_at = datetime.now()
     reset_session_log()
-    with session_id_scope(session_id):
+    with session_id_scope(str(session_id)):
         orchestrator = SessionOrchestrator(persona, scenario)
         logger.info("Session started: persona=%s language=%s", persona.id, persona.language_id)
 
-        await websocket.send_json({"type": "session.started", "session_id": session_id})
+        await websocket.send_json({"type": "session.started", "session_id": str(session_id)})
 
         try:
             # Persona opens the call
-            outcome = await _run_turn_interruptible(websocket, orchestrator.run_opening_turn())
+            outcome = await _run_turn_interruptible(
+                websocket, orchestrator.run_opening_turn(), orchestrator.start_playback
+            )
             if outcome in ("ok", "interrupted"):
-                reason = await _run_session(websocket, orchestrator)
+                reason = await _run_session(websocket, orchestrator, orchestrator.start_playback)
             else:
                 reason = "error" if outcome == "failed" else outcome
         except WebSocketDisconnect:
             logger.info("Client disconnected")
             return
 
+        # Flattened by the same function the persisted Turn rows come from, so
+        # the log the user sees cannot disagree with the one that was stored --
+        # and carries the offsets that make it a timestamped Gesprächsprotokoll.
         transcript = [
-            {"turn_seq": t.seq, "user_text": t.user_text, "persona_text": t.persona_text}
-            for t in orchestrator.turns
+            {"sprecher": u.sprecher, "text": u.text, "offset_ms": u.offset_ms}
+            for u in utterances(orchestrator.turns)
         ]
+        # Before session.ended, so the row exists by the time the client can
+        # ask for its Feedback -- a 404 then means the write genuinely failed,
+        # not that the client was merely early.
+        await _record(session_id, persona, scenario, orchestrator, started_at, reason)
         try:
             await websocket.send_json({"type": "session.ended", "reason": reason, "transcript": transcript})
             await websocket.close()
@@ -63,6 +82,38 @@ async def session_ws(websocket: WebSocket) -> None:
             logger.info("Client disconnected before session.ended could be sent")
             return
         logger.info("Session ended (%s)", reason)
+
+
+async def _record(
+    session_id: uuid.UUID,
+    persona: Persona,
+    scenario: Scenario,
+    orchestrator: SessionOrchestrator,
+    started_at: datetime,
+    reason: str,
+) -> None:
+    """Persist the finished Session and queue its wrap-up (ADR 0034, ADR 0019).
+
+    Dispatched off the event loop because the ORM is synchronous, and never
+    allowed to raise: the call is already over, and neither a database nor a
+    Redis outage may cost the user the transcript they are waiting for.
+    """
+    try:
+        db_id = await asyncio.to_thread(
+            persistence.persist_session,
+            session_id, persona, scenario, orchestrator.turns, started_at, reason,
+        )
+    except Exception:
+        logger.exception("Session could not be persisted; it is lost")
+        return
+    try:
+        # Imported here, not at module scope: the live path must not need
+        # Redis to be importable, let alone reachable.
+        from backend.feedback import queue
+
+        await asyncio.to_thread(queue.enqueue_feedback, db_id)
+    except Exception:
+        logger.exception("Feedback could not be queued for session %d", db_id)
 
 
 async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
@@ -90,13 +141,24 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario] | None:
     return persona, scenario
 
 
-async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) -> str:
+async def _run_session(
+    websocket: WebSocket, orchestrator: SessionOrchestrator, on_activate: Callable[[], None]
+) -> str:
     """Session runs until the user ends the session, a turn fails, or the
-    persona ends the call naturally ("user", "error", or "completed")."""
+    persona ends the call naturally ("user", "error", or "completed").
+
+    Takes `on_activate` for the same reason _wait_for_control_message does:
+    session.activate lands in whichever receive loop happens to own the socket
+    at that moment. The opening turn is usually already forwarded by the time
+    the user leaves the mic check, so that is normally this loop, not that one.
+    """
     while True:
         envelope = await _receive_json(websocket)
         if envelope is None or envelope.get("type") == "session.end":
             return "user"
+        if envelope.get("type") == "session.activate":
+            on_activate()
+            continue
         if envelope.get("type") == "turn.interrupt":
             continue
         if envelope.get("type") != "turn.audio.meta":
@@ -107,18 +169,20 @@ async def _run_session(websocket: WebSocket, orchestrator: SessionOrchestrator) 
             return "user"
 
         turn = orchestrator.run_turn(audio_bytes, "turn.webm", envelope.get("mime_type"))
-        outcome = await _run_turn_interruptible(websocket, turn)
+        outcome = await _run_turn_interruptible(websocket, turn, orchestrator.start_playback)
         if outcome == "interrupted":
             continue
         if outcome != "ok":
             return "error" if outcome == "failed" else outcome
 
 
-async def _run_turn_interruptible(websocket: WebSocket, events: AsyncIterator[TurnEvent]) -> str:
+async def _run_turn_interruptible(
+    websocket: WebSocket, events: AsyncIterator[TurnEvent], on_activate: Callable[[], None]
+) -> str:
     """Forwards one turn's events while racing session.end/disconnect/a user
     barge-in, so talking over the persona doesn't wait for it to finish."""
     forward_task = asyncio.create_task(_forward_turn_events(websocket, events))
-    control_task = asyncio.create_task(_wait_for_control_message(websocket))
+    control_task = asyncio.create_task(_wait_for_control_message(websocket, on_activate))
     done, _ = await asyncio.wait({forward_task, control_task}, return_when=asyncio.FIRST_COMPLETED)
 
     if control_task in done:
@@ -140,15 +204,24 @@ async def _run_turn_interruptible(websocket: WebSocket, events: AsyncIterator[Tu
     return forward_task.result()
 
 
-async def _wait_for_control_message(websocket: WebSocket) -> str:
+async def _wait_for_control_message(
+    websocket: WebSocket, on_activate: Callable[[], None]
+) -> str:
     """Waits for a client message that should interrupt the in-flight turn:
-    session.end/disconnect ends the session, turn.interrupt is a barge-in."""
+    session.end/disconnect ends the session, turn.interrupt is a barge-in.
+
+    session.activate is neither -- it usually arrives *during* the opening
+    turn, which is exactly the point (ADR 0048) -- so it starts the clock and
+    the wait continues.
+    """
     while True:
         envelope = await _receive_json(websocket)
         if envelope is None or envelope.get("type") == "session.end":
             return "end"
         if envelope.get("type") == "turn.interrupt":
             return "interrupt"
+        if envelope.get("type") == "session.activate":
+            on_activate()
 
 
 async def _forward_turn_events(websocket: WebSocket, events: AsyncIterator[TurnEvent]) -> str:
