@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AppHeader from "./components/AppHeader";
 import CallView from "./components/CallView";
 import MicCheck from "./components/MicCheck";
+import SetupSection from "./components/SetupSection";
 import TranscriptView from "./components/TranscriptView";
 import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useSessionSocket } from "./hooks/useSessionSocket";
@@ -231,35 +232,49 @@ export default function App() {
           </p>
         </section>
 
-        <h2>Persona</h2>
-        <div className="persona-grid">
-          {personas.map((p) => (
-            <button
-              key={p.id}
-              className={"persona-card" + (p.id === personaId ? " selected" : "")}
-              onClick={() => setPersonaId(p.id)}
-              type="button"
-            >
-              <span className="persona-name">{p.name}</span>
-              <span className="card-subtitle">{p.role}</span>
-            </button>
-          ))}
-        </div>
-
-        <h2>Szenario</h2>
-        <div className="persona-grid">
-          {scenarios.map((s) => (
-            <button
-              key={s.id}
-              className={"persona-card" + (s.id === scenarioId ? " selected" : "")}
-              onClick={() => setScenarioId(s.id)}
-              type="button"
-            >
-              <span className="persona-name">{s.name}</span>
-              <span className="card-subtitle">{s.description}</span>
-            </button>
-          ))}
-        </div>
+        {/* The scenario is selected first because it defines the training context. */}
+        <SetupSection
+          index="01"
+          title="Gesprächssituation wählen"
+          description="Welche Situation möchten Sie trainieren?"
+        >
+          <div className="persona-grid">
+            {scenarios.map((s) => (
+              <button
+                key={s.id}
+                className={"persona-card" + (s.id === scenarioId ? " selected" : "")}
+                onClick={() => setScenarioId(s.id)}
+                type="button"
+                aria-pressed={s.id === scenarioId}
+              >
+                <span className="persona-name">{s.name}</span>
+                <span className="card-subtitle">{s.description}</span>
+              </button>
+            ))}
+          </div>
+        </SetupSection>
+        
+        {/* The selected persona defines the customer role used during the call. */}
+        <SetupSection
+          index="02"
+          title="Gesprächspartner auswählen"
+          description="Jede Persona besitzt eine eigene Sprache, Stimme und Persönlichkeit."
+        >
+          <div className="persona-grid">
+            {personas.map((p) => (
+              <button
+                key={p.id}
+                className={"persona-card" + (p.id === personaId ? " selected" : "")}
+                onClick={() => setPersonaId(p.id)}
+                type="button"
+                aria-pressed={p.id === personaId}
+              >
+                <span className="persona-name">{p.name}</span>
+                <span className="card-subtitle">{p.role}</span>
+              </button>
+            ))}
+          </div>
+        </SetupSection>
 
         <button
           className="start-call-button"
