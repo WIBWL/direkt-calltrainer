@@ -652,3 +652,10 @@ audio {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Very narrow screens display each summary value on its own row. */
+@media (max-width: 480px) {
+  .selection-summary {
+    grid-template-columns: 1fr;
+  }
+}
