@@ -427,6 +427,13 @@ h2 {
   border-color: var(--blue);
 }
 
+/* Selected choices use a filled circle with a visible check mark. */
+.persona-card.selected .choice-check {
+  border-color: var(--color-blue-600);
+  background: var(--color-blue-600);
+  color: var(--color-surface);
+}
+
 .persona-name {
   font-family: var(--font-sans);
   font-weight: 600;
