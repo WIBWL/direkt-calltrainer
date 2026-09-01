@@ -292,6 +292,18 @@ h1 {
   width: 100%;
 }
 
+/* The summary groups all confirmed choices into one compact panel. */
+.selection-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 8px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-filter);
+}
+
 /* Existing grids must not add extra space inside the section card. */
 .setup-section .persona-grid {
   margin-bottom: 0;
