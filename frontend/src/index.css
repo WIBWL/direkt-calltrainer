@@ -1,40 +1,13 @@
 :root {
-  /* Colors from the Figma design */
-  --color-navy-900: #03253e;
-  --color-navy-700: #0b3a5b;
-  --color-blue-600: #325f7f;
-  --color-blue-300: #9bb8cd;
-  --color-blue-100: #e7f5ff;
-  --color-background: #f5f8fb;
-  --color-surface: #ffffff;
-  --color-surface-selected: #f3f9fd;
-  --color-surface-filter: #eaf4fa;
-  --color-border: #d7e2eb;
-  --color-border-subtle: #d3e1eb;
-  --color-text-muted: #5b6b78;
-  --color-text-muted-secondary: #5f7180;
-  --color-success: #2e8064;
-  --color-danger: #b4453a;
-
-  /* Shared font families */
-  --font-sans: "Inter", Arial, sans-serif;
-  --font-mono: "IBM Plex Mono", monospace;
-
-  /* Frequently used border radii */
-  --radius-card: 22px;
-  --radius-choice: 16px;
-  --radius-control: 10px;
-
-  /* Compatibility aliases for the existing styles */
-  --navy: var(--color-navy-900);
-  --navy-light: var(--color-blue-600);
-  --blue: var(--color-blue-600);
-  --blue-light: var(--color-blue-300);
-  --bg: var(--color-background);
-  --border: var(--color-border);
-  --text-muted: var(--color-text-muted);
-  --success: var(--color-success);
-  --danger: var(--color-danger);
+  --navy: #03253e;
+  --navy-light: #325f7f;
+  --blue: #5f8caa;
+  --blue-light: #8cb6df;
+  --bg: #f5f8fb;
+  --border: #e3eaf1;
+  --text-muted: #5b6b78;
+  --success: #2e8064;
+  --danger: #b4453a;
 }
 
 * {
@@ -42,174 +15,20 @@
 }
 
 body {
-  font-family: var(--font-sans);
+  font-family: "Hanken Grotesk", sans-serif;
   background: var(--bg);
   color: var(--navy);
   margin: 0;
 }
 
 #root {
-  min-height: 100vh;
-}
-
-/* Shared page containers keep every screen centered and responsive. */
-.app-page {
-  width: min(800px, calc(100% - 32px));
-  margin: 0 auto;
-  padding: 56px 0 80px;
-}
-
-.app-page-narrow {
-  max-width: 640px;
-}
-
-/* The shared header remains consistent across every training screen. */
-.app-header {
-  width: 100%;
-  height: 76px;
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.app-header-inner {
-  width: min(1080px, calc(100% - 40px));
-  height: 100%;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 32px;
-}
-
-.app-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-}
-
-.app-brand-mark {
-  width: 38px;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  border-radius: 12px;
-  background: var(--color-navy-900);
-}
-
-.app-brand-mark span {
-  width: 3px;
-  height: 12px;
-  border-radius: 2px;
-  background: var(--color-surface);
-}
-
-.app-brand-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--color-navy-900);
-}
-
-.training-progress {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.training-progress-step {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.training-progress-number {
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border: 1px solid var(--color-blue-300);
-  border-radius: 50%;
-  background: var(--color-surface);
-  color: var(--color-blue-600);
-  font-size: 13px;
-  font-weight: 600;
-  opacity: 0.45;
-}
-
-.training-progress-step.is-active .training-progress-number {
-  border-color: var(--color-navy-700);
-  background: var(--color-navy-700);
-  color: var(--color-surface);
-  opacity: 1;
-}
-
-.training-progress-step.is-complete .training-progress-number {
-  border-color: var(--color-blue-600);
-  background: var(--color-blue-600);
-  color: var(--color-surface);
-  opacity: 1;
-}
-
-.training-progress-label {
-  color: var(--color-navy-900);
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.training-progress-connector {
-  width: 28px;
-  height: 1px;
-  flex-shrink: 0;
-  background: var(--color-blue-300);
-}
-
-/* On smaller screens, the progress indicator moves below the brand. */
-@media (max-width: 720px) {
-  .app-header {
-    height: auto;
-  }
-
-  .app-header-inner {
-    width: min(100% - 32px, 800px);
-    min-height: 76px;
-    padding: 14px 0;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 14px;
-  }
-
-  .training-progress {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .training-progress-step {
-    flex: 1;
-  }
-
-  .training-progress-connector {
-    flex: 1;
-    width: auto;
-  }
-}
-
-@media (max-width: 480px) {
-  .training-progress-label {
-    font-size: 11px;
-  }
+  max-width: 40rem;
+  margin: 3rem auto;
+  padding: 0 1.5rem;
 }
 
 .eyebrow {
-  font-family: var(--font-mono);
+  font-family: "IBM Plex Mono", monospace;
   text-transform: uppercase;
   letter-spacing: 0.18em;
   font-size: 0.7rem;
@@ -218,146 +37,15 @@ body {
 }
 
 h1 {
-  font-family: var(--font-sans);
+  font-family: "Schibsted Grotesk", sans-serif;
   font-weight: 700;
   font-size: 1.75rem;
   letter-spacing: -0.02em;
   margin: 0 0 1.5rem;
 }
 
-/* The setup introduction explains the purpose of the first training step. */
-.setup-intro {
-  margin-bottom: 24px;
-}
-
-.setup-intro .eyebrow {
-  margin-bottom: 10px;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.4;
-  letter-spacing: 0.12em;
-}
-
-.setup-intro h1 {
-  margin: 0 0 10px;
-  font-size: 48px;
-  line-height: 1.08;
-  letter-spacing: -0.02em;
-}
-
-.setup-intro-description {
-  max-width: 800px;
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 17px;
-  line-height: 26px;
-}
-
-@media (max-width: 720px) {
-  .setup-intro h1 {
-    font-size: 36px;
-  }
-
-  .setup-intro-description {
-    font-size: 16px;
-    line-height: 24px;
-  }
-}
-
-/* Each setup section groups one decision into a separate card. */
-.setup-section {
-  width: 100%;
-  margin-bottom: 14px;
-  padding: 34px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-}
-
-.setup-section-content {
-  width: 100%;
-}
-
-/* The summary groups all confirmed choices into one compact panel. */
-.selection-summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0 0 14px;
-  padding: 8px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-filter);
-}
-
-/* Each item separates one confirmed value from the surrounding panel. */
-.selection-summary-item {
-  min-width: 0;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--color-surface);
-}
-
-.selection-summary-item dt {
-  margin-bottom: 4px;
-  color: var(--color-text-muted-secondary);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.selection-summary-item dd {
-  margin: 0;
-  color: var(--color-navy-900);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-/* Existing grids must not add extra space inside the section card. */
-.setup-section .persona-grid {
-  margin-bottom: 0;
-}
-
-/* The heading aligns the section number with its title and description. */
-.setup-section-heading {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.setup-section-index {
-  flex-shrink: 0;
-  color: #000000;
-  font-size: 17px;
-  line-height: 26px;
-}
-
-.setup-section-heading-text {
-  min-width: 0;
-}
-
-.setup-section-heading-text h2 {
-  margin: 0 0 4px;
-  color: var(--color-navy-900);
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-}
-
-.setup-section-heading-text p {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 16px;
-  line-height: 24px;
-}
-
 h2 {
-  font-family: var(--font-sans);
+  font-family: "Schibsted Grotesk", sans-serif;
   font-size: 1rem;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -373,7 +61,6 @@ h2 {
 }
 
 .persona-card {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -381,49 +68,23 @@ h2 {
   background: #fff;
   border: 2px solid var(--border);
   border-radius: 16px;
-  padding: 1rem 3.25rem 1rem 1rem;
+  padding: 1rem;
   cursor: pointer;
   font: inherit;
   color: inherit;
   transition: border-color 0.2s;
 }
 
-/* The indicator remains visible as an empty circle for unselected choices. */
-.choice-check {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid var(--color-blue-300);
-  border-radius: 50%;
-  color: transparent;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1;
-}
-
 .persona-card:hover {
   border-color: var(--blue-light);
 }
 
-/* Selected cards use a subtle background to reinforce the active state. */
 .persona-card.selected {
   border-color: var(--blue);
-  background: var(--color-surface-selected);
-}
-
-/* Selected choices use a filled circle with a visible check mark. */
-.persona-card.selected .choice-check {
-  border-color: var(--color-blue-600);
-  background: var(--color-blue-600);
-  color: var(--color-surface);
 }
 
 .persona-name {
-  font-family: var(--font-sans);
+  font-family: "Schibsted Grotesk", sans-serif;
   font-weight: 600;
   font-size: 0.95rem;
 }
@@ -487,7 +148,7 @@ input[type="file"] {
 }
 
 #status {
-  font-family: var(--font-mono);
+  font-family: "IBM Plex Mono", monospace;
   font-size: 0.8rem;
   letter-spacing: 0.02em;
   color: var(--text-muted);
@@ -628,7 +289,7 @@ audio {
 }
 
 .call-state-label {
-  font-family: var(--font-mono);
+  font-family: "IBM Plex Mono", monospace;
   font-size: 0.8rem;
   letter-spacing: 0.02em;
   color: var(--text-muted);
@@ -652,31 +313,4 @@ audio {
   background: var(--success);
   border-radius: 999px;
   transition: width 0.08s linear;
-}
-
-/* Setup sections use smaller spacing and typography on narrow screens. */
-@media (max-width: 720px) {
-  .setup-section {
-    padding: 24px;
-  }
-
-  .setup-section-heading {
-    gap: 12px;
-  }
-
-  .setup-section-heading-text h2 {
-    font-size: 22px;
-  }
-
-  /* The summary switches to two columns when four columns become too narrow. */
-  .selection-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-/* Very narrow screens display each summary value on its own row. */
-@media (max-width: 480px) {
-  .selection-summary {
-    grid-template-columns: 1fr;
-  }
 }
