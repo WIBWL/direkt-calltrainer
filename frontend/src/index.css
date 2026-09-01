@@ -112,16 +112,6 @@ body {
   color: var(--color-navy-900);
 }
 
-.prototype-badge {
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: var(--color-blue-100);
-  color: var(--color-blue-600);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
 .training-progress {
   display: flex;
   align-items: center;
@@ -213,10 +203,6 @@ body {
 }
 
 @media (max-width: 480px) {
-  .prototype-badge {
-    display: none;
-  }
-
   .training-progress-label {
     font-size: 11px;
   }
