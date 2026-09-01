@@ -253,7 +253,7 @@ export default function App() {
             ))}
           </div>
         </SetupSection>
-        
+
         {/* The selected persona defines the customer role used during the call. */}
         <SetupSection
           index="02"
