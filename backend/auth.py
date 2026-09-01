@@ -58,8 +58,8 @@ _bearer = HTTPBearer(auto_error=False)
 
 @dataclass(frozen=True)
 class AuthContext:
-    """The verified caller. `sub` is the Keycloak user id — the value that
-    becomes `session.subject_id` when ADR 0034's persistence lands (ADR 0031)."""
+    """The verified caller. `sub` is the Keycloak user id — the value written
+    as `session.subject_id` when the Session is persisted (ADR 0031/0034)."""
 
     sub: str
     roles: list[str]

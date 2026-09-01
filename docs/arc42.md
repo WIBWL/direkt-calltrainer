@@ -7,7 +7,7 @@
 Im Gegensatz zu klassischen Verkaufstrainern liegt der Fokus nicht auf Abschlussquoten, sondern auf Kommunikation, Klarheit und Wirkung des Sprechenden, ohne dass umfangreiche kundenspezifische Fachkenntnisse vorausgesetzt werden (C-05):
 
 - Kommunikation, Klarheit und Wirkung des Sprechenden
-- Erkennung von Sprechverhalten (Intonation, Tempo, Lautstärke, Artikulation)
+- Erkennung von Sprechverhalten (Redeanteil, Fragen, Sprechtempo, Wortanzahl, Reaktionszeit, Sprechpausen, Lautstärke — ADR 0051)
 - Vermeidung von überlangen/überkomplexen Erklärungen
 
 Nach jedem Trainingsgespräch erhält der Nutzer ein qualitatives Wrap-up mit konkreten Verbesserungsvorschlägen statt eines reinen Scores.
@@ -78,7 +78,7 @@ Simuliert einen externen Kunden im Gespräch. Die Persona kann aus einer erweite
 
 ### Feedback-/Auswertungskomponente
 
-Erstellt nach Gesprächsende das qualitative Wrap-up (F-09) inkl. konkreter Verbesserungsvorschläge (F-10), basierend auf der Analyse des Sprechverhaltens (F-35, F-36, F-37, F-38, F-51, F-08).
+Erstellt nach Gesprächsende das qualitative Wrap-up (F-09) inkl. konkreter Verbesserungsvorschläge (F-10), basierend auf den Kennzahlen des Gesprächs (F-53) und dem Lautstärkeverlauf (F-37). Die Kennzahlen beschreiben jeweils das ganze Gespräch, nicht einzelne Redebeiträge (ADR 0051).
 
 ## 3.2 Technischer Kontext
 
@@ -94,7 +94,7 @@ Primärer Zugangsweg im MVP (C-02). Erfasst Sprachsignal des Nutzers, gibt Sprac
 
 **Kanal / Schnittstelle:** Interne Schnittstelle
 
-Wandelt die gesprochene Nutzereingabe in Text um, als Grundlage für Sprachanalyse (F-35, F-36, F-37, F-38, F-51) und KI-Antwortgenerierung.
+Wandelt die gesprochene Nutzereingabe in Text um, als Grundlage für Sprachanalyse (F-36, F-41, F-08, F-51) und KI-Antwortgenerierung.
 
 ### Sprachsynthese (Text-to-Speech)
 
@@ -155,9 +155,10 @@ Besonderheiten: Der gesamte Zyklus muss in Echtzeit ablaufen (Q-03), da Verzöge
 
 ## 6.2 Szenario 2: Analyse des Sprechverhaltens während des Gesprächs
 
-- Während der Nutzer spricht, analysiert die Analyse-Komponente laufend Intonation (F-35), Sprechtempo (F-36), Lautstärke (F-37) und Artikulation (F-38).
-- Zusätzlich wird erkannt, ob ein Thema zu lang, zu kompliziert oder mit zu vielen Informationen erklärt wird (F-08) oder ob Stockungen, Füllwörtern und Unterbrechungen im Redefluss vorhanden sind (F-51)
-- Auffälligkeiten werden für das spätere Wrap-up gesammelt, nicht sofort während des Gesprächs unterbrochen oder angezeigt.
+- Während der Nutzer spricht, misst die Analyse-Komponente je Redebeitrag nur die Rohgrößen, die am Audio ablesbar sind (Sprechdauer, Pausen, Lautstärke) und rechnet sie auf die Zeitachse der Session um.
+- Die Kennzahlen entstehen erst am Gesprächsende aus allen Redebeiträgen zusammen und beschreiben jeweils das ganze Gespräch — Menge und Begründung siehe ADR 0051, Kennzahlenliste F-53.
+- Die Antwortzeit der KI wird mitgemessen und keinem Sprecher zugerechnet, damit sie nicht als Gesprächslücke des Nutzers erscheint (ADR 0051).
+- Ergebnisse werden für das spätere Wrap-up gesammelt, nicht während des Gesprächs angezeigt (ADR 0014).
 
 Besonderheiten: Diese Analyse läuft parallel zur eigentlichen Gesprächssimulation (Szenario 1), ohne den Gesprächsfluss zu unterbrechen. Die gesammelten Daten dienen als Grundlage für Szenario 3.
 
@@ -246,7 +247,7 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0011 | LLM Backend Is the University-Hosted DiReKT Gateway, Self-Contained | angenommen (durch ADR 0021 eingegrenzt) | Q-03, C-04, F-01 |
 | ADR 0012 | Backend Built with Python and FastAPI | angenommen | Q-03 |
 | ADR 0013 | Minimal Required Setup, Advanced Options Separate | angenommen | Q-02, F-43, R-34 |
-| ADR 0014 | Speech-Behavior Feedback Surfaces Only in the Post-Call Wrap-Up | angenommen | F-09, F-35, F-36, F-37, F-38, F-51 |
+| ADR 0014 | Speech-Behavior Feedback Surfaces Only in the Post-Call Wrap-Up | angenommen (eingegrenzt durch ADR 0051) | F-09, F-36, F-37, F-51, F-53 |
 | ADR 0015 | Persona Selection via Card View, Not a List | angenommen | Q-02, F-04, F-44 |
 | ADR 0016 | One Retry, Then Graceful Session End on Pipeline Failure | angenommen | Q-03, F-46 |
 | ADR 0017 | No Provider Abstraction Layer for STT/LLM/TTS | angenommen | |
@@ -276,9 +277,14 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0041 | Personas and Scenarios Loaded from the Database | angenommen | F-03, F-04 |
 | ADR 0042 | Opening Turn Pre-Warmed at Session Commitment, Not on Selection | angenommen | Q-03, F-01 |
 | ADR 0043 | English Prompt Content, Session Language Bound to the Persona | angenommen (löst ADR 0022 ab) | C-01, R-35, F-03, F-04 |
-| ADR 0044 | Forward KugelAudio's Audio Sub-Chunks; No Persistent Streaming Session | angenommen (verfeinert die TTS-Strecke aus ADR 0033) | Q-03, F-01 |
+| ADR 0044 | Forward KugelAudio's Audio Sub-Chunks; No Persistent Streaming Session | angenommen (verfeinert die TTS-Strecke aus ADR 0033) | Q-03, F-01, F-46 |
 | ADR 0045 | Case Facts, Call Goal and Success Condition on the Scenario; Objections on the Persona | angenommen (erweitert ADR 0001) | F-01, F-03, F-04, R-12 |
 | ADR 0046 | Liveliness Is Pursued at the Prompt Layer Before the Turn-Taking Layer | vorgeschlagen | F-01 |
+| ADR 0047 | Praat via Parselmouth as the Paraverbal Measurement Engine | angenommen (eingegrenzt durch ADR 0051) | F-36, F-37, F-51, F-08 |
+| ADR 0048 | Paraverbal Analysis Runs Inline on In-Memory Audio; Audio Is Never Persisted | angenommen | Q-03, C-04, F-12, F-36, F-37, F-51 |
+| ADR 0049 | The Model Interprets Measurements, It Does Not Produce Them | angenommen | F-09, F-10, R-19, R-22 |
+| ADR 0050 | A Session Is Addressed by an Unguessable Id | angenommen | C-04, F-12 |
+| ADR 0051 | Statistics Describe the Whole Session and Carry No Invented Norms | angenommen (grenzt ADR 0014/0047/0048 ein) | Q-01, F-53, F-12 |
 
 Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug; ADR 0017, 0025, 0027 bis 0030 und 0039 sind reine Wartbarkeits-, Werkzeug- oder Schemaentscheidungen ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 

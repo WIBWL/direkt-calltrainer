@@ -136,3 +136,19 @@ def _pcm16_to_wav(pcm_bytes: bytes, sample_rate: int) -> bytes:
         wav.setframerate(sample_rate)
         wav.writeframes(pcm_bytes)
     return buf.getvalue()
+
+
+def duration_ms(wav_bytes: bytes) -> int:
+    """Playback length of one synthesized chunk.
+
+    Both backends deliver WAV -- KugelAudio's headerless PCM is wrapped above --
+    so the header is always there to read. 0 for anything unreadable: the
+    caller uses this to place the Persona on the Session's timeline (ADR 0051),
+    which must not be able to fail a call.
+    """
+    try:
+        with wave.open(io.BytesIO(wav_bytes)) as wav:
+            return round(wav.getnframes() * 1000 / wav.getframerate())
+    except (wave.Error, ZeroDivisionError, EOFError):
+        logger.warning("Synthesized chunk has no readable WAV header; timing it as 0 ms")
+        return 0

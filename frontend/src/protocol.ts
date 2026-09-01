@@ -7,11 +7,13 @@
 /** The animation the call screen shows; driven by the server's `state` message. */
 export type CallState = "listening" | "thinking" | "speaking";
 
-/** One exchange of the finished Transcript, shown after the call ends. */
-export interface TurnRecord {
-  turn_seq: number;
-  user_text: string;
-  persona_text: string;
+/** One line of the post-call Gesprächsprotokoll, placed on the Session's
+ * timeline. Flattened server-side (backend/session/models.py) so this log and
+ * the persisted one cannot disagree about who spoke when. */
+export interface TranscriptEntry {
+  sprecher: "nutzer" | "persona";
+  text: string;
+  offset_ms: number;
 }
 
 // --- Client -> Server ---
@@ -35,6 +37,14 @@ export interface TurnAudioMetaMessage {
   mime_type: string;
 }
 
+/** Sent the moment the client starts playing the Persona's opening line.
+ * The server generates that line as soon as the socket connects (ADR 0042),
+ * long before the user reaches the call screen, so this is what tells it where
+ * t=0 on the Session's timeline actually is (ADR 0051). */
+export interface SessionActivateMessage {
+  type: "session.activate";
+}
+
 /** The user hung up. The server replies with `session.ended`. */
 export interface SessionEndMessage {
   type: "session.end";
@@ -48,6 +58,7 @@ export interface TurnInterruptMessage {
 /** Every message the client can send. Discriminated on `type`. */
 export type ClientMessage =
   | SessionStartMessage
+  | SessionActivateMessage
   | TurnAudioMetaMessage
   | SessionEndMessage
   | TurnInterruptMessage;
@@ -90,7 +101,7 @@ export interface ErrorMessage {
 export interface SessionEndedMessage {
   type: "session.ended";
   reason: "user" | "error" | "completed";
-  transcript: TurnRecord[];
+  transcript: TranscriptEntry[];
 }
 
 /** Every message the server can send. Discriminated on `type`. */
@@ -101,3 +112,49 @@ export type ServerMessage =
   | TurnCompletedMessage
   | ErrorMessage
   | SessionEndedMessage;
+
+// --- Finished Session (GET /api/sessions/{id}, backend/api/sessions.py) ---
+// The wrap-up is generated asynchronously (ADR 0019), so a Session is readable
+// before its Feedback exists; `status` says which of the two this is.
+
+export type FeedbackStatus = "queued" | "running" | "done" | "failed";
+
+export interface Messung {
+  schluessel: string;
+  bezeichnung: string;
+  einheit: string | null;
+  wert: number;
+  /** ADR 0029's free-form payload: curves, sub-measures, pause positions. */
+  detail: Record<string, unknown> | null;
+}
+
+export interface SessionTurn {
+  turn_id: number;
+  sprecher: "nutzer" | "persona";
+  start_offset_ms: number;
+  /** NULL where the utterance has no measured end. */
+  dauer_ms: number | null;
+  transkript: string;
+}
+
+export interface Feedbackpunkt {
+  art: "staerke" | "verbesserung";
+  text: string;
+  turn_id: number | null;
+}
+
+export interface SessionFeedback {
+  zusammenfassung: string;
+  punkte: Feedbackpunkt[];
+}
+
+export interface SessionDetail {
+  session_id: string;
+  persona: string;
+  szenario: string;
+  status: FeedbackStatus;
+  turns: SessionTurn[];
+  /** Statistics for the whole call, not per utterance (ADR 0051). */
+  messungen: Messung[];
+  feedback: SessionFeedback | null;
+}

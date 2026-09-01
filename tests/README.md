@@ -39,14 +39,16 @@ throwaway RSA key and a stubbed JWKS.
 | WebSocket wire protocol & handshake (+ token in `session.start`) | F-46, F-50, ADR 0009, ADR 0033, ADR 0035 | `test_websocket_protocol.py` |
 | Centralized / per-session logging | ADR 0039 | `test_logging.py` |
 | Persistence schema (ORM metadata) | ADR 0025/0026/0029/0030/0032, F-09, F-12, F-14 | `test_persistence_schema.py` |
-| Documented gaps (current-state guards) | ADR 0034, F-09/10, F-13/48, F-53, F-56, ADR 0018/0019 | `test_documented_gaps.py` |
+| Documented gaps (current-state guards) | F-13/48, F-53, F-56, ADR 0006/0009 | `test_documented_gaps.py` |
 
 ## Not covered here
 
-* **Paraverbal analysis** (F-35–F-38, F-40, F-51, F-24, dashboard F-53) and
-  **AI feedback** (F-09, F-10) — not implemented yet (ADR 0018/0019 worker is
-  unbuilt). `test_documented_gaps.py` guards their absence so this suite flags
-  the day they land.
+* **Paraverbal measurement and the post-call wrap-up** (F-09, F-10, F-37,
+  F-51, F-53) — now implemented in `backend/feedback/` (ADR 0047–0051), but
+  not yet covered by tests of their own. The current-state guards that used
+  to assert their absence were removed when the feature landed; feature
+  tests for `metrics.py`, `acoustics.py` and `generator.py` are owed.
+  The cross-session dashboard (F-53) is still unbuilt.
 * **Frontend** (React hooks, in-browser Silero VAD / ADR 0036, streamed audio
   playback) — no JS test runner is configured. VAD confirmed-speech filtering
   is a browser-only concern.

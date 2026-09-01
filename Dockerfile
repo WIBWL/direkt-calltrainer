@@ -13,7 +13,11 @@ ENV VITE_OIDC_ISSUER=$VITE_OIDC_ISSUER
 ENV VITE_OIDC_CLIENT_ID=$VITE_OIDC_CLIENT_ID
 RUN npm run build
 
-FROM python:3-slim
+# Pinned, not "python:3-slim": that tag has since floated to 3.14, where
+# SQLAlchemy 2.0.36 cannot resolve the `Mapped[int | None]` annotations in
+# backend/db/models.py and the app fails at import. Raise this deliberately,
+# together with the pins in requirements.txt.
+FROM python:3.12-slim
 
 EXPOSE 8000
 

@@ -2,12 +2,45 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { apiFetch } from "./api";
 import CallView from "./components/CallView";
+import FeedbackView from "./components/FeedbackView";
 import MicCheck from "./components/MicCheck";
 import TranscriptView from "./components/TranscriptView";
 import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useSessionSocket } from "./hooks/useSessionSocket";
 import { useStreamedAudioPlayback } from "./hooks/useStreamedAudioPlayback";
-import type { TurnRecord } from "./protocol";
+import type { TranscriptEntry } from "./protocol";
+
+// Survives a reload but not the tab closing, which is exactly the scope the
+// wrap-up has: it is reachable while this tab is, and is not linkable or
+// listed anywhere. Without it, refreshing the results page — the natural
+// reaction to a wrap-up that is taking a while — silently discarded it.
+const LAST_SESSION_KEY = "calltrainer.finishedSession";
+
+interface FinishedSession {
+  sessionId: string | null;
+  turns: TranscriptEntry[];
+  /** Carried along because a reload restores this screen without a Persona
+   * selection to look the name up in. */
+  personaName: string;
+}
+
+function loadFinishedSession(): FinishedSession | null {
+  try {
+    const stored = sessionStorage.getItem(LAST_SESSION_KEY);
+    return stored ? (JSON.parse(stored) as FinishedSession) : null;
+  } catch {
+    return null; // private mode, cleared storage, or an older shape
+  }
+}
+
+function saveFinishedSession(finished: FinishedSession | null) {
+  try {
+    if (finished) sessionStorage.setItem(LAST_SESSION_KEY, JSON.stringify(finished));
+    else sessionStorage.removeItem(LAST_SESSION_KEY);
+  } catch {
+    // Storage is a convenience here; the current tab works without it.
+  }
+}
 
 interface Persona {
   id: string;
@@ -29,14 +62,23 @@ export default function App() {
   const [personaId, setPersonaId] = useState<string | null>(null);
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [screen, setScreen] = useState<Screen>("setup");
-  const [transcript, setTranscript] = useState<TurnRecord[]>([]);
+  // Lazy initializer: read once on mount, not on every render.
+  const [restored] = useState<FinishedSession | null>(loadFinishedSession);
+  const [screen, setScreen] = useState<Screen>(restored ? "transcript" : "setup");
+  const [transcript, setTranscript] = useState<TranscriptEntry[]>(restored?.turns ?? []);
+  // Names the persisted Session so its Feedback can be fetched once the
+  // worker has produced it. Not kept anywhere but here: the wrap-up is
+  // reachable for as long as this screen is, and no longer.
+  const [endedSessionId, setEndedSessionId] = useState<string | null>(restored?.sessionId ?? null);
   // Holds a just-received session.ended until playback actually finishes —
   // see the effect below.
   const [pendingEnd, setPendingEnd] = useState<{
     reason: "user" | "error" | "completed";
-    turns: TurnRecord[];
+    turns: TranscriptEntry[];
+    sessionId: string | null;
   } | null>(null);
+  const personaName =
+    personas.find((p) => p.id === personaId)?.name ?? restored?.personaName ?? "Persona";
   // Forces a fresh Session even when persona/scenario didn't change — bumped
   // right when a call ends normally, so the *next* Session (and its opening
   // line) starts pre-warming immediately, before the user has asked for it.
@@ -82,9 +124,12 @@ export default function App() {
   // the goodbye is heard instead of getting cut off mid-sentence. This only
   // applies to natural/error endings — when the user clicks "Anruf
   // beenden", the call ends immediately instead (see the effect below).
-  const handleEnded = useCallback((reason: "user" | "error" | "completed", turns: TurnRecord[]) => {
-    setPendingEnd({ reason, turns });
-  }, []);
+  const handleEnded = useCallback(
+    (reason: "user" | "error" | "completed", turns: TranscriptEntry[], sessionId: string | null) => {
+      setPendingEnd({ reason, turns, sessionId });
+    },
+    [],
+  );
 
   const socket = useSessionSocket({
     personaId,
@@ -102,6 +147,8 @@ export default function App() {
     if (pendingEnd.reason !== "user" && playback.isPlaying) return;
     playback.reset();
     setTranscript(pendingEnd.turns);
+    setEndedSessionId(pendingEnd.sessionId);
+    saveFinishedSession({ sessionId: pendingEnd.sessionId, turns: pendingEnd.turns, personaName });
     setScreen("transcript");
     if (pendingEnd.reason === "error") {
       setNeedsReconnect(true);
@@ -151,12 +198,16 @@ export default function App() {
 
   const handleConfirmed = useCallback(() => {
     // Reveal whatever's already been generated (possibly the whole opening
-    // line by now) and switch to live playback for everything after.
+    // line by now) and switch to live playback for everything after. The
+    // server is told at the same moment, because this — not the connect —
+    // is where the Session's timeline starts (ADR 0051).
     playback.activate();
+    socket.sendActivate();
     setScreen("call");
-  }, [playback]);
+  }, [playback, socket.sendActivate]);
 
   const handleRestart = useCallback(() => {
+    saveFinishedSession(null);
     if (needsReconnect) {
       setGeneration((g) => g + 1);
       setNeedsReconnect(false);
@@ -181,8 +232,14 @@ export default function App() {
   }
 
   if (screen === "transcript") {
-    const personaName = personas.find((p) => p.id === personaId)?.name ?? "Persona";
-    return <TranscriptView transcript={transcript} personaName={personaName} onRestart={handleRestart} />;
+    return (
+      <TranscriptView
+        transcript={transcript}
+        personaName={personaName}
+        onRestart={handleRestart}
+        feedback={<FeedbackView sessionId={endedSessionId} />}
+      />
+    );
   }
 
   return (

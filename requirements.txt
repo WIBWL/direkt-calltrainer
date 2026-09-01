@@ -17,6 +17,12 @@ pydot==3.0.4
 sqlalchemy==2.0.36
 sqlalchemy-schemadisplay==2.0
 
+# Post-call feedback: Praat measurement and the async wrap-up worker
+numpy==2.5.2
+praat-parselmouth==0.4.7
+redis==8.1.0
+rq==2.12.0
+
 # Docs site (arc42 + ADRs)
 mkdocs==1.6.1
 mkdocs-material==9.5.49

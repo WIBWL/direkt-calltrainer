@@ -12,12 +12,14 @@ import asyncio
 import contextlib
 import logging
 import re
+import time
 from collections.abc import AsyncIterator
 
 from kugelaudio.exceptions import KugelAudioError
 from openai import OpenAIError
 
 from backend.clients import llm, stt, tts
+from backend.feedback.acoustics import AcousticsError, Pause, TurnAcoustics, analyze
 from backend.personas import Persona
 from backend.scenarios import Scenario
 from backend.session.chunking import sentence_chunks
@@ -160,6 +162,37 @@ _CLOSING_NUDGE = (
 _FALLBACK_CLOSING_LINE = "Vielen Dank für Ihre Zeit. Auf Wiederhören."
 
 
+async def _attach_measurements(
+    turn: Turn, acoustics: asyncio.Task[TurnAcoustics], ended_ms: int
+) -> None:
+    """Record the Turn's paraverbal measurements, on the Session's timeline (ADR 0048).
+
+    The audio arrived once the user had stopped talking, so `ended_ms` is where
+    this fragment ends and the measured duration is what walks it back to its
+    start. A Turn reopened after a barge-in is measured once per fragment, and
+    each fragment is placed by its own arrival -- which is why the pauses can
+    be rebased here and never need a per-fragment origin later.
+
+    Never fatal: unlike STT, dialogue generation and TTS, this leg is not one
+    the conversation depends on, so a Turn that cannot be measured simply
+    carries no measurements and the call continues.
+    """
+    try:
+        measured = await acoustics
+    except AcousticsError as e:
+        logger.info("Turn %d not measured: %s", turn.seq, e)
+        return
+    except Exception:
+        logger.exception("Paraverbal analysis failed for turn %d", turn.seq)
+        return
+    started_ms = max(0, ended_ms - measured.duration_ms)
+    if turn.user_offset_ms is None:
+        turn.user_offset_ms = started_ms
+    turn.user_speech_ms += measured.duration_ms
+    turn.pauses.extend(Pause(started_ms + p.offset_ms, p.duration_ms) for p in measured.pauses)
+    turn.loudness_db.extend(measured.loudness_db)
+
+
 class _ReplyProgress:
     """Mutable state threaded through one reply's synthesis: chunks sent, whether
     any was, whether the reply ends the call, the voiced text (for barge-in)."""
@@ -219,18 +252,67 @@ class SessionOrchestrator:
     list, driving one STT → dialogue → TTS pass per Turn. A barge-in can leave a
     Turn open (`_reopen_turn`) for the next utterance to continue (ADR 0035)."""
 
-    def __init__(self, persona: Persona, scenario: Scenario, subject_id: str | None = None):
+    def __init__(self, persona: Persona, scenario: Scenario):
+        # Monotonic, not wall-clock: these offsets locate utterances relative
+        # to each other on the Session's timeline, and must not jump if the
+        # system clock is adjusted mid-call.
+        self._started = time.monotonic()
         self._language_id = persona.language_id
         self._voice = persona.voice
-        # The authenticated Keycloak `sub` (ADR 0009). Held for when ADR 0034's
-        # persist-at-session-end path lands — it becomes `session.subject_id`
-        # (ADR 0031). Unused until then.
-        self._subject_id = subject_id
+        # The authenticated caller is not held here: the Session is written by
+        # backend/api/session_ws.py, which already has the AuthContext, so the
+        # `sub` goes straight from the handshake to `session.subject_id`
+        # (ADR 0009, ADR 0031) without a second copy living on the dialogue.
         self._messages: list[dict[str, str]] = [
             {"role": "system", "content": _build_system_prompt(persona, scenario)},
         ]
         self.turns: list[Turn] = []
         self._reopen_turn: Turn | None = None
+
+    def _elapsed_ms(self) -> int:
+        """Milliseconds since the Session started."""
+        return round((time.monotonic() - self._started) * 1000)
+
+    def start_playback(self) -> None:
+        """The client has begun playing the opening line; t=0 is now.
+
+        Until this point the clock has been measuring the server's own head
+        start. The opening Turn is generated as soon as the socket connects,
+        which is well before the user asks for it (ADR 0042), so everything
+        already on the timeline is offset by however long they spent on the
+        setup and mic-check screens. Left uncorrected that wait becomes the
+        user's first reaction time, and the Transcript's timestamps start
+        counting from a moment nobody was in the call yet.
+        """
+        # The audio synthesized so far begins playing now, so the timeline is
+        # shifted to put its first chunk at zero. Spacing is preserved rather
+        # than each window being zeroed: only the opening Turn can be here
+        # today, but that is then not load-bearing if pre-warming ever reaches
+        # further than one Turn (ADR 0042).
+        offsets = [t.persona_offset_ms for t in self.turns if t.persona_offset_ms is not None]
+        if offsets:
+            shift = min(offsets)
+            for turn in self.turns:
+                if turn.persona_offset_ms is not None:
+                    turn.persona_offset_ms -= shift
+                if turn.persona_end_ms is not None:
+                    turn.persona_end_ms = max(0, turn.persona_end_ms - shift)
+        self._started = time.monotonic()
+
+    def _note_persona_audio(self, turn: Turn, audio: bytes) -> None:
+        """Extend the Persona's speaking window by one synthesized chunk.
+
+        The window has to be modelled: the server learns when it *sent* a chunk,
+        never when the client finished playing it. Chunks play back to back, so
+        a chunk ready before the previous one has finished extends the window
+        rather than starting a new one; one that arrives after a stall starts
+        from now. This is what the user's reaction time is counted from, and
+        what keeps the model's own latency out of it (ADR 0051).
+        """
+        now = self._elapsed_ms()
+        if turn.persona_offset_ms is None:
+            turn.persona_offset_ms = now
+        turn.persona_end_ms = max(now, turn.persona_end_ms or now) + tts.duration_ms(audio)
 
     def _new_or_reopened_turn(self) -> tuple[Turn, bool]:
         """Reuses a still-open turn from a prior barge-in, else creates a
@@ -263,6 +345,14 @@ class SessionOrchestrator:
         """Run one turn: transcribe, stream a reply, synthesize+yield it chunk by chunk."""
         turn, reopening = self._new_or_reopened_turn()
         progress = _ReplyProgress()
+        # Measured on a worker thread alongside the STT round trip, not after
+        # it: Praat is local and fast, the gateway is neither, so the analysis
+        # is finished by the time the transcript comes back (ADR 0048).
+        acoustics = asyncio.create_task(asyncio.to_thread(analyze, audio_bytes))
+        # The audio arrives once the user has stopped talking, so this marks
+        # the utterance's end; _attach_measurements walks it back to its start.
+        ended_ms = self._elapsed_ms()
+        turn.user_end_ms = ended_ms
         try:
             yield StateChanged(state="thinking")
 
@@ -279,6 +369,9 @@ class SessionOrchestrator:
             else:
                 turn.user_text = user_text
                 self._messages.append({"role": "user", "content": user_text})
+            await _attach_measurements(turn, acoustics, ended_ms)
+            if turn.user_offset_ms is None:
+                turn.user_offset_ms = ended_ms  # unmeasured: the end is all we know
             closing = _signals_closing(turn.user_text)
 
             messages = self._messages
@@ -296,6 +389,8 @@ class SessionOrchestrator:
             # cancellation landed between yields, not inside a network await.
             self._finalize_interrupted(turn, progress)
             raise
+        finally:
+            acoustics.cancel()  # no-op once awaited; releases the audio otherwise
 
     async def _attempt_reply_with_retry(
         self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress
@@ -332,6 +427,10 @@ class SessionOrchestrator:
                     return
 
         turn.persona_text = turn.persona_text.strip()
+        if turn.persona_text and turn.persona_offset_ms is None:
+            # Words with no audio behind them (synthesis failed): place them on
+            # the timeline as an instant, so the Transcript still reads in order.
+            turn.persona_offset_ms = turn.persona_end_ms = self._elapsed_ms()
         repeated_reply = bool(turn.persona_text) and (
             self._repeats_last_reply(turn.persona_text) or _has_repeated_sentence(turn.persona_text)
         )
@@ -370,6 +469,7 @@ class SessionOrchestrator:
             yield StateChanged(state="speaking")
             progress.spoke_yet = True
         progress.chunk_seq += 1
+        self._note_persona_audio(turn, audio)
         yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=audio)
         turn.persona_text = f"{turn.persona_text} {_FALLBACK_CLOSING_LINE}".strip()
         self._messages[-1]["content"] = turn.persona_text
@@ -425,6 +525,7 @@ class SessionOrchestrator:
                     yield StateChanged(state="speaking")
                     progress.spoke_yet = True
                 progress.chunk_seq += 1
+                self._note_persona_audio(turn, wav)
                 yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=wav)
         except (KugelAudioError, OpenAIError, TimeoutError, OSError) as e:
             logger.error("TTS synthesis failed: %s", e)

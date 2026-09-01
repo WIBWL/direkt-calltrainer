@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { currentAccessToken } from "../auth";
-import type { CallState, ClientMessage, ServerMessage, TurnRecord } from "../protocol";
+import type { CallState, ClientMessage, ServerMessage, TranscriptEntry } from "../protocol";
 
 // The backend serves this SPA, so the WebSocket is same-origin (see CLAUDE.md).
 // Derived from window.location rather than a base-URL env var, which no longer
@@ -19,7 +19,12 @@ interface UseSessionSocketOptions {
    * current one ends. */
   generation: number;
   onAudioChunk: (data: ArrayBuffer) => void;
-  onEnded: (reason: "user" | "error" | "completed", transcript: TurnRecord[]) => void;
+  onEnded: (
+    reason: "user" | "error" | "completed",
+    transcript: TranscriptEntry[],
+    /** Names the persisted Session, for fetching its Feedback afterwards. */
+    sessionId: string | null,
+  ) => void;
 }
 
 /**
@@ -46,12 +51,14 @@ export function useSessionSocket({
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const turnSeqRef = useRef(0);
+  const sessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (personaId === null || scenarioId === null) return;
 
     setError(null);
     setCallState("thinking");
+    sessionIdRef.current = null;
 
     const ws = new WebSocket(WS_URL);
     ws.binaryType = "arraybuffer";
@@ -101,9 +108,11 @@ export function useSessionSocket({
           setError(message.message);
           break;
         case "session.ended":
-          onEnded(message.reason, message.transcript);
+          onEnded(message.reason, message.transcript, sessionIdRef.current);
           break;
         case "session.started":
+          sessionIdRef.current = message.session_id;
+          break;
         case "turn.audio.chunk":
         case "turn.completed":
           break;
@@ -153,6 +162,15 @@ export function useSessionSocket({
     setCallState("listening");
   }, []);
 
+  /** Marks t=0 on the Session's timeline: the opening line starts playing now. */
+  const sendActivate = useCallback(() => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    console.debug("[WS] -> session.activate");
+    const activate: ClientMessage = { type: "session.activate" };
+    ws.send(JSON.stringify(activate));
+  }, []);
+
   const endSession = useCallback(() => {
     const ws = wsRef.current;
     if (!ws) return;
@@ -167,9 +185,11 @@ export function useSessionSocket({
       // even in the brief window before the connection is established.
       console.debug("[WS] ending before connection was established");
       ws.close();
-      onEnded("user", []);
+      // No handshake means no Session was ever created, let alone persisted,
+      // so there is no id and no Feedback to wait for.
+      onEnded("user", [], null);
     }
   }, [onEnded]);
 
-  return { callState, error, sendTurnAudio, sendInterrupt, endSession };
+  return { callState, error, sendTurnAudio, sendInterrupt, sendActivate, endSession };
 }

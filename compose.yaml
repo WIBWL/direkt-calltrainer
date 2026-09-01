@@ -14,6 +14,7 @@ services:
     environment:
       # Within the compose network the database host is "db", not localhost.
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
       # The token `iss` and the browser's authority — reachable at localhost:18081
       # from the host. The container can't reach that, so it fetches the keys
       # over the compose network instead (backend/auth.py's OIDC_JWKS_URL).
@@ -27,6 +28,8 @@ services:
       - ./logs:/app/logs
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       keycloak:
         condition: service_healthy
@@ -46,6 +49,46 @@ services:
           ignore:
             - node_modules/
             - dist/
+
+  # The Feedback worker (ADR 0018/0019): same image and code as the app, a
+  # different process. It only ever touches Postgres and the LLM gateway, so
+  # it needs no port of its own and nothing depends on it being up for a call
+  # to run -- a stopped worker just means wrap-ups queue until it returns.
+  worker:
+    image: direkt-calltrainer
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: ["python", "-m", "backend.worker"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./backend
+          target: /app/backend
+        - action: rebuild
+          path: ./requirements.txt
+
+  redis:
+    image: redis:8-alpine
+    # No volume: the queue holds in-flight jobs only. What must survive a
+    # restart is the job's outcome, and that lives in Postgres (ADR 0032).
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   db:
     image: postgres:17

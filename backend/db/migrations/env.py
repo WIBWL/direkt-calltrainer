@@ -26,7 +26,11 @@ if not DATABASE_URL:
 # starts an interpolation and would reject a password containing one.
 config.set_main_option("sqlalchemy.url", DATABASE_URL.replace("%", "%%"))
 
-if config.config_file_name is not None:
+# fileConfig() disables every logger configured before it. That is fine for the
+# alembic CLI, but when the running app migrates itself at startup
+# (backend/db/provision.py) it would silently take out the application's own
+# logging (ADR 0039) for the rest of the process -- so that caller opts out.
+if config.config_file_name is not None and config.attributes.get("configure_logging", True):
     fileConfig(config.config_file_name)
 
 # Autogenerate diffs the models against the database (ADR 0027).
