@@ -278,6 +278,25 @@ h1 {
   }
 }
 
+/* Each setup section groups one decision into a separate card. */
+.setup-section {
+  width: 100%;
+  margin-bottom: 14px;
+  padding: 34px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.setup-section-content {
+  width: 100%;
+}
+
+/* Existing grids must not add extra space inside the section card. */
+.setup-section .persona-grid {
+  margin-bottom: 0;
+}
+
 h2 {
   font-family: var(--font-sans);
   font-size: 1rem;
