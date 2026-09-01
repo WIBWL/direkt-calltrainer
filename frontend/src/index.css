@@ -304,6 +304,32 @@ h1 {
   background: var(--color-surface-filter);
 }
 
+/* Each item separates one confirmed value from the surrounding panel. */
+.selection-summary-item {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.selection-summary-item dt {
+  margin-bottom: 4px;
+  color: var(--color-text-muted-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.selection-summary-item dd {
+  margin: 0;
+  color: var(--color-navy-900);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 /* Existing grids must not add extra space inside the section card. */
 .setup-section .persona-grid {
   margin-bottom: 0;
