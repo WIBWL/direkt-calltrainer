@@ -594,3 +594,18 @@ audio {
   border-radius: 999px;
   transition: width 0.08s linear;
 }
+
+/* Setup sections use smaller spacing and typography on narrow screens. */
+@media (max-width: 720px) {
+  .setup-section {
+    padding: 24px;
+  }
+
+  .setup-section-heading {
+    gap: 12px;
+  }
+
+  .setup-section-heading-text h2 {
+    font-size: 22px;
+  }
+}
