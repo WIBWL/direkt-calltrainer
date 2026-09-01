@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { apiFetch } from "./api";
+import AppHeader from "./components/AppHeader";
 import CallView from "./components/CallView";
 import MicCheck from "./components/MicCheck";
+import SelectionSummary from "./components/SelectionSummary";
+import SetupSection from "./components/SetupSection";
 import TranscriptView from "./components/TranscriptView";
 import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useSessionSocket } from "./hooks/useSessionSocket";
@@ -164,76 +167,156 @@ export default function App() {
     setScreen("setup");
   }, [needsReconnect]);
 
-  const readyForCall = personaId !== null && scenarioId !== null;
+  // Resolve the complete objects so their labels can be reused in the summary.
+  const selectedPersona = personas.find((persona) => persona.id === personaId);
+  const selectedScenario = scenarios.find((scenario) => scenario.id === scenarioId);
+  const readyForCall = selectedPersona !== undefined && selectedScenario !== undefined;
 
   if (screen === "mic-check") {
-    return <MicCheck onConfirmed={handleConfirmed} onCancel={() => setScreen("setup")} />;
+    return (
+      <>
+        <AppHeader activeStep="prepare" />
+
+        <main className="app-page app-page-narrow">
+          <MicCheck onConfirmed={handleConfirmed} onCancel={() => setScreen("setup")} />
+        </main>
+      </>
+    );
   }
 
   if (screen === "call") {
     return (
-      <CallView
-        callState={displayState}
-        error={socket.error ?? vad.micError}
-        onEndCall={socket.endSession}
-      />
+      <>
+        <AppHeader activeStep="call" />
+
+        <main className="app-page app-page-narrow">
+          <CallView
+            callState={displayState}
+            error={socket.error ?? vad.micError}
+            onEndCall={socket.endSession}
+          />
+        </main>
+      </>
     );
   }
 
   if (screen === "transcript") {
     const personaName = personas.find((p) => p.id === personaId)?.name ?? "Persona";
-    return <TranscriptView transcript={transcript} personaName={personaName} onRestart={handleRestart} />;
+
+    return (
+      <>
+        <AppHeader activeStep="feedback" />
+
+        <main className="app-page app-page-narrow">
+          <TranscriptView
+            transcript={transcript}
+            personaName={personaName}
+            onRestart={handleRestart}
+          />
+        </main>
+      </>
+    );
   }
 
   return (
     <>
-      <div className="eyebrow">Calltrainer</div>
-      <h1>Training starten</h1>
+      <AppHeader activeStep="prepare" />
 
-      <h2>Persona</h2>
-      <div className="persona-grid">
-        {personas.map((p) => (
+      <main className="app-page setup-page">
+        <section className="setup-intro" aria-labelledby="setup-page-title">
+          <div className="eyebrow">Training vorbereiten</div>
+
+          <h1 id="setup-page-title">Wählen Sie Ihr Kundengespräch</h1>
+
+          <p className="setup-intro-description">
+            Wählen Sie die Gesprächssituation und den passenden Gesprächspartner. Sprache und
+            Stimme übernimmt die ausgewählte Persona.
+          </p>
+        </section>
+
+        {/* The scenario is selected first because it defines the training context. */}
+        <SetupSection
+          index="01"
+          title="Gesprächssituation wählen"
+          description="Welche Situation möchten Sie trainieren?"
+        >
+          <div className="persona-grid">
+            {scenarios.map((s) => (
+              <button
+                key={s.id}
+                className={"persona-card" + (s.id === scenarioId ? " selected" : "")}
+                onClick={() => setScenarioId(s.id)}
+                type="button"
+                aria-pressed={s.id === scenarioId}
+                >
+                {/* The visual indicator complements the aria-pressed state. */}
+                <span className="choice-check" aria-hidden="true">
+                  {s.id === scenarioId ? "✓" : ""}
+                </span>
+
+                <span className="persona-name">{s.name}</span>
+                <span className="card-subtitle">{s.description}</span>
+              </button>
+            ))}
+          </div>
+        </SetupSection>
+
+        {/* The selected persona defines the customer role used during the call. */}
+        <SetupSection
+          index="02"
+          title="Gesprächspartner auswählen"
+          description="Jede Persona besitzt eine eigene Sprache, Stimme und Persönlichkeit."
+        >
+          <div className="persona-grid">
+            {personas.map((p) => (
+              <button
+                key={p.id}
+                className={"persona-card" + (p.id === personaId ? " selected" : "")}
+                onClick={() => setPersonaId(p.id)}
+                type="button"
+                aria-pressed={p.id === personaId}
+                >
+                {/* The visual indicator complements the aria-pressed state. */}
+                <span className="choice-check" aria-hidden="true">
+                  {p.id === personaId ? "✓" : ""}
+                </span>
+
+                <span className="persona-name">{p.name}</span>
+                <span className="card-subtitle">{p.role}</span>
+              </button>
+            ))}
+          </div>
+        </SetupSection>
+
+        {/* The summary lets users review their choices before continuing. */}
+        <SetupSection
+          index="03"
+          title="Auswahl prüfen"
+          description="Ihre Trainingsauswahl steht fest."
+        >
+          <SelectionSummary
+            scenario={selectedScenario?.name ?? "Noch nicht ausgewählt"}
+            persona={selectedPersona?.name ?? "Noch nicht ausgewählt"}
+            language="DE · Deutsch"
+            voice="Durch Persona festgelegt"
+          />
+
           <button
-            key={p.id}
-            className={"persona-card" + (p.id === personaId ? " selected" : "")}
-            onClick={() => setPersonaId(p.id)}
+            className="start-call-button"
             type="button"
+            disabled={!readyForCall}
+            onClick={() => setScreen("mic-check")}
           >
-            <span className="persona-name">{p.name}</span>
-            <span className="card-subtitle">{p.role}</span>
+            Weiter zum Mikrofontest
           </button>
-        ))}
-      </div>
+        </SetupSection>
 
-      <h2>Szenario</h2>
-      <div className="persona-grid">
-        {scenarios.map((s) => (
-          <button
-            key={s.id}
-            className={"persona-card" + (s.id === scenarioId ? " selected" : "")}
-            onClick={() => setScenarioId(s.id)}
-            type="button"
-          >
-            <span className="persona-name">{s.name}</span>
-            <span className="card-subtitle">{s.description}</span>
-          </button>
-        ))}
-      </div>
-
-      <button
-        className="start-call-button"
-        type="button"
-        disabled={!readyForCall}
-        onClick={() => setScreen("mic-check")}
-      >
-        Session starten
-      </button>
-
-      {loadError && (
-        <p id="status" className="error">
-          {loadError}
-        </p>
-      )}
+        {loadError && (
+          <p id="status" className="error">
+            {loadError}
+          </p>
+        )}
+      </main>
     </>
   );
 }
