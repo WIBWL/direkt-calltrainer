@@ -758,48 +758,54 @@ audio {
   flex-shrink: 0;
   border-radius: 2px;
   background: var(--color-blue-600);
+  transform: scaleY(0.55);
   transform-origin: center;
-  animation: call-wave-pulse 0.8s ease-in-out infinite alternate;
+  will-change: transform;
+  animation: call-wave-pulse 1.2s
+    cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
+/* Negative delays let the wave begin in motion instead of starting every bar together. */
 .call-wave-bar:nth-child(2) {
-  animation-delay: 0.12s;
+  animation-delay: -0.96s;
 }
 
 .call-wave-bar:nth-child(3) {
-  animation-delay: 0.24s;
+  animation-delay: -0.72s;
 }
 
 .call-wave-bar:nth-child(4) {
-  animation-delay: 0.36s;
+  animation-delay: -0.48s;
 }
 
 .call-wave-bar:nth-child(5) {
-  animation-delay: 0.48s;
+  animation-delay: -0.24s;
 }
 
 /* Green represents the user's turn, while blue represents the persona. */
 .call-animation-listening .call-wave-bar {
   background: var(--color-success);
-  animation-duration: 0.9s;
+  animation-duration: 1.4s;
 }
 
 .call-animation-thinking .call-wave-bar {
   background: var(--color-navy-700);
-  animation-duration: 1.2s;
+  animation-duration: 1.8s;
 }
 
 .call-animation-speaking .call-wave-bar {
   background: var(--color-blue-600);
-  animation-duration: 0.65s;
+  animation-duration: 1.05s;
 }
 
+/* A complete rise-and-fall cycle avoids abrupt direction changes between loops. */
 @keyframes call-wave-pulse {
-  from {
+  0%,
+  100% {
     transform: scaleY(0.55);
   }
 
-  to {
+  50% {
     transform: scaleY(1);
   }
 }
