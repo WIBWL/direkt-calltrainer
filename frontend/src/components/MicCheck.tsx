@@ -20,6 +20,9 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
   // Keep the successful result once audio has crossed the threshold.
   const [heardSomething, setHeardSomething] = useState(false);
 
+  // Scale the small RMS input range to a percentage for visual and accessible feedback.
+  const meterPercentage = Math.min(Math.round(level * 400), 100);
+
   useEffect(() => {
     if (heardSomething || level < HEARD_THRESHOLD) return;
 
@@ -86,26 +89,42 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
               Sagen Sie ein paar Worte, um Ihr Mikrofon zu testen.
             </p>
 
-            <div className="mic-meter">
+            <div
+              className="mic-meter"
+              role="progressbar"
+              aria-label="Mikrofonpegel"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={meterPercentage}
+            >
               <div
                 className="mic-meter-fill"
-                style={{ width: `${Math.min(level * 400, 100)}%` }}
+                style={{ width: `${meterPercentage}%` }}
               />
             </div>
 
             {error && (
-              <p id="status" className="error">
+              <p className="error" role="alert">
                 Mikrofonzugriff fehlgeschlagen: {error}
               </p>
             )}
 
-            {!error && <p id="status">Warte auf Audiosignal …</p>}
+            {!error && (
+              <p className="mic-test-status" role="status" aria-live="polite">
+                Warte auf Audiosignal …
+              </p>
+            )}
           </div>
         )}
 
         {heardSomething && (
           <div className="mic-test-panel mic-test-panel-success">
-            <div className="mic-test-result">
+            <div
+              className="mic-test-result"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
               <span className="mic-test-success-icon" aria-hidden="true">
                 ✓
               </span>
@@ -118,7 +137,7 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
               </div>
             </div>
 
-                        <div className="mic-test-actions">
+            <div className="mic-test-actions">
               <button
                 className="mic-test-retry-button"
                 type="button"
