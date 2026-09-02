@@ -58,6 +58,8 @@ export default function CallView({
     return () => window.clearInterval(id);
   }, []);
 
+    const formattedDuration = formatDuration(elapsedSeconds);
+
   return (
     <>
       <section
@@ -73,7 +75,7 @@ export default function CallView({
         </p>
       </section>
 
-            <section className="call-panel" aria-labelledby="call-persona-name">
+      <section className="call-panel" aria-labelledby="call-persona-name">
         <div className="call-persona">
           <div className="call-persona-avatar" aria-hidden="true">
             {getInitials(personaName)}
@@ -85,11 +87,20 @@ export default function CallView({
           </div>
         </div>
 
-        <CallAnimation state={callState} />
-
-        <p className="call-duration" aria-label="Anrufdauer">
-          {formatDuration(elapsedSeconds)}
+        <p className="call-status">
+          <span className="call-status-dot" aria-hidden="true">
+            ●
+          </span>{" "}
+          Gespräch läuft ·{" "}
+          <span
+            className="call-duration"
+            aria-label={`Anrufdauer ${formattedDuration}`}
+          >
+            {formattedDuration}
+          </span>
         </p>
+
+        <CallAnimation state={callState} />
 
         {error && (
           <p id="status" className="error">
