@@ -194,6 +194,9 @@ export default function App() {
 
         <main className="app-page app-page-narrow">
           <CallView
+            scenarioName={selectedScenario?.name ?? "Gespräch"}
+            personaName={selectedPersona?.name ?? "Persona"}
+            languageLabel="Deutsch"
             callState={displayState}
             error={socket.error ?? vad.micError}
             onEndCall={socket.endSession}

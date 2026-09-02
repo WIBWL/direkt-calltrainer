@@ -4,6 +4,9 @@ import type { CallState } from "../protocol";
 import CallAnimation from "./CallAnimation";
 
 interface CallViewProps {
+  scenarioName: string;
+  personaName: string;
+  languageLabel: string;
   callState: CallState;
   error: string | null;
   onEndCall: () => void;
@@ -23,7 +26,14 @@ function formatDuration(totalSeconds: number): string {
  * screen ever mounts — so the timer counts from mount, not from Session start,
  * which is close enough given pre-warm is at most a few seconds.
  */
-export default function CallView({ callState, error, onEndCall }: CallViewProps) {
+export default function CallView({
+  scenarioName,
+  personaName,
+  languageLabel,
+  callState,
+  error,
+  onEndCall,
+}: CallViewProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
@@ -36,8 +46,18 @@ export default function CallView({ callState, error, onEndCall }: CallViewProps)
 
   return (
     <>
-      <div className="eyebrow">Calltrainer</div>
-      <h1>Anruf läuft</h1>
+      <section
+        className="setup-intro call-intro"
+        aria-labelledby="call-page-title"
+      >
+        <div className="eyebrow">Gespräch läuft</div>
+
+        <h1 id="call-page-title">{scenarioName}</h1>
+
+        <p className="setup-intro-description">
+          Gespräch mit {personaName} · {languageLabel}
+        </p>
+      </section>
 
       <CallAnimation state={callState} />
 
