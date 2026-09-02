@@ -12,7 +12,7 @@ interface MicCheckProps {
 
 /** Pre-call microphone test: lets the user confirm that recording works before a session starts. */
 export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
-  const { level, error, start, stop } = useMicrophoneLevel();
+  const { level, error, deviceLabel, start, stop } = useMicrophoneLevel();
 
   // The microphone remains inactive until the user deliberately starts the test.
   const [isTesting, setIsTesting] = useState(false);
@@ -56,6 +56,14 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
         title="Mikrofon prüfen"
         description="Sprechen Sie nach dem Start einen kurzen Testsatz."
       >
+        {/* This field reports the active device without suggesting unsupported device selection. */}
+        <dl className="mic-device-information">
+          <div className="mic-device-information-row">
+            <dt>Mikrofon</dt>
+            <dd>{deviceLabel || "Standardmikrofon"}</dd>
+          </div>
+        </dl>
+
         {!isTesting && (
           <div className="mic-test-panel">
             <p className="mic-check-hint">
@@ -110,7 +118,7 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
               </div>
             </div>
 
-            <div className="mic-test-actions">
+                        <div className="mic-test-actions">
               <button
                 className="mic-test-retry-button"
                 type="button"
