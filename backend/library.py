@@ -60,7 +60,7 @@ def list_personas() -> list[Persona]:
         rows = db.scalars(
             select(models.Persona)
             .options(
-                joinedload(models.Persona.sprache),  # language name is part of the mapping
+                joinedload(models.Persona.language),  # language name is part of the mapping
                 joinedload(models.Persona.objections),  # and so are the objections (ADR 0045)
             )
             .where(models.Persona.active)
@@ -75,7 +75,7 @@ def get_persona(persona_id: str) -> Persona | None:
         row = db.scalars(
             select(models.Persona)
             .options(
-                joinedload(models.Persona.sprache),
+                joinedload(models.Persona.language),
                 joinedload(models.Persona.objections),
             )
             .where(models.Persona.key == persona_id, models.Persona.active)
