@@ -57,7 +57,7 @@ def persist_session(
             oeffentliche_id=oeffentliche_id,
             subject_id=subject_id,
             persona=_reference(db, db_models.Persona, persona.id),
-            szenario=_reference(db, db_models.Szenario, scenario.id),
+            szenario=_reference(db, db_models.Scenario, scenario.id),
             sprache_code=persona.language_id,
             status=_STATUS.get(reason, "abgebrochen"),
             gestartet_am=gestartet_am,
@@ -111,13 +111,14 @@ def _write_analysis(
     ]
 
 
-def _reference(db: DbSession, model: type, schluessel: str):
+def _reference(db: DbSession, model: type, key: str):
     """A seeded reference row, by its natural key.
 
     Assigned through the relationship rather than the foreign key, so the
-    primary key never has to be named here.
+    primary key never has to be named here. Only Persona and Scenario go
+    through this -- the Feedback tables keep their German `schluessel`.
     """
-    row = db.query(model).filter_by(schluessel=schluessel).one_or_none()
+    row = db.query(model).filter_by(key=key).one_or_none()
     if row is None:
-        raise LookupError(f"{model.__name__} {schluessel!r} is not seeded")
+        raise LookupError(f"{model.__name__} {key!r} is not seeded")
     return row

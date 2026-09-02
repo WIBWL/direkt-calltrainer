@@ -11,7 +11,7 @@ Für jeden Eintrag ist ausgewiesen, **worauf er zurückgeht**: eine Anforderung 
 Der Katalog nennt **keine Unternehmen, Personen, Orte, Produkte, Partner oder Marken**. Die Pilotunternehmen erscheinen ausschließlich als **Tätigkeitsprofile** (Abschnitt 2). Drei Gründe:
 
 - **C-05 (R-40, R-41):** Das Training soll ohne kundenspezifisches Produkt- und Fachwissen durchführbar sein. Ein Szenario, das ein konkretes Produkt voraussetzt, verletzt genau diese Randbedingung.
-- **ADR 0045:** `fallfakten` sind über den *Fall* zu schreiben, nie über den Anrufer und nie über ein benanntes System — sonst ist ein Szenario nicht mehr mit jeder Persona kombinierbar (ADR 0015).
+- **ADR 0045:** `case_facts` sind über den *Fall* zu schreiben, nie über den Anrufer und nie über ein benanntes System — sonst ist ein Szenario nicht mehr mit jeder Persona kombinierbar (ADR 0015).
 
 Was **bleibt**, ist die *Tätigkeit*: welcher Art die Arbeit ist, in welchem Verhältnis man zum Gegenüber steht, wie lange Gespräche laufen, worüber gestritten wird. Das trägt die Realitätsnähe, ohne die Unternehmen zu identifizieren.
 
@@ -65,29 +65,29 @@ ADR 0001 und ADR 0045 trennen strikt: die **Persona** trägt die *Art und Weise*
 
 | Feld | Entspricht Datenfeld | Inhalt |
 |---|---|---|
-| Situation | `beschreibung` | die Ausgangslage — nur die Lage, kein Nutzerziel |
-| Rolle Trainingsperson | Teil von `beschreibung` | in welcher Funktion der Nutzer angerufen wird. Die Rollen folgen **C-07** (R-01, R-02): Support, beratende Projektrollen, technische Rollen ohne vertriebliche Vorerfahrung |
-| Fall | `fallfakten` | Zahlen, Fristen, Vorgeschichte. Über den *Fall*, nie über den Anrufer |
-| Anrufziel | `anrufziel` | was der **Anrufer** erreichen will, ein Satz |
-| Erledigt wenn | `erfolgsbedingung` | die beobachtbare Bedingung, ab der der Anrufer die Sache als geklärt ansieht |
-| Typ | `typ` | einer der drei Typen aus **F-03** |
+| Situation | `description` | die Ausgangslage — nur die Lage, kein Nutzerziel |
+| Rolle Trainingsperson | Teil von `description` | in welcher Funktion der Nutzer angerufen wird. Die Rollen folgen **C-07** (R-01, R-02): Support, beratende Projektrollen, technische Rollen ohne vertriebliche Vorerfahrung |
+| Fall | `case_facts` | Zahlen, Fristen, Vorgeschichte. Über den *Fall*, nie über den Anrufer |
+| Anrufziel | `call_goal` | was der **Anrufer** erreichen will, ein Satz |
+| Erledigt wenn | `success_condition` | die beobachtbare Bedingung, ab der der Anrufer die Sache als geklärt ansieht |
+| Typ | `type` | einer der drei Typen aus **F-03** |
 | Dauer | — | kurz / mittel / lang. **Eigene Achse**, nicht mit dem Typ zu verwechseln. Spanne aus **C-06** (R-03) |
 | Vertriebsnähe | *(Katalogattribut, kein Datenfeld)* | neutral / beratungsnah / verhandlungsnah — dient der Ausgewogenheit der Bibliothek, siehe 2.1 |
 | Trainingsfokus | — | die Analyse-Features, die in diesem Fall greifen |
 | Herkunft | — | `R-xx` / `C-xx` / `Systementwurf`, plus Tätigkeitsprofil |
 
-> **Zur Rolle der Trainingsperson.** Sie ist kein eigenes Datenfeld: ADR 0045 hält fest, dass das *Ziel des Nutzers* nicht in den Persona-Prompt gehört. Was der Nutzer beruflich **ist**, steht dagegen sehr wohl in `beschreibung` — die bestehenden Seed-Daten schreiben genau das („the user, who works in support"). Der Katalog führt es als eigene Zeile, weil C-07 die Zielgruppe verbindlich benennt und die Abdeckung darüber geprüft wird.
+> **Zur Rolle der Trainingsperson.** Sie ist kein eigenes Datenfeld: ADR 0045 hält fest, dass das *Ziel des Nutzers* nicht in den Persona-Prompt gehört. Was der Nutzer beruflich **ist**, steht dagegen sehr wohl in `description` — die bestehenden Seed-Daten schreiben genau das („the user, who works in support"). Der Katalog führt es als eigene Zeile, weil C-07 die Zielgruppe verbindlich benennt und die Abdeckung darüber geprüft wird.
 
 ### Eine Persona beschreibt
 
 | Feld | Entspricht Datenfeld | Inhalt |
 |---|---|---|
-| Rolle | `rolle` / `rolle_anzeige` | Funktion des Gegenübers |
-| Haltung | `haltung` | Charakterzüge |
-| Manier | `verhalten` | wie hartnäckig, wie lange vage Antworten toleriert werden, was sie zufriedenstellt — **nur Manier, nichts Situatives** |
-| Einwände | `einwaende` | 3–4 Stück, als *Bewegung* formuliert, nicht als Zitat, szenarioneutral (**R-12**) |
-| Schwierigkeitsgrad | `schwierigkeitsgrad` | leicht / mittel / schwer. Das arc42-Glossar zählt ihn ausdrücklich zur Persona; ADR 0045 lässt ihn bestehen, obwohl er heute nirgends gelesen wird, und nennt die Auswahlkarte (ADR 0015) als naheliegenden Ort |
-| Sprache | `sprache_code` | seit ADR 0043 eine Eigenschaft der **Persona**, nicht der Session und nicht des Szenarios (**C-01**) |
+| Rolle | `role` / `role_label` | Funktion des Gegenübers |
+| Haltung | `traits` | Charakterzüge |
+| Manier | `behavior` | wie hartnäckig, wie lange vage Antworten toleriert werden, was sie zufriedenstellt — **nur Manier, nichts Situatives** |
+| Einwände | `objections` | 3–4 Stück, als *Bewegung* formuliert, nicht als Zitat, szenarioneutral (**R-12**) |
+| Schwierigkeitsgrad | `difficulty` | leicht / mittel / schwer. Das arc42-Glossar zählt ihn ausdrücklich zur Persona; ADR 0045 lässt ihn bestehen, obwohl er heute nirgends gelesen wird, und nennt die Auswahlkarte (ADR 0015) als naheliegenden Ort |
+| Sprache | `language_code` | seit ADR 0043 eine Eigenschaft der **Persona**, nicht der Session und nicht des Szenarios (**C-01**) |
 | Herkunft | — | `R-xx` / `Systementwurf` |
 
 ---
@@ -117,7 +117,7 @@ Anders als der Szenariokatalog ist der Persona-Katalog **dünn belegt**: In beid
 
 ### 4.1 Regel für die Einwände (R-12, ADR 0045)
 
-`persona_einwand` ist seit ADR 0045 das Zuhause von R-12. Beim Schreiben gilt:
+`persona_objection` ist seit ADR 0045 das Zuhause von R-12. Beim Schreiben gilt:
 
 - **Englisch** — die Tabelle hat keine Sprachspalte.
 - **Als Bewegung, nicht als Zitat**: *„refuses outright as soon as an additional cost is named"*, nicht der wörtliche Satz. Das Modell übernimmt Zitate wörtlich und kollabiert dann auf eine einzige Formulierung.
@@ -224,7 +224,7 @@ Der eine wörtlich belegte Einwand aus der Erhebung (Profil A, kostenkritischer 
 | **Empfohlene Personas** | P-04, P-08 |
 | **Herkunft** | **R-11** (SO 4.4, 4.6) → **F-23** — Profil A |
 
-> **Technisch blockiert.** F-23 setzt voraus, dass sich der Gegenpart an frühere Termine *erinnert*. Ein sitzungsübergreifendes Gedächtnis gibt es nicht, und `szenario` hat kein Feld dafür. Heute ließe sich der Fall nur als Vorgeschichte in den `fallfakten` bauen — dann erinnert sich der Gegenpart nicht, er wurde informiert. Das ist ein anderes Feature. Vor dem Bau als ADR oder Issue klären.
+> **Technisch blockiert.** F-23 setzt voraus, dass sich der Gegenpart an frühere Termine *erinnert*. Ein sitzungsübergreifendes Gedächtnis gibt es nicht, und `scenario` hat kein Feld dafür. Heute ließe sich der Fall nur als Vorgeschichte in den `case_facts` bauen — dann erinnert sich der Gegenpart nicht, er wurde informiert. Das ist ein anderes Feature. Vor dem Bau als ADR oder Issue klären.
 
 #### S-07 Absicherndes Wrap-up am Gesprächsende
 
@@ -430,9 +430,9 @@ Das Verhältnis ist bei den **Szenarien gut und bei den Personas schlecht**. Gen
 **1 — R-04 ist zweideutig und deshalb bis heute ohne Bezug.**
 > *„Die Entscheidungsbefugnis der Nutzer ist in manchen Fällen nicht ausreichend […]. Das soll sich im Gesprächsverhalten widerspiegeln."*
 
-Lesart 1: Der **Nutzer** hat keine Befugnis — nicht umsetzbar, das System kann dem Nutzer nichts verbieten. Lesart 2: Der **Gegenpart** verlangt eine Entscheidung, die der Nutzer nicht treffen darf — trainierbar über P-07 und über eine `erfolgsbedingung`, die Rücksprache mit Termin ausdrücklich zulässt. Lesart 2 würde einen der letzten *offen*-Einträge schließen, ist aber Interpretation. **Rückzufragen.**
+Lesart 1: Der **Nutzer** hat keine Befugnis — nicht umsetzbar, das System kann dem Nutzer nichts verbieten. Lesart 2: Der **Gegenpart** verlangt eine Entscheidung, die der Nutzer nicht treffen darf — trainierbar über P-07 und über eine `success_condition`, die Rücksprache mit Termin ausdrücklich zulässt. Lesart 2 würde einen der letzten *offen*-Einträge schließen, ist aber Interpretation. **Rückzufragen.**
 
-**2 — Der Persona-Katalog braucht Material.** Zwei namentlich belegte Kundentypen tragen keine Bibliothek, die F-04 „erweiterbar" nennt. Belegt ist außerdem genau **ein** wörtlicher Einwand für die gesamte `persona_einwand`-Tabelle. Konkret fehlen:
+**2 — Der Persona-Katalog braucht Material.** Zwei namentlich belegte Kundentypen tragen keine Bibliothek, die F-04 „erweiterbar" nennt. Belegt ist außerdem genau **ein** wörtlicher Einwand für die gesamte `persona_objection`-Tabelle. Konkret fehlen:
 
 - vier bis fünf typische Gegenübertypen je Profil, mit je zwei Sätzen zum Auftreten
 - die wiederkehrenden Bremssätze im Wortlaut (Rohmaterial für R-12)

@@ -44,19 +44,19 @@ SEED = load_seed_module()
 
 def _persona_row(**overrides):
     fields = {
-        "schluessel": "row-persona",
+        "key": "row-persona",
         "name": "Thomas Brandt",
-        "rolle_anzeige": "Geschäftsführer, Fokus auf Strategie & Budget",
-        "rolle": "Managing director of a mid-sized company",
-        "haltung": "matter-of-fact, time-conscious",
-        "verhalten": "You press for concrete answers.",
-        "trainingsziel": "",
-        "schwierigkeitsgrad": "mittel",
-        "sprache_code": "de",
-        "tts_stimme": "de_male",
-        "kugelaudio_stimme_id": 1885,
-        "aktiv": True,
-        "sprache": models.Sprache(sprache_code="de", bezeichnung="Deutsch"),
+        "role_label": "Geschäftsführer, Fokus auf Strategie & Budget",
+        "role": "Managing director of a mid-sized company",
+        "traits": "matter-of-fact, time-conscious",
+        "behavior": "You press for concrete answers.",
+        "training_goal": "",
+        "difficulty": "mittel",
+        "language_code": "de",
+        "tts_voice": "de_male",
+        "kugelaudio_voice_id": 1885,
+        "active": True,
+        "language": models.Language(code="de", label="Deutsch"),
     }
     return models.Persona(**{**fields, **overrides})
 
@@ -74,7 +74,7 @@ def test_persona_row_maps_onto_the_value_object():
 
 
 def test_persona_mapping_keeps_display_and_prompt_fields_apart():
-    """ADR 0043: `rolle_anzeige` is the card's label, `rolle` is prompt input.
+    """ADR 0043: `role_label` is the card's label, `role` is prompt input.
     One column each, and they must not be swapped."""
     persona = _to_persona(_persona_row())
     assert persona.role_label == "Geschäftsführer, Fokus auf Strategie & Budget"
@@ -93,15 +93,15 @@ def test_persona_mapping_carries_language_and_both_voices():
 
 
 def test_scenario_row_maps_onto_the_value_object():
-    """ADR 0043: `kurzbeschreibung` is the teaser shown, `beschreibung` the
+    """ADR 0043: `short_description` is the teaser shown, `description` the
     English call context the model reads."""
     scenario = _to_scenario(
-        models.Szenario(
-            schluessel="row-scenario",
-            typ="Angebots- und Preisgespräch",
-            titel="Kündigungsabsicht wegen Preis",
-            kurzbeschreibung="Der Kunde erwägt zu kündigen.",
-            beschreibung="The customer is calling to say they are considering cancelling.",
+        models.Scenario(
+            key="row-scenario",
+            type="Angebots- und Preisgespräch",
+            title="Kündigungsabsicht wegen Preis",
+            short_description="Der Kunde erwägt zu kündigen.",
+            description="The customer is calling to say they are considering cancelling.",
         )
     )
     assert isinstance(scenario, Scenario)
@@ -169,7 +169,7 @@ def test_seeded_scenarios_cover_support_and_pricing_contexts():
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_every_seeded_persona_speaks_a_language_that_has_a_pack(entry):
-    """ADR 0043: a Persona's `sprache_code` decides the spoken language, and
+    """ADR 0043: a Persona's `language_code` decides the spoken language, and
     `get_pack` raises for one without a pack — a configuration error that
     would only surface once a Session starts."""
     assert entry["language_id"] in LANGUAGE_PACKS
@@ -188,7 +188,7 @@ def test_seeded_scenarios_carry_no_language_of_their_own():
     Persona x Scenario pairing valid (ADR 0001, ADR 0015)."""
     for entry in SEED.SCENARIOS:
         assert "language_id" not in entry
-        assert "sprache" not in entry
+        assert "language" not in entry
 
 
 # --- ADR 0045: the case on the Scenario, the objections on the Persona ---
@@ -196,17 +196,17 @@ def test_seeded_scenarios_carry_no_language_of_their_own():
 
 def test_scenario_row_maps_the_case_fields():
     """ADR 0045: three columns, three fields — the case is addressable, not
-    buried in the prose of `beschreibung`."""
+    buried in the prose of `description`."""
     scenario = _to_scenario(
-        models.Szenario(
-            schluessel="row-case",
-            typ="Angebots- und Preisgespräch",
-            titel="Kündigungsabsicht wegen Preis",
-            kurzbeschreibung="Der Kunde erwägt zu kündigen.",
-            beschreibung="The customer is calling to say they are considering cancelling.",
-            fallfakten="14 licences, 1,180 euros a month since March last year.",
-            anrufziel="Get the price down, or a clear reason why not.",
-            erfolgsbedingung="Settled once a specific figure with a date is committed to.",
+        models.Scenario(
+            key="row-case",
+            type="Angebots- und Preisgespräch",
+            title="Kündigungsabsicht wegen Preis",
+            short_description="Der Kunde erwägt zu kündigen.",
+            description="The customer is calling to say they are considering cancelling.",
+            case_facts="14 licences, 1,180 euros a month since March last year.",
+            call_goal="Get the price down, or a clear reason why not.",
+            success_condition="Settled once a specific figure with a date is committed to.",
         )
     )
     assert scenario.case_facts == "14 licences, 1,180 euros a month since March last year."
@@ -217,12 +217,12 @@ def test_scenario_row_maps_the_case_fields():
 
 
 def test_persona_row_maps_its_objections_in_order():
-    """R-12 / ADR 0026: the objections are ordered rows, and `reihenfolge` is
+    """R-12 / ADR 0026: the objections are ordered rows, and `sort_order` is
     what orders them — `library.py` has to load and keep that order."""
     row = _persona_row(
-        einwaende=[
-            models.PersonaEinwand(reihenfolge=1, text="second objection"),
-            models.PersonaEinwand(reihenfolge=0, text="first objection"),
+        objections=[
+            models.PersonaObjection(sort_order=1, text="second objection"),
+            models.PersonaObjection(sort_order=0, text="first objection"),
         ]
     )
     persona = _to_persona(row)
@@ -231,15 +231,15 @@ def test_persona_row_maps_its_objections_in_order():
 
 def test_persona_without_objections_maps_to_an_empty_tuple():
     """A Persona need not have objections; the prompt then omits the block."""
-    assert _to_persona(_persona_row(einwaende=[])).objections == ()
+    assert _to_persona(_persona_row(objections=[])).objections == ()
 
 
 def test_objections_carry_no_language_of_their_own():
     """ADR 0043/0045: a Persona has a fixed language, and `persona_einwand` has
     no language column — which is why objections are authored in English, as
     moves rather than as quotable lines."""
-    assert not hasattr(models.PersonaEinwand, "sprache_code")
-    assert not hasattr(models.PersonaEinwand, "sprache")
+    assert not hasattr(models.PersonaObjection, "language_code")
+    assert not hasattr(models.PersonaObjection, "language")
 
 
 def test_seeded_scenarios_carry_the_case():
@@ -252,10 +252,10 @@ def test_seeded_scenarios_carry_the_case():
 
 
 def test_seeded_scenario_context_does_not_carry_the_trainer_objective():
-    """ADR 0045, the defect that prompted it: `beschreibung` used to end with
+    """ADR 0045, the defect that prompted it: `description` used to end with
     what the *user* is meant to achieve ("keep the customer through price
     negotiation"), addressed to the Persona — who is the customer. The caller's
-    own goal lives in `anrufziel` now, and nothing hands it the trainee's."""
+    own goal lives in `call_goal` now, and nothing hands it the trainee's."""
     for entry in SEED.SCENARIOS:
         lowered = entry["description"].lower()
         assert "the goal of the call is" not in lowered, entry["id"]
@@ -272,7 +272,7 @@ def test_seeded_personas_carry_objections():
 
 
 def test_seeded_persona_behaviour_carries_no_situation():
-    """ADR 0045: `verhalten` is manner only. Both Personas used to open it with
+    """ADR 0045: `behavior` is manner only. Both Personas used to open it with
     the same sentence about having a reason for the call — a statement about
     the Session's setup that the prompt frame already makes."""
     for entry in SEED.PERSONAS:

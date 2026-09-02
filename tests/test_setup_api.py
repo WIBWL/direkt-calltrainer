@@ -59,7 +59,7 @@ async def test_personas_endpoint_lists_every_persona_with_card_fields(client):
 
 
 async def test_personas_endpoint_serves_the_label_not_the_prompt_role(client):
-    """ADR 0043: `rolle_anzeige` is what the card shows; the English prompt
+    """ADR 0043: `role_label` is what the card shows; the English prompt
     fields stay on the server."""
     body = (await client.get("/api/personas")).json()
     served = {e["role"] for e in body}
@@ -86,7 +86,7 @@ async def test_scenarios_endpoint_lists_every_scenario_with_its_teaser(client):
 
 
 async def test_scenarios_endpoint_withholds_the_english_call_context(client):
-    """ADR 0043: `beschreibung` is prompt input, not something the setup screen
+    """ADR 0043: `description` is prompt input, not something the setup screen
     renders — it would show the user English text in a German UI."""
     body = (await client.get("/api/scenarios")).json()
     for entry, scenario in zip(body, TEST_SCENARIOS):

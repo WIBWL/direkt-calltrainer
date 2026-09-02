@@ -24,7 +24,7 @@ from backend.db.base import Base
 
 def test_every_domain_table_is_present():
     expected = {
-        "persona", "persona_einwand", "szenario", "sprache", "metrik_typ",
+        "persona", "persona_objection", "scenario", "language", "metrik_typ",
         "session", "turn", "messung", "befund", "feedback", "feedbackpunkt",
         "analysis_job",
     }
@@ -73,8 +73,11 @@ def test_analysis_job_has_a_persisted_status_and_retry_count():
 
 
 def test_reference_entities_are_keyed_by_a_stable_business_key():
-    for model in (models.Persona, models.Szenario, models.MetrikTyp):
-        assert model.__table__.c.schluessel.unique
+    # The library tables carry English names; the Feedback side keeps its German
+    # ones, so the business key is spelled differently on either side of that line.
+    for model in (models.Persona, models.Scenario):
+        assert model.__table__.c.key.unique
+    assert models.MetrikTyp.__table__.c.schluessel.unique
 
 
 def test_messung_value_is_numeric():

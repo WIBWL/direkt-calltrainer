@@ -53,7 +53,7 @@ def get_session(oeffentliche_id: uuid.UUID) -> dict:
         return {
             "session_id": str(session.oeffentliche_id),
             "persona": session.persona.name,
-            "szenario": session.szenario.titel,
+            "szenario": session.szenario.title,
             "status": _feedback_status(session),
             "turns": [_turn(t) for t in sorted(session.turns, key=lambda t: t.seq_index)],
             "messungen": [_messung(m) for m in session.messungen],

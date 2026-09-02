@@ -25,83 +25,83 @@ from backend.db.base import Base
 class Persona(Base):
     __tablename__ = "persona"
     persona_id: Mapped[int] = mapped_column(primary_key=True)
-    schluessel: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. tech-averse-management
+    key: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. tech-averse-management
     name: Mapped[str] = mapped_column(String(120))
     # Display field: shown on the selection card, written in the UI language.
     # The prompt fields below are English instead (ADR 0043), so the two roles
     # this column used to serve at once are now separate columns.
-    rolle_anzeige: Mapped[str] = mapped_column(String(120))
+    role_label: Mapped[str] = mapped_column(String(120))
     # Prompt fields: English, fed into the system prompt, never served by the API.
-    rolle: Mapped[str] = mapped_column(String(120))
-    haltung: Mapped[str] = mapped_column(String(120))
-    verhalten: Mapped[str] = mapped_column(Text)
-    trainingsziel: Mapped[str] = mapped_column(Text)
-    schwierigkeitsgrad: Mapped[str] = mapped_column(String(40))
-    aktiv: Mapped[bool] = mapped_column(Boolean, default=True)
+    role: Mapped[str] = mapped_column(String(120))
+    traits: Mapped[str] = mapped_column(String(120))
+    behavior: Mapped[str] = mapped_column(Text)
+    training_goal: Mapped[str] = mapped_column(Text)
+    difficulty: Mapped[str] = mapped_column(String(40))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
     # A Persona has exactly one Language and one voice (ADR 0041); there is no
     # per-Session choice, so both hang off the Persona rather than the Session.
     # Both voice columns are required: KugelAudio is the default TTS backend
     # and EFRE its fallback (ADR 0040), so a Persona needs an identity in each.
-    sprache_code: Mapped[str] = mapped_column(ForeignKey("sprache.sprache_code"))
-    tts_stimme: Mapped[str] = mapped_column(String(40))
-    kugelaudio_stimme_id: Mapped[int] = mapped_column(Integer)
+    language_code: Mapped[str] = mapped_column(ForeignKey("language.code"))
+    tts_voice: Mapped[str] = mapped_column(String(40))
+    kugelaudio_voice_id: Mapped[int] = mapped_column(Integer)
 
-    sprache: Mapped["Sprache"] = relationship(back_populates="personas")
-    einwaende: Mapped[list["PersonaEinwand"]] = relationship(
+    language: Mapped["Language"] = relationship(back_populates="personas")
+    objections: Mapped[list["PersonaObjection"]] = relationship(
         back_populates="persona",
-        order_by="PersonaEinwand.reihenfolge",
+        order_by="PersonaObjection.sort_order",
         cascade="all, delete-orphan",
     )
     sessions: Mapped[list["Session"]] = relationship(back_populates="persona")
 
 
-class PersonaEinwand(Base):
+class PersonaObjection(Base):
     """A typical objection of a Persona, kept as ordered rows rather than as a
     repeating group inside the persona row (ADR 0026)."""
 
-    __tablename__ = "persona_einwand"
-    einwand_id: Mapped[int] = mapped_column(primary_key=True)
+    __tablename__ = "persona_objection"
+    objection_id: Mapped[int] = mapped_column(primary_key=True)
     persona_id: Mapped[int] = mapped_column(ForeignKey("persona.persona_id"))
-    reihenfolge: Mapped[int] = mapped_column(Integer)
+    sort_order: Mapped[int] = mapped_column(Integer)
     text: Mapped[str] = mapped_column(Text)
 
-    persona: Mapped["Persona"] = relationship(back_populates="einwaende")
+    persona: Mapped["Persona"] = relationship(back_populates="objections")
 
 
-class Szenario(Base):
-    __tablename__ = "szenario"
-    szenario_id: Mapped[int] = mapped_column(primary_key=True)
-    schluessel: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. cold-call-followup
-    typ: Mapped[str] = mapped_column(String(60))
-    titel: Mapped[str] = mapped_column(String(160))
+class Scenario(Base):
+    __tablename__ = "scenario"
+    scenario_id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. cold-call-followup
+    type: Mapped[str] = mapped_column(String(60))
+    title: Mapped[str] = mapped_column(String(160))
     # Display field: the one-line teaser under the title on the selection card,
     # in the UI language. Deliberately short — it is read at a glance, not by
     # the model.
-    kurzbeschreibung: Mapped[str] = mapped_column(String(240))
+    short_description: Mapped[str] = mapped_column(String(240))
     # Prompt fields: English, handed to the model (ADR 0043). Scenarios carry
     # no language of their own; the Persona decides that.
     #
-    # `beschreibung` is the situation alone. The three below carry the case
+    # `description` is the situation alone. The three below carry the case
     # (ADR 0045): what is true of it, what the caller wants, and when the
     # caller considers the matter settled. They are about the *case*, never
     # about the caller -- that is what lets any Persona run any Scenario
     # (ADR 0001, ADR 0015). All three may be empty: a Scenario without them
     # falls back to the improvisation the frame asked for before, which is
     # what the user-authored Scenarios of ADR 0024 will need.
-    beschreibung: Mapped[str] = mapped_column(Text)
-    fallfakten: Mapped[str] = mapped_column(Text)
-    anrufziel: Mapped[str] = mapped_column(Text)
-    erfolgsbedingung: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text)
+    case_facts: Mapped[str] = mapped_column(Text)
+    call_goal: Mapped[str] = mapped_column(Text)
+    success_condition: Mapped[str] = mapped_column(Text)
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="szenario")
 
 
-class Sprache(Base):
-    __tablename__ = "sprache"
-    sprache_code: Mapped[str] = mapped_column(String(8), primary_key=True)
-    bezeichnung: Mapped[str] = mapped_column(String(60))
+class Language(Base):
+    __tablename__ = "language"
+    code: Mapped[str] = mapped_column(String(8), primary_key=True)
+    label: Mapped[str] = mapped_column(String(60))
 
-    personas: Mapped[list["Persona"]] = relationship(back_populates="sprache")
+    personas: Mapped[list["Persona"]] = relationship(back_populates="language")
     sessions: Mapped[list["Session"]] = relationship(back_populates="sprache")
 
 
@@ -129,15 +129,15 @@ class Session(Base):
     # Pseudonym; later the Keycloak "sub" claim (ADR 0031).
     subject_id: Mapped[str] = mapped_column(String(64))
     persona_id: Mapped[int] = mapped_column(ForeignKey("persona.persona_id"))
-    szenario_id: Mapped[int] = mapped_column(ForeignKey("szenario.szenario_id"))
-    sprache_code: Mapped[str] = mapped_column(ForeignKey("sprache.sprache_code"))
+    szenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id"))
+    sprache_code: Mapped[str] = mapped_column(ForeignKey("language.code"))
     status: Mapped[str] = mapped_column(String(20))      # laufend, beendet, abgebrochen
     gestartet_am: Mapped[datetime] = mapped_column(DateTime)
     beendet_am: Mapped[datetime | None] = mapped_column(DateTime)
 
     persona: Mapped["Persona"] = relationship(back_populates="sessions")
-    szenario: Mapped["Szenario"] = relationship(back_populates="sessions")
-    sprache: Mapped["Sprache"] = relationship(back_populates="sessions")
+    szenario: Mapped["Scenario"] = relationship(back_populates="sessions")
+    sprache: Mapped["Language"] = relationship(back_populates="sessions")
     turns: Mapped[list["Turn"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )

@@ -54,7 +54,7 @@ def test_prompt_injects_persona_name_role_traits_and_behaviour(prompt, persona):
 
 
 def test_prompt_serves_prompt_fields_not_display_fields(prompt, persona):
-    """ADR 0043: the English `rolle` goes to the model; `rolle_anzeige` is for
+    """ADR 0043: the English `role` goes to the model; `role_label` is for
     the selection card and has no business in the prompt."""
     assert persona.role_label not in prompt
 

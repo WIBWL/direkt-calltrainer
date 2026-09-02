@@ -5,10 +5,9 @@ seed state and not a runtime source: `backend/library.py` reads the tables,
 never this module. `backend/db/provision.py` writes it on startup and
 `scripts/seed_reference_data.py` on demand, both idempotently.
 
-Field names here are English and follow the value types in
-`backend/personas.py` / `backend/scenarios.py`; provision.py maps them onto the
-German column names. That mapping is the only place the two vocabularies meet,
-and it disappears once the schema itself is renamed.
+Field names here are English and match both the value types in
+`backend/personas.py` / `backend/scenarios.py` and the columns of the library
+tables, so provision.py writes them straight through without mapping.
 """
 
 # --- Personas -----------------------------------------------------------
@@ -105,12 +104,12 @@ PERSONAS = [
 ]
 
 # --- Szenarien ----------------------------------------------------------
-# `type` follows F-03's categories of Szenario-Typen.
+# `type` follows F-03's categories of Scenario types.
 #
 # Szenarien carry no language of their own (ADR 0043). "name" and
 # "short_description" are the display texts in the UI language; the rest is the
 # English call context the model reads — which is what lets any Persona run any
-# Szenario regardless of the language that Persona speaks.
+# Scenario regardless of the language that Persona speaks.
 #
 # Four prompt fields (ADR 0045): "description" is the situation, and
 # "case_facts"/"call_goal"/"success_condition" are the case. Two authoring rules
