@@ -810,6 +810,43 @@ audio {
   outline-offset: 3px;
 }
 
+/* Tablet layouts stack device information and enlarge the primary touch target. */
+@media (max-width: 720px) {
+  .mic-device-information-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .mic-device-information dd {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .mic-test-panel > .start-call-button {
+    width: 100%;
+  }
+}
+
+/* Narrow phones stack both success actions and reduce card padding. */
+@media (max-width: 480px) {
+  .mic-check-page .setup-section {
+    padding: 20px;
+    border-radius: 18px;
+  }
+
+  .mic-test-panel {
+    padding: 18px;
+  }
+
+  .mic-test-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .mic-test-result {
+    gap: 12px;
+  }
+}
+
 /* Setup sections use smaller spacing and typography on narrow screens. */
 @media (max-width: 720px) {
   .setup-section {
