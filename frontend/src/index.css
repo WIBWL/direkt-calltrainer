@@ -50,6 +50,8 @@ body {
 
 #root {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Shared page containers keep every screen centered and responsive. */
@@ -678,5 +680,83 @@ audio {
 @media (max-width: 480px) {
   .selection-summary {
     grid-template-columns: 1fr;
+  }
+}
+
+/* The shared footer keeps legal information visible without competing with the training content. */
+.app-footer {
+  width: 100%;
+  margin-top: auto;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.app-footer-inner {
+  width: min(1080px, calc(100% - 40px));
+  min-height: 88px;
+  margin: 0 auto;
+  padding: 24px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.app-footer-information {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.app-footer-copyright {
+  color: var(--color-navy-900);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.app-footer-disclaimer {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.app-footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.app-footer-links a {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.app-footer-links a:hover {
+  color: var(--color-navy-900);
+  text-decoration: underline;
+}
+
+.app-footer-links a + a::before {
+  content: "\00B7";
+  display: inline-block;
+  margin: 0 8px;
+  color: var(--color-blue-300);
+  text-decoration: none;
+}
+
+@media (max-width: 720px) {
+  .app-footer-inner {
+    width: min(100% - 32px, 1080px);
+    min-height: auto;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .app-footer-links {
+    justify-content: flex-start;
   }
 }

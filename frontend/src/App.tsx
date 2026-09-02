@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { apiFetch } from "./api";
+import AppFooter from "./components/AppFooter";
 import AppHeader from "./components/AppHeader";
 import CallView from "./components/CallView";
 import MicCheck from "./components/MicCheck";
@@ -180,6 +181,8 @@ export default function App() {
         <main className="app-page app-page-narrow">
           <MicCheck onConfirmed={handleConfirmed} onCancel={() => setScreen("setup")} />
         </main>
+
+        <AppFooter />
       </>
     );
   }
@@ -196,6 +199,8 @@ export default function App() {
             onEndCall={socket.endSession}
           />
         </main>
+
+        <AppFooter />
       </>
     );
   }
