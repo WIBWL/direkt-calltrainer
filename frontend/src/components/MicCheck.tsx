@@ -28,7 +28,7 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
     stop();
   }, [heardSomething, level, stop]);
 
-  // Starting from a user action makes the browser permission request predictable.
+  // The same user-triggered handler starts the initial test and any later retry.
   const handleStartTest = async () => {
     setHeardSomething(false);
     setIsTesting(true);
@@ -110,13 +110,23 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
               </div>
             </div>
 
-            <button
-              className="start-call-button"
-              type="button"
-              onClick={onConfirmed}
-            >
-              Gespräch starten
-            </button>
+            <div className="mic-test-actions">
+              <button
+                className="mic-test-retry-button"
+                type="button"
+                onClick={() => void handleStartTest()}
+              >
+                Erneut testen
+              </button>
+
+              <button
+                className="start-call-button"
+                type="button"
+                onClick={onConfirmed}
+              >
+                Gespräch starten
+              </button>
+            </div>
           </div>
         )}
 
