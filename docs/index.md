@@ -57,5 +57,6 @@ Sie sind in der Leitung. Wählen Sie eine Option:
 - [ADR 0051 — Statistics Describe the Whole Session and Carry No Invented Norms](adr/0051-session-level-statistics-and-machine-latency.md)
 - [ADR 0052 — Index Every Foreign-Key Column](adr/0052-index-every-foreign-key-column.md)
 - [ADR 0053 — Deterministic Constraint Names and Database-Enforced Vocabularies](adr/0053-named-constraints-and-database-enforced-vocabularies.md)
+- [ADR 0054 — The Scenario Briefs the Trainee, Not Only the Persona](adr/0054-scenario-briefing-for-the-trainee.md)
 
 *Vielen Dank für Ihren Anruf. Bitte legen Sie nach der Lektüre nicht auf — es warten noch mehr ADRs auf Sie.*

@@ -69,6 +69,7 @@ nav:
       - ADR 0051 - Session-Level Statistics Carrying No Invented Norms: adr/0051-session-level-statistics-and-machine-latency.md
       - ADR 0052 - Index Every Foreign-Key Column: adr/0052-index-every-foreign-key-column.md
       - ADR 0053 - Deterministic Constraint Names and Database-Enforced Vocabularies: adr/0053-named-constraints-and-database-enforced-vocabularies.md
+      - ADR 0054 - The Scenario Briefs the Trainee: adr/0054-scenario-briefing-for-the-trainee.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
   # site is served at the root (mkdocs serve / mkdocs build + static server).

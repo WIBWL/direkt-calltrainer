@@ -287,6 +287,7 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0051 | Statistics Describe the Whole Session and Carry No Invented Norms | angenommen (grenzt ADR 0014/0047/0048 ein) | Q-01, F-53, F-12 |
 | ADR 0052 | Index Every Foreign-Key Column | angenommen (löst ADR 0028 ab) | Q-03, F-12 |
 | ADR 0053 | Deterministic Constraint Names and Database-Enforced Vocabularies | angenommen | |
+| ADR 0054 | The Scenario Briefs the Trainee, Not Only the Persona | vorgeschlagen (erweitert ADR 0045) | Q-01, C-05, R-43 |
 
 Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug; ADR 0017, 0025, 0027 bis 0030 und 0039 sind reine Wartbarkeits-, Werkzeug- oder Schemaentscheidungen ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 
