@@ -8,8 +8,10 @@ interface CallViewProps {
   personaName: string;
   personaRole: string;
   languageLabel: string;
+  isMicrophoneMuted: boolean;
   callState: CallState;
   error: string | null;
+  onToggleMicrophone: () => void;
   onEndCall: () => void;
 }
 
@@ -44,8 +46,10 @@ export default function CallView({
   personaName,
   personaRole,
   languageLabel,
+  isMicrophoneMuted,
   callState,
   error,
+  onToggleMicrophone,
   onEndCall,
 }: CallViewProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -58,7 +62,7 @@ export default function CallView({
     return () => window.clearInterval(id);
   }, []);
 
-    const formattedDuration = formatDuration(elapsedSeconds);
+  const formattedDuration = formatDuration(elapsedSeconds);
 
   return (
     <>
@@ -108,9 +112,25 @@ export default function CallView({
           </p>
         )}
 
-        <button className="end-call-button" type="button" onClick={onEndCall}>
-          Anruf beenden
-        </button>
+        {/* The toggle state reflects whether local VAD microphone capture is paused. */}
+        <div className="call-controls">
+          <button
+            className={
+              "mute-call-button" + (isMicrophoneMuted ? " is-muted" : "")
+            }
+            type="button"
+            aria-pressed={isMicrophoneMuted}
+            onClick={onToggleMicrophone}
+          >
+            {isMicrophoneMuted
+              ? "Mikrofon einschalten"
+              : "Mikrofon stummschalten"}
+          </button>
+
+          <button className="end-call-button" type="button" onClick={onEndCall}>
+            Gespräch beenden
+          </button>
+        </div>
       </section>
     </>
   );

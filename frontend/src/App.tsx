@@ -34,6 +34,8 @@ export default function App() {
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [screen, setScreen] = useState<Screen>("setup");
+  // Tracks intentional muting separately from entering or leaving the call screen.
+  const [isMicrophoneMuted, setIsMicrophoneMuted] = useState(false);
   const [transcript, setTranscript] = useState<TurnRecord[]>([]);
   // Holds a just-received session.ended until playback actually finishes —
   // see the effect below.
@@ -145,20 +147,28 @@ export default function App() {
   // Armed for the whole call, not just while it's nominally the user's turn
   // — see the barge-in handling above.
   useEffect(() => {
-    if (screen !== "call") {
+    if (screen !== "call" || isMicrophoneMuted) {
+      // Pausing keeps the preloaded VAD instance warm without capturing speech.
       vad.stopListening();
       return;
     }
+
     void vad.startListening();
     return () => vad.stopListening();
-  }, [screen, vad.startListening, vad.stopListening]);
+  }, [isMicrophoneMuted, screen, vad.startListening, vad.stopListening]);
 
   const handleConfirmed = useCallback(() => {
     // Reveal whatever's already been generated (possibly the whole opening
     // line by now) and switch to live playback for everything after.
+    setIsMicrophoneMuted(false);
     playback.activate();
     setScreen("call");
   }, [playback]);
+
+  // The effect above owns VAD pause/resume; the button only changes UI state.
+  const handleToggleMicrophone = useCallback(() => {
+    setIsMicrophoneMuted((muted) => !muted);
+  }, []);
 
   const handleRestart = useCallback(() => {
     if (needsReconnect) {
@@ -198,8 +208,10 @@ export default function App() {
             personaName={selectedPersona?.name ?? "Persona"}
             personaRole={selectedPersona?.role ?? "Gesprächspartner"}
             languageLabel="Deutsch"
+            isMicrophoneMuted={isMicrophoneMuted}
             callState={displayState}
             error={socket.error ?? vad.micError}
+            onToggleMicrophone={handleToggleMicrophone}
             onEndCall={socket.endSession}
           />
         </main>
