@@ -202,7 +202,7 @@ export default function App() {
       <>
         <AppHeader activeStep="call" />
 
-        <main className="app-page app-page-narrow">
+        <main className="app-page call-page">
           <CallView
             scenarioName={selectedScenario?.name ?? "Gespräch"}
             personaName={selectedPersona?.name ?? "Persona"}
