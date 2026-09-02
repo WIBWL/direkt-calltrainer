@@ -80,7 +80,7 @@ async def _generate(session_id: int) -> None:
             raise LookupError(f"Session {session_id} does not exist")
         _mark(db, session_id, "running")
         dossier, valid_turns = _dossier(session)
-        language = _LANGUAGE_NAMES_EN.get(session.sprache_code, session.sprache_code)
+        language = _LANGUAGE_NAMES_EN.get(session.language_code, session.language_code)
 
     try:
         wrapup = await _ask(dossier, language)
