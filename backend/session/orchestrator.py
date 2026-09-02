@@ -3,8 +3,9 @@
 `SessionOrchestrator` owns the LLM message history and the Turn list for one
 call. The guards around the pipeline exist because Qwen3-4B misbehaves in
 specific, tested ways — copying the English prompt example (ADR 0043), ending
-calls too eagerly or not at all (ADR 0037), looping (ADR 0038); each guard's
-own comment names what it catches. Retry policy: one retry per leg, then end
+calls too eagerly or not at all (ADR 0037), looping or restating a demand the
+user has already met (ADR 0038); each guard's own comment names what it
+catches. Retry policy: one retry per leg, then end
 the Session cleanly (ADR 0016, ADR 0033).
 """
 
@@ -27,6 +28,7 @@ from backend.session.language_packs import LanguagePack, get_pack
 from backend.session.models import AudioChunk, Failed, StateChanged, Turn, TurnCompleted, TurnEvent
 
 logger = logging.getLogger(__name__)
+
 
 def _opening_instruction(pack: LanguagePack) -> str:
     """Asks the Persona for the line that opens the call.
@@ -58,7 +60,9 @@ def _case_block(scenario: Scenario) -> str:
 
     Each of the three is optional on its own: a Scenario predating ADR 0045,
     or a user-authored one (ADR 0024), can leave any of them blank, and an
-    empty field must not produce a dangling heading."""
+    empty field must not produce a dangling heading. The success condition
+    carries a usage rule with it: handed over bare, the model read it out as a
+    demand every Turn instead of weighing the call against it."""
     parts = []
     if scenario.case_facts:
         parts.append(f"Facts of the case: {scenario.case_facts}")
@@ -67,6 +71,16 @@ def _case_block(scenario: Scenario) -> str:
     if scenario.success_condition:
         parts.append(
             f"You consider the matter settled when: {scenario.success_condition}"
+        )
+        # Bare, this was recited as a demand every Turn and never weighed
+        # against what the user had already conceded.
+        parts.append(
+            "That condition is yours to check silently, never to read out: "
+            "before each reply, hold what the user has actually said so far "
+            "against it, and never restate a demand you have already made. "
+            "The moment it is met, say so plainly in your own words and "
+            "close the call -- asking once more to be sure is exactly the "
+            "wrong move."
         )
     return "".join(f"{part}\n" for part in parts)
 
@@ -103,7 +117,12 @@ def _improvisation_rule(scenario: Scenario) -> str:
             "date, a detail nobody has pinned down — and never contradict "
             "them or replace a figure they already state. Do not recite them "
             "unprompted either; they are what you know, not what you came to "
-            "read out.\n"
+            "read out. Give at most one or two of them in a single reply, and "
+            "only the ones the user's last question actually calls for — "
+            "never the whole case at once, not even when you are asked what "
+            "this is about. A figure you have already stated once in this "
+            "call does not get stated again unless you are asked for it "
+            "again.\n"
         )
     return (
         "Stay in character and improvise like a real person on a real call: "
@@ -143,22 +162,35 @@ def _build_system_prompt(persona: Persona, scenario: Scenario, pack: LanguagePac
         "avoid: before every reply, re-read your own previous lines in "
         "this call and check whether you are about to say the same thing "
         "again — the same question, recap, or objection — even reworded. "
-        "If so, drop it and say something new instead.\n"
+        "If so, drop it and say something new instead. Re-asking something "
+        "the user has already answered is the same mistake: if part of the "
+        "answer was unclear, ask about that part only, never the whole "
+        "question over again.\n"
         f"{pack.example_exchange}\n"
-        "If your concern has been concretely addressed — a clear answer, or "
-        "a specific commitment with an actual action, amount, or timeframe "
-        "(a refund, a callback, a fixed date) — or the user signals the call is "
-        f"over — a goodbye, a wrap-up like {pack.user_closing_examples}, "
-        "or any other natural way people end a phone call — end it "
-        "yourself: add one brief, friendly closing line (e.g. thank them, "
-        "say goodbye), then finish your reply with exactly this marker on "
-        "its own and nothing after it: [CALL_END]. Never end the call "
+        "Before every reply, check first whether what you came for has "
+        "already been given. A clear answer, or a specific commitment with an "
+        "actual action, amount, or timeframe (a refund, a callback, a fixed "
+        "date, a figure) counts — including one that arrived piece by piece "
+        "across several replies, and including one you had to ask twice to "
+        "get. Once it has been given you are done: do not ask again to make "
+        "sure, and do not put your demand one more time. Accept it out loud "
+        "in your own words, say that this works for you, thank them for the "
+        "accommodation, and end the call. The same applies when the user "
+        "signals the call is over — a goodbye, a wrap-up like "
+        f"{pack.user_closing_examples}, or any other natural way people end "
+        "a phone call.\n"
+        "To end it: add one brief, friendly closing line (accept what you "
+        "were given, thank them, say goodbye), then finish your reply with "
+        "exactly this marker on its own and nothing after it: [CALL_END]. "
+        "Never end the call "
         "while you still consider your concern unresolved, are still "
         "pressing for information, or have only gotten a vague reassurance "
         f"with no specifics ({pack.vague_reassurance_examples}) — a "
         "frustrated reply, or an empty promise with no actual "
         "content, is not by itself a reason to hang up; keep pushing for "
-        "specifics instead, the way a real caller would. Only include the "
+        "specifics instead, the way a real caller would. But once the "
+        "specifics are actually on the table, carrying on is the same "
+        "mistake in the other direction. Only include the "
         "marker when the call should truly end — never otherwise, never in the "
         "same reply as a question or a statement that the issue isn't "
         "resolved yet, and never explain or mention the marker itself.\n"
@@ -258,18 +290,34 @@ def _strip_foreign_script(text_chunk: str) -> str:
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
 
+# Below this, a shared sentence means shared filler ("Ja, genau.", "Ich
+# verstehe.") rather than shared content, so short ones are not compared.
+_MIN_SENTENCE_LEN = 15
+
+
+def _long_sentences(text: str) -> list[str]:
+    """The sentences of one reply worth comparing: normalised, filler dropped."""
+    sentences = (sentence.strip().lower() for sentence in _SENTENCE_SPLIT_RE.split(text))
+    return [sentence for sentence in sentences if len(sentence) >= _MIN_SENTENCE_LEN]
+
+
 def _has_repeated_sentence(text: str) -> bool:
     """True if a non-trivial sentence repeats within one reply — the model
     looping (ADR 0038). Short fragments ("Ja.", "Okay.") don't count."""
-    seen = set()
-    for sentence in _SENTENCE_SPLIT_RE.split(text):
-        sentence = sentence.strip().lower()
-        if len(sentence) < 15:
-            continue
-        if sentence in seen:
-            return True
-        seen.add(sentence)
-    return False
+    sentences = _long_sentences(text)
+    return len(sentences) != len(set(sentences))
+
+
+# ADR 0038's verbatim check never fires on the failure below it: the Persona
+# varies its opening sentence and carries the same block underneath it
+# unchanged, Turn after Turn, so no two replies are ever wholly identical --
+# the gap ADR 0038's own Consequences name. What separates a restatement from
+# a caller legitimately quoting a figure twice is not *whether* a sentence
+# came back but *how much* of the reply is old: a reply that repeats its
+# opening and then says seven new things has moved the call on, one that is
+# four fifths its predecessor has not. Measured against a real call, those two
+# cases sit at 25% and 80%.
+_RESTATEMENT_SHARE = 0.5
 
 
 class SessionOrchestrator:
@@ -463,23 +511,26 @@ class SessionOrchestrator:
         repeated_reply = bool(turn.persona_text) and (
             self._repeats_last_reply(turn.persona_text) or _has_repeated_sentence(turn.persona_text)
         )
+        restates = bool(turn.persona_text) and self._restates_previous_reply(turn.persona_text)
         self._messages.append({"role": "assistant", "content": turn.persona_text})
 
         # force_end_call backstops [CALL_END]: a small model won't always
         # include the marker even when told to (confirmed in testing).
-        ends_call = progress.ends_call or force_end_call or repeated_reply
+        ends_call = progress.ends_call or force_end_call or repeated_reply or restates
         if ends_call:
             logger.info(
-                "Turn %d ends the call (model marker=%s, closing-intent check=%s, repeated reply=%s)",
+                "Turn %d ends the call (model marker=%s, closing-intent check=%s, "
+                "repeated reply=%s, restated reply=%s)",
                 turn.seq,
                 progress.ends_call,
                 force_end_call,
                 repeated_reply,
+                restates,
             )
             # Only the closing-intent path actually asked the model for a
             # goodbye (_CLOSING_NUDGE); a repeat or an unprompted ending
             # didn't, so it can't be trusted to have included one.
-            if repeated_reply or (progress.ends_call and not force_end_call):
+            if repeated_reply or restates or (progress.ends_call and not force_end_call):
                 async for event in self._speak_fallback_closing(turn, progress):
                     yield event
         yield TurnCompleted(turn_seq=turn.seq, ends_call=ends_call)
@@ -505,13 +556,31 @@ class SessionOrchestrator:
         turn.persona_text = f"{turn.persona_text} {self._pack.fallback_closing_line}".strip()
         self._messages[-1]["content"] = turn.persona_text
 
+    def _previous_reply(self) -> str:
+        """The Persona's last reply, or "" on the opening Turn. Call before the
+        current reply has been appended to history."""
+        for message in reversed(self._messages):
+            if message["role"] == "assistant":
+                return message["content"]
+        return ""
+
     def _repeats_last_reply(self, text: str) -> bool:
         """True if this reply repeats its predecessor verbatim (modulo case and
         whitespace) — the cross-Turn form of `_has_repeated_sentence` (ADR 0038)."""
-        for message in reversed(self._messages):
-            if message["role"] == "assistant":
-                return message["content"].strip().lower() == text.strip().lower()
-        return False
+        return bool(text.strip()) and self._previous_reply().strip().lower() == text.strip().lower()
+
+    def _restates_previous_reply(self, text: str) -> bool:
+        """True if most of this reply was already in its predecessor — the
+        partial form of `_repeats_last_reply` (ADR 0038).
+
+        A share of the reply, not a count of sentences: repeating one figure
+        while adding new content is a real caller, repeating four fifths of
+        the last reply is the loop the guard is for."""
+        sentences = set(_long_sentences(text))
+        if not sentences:
+            return False
+        carried = len(set(_long_sentences(self._previous_reply())) & sentences)
+        return carried / len(sentences) > _RESTATEMENT_SHARE
 
     def _finalize_interrupted(self, turn: Turn, progress: _ReplyProgress) -> None:
         """Barge-in cleanup (ADR 0035). If audio was voiced, commit exactly that

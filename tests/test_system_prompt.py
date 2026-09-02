@@ -15,7 +15,8 @@ Covers:
             language pack
   ADR 0033 / ADR 0037 / ADR 0038  the [CALL_END] closing protocol
   ADR 0045  the Scenario carries the case (facts, call goal, success
-            condition), the Persona carries the objections
+            condition), the Persona carries the objections -- and the
+            condition is a criterion to weigh, not a demand to recite
   R-12  spontaneous objections
 """
 
@@ -259,3 +260,63 @@ def test_the_case_is_identical_for_every_persona_running_the_scenario():
         assert scenario.case_facts in prompt
         assert scenario.call_goal in prompt
         assert scenario.success_condition in prompt
+
+
+# --- Recognising that the call is over ------------------------------------
+
+
+def test_prompt_puts_the_satisfaction_check_before_every_reply(prompt):
+    """ADR 0037/0038: the closing rule used to be one long sentence whose negative
+    half ("never hang up early") drowned out its positive one, and a Persona
+    told to keep pushing never stopped. The check comes first now."""
+    assert "Before every reply, check first whether what you came for has" in prompt
+    lowered = prompt.lower()
+    assert "do not ask again to make sure" in lowered
+    assert "accept it out loud in your own words" in lowered
+
+
+def test_prompt_credits_a_commitment_given_piece_by_piece(prompt):
+    """ADR 0037/0038: the figure and the date arrived in separate Turns, and the
+    Persona kept treating each on its own as incomplete."""
+    lowered = prompt.lower()
+    assert "piece by piece" in lowered
+    assert "had to ask twice" in lowered
+
+
+def test_prompt_keeps_the_guard_against_ending_too_early(prompt):
+    """ADR 0037's asymmetry still holds: ending mid-conversation is the more
+    expensive failure, so the new check must not have replaced that rule."""
+    assert "Never end the call while you still consider your concern" in prompt
+    assert "vague reassurance with no specifics" in prompt
+
+
+def test_prompt_forbids_reciting_the_whole_case(persona):
+    """ADR 0045: the Persona answered "worum geht es denn?" with the entire
+    fact block, which is what made every following reply share sentences with
+    the one before it."""
+    prompt = _build_system_prompt(persona, _case_scenario(), GERMAN)
+    lowered = prompt.lower()
+    assert "at most one or two of them in a single reply" in lowered
+    assert "never the whole case at once" in lowered
+
+
+def test_prompt_forbids_re_asking_an_answered_question(prompt):
+    """ADR 0038: re-asking is how the repetition showed up in practice."""
+    lowered = prompt.lower()
+    assert "already answered is the same mistake" in lowered
+
+
+def test_success_condition_is_a_criterion_not_a_line_to_recite(persona):
+    """ADR 0045: handed over bare, the condition was read out as a demand in
+    every reply instead of being weighed against what the user had said."""
+    prompt = _build_system_prompt(persona, _case_scenario(), GERMAN)
+    lowered = prompt.lower()
+    assert "check silently, never to read out" in lowered
+    assert "never restate a demand you have already made" in lowered
+
+
+def test_no_usage_rule_without_a_success_condition(persona):
+    """ADR 0024: a user-authored Scenario may leave the condition blank, and
+    the rule for using it must not survive it."""
+    prompt = _build_system_prompt(persona, _case_scenario(success_condition=""), GERMAN)
+    assert "check silently" not in prompt.lower()
