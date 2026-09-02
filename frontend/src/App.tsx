@@ -280,7 +280,7 @@ export default function App() {
             scenarioName={selectedScenario?.name ?? "Gespräch"}
             personaName={selectedPersona?.name ?? "Persona"}
             personaRole={selectedPersona?.role ?? "Gesprächspartner"}
-            languageLabel="Deutsch"
+            languageLabel={selectedPersona?.language ?? "Sprache"}
             isMicrophoneMuted={isMicrophoneMuted}
             callState={displayState}
             error={socket.error ?? vad.micError}
@@ -391,7 +391,7 @@ export default function App() {
         <SelectionSummary
           scenario={selectedScenario?.name ?? "Noch nicht ausgewählt"}
           persona={selectedPersona?.name ?? "Noch nicht ausgewählt"}
-          language="DE · Deutsch"
+          language={selectedPersona?.language ?? "Noch nicht ausgewählt"}
           voice="Durch Persona festgelegt"
         />
 
