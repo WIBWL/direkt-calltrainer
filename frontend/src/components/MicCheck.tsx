@@ -69,9 +69,12 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
 
         {!isTesting && (
           <div className="mic-test-panel">
-            <p className="mic-check-hint">
-              Starten Sie den Test und sprechen Sie anschließend ein paar Worte.
-            </p>
+            <div className="mic-test-panel-copy">
+              <h3>Bereit für den Mikrofontest</h3>
+              <p className="mic-check-hint">
+                Starten Sie den Test und sprechen Sie anschließend ein paar Worte.
+              </p>
+            </div>
 
             <button
               className="start-call-button"
@@ -85,9 +88,12 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
 
         {isTesting && !heardSomething && (
           <div className="mic-test-panel">
-            <p className="mic-check-hint">
-              Sagen Sie ein paar Worte, um Ihr Mikrofon zu testen.
-            </p>
+            <div className="mic-test-panel-copy">
+              <h3>Mikrofontest läuft</h3>
+              <p className="mic-check-hint">
+                Sagen Sie ein paar Worte, um Ihr Mikrofon zu testen.
+              </p>
+            </div>
 
             <div
               className="mic-meter"

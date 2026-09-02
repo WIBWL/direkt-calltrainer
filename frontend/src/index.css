@@ -694,24 +694,120 @@ audio {
   gap: 12px;
 }
 
+/* State colors distinguish preparation, active testing and successful completion. */
+.mic-test-panel {
+  border-color: #c9deeb;
+  background: var(--color-surface-selected);
+}
+
+.mic-test-panel-success {
+  border-color: #bfd8cb;
+  background: #f1f8f5;
+}
+
+.mic-test-panel-copy h3,
+.mic-test-result-copy h3 {
+  margin: 0 0 6px;
+  color: var(--color-navy-900);
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.mic-test-panel-copy p,
+.mic-test-result-copy p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
 .mic-check-hint {
-  color: var(--text-muted);
-  margin: 0 0 1.5rem;
+  color: var(--color-text-muted);
+}
+
+/* The initial action remains compact while the success actions share a row. */
+.mic-test-panel > .start-call-button {
+  width: auto;
+  min-width: 160px;
+  align-self: flex-start;
 }
 
 .mic-meter {
-  height: 1rem;
-  border-radius: 999px;
-  background: var(--border);
+  height: 10px;
+  margin: 0;
   overflow: hidden;
-  margin-bottom: 0.75rem;
+  border-radius: 999px;
+  background: var(--color-border);
 }
 
 .mic-meter-fill {
   height: 100%;
-  background: var(--success);
   border-radius: 999px;
+  background: var(--color-success);
   transition: width 0.08s linear;
+}
+
+.mic-test-status {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.mic-test-panel .error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* The success icon reinforces the text without replacing its accessible status message. */
+.mic-test-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.mic-test-success-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-success);
+  color: var(--color-surface);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.mic-test-result-copy {
+  min-width: 0;
+}
+
+.mic-test-retry-button {
+  display: block;
+  width: 100%;
+  padding: 0.9rem 1.5rem;
+  border: 1px solid var(--color-navy-900);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-navy-900);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.mic-test-retry-button:hover {
+  background: var(--color-surface);
+}
+
+.mic-test-retry-button:focus-visible,
+.mic-test-panel .start-call-button:focus-visible {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
 }
 
 /* Setup sections use smaller spacing and typography on narrow screens. */
