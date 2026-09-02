@@ -636,6 +636,64 @@ audio {
   color: var(--text-muted);
 }
 
+/* The microphone page reuses the setup card while defining its own inner layout. */
+.mic-check-page .setup-section {
+  margin-bottom: 0;
+}
+
+.mic-check-intro {
+  max-width: 800px;
+}
+
+/* The detected device is informational because device switching is not supported yet. */
+.mic-device-information {
+  margin: 0 0 18px;
+}
+
+.mic-device-information-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  padding: 15px 18px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.mic-device-information dt {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mic-device-information dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-navy-900);
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* All microphone states share the same spacing and card dimensions. */
+.mic-test-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-choice);
+}
+
+.mic-test-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .mic-check-hint {
   color: var(--text-muted);
   margin: 0 0 1.5rem;
