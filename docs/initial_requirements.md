@@ -158,7 +158,7 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 | :--- | :------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------------- | :-- | :--------- |
 | R-43 | Bestehende Gesprächsleitfäden und ihre Auswertung als Bewertungsgrundlage sind nicht Gegenstand des Trainings.                                                | AP 4.3, 4.4    | N   | *offen* |
 | R-45 | Klassische vertriebliche Kennzahlen wie Abschlussquote oder Umsatz sollen nicht als Erfolgsmaßstab dienen.                                                    | SO 6.2, AP 5.2 | N   | *offen*       |
-| R-46 | Ein stark vertriebslastiger Fokus passt nicht zu den Rollen bei Solox. Die Abgrenzung gilt unternehmensspezifisch und nicht produktweit, siehe Konflikt K-01. | SO 4.9         | N   | *offen* |
+| R-46 | Ein stark vertriebslastiger Fokus passt nicht zu den Rollen bei Solox. Die Abgrenzung gilt unternehmensspezifisch und nicht produktweit: Vertriebsnahe Gespräche werden als einer von mehreren Szenario-Typen geführt (F-03), sodass jede Seite die passenden Szenarien wählt. Siehe RI-03. | SO 4.9         | N   | *offen* |
 | R-47 | Fernwartung und Bildschirmfreigabe sind Teil realer Support-Gespräche, aber nicht Gegenstand des Trainings.                                                   | SO 4.4, 5.1    | N   | *offen*    |
 
 ### Zusammenarbeit

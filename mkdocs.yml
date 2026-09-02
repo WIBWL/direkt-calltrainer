@@ -12,6 +12,7 @@ nav:
   - Home: index.md
   - Initial Requirements: initial_requirements.md
   - Features: features.md
+  - Szenario- und Persona-Katalog: scenario-catalogue.md
   - Datenmodell: datenmodell.md
   - Architecture Decisions:
       - ADR 0000 - Record Architecture Decisions: adr/0000-record-architecture-decisions.md

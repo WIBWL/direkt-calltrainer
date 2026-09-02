@@ -11,4 +11,5 @@ frontend/dist
 frontend/node_modules
 frontend/public/vad
 logs/
+site/
 test/
