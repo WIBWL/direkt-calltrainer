@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { useMicrophoneLevel } from "../hooks/useMicrophoneLevel";
+import SetupSection from "./SetupSection";
 
 const HEARD_THRESHOLD = 0.02;
 
@@ -9,19 +10,17 @@ interface MicCheckProps {
   onCancel: () => void;
 }
 
-/** Pre-call microphone test: lets the user see their mic actually picking up
- * audio before a Session starts, rather than discovering a broken mic mid-call. */
+/** Pre-call microphone test: lets the user confirm that recording works before a session starts. */
 export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
   const { level, error, start, stop } = useMicrophoneLevel();
-  // Latched, not live: once we've heard *anything* above threshold, stay
-  // confirmed — otherwise the button would only be enabled in the exact
-  // instant the user happens to still be making sound.
+
+  // Keep the successful result once audio has crossed the threshold.
   const [heardSomething, setHeardSomething] = useState(false);
 
   useEffect(() => {
     void start();
     return stop;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- start/stop only need to run once, on mount/unmount
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- start and stop only run on mount and unmount
   }, []);
 
   useEffect(() => {
@@ -30,31 +29,61 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
 
   return (
     <>
-      <div className="eyebrow">Calltrainer</div>
-      <h1>Mikrofon testen</h1>
-      <p className="mic-check-hint">Sag ein paar Worte, um dein Mikrofon zu testen.</p>
+      <section
+        className="setup-intro mic-check-intro"
+        aria-labelledby="mic-check-page-title"
+      >
+        <div className="eyebrow">Mikrofon vorbereiten</div>
 
-      <div className="mic-meter">
-        <div className="mic-meter-fill" style={{ width: `${Math.min(level * 400, 100)}%` }} />
-      </div>
+        <h1 id="mic-check-page-title">Mikrofon testen</h1>
 
-      {error && (
-        <p id="status" className="error">
-          Mikrofonzugriff fehlgeschlagen: {error}
+        <p className="setup-intro-description">
+          Prüfen Sie vor dem Gespräch, ob Ihr Mikrofon erkannt wird und Ihre Stimme
+          verständlich ankommt.
         </p>
-      )}
-      {!error && (
-        <p id="status" className={heardSomething ? "success" : ""}>
-          {heardSomething ? "Mikrofon erkannt." : "Warte auf Audiosignal …"}
-        </p>
-      )}
+      </section>
 
-      <button className="start-call-button" type="button" disabled={!heardSomething} onClick={onConfirmed}>
-        Anruf starten
-      </button>
-      <button className="cancel-button" type="button" onClick={onCancel}>
-        Abbrechen
-      </button>
+      <SetupSection
+        index="01"
+        title="Mikrofon prüfen"
+        description="Sprechen Sie einen kurzen Testsatz."
+      >
+        <p className="mic-check-hint">
+          Sagen Sie ein paar Worte, um Ihr Mikrofon zu testen.
+        </p>
+
+        <div className="mic-meter">
+          <div
+            className="mic-meter-fill"
+            style={{ width: `${Math.min(level * 400, 100)}%` }}
+          />
+        </div>
+
+        {error && (
+          <p id="status" className="error">
+            Mikrofonzugriff fehlgeschlagen: {error}
+          </p>
+        )}
+
+        {!error && (
+          <p id="status" className={heardSomething ? "success" : ""}>
+            {heardSomething ? "Mikrofon erkannt." : "Warte auf Audiosignal …"}
+          </p>
+        )}
+
+        <button
+          className="start-call-button"
+          type="button"
+          disabled={!heardSomething}
+          onClick={onConfirmed}
+        >
+          Anruf starten
+        </button>
+
+        <button className="cancel-button" type="button" onClick={onCancel}>
+          Abbrechen
+        </button>
+      </SetupSection>
     </>
   );
 }

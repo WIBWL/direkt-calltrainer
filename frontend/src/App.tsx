@@ -178,7 +178,7 @@ export default function App() {
       <>
         <AppHeader activeStep="prepare" />
 
-        <main className="app-page app-page-narrow">
+        <main className="app-page mic-check-page">
           <MicCheck onConfirmed={handleConfirmed} onCancel={() => setScreen("setup")} />
         </main>
 
