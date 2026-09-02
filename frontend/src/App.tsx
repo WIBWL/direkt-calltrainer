@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { apiFetch } from "./api";
+import AppFooter from "./components/AppFooter";
+import AppHeader from "./components/AppHeader";
 import CallView from "./components/CallView";
 import FeedbackView from "./components/FeedbackView";
 import MicCheck from "./components/MicCheck";
+import SelectionSummary from "./components/SelectionSummary";
+import SetupSection from "./components/SetupSection";
 import TranscriptView from "./components/TranscriptView";
 import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useSessionSocket, type CommittedSession } from "./hooks/useSessionSocket";
@@ -66,6 +70,8 @@ export default function App() {
   const [personaId, setPersonaId] = useState<string | null>(null);
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Tracks intentional muting separately from entering or leaving the call screen.
+  const [isMicrophoneMuted, setIsMicrophoneMuted] = useState(false);
   // Lazy initializer: read once on mount, not on every render.
   const [restored] = useState<FinishedSession | null>(loadFinishedSession);
   const [screen, setScreen] = useState<Screen>(restored ? "transcript" : "setup");
@@ -91,20 +97,24 @@ export default function App() {
   const [committed, setCommitted] = useState<CommittedSession | null>(null);
 
   useEffect(() => {
-    apiFetch<Persona[]>("/api/personas")
-      .then((data) => {
-        setPersonas(data);
-        // Preselect the first entry (ADR 0015); no-op on an empty list.
-        if (data[0]) setPersonaId(data[0].id);
-      })
-      .catch((e) => setLoadError(`Personas konnten nicht geladen werden: ${e.message}`));
-    apiFetch<Scenario[]>("/api/scenarios")
-      .then((data) => {
-        setScenarios(data);
-        if (data[0]) setScenarioId(data[0].id);
-      })
-      .catch((e) => setLoadError(`Szenarien konnten nicht geladen werden: ${e.message}`));
-  }, []);
+  apiFetch<Persona[]>("/api/personas")
+    .then((data) => {
+      setPersonas(data);
+      if (!restored && data[0]) setPersonaId(data[0].id);
+    })
+    .catch((e) =>
+      setLoadError(`Personas konnten nicht geladen werden: ${e.message}`)
+    );
+
+  apiFetch<Scenario[]>("/api/scenarios")
+    .then((data) => {
+      setScenarios(data);
+      if (!restored && data[0]) setScenarioId(data[0].id);
+    })
+    .catch((e) =>
+      setLoadError(`Szenarien konnten nicht geladen werden: ${e.message}`)
+    );
+}, [restored]);
 
   // The Session (WebSocket + VAD + audio playback) lives here, at the App
   // level, not inside whichever screen happens to be showing — it connects
@@ -194,23 +204,29 @@ export default function App() {
   // Armed for the whole call, not just while it's nominally the user's turn
   // — see the barge-in handling above.
   useEffect(() => {
-    if (screen !== "call") {
+    if (screen !== "call" || isMicrophoneMuted) {
+      // Pausing keeps the preloaded VAD instance warm without capturing speech.
       vad.stopListening();
       return;
     }
+
     void vad.startListening();
     return () => vad.stopListening();
-  }, [screen, vad.startListening, vad.stopListening]);
+  }, [isMicrophoneMuted, screen, vad.startListening, vad.stopListening]);
 
   const handleConfirmed = useCallback(() => {
-    // Reveal whatever's already been generated (possibly the whole opening
-    // line by now) and switch to live playback for everything after. The
-    // server is told at the same moment, because this — not the connect —
-    // is where the Session's timeline starts (ADR 0051).
+    // Reveal the buffered opening line and switch to live playback.
+    // This is also the point at which the Session timeline starts.
+    setIsMicrophoneMuted(false);
     playback.activate();
     socket.sendActivate();
     setScreen("call");
   }, [playback, socket.sendActivate]);
+
+  // The effect above owns VAD pause/resume; the button only changes UI state.
+  const handleToggleMicrophone = useCallback(() => {
+    setIsMicrophoneMuted((muted) => !muted);
+  }, []);
 
   const handleStartSession = useCallback(() => {
     if (personaId === null || scenarioId === null) return;
@@ -235,83 +251,168 @@ export default function App() {
     setScreen("setup");
   }, []);
 
+  const selectedPersona = personas.find((persona) => persona.id === personaId);
+  const selectedScenario = scenarios.find((scenario) => scenario.id === scenarioId);
+
   const readyForCall = personaId !== null && scenarioId !== null;
 
   if (screen === "mic-check") {
-    return <MicCheck onConfirmed={handleConfirmed} onCancel={handleCancelMicCheck} />;
+    return (
+      <>
+        <AppHeader activeStep="prepare" />
+
+        <main className="app-page mic-check-page">
+          <MicCheck onConfirmed={handleConfirmed} onCancel={handleCancelMicCheck} />
+        </main>
+
+        <AppFooter />
+      </>
+    );
   }
 
   if (screen === "call") {
     return (
-      <CallView
-        callState={displayState}
-        error={socket.error ?? vad.micError}
-        onEndCall={socket.endSession}
-      />
+      <>
+        <AppHeader activeStep="call" />
+
+        <main className="app-page call-page">
+          <CallView
+            scenarioName={selectedScenario?.name ?? "Gespräch"}
+            personaName={selectedPersona?.name ?? "Persona"}
+            personaRole={selectedPersona?.role ?? "Gesprächspartner"}
+            languageLabel="Deutsch"
+            isMicrophoneMuted={isMicrophoneMuted}
+            callState={displayState}
+            error={socket.error ?? vad.micError}
+            onToggleMicrophone={handleToggleMicrophone}
+            onEndCall={socket.endSession}
+          />
+        </main>
+
+        <AppFooter />
+      </>
     );
   }
 
   if (screen === "transcript") {
     return (
-      <TranscriptView
-        transcript={transcript}
-        personaName={personaName}
-        onRestart={handleRestart}
-        feedback={<FeedbackView sessionId={endedSessionId} />}
-      />
+      <>
+        <AppHeader activeStep="feedback" />
+
+        <main className="app-page app-page-narrow">
+          <TranscriptView
+            transcript={transcript}
+            personaName={personaName}
+            onRestart={handleRestart}
+            feedback={<FeedbackView sessionId={endedSessionId} />}
+          />
+        </main>
+
+        <AppFooter />
+      </>
     );
   }
 
   return (
-    <>
-      <div className="eyebrow">Calltrainer</div>
-      <h1>Training starten</h1>
+  <>
+    <AppHeader activeStep="prepare" />
 
-      <h2>Persona</h2>
-      <div className="persona-grid">
-        {personas.map((p) => (
-          <button
-            key={p.id}
-            className={"persona-card" + (p.id === personaId ? " selected" : "")}
-            onClick={() => setPersonaId(p.id)}
-            type="button"
-          >
-            <span className="persona-name">{p.name}</span>
-            <span className="card-subtitle">{p.role}</span>
-            <span className="language-badge">{p.language}</span>
-          </button>
-        ))}
-      </div>
+    <main className="app-page setup-page">
+      <section className="setup-intro" aria-labelledby="setup-page-title">
+        <div className="eyebrow">Training vorbereiten</div>
 
-      <h2>Szenario</h2>
-      <div className="persona-grid">
-        {scenarios.map((s) => (
-          <button
-            key={s.id}
-            className={"persona-card" + (s.id === scenarioId ? " selected" : "")}
-            onClick={() => setScenarioId(s.id)}
-            type="button"
-          >
-            <span className="persona-name">{s.name}</span>
-            <span className="card-subtitle">{s.short_description}</span>
-          </button>
-        ))}
-      </div>
+        <h1 id="setup-page-title">Wählen Sie Ihr Kundengespräch</h1>
 
-      <button
-        className="start-call-button"
-        type="button"
-        disabled={!readyForCall}
-        onClick={handleStartSession}
+        <p className="setup-intro-description">
+          Wählen Sie die Gesprächssituation und den passenden Gesprächspartner.
+          Sprache und Stimme übernimmt die ausgewählte Persona.
+        </p>
+      </section>
+
+      <SetupSection
+        index="01"
+        title="Gesprächssituation wählen"
+        description="Welche Situation möchten Sie trainieren?"
       >
-        Session starten
-      </button>
+        <div className="persona-grid">
+          {scenarios.map((s) => (
+            <button
+              key={s.id}
+              className={
+                "persona-card" + (s.id === scenarioId ? " selected" : "")
+              }
+              onClick={() => setScenarioId(s.id)}
+              type="button"
+              aria-pressed={s.id === scenarioId}
+            >
+              <span className="choice-check" aria-hidden="true">
+                {s.id === scenarioId ? "✓" : ""}
+              </span>
+
+              <span className="persona-name">{s.name}</span>
+              <span className="card-subtitle">{s.short_description}</span>
+            </button>
+          ))}
+        </div>
+      </SetupSection>
+
+      <SetupSection
+        index="02"
+        title="Gesprächspartner auswählen"
+        description="Jede Persona besitzt eine eigene Sprache, Stimme und Persönlichkeit."
+      >
+        <div className="persona-grid">
+          {personas.map((p) => (
+            <button
+              key={p.id}
+              className={
+                "persona-card" + (p.id === personaId ? " selected" : "")
+              }
+              onClick={() => setPersonaId(p.id)}
+              type="button"
+              aria-pressed={p.id === personaId}
+            >
+              <span className="choice-check" aria-hidden="true">
+                {p.id === personaId ? "✓" : ""}
+              </span>
+
+              <span className="persona-name">{p.name}</span>
+              <span className="card-subtitle">{p.role}</span>
+            </button>
+          ))}
+        </div>
+      </SetupSection>
+
+      <SetupSection
+        index="03"
+        title="Auswahl prüfen"
+        description="Ihre Trainingsauswahl steht fest."
+      >
+        <SelectionSummary
+          scenario={selectedScenario?.name ?? "Noch nicht ausgewählt"}
+          persona={selectedPersona?.name ?? "Noch nicht ausgewählt"}
+          language="DE · Deutsch"
+          voice="Durch Persona festgelegt"
+        />
+
+        <button
+          className="start-call-button"
+          type="button"
+          disabled={!readyForCall}
+          onClick={handleStartSession}
+        >
+          Weiter zum Mikrofontest
+        </button>
+      </SetupSection>
 
       {loadError && (
         <p id="status" className="error">
           {loadError}
         </p>
       )}
-    </>
-  );
+    </main>
+
+    <AppFooter />
+  </>
+);
 }
