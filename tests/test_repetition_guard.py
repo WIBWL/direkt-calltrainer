@@ -1,7 +1,8 @@
 """Degenerate-repetition guard and guaranteed closing line.
 
 Covers ADR 0038:
-  * a reply that repeats the persona's previous message, or repeats a
+  * a reply that repeats any earlier persona message (not just the
+    immediately preceding one -- the model oscillates A-B-A-B), or repeats a
     sentence within itself, is treated as "the model has nothing left to
     say" and ends the call
   * on a backstopped ending (repetition, or an unprompted [CALL_END] that
@@ -72,6 +73,44 @@ async def test_reply_repeating_the_previous_reply_ends_the_call(persona, scenari
     tc = completed(events)
     assert tc is not None and tc.ends_call is True
     assert "listening" not in states(events)
+
+
+async def test_reply_oscillating_back_to_an_earlier_reply_ends_the_call(persona, scenario, fake_pipeline):
+    """A-B-A: turn 3 repeats turn 1 with a different reply in between, which a
+    "same as the last reply" check would miss."""
+    a = "Ich brauche dazu bitte eine konkrete Zahl von Ihnen, sonst kommen wir nicht weiter."
+    b = "Also gut, dann warte ich noch einen Moment auf Ihre Rueckmeldung dazu."
+    fake_pipeline.stt.transcripts = ["Einen Moment.", "Ich schaue nach.", "Gleich habe ich es."]
+    fake_pipeline.llm.replies = [a, b, a]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_turn(b"1", "turn.webm", "audio/webm"))
+    turn2 = await collect(orch.run_turn(b"2", "turn.webm", "audio/webm"))
+    assert completed(turn2).ends_call is False, "the B reply in between is not a repeat"
+    turn3 = await collect(orch.run_turn(b"3", "turn.webm", "audio/webm"))
+
+    tc = completed(turn3)
+    assert tc is not None and tc.ends_call is True
+    assert "listening" not in states(turn3)
+
+
+async def test_short_reply_recurring_non_adjacently_is_not_treated_as_a_loop(
+    persona, scenario, fake_pipeline
+):
+    """A brief acknowledgement can legitimately recur a few Turns apart; only a
+    substantial reply coming back counts as the "further back than last" loop.
+    (An exact back-to-back repeat is still degenerate at any length --
+    `_repeats_last_reply` -- so this spaces the two out.)"""
+    short = "Ja, genau."
+    fake_pipeline.stt.transcripts = ["Stimmt das so?", "Wirklich?", "Ganz sicher?"]
+    fake_pipeline.llm.replies = [short, "Da bin ich mir ziemlich sicher, ja.", short]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+    await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
+    events = await collect(orch.run_turn(b"c", "turn.webm", "audio/webm"))
+
+    assert completed(events).ends_call is False
 
 
 async def test_backstopped_ending_appends_the_fixed_closing_line(persona, scenario, fake_pipeline):

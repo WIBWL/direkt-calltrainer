@@ -289,6 +289,10 @@ def _strip_foreign_script(text_chunk: str) -> str:
 
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
+# Below this, a whole reply repeating an earlier one is more likely a natural
+# short acknowledgement than the model looping (ADR 0038).
+_MIN_LOOP_REPLY_CHARS = 30
+
 
 # Below this, a shared sentence means shared filler ("Ja, genau.", "Ich
 # verstehe.") rather than shared content, so short ones are not compared.
@@ -509,7 +513,9 @@ class SessionOrchestrator:
             # the timeline as an instant, so the Transcript still reads in order.
             turn.persona_offset_ms = turn.persona_end_ms = self._elapsed_ms()
         repeated_reply = bool(turn.persona_text) and (
-            self._repeats_last_reply(turn.persona_text) or _has_repeated_sentence(turn.persona_text)
+            self._repeats_last_reply(turn.persona_text) or
+            self._repeats_earlier_reply(turn.persona_text) or
+            _has_repeated_sentence(turn.persona_text)
         )
         restates = bool(turn.persona_text) and self._restates_previous_reply(turn.persona_text)
         self._messages.append({"role": "assistant", "content": turn.persona_text})
@@ -568,6 +574,25 @@ class SessionOrchestrator:
         """True if this reply repeats its predecessor verbatim (modulo case and
         whitespace) — the cross-Turn form of `_has_repeated_sentence` (ADR 0038)."""
         return bool(text.strip()) and self._previous_reply().strip().lower() == text.strip().lower()
+
+    def _repeats_earlier_reply(self, text: str) -> bool:
+        """True if this reply reproduces one the persona gave further back than
+        the previous Turn, verbatim modulo case and whitespace — an A-B-A-B
+        oscillation, which `_repeats_last_reply` walks straight past because the
+        repeat is two Turns back (ADR 0038).
+
+        A trivially short reply ("Ja, genau.") can recur across the call without
+        being a loop, so only substantial ones count here — unlike
+        `_repeats_last_reply`, where an exact back-to-back repeat is degenerate
+        at any length.
+        """
+        candidate = text.strip().lower()
+        if len(candidate) < _MIN_LOOP_REPLY_CHARS:
+            return False
+        return any(
+            m["role"] == "assistant" and m["content"].strip().lower() == candidate
+            for m in self._messages
+        )
 
     def _restates_previous_reply(self, text: str) -> bool:
         """True if most of this reply was already in its predecessor — the
