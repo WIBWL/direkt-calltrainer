@@ -12,20 +12,24 @@ interface MicCheckProps {
 
 /** Pre-call microphone test: lets the user confirm that recording works before a session starts. */
 export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
-  const { level, error, start, stop } = useMicrophoneLevel();
+  const { level, error, start } = useMicrophoneLevel();
+
+  // The microphone remains inactive until the user deliberately starts the test.
+  const [isTesting, setIsTesting] = useState(false);
 
   // Keep the successful result once audio has crossed the threshold.
   const [heardSomething, setHeardSomething] = useState(false);
 
   useEffect(() => {
-    void start();
-    return stop;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- start and stop only run on mount and unmount
-  }, []);
-
-  useEffect(() => {
     if (level >= HEARD_THRESHOLD) setHeardSomething(true);
   }, [level]);
+
+  // Starting from a user action makes the browser permission request predictable.
+  const handleStartTest = async () => {
+    setHeardSomething(false);
+    setIsTesting(true);
+    await start();
+  };
 
   return (
     <>
@@ -46,39 +50,59 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
       <SetupSection
         index="01"
         title="Mikrofon prüfen"
-        description="Sprechen Sie einen kurzen Testsatz."
+        description="Sprechen Sie nach dem Start einen kurzen Testsatz."
       >
-        <p className="mic-check-hint">
-          Sagen Sie ein paar Worte, um Ihr Mikrofon zu testen.
-        </p>
+        {!isTesting && (
+          <div className="mic-test-panel">
+            <p className="mic-check-hint">
+              Starten Sie den Test und sprechen Sie anschließend ein paar Worte.
+            </p>
 
-        <div className="mic-meter">
-          <div
-            className="mic-meter-fill"
-            style={{ width: `${Math.min(level * 400, 100)}%` }}
-          />
-        </div>
-
-        {error && (
-          <p id="status" className="error">
-            Mikrofonzugriff fehlgeschlagen: {error}
-          </p>
+            <button
+              className="start-call-button"
+              type="button"
+              onClick={() => void handleStartTest()}
+            >
+              Test starten
+            </button>
+          </div>
         )}
 
-        {!error && (
-          <p id="status" className={heardSomething ? "success" : ""}>
-            {heardSomething ? "Mikrofon erkannt." : "Warte auf Audiosignal …"}
-          </p>
-        )}
+        {isTesting && (
+          <div className="mic-test-panel">
+            <p className="mic-check-hint">
+              Sagen Sie ein paar Worte, um Ihr Mikrofon zu testen.
+            </p>
 
-        <button
-          className="start-call-button"
-          type="button"
-          disabled={!heardSomething}
-          onClick={onConfirmed}
-        >
-          Anruf starten
-        </button>
+            <div className="mic-meter">
+              <div
+                className="mic-meter-fill"
+                style={{ width: `${Math.min(level * 400, 100)}%` }}
+              />
+            </div>
+
+            {error && (
+              <p id="status" className="error">
+                Mikrofonzugriff fehlgeschlagen: {error}
+              </p>
+            )}
+
+            {!error && (
+              <p id="status" className={heardSomething ? "success" : ""}>
+                {heardSomething ? "Mikrofon erkannt." : "Warte auf Audiosignal …"}
+              </p>
+            )}
+
+            <button
+              className="start-call-button"
+              type="button"
+              disabled={!heardSomething}
+              onClick={onConfirmed}
+            >
+              Anruf starten
+            </button>
+          </div>
+        )}
 
         <button className="cancel-button" type="button" onClick={onCancel}>
           Abbrechen
