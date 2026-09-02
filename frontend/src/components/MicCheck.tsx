@@ -72,7 +72,7 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
             <div className="mic-test-panel-copy">
               <h3>Bereit für den Mikrofontest</h3>
               <p className="mic-check-hint">
-                Starten Sie den Test und sprechen Sie anschließend ein paar Worte.
+                Klicken Sie auf „Test starten“ und sprechen Sie einen kurzen Satz.
               </p>
             </div>
 
@@ -138,7 +138,7 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
               <div className="mic-test-result-copy">
                 <h3>Mikrofon funktioniert</h3>
                 <p>
-                  Ihr Mikrofon wurde erkannt. Sie können das Gespräch jetzt starten.
+                  Ihre Stimme wurde erkannt. Sie können das Gespräch jetzt starten.
                 </p>
               </div>
             </div>

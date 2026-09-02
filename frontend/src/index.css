@@ -636,103 +636,124 @@ audio {
   color: var(--text-muted);
 }
 
-/* The microphone page reuses the setup card while defining its own inner layout. */
+/* The microphone page follows the centered 800px layout from the Figma screens. */
 .mic-check-page .setup-section {
   margin-bottom: 0;
 }
 
-.mic-check-intro {
-  max-width: 800px;
+.mic-check-page .setup-section-heading {
+  margin-bottom: 10px;
 }
 
-/* The detected device is informational because device switching is not supported yet. */
+.mic-check-intro {
+  max-width: 800px;
+  margin-bottom: 40px;
+}
+
+/* The active microphone is shown as read-only information above the test area. */
 .mic-device-information {
-  margin: 0 0 18px;
+  margin: 0 0 10px;
+  padding: 6px 4px;
 }
 
 .mic-device-information-row {
-  display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
-  align-items: center;
-  gap: 24px;
-  padding: 15px 18px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
 }
 
 .mic-device-information dt {
-  color: var(--color-text-muted);
-  font-size: 14px;
+  color: #082f49;
+  font-size: 12px;
   font-weight: 600;
+  line-height: 24px;
 }
 
 .mic-device-information dd {
+  width: 100%;
+  height: 44px;
   min-width: 0;
+  display: flex;
+  align-items: center;
   margin: 0;
+  padding: 0 14px;
   overflow: hidden;
-  color: var(--color-navy-900);
-  font-size: 15px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: #082f49;
+  font-size: 12px;
   font-weight: 600;
+  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* All microphone states share the same spacing and card dimensions. */
+/* Every test state uses the centered Figma test-area layout. */
 .mic-test-panel {
+  width: 100%;
+  min-height: 180px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   padding: 24px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-choice);
-}
-
-.mic-test-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-/* State colors distinguish preparation, active testing and successful completion. */
-.mic-test-panel {
-  border-color: #c9deeb;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
   background: var(--color-surface-selected);
+  text-align: center;
 }
 
 .mic-test-panel-success {
+  min-height: 220px;
   border-color: #bfd8cb;
   background: #f1f8f5;
 }
 
+.mic-test-panel-copy,
+.mic-test-result-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
 .mic-test-panel-copy h3,
 .mic-test-result-copy h3 {
-  margin: 0 0 6px;
-  color: var(--color-navy-900);
-  font-size: 18px;
-  line-height: 1.3;
+  margin: 0;
+  color: #082f49;
+  font-size: 16px;
+  line-height: 24px;
 }
 
 .mic-test-panel-copy p,
 .mic-test-result-copy p {
   margin: 0;
-  color: var(--color-text-muted);
-  font-size: 14px;
-  line-height: 1.55;
+  color: var(--color-text-muted-secondary);
+  font-size: 13px;
+  line-height: 24px;
 }
 
 .mic-check-hint {
-  color: var(--color-text-muted);
+  color: var(--color-text-muted-secondary);
 }
 
-/* The initial action remains compact while the success actions share a row. */
+/* The Figma buttons use fixed desktop dimensions instead of the shared pill shape. */
 .mic-test-panel > .start-call-button {
-  width: auto;
+  width: 160px;
+  height: 44px;
   min-width: 160px;
-  align-self: flex-start;
+  align-self: center;
+  padding: 10px;
+  border-radius: var(--radius-control);
+  font-size: 14px;
+  line-height: 24px;
 }
 
 .mic-meter {
+  width: 100%;
   height: 10px;
   margin: 0;
   overflow: hidden;
@@ -761,47 +782,61 @@ audio {
   line-height: 1.5;
 }
 
-/* The success icon reinforces the text without replacing its accessible status message. */
+/* The success icon and copy are stacked vertically as shown in Figma. */
 .mic-test-result {
   display: flex;
-  align-items: flex-start;
-  gap: 14px;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
 }
 
 .mic-test-success-icon {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border: 1px solid #0c2f24;
   border-radius: 50%;
-  background: var(--color-success);
+  background: #226048;
   color: var(--color-surface);
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .mic-test-result-copy {
   min-width: 0;
 }
 
-.mic-test-retry-button {
-  display: block;
-  width: 100%;
-  padding: 0.9rem 1.5rem;
-  border: 1px solid var(--color-navy-900);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--color-navy-900);
+.mic-test-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mic-test-retry-button,
+.mic-test-actions .start-call-button {
+  width: 160px;
+  height: 44px;
+  padding: 10px;
+  border-radius: var(--radius-control);
   font: inherit;
+  font-size: 14px;
+  line-height: 24px;
+}
+
+.mic-test-retry-button {
+  border: 1px solid var(--color-blue-600);
+  background: var(--color-surface);
+  color: var(--color-blue-600);
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s, color 0.2s;
 }
 
 .mic-test-retry-button:hover {
-  background: var(--color-surface);
+  background: var(--color-blue-100);
 }
 
 .mic-test-retry-button:focus-visible,
@@ -810,13 +845,8 @@ audio {
   outline-offset: 3px;
 }
 
-/* Tablet layouts stack device information and enlarge the primary touch target. */
+/* Tablet layouts keep device names readable and enlarge the initial action. */
 @media (max-width: 720px) {
-  .mic-device-information-row {
-    grid-template-columns: 1fr;
-    gap: 6px;
-  }
-
   .mic-device-information dd {
     overflow-wrap: anywhere;
     white-space: normal;
@@ -835,15 +865,22 @@ audio {
   }
 
   .mic-test-panel {
+    min-height: 180px;
     padding: 18px;
   }
 
-  .mic-test-actions {
-    grid-template-columns: 1fr;
+  .mic-test-panel-success {
+    min-height: 220px;
   }
 
-  .mic-test-result {
-    gap: 12px;
+  .mic-test-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .mic-test-retry-button,
+  .mic-test-actions .start-call-button {
+    width: 100%;
   }
 }
 
