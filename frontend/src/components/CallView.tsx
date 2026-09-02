@@ -6,6 +6,7 @@ import CallAnimation from "./CallAnimation";
 interface CallViewProps {
   scenarioName: string;
   personaName: string;
+  personaRole: string;
   languageLabel: string;
   callState: CallState;
   error: string | null;
@@ -19,6 +20,18 @@ function formatDuration(totalSeconds: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+/** Initials for the persona avatar, limited to the first two name parts. */
+function getInitials(name: string): string {
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+
+  return initials || "?";
+}
+
 /**
  * Presentational: the live-call screen (F-46 — mic status via the animation,
  * call duration, and the end-call button). The Session itself is owned and kept
@@ -29,6 +42,7 @@ function formatDuration(totalSeconds: number): string {
 export default function CallView({
   scenarioName,
   personaName,
+  personaRole,
   languageLabel,
   callState,
   error,
@@ -59,21 +73,34 @@ export default function CallView({
         </p>
       </section>
 
-      <CallAnimation state={callState} />
+            <section className="call-panel" aria-labelledby="call-persona-name">
+        <div className="call-persona">
+          <div className="call-persona-avatar" aria-hidden="true">
+            {getInitials(personaName)}
+          </div>
 
-      <p className="call-duration" aria-label="Anrufdauer">
-        {formatDuration(elapsedSeconds)}
-      </p>
+          <div className="call-persona-details">
+            <h2 id="call-persona-name">{personaName}</h2>
+            <p>{personaRole}</p>
+          </div>
+        </div>
 
-      {error && (
-        <p id="status" className="error">
-          {error}
+        <CallAnimation state={callState} />
+
+        <p className="call-duration" aria-label="Anrufdauer">
+          {formatDuration(elapsedSeconds)}
         </p>
-      )}
 
-      <button className="end-call-button" type="button" onClick={onEndCall}>
-        Anruf beenden
-      </button>
+        {error && (
+          <p id="status" className="error">
+            {error}
+          </p>
+        )}
+
+        <button className="end-call-button" type="button" onClick={onEndCall}>
+          Anruf beenden
+        </button>
+      </section>
     </>
   );
 }

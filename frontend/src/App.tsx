@@ -196,6 +196,7 @@ export default function App() {
           <CallView
             scenarioName={selectedScenario?.name ?? "Gespräch"}
             personaName={selectedPersona?.name ?? "Persona"}
+            personaRole={selectedPersona?.role ?? "Gesprächspartner"}
             languageLabel="Deutsch"
             callState={displayState}
             error={socket.error ?? vad.micError}
