@@ -587,53 +587,92 @@ audio {
   color: var(--navy);
 }
 
+/* The live-call indicator maps each server state to a compact animated voice wave. */
 .call-animation {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.25rem;
-  padding: 4rem 0 2rem;
+  gap: 10px;
 }
 
-.call-orb {
-  width: 8rem;
-  height: 8rem;
-  border-radius: 50%;
-  background: var(--blue);
+.call-wave {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
-.call-orb-listening {
-  background: var(--blue-light);
-  animation: orb-pulse 2.2s ease-in-out infinite;
+.call-wave-bar {
+  width: 4px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background: var(--color-blue-600);
+  transform-origin: center;
+  animation: call-wave-pulse 0.8s ease-in-out infinite alternate;
 }
 
-.call-orb-thinking {
-  background: var(--navy-light);
-  animation: orb-pulse 0.9s ease-in-out infinite;
+.call-wave-bar:nth-child(2) {
+  animation-delay: 0.12s;
 }
 
-.call-orb-speaking {
-  background: var(--success);
-  animation: orb-pulse 0.6s ease-in-out infinite;
+.call-wave-bar:nth-child(3) {
+  animation-delay: 0.24s;
 }
 
-@keyframes orb-pulse {
-  0%,
-  100% {
-    transform: scale(0.85);
-    opacity: 0.7;
+.call-wave-bar:nth-child(4) {
+  animation-delay: 0.36s;
+}
+
+.call-wave-bar:nth-child(5) {
+  animation-delay: 0.48s;
+}
+
+/* Green represents the user's turn, while blue represents the persona. */
+.call-animation-listening .call-wave-bar {
+  background: var(--color-success);
+  animation-duration: 0.9s;
+}
+
+.call-animation-thinking .call-wave-bar {
+  background: var(--color-navy-700);
+  animation-duration: 1.2s;
+}
+
+.call-animation-speaking .call-wave-bar {
+  background: var(--color-blue-600);
+  animation-duration: 0.65s;
+}
+
+@keyframes call-wave-pulse {
+  from {
+    transform: scaleY(0.55);
   }
-  50% {
-    transform: scale(1);
-    opacity: 1;
+
+  to {
+    transform: scaleY(1);
   }
 }
 
+/* Keep the changing state available to assistive technology without adding live text to the UI. */
 .call-state-label {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  letter-spacing: 0.02em;
-  color: var(--text-muted);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Respect users who prefer reduced motion while retaining the state color. */
+@media (prefers-reduced-motion: reduce) {
+  .call-wave-bar {
+    animation: none;
+  }
 }
 
 /* The microphone page follows the centered 800px layout from the Figma screens. */
