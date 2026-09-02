@@ -1,3 +1,10 @@
+"""The Scenario library (see CONTEXT.md).
+
+The situational context of a call, independent of the Persona's character — any
+Persona can run any Scenario (ADR 0001), nothing to filter by. Code for now;
+ADR 0041 moves it into the database alongside the Personas.
+"""
+
 from dataclasses import dataclass
 
 

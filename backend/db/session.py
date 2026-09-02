@@ -38,8 +38,14 @@ def build_database_url() -> URL:
 
     SQLAlchemy's URL.create quotes the components, so a password containing
     "@", "/" or "%" needs no manual escaping.
+
+    Read here rather than at import time so that importing this module -- which
+    models.py and the migrations do -- never requires an environment.
     """
-    missing = [k for k in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB") if not os.environ.get(k)]
+    missing = [
+        k for k in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB")
+        if not os.environ.get(k)
+    ]
     if missing:
         raise RuntimeError(
             f"Database settings missing: {', '.join(missing)}. Inside the container "

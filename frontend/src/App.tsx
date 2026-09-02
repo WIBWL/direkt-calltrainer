@@ -1,14 +1,46 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { apiFetch } from "./api";
 import CallView from "./components/CallView";
+import FeedbackView from "./components/FeedbackView";
 import MicCheck from "./components/MicCheck";
 import TranscriptView from "./components/TranscriptView";
 import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useSessionSocket } from "./hooks/useSessionSocket";
 import { useStreamedAudioPlayback } from "./hooks/useStreamedAudioPlayback";
-import type { TurnRecord } from "./protocol";
+import type { TranscriptEntry } from "./protocol";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "";
+// Survives a reload but not the tab closing, which is exactly the scope the
+// wrap-up has: it is reachable while this tab is, and is not linkable or
+// listed anywhere. Without it, refreshing the results page — the natural
+// reaction to a wrap-up that is taking a while — silently discarded it.
+const LAST_SESSION_KEY = "calltrainer.finishedSession";
+
+interface FinishedSession {
+  sessionId: string | null;
+  turns: TranscriptEntry[];
+  /** Carried along because a reload restores this screen without a Persona
+   * selection to look the name up in. */
+  personaName: string;
+}
+
+function loadFinishedSession(): FinishedSession | null {
+  try {
+    const stored = sessionStorage.getItem(LAST_SESSION_KEY);
+    return stored ? (JSON.parse(stored) as FinishedSession) : null;
+  } catch {
+    return null; // private mode, cleared storage, or an older shape
+  }
+}
+
+function saveFinishedSession(finished: FinishedSession | null) {
+  try {
+    if (finished) sessionStorage.setItem(LAST_SESSION_KEY, JSON.stringify(finished));
+    else sessionStorage.removeItem(LAST_SESSION_KEY);
+  } catch {
+    // Storage is a convenience here; the current tab works without it.
+  }
+}
 
 interface Persona {
   id: string;
@@ -30,14 +62,23 @@ export default function App() {
   const [personaId, setPersonaId] = useState<string | null>(null);
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [screen, setScreen] = useState<Screen>("setup");
-  const [transcript, setTranscript] = useState<TurnRecord[]>([]);
+  // Lazy initializer: read once on mount, not on every render.
+  const [restored] = useState<FinishedSession | null>(loadFinishedSession);
+  const [screen, setScreen] = useState<Screen>(restored ? "transcript" : "setup");
+  const [transcript, setTranscript] = useState<TranscriptEntry[]>(restored?.turns ?? []);
+  // Names the persisted Session so its Feedback can be fetched once the
+  // worker has produced it. Not kept anywhere but here: the wrap-up is
+  // reachable for as long as this screen is, and no longer.
+  const [endedSessionId, setEndedSessionId] = useState<string | null>(restored?.sessionId ?? null);
   // Holds a just-received session.ended until playback actually finishes —
   // see the effect below.
   const [pendingEnd, setPendingEnd] = useState<{
     reason: "user" | "error" | "completed";
-    turns: TurnRecord[];
+    turns: TranscriptEntry[];
+    sessionId: string | null;
   } | null>(null);
+  const personaName =
+    personas.find((p) => p.id === personaId)?.name ?? restored?.personaName ?? "Persona";
   // Forces a fresh Session even when persona/scenario didn't change — bumped
   // right when a call ends normally, so the *next* Session (and its opening
   // line) starts pre-warming immediately, before the user has asked for it.
@@ -51,18 +92,17 @@ export default function App() {
   const [needsReconnect, setNeedsReconnect] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/personas`)
-      .then((r) => r.json())
-      .then((data: Persona[]) => {
+    apiFetch<Persona[]>("/api/personas")
+      .then((data) => {
         setPersonas(data);
-        if (data.length > 0) setPersonaId(data[0].id);
+        // Preselect the first entry (ADR 0015); no-op on an empty list.
+        if (data[0]) setPersonaId(data[0].id);
       })
       .catch((e) => setLoadError(`Personas konnten nicht geladen werden: ${e.message}`));
-    fetch(`${API_URL}/api/scenarios`)
-      .then((r) => r.json())
-      .then((data: Scenario[]) => {
+    apiFetch<Scenario[]>("/api/scenarios")
+      .then((data) => {
         setScenarios(data);
-        if (data.length > 0) setScenarioId(data[0].id);
+        if (data[0]) setScenarioId(data[0].id);
       })
       .catch((e) => setLoadError(`Szenarien konnten nicht geladen werden: ${e.message}`));
   }, []);
@@ -81,10 +121,15 @@ export default function App() {
   // moment the reply's Turn completes, independent of local audio playback
   // timing. Don't tear the Session down immediately: stash it and let the
   // effect below act on it once the tail audio has actually finished, so
-  // the goodbye is heard instead of getting cut off mid-sentence.
-  const handleEnded = useCallback((reason: "user" | "error" | "completed", turns: TurnRecord[]) => {
-    setPendingEnd({ reason, turns });
-  }, []);
+  // the goodbye is heard instead of getting cut off mid-sentence. This only
+  // applies to natural/error endings — when the user clicks "Anruf
+  // beenden", the call ends immediately instead (see the effect below).
+  const handleEnded = useCallback(
+    (reason: "user" | "error" | "completed", turns: TranscriptEntry[], sessionId: string | null) => {
+      setPendingEnd({ reason, turns, sessionId });
+    },
+    [],
+  );
 
   const socket = useSessionSocket({
     personaId,
@@ -95,9 +140,15 @@ export default function App() {
   });
 
   useEffect(() => {
-    if (pendingEnd === null || playback.isPlaying) return;
+    if (pendingEnd === null) return;
+    // A user-initiated end should cut the call immediately, not let the
+    // Persona's audio keep playing out — only natural/error endings wait
+    // for the tail audio to finish (see handleEnded above).
+    if (pendingEnd.reason !== "user" && playback.isPlaying) return;
     playback.reset();
     setTranscript(pendingEnd.turns);
+    setEndedSessionId(pendingEnd.sessionId);
+    saveFinishedSession({ sessionId: pendingEnd.sessionId, turns: pendingEnd.turns, personaName });
     setScreen("transcript");
     if (pendingEnd.reason === "error") {
       setNeedsReconnect(true);
@@ -108,34 +159,55 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- playback is stable-shaped; only isPlaying/pendingEnd should retrigger this
   }, [pendingEnd, playback.isPlaying]);
 
-  const vad = useMicrophoneVAD(socket.sendTurnAudio);
+  // The server sends state:"listening" the moment the Turn completes, but
+  // the Persona's last audio chunk(s) can still be playing out locally —
+  // hold the displayed state at "speaking" until playback actually finishes.
+  const displayState = socket.callState === "listening" && playback.isPlaying ? "speaking" : socket.callState;
+
+  // useMicrophoneVAD wires onSpeechStart into MicVAD only once (see its
+  // initRef guard), so handleBargeIn below must read fresh state via a ref.
+  const displayStateRef = useRef(displayState);
+  displayStateRef.current = displayState;
+
+  // Barge-in trigger (see useMicrophoneVAD for the actual filtering).
+  // Stable ([]) so startListening/stopListening below don't churn either.
+  const handleBargeIn = useCallback(() => {
+    if (displayStateRef.current === "listening") return;
+    playback.interrupt();
+    socket.sendInterrupt();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment above
+  }, []);
+
+  const vad = useMicrophoneVAD(handleBargeIn, socket.sendTurnAudio);
 
   useEffect(() => {
     vad.preload();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- preload once, on mount
   }, []);
 
-  // Strict turn-taking: armed only while it's genuinely the user's turn —
-  // callState is "listening" AND the Persona's audio has fully finished
-  // playing (not just server-side Turn completion, see displayState below).
-  // Everywhere else (including "thinking"), the mic stays off.
+  // Armed for the whole call, not just while it's nominally the user's turn
+  // — see the barge-in handling above.
   useEffect(() => {
-    if (screen !== "call" || socket.callState !== "listening" || playback.isPlaying) {
+    if (screen !== "call") {
       vad.stopListening();
       return;
     }
     void vad.startListening();
     return () => vad.stopListening();
-  }, [screen, socket.callState, playback.isPlaying, vad.startListening, vad.stopListening]);
+  }, [screen, vad.startListening, vad.stopListening]);
 
   const handleConfirmed = useCallback(() => {
     // Reveal whatever's already been generated (possibly the whole opening
-    // line by now) and switch to live playback for everything after.
+    // line by now) and switch to live playback for everything after. The
+    // server is told at the same moment, because this — not the connect —
+    // is where the Session's timeline starts (ADR 0051).
     playback.activate();
+    socket.sendActivate();
     setScreen("call");
-  }, [playback]);
+  }, [playback, socket.sendActivate]);
 
   const handleRestart = useCallback(() => {
+    saveFinishedSession(null);
     if (needsReconnect) {
       setGeneration((g) => g + 1);
       setNeedsReconnect(false);
@@ -144,16 +216,6 @@ export default function App() {
   }, [needsReconnect]);
 
   const readyForCall = personaId !== null && scenarioId !== null;
-
-  // The server sends state:"listening" the moment the Turn completes
-  // server-side — but the Persona's last audio chunk(s) can still be
-  // playing out locally for a bit after that (same root cause as the
-  // session.ended/pendingEnd race above, just on every Turn instead of only
-  // the last one). Showing "listening" ("Du bist am Zug") already at that
-  // point is misleading — the mic isn't even armed yet either, since that's
-  // separately gated on !playback.isPlaying — so the displayed state holds
-  // at "speaking" until playback actually finishes.
-  const displayState = socket.callState === "listening" && playback.isPlaying ? "speaking" : socket.callState;
 
   if (screen === "mic-check") {
     return <MicCheck onConfirmed={handleConfirmed} onCancel={() => setScreen("setup")} />;
@@ -170,7 +232,14 @@ export default function App() {
   }
 
   if (screen === "transcript") {
-    return <TranscriptView transcript={transcript} onRestart={handleRestart} />;
+    return (
+      <TranscriptView
+        transcript={transcript}
+        personaName={personaName}
+        onRestart={handleRestart}
+        feedback={<FeedbackView sessionId={endedSessionId} />}
+      />
+    );
   }
 
   return (

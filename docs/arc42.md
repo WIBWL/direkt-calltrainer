@@ -7,7 +7,7 @@
 Im Gegensatz zu klassischen Verkaufstrainern liegt der Fokus nicht auf Abschlussquoten, sondern auf Kommunikation, Klarheit und Wirkung des Sprechenden, ohne dass umfangreiche kundenspezifische Fachkenntnisse vorausgesetzt werden (C-05):
 
 - Kommunikation, Klarheit und Wirkung des Sprechenden
-- Erkennung von Sprechverhalten (Intonation, Tempo, Lautstärke, Artikulation)
+- Erkennung von Sprechverhalten (Redeanteil, Fragen, Sprechtempo, Wortanzahl, Reaktionszeit, Sprechpausen, Lautstärke — ADR 0051)
 - Vermeidung von überlangen/überkomplexen Erklärungen
 
 Nach jedem Trainingsgespräch erhält der Nutzer ein qualitatives Wrap-up mit konkreten Verbesserungsvorschlägen statt eines reinen Scores.
@@ -48,7 +48,7 @@ Weitere Qualitätsanforderungen geringerer Priorität sind in Kapitel 10 aufgef�
 
 | ID | Randbedingung | Beschreibung | Quelle |
 |---|---|---|---|
-| C-01 | Sprache konfigurierbar | Das Training findet in der Sprache statt, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Die Sprache wird pro Trainings-Session ausgewählt, unabhängig von Szenario und Persona. Belegt sind Deutsch bei Solox sowie Englisch und teilweise Spanisch bei APPOLLO Systems. Siehe ADR 0022. | R-35 |
+| C-01 | Sprache konfigurierbar | Das Training findet in der Sprache statt, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Die Sprache ist an die Persona gebunden und ergibt sich aus deren Auswahl; Szenarien sind sprachneutral und mit jeder Persona kombinierbar. Belegt sind Deutsch bei Solox sowie Englisch und teilweise Spanisch bei APPOLLO Systems. Siehe ADR 0043 (löst ADR 0022 ab). | R-35 |
 | C-04 | Datenschutz nach DSGVO | Alle Daten, insbesondere Sprachaufzeichnungen und personenbezogene Daten, werden DSGVO-konform verarbeitet. Die Randbedingung begrenzt die Umsetzung aller übrigen Ziele und steht nicht als gleichrangiges Ziel neben ihnen. | rechtliche Vorgabe |
 | C-05 | Kein kundenspezifisches Fachwissen vorausgesetzt | Fachliches Know-how zu einzelnen Kunden oder Systemen wird nicht abgebildet, da sich die Fachlichkeit je Kundenlandschaft unterscheidet. Der Fokus liegt auf Kommunikation statt Fachlichkeit. | R-40, R-41 |
 | C-06 | Gesprächsdauer | Die zu trainierenden Gespräche reichen von kurzen Rückfragen bis zu Gesprächen von einer Stunde. | R-03 |
@@ -78,7 +78,7 @@ Simuliert einen externen Kunden im Gespräch. Die Persona kann aus einer erweite
 
 ### Feedback-/Auswertungskomponente
 
-Erstellt nach Gesprächsende das qualitative Wrap-up (F-09) inkl. konkreter Verbesserungsvorschläge (F-10), basierend auf der Analyse des Sprechverhaltens (F-35, F-36, F-37, F-38, F-51, F-08).
+Erstellt nach Gesprächsende das qualitative Wrap-up (F-09) inkl. konkreter Verbesserungsvorschläge (F-10), basierend auf den Kennzahlen des Gesprächs (F-53) und dem Lautstärkeverlauf (F-37). Die Kennzahlen beschreiben jeweils das ganze Gespräch, nicht einzelne Redebeiträge (ADR 0051).
 
 ## 3.2 Technischer Kontext
 
@@ -94,7 +94,7 @@ Primärer Zugangsweg im MVP (C-02). Erfasst Sprachsignal des Nutzers, gibt Sprac
 
 **Kanal / Schnittstelle:** Interne Schnittstelle
 
-Wandelt die gesprochene Nutzereingabe in Text um, als Grundlage für Sprachanalyse (F-35, F-36, F-37, F-38, F-51) und KI-Antwortgenerierung.
+Wandelt die gesprochene Nutzereingabe in Text um, als Grundlage für Sprachanalyse (F-36, F-41, F-08, F-51) und KI-Antwortgenerierung.
 
 ### Sprachsynthese (Text-to-Speech)
 
@@ -155,9 +155,10 @@ Besonderheiten: Der gesamte Zyklus muss in Echtzeit ablaufen (Q-03), da Verzöge
 
 ## 6.2 Szenario 2: Analyse des Sprechverhaltens während des Gesprächs
 
-- Während der Nutzer spricht, analysiert die Analyse-Komponente laufend Intonation (F-35), Sprechtempo (F-36), Lautstärke (F-37) und Artikulation (F-38).
-- Zusätzlich wird erkannt, ob ein Thema zu lang, zu kompliziert oder mit zu vielen Informationen erklärt wird (F-08) oder ob Stockungen, Füllwörtern und Unterbrechungen im Redefluss vorhanden sind (F-51)
-- Auffälligkeiten werden für das spätere Wrap-up gesammelt, nicht sofort während des Gesprächs unterbrochen oder angezeigt.
+- Während der Nutzer spricht, misst die Analyse-Komponente je Redebeitrag nur die Rohgrößen, die am Audio ablesbar sind (Sprechdauer, Pausen, Lautstärke) und rechnet sie auf die Zeitachse der Session um.
+- Die Kennzahlen entstehen erst am Gesprächsende aus allen Redebeiträgen zusammen und beschreiben jeweils das ganze Gespräch — Menge und Begründung siehe ADR 0051, Kennzahlenliste F-53.
+- Die Antwortzeit der KI wird mitgemessen und keinem Sprecher zugerechnet, damit sie nicht als Gesprächslücke des Nutzers erscheint (ADR 0051).
+- Ergebnisse werden für das spätere Wrap-up gesammelt, nicht während des Gesprächs angezeigt (ADR 0014).
 
 Besonderheiten: Diese Analyse läuft parallel zur eigentlichen Gesprächssimulation (Szenario 1), ohne den Gesprächsfluss zu unterbrechen. Die gesammelten Daten dienen als Grundlage für Szenario 3.
 
@@ -243,10 +244,10 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0008 | Frontend Built with React and TypeScript | angenommen | F-46, F-50 |
 | ADR 0009 | Authentication via Keycloak (OIDC Authorization Code Flow + PKCE) | angenommen | C-04, F-31, F-50 |
 | ADR 0010 | Own PostgreSQL Instance for Session Persistence | angenommen | C-04, F-12, F-13 |
-| ADR 0011 | LLM Backend Is the University-Hosted EFRE-Direkt Gateway, Self-Contained | angenommen (durch ADR 0021 eingegrenzt) | Q-03, C-04, F-01 |
+| ADR 0011 | LLM Backend Is the University-Hosted DiReKT Gateway, Self-Contained | angenommen (durch ADR 0021 eingegrenzt) | Q-03, C-04, F-01 |
 | ADR 0012 | Backend Built with Python and FastAPI | angenommen | Q-03 |
 | ADR 0013 | Minimal Required Setup, Advanced Options Separate | angenommen | Q-02, F-43, R-34 |
-| ADR 0014 | Speech-Behavior Feedback Surfaces Only in the Post-Call Wrap-Up | angenommen | F-09, F-35, F-36, F-37, F-38, F-51 |
+| ADR 0014 | Speech-Behavior Feedback Surfaces Only in the Post-Call Wrap-Up | angenommen (eingegrenzt durch ADR 0051) | F-09, F-36, F-37, F-51, F-53 |
 | ADR 0015 | Persona Selection via Card View, Not a List | angenommen | Q-02, F-04, F-44 |
 | ADR 0016 | One Retry, Then Graceful Session End on Pipeline Failure | angenommen | Q-03, F-46 |
 | ADR 0017 | No Provider Abstraction Layer for STT/LLM/TTS | angenommen | |
@@ -254,23 +255,40 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0019 | Redis + RQ for the Feedback Job Queue | angenommen | F-09 |
 | ADR 0020 | Deployment on a University-Hosted Server | angenommen | C-04 |
 | ADR 0021 | STT and TTS Run as Separately Self-Hosted Local Models | angenommen | Q-03, C-04, F-01 |
-| ADR 0022 | Language as Independent Session Parameter | angenommen (löst ADR 0006 ab) | C-01, R-35 |
+| ADR 0022 | Language as Independent Session Parameter | abgelöst durch ADR 0043 (löst ADR 0006 ab) | C-01, R-35 |
 | ADR 0023 | No Session Data Persisted Beyond the MVP; Consent-Gated Storage After | abgelöst durch ADR 0034 | C-04, F-12, F-13, F-48, F-49 |
 | ADR 0024 | User-Authored Scenario Context and Personas (Post-MVP) | angenommen | F-04, F-26, F-34, F-45 |
 | ADR 0025 | SQLAlchemy 2.0 as ORM | angenommen | |
 | ADR 0026 | Normalized Relational Schema for Session Persistence | angenommen | F-12, F-13 |
 | ADR 0027 | Alembic Migrations Autogenerated from ORM Metadata | angenommen | |
-| ADR 0028 | No Secondary Indexes Beyond Primary/Foreign Keys Yet | abgelöst durch ADR 0035 | |
+| ADR 0028 | No Secondary Indexes Beyond Primary/Foreign Keys Yet | abgelöst durch ADR 0052 | |
 | ADR 0029 | JSONB for Flexible Per-Measurement Detail Data | angenommen | |
 | ADR 0030 | ER Diagram Generated from ORM Metadata | angenommen | |
 | ADR 0031 | Pseudonymous subject_id Placeholder Instead of a User Foreign Key | angenommen | C-04, F-31 |
 | ADR 0032 | AnalysisJob as a Persisted Entity for Async Job Status | angenommen | Q-07, F-09 |
 | ADR 0033 | Streaming Session Pipeline via Chunked TTS over WebSocket | angenommen | Q-03, F-01, F-46 |
 | ADR 0034 | Session Data Is Persisted in the MVP, Written Once at Session End | angenommen (löst ADR 0023 ab) | C-04, Q-03, F-12, F-13, F-48, F-49 |
-| ADR 0035 | Index Every Foreign-Key Column | angenommen (löst ADR 0028 ab) | Q-03, F-12 |
-| ADR 0036 | Deterministic Constraint Names and Database-Enforced Vocabularies | angenommen | |
+| ADR 0035 | Eager Client-Driven Barge-In Interruption | angenommen | Q-03, F-01, F-46 |
+| ADR 0036 | VAD Confirmed-Speech Threshold Instead of a Backchannel Word List | angenommen | Q-03, F-01 |
+| ADR 0037 | Closing-Intent Detection Is Regex-Based, Not an LLM Classifier | angenommen | Q-07, F-01 |
+| ADR 0038 | Guard Against Degenerate Repetition; Guarantee a Closing Line on Backstopped Endings | angenommen | Q-07, F-01 |
+| ADR 0039 | Centralized Logging — Colored Console, Per-Session-Truncated File, Not Committed | angenommen | |
+| ADR 0040 | TTS Defaults to KugelAudio with a DiReKT Fallback; Gemini Removed | angenommen (grenzt die TTS-Hälfte von ADR 0021 ein) | Q-03, Q-07, C-04, F-01 |
+| ADR 0041 | Personas and Scenarios Loaded from the Database | angenommen | F-03, F-04 |
+| ADR 0042 | Opening Turn Pre-Warmed at Session Commitment, Not on Selection | angenommen | Q-03, F-01 |
+| ADR 0043 | English Prompt Content, Session Language Bound to the Persona | angenommen (löst ADR 0022 ab) | C-01, R-35, F-03, F-04 |
+| ADR 0044 | Forward KugelAudio's Audio Sub-Chunks; No Persistent Streaming Session | angenommen (verfeinert die TTS-Strecke aus ADR 0033) | Q-03, F-01, F-46 |
+| ADR 0045 | Case Facts, Call Goal and Success Condition on the Scenario; Objections on the Persona | angenommen (erweitert ADR 0001) | F-01, F-03, F-04, R-12 |
+| ADR 0046 | Liveliness Is Pursued at the Prompt Layer Before the Turn-Taking Layer | vorgeschlagen | F-01 |
+| ADR 0047 | Praat via Parselmouth as the Paraverbal Measurement Engine | angenommen (eingegrenzt durch ADR 0051) | F-36, F-37, F-51, F-08 |
+| ADR 0048 | Paraverbal Analysis Runs Inline on In-Memory Audio; Audio Is Never Persisted | angenommen | Q-03, C-04, F-12, F-36, F-37, F-51 |
+| ADR 0049 | The Model Interprets Measurements, It Does Not Produce Them | angenommen | F-09, F-10, R-19, R-22 |
+| ADR 0050 | A Session Is Addressed by an Unguessable Id | angenommen | C-04, F-12 |
+| ADR 0051 | Statistics Describe the Whole Session and Carry No Invented Norms | angenommen (grenzt ADR 0014/0047/0048 ein) | Q-01, F-53, F-12 |
+| ADR 0052 | Index Every Foreign-Key Column | angenommen (löst ADR 0028 ab) | Q-03, F-12 |
+| ADR 0053 | Deterministic Constraint Names and Database-Enforced Vocabularies | angenommen | |
 
-Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug, ADR 0017 eine reine Wartbarkeitsentscheidung ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
+Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug; ADR 0017, 0025, 0027 bis 0030 und 0039 sind reine Wartbarkeits-, Werkzeug- oder Schemaentscheidungen ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 
 # 10. Qualitätsanforderungen
 
@@ -303,7 +321,7 @@ Da die technische Lösungsstrategie (Kapitel 4) noch nicht final festgelegt ist,
 | Nr. | Risiko | Beschreibung | Gegenmaßnahme |
 |---|---|---|---|
 | RI-01 | Echtzeitfähigkeit der Sprach- und LLM-Schnittstellen | Die Kombination aus Spracherkennung, Antwortgenerierung und Sprachsynthese muss in Echtzeit ablaufen (Q-03). Externe Schnittstellen können Latenzschwankungen aufweisen, die den natürlichen Gesprächsfluss beeinträchtigen. | Latenz je Teilstrecke getrennt messen, um den Engpass zu bestimmen. Frühzeitige Tests mit den infrage kommenden Anbietern vor der finalen technischen Festlegung (Kapitel 4). |
-| RI-02 | Unklare Datenschutz-Umsetzung | Datenschutzkonformität ist eine nicht verhandelbare Randbedingung (C-04). Hosting-Ort und Einwilligungsprozess sind grundsätzlich entschieden (ADR 0034). Das Risiko ist gestiegen, seit Sessiondaten bereits im MVP gespeichert werden: Es gibt damit auch im MVP dauerhaft gespeicherte Daten, aber noch keine festgelegte Speicherdauer, keine Aufbewahrungsfrist und mangels Nutzerkonten keine Einwilligungsverwaltung. Der technische Löschpfad existiert inzwischen — die Fremdschlüssel kaskadieren in der Datenbank (ADR 0035/0036) —, aber niemand ruft ihn auf: Es fehlen die Frist und die Selbstbedienungsfunktion. | Speicherdauer festlegen und Löschfunktion umsetzen, bevor Nutzer außerhalb der Pilotgruppe das System verwenden. Datenschutzhinweis (F-49) vor der ersten Aufzeichnung als Voraussetzung behandeln. Einwilligungsoberfläche zusammen mit der Authentifizierung (ADR 0009) planen, nicht nachträglich ergänzen. |
+| RI-02 | Unklare Datenschutz-Umsetzung | Datenschutzkonformität ist eine nicht verhandelbare Randbedingung (C-04). Hosting-Ort und Einwilligungsprozess sind grundsätzlich entschieden (ADR 0034). Das Risiko ist gestiegen, seit Sessiondaten bereits im MVP gespeichert werden: Es gibt damit auch im MVP dauerhaft gespeicherte Daten, aber noch keine festgelegte Speicherdauer, keine Aufbewahrungsfrist und mangels Nutzerkonten keine Einwilligungsverwaltung. Der technische Löschpfad existiert inzwischen — die Fremdschlüssel kaskadieren in der Datenbank (ADR 0052/0053) —, aber niemand ruft ihn auf: Es fehlen die Frist und die Selbstbedienungsfunktion. | Speicherdauer festlegen und Löschfunktion umsetzen, bevor Nutzer außerhalb der Pilotgruppe das System verwenden. Datenschutzhinweis (F-49) vor der ersten Aufzeichnung als Voraussetzung behandeln. Einwilligungsoberfläche zusammen mit der Authentifizierung (ADR 0009) planen, nicht nachträglich ergänzen. |
 
 ### Fachliche Risiken
 
@@ -324,11 +342,11 @@ Erste Implementierung hat begonnen. Technische Schulden sind einzutragen.
 | Begriff | Definition |
 |---|---|
 | Architecture Decision Record (ADR) | Kurzes, fortlaufend nummeriertes Dokument, das genau eine architektonisch bedeutsame Entscheidung mit Kontext, Status und Konsequenzen festhält. Wird eine Entscheidung revidiert, bleibt der alte Eintrag bestehen und wird als abgelöst gekennzeichnet. |
-| Data Platform | Extern betriebener, über OIDC authentifizierter Dienst, an den das System hochgeladene Dokumente und große Dateien wie Gesprächsaufzeichnungen zur Speicherung übergibt. Strukturierte Session-Daten hält das Produkt dagegen in einer eigenen PostgreSQL-Datenbank (ADR 0010). |
-| EFRE-Direkt | Von der Hochschule bereitgestellter Dienst zur Erzeugung der Persona-Dialoge. Seine Nutzung ist eine Rahmenbedingung des Projekts und nicht das Ergebnis einer Auswahl unter konkurrierenden Anbietern. |
+| Data Platform | Extern betriebener, über OIDC authentifizierter Dienst, über den das System hochgeladene Dokumente und große Dateien wie Gesprächsaufzeichnungen überträgt. Der Dienst dient allein dem Datentransfer; gespeichert werden die Daten in der projekteigenen PostgreSQL-Datenbank (ADR 0010). |
+| DiReKT | Von der Hochschule bereitgestellter Dienst zur Erzeugung der Persona-Dialoge. Seine Nutzung ist eine Rahmenbedingung des Projekts und nicht das Ergebnis einer Auswahl unter konkurrierenden Anbietern. |
 | Feedback | Qualitative, verhaltensbezogene Rückmeldung zu einer abgeschlossenen Session mit konkreten Verbesserungsvorschlägen. Sie wird vollständig vom KI-System erzeugt; eine menschliche Trainerrolle ist im Produkt nicht vorgesehen. |
-| Persona | Charakterprofil des KI-Gesprächspartners einer Session, das dessen Rolle, Verhalten und Schwierigkeitsgrad beschreibt. Die Persona ist unabhängig vom Szenario konfigurierbar. |
+| Persona | Charakterprofil des KI-Gesprächspartners einer Session, das dessen Rolle, Verhalten und Schwierigkeitsgrad beschreibt. Die Persona ist unabhängig vom Szenario konfigurierbar und legt zugleich die Sprache und die Stimme des Gesprächs fest. |
 | Persona-Bibliothek | Offene, erweiterbare Sammlung der auswählbaren Personas. Neue Personas können aufgenommen werden, ohne die Session- oder Szenario-Logik zu verändern. |
-| Session | Ein einzelnes simuliertes Telefongespräch zwischen Nutzer und KI-Gesprächspartner, konfiguriert über Szenario, Persona und Sprache. Die Session ist die zentrale Trainings- und Auswertungseinheit, auf die sich das Feedback bezieht. |
-| Sprache | Eigenständiger, vom Nutzer wählbarer Session-Parameter, der festlegt, in welcher Sprache das Trainingsgespräch geführt wird. Die Sprache ist keine Eigenschaft einer einzelnen Persona. |
+| Session | Ein einzelnes simuliertes Telefongespräch zwischen Nutzer und KI-Gesprächspartner, konfiguriert über Szenario und Persona. Die Sprache ergibt sich aus der Persona und ist kein eigener Auswahlparameter. Die Session ist die zentrale Trainings- und Auswertungseinheit, auf die sich das Feedback bezieht. |
+| Sprache | Die Sprache, in der das Trainingsgespräch geführt wird. Sie ist eine Eigenschaft der Persona und wird mit deren Auswahl festgelegt (ADR 0043); Szenarien sind sprachneutral. Davon zu unterscheiden ist die Sprache der Prompt-Inhalte, die einheitlich Englisch ist. |
 | Szenario | Situativer Rahmen einer Session, also Anlass und beabsichtigter Verlauf des Gesprächs. Das Szenario ist unabhängig von der Persona konfigurierbar. |

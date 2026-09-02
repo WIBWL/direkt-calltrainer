@@ -1,9 +1,11 @@
-"""The seed runs on every container start (docker-entrypoint.sh), so running it
-twice must not change anything the first run produced.
+"""The seed runs on every application start (backend/db/provision.py, called
+from the lifespan handler), so running it twice must not change anything the
+first run produced.
 
-It is exercised as a subprocess rather than by importing it, because that is
-exactly how the entrypoint invokes it — including its `load_dotenv` and its
-module-level `sys.path` juggling, both of which only behave that way as a script.
+Exercised through scripts/seed_reference_data.py as a subprocess rather than by
+importing provision(), because the script is the path a human takes — including
+its `load_dotenv` and its module-level `sys.path` juggling, both of which only
+behave that way as a script. The application calls the same provision().
 """
 import os
 import subprocess
@@ -15,13 +17,27 @@ from sqlalchemy.engine import make_url
 from tests.conftest import PROJECT_ROOT
 
 
+def _postgres_env(database_url: str) -> dict[str, str]:
+    """The POSTGRES_* settings for `database_url`, as the seed script's own
+    `build_database_url()` expects to find them."""
+    url = make_url(database_url)
+    return {
+        "POSTGRES_USER": url.username,
+        "POSTGRES_PASSWORD": url.password,
+        "POSTGRES_DB": url.database,
+        "POSTGRES_HOST": url.host,
+        "POSTGRES_PORT": str(url.port or 5432),
+    }
+
+
 def _run_seed(database_url: str) -> str:
     result = subprocess.run(
         [sys.executable, "scripts/seed_reference_data.py"],
         cwd=PROJECT_ROOT,
-        # POSTGRES_DB must win over the .env the script itself loads; python-dotenv
-        # does not override variables that are already set, so this is enough.
-        env={**os.environ, "POSTGRES_DB": make_url(database_url).database},
+        # These must win over the .env the script itself loads; python-dotenv
+        # does not override variables that are already set, so passing them
+        # through the child's environment is enough.
+        env={**os.environ, **_postgres_env(database_url)},
         capture_output=True,
         text=True,
         # Asserted below instead, so a failure shows the seed's own output.

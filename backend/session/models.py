@@ -1,40 +1,137 @@
-"""Session data and the internal event union yielded by SessionOrchestrator.run_turn."""
+"""Session data, the Turn timeline, and the internal event union yielded by
+SessionOrchestrator.run_turn.
 
-import uuid
+The events are internal — `backend/api/session_ws.py` is their only consumer,
+turning each into one wire message. Separate types, not dicts, so a missing
+branch there is obvious.
+
+This module owns the two readings of a finished Session: `utterances` puts what
+was said on a timeline, and `conversation` folds the measurements into the
+facts the Session's statistics are derived from. Both live here because both
+are questions about a *sequence* of Turns, which is what a Turn's fields alone
+cannot answer.
+"""
+
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Literal
+
+from backend.feedback.acoustics import Pause
+from backend.feedback.metrics import Conversation
 
 
 @dataclass
 class Turn:
-    """One exchange within a session: the persona's utterance and the user's
-    reply to it (see CONTEXT.md's "Turn" entry).
-
-    Either half can stay empty: the opening Turn has no user utterance, and a
-    Turn cut short by a pipeline failure (ADR 0016) has no persona reply. The
-    durations are None until measured — the user's arrives from the client,
-    which is the only side that knows how long the speech segment was, and the
-    persona's is summed from the synthesized audio.
-    """
+    """One exchange within a Session (see CONTEXT.md). Distinct from the
+    persisted `turn` row (ADR 0026), which is one utterance of one speaker."""
 
     seq: int
     persona_text: str = ""
     user_text: str = ""
-    user_duration_ms: int | None = None
-    persona_duration_ms: int | None = None
+
+    # The two utterances placed on the Session's timeline, in milliseconds from
+    # its start; None until that utterance has happened. The Persona's window is
+    # modelled from the audio synthesized for it, because the server never
+    # learns when the client finished playing it.
+    user_offset_ms: int | None = None
+    user_end_ms: int | None = None
+    persona_offset_ms: int | None = None
+    persona_end_ms: int | None = None
+
+    # Paraverbal facts about the user's speech (ADR 0048), taken while the
+    # audio was still in memory and already rebased onto the Session's
+    # timeline -- so a Turn reopened after a barge-in, and therefore spoken in
+    # several fragments, needs no special case once the Session is folded up.
+    user_speech_ms: int = 0
+    pauses: list[Pause] = field(default_factory=list)
+    loudness_db: list[float | None] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class Utterance:
+    """One side of one exchange, on the Session's timeline."""
+
+    sprecher: Literal["nutzer", "persona"]
+    text: str
+    offset_ms: int
+    dauer_ms: int | None
+
+
+def utterances(turns: Sequence[Turn]) -> list[Utterance]:
+    """The exchanges flattened into single-speaker utterances, in the order spoken.
+
+    Within one Turn the user speaks first: their text is the reply to the
+    *previous* Turn's Persona line, and this Turn's Persona line answers it.
+    Empty sides are skipped -- the opening Turn has no user text, and an
+    interrupted one may have no Persona text.
+
+    The single place that knows this ordering: both the Transcript sent over
+    the WebSocket and the persisted Turn rows are built from it.
+    """
+    spoken: list[Utterance] = []
+    for turn in turns:
+        if turn.user_text:
+            spoken.append(Utterance(
+                "nutzer", turn.user_text, turn.user_offset_ms or 0,
+                _span(turn.user_offset_ms, turn.user_end_ms),
+            ))
+        if turn.persona_text:
+            spoken.append(Utterance(
+                "persona", turn.persona_text, turn.persona_offset_ms or 0,
+                _span(turn.persona_offset_ms, turn.persona_end_ms),
+            ))
+    return spoken
+
+
+def conversation(turns: Sequence[Turn]) -> Conversation:
+    """Fold the finished call into the facts its statistics are derived from.
+
+    Reaction time is the one measure that spans two Turns: the user's reply in
+    Turn N answers the Persona line of Turn N-1, so it is counted from that
+    line's end. Everything the machine did in between -- generating, then
+    synthesizing -- is outside the window by construction (ADR 0051).
+    """
+    reactions: list[int] = []
+    pauses: list[Pause] = []
+    loudness: list[float | None] = []
+    user_ms = persona_ms = 0
+    persona_stopped: int | None = None
+
+    for turn in turns:
+        if turn.user_offset_ms is not None and persona_stopped is not None:
+            reactions.append(max(0, turn.user_offset_ms - persona_stopped))
+        user_ms += turn.user_speech_ms
+        pauses.extend(turn.pauses)
+        loudness.extend(turn.loudness_db)
+        persona_ms += _span(turn.persona_offset_ms, turn.persona_end_ms) or 0
+        persona_stopped = turn.persona_end_ms or persona_stopped
+
+    return Conversation(
+        user_text=" ".join(turn.user_text for turn in turns if turn.user_text),
+        user_speech_ms=user_ms,
+        persona_speech_ms=persona_ms,
+        reactions_ms=tuple(reactions),
+        pauses=tuple(pauses),
+        loudness_db=tuple(loudness),
+    )
+
+
+def _span(start: int | None, end: int | None) -> int | None:
+    """How long an utterance lasted, where both of its ends are known."""
+    return None if start is None or end is None else max(0, end - start)
 
 
 @dataclass
 class StateChanged:
-    """Conversation state changed."""
+    """The state the client animation should show. `speaking` waits for real
+    audio, so the animation never claims speech during a silent gap."""
 
     state: Literal["listening", "thinking", "speaking"]
 
 
 @dataclass
 class AudioChunk:
-    """Synthesized TTS chunk of the persona's text."""
+    """One synthesised piece of a reply; a Turn emits several, played back to back."""
 
     turn_seq: int
     chunk_seq: int
@@ -43,7 +140,8 @@ class AudioChunk:
 
 @dataclass
 class TurnCompleted:
-    """Turn finished successfully."""
+    """The Turn finished cleanly. `ends_call` also ends the Session — goodbye,
+    a detected closing signal, or a degenerate reply (ADR 0037, ADR 0038)."""
 
     turn_seq: int
     ends_call: bool = False
@@ -51,52 +149,13 @@ class TurnCompleted:
 
 @dataclass
 class Failed:
-    """A pipeline leg failed past its retry. The session should end gracefully."""
+    """A leg failed past its one retry (ADR 0016); the Session then ends, with
+    no per-Turn recovery. Distinct codes so the client can word each leg."""
 
     code: Literal["stt_failed", "llm_failed", "tts_failed"]
     message: str
 
 
-# Union of events a Turn can produce, translated to wire messages by session_ws.py.
+# `_forward_turn_events` in session_ws.py has one branch per member — a new
+# member needs a branch there or its events are silently dropped.
 TurnEvent = StateChanged | AudioChunk | TurnCompleted | Failed
-
-
-@dataclass
-class FinishedSession:
-    """Everything worth persisting about a Session that has ended (ADR 0034).
-
-    Assembled by the WebSocket layer once the call is over and handed to
-    `repository.save_session` as one value, so the two sides share a single
-    definition of what a stored Session consists of rather than a long
-    parameter list that has to stay in the same order at both ends.
-    """
-
-    extern_id: uuid.UUID
-    subject_id: str
-    persona_key: str
-    scenario_key: str
-    language_code: str
-    # How the call ended, as `session_ws` reports it: "user", "completed" or
-    # "error". Mapped onto the persisted status vocabulary by the repository.
-    reason: str
-    started_at: datetime
-    ended_at: datetime
-    turns: list[Turn] = field(default_factory=list)
-
-
-@dataclass
-class StoredSession:
-    """A Session read back out of the database.
-
-    The counterpart to `FinishedSession`: that one goes in, this one comes out.
-    It carries the Persona and Scenario by display name rather than by key,
-    because its only consumer is the post-call view, which shows them.
-    """
-
-    extern_id: uuid.UUID
-    persona_name: str
-    scenario_name: str
-    status: str
-    started_at: datetime
-    ended_at: datetime | None
-    turns: list[Turn] = field(default_factory=list)

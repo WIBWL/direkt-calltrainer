@@ -6,9 +6,8 @@ derived from these classes, so neither can drift from the schema.
 
 Conventions: one concept is one class is one table; table and column names are
 English and follow the domain glossary in CONTEXT.md, so a term means the same
-thing in the schema as it does in the code around it. Relationships that own
-their children carry a delete cascade, so removing a Session takes its whole
-subtree with it while the shared reference entities stay.
+thing in the schema as it does in the code around it. German remains only in
+user-facing content and in the documentation.
 
 Deletes are declared twice on purpose: `ondelete` on the foreign key so the
 database enforces them even for raw SQL, and `passive_deletes=True` on the
@@ -53,6 +52,17 @@ STATUS_COMPLETED = "completed"
 STATUS_ABORTED = "aborted"
 SESSION_STATUSES = (STATUS_COMPLETED, STATUS_ABORTED)
 
+# Turn.speaker. One row per utterance, so each row names exactly one speaker;
+# backend/session/models.py's utterances() is what produces them.
+SPEAKER_USER = "user"
+SPEAKER_PERSONA = "persona"
+SPEAKERS = (SPEAKER_USER, SPEAKER_PERSONA)
+
+# FeedbackPoint.kind (F-10): what the point is saying about the Session.
+POINT_STRENGTH = "strength"
+POINT_IMPROVEMENT = "improvement"
+POINT_KINDS = (POINT_STRENGTH, POINT_IMPROVEMENT)
+
 # AnalysisJob vocabulary (ADR 0032). Kept here next to the schema, because the
 # CHECK constraints below are what actually enforce them.
 JOB_KINDS = ("analysis", "feedback")
@@ -72,11 +82,12 @@ def _one_of(column: str, values: tuple[str, ...]) -> CheckConstraint:
 
 class Persona(Base):
     """The simulated conversation partner. This table — not `backend/personas.py`
-    — is the source of truth; that module only seeds it (ADR 0024 has Users
-    authoring their own Personas, which have to live here).
+    — is the source of truth (ADR 0041); that module only seeds it, and ADR 0024
+    has Users authoring their own Personas, which have to live here.
 
-    A Persona has exactly one Language and one voice, so both are attributes
-    here rather than something a User picks per Session.
+    A Persona has exactly one Language and one voice per TTS backend (ADR 0043),
+    so all three are attributes here rather than something a User picks per
+    Session.
     """
 
     __tablename__ = "persona"
@@ -89,9 +100,12 @@ class Persona(Base):
     training_goal: Mapped[str] = mapped_column(Text)
     difficulty: Mapped[str] = mapped_column(String(40))
     language_code: Mapped[str] = mapped_column(ForeignKey("language.code"), index=True)
+    # The voice on the DiReKT fallback backend.
     tts_voice: Mapped[str] = mapped_column(String(60))
-    # Only used when TTS_BACKEND=kugelaudio, hence nullable.
+    # Only used when TTS runs on KugelAudio (ADR 0040), hence nullable.
     kugelaudio_voice_id: Mapped[int | None] = mapped_column(Integer)
+    # Retired Personas are deactivated, never deleted: Session rows reference
+    # them, and a past Session has to stay readable.
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     language: Mapped["Language"] = relationship(back_populates="personas")
@@ -121,7 +135,7 @@ class PersonaObjection(Base):
 
 class Scenario(Base):
     """The situational context of a Session. Like Persona, this table is the
-    source of truth and `backend/scenarios.py` only seeds it."""
+    source of truth and `backend/scenarios.py` only seeds it (ADR 0041)."""
 
     __tablename__ = "scenario"
     scenario_id: Mapped[int] = mapped_column(primary_key=True)
@@ -130,8 +144,6 @@ class Scenario(Base):
     scenario_type: Mapped[str] = mapped_column(String(60))
     title: Mapped[str] = mapped_column(String(160))
     description: Mapped[str] = mapped_column(Text)
-    # Retired Scenarios are deactivated, never deleted: Session rows reference
-    # them, and a past Session has to stay readable.
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="scenario")
@@ -150,11 +162,15 @@ class Language(Base):
 
 
 class MetricType(Base):
-    """One measurable dimension of speaking behaviour, e.g. speaking rate."""
+    """One measurable dimension of speaking behaviour, e.g. speaking rate.
+
+    The inventory is owned by backend/feedback/metrics.py, which also seeds this
+    table, so the metric list and the analysis cannot drift apart (ADR 0051).
+    """
 
     __tablename__ = "metric_type"
     metric_type_id: Mapped[int] = mapped_column(primary_key=True)
-    key: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. intonation, speaking_rate
+    key: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. speaking_rate
     name: Mapped[str] = mapped_column(String(120))
     unit: Mapped[str | None] = mapped_column(String(40))
     feature_id: Mapped[str | None] = mapped_column(String(10))
@@ -162,6 +178,9 @@ class MetricType(Base):
 
     measurements: Mapped[list["Measurement"]] = relationship(back_populates="metric_type")
     findings: Mapped[list["Finding"]] = relationship(back_populates="metric_type")
+    feedback_points: Mapped[list["FeedbackPoint"]] = relationship(
+        back_populates="metric_type"
+    )
 
 
 class Session(Base):
@@ -172,17 +191,15 @@ class Session(Base):
     __table_args__ = (_one_of("status", SESSION_STATUSES),)
 
     session_id: Mapped[int] = mapped_column(primary_key=True)
-    # The id the client sees. Separate from the primary key so the wire never
-    # exposes a guessable sequence number, and so the row can still be written
-    # at the end of the Session rather than having to exist at its start.
-    # Defaulted so a caller that has no public id yet still gets a valid one.
-    # The live Session path does pass its own: session_ws.py has to hand the id
-    # to the client when the socket opens, long before this row is written.
+    # The id the client sees and later names the Session by (ADR 0050). Random
+    # rather than the primary key: the wire never exposes a guessable sequence
+    # number, and being unguessable is what keeps one user's Session from
+    # another's. Defaulted so a caller without one still gets a valid id; the
+    # live path passes its own, because session_ws.py hands the id to the
+    # client when the socket opens, long before this row is written.
     extern_id: Mapped[uuid.UUID] = mapped_column(Uuid, unique=True, default=uuid.uuid4)
-    # Pseudonym, not an anonymisation: a random UUID per Session keeps Sessions
-    # unlinkable, but the transcript itself can still identify a person, so this
-    # stays personal data (ADR 0031). Becomes the Keycloak "sub" claim once
-    # ADR 0009's authentication exists.
+    # The caller's Keycloak "sub" claim (ADR 0009/0031), taken from the
+    # WebSocket handshake.
     subject_id: Mapped[str] = mapped_column(String(64))
     persona_id: Mapped[int] = mapped_column(ForeignKey("persona.persona_id"), index=True)
     scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id"), index=True)
@@ -203,6 +220,14 @@ class Session(Base):
     turns: Mapped[list["Turn"]] = relationship(
         back_populates="session", cascade="all, delete-orphan", passive_deletes=True
     )
+    # Measurements and findings describe the whole call, not one utterance
+    # (ADR 0051), so they hang off the Session rather than off a Turn.
+    measurements: Mapped[list["Measurement"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan", passive_deletes=True
+    )
+    findings: Mapped[list["Finding"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan", passive_deletes=True
+    )
     feedback: Mapped["Feedback | None"] = relationship(
         back_populates="session", cascade="all, delete-orphan", passive_deletes=True
     )
@@ -212,33 +237,24 @@ class Session(Base):
 
 
 class Turn(Base):
-    """One exchange within a Session: the user's utterance and the Persona's
-    reply to it (see CONTEXT.md's "Turn" entry) — both halves in one row, not
-    one row per speaker.
+    """One utterance by one speaker, in the order it was spoken.
 
-    The Session's opening Turn has no user half, because the Persona speaks
-    first: its `user_transcript` is empty and `user_duration_ms` is NULL.
-    The same holds for a final Turn cut short by a pipeline failure (ADR 0016),
-    where the Persona half stays empty instead.
-
-    Ordering comes from `seq_index` alone (per Session, starting at 1); no
-    absolute offset into the Session is stored, since a paired Turn has two
-    start times and nothing reads them — the Session's audio is not persisted
-    (ADR 0034), so there is no timeline to align against.
+    A Turn in the domain sense is an exchange (see CONTEXT.md), and that is how
+    backend/session/models.py holds it in memory — but it is stored flattened,
+    one row per speaker, because that is what makes the Gesprächsprotokoll
+    timestamped: each row carries its own offset into the Session.
+    `utterances()` is the single place that performs the flattening.
     """
 
     __tablename__ = "turn"
     __table_args__ = (
-        CheckConstraint("seq_index >= 1", name="seq_index_positive"),
-        # The client supplies the user half; a negative duration would be a bug
-        # on the wire rather than a measurement.
+        _one_of("speaker", SPEAKERS),
+        CheckConstraint("seq_index >= 0", name="seq_index_non_negative"),
+        CheckConstraint("start_offset_ms >= 0", name="start_offset_non_negative"),
+        # A negative duration would be a bug in the measurement, not a
+        # measurement; NULL is the legitimate way to say "not measured".
         CheckConstraint(
-            "user_duration_ms IS NULL OR user_duration_ms >= 0",
-            name="user_duration_non_negative",
-        ),
-        CheckConstraint(
-            "persona_duration_ms IS NULL OR persona_duration_ms >= 0",
-            name="persona_duration_non_negative",
+            "duration_ms IS NULL OR duration_ms >= 0", name="duration_non_negative"
         ),
     )
 
@@ -246,75 +262,72 @@ class Turn(Base):
     session_id: Mapped[int] = mapped_column(
         ForeignKey("session.session_id", ondelete="CASCADE"), index=True
     )
+    # SPEAKER_USER or SPEAKER_PERSONA, see the constants above.
+    speaker: Mapped[str] = mapped_column(String(10))
     seq_index: Mapped[int] = mapped_column(Integer)
-    user_transcript: Mapped[str] = mapped_column(Text)
-    persona_transcript: Mapped[str] = mapped_column(Text)
-    # Nullable because a half can be absent (see above). Needed for speaking
-    # rate (F-36), talk-time share (F-24) and fluency (F-51), none of which
-    # can be derived from the transcript text.
-    user_duration_ms: Mapped[int | None] = mapped_column(Integer)
-    persona_duration_ms: Mapped[int | None] = mapped_column(Integer)
+    start_offset_ms: Mapped[int] = mapped_column(Integer)
+    # NULL where an utterance has no measured end: a user Turn whose audio
+    # could not be analysed, or a Persona line whose synthesis failed.
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    transcript: Mapped[str] = mapped_column(Text)
 
     session: Mapped["Session"] = relationship(back_populates="turns")
     feedback_points: Mapped[list["FeedbackPoint"]] = relationship(back_populates="turn")
-    measurements: Mapped[list["Measurement"]] = relationship(
-        back_populates="turn", cascade="all, delete-orphan", passive_deletes=True
-    )
-    findings: Mapped[list["Finding"]] = relationship(
-        back_populates="turn", cascade="all, delete-orphan", passive_deletes=True
-    )
 
 
 class Measurement(Base):
-    """One metric measured on the *user's* half of a Turn.
+    """One metric measured over the whole Session (ADR 0051).
 
-    Every paraverbal metric (F-35 to F-38, F-51) describes how the trainee
-    spoke; the Persona's half is synthesized speech, so measuring it says
-    nothing about the user. That is what lets a Turn hold both speakers in one
-    row without `turn_id` becoming ambiguous here.
+    Session-level, not per Turn: none of the Kennzahlen (Redeanteil, Fragen,
+    Sprechtempo, Wortanzahl, Reaktionszeit, Sprechpausen) is meaningful for a
+    single utterance, and there is exactly one set of them per Session.
     """
 
     __tablename__ = "measurement"
     measurement_id: Mapped[int] = mapped_column(primary_key=True)
-    turn_id: Mapped[int] = mapped_column(
-        ForeignKey("turn.turn_id", ondelete="CASCADE"), index=True
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("session.session_id", ondelete="CASCADE"), index=True
     )
     metric_type_id: Mapped[int] = mapped_column(
         ForeignKey("metric_type.metric_type_id"), index=True
     )
     value: Mapped[Decimal] = mapped_column(Numeric(10, 4))
-    detail_json: Mapped[dict | None] = mapped_column(JSONB)  # e.g. the metric's course over the turn
+    detail_json: Mapped[dict | None] = mapped_column(JSONB)  # e.g. the metric's course over the call
 
-    turn: Mapped["Turn"] = relationship(back_populates="measurements")
+    session: Mapped["Session"] = relationship(back_populates="measurements")
     metric_type: Mapped["MetricType"] = relationship(back_populates="measurements")
 
 
 class Finding(Base):
-    """A noteworthy observation at one point inside the user's utterance — the
-    qualitative counterpart to a Measurement, and like it always about the
-    user's half of the Turn."""
+    """A noteworthy observation about the Session — the qualitative counterpart
+    to a Measurement.
+
+    Has no writer and no reader: the table stays for pilot data, but nothing in
+    the API, the wrap-up prompt or the frontend refers to it (ADR 0051).
+    """
 
     __tablename__ = "finding"
     finding_id: Mapped[int] = mapped_column(primary_key=True)
-    turn_id: Mapped[int] = mapped_column(
-        ForeignKey("turn.turn_id", ondelete="CASCADE"), index=True
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("session.session_id", ondelete="CASCADE"), index=True
     )
     metric_type_id: Mapped[int | None] = mapped_column(
         ForeignKey("metric_type.metric_type_id", ondelete="SET NULL"), index=True
     )
     category: Mapped[str] = mapped_column(String(60))
-    # Relative to the start of the user's utterance in this Turn, for the same
-    # reason Measurement attaches to the user's half only (see Measurement).
-    offset_ms: Mapped[int] = mapped_column(Integer)
+    # Milliseconds from the start of the Session, where the finding has a
+    # moment (a long pause); NULL where it characterises the whole call.
+    offset_ms: Mapped[int | None] = mapped_column(Integer)
     description: Mapped[str] = mapped_column(Text)
 
-    turn: Mapped["Turn"] = relationship(back_populates="findings")
+    session: Mapped["Session"] = relationship(back_populates="findings")
     metric_type: Mapped["MetricType | None"] = relationship(back_populates="findings")
     feedback_points: Mapped[list["FeedbackPoint"]] = relationship(back_populates="finding")
 
 
 class Feedback(Base):
-    """The post-call summary for one Session."""
+    """The post-call summary for one Session, produced in the RQ worker
+    (ADR 0049)."""
 
     __tablename__ = "feedback"
     feedback_id: Mapped[int] = mapped_column(primary_key=True)
@@ -327,15 +340,20 @@ class Feedback(Base):
 
     session: Mapped["Session"] = relationship(back_populates="feedback")
     points: Mapped[list["FeedbackPoint"]] = relationship(
-        back_populates="feedback", cascade="all, delete-orphan", passive_deletes=True
+        back_populates="feedback",
+        order_by="FeedbackPoint.position",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
 
 class FeedbackPoint(Base):
-    """One individual point of a Feedback, optionally tied back to the Turn or
-    Finding it came from."""
+    """One individual point of a Feedback, optionally tied back to the Turn,
+    Finding or MetricType it came from."""
 
     __tablename__ = "feedback_point"
+    __table_args__ = (_one_of("kind", POINT_KINDS),)
+
     feedback_point_id: Mapped[int] = mapped_column(primary_key=True)
     feedback_id: Mapped[int] = mapped_column(
         ForeignKey("feedback.feedback_id", ondelete="CASCADE"), index=True
@@ -346,11 +364,18 @@ class FeedbackPoint(Base):
     finding_id: Mapped[int | None] = mapped_column(
         ForeignKey("finding.finding_id", ondelete="SET NULL"), index=True
     )
+    metric_type_id: Mapped[int | None] = mapped_column(
+        ForeignKey("metric_type.metric_type_id", ondelete="SET NULL"), index=True
+    )
+    # POINT_STRENGTH or POINT_IMPROVEMENT, see the constants above.
+    kind: Mapped[str] = mapped_column(String(20))
+    position: Mapped[int] = mapped_column(Integer)
     text: Mapped[str] = mapped_column(Text)
 
     feedback: Mapped["Feedback"] = relationship(back_populates="points")
     turn: Mapped["Turn | None"] = relationship(back_populates="feedback_points")
     finding: Mapped["Finding | None"] = relationship(back_populates="feedback_points")
+    metric_type: Mapped["MetricType | None"] = relationship(back_populates="feedback_points")
 
 
 class AnalysisJob(Base):

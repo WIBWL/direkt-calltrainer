@@ -1,6 +1,12 @@
-"""Model config for STT, LLM, and TTS — OpenAI-compatible by
-default (EFRE_URL/Gemini), with an optional non-OpenAI-compatible TTS
-provider (KugelAudio) behind the TTS_BACKEND toggle."""
+"""One place where every pipeline-backend environment variable is read — once,
+at import, into a module-level constant, never from inside a function elsewhere.
+
+Required variables have no default and throw before the app can listen: a wrong
+or missing value should fail now, not surface later as a 403 that looks like bad
+credentials. STT and the LLM have one backend each, no fallback (ADR 0011); TTS
+defaults to KugelAudio with the DiReKT model as fallback (ADR 0040), or the
+DiReKT model always under DEBUG.
+"""
 
 import os
 
@@ -12,35 +18,41 @@ load_dotenv()
 
 
 def _required_env(name: str) -> str:
-    """Reads a required environment variable."""
+    """Read a variable that must be set, or throw. No default: a fallback that
+    happens to look right just moves the failure to the first request."""
     value = os.environ.get(name)
     if not value:
-        raise RuntimeError(
-            f"Missing required environment variable {name!r}. Copy .env.example to .env and fill in real values."
-        )
+        raise RuntimeError(f"{name} is required (see .env.example)")
     return value
 
 
-CLIENT = AsyncOpenAI(base_url=f"{_required_env('EFRE_URL')}/v1", api_key=_required_env("EFRE_API_KEY"))
+# The DiReKT model gateway (ADR 0011). A named constant because `lifespan` in
+# app.py checks this same URL at boot.
+DIREKT_URL = _required_env("DIREKT_URL")
 
-# STT config
+CLIENT = AsyncOpenAI(base_url=f"{DIREKT_URL}/v1", api_key=_required_env("DIREKT_API_KEY"))
+
+# Optional, default off. When truthy, TTS skips KugelAudio and uses the DiReKT
+# model on every call — lets the app run without KugelAudio credentials.
+DEBUG = os.environ.get("DEBUG", "").lower() in ("1", "true", "yes")
+
+# STT config.
 STT_CLIENT = CLIENT
 STT_MODEL = _required_env("STT_MODEL")
 
-# LLM config
-LLM_BACKEND = os.environ.get("LLM_BACKEND", "efre").lower()
-if LLM_BACKEND == "gemini":
-    LLM_CLIENT = AsyncOpenAI(base_url=_required_env("GEMINI_URL"), api_key=_required_env("GEMINI_API_KEY"))
-    LLM_MODEL = _required_env("GEMINI_MODEL")
-else:
-    LLM_CLIENT = CLIENT
-    LLM_MODEL = _required_env("LLM_MODEL")
+# LLM config.
+LLM_CLIENT = CLIENT
+LLM_MODEL = _required_env("LLM_MODEL")
 
-# TTS config
-TTS_BACKEND = os.environ.get("TTS_BACKEND", "efre").lower()
-if TTS_BACKEND == "kugelaudio":
-    TTS_CLIENT = KugelAudio(api_key=_required_env("KUGELAUDIO_API_KEY"))
-    TTS_MODEL = _required_env("KUGELAUDIO_MODEL")
+# TTS config: KugelAudio is the default; TTS_MODEL (the DiReKT model) is only the
+# fallback, or always under DEBUG.
+TTS_MODEL = _required_env("TTS_MODEL")
+if DEBUG:
+    # No KugelAudio client under DEBUG, so its credentials aren't required.
+    KUGELAUDIO_CLIENT = None
+    KUGELAUDIO_MODEL = None
 else:
-    TTS_CLIENT = CLIENT
-    TTS_MODEL = _required_env("TTS_MODEL")
+    # region="eu" pins to api.eu.kugelaudio.com; the EU endpoint is used because
+    # the app is deployed in the EU (ADR 0020).
+    KUGELAUDIO_CLIENT = KugelAudio(api_key=_required_env("KUGELAUDIO_API_KEY"), region="eu")
+    KUGELAUDIO_MODEL = _required_env("KUGELAUDIO_MODEL")

@@ -30,7 +30,11 @@ except RuntimeError as exc:
 # starts an interpolation and would reject a password containing one.
 config.set_main_option("sqlalchemy.url", DATABASE_URL.replace("%", "%%"))
 
-if config.config_file_name is not None:
+# fileConfig() disables every logger configured before it. That is fine for the
+# alembic CLI, but when the running app migrates itself at startup
+# (backend/db/provision.py) it would silently take out the application's own
+# logging (ADR 0039) for the rest of the process -- so that caller opts out.
+if config.config_file_name is not None and config.attributes.get("configure_logging", True):
     fileConfig(config.config_file_name)
 
 # Autogenerate diffs the models against the database (ADR 0027).
@@ -58,10 +62,10 @@ MIGRATION_LOCK_KEY = 8_243_119
 def run_migrations_online() -> None:
     """Run the migrations against a live database.
 
-    Guarded by an advisory lock: docker-entrypoint.sh migrates on every
-    container start, so scaling to more than one instance would otherwise have
-    them apply the same revision concurrently. The second one waits here and
-    then finds nothing left to do.
+    Guarded by an advisory lock: the app and the worker each migrate on
+    startup (backend/db/provision.py), and scaling either past one instance
+    adds more, so without it they would apply the same revision concurrently.
+    The others wait here and then find nothing left to do.
     """
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),

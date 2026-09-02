@@ -1,41 +1,248 @@
-"""Shared fixtures for the database tests.
+"""Shared test fixtures.
 
-Every test that needs a database gets its own, created fresh and dropped
-afterwards, so a failing test can never leave the development database in a
-half-migrated state and tests cannot see each other's rows. That costs a few
-hundred milliseconds per test and buys complete isolation.
+Two suites share this file. Most tests fake the STT/LLM/TTS pipeline and never
+touch a database; the persistence tests get a real one, created fresh per test
+and dropped afterwards, so a failing test can never leave the development
+database half-migrated and tests cannot see each other's rows.
 
-The connection details come from the same POSTGRES_* settings the application
-uses, but only the server part of them: the database name is replaced with a
-generated one. Without those settings, or without a reachable server, these
-tests skip rather than fail, so a checkout without Postgres running still gets
-a green run of everything else.
+The persistence fixtures read .env separately (`_ENV`, via dotenv_values, which
+leaves os.environ alone) and inject only their own throwaway database, for the
+duration of the test. Without those settings in .env, or without a reachable
+server, they skip rather than fail, so a checkout without Postgres still gets a
+green run of everything else.
+
+The backend reads a handful of environment variables at import time
+(`backend/clients/config.py`), so they are set here *before* any backend
+module is imported. Values are dummies: no test in this suite makes a real
+network call — every pipeline backend (STT / LLM / TTS) is faked.
+
+`DEBUG=true` keeps TTS config fully offline (no KugelAudio client is
+constructed); the KugelAudio-default / DiReKT-fallback dispatch is still
+covered in `test_tts_fallback.py` by patching the tts module directly.
 """
+
+# The env vars below must be set before backend imports run, so those imports
+# deliberately sit after this block.
+# pylint: disable=wrong-import-position,missing-function-docstring
+# pylint: disable=too-few-public-methods,redefined-outer-name
+
 import os
-import uuid
-from collections.abc import AsyncIterator, Iterator
-from contextlib import contextmanager
-from dataclasses import dataclass
-from datetime import UTC, datetime
-from pathlib import Path
 
-import httpx
-import pytest
-from alembic import command
-from alembic.config import Config
-from dotenv import load_dotenv
-from sqlalchemy import URL, create_engine, text
-from sqlalchemy.engine import make_url
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session as DbSession
-from sqlalchemy.orm import sessionmaker
+os.environ.setdefault("DIREKT_URL", "http://direkt.test.invalid")
+os.environ.setdefault("DIREKT_API_KEY", "test-direkt-key")
+os.environ.setdefault("STT_MODEL", "test-stt-model")
+os.environ.setdefault("LLM_MODEL", "test-llm-model")
+os.environ.setdefault("TTS_MODEL", "test-tts-model")
+os.environ.setdefault("KUGELAUDIO_MODEL", "test-kugelaudio-model")
+os.environ.setdefault("KUGELAUDIO_API_KEY", "test-kugelaudio-key")
+os.environ.setdefault("DEBUG", "true")
+os.environ.setdefault("OIDC_ISSUER", "http://keycloak.test.invalid/realms/direkt")
 
-from backend.db.models import Language, MetricType, Persona, Scenario
-from backend.db.session import build_database_url, reset_engine
-from backend.session.models import FinishedSession, Turn
+import uuid  # noqa: E402
+from collections.abc import AsyncIterator, Iterator  # noqa: E402
+from contextlib import contextmanager  # noqa: E402
+from dataclasses import dataclass, replace  # noqa: E402
+from datetime import UTC, datetime  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+import httpx  # noqa: E402
+import pytest  # noqa: E402
+from alembic import command  # noqa: E402
+from alembic.config import Config  # noqa: E402
+from dotenv import dotenv_values  # noqa: E402
+from kugelaudio.exceptions import KugelAudioError  # noqa: E402
+from openai import OpenAIError  # noqa: E402
+from sqlalchemy import URL, create_engine, text  # noqa: E402
+from sqlalchemy.engine import make_url  # noqa: E402
+from sqlalchemy.exc import OperationalError  # noqa: E402
+from sqlalchemy.orm import Session as DbSession  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+
+from backend import auth  # noqa: E402
+from backend.app import app  # noqa: E402
+from backend.clients import llm, stt, tts  # noqa: E402
+from backend.personas import PERSONAS  # noqa: E402
+from backend.scenarios import SCENARIOS  # noqa: E402
+from backend.db.models import Language, MetricType, Persona, Scenario  # noqa: E402
+from backend.db.session import reset_engine, session_scope  # noqa: E402
+from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted  # noqa: E402
+from backend.session.models import Turn  # noqa: E402
+
+# A fixed caller for tests that don't care about auth (most of them).
+TEST_AUTH = auth.AuthContext(sub="test-subject", roles=[], token="test-token")
+
+
+@pytest.fixture
+def auth_ctx():
+    return TEST_AUTH
+
+
+@pytest.fixture(autouse=True)
+def _override_auth():
+    """Every test runs as `TEST_AUTH` unless it clears the override itself
+    (see `test_setup_api.py`'s unauthenticated cases)."""
+    app.dependency_overrides[auth.require_user] = lambda: TEST_AUTH
+    yield
+    app.dependency_overrides.pop(auth.require_user, None)
+
+
+@pytest.fixture
+def persona():
+    return PERSONAS[0]
+
+
+@pytest.fixture
+def scenario():
+    return SCENARIOS[0]
+
+
+class FakeLLM:
+    """Stand-in for `backend.clients.llm.stream_reply`.
+
+    Configure `.replies` with the successive full replies to stream (one per
+    call). Each reply is emitted as several token deltas so the chunker and
+    the streaming pipeline see realistic input. Set `.fail_times` to raise an
+    OpenAIError on the first N calls before serving a reply.
+    """
+
+    def __init__(self, replies=None):
+        self.replies = list(replies or ["Alles klar, danke."])
+        self.calls = []
+        self.fail_times = 0
+
+    def stream_reply(self, messages):
+        self.calls.append(messages)
+
+        async def _gen():
+            if self.fail_times > 0:
+                self.fail_times -= 1
+                raise OpenAIError("simulated LLM failure")
+            reply = self.replies.pop(0) if self.replies else ""
+            for i, word in enumerate(reply.split(" ")):  # mimic token streaming
+                yield word if i == 0 else " " + word
+
+        return _gen()
+
+
+class FakeSTT:
+    """Stand-in for `backend.clients.stt.transcribe`."""
+
+    def __init__(self, transcripts=None):
+        self.transcripts = list(transcripts or ["Hallo, worum geht es?"])
+        self.calls = []
+        self.fail_times = 0
+
+    async def transcribe(self, audio_bytes, filename, content_type, language_id):
+        self.calls.append((audio_bytes, filename, content_type, language_id))
+        if self.fail_times > 0:
+            self.fail_times -= 1
+            raise OpenAIError("simulated STT failure")
+        return self.transcripts.pop(0) if self.transcripts else ""
+
+
+class FakeTTS:
+    """Stand-in for `backend.clients.tts.synthesize_stream` (+ one-shot
+    `synthesize`).
+
+    `synthesize_stream` mimics the real KugelAudio->DiReKT fallback as a
+    two-attempt sequence: a `fail_times` of 1 is "KugelAudio blipped, DiReKT
+    covered it" (absorbed, 2 recorded calls); a higher count exhausts both and
+    raises (-> `tts_failed`). Set `.hang` to an `asyncio.Event` to park
+    synthesis (barge-in tests). `.chunks_per_call` controls how many audio
+    sub-chunks one text chunk yields.
+    """
+
+    def __init__(self):
+        self.calls = []
+        self.fail_times = 0
+        self.hang = None
+        self.chunks_per_call = 1
+
+    async def synthesize_stream(self, text, voice, language_id):
+        for _ in range(2):  # KugelAudio attempt, then the DiReKT fallback
+            self.calls.append((text, voice, language_id))
+            if self.hang is not None:
+                await self.hang.wait()
+            if self.fail_times > 0:
+                self.fail_times -= 1
+                continue
+            for _ in range(self.chunks_per_call):
+                yield b"AUDIO:" + text.encode("utf-8")
+            return
+        raise KugelAudioError("simulated TTS failure")
+
+    async def synthesize(self, text, voice, language_id):
+        self.calls.append((text, voice, language_id))
+        if self.hang is not None:
+            await self.hang.wait()
+        if self.fail_times > 0:
+            self.fail_times -= 1
+            raise KugelAudioError("simulated TTS failure")
+        return b"AUDIO:" + text.encode("utf-8")
+
+
+@pytest.fixture
+def fake_pipeline(monkeypatch):
+    """Patch STT, LLM and TTS on the modules the orchestrator calls them
+    through. Returns the three fakes so a test can inspect/seed them."""
+    llm_fake = FakeLLM()
+    stt_fake = FakeSTT()
+    tts_fake = FakeTTS()
+
+    monkeypatch.setattr(llm, "stream_reply", llm_fake.stream_reply)
+    monkeypatch.setattr(stt, "transcribe", stt_fake.transcribe)
+    monkeypatch.setattr(tts, "synthesize_stream", tts_fake.synthesize_stream)
+    monkeypatch.setattr(tts, "synthesize", tts_fake.synthesize)
+
+    class Pipeline:
+        """Bundle of the three fakes active for one test."""
+
+        llm = llm_fake
+        stt = stt_fake
+        tts = tts_fake
+
+    return Pipeline()
+
+
+async def collect(turn_events):
+    """Drain an async iterator of TurnEvents into a list."""
+    return [event async for event in turn_events]
+
+
+def states(events):
+    """The ordered `StateChanged` values in an event list."""
+    return [e.state for e in events if isinstance(e, StateChanged)]
+
+
+def audio_chunks(events):
+    """The `AudioChunk` events in an event list."""
+    return [e for e in events if isinstance(e, AudioChunk)]
+
+
+def completed(events):
+    """The first `TurnCompleted` event, or None."""
+    return next((e for e in events if isinstance(e, TurnCompleted)), None)
+
+
+def failure(events):
+    """The first `Failed` event, or None."""
+    return next((e for e in events if isinstance(e, Failed)), None)
+
+
+# --- Database fixtures ----------------------------------------------------
+# Everything below is for the persistence tests. A test that does not request
+# one of these fixtures never opens a connection to Postgres at all.
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-load_dotenv(PROJECT_ROOT / ".env")
+
+# Read, not loaded: dotenv_values leaves os.environ alone, so a test that does
+# not request a database fixture still has no POSTGRES_* set and cannot connect.
+_ENV = dotenv_values(PROJECT_ROOT / ".env")
+
+# The POSTGRES_* keys database_env() injects; host and port fall back to the
+# same defaults backend/db/session.py applies.
+_DB_SETTINGS = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
+                "POSTGRES_HOST", "POSTGRES_PORT")
 
 
 def _render(url: URL) -> str:
@@ -45,32 +252,49 @@ def _render(url: URL) -> str:
 
 
 def _server_url() -> URL:
-    """The configured database server, or a skip if the settings are incomplete."""
-    try:
-        return build_database_url()
-    except RuntimeError as exc:
+    """The configured database server, or a skip if .env is incomplete."""
+    missing = [k for k in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB")
+               if not _ENV.get(k)]
+    if missing:
         # `return` only so every path returns an expression: skip() raises.
-        return pytest.skip(f"Database settings incomplete: {exc}")
+        return pytest.skip(f"Database settings missing from .env: {', '.join(missing)}")
+    return URL.create(
+        "postgresql+psycopg",
+        username=_ENV["POSTGRES_USER"],
+        password=_ENV["POSTGRES_PASSWORD"],
+        host=_ENV.get("POSTGRES_HOST") or "localhost",
+        port=int(_ENV.get("POSTGRES_PORT") or 5432),
+        database=_ENV["POSTGRES_DB"],
+    )
 
 
 @contextmanager
 def database_env(url: str) -> Iterator[None]:
-    """Points POSTGRES_DB at the database in `url` for the duration of the block.
+    """Puts the POSTGRES_* settings for `url` into the environment for the block.
 
-    Alembic's env.py and the seed script both assemble their connection from
-    the POSTGRES_* settings, so overriding the database name is how a test aims
-    them at its own throwaway database.
+    Alembic's env.py and backend/db/session.py both call `build_database_url()`,
+    which assembles the connection from POSTGRES_*, so setting those is how a
+    test aims them at its own throwaway database. Restored afterwards, down to
+    "was not set before", so the next test starts unable to connect again.
     """
-    name = make_url(url).database
-    previous = os.environ.get("POSTGRES_DB")
-    os.environ["POSTGRES_DB"] = name
+    parsed = make_url(url)
+    values = {
+        "POSTGRES_USER": parsed.username,
+        "POSTGRES_PASSWORD": parsed.password,
+        "POSTGRES_DB": parsed.database,
+        "POSTGRES_HOST": parsed.host,
+        "POSTGRES_PORT": str(parsed.port or 5432),
+    }
+    previous = {k: os.environ.get(k) for k in _DB_SETTINGS}
+    os.environ.update(values)
     try:
         yield
     finally:
-        if previous is None:
-            os.environ.pop("POSTGRES_DB", None)
-        else:
-            os.environ["POSTGRES_DB"] = previous
+        for key, was in previous.items():
+            if was is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = was
 
 
 def alembic_upgrade(url: str, revision: str = "head") -> None:
@@ -128,37 +352,43 @@ def db_session(migrated_database: str) -> Iterator[DbSession]:
         engine.dispose()
 
 
+@pytest.fixture
+def app_database(migrated_database: str) -> Iterator[str]:
+    """Points the *application's* engine at this test's throwaway database.
+
+    backend/db/session.py memoises its engine, so the settings override alone
+    would not reach it — reset_engine() is what makes it pick the test database
+    up, and again afterwards so the next test is unaffected. Needed by anything
+    that goes through session_scope() rather than taking a session as an
+    argument, which is every write path since ADR 0034.
+    """
+    with database_env(migrated_database):
+        reset_engine()
+        yield migrated_database
+    reset_engine()
+
+
+@pytest.fixture
+def seeded_database(app_database: str) -> str:
+    """`app_database`, with the reference tables filled from personas.py /
+    scenarios.py / metrics.py — the state the application boots into.
+
+    For the setup endpoints, which read the persona and scenario tables
+    (ADR 0041) and therefore have nothing to serve without this.
+    """
+    # Imported here so a collection-time import never needs the environment.
+    from backend.db.provision import seed  # pylint: disable=import-outside-toplevel
+
+    with session_scope() as db:
+        seed(db)
+    return app_database
+
+
 PERSONA_KEY = "thomas-brandt-ceo"
 SCENARIO_KEY = "price-cancellation-risk"
-METRIC_KEY = "speaking_rate"
+METRIC_KEY = "tempo"
 
 SESSION_STARTED = datetime(2026, 8, 27, 10, 0, 0, tzinfo=UTC)
-SESSION_ENDED = datetime(2026, 8, 27, 10, 4, 0, tzinfo=UTC)
-
-
-def make_finished_session(
-    *,
-    extern_id: uuid.UUID | None = None,
-    reason: str = "user",
-    turns: list[Turn] | None = None,
-    persona_key: str = PERSONA_KEY,
-) -> FinishedSession:
-    """A ready-to-save Session pointing at the `reference_data` rows.
-
-    Shared by the write and read tests so they agree on what a stored Session
-    looks like; each overrides only the part it is actually about.
-    """
-    return FinishedSession(
-        extern_id=extern_id or uuid.uuid4(),
-        subject_id=str(uuid.uuid4()),
-        persona_key=persona_key,
-        scenario_key=SCENARIO_KEY,
-        language_code="de",
-        reason=reason,
-        started_at=SESSION_STARTED,
-        ended_at=SESSION_ENDED,
-        turns=turns if turns is not None else [],
-    )
 
 
 @dataclass
@@ -199,7 +429,7 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
         active=True,
     )
     metric_type = MetricType(
-        key=METRIC_KEY, name="Sprechtempo", unit="Wörter/min", active=True
+        key=METRIC_KEY, name="Sprechtempo", unit="Wörter/min", feature_id="F-36", active=True
     )
     db_session.add_all([language, persona, scenario, metric_type])
     db_session.commit()
@@ -208,26 +438,51 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
     )
 
 
+def persist(
+    *,
+    extern_id: uuid.UUID | None = None,
+    reason: str = "user",
+    turns: list[Turn] | None = None,
+    persona_key: str = PERSONA_KEY,
+) -> uuid.UUID:
+    """Write a Session through the real write path; returns its extern_id.
+
+    persist_session() opens its own session_scope(), so this needs the
+    `app_database` fixture rather than `db_session` — the two see the same
+    database, but only the former is what the application itself connects to.
+    """
+    # Imported here, not at module scope: importing the write path pulls in
+    # the feedback stack, which a collection-time import should not need.
+    from backend.session import persistence  # pylint: disable=import-outside-toplevel
+
+    persona = next(p for p in PERSONAS if p.id == PERSONA_KEY)
+    if persona_key != PERSONA_KEY:  # a key that is deliberately not seeded
+        persona = replace(persona, id=persona_key)
+    extern_id = extern_id or uuid.uuid4()
+    persistence.persist_session(
+        extern_id,
+        str(uuid.uuid4()),
+        persona,
+        replace(SCENARIOS[0], id=SCENARIO_KEY),
+        turns if turns is not None else [],
+        SESSION_STARTED,
+        reason,
+    )
+    return extern_id
+
+
 @pytest.fixture
-async def api_client(migrated_database: str) -> AsyncIterator[httpx.AsyncClient]:
+async def api_client(app_database: str) -> AsyncIterator[httpx.AsyncClient]:  # pylint: disable=unused-argument
     """The FastAPI app, wired to this test's throwaway database.
+
+    `app_database` is requested for its effect, not its value: it is what points
+    the application's engine at this test's database.
 
     Driven through httpx's ASGI transport rather than Starlette's TestClient:
     the pinned starlette (0.35) passes `app=` to httpx.Client, which httpx 0.28
     no longer accepts. Going through the transport exercises the same ASGI
     stack without touching either pin.
-
-    The application memoises its engine, so the settings override alone would
-    not reach it — reset_engine() is what makes it pick up the test database,
-    and again afterwards so the next test is unaffected.
     """
-    with database_env(migrated_database):
-        reset_engine()
-        # Imported here, not at module scope: importing the app is what builds
-        # the routes, and it must happen with the test settings in place.
-        from backend.app import app  # pylint: disable=import-outside-toplevel
-
-        transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
-            yield client
-    reset_engine()
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        yield client

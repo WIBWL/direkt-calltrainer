@@ -2,11 +2,12 @@
 reference data alone.
 
 This is the mechanism behind ADR 0034's promise that a User can delete their own
-data. The cascades are declared at ORM level only (`cascade="all, delete-orphan"`)
-— the foreign keys carry no `ON DELETE`, so this works through the ORM and not
-through raw SQL. That distinction is exactly what these tests pin down, including
-the awkward case: a FeedbackPoint references a Turn but is owned by the Feedback,
-so the two cascades have to unwind in an order that does not trip the foreign key.
+data. The cascade is declared twice on purpose: `ON DELETE` on the foreign key so
+the database enforces it even for raw SQL, and `cascade="all, delete-orphan"`
+with `passive_deletes=True` on the relationship so the ORM lets it do the work.
+Both paths are pinned down below, including the awkward case: a FeedbackPoint
+references a Turn but is owned by the Feedback, so the two have to unwind in an
+order that does not trip the foreign key.
 """
 from datetime import UTC, datetime
 
@@ -46,20 +47,33 @@ def session_with_full_subtree(db_session: DbSession, reference_data: ReferenceRo
     db_session.add(session)
     db_session.flush()
 
+    # One row per utterance (ADR 0026), so the exchange is two rows.
     turn = Turn(
         session_id=session.session_id,
-        seq_index=1,
-        user_transcript="Was kostet das?",
-        persona_transcript="Das hängt vom Umfang ab.",
-        user_duration_ms=1500,
-        persona_duration_ms=2200,
+        seq_index=0,
+        speaker="user",
+        start_offset_ms=0,
+        duration_ms=1500,
+        transcript="Was kostet das?",
     )
-    db_session.add(turn)
+    db_session.add_all([
+        turn,
+        Turn(
+            session_id=session.session_id,
+            seq_index=1,
+            speaker="persona",
+            start_offset_ms=1800,
+            duration_ms=2200,
+            transcript="Das hängt vom Umfang ab.",
+        ),
+    ])
     db_session.flush()
 
+    # Measurement and Finding hang off the Session, not off a Turn: every
+    # statistic describes the whole call (ADR 0051).
     metric_type_id = reference_data.metric_type.metric_type_id
     finding = Finding(
-        turn_id=turn.turn_id,
+        session_id=session.session_id,
         metric_type_id=metric_type_id,
         category="speaking_rate",
         offset_ms=400,
@@ -72,7 +86,8 @@ def session_with_full_subtree(db_session: DbSession, reference_data: ReferenceRo
     )
     db_session.add_all(
         [
-            Measurement(turn_id=turn.turn_id, metric_type_id=metric_type_id, value=142.5),
+            Measurement(session_id=session.session_id,
+                        metric_type_id=metric_type_id, value=142.5),
             finding,
             feedback,
             AnalysisJob(
@@ -92,6 +107,8 @@ def session_with_full_subtree(db_session: DbSession, reference_data: ReferenceRo
             feedback_id=feedback.feedback_id,
             turn_id=turn.turn_id,
             finding_id=finding.finding_id,
+            kind="improvement",
+            position=0,
             text="Sprich beim Preis langsamer.",
         )
     )
@@ -107,7 +124,7 @@ def _count(db: DbSession, model: type) -> int:
 def test_subtree_is_set_up_as_expected(db_session: DbSession) -> None:
     """Guards the fixture itself: without every child row present, the delete
     tests below would pass for the wrong reason."""
-    assert _count(db_session, Turn) == 1
+    assert _count(db_session, Turn) == 2
     assert _count(db_session, Measurement) == 1
     assert _count(db_session, Finding) == 1
     assert _count(db_session, Feedback) == 1

@@ -14,6 +14,12 @@ ignore-paths=^backend/db/migrations/versions/.*$
 # read of the module finds none of the members env.py legitimately calls.
 ignored-modules=alembic.context
 
+# Project root is the import root, so `backend.*` resolves in scripts/ (which
+# add it to sys.path themselves at runtime). Uses source-roots rather than an
+# init-hook that prepends "." to sys.path -- the latter shadows stdlib modules
+# like collections.abc when pylint runs with a different working directory.
+source-roots=.
+
 [MESSAGES CONTROL]
 # Responsibility: logic, design metrics, and docstrings only.
 # PEP8 style and formatting is enforced by flake8 -- disabled here to avoid duplication.

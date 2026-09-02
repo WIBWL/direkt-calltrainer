@@ -1,34 +1,46 @@
-"""Session orchestration: STT -> LLM -> TTS pipeline and retry policy."""
+"""One Session's conversation: the STT → dialogue → TTS pass per Turn.
+
+`SessionOrchestrator` owns the LLM message history and the Turn list for one
+call. The guards around the pipeline exist because Qwen3-4B misbehaves in
+specific, tested ways — copying the English prompt example (ADR 0043), ending
+calls too eagerly or not at all (ADR 0037), looping (ADR 0038); each guard's
+own comment names what it catches. Retry policy: one retry per leg, then end
+the Session cleanly (ADR 0016, ADR 0033).
+"""
 
 import asyncio
+import contextlib
 import logging
 import re
+import time
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
-from difflib import SequenceMatcher
 
 from kugelaudio.exceptions import KugelAudioError
-from langdetect import LangDetectException, detect
 from openai import OpenAIError
 
 from backend.clients import llm, stt, tts
+from backend.feedback.acoustics import AcousticsError, Pause, TurnAcoustics, analyze
 from backend.personas import Persona
 from backend.scenarios import Scenario
 from backend.session.chunking import sentence_chunks
 from backend.session.models import AudioChunk, Failed, StateChanged, Turn, TurnCompleted, TurnEvent
 
-logger = logging.getLogger("calltrainer")
+logger = logging.getLogger(__name__)
 
 _LANGUAGE_NAMES_EN: dict[str, str] = {"de": "German"}
 
+# The spoken-line example is deliberately in the target language: with an
+# English example ("Hi, this is...") the small model copies it and opens the
+# call in English despite the German instruction (8/8 in testing). Key it by
+# language_id along with _EXAMPLE_EXCHANGE if a second language is added (ADR 0043).
 _OPENING_INSTRUCTION = (
     "The call is starting now: you are the one calling, and you speak first. "
     "Open the conversation yourself with 1-2 short, realistic sentences: a "
     "greeting, who you are, and — briefly — what you're calling about (the "
     "question/concern from your role above). Invent plausible details as you "
     "go — different every time. Start directly with the spoken line itself, "
-    "e.g. \"Hi, this is...\" — no announcement before it like \"Here is the "
-    "opening\", no quotation marks around it, no meta-commentary or stage "
+    "e.g. \"Guten Tag, hier ist...\" — no announcement before it like \"Here is "
+    "the opening\", no quotation marks around it, no meta-commentary or stage "
     "directions. Reply with only that opening line."
 )
 
@@ -61,7 +73,12 @@ _EXAMPLE_EXCHANGE = (
 
 
 def _build_system_prompt(persona: Persona, scenario: Scenario) -> str:
-    """Builds the LLM system prompt."""
+    """Most of the requirements on how the counterpart behaves live here (F-01,
+    F-04): caller framing, "invent detail rather than deflect", anti-repetition,
+    the `[CALL_END]` protocol (ADR 0037, ADR 0038). English frame for
+    instruction-following on this model (ADR 0043); persona and scenario text
+    stay in the target language."""
+    language = _LANGUAGE_NAMES_EN[persona.language_id]
     return (
         "You are playing a character in a phone-call training exercise. "
         "You are the one who called — you initiated this call because you "
@@ -71,10 +88,6 @@ def _build_system_prompt(persona: Persona, scenario: Scenario) -> str:
         "problem is, and never wait for them to explain why they're "
         "calling — you're the one with something to discuss.\n"
         f"Context of the call: {scenario.description}\n"
-        # Without this the model invents a fresh name on every call, and the
-        # stored Transcript then contradicts the Persona it belongs to.
-        f"Your name: {persona.name}. Introduce yourself with this name and no "
-        "other, and keep it consistent for the whole call.\n"
         f"Your role: {persona.role}.\n"
         f"Character traits: {persona.traits}.\n"
         f"Behavior: {persona.behavior}.\n"
@@ -91,105 +104,117 @@ def _build_system_prompt(persona: Persona, scenario: Scenario) -> str:
         "again — the same question, recap, or objection — even reworded. "
         "If so, drop it and say something new instead.\n"
         f"{_EXAMPLE_EXCHANGE}\n"
-        "If, based on the conversation so far, your questions and concerns "
-        "seem resolved, or the user says goodbye, end the call naturally: "
-        "add one brief, friendly closing line (e.g. thank them, say "
-        "goodbye), then finish your reply with exactly this marker on its "
-        "own and nothing after it: [CALL_END]. Only include that marker "
-        "when the call should truly end — never otherwise, and never "
-        "explain or mention the marker itself.\n"
-        f"Reply exclusively in {_LANGUAGE_NAMES_EN[persona.language_id]}, "
-        "in short, realistic sentences the way people actually talk on "
-        "the phone. Stay true to the role without exaggerating into "
-        "caricature. Output only what the persona would say — no "
-        "meta-commentary, no stage directions."
+        "If your concern has been concretely addressed — a clear answer, or "
+        "a specific commitment with an actual action, amount, or timeframe "
+        "(like the refund example above) — or the user signals the call is "
+        "over — a goodbye, a wrap-up like \"das reicht mir\"/\"das wär's\", "
+        "or any other natural way people end a phone call — end it "
+        "yourself: add one brief, friendly closing line (e.g. thank them, "
+        "say goodbye), then finish your reply with exactly this marker on "
+        "its own and nothing after it: [CALL_END]. Never end the call "
+        "while you still consider your concern unresolved, are still "
+        "pressing for information, or have only gotten a vague reassurance "
+        "with no specifics (\"ich kümmere mich darum\", \"ich stelle das "
+        "klar\") — a frustrated reply, or an empty promise with no actual "
+        "content, is not by itself a reason to hang up; keep pushing for "
+        "specifics instead, the way a real caller would. Only include the "
+        "marker when the call should truly end — never otherwise, never in the "
+        "same reply as a question or a statement that the issue isn't "
+        "resolved yet, and never explain or mention the marker itself.\n"
+        f"Reply exclusively in {language}, every single time regardless of "
+        "what language the user writes in, in short, realistic sentences "
+        "the way people actually talk on the phone. Stay true to the role "
+        "without exaggerating into caricature. Output only what the "
+        "persona would say — no meta-commentary, no stage directions."
     )
-
-
-_LANGUAGE_CORRECTION = "Your last reply wasn't in {language}. From now on, reply exclusively in {language}."
-
-_REPETITION_CORRECTION = (
-    "That reply repeated something you already said earlier in this call, "
-    "almost word for word. Say something different this time: react "
-    "specifically to the user's last message instead of repeating yourself."
-)
-_SIMILARITY_THRESHOLD = 0.6
-_MIN_CHARS_FOR_SIMILARITY_CHECK = 30  # too short to compare meaningfully below this
-
-
-def _similar_enough(text_lower: str, reply: str) -> bool:
-    if len(reply) < _MIN_CHARS_FOR_SIMILARITY_CHECK:
-        return False
-    return SequenceMatcher(None, text_lower, reply.lower()).ratio() > _SIMILARITY_THRESHOLD
-
-
-def _too_similar_to_previous(text: str, previous_replies: list[str]) -> bool:
-    if len(text) < _MIN_CHARS_FOR_SIMILARITY_CHECK:
-        return False
-    text_lower = text.lower()
-    return any(_similar_enough(text_lower, reply) for reply in previous_replies)
 
 
 _END_CALL_RE = re.compile(r"\[\s*call[_\s]?end\s*\]", re.IGNORECASE)
 
-_FAREWELL_PATTERNS: dict[str, re.Pattern[str]] = {
-    "de": re.compile(
-        r"\b(auf wiederh(?:ö|oe)ren|auf wiedersehen|tsch(?:ü|ue)ss+|tschau|mach'?s gut|"
-        r"bis (bald|dann|sp(?:ä|ae)ter)|einen (sch(?:ö|oe)nen tag|sch(?:ö|oe)nen abend))\b",
-        re.IGNORECASE,
-    ),
-}
-_FAREWELL_NUDGE = (
-    "The user just said goodbye. End the call now: add one brief, friendly "
-    "closing line, then finish your reply with exactly this marker and "
-    "nothing after it: [CALL_END]."
+# The farewell / postpone phrases _signals_closing matches (ADR 0037). Narrow
+# by design: a missed phrase costs one extra turn, where the old LLM classifier
+# could cut a call short mid-conversation.
+_FAREWELL_RE = re.compile(r"\b(tschüss|auf wiederhören|auf wiedersehen|wiederhören|ciao)\b", re.IGNORECASE)
+_POSTPONE_RE = re.compile(
+    r"(ein andere[rs]? mal|andermal|anders (fortsetzen|weiterführen|weitermachen)|"
+    r"später (nochmal|weiter|zurückrufen)|melde mich (nochmal|später|wieder)|"
+    r"rufe? (sie |dich )?(nochmal|später|zurück)|keine zeit (mehr|gerade)|"
+    r"muss (jetzt |gleich )?(auflegen|los|schluss machen)|gespräch (beenden|abbrechen))",
+    re.IGNORECASE,
 )
 
 
-def _sounds_like_farewell(text: str, language_id: str) -> bool:
-    pattern = _FAREWELL_PATTERNS.get(language_id)
-    return pattern is not None and bool(pattern.search(text))
+def _signals_closing(user_text: str) -> bool:
+    """True if the user's latest message is an explicit farewell or a request to
+    postpone / continue elsewhere — signals the persona itself misses (ADR 0037)."""
+    return bool(_FAREWELL_RE.search(user_text) or _POSTPONE_RE.search(user_text))
 
 
-class _NeedsCorrection(Exception):
-    """Internal control-flow signal: the reply's first chunk needs a
-    corrective retry (wrong language or too similar to previous reply)."""
+_CLOSING_NUDGE = (
+    "The user just signaled the call is over. End it now: add one brief, "
+    "friendly closing line, then finish your reply with exactly this "
+    "marker and nothing after it: [CALL_END]."
+)
 
-    def __init__(self, correction: str):
-        super().__init__(correction)
-        self.correction = correction
+# Spoken on a backstopped ending (a detected repeat, or an unprompted
+# `[CALL_END]`) — paths where the model was never asked for a closing line, so
+# can't be trusted to have produced one (ADR 0038).
+_FALLBACK_CLOSING_LINE = "Vielen Dank für Ihre Zeit. Auf Wiederhören."
 
 
-_MIN_CHARS_FOR_LANGUAGE_CHECK = 20  # langdetect is unreliable (and overconfident) below this
+async def _attach_measurements(
+    turn: Turn, acoustics: asyncio.Task[TurnAcoustics], ended_ms: int
+) -> None:
+    """Record the Turn's paraverbal measurements, on the Session's timeline (ADR 0048).
 
+    The audio arrived once the user had stopped talking, so `ended_ms` is where
+    this fragment ends and the measured duration is what walks it back to its
+    start. A Turn reopened after a barge-in is measured once per fragment, and
+    each fragment is placed by its own arrival -- which is why the pauses can
+    be rebased here and never need a per-fragment origin later.
 
-def _looks_like_expected_language(text: str, language_id: str) -> bool:
-    if len(text) < _MIN_CHARS_FOR_LANGUAGE_CHECK:
-        return True  # too short to classify reliably — don't block on it
+    Never fatal: unlike STT, dialogue generation and TTS, this leg is not one
+    the conversation depends on, so a Turn that cannot be measured simply
+    carries no measurements and the call continues.
+    """
     try:
-        return detect(text) == language_id
-    except LangDetectException:
-        return True
+        measured = await acoustics
+    except AcousticsError as e:
+        logger.info("Turn %d not measured: %s", turn.seq, e)
+        return
+    except Exception:
+        logger.exception("Paraverbal analysis failed for turn %d", turn.seq)
+        return
+    started_ms = max(0, ended_ms - measured.duration_ms)
+    if turn.user_offset_ms is None:
+        turn.user_offset_ms = started_ms
+    turn.user_speech_ms += measured.duration_ms
+    turn.pauses.extend(Pause(started_ms + p.offset_ms, p.duration_ms) for p in measured.pauses)
+    turn.loudness_db.extend(measured.loudness_db)
 
 
-class _ReplyProgress:  # pylint: disable=too-few-public-methods
-    """Mutable state shared across one reply's pipelined TTS chunks — a
-    plain data holder by design, not a candidate for more methods."""
+class _ReplyProgress:
+    """Mutable state threaded through one reply's synthesis: chunks sent, whether
+    any was, whether the reply ends the call, the voiced text (for barge-in)."""
 
     def __init__(self) -> None:
         self.chunk_seq = 0
         self.spoke_yet = False
         self.ends_call = False
+        self.spoken_text = ""
 
 
 def _strip_end_marker(text_chunk: str, progress: _ReplyProgress) -> str:
-    """Strips the [CALL_END] marker if present, flagging progress.ends_call."""
+    """Strip the `[CALL_END]` marker before TTS and flag `progress.ends_call`.
+    Loose regex (whitespace, case, `_`) — the model doesn't always emit it exactly."""
     if not _END_CALL_RE.search(text_chunk):
         return text_chunk
     progress.ends_call = True
     return _END_CALL_RE.sub("", text_chunk).strip()
 
 
+# The small model occasionally slips a stray CJK / Hangul character into a
+# German reply; left in, TTS mispronounces it or glitches. Scrubbed before synthesis.
 _FOREIGN_SCRIPT_RE = re.compile(
     "["
     "\u3000-\u303f"  # CJK punctuation
@@ -205,211 +230,306 @@ def _strip_foreign_script(text_chunk: str) -> str:
     return _FOREIGN_SCRIPT_RE.sub("", text_chunk).strip()
 
 
-async def _drain_if_pending(
-    turn: Turn, pending: tuple[str, "asyncio.Task[bytes | None]"] | None, progress: _ReplyProgress
-) -> AsyncIterator[TurnEvent]:
-    """Awaits+yields the pipelined TTS task's events, if there is one."""
-    if pending is None:
-        return
-    async for event in _emit_pending(turn, pending, progress):
-        yield event
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
 
-async def _emit_pending(
-    turn: Turn, pending: tuple[str, "asyncio.Task[bytes | None]"], progress: _ReplyProgress
-) -> AsyncIterator[TurnEvent]:
-    """Await one pipelined TTS task and yield its AudioChunk, or a Failed
-    event if synthesis didn't succeed after its own retry."""
-    audio = await pending[1]
-    if audio is None:
-        yield Failed(code="tts_failed", message="Synthesis failed after one retry.")
-        return
-    if not progress.spoke_yet:
-        yield StateChanged(state="speaking")
-        progress.spoke_yet = True
-    progress.chunk_seq += 1
-    # The reply is synthesized chunk by chunk (ADR 0033), so the Turn's persona
-    # duration is the sum over its chunks. An unreadable chunk contributes
-    # nothing rather than voiding the whole Turn's measurement.
-    chunk_ms = tts.duration_ms(audio)
-    if chunk_ms is not None:
-        turn.persona_duration_ms = (turn.persona_duration_ms or 0) + chunk_ms
-    yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=audio)
+def _has_repeated_sentence(text: str) -> bool:
+    """True if a non-trivial sentence repeats within one reply — the model
+    looping (ADR 0038). Short fragments ("Ja.", "Okay.") don't count."""
+    seen = set()
+    for sentence in _SENTENCE_SPLIT_RE.split(text):
+        sentence = sentence.strip().lower()
+        if len(sentence) < 15:
+            continue
+        if sentence in seen:
+            return True
+        seen.add(sentence)
+    return False
 
 
 class SessionOrchestrator:
-    """Owns one Session's conversation state: the LLM message history and the
-    Turn-by-Turn Transcript. `run_opening_turn`/`run_turn` each drive one
-    STT -> LLM -> TTS pass and apply ADR 0016's retry-then-graceful-end
-    policy, reinterpreted per-leg for the streaming pipeline (ADR 0033)."""
+    """One instance per Session. Holds the LLM message history and the Turn
+    list, driving one STT → dialogue → TTS pass per Turn. A barge-in can leave a
+    Turn open (`_reopen_turn`) for the next utterance to continue (ADR 0035)."""
 
     def __init__(self, persona: Persona, scenario: Scenario):
-        # A Persona has exactly one Language/voice (see personas.py) — no
-        # per-Session choice, so both are derived from the Persona rather
-        # than passed in separately.
+        # Monotonic, not wall-clock: these offsets locate utterances relative
+        # to each other on the Session's timeline, and must not jump if the
+        # system clock is adjusted mid-call.
+        self._started = time.monotonic()
         self._language_id = persona.language_id
-        self._language_name = _LANGUAGE_NAMES_EN[persona.language_id]
         self._voice = persona.voice
+        # The authenticated caller is not held here: the Session is written by
+        # backend/api/session_ws.py, which already has the AuthContext, so the
+        # `sub` goes straight from the handshake to `session.subject_id`
+        # (ADR 0009, ADR 0031) without a second copy living on the dialogue.
         self._messages: list[dict[str, str]] = [
             {"role": "system", "content": _build_system_prompt(persona, scenario)},
         ]
-        self._persona_replies: list[str] = []
         self.turns: list[Turn] = []
-        # Recorded here rather than when the Session is persisted, because the
-        # row is only written once the Session has ended (ADR 0034).
-        self.started_at = datetime.now(UTC)
+        self._reopen_turn: Turn | None = None
+
+    def _elapsed_ms(self) -> int:
+        """Milliseconds since the Session started."""
+        return round((time.monotonic() - self._started) * 1000)
+
+    def start_playback(self) -> None:
+        """The client has begun playing the opening line; t=0 is now.
+
+        Until this point the clock has been measuring the server's own head
+        start. The opening Turn is generated as soon as the socket connects,
+        which is well before the user asks for it (ADR 0042), so everything
+        already on the timeline is offset by however long they spent on the
+        setup and mic-check screens. Left uncorrected that wait becomes the
+        user's first reaction time, and the Transcript's timestamps start
+        counting from a moment nobody was in the call yet.
+        """
+        # The audio synthesized so far begins playing now, so the timeline is
+        # shifted to put its first chunk at zero. Spacing is preserved rather
+        # than each window being zeroed: only the opening Turn can be here
+        # today, but that is then not load-bearing if pre-warming ever reaches
+        # further than one Turn (ADR 0042).
+        offsets = [t.persona_offset_ms for t in self.turns if t.persona_offset_ms is not None]
+        if offsets:
+            shift = min(offsets)
+            for turn in self.turns:
+                if turn.persona_offset_ms is not None:
+                    turn.persona_offset_ms -= shift
+                if turn.persona_end_ms is not None:
+                    turn.persona_end_ms = max(0, turn.persona_end_ms - shift)
+        self._started = time.monotonic()
+
+    def _note_persona_audio(self, turn: Turn, audio: bytes) -> None:
+        """Extend the Persona's speaking window by one synthesized chunk.
+
+        The window has to be modelled: the server learns when it *sent* a chunk,
+        never when the client finished playing it. Chunks play back to back, so
+        a chunk ready before the previous one has finished extends the window
+        rather than starting a new one; one that arrives after a stall starts
+        from now. This is what the user's reaction time is counted from, and
+        what keeps the model's own latency out of it (ADR 0051).
+        """
+        now = self._elapsed_ms()
+        if turn.persona_offset_ms is None:
+            turn.persona_offset_ms = now
+        turn.persona_end_ms = max(now, turn.persona_end_ms or now) + tts.duration_ms(audio)
+
+    def _new_or_reopened_turn(self) -> tuple[Turn, bool]:
+        """Reuses a still-open turn from a prior barge-in, else creates a
+        fresh one; marks it unresolved so an early interruption still counts."""
+        reopening = self._reopen_turn is not None
+        turn = self._reopen_turn if reopening else Turn(seq=len(self.turns) + 1)
+        if not reopening:
+            self.turns.append(turn)
+        self._reopen_turn = turn
+        return turn, reopening
 
     async def run_opening_turn(self) -> AsyncIterator[TurnEvent]:
         """Have the Persona speak first: a freshly generated, varied call opener."""
-        turn = Turn(seq=len(self.turns) + 1)
-        self.turns.append(turn)
-
-        yield StateChanged(state="thinking")
-        # Sent as a "user" turn, not another system message: some
-        # OpenAI-compatible backends (e.g. Gemini) map only user/assistant
-        # messages into their native request format and reject a request
-        # whose messages are all system-role as having no content at all.
-        kickoff_messages = [*self._messages, {"role": "user", "content": _OPENING_INSTRUCTION}]
-        async for event in self._generate_reply(turn, kickoff_messages):
-            yield event
+        turn, _ = self._new_or_reopened_turn()
+        progress = _ReplyProgress()
+        try:
+            yield StateChanged(state="thinking")
+            kickoff_messages = [*self._messages, {"role": "user", "content": _OPENING_INSTRUCTION}]
+            async with contextlib.aclosing(self._generate_reply(turn, kickoff_messages, progress)) as replies:
+                async for event in replies:
+                    yield event
+            self._reopen_turn = None
+        except (asyncio.CancelledError, GeneratorExit):
+            self._finalize_interrupted(turn, progress)
+            raise
 
     async def run_turn(
-        self,
-        audio_bytes: bytes,
-        filename: str,
-        content_type: str | None,
-        duration_ms: int | None = None,
+        self, audio_bytes: bytes, filename: str, content_type: str | None
     ) -> AsyncIterator[TurnEvent]:
-        """Run one Turn: transcribe, stream a reply, synthesize+yield it chunk by chunk.
-
-        `duration_ms` is how long the user actually spoke, as measured by the
-        client's voice-activity detection — the server only ever sees the
-        finished recording, so it cannot derive this itself. None when the
-        client does not send it, in which case the Turn is stored without
-        speaking-rate data rather than not stored at all.
-        """
-        turn = Turn(seq=len(self.turns) + 1, user_duration_ms=duration_ms)
-        self.turns.append(turn)
-
-        yield StateChanged(state="thinking")
-
-        user_text = await self._transcribe_with_retry(audio_bytes, filename, content_type)
-        if user_text is None:
-            yield Failed(code="stt_failed", message="Transcription failed after one retry.")
-            return
-        turn.user_text = user_text
-        self._messages.append({"role": "user", "content": user_text})
-
-        farewell = _sounds_like_farewell(user_text, self._language_id)
-        messages = self._messages
-        if farewell:
-            messages = [*messages, {"role": "system", "content": _FAREWELL_NUDGE}]
-
-        async for event in self._generate_reply(turn, messages, force_end_call=farewell):
-            yield event
-
-    async def _generate_reply(
-        self, turn: Turn, messages: list[dict[str, str]], force_end_call: bool = False
-    ) -> AsyncIterator[TurnEvent]:
-        """Drive one reply attempt (plus, per ADR 0016/0033, one retry — also
-        covering a reply that needs a correction, i.e. came back in the wrong
-        Language or repeated the previous reply). Appends the finished reply
-        to persistent history and yields the Turn's completion/state events.
-
-        `force_end_call` makes ending the call deterministic once a farewell
-        was detected (see `_sounds_like_farewell`) — the LLM still writes the
-        closing line, but the call actually ending no longer depends on it
-        reliably including the [CALL_END] marker, which a small model won't
-        always do even when explicitly told to (confirmed in testing)."""
+        """Run one turn: transcribe, stream a reply, synthesize+yield it chunk by chunk."""
+        turn, reopening = self._new_or_reopened_turn()
         progress = _ReplyProgress()
-        already_retried = False
-        attempt_messages = messages
+        # Measured on a worker thread alongside the STT round trip, not after
+        # it: Praat is local and fast, the gateway is neither, so the analysis
+        # is finished by the time the transcript comes back (ADR 0048).
+        acoustics = asyncio.create_task(asyncio.to_thread(analyze, audio_bytes))
+        # The audio arrives once the user has stopped talking, so this marks
+        # the utterance's end; _attach_measurements walks it back to its start.
+        ended_ms = self._elapsed_ms()
+        turn.user_end_ms = ended_ms
+        try:
+            yield StateChanged(state="thinking")
+
+            user_text = await self._transcribe_with_retry(audio_bytes, filename, content_type)
+            if user_text is None:
+                yield Failed(code="stt_failed", message="Transcription failed after one retry.")
+                return
+
+            # A still-open turn from a barge-in gets the new text appended
+            # onto its question instead of starting a fresh turn.
+            if reopening and turn.user_text:
+                turn.user_text = f"{turn.user_text} {user_text}".strip()
+                self._messages[-1]["content"] = turn.user_text
+            else:
+                turn.user_text = user_text
+                self._messages.append({"role": "user", "content": user_text})
+            await _attach_measurements(turn, acoustics, ended_ms)
+            if turn.user_offset_ms is None:
+                turn.user_offset_ms = ended_ms  # unmeasured: the end is all we know
+            closing = _signals_closing(turn.user_text)
+
+            messages = self._messages
+            if closing:
+                messages = [*messages, {"role": "system", "content": _CLOSING_NUDGE}]
+
+            async with contextlib.aclosing(
+                self._generate_reply(turn, messages, progress, force_end_call=closing)
+            ) as replies:
+                async for event in replies:
+                    yield event
+            self._reopen_turn = None
+        except (asyncio.CancelledError, GeneratorExit):
+            # User barged in; aclosing above ensures this runs even if
+            # cancellation landed between yields, not inside a network await.
+            self._finalize_interrupted(turn, progress)
+            raise
+        finally:
+            acoustics.cancel()  # no-op once awaited; releases the audio otherwise
+
+    async def _attempt_reply_with_retry(
+        self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress
+    ) -> AsyncIterator[TurnEvent]:
+        """One reply attempt plus one retry on an LLM error. Yields the reply's
+        events; yields a Failed event and stops if it can't be delivered."""
         for llm_attempt in range(2):  # initial attempt + one retry
             try:
-                skip_check = already_retried
-                async for event in self._stream_and_synthesize(turn, attempt_messages, progress, skip_check):
-                    yield event
-                    if isinstance(event, Failed):
-                        return
-                break  # streamed to completion without an LLM-side error
-            except (OpenAIError, _NeedsCorrection) as e:
-                needs_correction = isinstance(e, _NeedsCorrection)
-                if needs_correction:
-                    already_retried = True
-                else:
-                    logger.error("LLM request failed (attempt %d): %s", llm_attempt + 1, e)
-                # Audio for part of this reply was already sent/played — a
-                # fresh completion would diverge from what the user just heard,
-                # so we don't retry past that point (ADR 0033) or past the one
-                # retry attempt ADR 0016 allows.
+                stream = self._stream_and_synthesize(turn, messages, progress)
+                async with contextlib.aclosing(stream) as chunks:
+                    async for event in chunks:
+                        yield event
+                        if isinstance(event, Failed):
+                            return
+                return  # streamed to completion without an LLM-side error
+            except OpenAIError as e:
+                logger.error("LLM request failed (attempt %d): %s", llm_attempt + 1, e)
+                # Retry only before any audio has gone out (ADR 0033): a fresh
+                # completion would diverge from what the user already heard.
                 if progress.spoke_yet or llm_attempt == 1:
-                    yield Failed(code="llm_failed", message=str(e) or "Reply needed a correction.")
+                    yield Failed(code="llm_failed", message=str(e))
                     return
-                turn.persona_text = ""  # retrying from scratch
-                if needs_correction:
-                    attempt_messages = [*messages, {"role": "user", "content": e.correction}]
+                turn.persona_text = ""  # retry from scratch
+
+    async def _generate_reply(
+        self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress, force_end_call: bool = False
+    ) -> AsyncIterator[TurnEvent]:
+        """Drive one reply attempt plus one retry on an LLM error.
+        Appends the finished reply to history and yields events."""
+        async with contextlib.aclosing(self._attempt_reply_with_retry(turn, messages, progress)) as events:
+            async for event in events:
+                yield event
+                if isinstance(event, Failed):
+                    return
 
         turn.persona_text = turn.persona_text.strip()
+        if turn.persona_text and turn.persona_offset_ms is None:
+            # Words with no audio behind them (synthesis failed): place them on
+            # the timeline as an instant, so the Transcript still reads in order.
+            turn.persona_offset_ms = turn.persona_end_ms = self._elapsed_ms()
+        repeated_reply = bool(turn.persona_text) and (
+            self._repeats_last_reply(turn.persona_text) or _has_repeated_sentence(turn.persona_text)
+        )
         self._messages.append({"role": "assistant", "content": turn.persona_text})
-        self._persona_replies.append(turn.persona_text)
 
-        ends_call = progress.ends_call or force_end_call
+        # force_end_call backstops [CALL_END]: a small model won't always
+        # include the marker even when told to (confirmed in testing).
+        ends_call = progress.ends_call or force_end_call or repeated_reply
+        if ends_call:
+            logger.info(
+                "Turn %d ends the call (model marker=%s, closing-intent check=%s, repeated reply=%s)",
+                turn.seq,
+                progress.ends_call,
+                force_end_call,
+                repeated_reply,
+            )
+            # Only the closing-intent path actually asked the model for a
+            # goodbye (_CLOSING_NUDGE); a repeat or an unprompted ending
+            # didn't, so it can't be trusted to have included one.
+            if repeated_reply or (progress.ends_call and not force_end_call):
+                async for event in self._speak_fallback_closing(turn, progress):
+                    yield event
         yield TurnCompleted(turn_seq=turn.seq, ends_call=ends_call)
         if not ends_call:
             yield StateChanged(state="listening")
 
-    def _check_first_chunk_once(self, checked: bool, text_chunk: str) -> bool:
-        """Runs the Language + repetition checks on the first chunk only
-        (checked=False means "not checked yet"). Returns True (now checked)
-        or raises `_NeedsCorrection` with a one-off nudge to retry with."""
-        if checked:
-            return True
-        if not _looks_like_expected_language(text_chunk, self._language_id):
-            logger.warning("Reply looked like the wrong language, retrying with a correction")
-            raise _NeedsCorrection(_LANGUAGE_CORRECTION.format(language=self._language_name))
-        if _too_similar_to_previous(text_chunk, self._persona_replies):
-            logger.warning("Reply looked too similar to the previous one, retrying with a correction")
-            raise _NeedsCorrection(_REPETITION_CORRECTION)
-        return True
+    async def _speak_fallback_closing(self, turn: Turn, progress: _ReplyProgress) -> AsyncIterator[TurnEvent]:
+        """Synthesizes a guaranteed sign-off for a backstopped ending,
+        instead of trusting the Persona's own reply to have included one."""
+        try:
+            audio = await tts.synthesize(_FALLBACK_CLOSING_LINE, self._voice, self._language_id)
+        except (KugelAudioError, OpenAIError, TimeoutError, OSError) as e:
+            logger.warning("Fallback closing line could not be synthesized: %s", e)
+            return
+        if not progress.spoke_yet:
+            yield StateChanged(state="speaking")
+            progress.spoke_yet = True
+        progress.chunk_seq += 1
+        self._note_persona_audio(turn, audio)
+        yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=audio)
+        turn.persona_text = f"{turn.persona_text} {_FALLBACK_CLOSING_LINE}".strip()
+        self._messages[-1]["content"] = turn.persona_text
+
+    def _repeats_last_reply(self, text: str) -> bool:
+        """True if this reply repeats its predecessor verbatim (modulo case and
+        whitespace) — the cross-Turn form of `_has_repeated_sentence` (ADR 0038)."""
+        for message in reversed(self._messages):
+            if message["role"] == "assistant":
+                return message["content"].strip().lower() == text.strip().lower()
+        return False
+
+    def _finalize_interrupted(self, turn: Turn, progress: _ReplyProgress) -> None:
+        """Barge-in cleanup (ADR 0035). If audio was voiced, commit exactly that
+        text to history and close the Turn. If not, discard the text and leave
+        the Turn open so the next utterance continues the same question."""
+        if progress.spoke_yet:
+            turn.persona_text = progress.spoken_text.strip()
+            self._messages.append({"role": "assistant", "content": turn.persona_text})
+            self._reopen_turn = None
+        else:
+            turn.persona_text = ""
 
     async def _stream_and_synthesize(
-        self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress, skip_check: bool
+        self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress
     ) -> AsyncIterator[TurnEvent]:
-        """Stream one LLM completion, synthesizing+yielding it chunk by chunk,
-        pipelined one chunk deep: each chunk's TTS call is fired off
-        immediately and only awaited once the *next* chunk's text has
-        arrived, so synthesis overlaps with the LLM generating what comes
-        after it instead of blocking it — pure serial dead time otherwise.
+        """Stream one LLM completion; feed each sentence-sized chunk to TTS and
+        forward its audio sub-chunks to the client as they are generated."""
+        async for text_chunk in sentence_chunks(llm.stream_reply(messages)):
+            text_chunk = _strip_end_marker(text_chunk, progress)
+            text_chunk = _strip_foreign_script(text_chunk)
 
-        Raises `_NeedsCorrection` if `skip_check` is False and the first
-        chunk fails the Language/repetition checks (the retry attempt passes
-        True, since that budget is spent after one correction), and lets
-        `OpenAIError` from the LLM call propagate — both handled by the
-        caller's retry loop. A TTS failure is not retried at this level;
-        it's yielded as `Failed` directly."""
-        pending: tuple[str, asyncio.Task[bytes | None]] | None = None
-        checked = skip_check
+            if text_chunk:
+                turn.persona_text += text_chunk + " "
+                async for event in self._speak(turn, text_chunk, progress):
+                    yield event
+                    if isinstance(event, Failed):
+                        return
+
+            if progress.ends_call:
+                break  # nothing meaningful should follow the marker
+
+    async def _speak(self, turn: Turn, text_chunk: str, progress: _ReplyProgress) -> AsyncIterator[TurnEvent]:
+        """Synthesize one chunk and forward its audio as KugelAudio produces it,
+        piece by piece (ADR 0044). A failure past the fallback ends the Turn."""
+        voiced = False
         try:
-            async for text_chunk in sentence_chunks(llm.stream_reply(messages)):
-                checked = self._check_first_chunk_once(checked, text_chunk)
-                text_chunk = _strip_end_marker(text_chunk, progress)
-                text_chunk = _strip_foreign_script(text_chunk)
-
-                if text_chunk:
-                    turn.persona_text += text_chunk + " "
-                    async for event in _drain_if_pending(turn, pending, progress):
-                        yield event
-                    pending = (text_chunk, asyncio.create_task(self._synthesize_with_retry(text_chunk)))
-
-                if progress.ends_call:
-                    break  # nothing meaningful should follow the marker
-
-            async for event in _drain_if_pending(turn, pending, progress):
-                yield event
-        except (OpenAIError, _NeedsCorrection):
-            if pending is not None:
-                pending[1].cancel()
-            raise
+            async for wav in tts.synthesize_stream(text_chunk, self._voice, self._language_id):
+                if not voiced:
+                    voiced = True
+                    progress.spoken_text += text_chunk + " "
+                if not progress.spoke_yet:
+                    yield StateChanged(state="speaking")
+                    progress.spoke_yet = True
+                progress.chunk_seq += 1
+                self._note_persona_audio(turn, wav)
+                yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=wav)
+        except (KugelAudioError, OpenAIError, TimeoutError, OSError) as e:
+            logger.error("TTS synthesis failed: %s", e)
+            yield Failed(code="tts_failed", message=str(e))
 
     async def _transcribe_with_retry(
         self, audio_bytes: bytes, filename: str, content_type: str | None
@@ -420,13 +540,4 @@ class SessionOrchestrator:
                 return await stt.transcribe(audio_bytes, filename, content_type, self._language_id)
             except OpenAIError as e:
                 logger.error("STT request failed (attempt %d): %s", attempt + 1, e)
-        return None
-
-    async def _synthesize_with_retry(self, text: str) -> bytes | None:
-        """Synthesize one chunk with one retry on failure; None if both attempts fail."""
-        for attempt in range(2):  # initial attempt + one retry
-            try:
-                return await tts.synthesize(text, self._voice, self._language_id)
-            except (OpenAIError, KugelAudioError) as e:
-                logger.error("TTS request failed (attempt %d): %s", attempt + 1, e)
         return None

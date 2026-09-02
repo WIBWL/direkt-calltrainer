@@ -1,0 +1,2660 @@
+
+<!doctype html>
+<html lang="de" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-powered phone conversation trainer">
+      
+      
+      
+      
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.49">
+    
+    
+      
+        <title>Model & Parameter Tuning — STT, LLM, TTS - Calltrainer</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.6f8fc17f.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#model-parameter-tuning-stt-llm-tts" class="md-skip">
+          Zum Inhalt
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Kopfzeile">
+    <a href=".." title="Calltrainer" class="md-header__button md-logo" aria-label="Calltrainer" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calltrainer
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Model &amp; Parameter Tuning — STT, LLM, TTS
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Suche" placeholder="Suche" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Suche">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Zurücksetzen" aria-label="Zurücksetzen" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Suche wird initialisiert
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Calltrainer" class="md-nav__button md-logo" aria-label="Calltrainer" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calltrainer
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../initial_requirements/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Initial Requirements
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datenmodell/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Datenmodell
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Architecture Decisions
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture Decisions
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0000-record-architecture-decisions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0000 - Record Architecture Decisions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0001-separate-scenario-and-persona/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0001 - Separate Scenario and Persona Concepts
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0002-persona-library/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0002 - Personas as an Extensible Library
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0003-feedback-fully-ai-generated/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0003 - No Human Trainer, Feedback Fully AI-Generated
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0004-qualitative-feedback-over-score/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0004 - Qualitative Feedback Over Score
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0005-no-domain-knowledge-or-sales-kpis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0005 - No Automated Enterprise/CRM Integration, No Sales KPIs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0006-german-only-for-mvp/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0006 - German Only for the MVP (superseded)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0007-desktop-headset-primary-access/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0007 - Desktop + Headset Primary Access
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0008-react-typescript-frontend/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0008 - React + TypeScript Frontend
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0009-keycloak-oidc-pkce-auth/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0009 - Keycloak OIDC Authorization Code Flow + PKCE
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0010-own-postgresql-instance-for-session-persistence/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0010 - Own PostgreSQL Instance for Session Persistence
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0011-direkt-llm-backend/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0011 - DiReKT LLM Backend, Self-Contained
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0012-python-fastapi-backend/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0012 - Python + FastAPI Backend
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0013-minimal-required-setup/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0013 - Minimal Required Setup, Advanced Options Separate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0014-feedback-only-after-call/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0014 - Feedback Only in the Post-Call Wrap-Up
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0015-persona-card-selection/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0015 - Persona Selection via Card View
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0016-pipeline-failure-handling/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0016 - Pipeline Failure Handling (Retry Once, Then End Session)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0017-no-provider-abstraction/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0017 - No Provider Abstraction Layer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0018-layered-monolith-with-async-feedback-worker/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0018 - Layered Monolith + Async Feedback Worker
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0019-redis-rq-job-queue/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0019 - Redis + RQ Job Queue
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0020-university-server-hosting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0020 - University-Hosted Server Deployment
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0021-local-stt-tts-models/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0021 - Local Self-Hosted STT/TTS Models (TTS half superseded)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0022-language-independent-session-parameter/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0022 - Language as Independent Session Parameter (superseded)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0023-no-persistence-in-mvp-consent-gated-after/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0023 - No Session Data Persisted Beyond the MVP; Consent-Gated Storage After (superseded)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0024-user-authored-scenario-and-persona/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0024 - User-Authored Scenario Context and Personas (Post-MVP)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0025-sqlalchemy-orm/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0025 - SQLAlchemy 2.0 as ORM
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0026-normalized-schema-for-session-persistence/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0026 - Normalized Relational Schema for Session Persistence
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0027-alembic-migrations-from-orm-metadata/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0027 - Alembic Migrations Autogenerated from ORM Metadata
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0028-no-secondary-indexes-yet/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0028 - No Secondary Indexes Beyond Primary/Foreign Keys Yet (superseded)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0029-jsonb-for-measurement-details/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0029 - JSONB for Flexible Per-Measurement Detail Data
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0030-erd-generated-from-orm-metadata/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0030 - ER Diagram Generated from ORM Metadata
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0031-pseudonymous-subject-id-placeholder/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0031 - Pseudonymous subject_id Placeholder Instead of a User FK
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0032-analysis-job-persisted-status/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0032 - AnalysisJob as a Persisted Entity for Async Job Status
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0033-streaming-session-pipeline/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0033 - Streaming Session Pipeline via Chunked TTS over WebSocket
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0034-persist-session-data-at-session-end/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0034 - Session Data Persisted in the MVP, Written Once at Session End
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0035-barge-in-interruption/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0035 - Eager Client-Driven Barge-In Interruption
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0036-vad-backchannel-filtering/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0036 - VAD Confirmed-Speech Threshold Instead of a Backchannel Word List
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0037-regex-closing-intent-detection/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0037 - Closing-Intent Detection Is Regex-Based, Not an LLM Classifier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0038-repetition-guard-and-fallback-closing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0038 - Repetition Guard and Guaranteed Fallback Closing Line
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0039-centralized-logging/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0039 - Centralized Logging, Colored Console + Per-Session-Truncated File
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0040-kugelaudio-default-tts-gemini-removed/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0040 - KugelAudio Default TTS with DiReKT Fallback; Gemini Removed
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0041-personas-scenarios-from-database/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0041 - Personas and Scenarios Loaded from the Database
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0042-prewarm-opening-turn-at-commitment/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0042 - Opening Turn Pre-Warmed at Session Commitment
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0043-english-prompt-content-persona-bound-language/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0043 - English Prompt Content, Session Language Bound to the Persona
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0044-streaming-tts-forward-subchunks/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0044 - Forward KugelAudio's Audio Sub-Chunks; No Persistent Streaming Session
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0045-case-facts-on-scenario-objections-on-persona/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0045 - Case Facts, Call Goal and Success Condition on the Scenario; Objections on the Persona
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0046-liveliness-at-the-prompt-layer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0046 - Liveliness Is Pursued at the Prompt Layer Before the Turn-Taking Layer (proposed)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0047-parselmouth-praat-acoustic-measurement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0047 - Praat via Parselmouth as the Paraverbal Measurement Engine
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0048-inline-acoustic-analysis-audio-not-persisted/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0048 - Paraverbal Analysis Inline on In-Memory Audio, Audio Never Persisted
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0049-deterministic-measurement-llm-interpretation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0049 - The Model Interprets Measurements, It Does Not Produce Them
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0050-unguessable-session-id/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0050 - A Session Is Addressed by an Unguessable Id
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0051-session-level-statistics-and-machine-latency/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0051 - Session-Level Statistics Carrying No Invented Norms
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0052-index-every-foreign-key-column/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0052 - Index Every Foreign-Key Column
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0053-named-constraints-and-database-enforced-vocabularies/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR 0053 - Deterministic Constraint Names and Database-Enforced Vocabularies
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Architecture (arc42)
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture (arc42)
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../arc42/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Gesamtdokument
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/arc42/#1-einfuhrung-und-ziele" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    1. Einführung und Ziele
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/arc42/#2-randbedingungen" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    2. Randbedingungen
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/arc42/#3-kontextabgrenzung" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    3. Kontextabgrenzung
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/arc42/#4-losungsstrategie" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    4. Lösungsstrategie
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/arc42/#5-bausteinsicht" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    5. Bausteinsicht
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/arc42/#6-laufzeitsicht" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    6. Laufzeitsicht
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/arc42/#7-verteilungssicht" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    7. Verteilungssicht
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/arc42/#8-querschnittliche-konzepte" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    8. Querschnittliche Konzepte
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/arc42/#9-architekturentscheidungen" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    9. Architekturentscheidungen
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/arc42/#10-qualitatsanforderungen" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    10. Qualitätsanforderungen
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/arc42/#11-risiken-und-technische-schulden" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    11. Risiken und technische Schulden
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="/arc42/#12-glossar" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    12. Glossar
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Inhaltsverzeichnis">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Inhaltsverzeichnis
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#changes-applied-20260831" class="md-nav__link">
+    <span class="md-ellipsis">
+      Changes applied 2026‑08‑31
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tldr" class="md-nav__link">
+    <span class="md-ellipsis">
+      TL;DR
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#method" class="md-nav__link">
+    <span class="md-ellipsis">
+      Method
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#available-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      Available models
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#llm-qwen3-4b-awq" class="md-nav__link">
+    <span class="md-ellipsis">
+      LLM — Qwen3-4B-AWQ
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="LLM — Qwen3-4B-AWQ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#current-call-backendclientsllmpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Current call (backend/clients/llm.py)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enable_thinking-false-mandatory-keep-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      enable_thinking: false — mandatory, keep it
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sampling-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sampling parameters
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#repetition-control-presence_penalty-not-frequency_penalty" class="md-nav__link">
+    <span class="md-ellipsis">
+      Repetition control — presence_penalty, not frequency_penalty
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#max_tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      max_tokens
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#seed" class="md-nav__link">
+    <span class="md-ellipsis">
+      seed
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#latency" class="md-nav__link">
+    <span class="md-ellipsis">
+      Latency
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-issues-that-are-prompt-not-parameter-problems" class="md-nav__link">
+    <span class="md-ellipsis">
+      Known issues that are prompt, not parameter, problems
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stt-whisper-large-v3-turbo" class="md-nav__link">
+    <span class="md-ellipsis">
+      STT — whisper-large-v3-turbo
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="STT — whisper-large-v3-turbo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#latency_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Latency
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameters-what-actually-does-something" class="md-nav__link">
+    <span class="md-ellipsis">
+      Parameters — what actually does something
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#silence-noise-confident-hallucination" class="md-nav__link">
+    <span class="md-ellipsis">
+      Silence / noise → confident hallucination
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#numbers-get-dropped" class="md-nav__link">
+    <span class="md-ellipsis">
+      Numbers get dropped
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tts" class="md-nav__link">
+    <span class="md-ellipsis">
+      TTS
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TTS">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#kugelaudio-default-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      KugelAudio (default backend)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kugelaudio-batch-vs-streaming-the-latency-win-done-adr-0044" class="md-nav__link">
+    <span class="md-ellipsis">
+      KugelAudio: batch vs streaming — the latency win (done, ADR 0044)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#voxtral4btts2603-direkt-fallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      Voxtral‑4B‑TTS‑2603 (DiReKT fallback)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-was-changed-vs-what-is-still-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      What was changed vs. what is still open
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#open-items" class="md-nav__link">
+    <span class="md-ellipsis">
+      Open items
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sources
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+<h1 id="model-parameter-tuning-stt-llm-tts">Model &amp; Parameter Tuning — STT, LLM, TTS<a class="headerlink" href="#model-parameter-tuning-stt-llm-tts" title="Permanent link">&para;</a></h1>
+<p>Investigation into the concrete models behind the Session pipeline: which
+parameters to set and to what values, backed by live measurements against the
+real endpoints (not the mock).</p>
+<p><strong>Date of measurements:</strong> 2026‑08‑31, over VPN into the gateway's network
+(the <code>llm.efre-direkt.de</code> LiteLLM gateway and the KugelAudio API were both
+reachable). All latency figures are wall‑clock round trips from this machine;
+absolute numbers will be lower on the deployment server, but the <em>relative</em>
+comparisons hold.</p>
+<p><strong>Priority: latency.</strong> Perceived speed is the top objective. Where a choice
+trades quality for latency, latency wins; where it is neutral, quality
+improvements are taken for free.</p>
+<hr />
+<h2 id="changes-applied-20260831">Changes applied 2026‑08‑31<a class="headerlink" href="#changes-applied-20260831" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.env</code> / <code>.env.example</code></td>
+<td><code>KUGELAUDIO_MODEL</code>: <code>kugel-2-turbo</code> → <code>kugel-3</code></td>
+<td>Measured (n=12): <code>kugel-3</code> matches turbo on time‑to‑first‑audio and is <strong>faster on full synthesis</strong> (839 ms vs 890 ms first chunk, 1136 ms vs 1356 ms mid). <code>kugel-2-turbo</code> is a deprecated id (<code>ka.models.list()</code> returns only <code>kugel-3</code>). The "turbo is faster" intuition does not hold here.</td>
+</tr>
+<tr>
+<td><code>backend/clients/tts.py</code> + <code>backend/session/orchestrator.py</code></td>
+<td><strong>New <code>synthesize_stream</code></strong> — <code>stream_async</code> per sentence chunk, <strong>each <code>AudioChunk</code> forwarded to the client as it arrives</strong> instead of buffering the chunk into one WAV. The one‑chunk‑deep <code>asyncio.Task</code> pipeline (<code>_drain_if_pending</code>) is removed. Full write‑up: <strong>ADR 0044</strong>.</td>
+<td>First‑audio for a Turn's first chunk: <strong>~0.9 s → ~0.28 s</strong> (p50, measured). End‑to‑end (STT + LLM + TTS) a Turn's first audio went <strong>~1.5 s → ~1.0 s</strong> in live testing. A persistent <code>streaming_session</code> was measured <em>slower</em> (~1.1 s) with this SDK — see ADR 0044.</td>
+</tr>
+<tr>
+<td><code>backend/clients/config.py</code></td>
+<td><code>KugelAudio(..., region="eu")</code></td>
+<td>Pins to <code>api.eu.kugelaudio.com</code>; the EU endpoint is used because the app is deployed in the EU (ADR 0020). Region-to-region RTT was not measured.</td>
+</tr>
+<tr>
+<td><code>backend/app.py</code></td>
+<td><code>await tts.prewarm()</code> in <code>lifespan</code></td>
+<td><code>connect_async()</code> pools the <code>stream_async</code> WebSocket at startup — removes ~300–600 ms of cold start from the <strong>first</strong> Turn of the process. Best‑effort, no‑op under <code>DEBUG</code>.</td>
+</tr>
+<tr>
+<td><code>backend/clients/llm.py</code></td>
+<td><code>temperature 0.7, top_p 0.8, presence_penalty 1.5, top_k 20, min_p 0</code>; <code>max_tokens 250 → 180</code></td>
+<td>Qwen3's documented non‑thinking sampling. Latency‑neutral on the forward pass, but tighter sampling produced <strong>shorter, more on‑task replies</strong> — fewer tokens to generate and synthesise. <code>frequency_penalty 0.5</code> was the weakest anti‑repetition option tested.</td>
+</tr>
+<tr>
+<td><code>backend/session/chunking.py</code></td>
+<td>First chunk flushed at the first sentence end past a <strong>25‑char</strong> floor (later chunks keep the 80‑char minimum)</td>
+<td>The first chunk sets the whole Turn's perceived latency. A ~40‑char opening sentence reaches TTS ~0.2–0.3 s sooner than waiting for an 80‑char buffer, and the LLM produces 40 chars before 80. The floor still stops a bare "Ja." / "Guten Tag." firing its own TTS call.</td>
+</tr>
+<tr>
+<td><code>backend/session/orchestrator.py</code></td>
+<td><code>_OPENING_INSTRUCTION</code> example <code>"Hi, this is…"</code> → <code>"Guten Tag, hier ist…"</code></td>
+<td>With the English example the model opened the call in English <strong>8/8</strong>; German example → <strong>0/8</strong>. (Quality, not latency — but free and low‑risk.)</td>
+</tr>
+</tbody>
+</table>
+<p>All the big TTS latency wins are now in (ADR 0044). What remains
+(<a href="#open-items">Open items</a>) is smaller: the persona "write for speech" prompt
+block, the STT silence guard, and — only if load ever demands it — revisiting
+the persistent‑session path.</p>
+<hr />
+<h2 id="tldr">TL;DR<a class="headerlink" href="#tldr" title="Permanent link">&para;</a></h2>
+<p>The <strong>model choice is not open</strong> — only three of the models the gateway lists
+are still served (see <a href="#available-models">Available models</a>), so this is a
+parameter‑tuning exercise, not a model bake‑off.</p>
+<table>
+<thead>
+<tr>
+<th>Leg</th>
+<th>Model (fixed)</th>
+<th>Biggest finding</th>
+<th>Recommended change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LLM</td>
+<td><code>Qwen3-4B-AWQ</code> (only option)</td>
+<td><code>enable_thinking:false</code> is already set and is <strong>essential</strong> (without it: 3.2 s to first token and an empty reply). Sampling params were <strong>unset</strong> → the server ran at <code>temperature 1.0 / top_p 1.0</code>, looser than Qwen3's own recommendation, producing longer/driftier replies.</td>
+<td>✅ <code>temperature 0.7, top_p 0.8, top_k 20, min_p 0</code>, <code>presence_penalty 1.5</code> (replaces <code>frequency_penalty</code>), <code>max_tokens 180</code>. ✅ German opener example. ⬜ a larger model (e.g. <code>DeepSeek-V4-Flash</code>, if served again) would fix what prompt+params can't.</td>
+</tr>
+<tr>
+<td>STT</td>
+<td><code>whisper-large-v3-turbo</code> (only option)</td>
+<td>Fast (~0.8 s, RTF ≪ 1). <code>language</code>, <code>temperature</code>, <code>prompt</code>, <code>response_format</code> do <strong>nothing useful or actively harm</strong>. Hallucinates a fixed phrase on silence; drops spoken numbers.</td>
+<td>✅ No change (already correct — <code>json</code>, <code>language="de"</code>, no <code>prompt</code>). ⬜ Silence/hallucination guard.</td>
+</tr>
+<tr>
+<td>TTS</td>
+<td>KugelAudio <code>kugel-3</code> + <code>Voxtral-4B-TTS-2603</code> (fallback)</td>
+<td>"turbo is faster" is <strong>false</strong> — <code>kugel-3</code> matches <code>kugel-2-turbo</code> on first‑audio and beats it on full synthesis (n=12). The old batch call cost <strong>~0.9 s to first audio</strong>. Voxtral fallback is ~2–3× slower than KugelAudio.</td>
+<td>✅ <code>kugel-3</code>, <code>region="eu"</code>, <code>prewarm()</code>, early first chunk. ✅ <strong><code>synthesize_stream</code> forwards each <code>AudioChunk</code> — first audio ~0.9 s → ~0.28 s</strong> (ADR 0044). Persistent <code>streaming_session</code> measured <em>slower</em> with this SDK.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="method">Method<a class="headerlink" href="#method" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Each configuration was called <strong>N = 2–12 times</strong> against the live endpoint;
+  latency is reported as p50 (and mean ± σ where useful), not single shots.</li>
+<li>The LLM was driven with the <strong>real system prompt</strong>
+  (<code>backend.session.orchestrator._build_system_prompt(PERSONAS[0], SCENARIOS[0])</code>,
+  ≈ 1.5 k tokens) and realistic mid‑call German user turns, streamed, measuring
+  time‑to‑first‑token (TTFT) and total time.</li>
+<li>Quality was scored heuristically per reply: language (German vs
+  code‑switching), length, <code>&lt;think&gt;</code> leakage, spurious <code>[CALL_END]</code>, and
+  sentence repetition.</li>
+<li>STT was driven with <code>test/sample.wav</code> (12.1 s of German TTS speech) plus
+  synthesised silence/noise and truncated clips.</li>
+<li>TTS was measured for a typical chunk from the app's chunker
+  (<code>backend/session/chunking.py</code>, 80–250 chars) and for a one‑word chunk.</li>
+<li>Scripts live in the scratchpad, not the repo; this document is the artefact.</li>
+</ul>
+<hr />
+<h2 id="available-models">Available models<a class="headerlink" href="#available-models" title="Permanent link">&para;</a></h2>
+<p><code>GET https://llm.efre-direkt.de/v1/models</code> returns six ids:</p>
+<pre><code>Kimi-K2.7-Code   whisper-large-v3-turbo   Voxtral-4B-TTS-2603
+GLM-5.2-NVFP4    DeepSeek-V4-Flash-0731   Qwen3-4B-AWQ
+</code></pre>
+<p>…but only three are still served. <code>DeepSeek-V4-Flash-0731</code>, <code>GLM-5.2-NVFP4</code> and
+<code>Kimi-K2.7-Code</code> all return:</p>
+<pre><code>HTTP 403  {'error': 'model use not permitted'}
+</code></pre>
+<p>These larger models were available for free during a Hetzner trial phase that
+has since ended; <code>test/sample_benchmark_results.txt</code> (2026‑08‑09) shows Kimi and
+DeepSeek working then. They still appear in <code>/v1/models</code> but the backends are
+gone, so this is not a transient error. The gateway is a <strong>LiteLLM proxy</strong> in
+front of vLLM; the key is restricted to <code>llm_api_routes</code> only (no <code>/health</code>,
+<code>/version</code>).</p>
+<p><strong>Consequence:</strong> dialogue generation is locked to <code>Qwen3-4B-AWQ</code>, a 4‑billion‑
+parameter model. Several quality issues below (weak instruction‑following on the
+<code>[CALL_END]</code> protocol, occasional code‑switching) are inherent to a model that
+small and would most likely be fixed by <code>DeepSeek-V4-Flash-0731</code> at <code>low</code>
+reasoning effort. <strong>If a larger model becomes available again, moving dialogue
+generation onto it is the single highest‑leverage change available.</strong> Everything
+else here is making the most of Qwen3‑4B.</p>
+<hr />
+<h2 id="llm-qwen3-4b-awq">LLM — <code>Qwen3-4B-AWQ</code><a class="headerlink" href="#llm-qwen3-4b-awq" title="Permanent link">&para;</a></h2>
+<h3 id="current-call-backendclientsllmpy">Current call (<code>backend/clients/llm.py</code>)<a class="headerlink" href="#current-call-backendclientsllmpy" title="Permanent link">&para;</a></h3>
+<pre><code class="language-python">LLM_CLIENT.chat.completions.create(
+    model=LLM_MODEL, messages=messages, stream=True,
+    max_tokens=250,
+    frequency_penalty=0.5,
+    extra_body={&quot;chat_template_kwargs&quot;: {&quot;enable_thinking&quot;: False}},
+)
+</code></pre>
+<p>Everything not listed falls back to <strong>vLLM defaults</strong>: <code>temperature 1.0</code>,
+<code>top_p 1.0</code>, <code>top_k 0</code> (off), <code>min_p 0</code>, <code>presence_penalty 0</code>,
+<code>repetition_penalty 1.0</code>.</p>
+<h3 id="enable_thinking-false-mandatory-keep-it"><code>enable_thinking: false</code> — mandatory, keep it<a class="headerlink" href="#enable_thinking-false-mandatory-keep-it" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Config</th>
+<th>TTFT</th>
+<th>Visible reply</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enable_thinking: false</code> (current)</td>
+<td><strong>0.09 s</strong> (warm), 0.45 s cold</td>
+<td>full German reply, 15–45 words</td>
+</tr>
+<tr>
+<td>no toggle (thinking on)</td>
+<td><strong>3.16 s</strong></td>
+<td><strong>empty</strong> — the whole 250‑token budget is spent on English <code>reasoning_content</code>, which the streaming <code>delta.content</code> never surfaces</td>
+</tr>
+</tbody>
+</table>
+<p>Qwen3 thinking mode is catastrophic here: multi‑second first‑token latency and
+no usable output within any sane token budget. The current code is right; this
+note is so nobody "cleans up" the <code>extra_body</code>.</p>
+<h3 id="sampling-parameters">Sampling parameters<a class="headerlink" href="#sampling-parameters" title="Permanent link">&para;</a></h3>
+<p>Qwen3's model card gives explicit <strong>non‑thinking</strong> recommendations:
+<code>Temperature = 0.7, TopP = 0.8, TopK = 20, MinP = 0</code>, and <em>"DO NOT use greedy
+decoding"</em>. The app currently sets none of these, so it runs at <code>1.0 / 1.0</code>.</p>
+<p>Observed effect of tightening to the recommended values:</p>
+<ul>
+<li><strong>Opening line, language:</strong> with a tighter distribution the opener is more
+  consistently German and on‑format (see the prompt fix below — the dominant
+  factor there is the prompt, not sampling).</li>
+<li><strong>Persona consistency:</strong> at <code>temperature 0.3</code> replies became near‑identical
+  across runs (verbatim repeats between independent sessions) — too flat for a
+  training partner. <code>0.7</code> keeps variety while staying focused. <code>1.0</code> (today's
+  value) drifts: on an ambiguous turn only <strong>3/8</strong> replies stayed on task vs
+  <strong>8/8</strong> at <code>0.7</code>.</li>
+</ul>
+<p><strong>Recommendation:</strong> <code>temperature 0.7, top_p 0.8</code>, and <code>top_k 20, min_p 0</code> via
+<code>extra_body</code>.</p>
+<h3 id="repetition-control-presence_penalty-not-frequency_penalty">Repetition control — <code>presence_penalty</code>, not <code>frequency_penalty</code><a class="headerlink" href="#repetition-control-presence_penalty-not-frequency_penalty" title="Permanent link">&para;</a></h3>
+<p>ADR 0038 documents degenerate repetition (the model repeating its previous
+reply, or a sentence within a reply). The current mitigation is
+<code>frequency_penalty 0.5</code>. Qwen3's card instead recommends <strong><code>presence_penalty</code>
+0–2</strong> (<em>"If you encounter significant endless repetitions, set the
+<code>presence_penalty</code> to 1.5"</em>).</p>
+<p>Cross‑turn test — persona has already objected "too expensive", user gives a
+neutral turn, does the persona re‑raise the same objection?</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Re‑raises the objection</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>nothing</td>
+<td>0 / 8</td>
+</tr>
+<tr>
+<td><code>frequency_penalty 0.5</code> (current)</td>
+<td><strong>3 / 8</strong></td>
+</tr>
+<tr>
+<td><code>presence_penalty 1.5</code></td>
+<td>0 / 8</td>
+</tr>
+<tr>
+<td><code>repetition_penalty 1.1</code> (<code>extra_body</code>)</td>
+<td>1 / 8</td>
+</tr>
+<tr>
+<td><code>presence_penalty 1.0</code> + <code>frequency_penalty 0.3</code></td>
+<td>0 / 8</td>
+</tr>
+</tbody>
+</table>
+<p><code>frequency_penalty 0.5</code> alone was the <strong>weakest</strong> option in this test. Note
+<code>presence_penalty 1.5</code> occasionally pulls system‑prompt phrasing into the reply
+("Ich habe einen konkreten Grund für diesen Anruf" — a paraphrase of the
+<code>behavior</code> text); <code>1.0</code> is a safer default.</p>
+<p><strong>Recommendation:</strong> replace <code>frequency_penalty 0.5</code> with <code>presence_penalty 1.5</code>
+(matches the card), or <code>presence_penalty 1.0</code> if the system‑prompt‑echo effect
+shows up in practice. Keep the in‑code repetition guard (ADR 0038) regardless —
+sampling reduces the rate, it does not eliminate it.</p>
+<h3 id="max_tokens"><code>max_tokens</code><a class="headerlink" href="#max_tokens" title="Permanent link">&para;</a></h3>
+<p><code>250</code> is fine. It is a <strong>safety cap, not a target</strong> — normal replies use
+15–45 words (≈ 20–60 tokens); the cap is only hit on the rare rambling
+"frustrated" turn, where truncation is acceptable. Do <strong>not</strong> lower it to
+"encourage" brevity — brevity comes from the prompt, and a low cap just cuts
+sentences mid‑word (observed at <code>max_tokens 120</code>). Keep it. (vLLM's own default
+is <code>16</code>, so this parameter must stay set.)</p>
+<h3 id="seed"><code>seed</code><a class="headerlink" href="#seed" title="Permanent link">&para;</a></h3>
+<p>vLLM honours <code>seed</code>: same seed → byte‑identical output, different seed →
+different. Not wanted in production (variety is the point) but useful for the
+test suite and for A/B‑ing prompt changes deterministically.</p>
+<h3 id="latency">Latency<a class="headerlink" href="#latency" title="Permanent link">&para;</a></h3>
+<p>With thinking off, Qwen3‑4B on this gateway is <strong>not a latency concern</strong>:
+TTFT ≈ 0.09 s once warm, full short reply in 0.4–1.0 s. The first request after
+a cold start pays ≈ 0.4 s to prefill the long system prompt, then the prefix is
+cached server‑side.</p>
+<h3 id="known-issues-that-are-prompt-not-parameter-problems">Known issues that are <strong>prompt</strong>, not parameter, problems<a class="headerlink" href="#known-issues-that-are-prompt-not-parameter-problems" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p><strong>English opener leak.</strong> <code>_OPENING_INSTRUCTION</code> contains the literal example
+   <code>e.g. "Hi, this is..."</code>. Qwen3‑4B copies it: <strong>8/8</strong> openings started with
+   "Hi, …" ("Hi, das ist Herr Meier von der Geschäftsführung…"), 3/8 were
+   half‑English. Swapping the example to German (<code>e.g. "Guten Tag, hier ist…"</code>)
+   → <strong>0/8</strong> code‑switching. This aligns with ADR 0043 (language‑keyed prompt
+   examples). <strong>Fix the example</strong> — ideally key it by <code>language_id</code> like the
+   other language‑bound constants.</p>
+</li>
+<li>
+<p><strong><code>[CALL_END]</code> over‑eagerness.</strong> On an ambiguous "that's clear then, but…"
+   turn where the persona should keep pushing, it still appends <code>[CALL_END]</code> in
+   <strong>~2/8 (temp 0.7)</strong> replies — ending the call while the user is still
+   engaged. This is the exact failure ADR 0037 rejected an LLM classifier for,
+   now coming from the dialogue model itself. Mitigations tried:</p>
+</li>
+<li>lower temperature — helps marginally, costs persona variety;</li>
+<li><em>"ignore <code>[CALL_END]</code> if the reply also contains <code>?</code>"</em> — <strong>rejected</strong>:
+     4/8 <em>legitimate</em> endings also carry a trailing question, so the guard
+     breaks more than it fixes.
+   No clean fix at this model size. Documented as a known limitation; strongest
+   argument for moving to a larger model if one becomes available.</li>
+</ol>
+<hr />
+<h2 id="stt-whisper-large-v3-turbo">STT — <code>whisper-large-v3-turbo</code><a class="headerlink" href="#stt-whisper-large-v3-turbo" title="Permanent link">&para;</a></h2>
+<p>Only STT model available. It is <strong>fast and accurate</strong>; almost every knob is
+inert.</p>
+<h3 id="latency_1">Latency<a class="headerlink" href="#latency_1" title="Permanent link">&para;</a></h3>
+<p>0.44–0.97 s for anything from 0.3 s to 12 s of audio — RTF far below 1, flat in
+input length. <strong>Not a bottleneck.</strong> (The blocking nature of STT per Turn, ADR
+0033, stands, but the wait is short.)</p>
+<h3 id="parameters-what-actually-does-something">Parameters — what actually does something<a class="headerlink" href="#parameters-what-actually-does-something" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Finding</th>
+<th>Recommendation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>language</code></td>
+<td><code>"de"</code>, unset, and even <strong><code>"en"</code></strong> produce byte‑identical output and identical latency on clear German audio. vLLM auto‑detects regardless.</td>
+<td>Keep <code>language="de"</code> — correct intent, harmless, and may matter on borderline audio.</td>
+</tr>
+<tr>
+<td><code>temperature</code></td>
+<td><code>0.0 / 0.2 / 0.5</code> → identical output. Decoding is effectively greedy.</td>
+<td>Leave unset (default 0).</td>
+</tr>
+<tr>
+<td><code>response_format</code></td>
+<td><code>json</code> works. <strong><code>text</code> is broken</strong> — it returns a JSON <em>string</em>, not plain text. <code>verbose_json</code> returns segments <strong>but <code>no_speech_prob</code> is <code>null</code></strong> (not populated by this build).</td>
+<td>Keep the SDK default (<code>json</code>). Do <strong>not</strong> rely on <code>no_speech_prob</code>.</td>
+</tr>
+<tr>
+<td><code>prompt</code></td>
+<td><strong>Actively harmful.</strong> A spelling‑hint prompt turned "Meier" into "Meijer" and dropped the leading "Guten Tag". Matches a known unresolved vLLM bug.</td>
+<td><strong>Never set <code>prompt</code>.</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="silence-noise-confident-hallucination">Silence / noise → confident hallucination<a class="headerlink" href="#silence-noise-confident-hallucination" title="Permanent link">&para;</a></h3>
+<p>VAD misfires (ADR 0036) will occasionally send a near‑silent Turn. Whisper does
+not return empty — it invents:</p>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Transcript (3/3 runs)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.3 s / 0.5 s / 2 s silence</td>
+<td><code>"Vielen Dank."</code></td>
+</tr>
+<tr>
+<td>1 s low‑level noise</td>
+<td><code>"Amen."</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>"Vielen Dank."</code> is a mild closing signal — a hallucinated one could nudge the
+persona toward ending the call. The only usable signal is weak:
+<code>avg_logprob ≈ -0.34</code> for the hallucination vs <code>-0.05…-0.23</code> for real speech,
+and <code>compression_ratio</code> <code>0.62</code> vs <code>0.87–0.95</code>.</p>
+<p><strong>Recommended guard (needs its own small design):</strong> after transcription, treat a
+Turn as <em>empty / no‑op</em> (return to listening, no persona reply, no history
+entry) when the transcript is short <strong>and</strong> low‑confidence — e.g. request
+<code>response_format="verbose_json"</code> and drop the Turn when
+<code>len(text) &lt; ~15</code> and <code>avg_logprob &lt; -0.5</code>, or maintain a tiny blocklist of the
+handful of known hallucination phrases (<code>"Vielen Dank."</code>, <code>"Amen."</code>,
+<code>"Untertitel…"</code>, …). Primary defence stays client‑side: the VAD <code>minSpeechMs</code>
+threshold.</p>
+<h3 id="numbers-get-dropped">Numbers get dropped<a class="headerlink" href="#numbers-get-dropped" title="Permanent link">&para;</a></h3>
+<p>"…Angebot <strong>über 12.400 Euro</strong> angefragt" transcribed as "…Angebot <strong>über
+Euro</strong> angefragt" in <em>every</em> configuration — the amount vanishes. Phone numbers
+are mangled too ("0931 8765432" → "093318765432"). A turbo‑model weakness, not
+tunable. Relevant to the pricing Scenario and to F‑40 (concreteness); worth a
+note in the Session summary UI that spoken figures may not survive transcription.</p>
+<hr />
+<h2 id="tts">TTS<a class="headerlink" href="#tts" title="Permanent link">&para;</a></h2>
+<h3 id="kugelaudio-default-backend">KugelAudio (default backend)<a class="headerlink" href="#kugelaudio-default-backend" title="Permanent link">&para;</a></h3>
+<p>Current call: <code>tts.generate_async(text, model_id="kugel-2-turbo",
+voice_id=1885, language="de")</code> — everything else default (<code>cfg_scale 2.0</code>,
+<code>sample_rate 24000</code>, <code>speed 1.0</code>, <code>normalize True</code>).</p>
+<p><strong>Voice 1885</strong> is a custom voice literally named <em>"Thomas Brandt"</em> — MALE,
+CONVERSATIONAL, <em>"40s, native German, clear, warm, confident, professional"</em> —
+i.e. purpose‑built for the persona. Keep it.</p>
+<p><strong>Model id — "turbo is faster" does not hold.</strong> <code>ka.models.list()</code> returns only
+<strong><code>kugel-3</code></strong>; <code>kugel-2-turbo</code> still works (legacy ids accepted) but is
+deprecated. Full per‑model latency, <strong>n = 12, p50</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Model id</th>
+<th>stream TTFA (first chunk)</th>
+<th>stream TTFA (mid chunk)</th>
+<th>stream full synth (first)</th>
+<th>stream full synth (mid)</th>
+<th>batch total (first)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>kugel-3</code></strong></td>
+<td>298 ms</td>
+<td><strong>257 ms</strong></td>
+<td><strong>839 ms</strong></td>
+<td><strong>1136 ms</strong></td>
+<td>852 ms</td>
+</tr>
+<tr>
+<td><code>kugel-2.5</code></td>
+<td>319 ms</td>
+<td>305 ms</td>
+<td>1003 ms</td>
+<td>1505 ms</td>
+<td>844 ms</td>
+</tr>
+<tr>
+<td><code>kugel-2-turbo</code> (was default)</td>
+<td>291 ms</td>
+<td>295 ms</td>
+<td>890 ms</td>
+<td>1356 ms</td>
+<td>910 ms</td>
+</tr>
+<tr>
+<td><code>kugel-2</code></td>
+<td>259 ms</td>
+<td>303 ms</td>
+<td>898 ms</td>
+<td>1399 ms</td>
+<td>1118 ms</td>
+</tr>
+<tr>
+<td><code>kugel-1-turbo</code></td>
+<td>267 ms</td>
+<td>295 ms</td>
+<td>838 ms</td>
+<td>1204 ms</td>
+<td>896 ms</td>
+</tr>
+</tbody>
+</table>
+<p>Time‑to‑first‑audio is within noise for every model (259–319 ms). On <strong>full
+synthesis</strong> — which matters because later chunks queue behind the current one —
+<code>kugel-3</code> is the fastest of the supported models and clearly beats
+<code>kugel-2-turbo</code> (‑50 ms first chunk, ‑220 ms mid chunk). <code>kugel-1-turbo</code> is
+marginally quicker on TTFA but is two generations older.</p>
+<p><strong>Applied:</strong> <code>KUGELAUDIO_MODEL=kugel-3</code>.</p>
+<p><strong><code>cfg_scale</code>:</strong> clamped to <code>[1.2, 2.5]</code>, default <code>2.0</code>. <code>2.0</code> was both the
+documented sweet spot and the fastest (<code>1.3</code> and <code>2.5</code> were slower). Leave
+default.</p>
+<p><strong><code>sample_rate</code> / <code>output_format</code>:</strong> <code>24000</code> is native; other rates just add
+resampling and don't speed up inference (confirmed — 16 kHz was no faster).
+Leave default; the app's PCM16→WAV wrap is fine.</p>
+<p><strong><code>speed</code>:</strong> no latency effect, <code>1.0</code> is natural. Leave default.</p>
+<h3 id="kugelaudio-batch-vs-streaming-the-latency-win-done-adr-0044">KugelAudio: batch vs streaming — the latency win (done, ADR 0044)<a class="headerlink" href="#kugelaudio-batch-vs-streaming-the-latency-win-done-adr-0044" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Path (first audio, p50)</th>
+<th>latency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>generate_async</code> per chunk (old), first chunk</td>
+<td><strong>0.90 s</strong></td>
+</tr>
+<tr>
+<td><code>generate_async</code>, one‑word chunk</td>
+<td>0.65 s</td>
+</tr>
+<tr>
+<td><code>stream_async</code> per chunk, forwarding each <code>AudioChunk</code></td>
+<td><strong>0.28 s</strong></td>
+</tr>
+<tr>
+<td>persistent <code>streaming_session</code>, <code>send()</code> per sentence + one <code>flush()</code></td>
+<td><strong>1.11 s</strong></td>
+</tr>
+<tr>
+<td><code>generate_async</code> per sentence, 3‑sentence turn, realistic LLM gap</td>
+<td>0.81 s</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Implemented:</strong> <code>synthesize_stream</code> — one <code>stream_async</code> per sentence chunk,
+each <code>AudioChunk</code> forwarded straight to the client, over the <code>prewarm()</code>‑pooled
+connection, <code>region="eu"</code>. The one‑chunk‑deep <code>asyncio.Task</code> pipeline is gone
+(<code>stream_async</code> already overlaps generation and playback). First chunk of a
+Turn: <strong>~0.9 s → ~0.28 s</strong>; end‑to‑end Turn first‑audio <strong>~1.5 s → ~1.0 s</strong>
+live.</p>
+<p><strong>Rejected — persistent <code>streaming_session</code>.</strong> KugelAudio's own guidance
+("keep one session per Turn, <code>flush</code> once, pay the model TTFA once") optimises
+<em>total</em> Turn time, not first‑audio, and with <code>kugelaudio==1.9.0</code> it was
+measurably <strong>worse</strong> to first audio (1.11 s): <code>session.send()</code> polls ~50 ms for
+audio then returns, so with the LLM emitting a sentence every ~200 ms the
+server holds synthesis until the closing <code>flush</code>, which lands at end‑of‑reply.
+<code>stream_async</code> per chunk pays N prefills (worse total time, but the audio plays
+out over seconds anyway) and each chunk's first audio is ~0.28 s. If a later
+SDK delivers audio mid‑<code>send()</code>, the persistent path is worth re‑measuring —
+the call site is one method.</p>
+<h3 id="voxtral4btts2603-direkt-fallback">Voxtral‑4B‑TTS‑2603 (DiReKT fallback)<a class="headerlink" href="#voxtral4btts2603-direkt-fallback" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Voxtral</th>
+<th>KugelAudio <code>kugel-3</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>~105‑char chunk, total synth</td>
+<td>~3.6 s (RTF ≈ 0.7)</td>
+<td>~1.2 s (RTF ≈ 0.25)</td>
+</tr>
+<tr>
+<td>one‑word chunk</td>
+<td>~1.1 s</td>
+<td>~0.65 s</td>
+</tr>
+<tr>
+<td>output</td>
+<td>24 kHz WAV/PCM/MP3</td>
+<td>24 kHz PCM</td>
+</tr>
+</tbody>
+</table>
+<p>Voxtral is ~2–3× slower per chunk and its latency scales worse with length. It
+is a correct <em>fallback</em> (ADR 0040) but noticeably degrades the conversational
+feel while active — fine as an availability net, not something to switch to.</p>
+<ul>
+<li>Voices: <code>de_male</code> (current), <code>de_female</code>, <code>casual_male</code> work. <code>male</code>,
+  <code>formal_male</code>, <code>male_1</code> → <strong>HTTP 500</strong> (invalid voice → server error, not a
+  4xx). The hard‑coded <code>de_male</code> is safe.</li>
+<li><code>response_format</code>: keep <code>wav</code> (the code does). <code>pcm</code> returns headerless,
+  <code>mp3</code> works and is ~5× smaller if bandwidth ever matters.</li>
+<li><code>language</code>: <code>"de"</code>, <code>"German"</code>, and unset all produce output; keep <code>"de"</code>.</li>
+</ul>
+<hr />
+<h2 id="what-was-changed-vs-what-is-still-open">What was changed vs. what is still open<a class="headerlink" href="#what-was-changed-vs-what-is-still-open" title="Permanent link">&para;</a></h2>
+<p>All the changes in the table at the top are <strong>applied</strong> and live‑tested. The
+TTS streaming rework is written up as <strong>ADR 0044</strong>; the LLM sampling and
+opening‑line fixes have no ADR (they're parameter changes).</p>
+<p><strong>STT — no code change, and do not:</strong> add a <code>prompt</code> argument, or switch
+<code>response_format</code> away from <code>json</code>.</p>
+<hr />
+<h2 id="open-items">Open items<a class="headerlink" href="#open-items" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Move to <code>DeepSeek-V4-Flash-0731</code> if it is served again.</strong> Biggest single
+   <em>quality</em> lever; would likely resolve the <code>[CALL_END]</code> over‑eagerness and
+   code‑switching that Qwen3‑4B cannot be prompted out of. Its thinking‑toggle
+   is <code>chat_template_kwargs: {"thinking": false}</code> / <code>reasoning_effort: "low"</code>,
+   not Qwen3's <code>enable_thinking</code>. Note: <code>DeepSeek-V4-Flash</code> at <code>low</code> effort was
+   as fast as Qwen3 in the 2026‑08‑09 benchmark (<code>test/sample_benchmark_results.txt</code>),
+   so this is not a speed sacrifice — re‑measure if it comes back.</li>
+<li><strong>Persona "write for speech" prompt block.</strong> <code>_build_system_prompt</code> has no
+   rule against markdown / emoji / stage directions; the dialogue model
+   occasionally emits <code>—</code>, quotes, <code>[...]</code>. Add the KugelAudio prompt block
+   (see the <code>kugelaudio-tts</code> skill).</li>
+<li><strong>STT hallucination guard</strong> — small, self‑contained; decide verbose_json +
+   <code>avg_logprob</code> threshold vs a phrase blocklist.</li>
+<li><strong>Number/figure transcription loss</strong> — no fix; note it in the Session summary
+   UI and keep it in mind for the pricing Scenario.</li>
+</ol>
+<hr />
+<h2 id="sources">Sources<a class="headerlink" href="#sources" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="https://huggingface.co/Qwen/Qwen3-4B">Qwen3‑4B model card — best practices / sampling</a></li>
+<li><a href="https://docs.vllm.ai/en/latest/api/vllm/sampling_params.html">vLLM <code>SamplingParams</code> defaults</a></li>
+<li><a href="https://docs.vllm.ai/en/latest/serving/online_serving/speech_to_text/">vLLM Speech‑to‑Text API</a></li>
+<li><a href="https://github.com/vllm-project/vllm/issues/35276">vLLM issue #35276 — Whisper <code>prompt</code> causes hallucination</a></li>
+<li><a href="https://recipes.vllm.ai/deepseek-ai/DeepSeek-V4-Flash">DeepSeek‑V4‑Flash — vLLM recipe</a></li>
+<li><a href="https://recipes.vllm.ai/zai-org/GLM-5.2">GLM‑5.2 — vLLM recipe</a></li>
+<li><a href="https://recipes.vllm.ai/mistralai/Voxtral-4B-TTS-2603">Voxtral‑4B‑TTS‑2603 — vLLM recipe</a> · <a href="https://huggingface.co/mistralai/Voxtral-4B-TTS-2603">model card</a></li>
+<li><a href="https://docs.kugelaudio.com/models.md">KugelAudio docs — models</a> · <a href="https://docs.kugelaudio.com/sdks/python/generate">generate params</a> · <a href="https://docs.kugelaudio.com/streaming/chunking-and-latency.md">streaming &amp; latency</a> · <a href="https://docs.kugelaudio.com/latency.md">latency methodology</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.expand"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "In Zwischenablage kopiert", "clipboard.copy": "In Zwischenablage kopieren", "search.result.more.one": "1 weiteres Suchergebnis auf dieser Seite", "search.result.more.other": "# weitere Suchergebnisse auf dieser Seite", "search.result.none": "Keine Suchergebnisse", "search.result.one": "1 Suchergebnis", "search.result.other": "# Suchergebnisse", "search.result.placeholder": "Suchbegriff eingeben", "search.result.term.missing": "Es fehlt", "select.version": "Version ausw\u00e4hlen"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.88dd0f4e.min.js"></script>
+      
+    
+  </body>
+</html>

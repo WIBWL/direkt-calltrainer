@@ -20,7 +20,7 @@ The MVP is operated with the project team and the two pilot companies, and has n
 
 We will persist Session data in the MVP, and we will write it exactly once, at the end of a Session, in a single transaction.
 
-Persisted are Session metadata, the Turn transcripts, and — once the async worker of ADR 0018 exists — the measurements, findings, and Feedback belonging to that Session. Session audio is not persisted. ADR 0010 already keeps large files out of this database, and the schema (ADR 0026) has no column for a recording; a Session's audio therefore continues to exist only for as long as the Session is running.
+Persisted are Session metadata, the Turn transcripts, and — once the async worker of ADR 0018 exists — the measurements, findings, and Feedback belonging to that Session. Session audio is not persisted yet: the schema (ADR 0026) has no column for a recording, so a Session's audio exists only for as long as the Session is running.
 
 The write happens after the Session has ended, at the point where the completed transcript is assembled for the client, and never during the live turn loop. Because the ORM session is synchronous and the surrounding path is asynchronous, the write is dispatched off the event loop rather than awaited inline. A Session that ends because the client disconnected is not persisted; only Sessions that reach a regular end — the user ending the call, the Persona ending it, or a pipeline failure per ADR 0016 — produce a row.
 

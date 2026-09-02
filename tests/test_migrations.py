@@ -58,17 +58,22 @@ def test_full_round_trip_restores_the_same_schema(empty_database: str) -> None:
     assert after == before
 
 
-def test_turn_holds_both_speakers_in_one_row(empty_database: str) -> None:
-    """Guards the decision that a Turn is one exchange, not one utterance
-    (CONTEXT.md's "Turn" entry) — the shape the analysis tables depend on."""
+def test_turn_holds_one_utterance_per_row(empty_database: str) -> None:
+    """Guards the decision that a stored Turn is one utterance of one speaker,
+    not a whole exchange (ADR 0026).
+
+    A Turn is an exchange in memory (CONTEXT.md's "Turn" entry, and
+    backend/session/models.py holds it that way), but it is stored flattened —
+    that is what gives every line its own offset and makes the
+    Gesprächsprotokoll timestamped. `utterances()` performs the flattening.
+    """
     alembic_upgrade(empty_database)
 
     columns = _columns(empty_database, "turn")
-    assert {"user_transcript", "persona_transcript"} <= columns
-    assert {"user_duration_ms", "persona_duration_ms"} <= columns
-    # Dropped with the pairing: a paired Turn has no single speaker or start.
-    assert "sprecher" not in columns
-    assert "start_offset_ms" not in columns
+    assert {"speaker", "transcript", "start_offset_ms", "duration_ms"} <= columns
+    # A row names one speaker, so there are no per-speaker halves on it.
+    assert "user_transcript" not in columns
+    assert "persona_transcript" not in columns
 
 
 def _constraint_names(url: str) -> list[tuple[str, str, str]]:
