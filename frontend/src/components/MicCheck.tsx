@@ -12,7 +12,7 @@ interface MicCheckProps {
 
 /** Pre-call microphone test: lets the user confirm that recording works before a session starts. */
 export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
-  const { level, error, start } = useMicrophoneLevel();
+  const { level, error, start, stop } = useMicrophoneLevel();
 
   // The microphone remains inactive until the user deliberately starts the test.
   const [isTesting, setIsTesting] = useState(false);
@@ -21,8 +21,12 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
   const [heardSomething, setHeardSomething] = useState(false);
 
   useEffect(() => {
-    if (level >= HEARD_THRESHOLD) setHeardSomething(true);
-  }, [level]);
+    if (heardSomething || level < HEARD_THRESHOLD) return;
+
+    // Recording is no longer needed after the microphone has been confirmed.
+    setHeardSomething(true);
+    stop();
+  }, [heardSomething, level, stop]);
 
   // Starting from a user action makes the browser permission request predictable.
   const handleStartTest = async () => {
@@ -68,7 +72,7 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
           </div>
         )}
 
-        {isTesting && (
+        {isTesting && !heardSomething && (
           <div className="mic-test-panel">
             <p className="mic-check-hint">
               Sagen Sie ein paar Worte, um Ihr Mikrofon zu testen.
@@ -87,19 +91,31 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
               </p>
             )}
 
-            {!error && (
-              <p id="status" className={heardSomething ? "success" : ""}>
-                {heardSomething ? "Mikrofon erkannt." : "Warte auf Audiosignal …"}
-              </p>
-            )}
+            {!error && <p id="status">Warte auf Audiosignal …</p>}
+          </div>
+        )}
+
+        {heardSomething && (
+          <div className="mic-test-panel mic-test-panel-success">
+            <div className="mic-test-result">
+              <span className="mic-test-success-icon" aria-hidden="true">
+                ✓
+              </span>
+
+              <div className="mic-test-result-copy">
+                <h3>Mikrofon funktioniert</h3>
+                <p>
+                  Ihr Mikrofon wurde erkannt. Sie können das Gespräch jetzt starten.
+                </p>
+              </div>
+            </div>
 
             <button
               className="start-call-button"
               type="button"
-              disabled={!heardSomething}
               onClick={onConfirmed}
             >
-              Anruf starten
+              Gespräch starten
             </button>
           </div>
         )}
