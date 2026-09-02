@@ -31,16 +31,25 @@ from backend.session.models import Turn, conversation, utterances
 logger = logging.getLogger(__name__)
 
 # How a Session ended, in the wire protocol's vocabulary -> in the schema's.
-_STATUS = {"user": "beendet", "completed": "beendet", "error": "abgebrochen"}
+_STATUS = {
+    "user": db_models.STATUS_COMPLETED,
+    "completed": db_models.STATUS_COMPLETED,
+    "error": db_models.STATUS_ABORTED,
+}
+
+# Who spoke, in the wire protocol's vocabulary -> in the schema's. The wire
+# stays German (the frontend reads these keys); the column is English and
+# constrained to SPEAKERS, so the two have to be translated here.
+_SPEAKER = {"nutzer": db_models.SPEAKER_USER, "persona": db_models.SPEAKER_PERSONA}
 
 
 def persist_session(
-    oeffentliche_id: uuid.UUID,
+    extern_id: uuid.UUID,
     subject_id: str,
     persona: Persona,
     scenario: Scenario,
     turns: Sequence[Turn],
-    gestartet_am: datetime,
+    started_at: datetime,
     reason: str,
 ) -> int:
     """Write the Session, its Turns and its measurements. Returns session_id.
@@ -54,22 +63,22 @@ def persist_session(
     """
     with session_scope() as db:
         session = db_models.Session(
-            oeffentliche_id=oeffentliche_id,
+            extern_id=extern_id,
             subject_id=subject_id,
             persona=_reference(db, db_models.Persona, persona.id),
-            szenario=_reference(db, db_models.Scenario, scenario.id),
-            sprache_code=persona.language_id,
-            status=_STATUS.get(reason, "abgebrochen"),
-            gestartet_am=gestartet_am,
-            beendet_am=datetime.now(),
+            scenario=_reference(db, db_models.Scenario, scenario.id),
+            language_code=persona.language_id,
+            status=_STATUS.get(reason, db_models.STATUS_ABORTED),
+            started_at=started_at,
+            ended_at=datetime.now(),
         )
         session.turns = [
             db_models.Turn(
-                sprecher=spoken.sprecher,
+                speaker=_SPEAKER[spoken.sprecher],
                 seq_index=index,
                 start_offset_ms=spoken.offset_ms,
-                dauer_ms=spoken.dauer_ms,
-                transkript=spoken.text,
+                duration_ms=spoken.dauer_ms,
+                transcript=spoken.text,
             )
             for index, spoken in enumerate(utterances(turns))
         ]
@@ -77,21 +86,21 @@ def persist_session(
         # The wrap-up itself is generated asynchronously (ADR 0018/0019); this
         # row is what makes its outcome queryable afterwards (ADR 0032).
         session.jobs = [db_models.AnalysisJob(
-            art="feedback", status="queued", versuche=0, aktualisiert_am=datetime.now(),
+            kind="feedback", status="queued", attempts=0, updated_at=datetime.now(),
         )]
         db.add(session)
         db.flush()
-        logger.info("Session persisted: id=%d turns=%d messungen=%d",
-                    session.session_id, len(session.turns), len(session.messungen))
+        logger.info("Session persisted: id=%d turns=%d measurements=%d",
+                    session.session_id, len(session.turns), len(session.measurements))
         return session.session_id
 
 
 def _write_analysis(
     db: DbSession, session: db_models.Session, call: metrics.Conversation
 ) -> None:
-    """Attach the Session's Messung rows.
+    """Attach the Session's Measurement rows.
 
-    No `Befund` rows are written: marking a value as remarkable takes a norm to
+    No `Finding` rows are written: marking a value as remarkable takes a norm to
     compare it against, and none of these metrics has one that was measured
     rather than guessed (ADR 0051). The table waits for pilot data.
 
@@ -99,15 +108,15 @@ def _write_analysis(
     guessed reference row -- provision.py seeds the inventory from the same
     METRICS tuple, so that can only happen against a database behind the code.
     """
-    metrik_ids = {m.schluessel: m.metrik_typ_id for m in db.query(db_models.MetrikTyp).all()}
-    session.messungen = [
-        db_models.Messung(
-            metrik_typ_id=metrik_ids[m.schluessel],
-            wert=Decimal(f"{m.wert:.4f}"),
+    metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType).all()}
+    session.measurements = [
+        db_models.Measurement(
+            metric_type_id=metric_ids[m.schluessel],
+            value=Decimal(f"{m.wert:.4f}"),
             detail_json=m.detail,
         )
         for m in metrics.measure(call)
-        if m.schluessel in metrik_ids
+        if m.schluessel in metric_ids
     ]
 
 

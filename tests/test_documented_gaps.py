@@ -37,6 +37,6 @@ def test_frontend_has_no_ui_language_switch_yet():
 @pytest.mark.parametrize("endpoint", ["/api/feedback", "/api/history"])
 def test_no_cross_session_history_endpoints_are_registered(endpoint):
     """F-13/F-48/F-53: only the Session just finished is readable, via
-    /api/sessions/{oeffentliche_id} (ADR 0048). There is no history."""
+    /api/sessions/{extern_id} (ADR 0050). There is no history."""
     routes = {getattr(r, "path", None) for r in app.routes}
     assert endpoint not in routes

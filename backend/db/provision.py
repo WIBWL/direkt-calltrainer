@@ -14,9 +14,9 @@ Content sources:
                         source of truth and that module carries its initial
                         content; neither is hardcoded in the backend anymore)
     Language         -> the language_id values the seeded Personas use
-    MetrikTyp        -> backend/feedback/metrics.py (METRICS), which also
-                        derives the Messung rows, so the seeded inventory and
-                        the analysis cannot drift apart.
+    MetricType       -> backend/feedback/metrics.py (METRICS), which also
+                        derives the measurement rows, so the seeded inventory
+                        and the analysis cannot drift apart.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy.orm import Session as DbSession
 
-from backend.db.models import Language, MetrikTyp, Persona, PersonaObjection, Scenario
+from backend.db.models import Language, MetricType, Persona, PersonaObjection, Scenario
 from backend.db.seed_data import LANGUAGE_NAMES, PERSONAS, SCENARIOS
 from backend.db.session import session_scope
 from backend.feedback.metrics import METRICS
@@ -37,10 +37,8 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# Every column the ORM requires is carried by seed_data.py, and since the
-# library tables were renamed its field names match the columns one to one --
-# no mapping happens here anymore. The Feedback tables are the exception and
-# keep their German names, so MetrikTyp below still reads `schluessel`.
+# Every column the ORM requires is carried by seed_data.py, and its field names
+# match the columns one to one, so nothing is defaulted or mapped here.
 
 
 def provision() -> dict[str, int]:
@@ -56,19 +54,37 @@ def provision() -> dict[str, int]:
 
 def seed(db: DbSession) -> dict[str, int]:
     """Bring the reference tables to the seed state; returns rows created."""
-    return {
+    created = {
         "Language": _seed_languages(db),
         "Persona": _seed_personas(db),
         "Scenario": _seed_scenarios(db),
-        "MetrikTyp": _seed_metrik_typen(db),
+        "MetricType": _seed_metric_types(db),
     }
+    # Deactivate, never delete: `session` references these rows by foreign key,
+    # so a Persona dropped from the seed has to stay readable for the Sessions
+    # that already ran with it. /api/personas and /api/scenarios filter on
+    # `active`, which is what actually removes it from the selection.
+    _deactivate_missing(db, Persona, {p["id"] for p in PERSONAS})
+    _deactivate_missing(db, Scenario, {s["id"] for s in SCENARIOS})
+    # Languages are deliberately absent: a closed code list, never retired, and
+    # a Session keeps pointing at the code it ran in.
+    return created
+
+
+def _deactivate_missing(db: DbSession, model, seeded_keys: set[str]) -> None:
+    """Sets `active` to False on every row the seed no longer contains."""
+    (
+        db.query(model)
+        .filter(model.key.notin_(seeded_keys), model.active.is_(True))
+        .update({"active": False}, synchronize_session=False)
+    )
 
 
 def inventory(db: DbSession) -> dict[str, int]:
     """Row counts of the reference tables, for the CLI's summary line."""
     return {
         model.__name__: db.query(model).count()
-        for model in (Language, Persona, PersonaObjection, Scenario, MetrikTyp)
+        for model in (Language, Persona, PersonaObjection, Scenario, MetricType)
     }
 
 
@@ -90,7 +106,7 @@ def _upsert(db: DbSession, model, natural_key: dict, values: dict):
 def _seed_languages(db: DbSession) -> int:
     return sum(
         _upsert(db, Language, {"code": code},
-                {"label": LANGUAGE_NAMES.get(code, code)})[1]
+                {"name": LANGUAGE_NAMES.get(code, code)})[1]
         for code in sorted({p["language_id"] for p in PERSONAS})
     )
 
@@ -115,20 +131,20 @@ def _seed_objections(db: DbSession, persona: Persona, objections) -> None:
     """Bring one Persona's objections to the seed state (R-12, ADR 0045).
 
     Replaced wholesale rather than upserted: the list is what carries meaning,
-    and `sort_order` gives a single objection no natural key to match on. Not
+    and `position` gives a single objection no natural key to match on. Not
     counted as created rows -- `inventory()` already reports the table.
     """
     db.flush()  # a freshly created Persona needs its id before rows point at it
     db.query(PersonaObjection).filter_by(
         persona_id=persona.persona_id).delete(synchronize_session=False)
     for index, text in enumerate(objections):
-        db.add(PersonaObjection(persona_id=persona.persona_id, sort_order=index, text=text))
+        db.add(PersonaObjection(persona_id=persona.persona_id, position=index, text=text))
 
 
 def _seed_scenarios(db: DbSession) -> int:
     return sum(
         _upsert(db, Scenario, {"key": s["id"]},
-                {"type": s["type"], "title": s["name"],
+                {"scenario_type": s["scenario_type"], "title": s["name"],
                  "short_description": s["short_description"],
                  "description": s["description"], "case_facts": s["case_facts"],
                  "call_goal": s["call_goal"],
@@ -137,10 +153,10 @@ def _seed_scenarios(db: DbSession) -> int:
     )
 
 
-def _seed_metrik_typen(db: DbSession) -> int:
+def _seed_metric_types(db: DbSession) -> int:
     return sum(
-        _upsert(db, MetrikTyp, {"schluessel": m.schluessel},
-                {"bezeichnung": m.bezeichnung, "einheit": m.einheit,
-                 "feature_id": m.feature_id, "aktiv": m.aktiv})[1]
+        _upsert(db, MetricType, {"key": m.schluessel},
+                {"name": m.bezeichnung, "unit": m.einheit,
+                 "feature_id": m.feature_id, "active": m.aktiv})[1]
         for m in METRICS
     )

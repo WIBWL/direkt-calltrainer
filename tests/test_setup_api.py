@@ -14,8 +14,12 @@ Covers:
 Uses httpx's ASGITransport rather than starlette's TestClient: the repo pins
 httpx 0.28, whose Client no longer accepts the `app=` kwarg TestClient passes.
 The `_override_auth` autouse fixture (conftest) makes every request here an
-authenticated one unless a test drops the override, and the library is faked
-(`fake_library`), so no database is involved.
+authenticated one unless a test drops the override.
+
+Runs against a seeded throwaway database: since ADR 0041 the endpoints read the
+persona and scenario tables rather than the modules below, so the modules are
+what the seed *wrote* — which is exactly what makes comparing against them a
+meaningful assertion rather than a tautology.
 """
 
 import httpx
@@ -23,13 +27,17 @@ import pytest
 
 from backend import auth
 from backend.app import app
-from tests.conftest import TEST_PERSONAS, TEST_SCENARIOS
+# The endpoints read the seeded tables (ADR 0041), so the seed content is what
+# they must return -- comparing against the test doubles would compare the
+# endpoint with something it never sees.
+from backend.db.seed_data import LANGUAGE_NAMES, PERSONAS as SEEDED_PERSONAS
+from backend.db.seed_data import SCENARIOS as SEEDED_SCENARIOS
 
 # pylint: disable=missing-function-docstring,redefined-outer-name
 
 
 @pytest.fixture
-async def client(fake_library):  # noqa: ARG001 -- patches the library for the app
+async def client(seeded_database):  # pylint: disable=unused-argument
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
@@ -47,15 +55,18 @@ async def test_personas_endpoint_lists_every_persona_with_card_fields(client):
     resp = await client.get("/api/personas")
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body) == len(TEST_PERSONAS)
-    for entry, persona in zip(body, TEST_PERSONAS):
-        assert entry == {
-            "id": persona.id,
-            "name": persona.name,
-            "role": persona.role_label,
-            "language": persona.language_name,
+    assert len(body) == len(SEEDED_PERSONAS)
+    # Keyed rather than zipped: the endpoint orders by name, the seed by nothing
+    # in particular, and neither ordering is what this test is about.
+    by_id = {entry["id"]: entry for entry in body}
+    for persona in SEEDED_PERSONAS:
+        assert by_id[persona["id"]] == {
+            "id": persona["id"],
+            "name": persona["name"],
+            "role": persona["role_label"],
+            "language": LANGUAGE_NAMES[persona["language_id"]],
         }
-        assert entry["name"] and entry["role"], "a card needs a visible name and role"
+        assert persona["name"] and persona["role_label"], "a card needs a visible name and role"
 
 
 async def test_personas_endpoint_serves_the_label_not_the_prompt_role(client):
@@ -63,10 +74,10 @@ async def test_personas_endpoint_serves_the_label_not_the_prompt_role(client):
     fields stay on the server."""
     body = (await client.get("/api/personas")).json()
     served = {e["role"] for e in body}
-    assert served == {p.role_label for p in TEST_PERSONAS}
-    for persona in TEST_PERSONAS:
-        assert persona.role not in served
-        assert persona.traits not in served
+    assert served == {p["role_label"] for p in SEEDED_PERSONAS}
+    for persona in SEEDED_PERSONAS:
+        assert persona["role"] not in served
+        assert persona["traits"] not in served
     for entry in body:
         assert "traits" not in entry and "behavior" not in entry
 
@@ -76,12 +87,13 @@ async def test_scenarios_endpoint_lists_every_scenario_with_its_teaser(client):
     resp = await client.get("/api/scenarios")
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body) == len(TEST_SCENARIOS)
-    for entry, scenario in zip(body, TEST_SCENARIOS):
-        assert entry == {
-            "id": scenario.id,
-            "name": scenario.name,
-            "short_description": scenario.short_description,
+    assert len(body) == len(SEEDED_SCENARIOS)
+    by_id = {entry["id"]: entry for entry in body}
+    for scenario in SEEDED_SCENARIOS:
+        assert by_id[scenario["id"]] == {
+            "id": scenario["id"],
+            "name": scenario["name"],
+            "short_description": scenario["short_description"],
         }
 
 
@@ -89,8 +101,10 @@ async def test_scenarios_endpoint_withholds_the_english_call_context(client):
     """ADR 0043: `description` is prompt input, not something the setup screen
     renders — it would show the user English text in a German UI."""
     body = (await client.get("/api/scenarios")).json()
-    for entry, scenario in zip(body, TEST_SCENARIOS):
-        assert scenario.description not in entry.values()
+    served = {value for entry in body for value in entry.values()}
+    for scenario in SEEDED_SCENARIOS:
+        assert scenario["description"] not in served
+    for entry in body:
         assert "description" not in entry
 
 

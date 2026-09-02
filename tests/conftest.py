@@ -1,5 +1,19 @@
 """Shared test fixtures.
 
+Two suites share this file. Most tests fake the STT/LLM/TTS pipeline and never
+touch a database; the persistence tests get a real one, created fresh per test
+and dropped afterwards, so a failing test can never leave the development
+database half-migrated and tests cannot see each other's rows.
+
+That split is why the POSTGRES_* settings are claimed with deliberately
+unusable values below, before the backend is imported: a test that does not ask
+for a database must not be able to reach the real one by accident. The
+persistence fixtures read .env separately (`_ENV`, via dotenv_values, which
+leaves os.environ alone) and inject only their own throwaway database, for the
+duration of the test. Without those settings in .env, or without a reachable
+server, they skip rather than fail, so a checkout without Postgres still gets a
+green run of everything else.
+
 The backend reads a handful of environment variables at import time
 (`backend/clients/config.py`), so they are set here *before* any backend
 module is imported. Values are dummies: no test in this suite makes a real
@@ -28,19 +42,51 @@ os.environ.setdefault("TTS_MODEL", "test-tts-model")
 os.environ.setdefault("KUGELAUDIO_MODEL", "test-kugelaudio-model")
 os.environ.setdefault("KUGELAUDIO_API_KEY", "test-kugelaudio-key")
 os.environ.setdefault("DEBUG", "true")
-os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
 os.environ.setdefault("OIDC_ISSUER", "http://keycloak.test.invalid/realms/direkt")
 
+# Deliberately unusable credentials, and the reason they are set here at all:
+# backend/clients/config.py calls load_dotenv() when the backend is first
+# imported, which would otherwise put the developer's real POSTGRES_* into the
+# environment for the whole test session. python-dotenv does not override
+# variables that are already set, so claiming them first is what keeps a stray
+# session_scope() out of the development database — it fails to connect instead
+# of quietly writing to it. The database fixtures below override all three for
+# the duration of a test that actually asks for one.
+os.environ.setdefault("POSTGRES_USER", "calltrainer-test-no-such-user")
+os.environ.setdefault("POSTGRES_PASSWORD", "not-a-real-password")
+os.environ.setdefault("POSTGRES_DB", "calltrainer-test-no-such-database")
+
+import uuid  # noqa: E402
+from collections.abc import AsyncIterator, Iterator  # noqa: E402
+from contextlib import contextmanager  # noqa: E402
+from dataclasses import dataclass, replace  # noqa: E402
+from datetime import UTC, datetime  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+import httpx  # noqa: E402
 import pytest  # noqa: E402
+from alembic import command  # noqa: E402
+from alembic.config import Config  # noqa: E402
+from dotenv import dotenv_values  # noqa: E402
 from kugelaudio.exceptions import KugelAudioError  # noqa: E402
 from openai import OpenAIError  # noqa: E402
+from sqlalchemy import URL, create_engine, text  # noqa: E402
+from sqlalchemy.engine import make_url  # noqa: E402
+from sqlalchemy.exc import OperationalError  # noqa: E402
+from sqlalchemy.orm import Session as DbSession  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 from backend import auth, library  # noqa: E402
 from backend.app import app  # noqa: E402
 from backend.clients import llm, stt, tts  # noqa: E402
 from backend.personas import Persona, PersonaVoice  # noqa: E402
 from backend.scenarios import Scenario  # noqa: E402
+# The ORM models keep a namespace: `Persona` and `Scenario` above are the value
+# objects the app passes around, and both names would otherwise collide here.
+from backend.db import models as db_models  # noqa: E402
+from backend.db.session import reset_engine, session_scope  # noqa: E402
 from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted  # noqa: E402
+from backend.session.models import Turn  # noqa: E402
 
 # Personas and Scenarios live in the database since ADR 0041, so the suite can
 # no longer import a hardcoded library -- and must not need a database to run.
@@ -286,3 +332,266 @@ def completed(events):
 def failure(events):
     """The first `Failed` event, or None."""
     return next((e for e in events if isinstance(e, Failed)), None)
+
+
+# --- Database fixtures ----------------------------------------------------
+# Everything below is for the persistence tests. A test that does not request
+# one of these fixtures never opens a connection to Postgres at all.
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+# Read, not loaded: dotenv_values leaves os.environ alone, so a test that does
+# not request a database fixture still has no POSTGRES_* set and cannot connect.
+_ENV = dotenv_values(PROJECT_ROOT / ".env")
+
+# The POSTGRES_* keys database_env() injects; host and port fall back to the
+# same defaults backend/db/session.py applies.
+_DB_SETTINGS = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
+                "POSTGRES_HOST", "POSTGRES_PORT")
+
+
+def _render(url: URL) -> str:
+    """URL.__str__ masks the password, which makes the result unusable as a
+    connection string — this keeps it."""
+    return url.render_as_string(hide_password=False)
+
+
+def _server_url() -> URL:
+    """The configured database server, or a skip if .env is incomplete."""
+    missing = [k for k in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB")
+               if not _ENV.get(k)]
+    if missing:
+        # `return` only so every path returns an expression: skip() raises.
+        return pytest.skip(f"Database settings missing from .env: {', '.join(missing)}")
+    return URL.create(
+        "postgresql+psycopg",
+        username=_ENV["POSTGRES_USER"],
+        password=_ENV["POSTGRES_PASSWORD"],
+        host=_ENV.get("POSTGRES_HOST") or "localhost",
+        port=int(_ENV.get("POSTGRES_PORT") or 5432),
+        database=_ENV["POSTGRES_DB"],
+    )
+
+
+@contextmanager
+def database_env(url: str) -> Iterator[None]:
+    """Puts the POSTGRES_* settings for `url` into the environment for the block.
+
+    Alembic's env.py and backend/db/session.py both call `build_database_url()`,
+    which assembles the connection from POSTGRES_*, so setting those is how a
+    test aims them at its own throwaway database. Restored afterwards, down to
+    "was not set before", so the next test starts unable to connect again.
+    """
+    parsed = make_url(url)
+    values = {
+        "POSTGRES_USER": parsed.username,
+        "POSTGRES_PASSWORD": parsed.password,
+        "POSTGRES_DB": parsed.database,
+        "POSTGRES_HOST": parsed.host,
+        "POSTGRES_PORT": str(parsed.port or 5432),
+    }
+    previous = {k: os.environ.get(k) for k in _DB_SETTINGS}
+    os.environ.update(values)
+    try:
+        yield
+    finally:
+        for key, was in previous.items():
+            if was is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = was
+
+
+def alembic_upgrade(url: str, revision: str = "head") -> None:
+    """Migrates `url` up to `revision`."""
+    with database_env(url):
+        command.upgrade(Config(str(PROJECT_ROOT / "alembic.ini")), revision)
+
+
+def alembic_downgrade(url: str, revision: str) -> None:
+    """Migrates `url` back down to `revision`."""
+    with database_env(url):
+        command.downgrade(Config(str(PROJECT_ROOT / "alembic.ini")), revision)
+
+
+@pytest.fixture
+def empty_database() -> Iterator[str]:
+    """A freshly created, entirely empty database. Dropped when the test ends."""
+    server = _server_url()
+    name = f"calltrainer_test_{uuid.uuid4().hex[:12]}"
+    admin = create_engine(server.set(database="postgres"), isolation_level="AUTOCOMMIT")
+
+    try:
+        with admin.connect() as conn:
+            conn.execute(text(f'CREATE DATABASE "{name}"'))
+    except OperationalError as e:
+        admin.dispose()
+        pytest.skip(f"No reachable PostgreSQL server for the tests: {e}")
+
+    try:
+        yield _render(server.set(database=name))
+    finally:
+        with admin.connect() as conn:
+            # FORCE terminates leftover connections; without it a session the
+            # test failed to close would block the drop and leak the database.
+            conn.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
+        admin.dispose()
+
+
+@pytest.fixture
+def migrated_database(empty_database: str) -> str:
+    """An empty database with all migrations applied."""
+    alembic_upgrade(empty_database)
+    return empty_database
+
+
+@pytest.fixture
+def db_session(migrated_database: str) -> Iterator[DbSession]:
+    """An ORM session against a migrated, empty database."""
+    engine = create_engine(migrated_database)
+    session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)()
+    try:
+        yield session
+    finally:
+        session.close()
+        engine.dispose()
+
+
+@pytest.fixture
+def app_database(migrated_database: str) -> Iterator[str]:
+    """Points the *application's* engine at this test's throwaway database.
+
+    backend/db/session.py memoises its engine, so the settings override alone
+    would not reach it — reset_engine() is what makes it pick the test database
+    up, and again afterwards so the next test is unaffected. Needed by anything
+    that goes through session_scope() rather than taking a session as an
+    argument, which is every write path since ADR 0034.
+    """
+    with database_env(migrated_database):
+        reset_engine()
+        yield migrated_database
+    reset_engine()
+
+
+@pytest.fixture
+def seeded_database(app_database: str) -> str:
+    """`app_database`, with the reference tables filled from seed_data.py /
+    metrics.py — the state the application boots into.
+
+    For the setup endpoints, which read the persona and scenario tables
+    (ADR 0041) and therefore have nothing to serve without this.
+    """
+    # Imported here so a collection-time import never needs the environment.
+    from backend.db.provision import seed  # pylint: disable=import-outside-toplevel
+
+    with session_scope() as db:
+        seed(db)
+    return app_database
+
+
+PERSONA_KEY = "thomas-brandt-ceo"
+SCENARIO_KEY = "price-cancellation-risk"
+METRIC_KEY = "tempo"
+
+SESSION_STARTED = datetime(2026, 8, 27, 10, 0, 0, tzinfo=UTC)
+
+
+@dataclass
+class ReferenceRows:
+    """The reference entities a Session has to point at, as created by
+    `reference_data`. Shared so the Session-related tests describe the same
+    starting world instead of each building their own."""
+
+    persona: db_models.Persona
+    scenario: db_models.Scenario
+    language: db_models.Language
+    metric_type: db_models.MetricType
+
+
+@pytest.fixture
+def reference_data(db_session: DbSession) -> ReferenceRows:
+    """Seeds the minimum reference data a Session needs, by hand rather than
+    through the seed script, so these tests do not depend on what personas.py
+    happens to contain."""
+    language = db_models.Language(code="de", name="Deutsch")
+    persona = db_models.Persona(
+        key=PERSONA_KEY,
+        name="Thomas Brandt",
+        role_label="Geschäftsführer, Strategie & Budget",
+        role="Geschäftsführer",
+        traits="sachlich",
+        behavior="Verhalten",
+        training_goal="",
+        difficulty="mittel",
+        language_code="de",
+        tts_voice="de_male",
+        active=True,
+    )
+    scenario = db_models.Scenario(
+        key=SCENARIO_KEY,
+        scenario_type="Preisgespräch",
+        title="Kündigungsabsicht",
+        short_description="Kunde erwägt zu kündigen.",
+        description="Beschreibung",
+        case_facts="",
+        call_goal="",
+        success_condition="",
+        active=True,
+    )
+    metric_type = db_models.MetricType(
+        key=METRIC_KEY, name="Sprechtempo", unit="Wörter/min", feature_id="F-36", active=True
+    )
+    db_session.add_all([language, persona, scenario, metric_type])
+    db_session.commit()
+    return ReferenceRows(
+        persona=persona, scenario=scenario, language=language, metric_type=metric_type
+    )
+
+
+def persist(
+    *,
+    extern_id: uuid.UUID | None = None,
+    reason: str = "user",
+    turns: list[Turn] | None = None,
+    persona_key: str = PERSONA_KEY,
+) -> uuid.UUID:
+    """Write a Session through the real write path; returns its extern_id.
+
+    persist_session() opens its own session_scope(), so this needs the
+    `app_database` fixture rather than `db_session` — the two see the same
+    database, but only the former is what the application itself connects to.
+    """
+    # Imported here, not at module scope: importing the write path pulls in
+    # the feedback stack, which a collection-time import should not need.
+    from backend.session import persistence  # pylint: disable=import-outside-toplevel
+
+    # A key other than PERSONA_KEY is deliberately one the seed did not write.
+    persona = replace(TEST_PERSONAS[0], id=persona_key)
+    extern_id = extern_id or uuid.uuid4()
+    persistence.persist_session(
+        extern_id,
+        str(uuid.uuid4()),
+        persona,
+        replace(TEST_SCENARIOS[0], id=SCENARIO_KEY),
+        turns if turns is not None else [],
+        SESSION_STARTED,
+        reason,
+    )
+    return extern_id
+
+
+@pytest.fixture
+async def api_client(app_database: str) -> AsyncIterator[httpx.AsyncClient]:  # pylint: disable=unused-argument
+    """The FastAPI app, wired to this test's throwaway database.
+
+    `app_database` is requested for its effect, not its value: it is what points
+    the application's engine at this test's database.
+
+    Driven through httpx's ASGI transport rather than Starlette's TestClient:
+    the pinned starlette (0.35) passes `app=` to httpx.Client, which httpx 0.28
+    no longer accepts. Going through the transport exercises the same ASGI
+    stack without touching either pin.
+    """
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        yield client

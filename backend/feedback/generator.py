@@ -26,6 +26,13 @@ from backend.db.session import session_scope
 logger = logging.getLogger(__name__)
 
 _LANGUAGE_NAMES_EN = {"de": "German"}
+
+# The wrap-up's own vocabulary -> the schema's. The model is prompted in German
+# and answers with "staerke"/"verbesserung" (the same words the frontend reads
+# back out of the API), while feedback_point.kind is English and constrained to
+# POINT_KINDS. backend/api/sessions.py holds the inverse.
+_POINT_KIND = {"staerke": db_models.POINT_STRENGTH,
+               "verbesserung": db_models.POINT_IMPROVEMENT}
 # A fenced ```json block is the most common way a small model wraps structured
 # output despite being told not to; unwrap it rather than failing the parse.
 _FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
@@ -73,7 +80,7 @@ async def _generate(session_id: int) -> None:
             raise LookupError(f"Session {session_id} does not exist")
         _mark(db, session_id, "running")
         dossier, valid_turns = _dossier(session)
-        language = _LANGUAGE_NAMES_EN.get(session.sprache_code, session.sprache_code)
+        language = _LANGUAGE_NAMES_EN.get(session.language_code, session.language_code)
 
     try:
         wrapup = await _ask(dossier, language)
@@ -105,17 +112,17 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
     """
     lines = ["Measured statistics for this call (established fact):"]
     lines += [
-        f"    {m.metrik_typ.bezeichnung}: {float(m.wert):.1f} {m.metrik_typ.einheit or ''}".rstrip()
-        for m in session.messungen
+        f"    {m.metric_type.name}: {float(m.value):.1f} {m.metric_type.unit or ''}".rstrip()
+        for m in session.measurements
     ]
 
     lines.append("Transcript, timestamped from the start of the call:")
     turn_ids: set[int] = set()
     for turn in sorted(session.turns, key=lambda t: t.seq_index):
-        speaker = "User" if turn.sprecher == "nutzer" else "Caller"
+        speaker = "User" if turn.speaker == db_models.SPEAKER_USER else "Caller"
         lines.append(
             f'    [turn_id={turn.turn_id}] {_timestamp(turn.start_offset_ms)} '
-            f'{speaker}: "{turn.transkript}"'
+            f'{speaker}: "{turn.transcript}"'
         )
         turn_ids.add(turn.turn_id)
     return "\n".join(lines), turn_ids
@@ -327,23 +334,24 @@ def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) 
     citation rather than dropped: the observation may still be sound, but a
     reference the user could follow to the wrong place must not survive.
     """
-    # Through the ORM, not a bulk delete: the cascade onto Feedbackpunkt is
-    # declared at ORM level only (no ON DELETE in the migration), so a bulk
-    # delete would leave the points behind and violate their foreign key.
+    # Through the ORM, not a bulk delete. The database would carry the points
+    # along by itself (feedback_point.feedback_id is ON DELETE CASCADE), but
+    # going through the ORM keeps the identity map in step with what was
+    # deleted, which a bulk delete in the middle of this transaction would not.
     previous = db.query(db_models.Feedback).filter_by(session_id=session_id).one_or_none()
     if previous is not None:
         db.delete(previous)
         db.flush()
     feedback = db_models.Feedback(
         session_id=session_id,
-        zusammenfassung=wrapup.zusammenfassung,
+        summary=wrapup.zusammenfassung,
         score=None,  # ADR 0004: qualitative only, no score in the MVP
-        erstellt_am=datetime.now(),
+        created_at=datetime.now(),
     )
-    feedback.punkte = [
-        db_models.Feedbackpunkt(
-            reihenfolge=index,
-            art=art,
+    feedback.points = [
+        db_models.FeedbackPoint(
+            position=index,
+            kind=_POINT_KIND[art],
             text=punkt.text,
             turn_id=punkt.turn_id if punkt.turn_id in turn_ids else None,
         )
@@ -356,15 +364,15 @@ def _mark(db: DbSession, session_id: int, status: str, fehlertext: str | None = 
     """Move the Session's feedback job to `status` (ADR 0032)."""
     job = (
         db.query(db_models.AnalysisJob)
-        .filter_by(session_id=session_id, art="feedback")
+        .filter_by(session_id=session_id, kind="feedback")
         .order_by(db_models.AnalysisJob.job_id.desc())
         .first()
     )
     if job is None:
-        job = db_models.AnalysisJob(session_id=session_id, art="feedback", versuche=0)
+        job = db_models.AnalysisJob(session_id=session_id, kind="feedback", attempts=0)
         db.add(job)
     job.status = status
-    job.fehlertext = fehlertext
-    job.aktualisiert_am = datetime.now()
+    job.error_text = fehlertext
+    job.updated_at = datetime.now()
     if status == "running":
-        job.versuche += 1
+        job.attempts += 1

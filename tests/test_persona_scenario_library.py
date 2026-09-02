@@ -56,7 +56,7 @@ def _persona_row(**overrides):
         "tts_voice": "de_male",
         "kugelaudio_voice_id": 1885,
         "active": True,
-        "language": models.Language(code="de", label="Deutsch"),
+        "language": models.Language(code="de", name="Deutsch"),
     }
     return models.Persona(**{**fields, **overrides})
 
@@ -98,7 +98,7 @@ def test_scenario_row_maps_onto_the_value_object():
     scenario = _to_scenario(
         models.Scenario(
             key="row-scenario",
-            type="Angebots- und Preisgespräch",
+            scenario_type="Angebots- und Preisgespräch",
             title="Kündigungsabsicht wegen Preis",
             short_description="Der Kunde erwägt zu kündigen.",
             description="The customer is calling to say they are considering cancelling.",
@@ -149,7 +149,7 @@ def test_seeded_persona_behaviour_encodes_price_pushback():
 def test_seeded_scenario_library_is_non_empty_and_well_formed():
     assert SEED.SCENARIOS, "F-03: the library ships at least one scenario"
     for entry in SEED.SCENARIOS:
-        assert entry["id"] and entry["name"] and entry["type"]
+        assert entry["id"] and entry["name"] and entry["scenario_type"]
         assert entry["short_description"], "ADR 0043: the card shows a teaser"
         assert len(entry["description"]) > 40, "the model gets a real call context"
 
@@ -200,7 +200,7 @@ def test_scenario_row_maps_the_case_fields():
     scenario = _to_scenario(
         models.Scenario(
             key="row-case",
-            type="Angebots- und Preisgespräch",
+            scenario_type="Angebots- und Preisgespräch",
             title="Kündigungsabsicht wegen Preis",
             short_description="Der Kunde erwägt zu kündigen.",
             description="The customer is calling to say they are considering cancelling.",
@@ -217,12 +217,12 @@ def test_scenario_row_maps_the_case_fields():
 
 
 def test_persona_row_maps_its_objections_in_order():
-    """R-12 / ADR 0026: the objections are ordered rows, and `sort_order` is
+    """R-12 / ADR 0026: the objections are ordered rows, and `position` is
     what orders them — `library.py` has to load and keep that order."""
     row = _persona_row(
         objections=[
-            models.PersonaObjection(sort_order=1, text="second objection"),
-            models.PersonaObjection(sort_order=0, text="first objection"),
+            models.PersonaObjection(position=1, text="second objection"),
+            models.PersonaObjection(position=0, text="first objection"),
         ]
     )
     persona = _to_persona(row)

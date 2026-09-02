@@ -60,7 +60,7 @@ class Pause:
 class TurnAcoustics:
     """Raw acoustic facts about one user utterance.
 
-    Deliberately not domain metrics: the mapping onto MetrikTyp rows, and every
+    Deliberately not domain metrics: the mapping onto MetricType rows, and every
     judgment about what counts as too fast or too quiet, lives in metrics.py.
     Offsets are relative to the start of this utterance; the caller rebases
     them onto the Session's timeline.

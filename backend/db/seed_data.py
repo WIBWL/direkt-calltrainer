@@ -104,7 +104,7 @@ PERSONAS = [
 ]
 
 # --- Szenarien ----------------------------------------------------------
-# `type` follows F-03's categories of Scenario types.
+# `scenario_type` follows F-03's categories of Scenario types.
 #
 # Szenarien carry no language of their own (ADR 0043). "name" and
 # "short_description" are the display texts in the UI language; the rest is the
@@ -123,7 +123,7 @@ PERSONAS = [
 SCENARIOS = [
     {
         "id": "cold-call-followup",
-        "type": "Angebots- und Preisgespräch",
+        "scenario_type": "Angebots- und Preisgespräch",
         "name": "Offenes Anliegen zu bestehendem Vertrag",
         "short_description": (
             "Der Kunde ruft mit einer offenen Frage zu einem bestehenden "
@@ -154,7 +154,7 @@ SCENARIOS = [
     },
     {
         "id": "price-cancellation-risk",
-        "type": "Angebots- und Preisgespräch",
+        "scenario_type": "Angebots- und Preisgespräch",
         "name": "Kündigungsabsicht wegen Preis",
         "short_description": (
             "Der Kunde erwägt zu kündigen, weil ihm die laufenden Kosten zu "

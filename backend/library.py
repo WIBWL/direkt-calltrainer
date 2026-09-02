@@ -22,7 +22,7 @@ def _to_persona(row: models.Persona) -> Persona:
         id=row.key,
         name=row.name,
         language_id=row.language_code,
-        language_name=row.language.label,
+        language_name=row.language.name,
         voice=PersonaVoice(
             tts_voice=row.tts_voice,
             kugelaudio_voice_id=row.kugelaudio_voice_id,
@@ -33,11 +33,11 @@ def _to_persona(row: models.Persona) -> Persona:
         behavior=row.behavior,
         # Sorted here rather than left to the relationship's `order_by`: that
         # only orders what the database returns, so the mapping would depend on
-        # how the row was obtained. `sort_order` (ADR 0026) is the authored
+        # how the row was obtained. `position` (ADR 0026) is the authored
         # order, and it is the order the prompt gets.
         objections=tuple(
             objection.text
-            for objection in sorted(row.objections, key=lambda e: e.sort_order)
+            for objection in sorted(row.objections, key=lambda e: e.position)
         ),
     )
 

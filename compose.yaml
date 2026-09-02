@@ -2,9 +2,14 @@ name: direkt-calltrainer
 services:
   app:
     image: direkt-calltrainer
+    # Pinned: praat-parselmouth ships no Linux aarch64 wheel, so an arm64 build
+    # falls back to the source tarball and fails to compile in python-slim.
+    platform: linux/amd64
     build:
       context: .
       dockerfile: ./Dockerfile
+      platforms:
+        - linux/amd64
       args:
         # The SPA needs these at `npm run build` time (see Dockerfile).
         VITE_OIDC_ISSUER: ${VITE_OIDC_ISSUER:-http://localhost:18081/realms/direkt}
@@ -12,8 +17,11 @@ services:
     env_file:
       - .env
     environment:
-      # Within the compose network the database host is "db", not localhost.
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # The only part of the connection that differs from the host default:
+      # within the compose network the database is reachable as "db". User,
+      # password and database name come from the env_file, and the URL itself
+      # is assembled in backend/db/session.py.
+      POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379
       # The token `iss` and the browser's authority — reachable at localhost:18081
       # from the host. The container can't reach that, so it fetches the keys
@@ -33,6 +41,17 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
+    healthcheck:
+      # Readiness, not liveness: an instance that cannot reach the database can
+      # only answer 503, so it should not count as healthy. Uses Python because
+      # the image has no curl. start_period covers migrations and seeding, which
+      # run in the app's own lifespan handler (backend/db/provision.py).
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     develop:
       watch:
         # Backend code changes: synced into the running container and the
@@ -56,14 +75,18 @@ services:
   # to run -- a stopped worker just means wrap-ups queue until it returns.
   worker:
     image: direkt-calltrainer
+    # Same image as app, so the same pin applies.
+    platform: linux/amd64
     build:
       context: .
       dockerfile: ./Dockerfile
+      platforms:
+        - linux/amd64
     command: ["python", "-m", "backend.worker"]
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379
     volumes:
       - ./logs:/app/logs

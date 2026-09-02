@@ -28,16 +28,15 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('einwand_id')
     )
 
-    # Die neuen Spalten sind NOT NULL, die Tabellen enthalten aber bereits
-    # Referenzzeilen. Daher dreistufig: nullable anlegen -> befuellen ->
-    # NOT NULL setzen.
+    # The new columns are NOT NULL, but the tables already hold reference
+    # rows. Hence three steps: add as nullable -> backfill -> set NOT NULL.
     op.add_column('persona', sa.Column('schluessel', sa.String(length=60), nullable=True))
     op.add_column('persona', sa.Column('verhalten', sa.Text(), nullable=True))
     op.add_column('persona', sa.Column('trainingsziel', sa.Text(), nullable=True))
     op.add_column('szenario', sa.Column('schluessel', sa.String(length=60), nullable=True))
 
-    # schluessel muss korrekt gesetzt werden: das Seed-Skript erkennt die
-    # Zeilen daran wieder. Ein falscher Wert wuerde dort ein Duplikat anlegen.
+    # schluessel has to be set correctly: the seed script recognises the rows
+    # by it. A wrong value would make the seed script insert a duplicate.
     op.execute(
         "UPDATE persona SET schluessel = 'tech-averse-management' "
         "WHERE name = 'Technikaverses Management'"
@@ -46,7 +45,7 @@ def upgrade() -> None:
         "UPDATE szenario SET schluessel = 'cold-call-followup' "
         "WHERE titel = 'Follow-up-/Closing-Call nach Kaltakquise'"
     )
-    # Fallback fuer unbekannte Zeilen, damit NOT NULL sicher greift.
+    # Fallback for unknown rows, so that NOT NULL is guaranteed to hold.
     op.execute(
         "UPDATE persona SET schluessel = 'persona-' || persona_id "
         "WHERE schluessel IS NULL"
@@ -55,8 +54,8 @@ def upgrade() -> None:
         "UPDATE szenario SET schluessel = 'szenario-' || szenario_id "
         "WHERE schluessel IS NULL"
     )
-    # verhalten/trainingsziel bleiben leer — die Inhalte liefert
-    # scripts/seed_reference_data.py, das nach der Migration laeuft.
+    # verhalten/trainingsziel stay empty — the content comes from
+    # scripts/seed_reference_data.py, which runs after the migration.
     op.execute("UPDATE persona SET verhalten = '' WHERE verhalten IS NULL")
     op.execute("UPDATE persona SET trainingsziel = '' WHERE trainingsziel IS NULL")
 

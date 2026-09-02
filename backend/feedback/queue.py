@@ -28,7 +28,7 @@ _RESULT_TTL_S = 3600
 def connection() -> Redis:
     """The process-wide Redis connection, created on first use.
 
-    Read lazily like DATABASE_URL in backend/db/session.py, so importing this
+    Read lazily like the database settings in backend/db/session.py, so importing this
     module never requires a configured environment.
     """
     return Redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379"))
