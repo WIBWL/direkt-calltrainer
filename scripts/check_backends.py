@@ -3,7 +3,7 @@
 Runs the same check the app runs at startup
 (`backend.clients.health.check_backends`), on its own, so you can tell whether
 a model is down without booting the app. Respects the DEBUG toggle in .env
-(forces TTS to the EFRE fallback instead of KugelAudio).
+(forces TTS to the DiReKT fallback instead of KugelAudio).
 
 Usage:
     python scripts/check_backends.py

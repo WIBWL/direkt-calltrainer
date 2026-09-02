@@ -6,11 +6,11 @@ Accepted
 
 ## Context
 
-arc42 flags component swappability (e.g. exchangeable LLM/STT/TTS components) as an open maintainability target (Kapitel 8). However, the EFRE-Direkt gateway is a fixed project requirement (ADR 0011), not a choice among competing providers — there is no second provider in view to swap to.
+arc42 flags component swappability (e.g. exchangeable LLM/STT/TTS components) as an open maintainability target (Kapitel 8). However, the DiReKT gateway is a fixed project requirement (ADR 0011), not a choice among competing providers — there is no second provider in view to swap to.
 
 ## Decision
 
-We will call the EFRE-Direkt OpenAI-compatible API directly wherever STT, dialogue generation, or TTS is needed, without introducing a provider-abstraction interface. Each capability is called from one clearly separated place in the code.
+We will call the DiReKT OpenAI-compatible API directly wherever STT, dialogue generation, or TTS is needed, without introducing a provider-abstraction interface. Each capability is called from one clearly separated place in the code.
 
 ## Consequences
 

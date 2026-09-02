@@ -1,23 +1,27 @@
 """Setup screen: the REST endpoints that feed persona/scenario selection.
 
 Covers:
-  F-43  Setup-Übersicht  (mandatory settings visible before a session)
-  F-44  Persona-Kartenansicht  (persona picked from cards with a short profile)
+  F-43  setup overview  (mandatory settings visible before a session)
+  F-44  persona card view  (persona picked from cards with a short profile)
   F-15/ADR 0015  persona-card selection
   F-01/F-03/F-04  the persona and scenario libraries are exposed to the client
   ADR 0001  scenario and persona are separate, independently chosen
+  F-31/F-50/ADR 0009  the setup lists require a valid Keycloak token
   ADR 0041  both are served from the database-backed library
   ADR 0043  the endpoints serve display fields only; the Persona's language is
             a property of the Persona, not a Session-level choice
 
 Uses httpx's ASGITransport rather than starlette's TestClient: the repo pins
 httpx 0.28, whose Client no longer accepts the `app=` kwarg TestClient passes.
-The library is faked (`fake_library`), so no database is involved.
+The `_override_auth` autouse fixture (conftest) makes every request here an
+authenticated one unless a test drops the override, and the library is faked
+(`fake_library`), so no database is involved.
 """
 
 import httpx
 import pytest
 
+from backend import auth
 from backend.app import app
 from tests.conftest import TEST_PERSONAS, TEST_SCENARIOS
 
@@ -121,3 +125,12 @@ async def test_language_is_a_persona_property_not_a_separate_choice(client):
     assert "/api/languages" not in routes
     for entry in (await client.get("/api/scenarios")).json():
         assert "language" not in entry and "language_id" not in entry
+
+
+async def test_setup_lists_require_a_token(client):
+    """F-31/F-50/ADR 0009: without a valid token the setup lists are 401,
+    while /health stays open (it's an infra check)."""
+    app.dependency_overrides.pop(auth.require_user, None)  # drop conftest's override
+    assert (await client.get("/api/personas")).status_code == 401
+    assert (await client.get("/api/scenarios")).status_code == 401
+    assert (await client.get("/health")).status_code == 200

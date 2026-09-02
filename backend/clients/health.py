@@ -1,9 +1,8 @@
 """Startup health checks for the three pipeline backends.
 
-Fires one minimal real request at each configured backend (STT, LLM, TTS) so a
-dead model surfaces at boot instead of mid-call. Exercises the exact prod code
-paths in `stt` / `llm` / `tts`, including TTS's KugelAudio-by-default/EFRE-
-fallback logic (see `DEBUG` in `backend.clients.config`).
+Fires one minimal real request at each backend (STT, LLM, TTS) so a dead model
+surfaces at boot, not mid-call. Uses the exact prod code paths, including TTS's
+KugelAudio-then-DiReKT fallback (see `DEBUG` in `backend.clients.config`).
 """
 
 import asyncio
@@ -72,8 +71,13 @@ async def _run_check(name: str, check_fn, model: str) -> bool:
 
 
 async def check_backends() -> bool:
-    """Check all three pipeline backends concurrently. Logs one line per
-    backend; returns True only if every check succeeded. Never raises."""
+    """Check all three pipeline backends concurrently, one log line each;
+    returns True only if all passed.
+
+    Never raises — it runs from `lifespan`, which logs a dead dependency rather
+    than failing the boot. The return value is for `scripts/check_backends.py`,
+    which does exit non-zero on it.
+    """
     results = await asyncio.gather(*(_run_check(name, check_fn, model) for name, (check_fn, model) in _CHECKS.items()))
     failing = results.count(False)
     if failing:

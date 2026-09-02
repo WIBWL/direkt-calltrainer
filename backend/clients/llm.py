@@ -1,4 +1,9 @@
-"""Dialogue-generation client calls."""
+"""Dialogue generation: the persona's reply, streamed token by token.
+
+One backend, no fallback (ADR 0011). Streaming lets the orchestrator chunk the
+reply and synthesise audio before it finishes (ADR 0033). The sampling
+parameters below are Qwen3-specific, tuned by measurement (docs/model-parameters.md).
+"""
 
 import logging
 from collections.abc import AsyncIterator
@@ -45,3 +50,28 @@ async def stream_reply(messages: list[dict[str, str]]) -> AsyncIterator[str]:
         delta = chunk.choices[0].delta.content if chunk.choices else None
         if delta:
             yield delta
+
+
+# The wrap-up is a whole document rather than one spoken line, so it needs a
+# far larger budget than _MAX_REPLY_TOKENS -- and it is generated after the
+# call, where latency costs nobody anything.
+_MAX_FEEDBACK_TOKENS = 900
+
+
+async def complete(messages: list[dict[str, str]]) -> str:
+    """One non-streamed completion, for the post-call wrap-up (ADR 0049).
+
+    Nothing is waiting on the first token here, unlike stream_reply, so the
+    caller gets the finished text in one piece and can validate it as a whole.
+    """
+    logger.info("Generating feedback via LLM (%s)...", LLM_MODEL)
+    completion = await LLM_CLIENT.chat.completions.create(
+        model=LLM_MODEL,
+        messages=messages,
+        max_tokens=_MAX_FEEDBACK_TOKENS,
+        # Low but not zero: the wrap-up should read naturally, while staying
+        # close to the findings it was given rather than embroidering them.
+        temperature=0.3,
+        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+    )
+    return completion.choices[0].message.content or ""

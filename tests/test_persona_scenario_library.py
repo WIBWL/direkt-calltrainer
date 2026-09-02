@@ -11,9 +11,9 @@ things to check and this module keeps them apart:
     asserted against the seed data, which is importable without a database.
 
 Covers:
-  F-04  Kundenpersona-Bibliothek  (extensible; cost-critical customers,
+  F-04  customer persona library  (extensible; cost-critical customers,
         managing directors / IT leads focused on strategy & budget)
-  F-03  Szenario-Typen  (support cases, pricing/offer talks, ...)
+  F-03  scenario types  (support cases, pricing/offer talks, ...)
   F-01  the counterpart reflects conversational dynamics, not just facts
   R-07  cost-critical customer   R-08  budget-focused decision maker
   R-09  support + consulting     R-10  offer/price negotiation
@@ -117,15 +117,15 @@ def test_scenario_row_maps_onto_the_value_object():
 def test_seeded_persona_library_is_non_empty_and_well_formed():
     assert SEED.PERSONAS, "F-04: the library ships at least one persona"
     for entry in SEED.PERSONAS:
-        assert entry["schluessel"] and entry["name"]
-        assert entry["rolle"], "F-04: a persona carries a role"
-        assert entry["rolle_anzeige"], "ADR 0043: and a label to show on the card"
-        assert entry["haltung"], "F-01: a persona carries character traits"
-        assert entry["verhalten"], "F-01: a persona carries a behaviour description"
+        assert entry["id"] and entry["name"]
+        assert entry["role"], "F-04: a persona carries a role"
+        assert entry["role_label"], "ADR 0043: and a label to show on the card"
+        assert entry["traits"], "F-01: a persona carries character traits"
+        assert entry["behavior"], "F-01: a persona carries a behaviour description"
 
 
 def test_seeded_persona_keys_are_unique():
-    keys = [p["schluessel"] for p in SEED.PERSONAS]
+    keys = [p["id"] for p in SEED.PERSONAS]
     assert len(keys) == len(set(keys))
 
 
@@ -134,7 +134,7 @@ def test_seeded_library_covers_the_budget_focused_decision_maker():
     focus is representable. Asserted in English — ADR 0043 moved the prompt
     fields off German."""
     joined = " ".join(
-        f"{p['rolle']} {p['haltung']} {p['verhalten']}".lower() for p in SEED.PERSONAS
+        f"{p['role']} {p['traits']} {p['behavior']}".lower() for p in SEED.PERSONAS
     )
     assert "managing director" in joined or "it lead" in joined
     assert "budget" in joined or "strategy" in joined
@@ -142,52 +142,52 @@ def test_seeded_library_covers_the_budget_focused_decision_maker():
 
 def test_seeded_persona_behaviour_encodes_price_pushback():
     """F-04 / R-07: a cost-critical counterpart that presses on price."""
-    joined = " ".join(p["verhalten"].lower() for p in SEED.PERSONAS)
+    joined = " ".join(p["behavior"].lower() for p in SEED.PERSONAS)
     assert "price" in joined
 
 
 def test_seeded_scenario_library_is_non_empty_and_well_formed():
-    assert SEED.SZENARIEN, "F-03: the library ships at least one scenario"
-    for entry in SEED.SZENARIEN:
-        assert entry["schluessel"] and entry["titel"] and entry["typ"]
-        assert entry["kurzbeschreibung"], "ADR 0043: the card shows a teaser"
-        assert len(entry["beschreibung"]) > 40, "the model gets a real call context"
+    assert SEED.SCENARIOS, "F-03: the library ships at least one scenario"
+    for entry in SEED.SCENARIOS:
+        assert entry["id"] and entry["name"] and entry["type"]
+        assert entry["short_description"], "ADR 0043: the card shows a teaser"
+        assert len(entry["description"]) > 40, "the model gets a real call context"
 
 
 def test_seeded_scenario_keys_are_unique():
-    keys = [s["schluessel"] for s in SEED.SZENARIEN]
+    keys = [s["id"] for s in SEED.SCENARIOS]
     assert len(keys) == len(set(keys))
 
 
 def test_seeded_scenarios_cover_support_and_pricing_contexts():
     """F-03 / R-09 / R-10: at least a support-style case and a
     price/cancellation negotiation are trainable."""
-    blob = " ".join(f"{s['titel']} {s['beschreibung']}".lower() for s in SEED.SZENARIEN)
+    blob = " ".join(f"{s['name']} {s['description']}".lower() for s in SEED.SCENARIOS)
     assert "support" in blob
     assert "cancel" in blob or "price" in blob
 
 
-@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["schluessel"])
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_every_seeded_persona_speaks_a_language_that_has_a_pack(entry):
     """ADR 0043: a Persona's `sprache_code` decides the spoken language, and
     `get_pack` raises for one without a pack — a configuration error that
     would only surface once a Session starts."""
-    assert entry["sprache_code"] in LANGUAGE_PACKS
+    assert entry["language_id"] in LANGUAGE_PACKS
 
 
-@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["schluessel"])
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_every_seeded_persona_has_its_own_voice(entry):
     """ADR 0040/0041: voice is a per-Persona property, and both backends need
-    an identity — KugelAudio by default, the EFRE model as fallback."""
-    assert entry["tts_stimme"]
-    assert isinstance(entry["kugelaudio_stimme_id"], int)
+    an identity — KugelAudio by default, the DiReKT model as fallback."""
+    assert entry["tts_voice"]
+    assert isinstance(entry["kugelaudio_voice_id"], int)
 
 
 def test_seeded_scenarios_carry_no_language_of_their_own():
     """ADR 0043: Scenarios stay language-neutral, which is what keeps every
     Persona x Scenario pairing valid (ADR 0001, ADR 0015)."""
-    for entry in SEED.SZENARIEN:
-        assert "sprache_code" not in entry
+    for entry in SEED.SCENARIOS:
+        assert "language_id" not in entry
         assert "sprache" not in entry
 
 
@@ -245,10 +245,10 @@ def test_objections_carry_no_language_of_their_own():
 def test_seeded_scenarios_carry_the_case():
     """ADR 0045: every shipped Scenario states its facts, the caller's goal and
     the condition under which the matter is settled."""
-    for entry in SEED.SZENARIEN:
-        assert entry["fallfakten"].strip(), f"{entry['schluessel']}: no case facts"
-        assert entry["anrufziel"].strip(), f"{entry['schluessel']}: no call goal"
-        assert entry["erfolgsbedingung"].strip(), f"{entry['schluessel']}: no success condition"
+    for entry in SEED.SCENARIOS:
+        assert entry["case_facts"].strip(), f"{entry['id']}: no case facts"
+        assert entry["call_goal"].strip(), f"{entry['id']}: no call goal"
+        assert entry["success_condition"].strip(), f"{entry['id']}: no success condition"
 
 
 def test_seeded_scenario_context_does_not_carry_the_trainer_objective():
@@ -256,18 +256,18 @@ def test_seeded_scenario_context_does_not_carry_the_trainer_objective():
     what the *user* is meant to achieve ("keep the customer through price
     negotiation"), addressed to the Persona — who is the customer. The caller's
     own goal lives in `anrufziel` now, and nothing hands it the trainee's."""
-    for entry in SEED.SZENARIEN:
-        lowered = entry["beschreibung"].lower()
-        assert "the goal of the call is" not in lowered, entry["schluessel"]
-        assert "goal of the call" not in lowered, entry["schluessel"]
+    for entry in SEED.SCENARIOS:
+        lowered = entry["description"].lower()
+        assert "the goal of the call is" not in lowered, entry["id"]
+        assert "goal of the call" not in lowered, entry["id"]
 
 
 def test_seeded_personas_carry_objections():
     """R-12: `persona_einwand` has been empty since ADR 0026 created it. Three
     to four per Persona is what ADR 0045 asks for."""
     for entry in SEED.PERSONAS:
-        objections = entry["einwaende"]
-        assert 3 <= len(objections) <= 4, f"{entry['schluessel']}: {len(objections)} objections"
+        objections = entry["objections"]
+        assert 3 <= len(objections) <= 4, f"{entry['id']}: {len(objections)} objections"
         assert all(text.strip() for text in objections)
 
 
@@ -276,6 +276,6 @@ def test_seeded_persona_behaviour_carries_no_situation():
     the same sentence about having a reason for the call — a statement about
     the Session's setup that the prompt frame already makes."""
     for entry in SEED.PERSONAS:
-        lowered = entry["verhalten"].lower()
-        assert "reason for this call" not in lowered, entry["schluessel"]
-        assert "context of the call" not in lowered, entry["schluessel"]
+        lowered = entry["behavior"].lower()
+        assert "reason for this call" not in lowered, entry["id"]
+        assert "context of the call" not in lowered, entry["id"]

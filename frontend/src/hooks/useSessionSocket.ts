@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { CallState, ClientMessage, ServerMessage, TurnRecord } from "../protocol";
+import { currentAccessToken } from "../auth";
+import type { CallState, ClientMessage, ServerMessage, TranscriptEntry } from "../protocol";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "";
-const WS_URL = `${API_URL.replace(/^http/, "ws")}/ws/session`;
+// The backend serves this SPA, so the WebSocket is same-origin (see CLAUDE.md).
+// Derived from window.location rather than a base-URL env var, which no longer
+// exists.
+const WS_URL =
+  typeof window === "undefined"
+    ? "/ws/session"
+    : `${window.location.origin.replace(/^http/, "ws")}/ws/session`;
 
 /** The Session the user has committed to, as far as the connection is
  * concerned. A fresh object stands for a fresh Session: the connection is
@@ -18,7 +24,12 @@ export interface CommittedSession {
 interface UseSessionSocketOptions {
   session: CommittedSession | null;
   onAudioChunk: (data: ArrayBuffer) => void;
-  onEnded: (reason: "user" | "error" | "completed", transcript: TurnRecord[]) => void;
+  onEnded: (
+    reason: "user" | "error" | "completed",
+    transcript: TranscriptEntry[],
+    /** Names the persisted Session, for fetching its Feedback afterwards. */
+    sessionId: string | null,
+  ) => void;
 }
 
 /**
@@ -35,12 +46,14 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const turnSeqRef = useRef(0);
+  const sessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (session === null) return;
 
     setError(null);
     setCallState("thinking");
+    sessionIdRef.current = null;
 
     const ws = new WebSocket(WS_URL);
     ws.binaryType = "arraybuffer";
@@ -54,13 +67,22 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     // "connection lost" message even though the real connection is fine.
     const isCurrent = () => wsRef.current === ws;
 
-    ws.onopen = () => {
+    ws.onopen = async () => {
       if (!isCurrent()) return;
+      const token = await currentAccessToken();
+      if (!isCurrent()) return;
+      if (!token) {
+        console.warn("[WS] no access token; closing");
+        ws.close();
+        setError("Sitzung abgelaufen. Bitte neu anmelden.");
+        return;
+      }
       console.debug("[WS] connected, sending session.start");
       const start: ClientMessage = {
         type: "session.start",
         persona_id: session.personaId,
         scenario_id: session.scenarioId,
+        token,
       };
       ws.send(JSON.stringify(start));
     };
@@ -81,9 +103,11 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
           setError(message.message);
           break;
         case "session.ended":
-          onEnded(message.reason, message.transcript);
+          onEnded(message.reason, message.transcript, sessionIdRef.current);
           break;
         case "session.started":
+          sessionIdRef.current = message.session_id;
+          break;
         case "turn.audio.chunk":
         case "turn.completed":
           break;
@@ -133,6 +157,15 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     setCallState("listening");
   }, []);
 
+  /** Marks t=0 on the Session's timeline: the opening line starts playing now. */
+  const sendActivate = useCallback(() => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    console.debug("[WS] -> session.activate");
+    const activate: ClientMessage = { type: "session.activate" };
+    ws.send(JSON.stringify(activate));
+  }, []);
+
   const endSession = useCallback(() => {
     const ws = wsRef.current;
     if (!ws) return;
@@ -147,9 +180,11 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
       // even in the brief window before the connection is established.
       console.debug("[WS] ending before connection was established");
       ws.close();
-      onEnded("user", []);
+      // No handshake means no Session was ever created, let alone persisted,
+      // so there is no id and no Feedback to wait for.
+      onEnded("user", [], null);
     }
   }, [onEnded]);
 
-  return { callState, error, sendTurnAudio, sendInterrupt, endSession };
+  return { callState, error, sendTurnAudio, sendInterrupt, sendActivate, endSession };
 }

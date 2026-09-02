@@ -4,7 +4,7 @@ Covers ADR 0016 (one retry, then graceful end) as reinterpreted per leg by
 ADR 0033 / ADR 0044:
   * STT: one retry; a second failure -> `stt_failed`, turn ends
   * LLM: retried only while nothing has been sent; -> `llm_failed`
-  * TTS: KugelAudio failing before audio falls back to the EFRE model for that
+  * TTS: KugelAudio failing before audio falls back to the DiReKT model for that
     chunk; if that also fails -> `tts_failed`. A failure *after* audio has been
     sent ends the turn (a fresh synth would diverge from what was heard).
 A transient blip (one failure then a fallback covers it) is absorbed silently.
@@ -82,7 +82,7 @@ async def test_persistent_tts_failure_ends_the_turn_with_tts_failed(orch, fake_p
 async def test_transient_tts_failure_falls_back_and_is_absorbed(orch, fake_pipeline):
     fake_pipeline.stt.transcripts = ["Sagen Sie etwas."]
     fake_pipeline.llm.replies = ["Kurze Antwort."]
-    fake_pipeline.tts.fail_times = 1  # KugelAudio blips once; the EFRE fallback covers it
+    fake_pipeline.tts.fail_times = 1  # KugelAudio blips once; the DiReKT fallback covers it
 
     events = await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
 

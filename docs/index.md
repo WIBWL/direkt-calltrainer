@@ -21,7 +21,7 @@ Sie sind in der Leitung. Wählen Sie eine Option:
 - [ADR 0008 — React + TypeScript Frontend](adr/0008-react-typescript-frontend.md)
 - [ADR 0009 — Keycloak OIDC Authorization Code Flow + PKCE](adr/0009-keycloak-oidc-pkce-auth.md)
 - [ADR 0010 — Own PostgreSQL Instance for Session Persistence](adr/0010-own-postgresql-instance-for-session-persistence.md)
-- [ADR 0011 — EFRE-Direkt LLM Backend, Self-Contained](adr/0011-efre-direkt-llm-backend.md)
+- [ADR 0011 — DiReKT LLM Backend, Self-Contained](adr/0011-direkt-llm-backend.md)
 - [ADR 0012 — Python + FastAPI Backend](adr/0012-python-fastapi-backend.md)
 - [ADR 0013 — Minimal Required Setup, Advanced Options Separate](adr/0013-minimal-required-setup.md)
 - [ADR 0014 — Feedback Only in the Post-Call Wrap-Up](adr/0014-feedback-only-after-call.md)
@@ -50,5 +50,10 @@ Sie sind in der Leitung. Wählen Sie eine Option:
 - [ADR 0044 — Forward KugelAudio's Audio Sub-Chunks; No Persistent Streaming Session](adr/0044-streaming-tts-forward-subchunks.md)
 - [ADR 0045 — Case Facts, Call Goal and Success Condition on the Scenario; Objections on the Persona](adr/0045-case-facts-on-scenario-objections-on-persona.md)
 - [ADR 0046 — Liveliness Is Pursued at the Prompt Layer Before the Turn-Taking Layer (proposed)](adr/0046-liveliness-at-the-prompt-layer.md)
+- [ADR 0047 — Praat via Parselmouth as the Paraverbal Measurement Engine](adr/0047-parselmouth-praat-acoustic-measurement.md)
+- [ADR 0048 — Paraverbal Analysis Runs Inline on In-Memory Audio; Audio Is Never Persisted](adr/0048-inline-acoustic-analysis-audio-not-persisted.md)
+- [ADR 0049 — The Model Interprets Measurements, It Does Not Produce Them](adr/0049-deterministic-measurement-llm-interpretation.md)
+- [ADR 0050 — A Session Is Addressed by an Unguessable Id](adr/0050-unguessable-session-id.md)
+- [ADR 0051 — Statistics Describe the Whole Session and Carry No Invented Norms](adr/0051-session-level-statistics-and-machine-latency.md)
 
 *Vielen Dank für Ihren Anruf. Bitte legen Sie nach der Lektüre nicht auf — es warten noch mehr ADRs auf Sie.*

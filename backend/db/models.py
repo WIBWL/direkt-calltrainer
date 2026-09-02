@@ -11,10 +11,11 @@ subtree with it while the shared reference entities stay.
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, String, Integer, Numeric, Text, DateTime, Boolean
+from sqlalchemy import ForeignKey, String, Integer, Numeric, Text, DateTime, Boolean, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -107,7 +108,7 @@ class Sprache(Base):
 class MetrikTyp(Base):
     __tablename__ = "metrik_typ"
     metrik_typ_id: Mapped[int] = mapped_column(primary_key=True)
-    schluessel: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. intonation, tempo
+    schluessel: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. redeanteil, tempo
     bezeichnung: Mapped[str] = mapped_column(String(120))
     einheit: Mapped[str | None] = mapped_column(String(40))
     feature_id: Mapped[str | None] = mapped_column(String(10))
@@ -115,12 +116,18 @@ class MetrikTyp(Base):
 
     messungen: Mapped[list["Messung"]] = relationship(back_populates="metrik_typ")
     befunde: Mapped[list["Befund"]] = relationship(back_populates="metrik_typ")
+    feedbackpunkte: Mapped[list["Feedbackpunkt"]] = relationship(back_populates="metrik_typ")
 
 
 class Session(Base):
     __tablename__ = "session"
     session_id: Mapped[int] = mapped_column(primary_key=True)
-    subject_id: Mapped[str] = mapped_column(String(64))  # pseudonym, later the Keycloak "sub" claim (ADR 0031)
+    # What the client is given and later names the Session by. Random rather
+    # than the primary key: with no authentication yet (ADR 0031), being
+    # unguessable is the only thing keeping one user's Session from another's.
+    oeffentliche_id: Mapped[uuid.UUID] = mapped_column(Uuid, unique=True, default=uuid.uuid4)
+    # Pseudonym; later the Keycloak "sub" claim (ADR 0031).
+    subject_id: Mapped[str] = mapped_column(String(64))
     persona_id: Mapped[int] = mapped_column(ForeignKey("persona.persona_id"))
     szenario_id: Mapped[int] = mapped_column(ForeignKey("szenario.szenario_id"))
     sprache_code: Mapped[str] = mapped_column(ForeignKey("sprache.sprache_code"))
@@ -132,6 +139,14 @@ class Session(Base):
     szenario: Mapped["Szenario"] = relationship(back_populates="sessions")
     sprache: Mapped["Sprache"] = relationship(back_populates="sessions")
     turns: Mapped[list["Turn"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan"
+    )
+    # Measurements and findings describe the whole call, not one utterance
+    # (ADR 0051), so they hang off the Session rather than off a Turn.
+    messungen: Mapped[list["Messung"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan"
+    )
+    befunde: Mapped[list["Befund"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
     feedback: Mapped["Feedback | None"] = relationship(
@@ -149,41 +164,39 @@ class Turn(Base):
     sprecher: Mapped[str] = mapped_column(String(10))    # nutzer, persona
     seq_index: Mapped[int] = mapped_column(Integer)
     start_offset_ms: Mapped[int] = mapped_column(Integer)
-    dauer_ms: Mapped[int] = mapped_column(Integer)
+    # NULL where an utterance has no measured end: a user Turn whose audio
+    # could not be analysed, or a Persona line whose synthesis failed.
+    dauer_ms: Mapped[int | None] = mapped_column(Integer)
     transkript: Mapped[str] = mapped_column(Text)
 
     session: Mapped["Session"] = relationship(back_populates="turns")
     feedbackpunkte: Mapped[list["Feedbackpunkt"]] = relationship(back_populates="turn")
-    messungen: Mapped[list["Messung"]] = relationship(
-        back_populates="turn", cascade="all, delete-orphan"
-    )
-    befunde: Mapped[list["Befund"]] = relationship(
-        back_populates="turn", cascade="all, delete-orphan"
-    )
 
 
 class Messung(Base):
     __tablename__ = "messung"
     messung_id: Mapped[int] = mapped_column(primary_key=True)
-    turn_id: Mapped[int] = mapped_column(ForeignKey("turn.turn_id"))
+    session_id: Mapped[int] = mapped_column(ForeignKey("session.session_id"))
     metrik_typ_id: Mapped[int] = mapped_column(ForeignKey("metrik_typ.metrik_typ_id"))
     wert: Mapped[Decimal] = mapped_column(Numeric(10, 4))
-    detail_json: Mapped[dict | None] = mapped_column(JSONB)  # e.g. the metric's course over the turn
+    detail_json: Mapped[dict | None] = mapped_column(JSONB)  # e.g. the metric's course over the call
 
-    turn: Mapped["Turn"] = relationship(back_populates="messungen")
+    session: Mapped["Session"] = relationship(back_populates="messungen")
     metrik_typ: Mapped["MetrikTyp"] = relationship(back_populates="messungen")
 
 
 class Befund(Base):
     __tablename__ = "befund"
     befund_id: Mapped[int] = mapped_column(primary_key=True)
-    turn_id: Mapped[int] = mapped_column(ForeignKey("turn.turn_id"))
+    session_id: Mapped[int] = mapped_column(ForeignKey("session.session_id"))
     metrik_typ_id: Mapped[int | None] = mapped_column(ForeignKey("metrik_typ.metrik_typ_id"))
     kategorie: Mapped[str] = mapped_column(String(60))
-    offset_ms: Mapped[int] = mapped_column(Integer)
+    # Milliseconds from the start of the Session, where the finding has a
+    # moment (a long pause); NULL where it characterises the whole call.
+    offset_ms: Mapped[int | None] = mapped_column(Integer)
     beschreibung: Mapped[str] = mapped_column(Text)
 
-    turn: Mapped["Turn"] = relationship(back_populates="befunde")
+    session: Mapped["Session"] = relationship(back_populates="befunde")
     metrik_typ: Mapped["MetrikTyp | None"] = relationship(back_populates="befunde")
     feedbackpunkte: Mapped[list["Feedbackpunkt"]] = relationship(back_populates="befund")
 
@@ -198,7 +211,9 @@ class Feedback(Base):
 
     session: Mapped["Session"] = relationship(back_populates="feedback")
     punkte: Mapped[list["Feedbackpunkt"]] = relationship(
-        back_populates="feedback", cascade="all, delete-orphan"
+        back_populates="feedback",
+        order_by="Feedbackpunkt.reihenfolge",
+        cascade="all, delete-orphan",
     )
 
 
@@ -208,11 +223,15 @@ class Feedbackpunkt(Base):
     feedback_id: Mapped[int] = mapped_column(ForeignKey("feedback.feedback_id"))
     turn_id: Mapped[int | None] = mapped_column(ForeignKey("turn.turn_id"))
     befund_id: Mapped[int | None] = mapped_column(ForeignKey("befund.befund_id"))
+    metrik_typ_id: Mapped[int | None] = mapped_column(ForeignKey("metrik_typ.metrik_typ_id"))
+    art: Mapped[str] = mapped_column(String(20))          # staerke, verbesserung
+    reihenfolge: Mapped[int] = mapped_column(Integer)
     text: Mapped[str] = mapped_column(Text)
 
     feedback: Mapped["Feedback"] = relationship(back_populates="punkte")
     turn: Mapped["Turn | None"] = relationship(back_populates="feedbackpunkte")
     befund: Mapped["Befund | None"] = relationship(back_populates="feedbackpunkte")
+    metrik_typ: Mapped["MetrikTyp | None"] = relationship(back_populates="feedbackpunkte")
 
 
 class AnalysisJob(Base):

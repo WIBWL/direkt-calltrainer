@@ -2,6 +2,7 @@
 fastapi[all]==0.109.0
 gunicorn==21.2.0
 httpx==0.28.1
+pyjwt[crypto]==2.13.0
 python-dotenv==1.0.1
 uvicorn[standard]==0.27.0
 
@@ -15,6 +16,12 @@ psycopg[binary]==3.2.10
 pydot==3.0.4
 sqlalchemy==2.0.36
 sqlalchemy-schemadisplay==2.0
+
+# Post-call feedback: Praat measurement and the async wrap-up worker
+numpy==2.5.2
+praat-parselmouth==0.4.7
+redis==8.1.0
+rq==2.12.0
 
 # Docs site (arc42 + ADRs)
 mkdocs==1.6.1

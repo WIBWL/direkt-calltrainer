@@ -5,11 +5,19 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
+# OIDC config is baked into the SPA at build time (see frontend/src/oidcConfig.ts).
+# compose.yaml passes these; a bare `docker build` falls back to the local defaults.
+ARG VITE_OIDC_ISSUER=http://localhost:18081/realms/direkt
+ARG VITE_OIDC_CLIENT_ID=calltrainer-frontend
+ENV VITE_OIDC_ISSUER=$VITE_OIDC_ISSUER
+ENV VITE_OIDC_CLIENT_ID=$VITE_OIDC_CLIENT_ID
 RUN npm run build
 
-# Pinned: python:3-slim moved to 3.14, which the pinned SQLAlchemy 2.0.36
-# cannot import (typing.Union.__getitem__ changed). Bump both together.
-FROM python:3.13-slim
+# Pinned, not "python:3-slim": that tag has since floated to 3.14, where
+# SQLAlchemy 2.0.36 cannot resolve the `Mapped[int | None]` annotations in
+# backend/db/models.py and the app fails at import. Raise this deliberately,
+# together with the pins in requirements.txt.
+FROM python:3.12-slim
 
 EXPOSE 8000
 

@@ -7,7 +7,8 @@ Covers:
   ADR 0041  the handshake resolves the ids through the database-backed
             library, faked here so the test needs no database
   Handshake robustness: a missing/!= 'session.start' or an unknown
-  persona/scenario id closes the socket with protocol-error code 1002
+  persona/scenario id closes the socket with protocol-error code 1002; a
+  missing/invalid token closes with 1008 (F-50/ADR 0009).
 
 starlette's TestClient can't be used here (the repo pins httpx 0.28, whose
 Client rejects TestClient's `app=` kwarg), so the ASGI-level helpers are
@@ -16,15 +17,33 @@ driven directly through a fake WebSocket.
 
 import json
 
+import pytest
 from fastapi import WebSocketDisconnect
 
 from backend.api import session_ws
 from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted
-from tests.conftest import TEST_PERSONAS, TEST_SCENARIOS
+from tests.conftest import TEST_AUTH, TEST_PERSONAS, TEST_SCENARIOS
 
 # session_ws's ASGI helpers are underscore-prefixed; driving them directly is
 # the point of this module.
-# pylint: disable=missing-function-docstring,missing-class-docstring,protected-access
+# pylint: disable=missing-function-docstring,missing-class-docstring,protected-access,redefined-outer-name
+
+
+@pytest.fixture(autouse=True)
+def _accept_test_token(monkeypatch):
+    """The real handshake verifies the token in `session.start`; here it's a
+    stub. `test_handshake_rejects_a_missing_token` restores the real check."""
+    monkeypatch.setattr(
+        session_ws, "authenticate_ws", lambda msg: TEST_AUTH if msg.get("token") else None
+    )
+
+
+_START = {
+    "type": "session.start",
+    "token": "test",
+    "persona_id": TEST_PERSONAS[0].id,
+    "scenario_id": TEST_SCENARIOS[0].id,
+}
 
 
 class FakeWebSocket:
@@ -70,15 +89,9 @@ _DISCONNECT = object()
 
 
 async def test_handshake_accepts_a_valid_session_start(fake_library):
-    ws = FakeWebSocket([
-        {
-            "type": "session.start",
-            "persona_id": TEST_PERSONAS[0].id,
-            "scenario_id": TEST_SCENARIOS[0].id,
-        },
-    ])
+    ws = FakeWebSocket([_START])
     result = await session_ws._handshake(ws)
-    assert result == (TEST_PERSONAS[0], TEST_SCENARIOS[0])
+    assert result == (TEST_PERSONAS[0], TEST_SCENARIOS[0], TEST_AUTH)
     assert ws.closed is None
 
 
@@ -88,14 +101,14 @@ async def test_handshake_rejects_a_wrong_first_message():
     assert ws.closed[0] == 1002
 
 
+async def test_handshake_rejects_a_missing_token():
+    ws = FakeWebSocket([{k: v for k, v in _START.items() if k != "token"}])
+    assert await session_ws._handshake(ws) is None
+    assert ws.closed[0] == 1008  # policy violation
+
+
 async def test_handshake_rejects_unknown_persona_or_scenario(fake_library):
-    ws = FakeWebSocket([
-        {
-            "type": "session.start",
-            "persona_id": "does-not-exist",
-            "scenario_id": TEST_SCENARIOS[0].id,
-        },
-    ])
+    ws = FakeWebSocket([{**_START, "persona_id": "does-not-exist"}])
     assert await session_ws._handshake(ws) is None
     assert ws.closed[0] == 1002
 

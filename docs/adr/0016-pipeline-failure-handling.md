@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The Session loop chains three calls per turn: STT, dialogue generation, TTS. Dialogue generation runs against the university-hosted EFRE-Direkt gateway (ADR 0011); STT and TTS run against separately self-hosted local models (ADR 0021). arc42 flags the resulting availability/fault-tolerance behavior as an explicit gap (Kapitel 6). Any of the three steps can fail mid-turn, e.g. on a timeout.
+The Session loop chains three calls per turn: STT, dialogue generation, TTS. Dialogue generation runs against the university-hosted DiReKT gateway (ADR 0011); STT and TTS run against separately self-hosted local models (ADR 0021). arc42 flags the resulting availability/fault-tolerance behavior as an explicit gap (Kapitel 6). Any of the three steps can fail mid-turn, e.g. on a timeout.
 
 ## Decision
 

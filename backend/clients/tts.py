@@ -5,7 +5,7 @@ Two shapes:
 * ``synthesize_stream`` — the live path. Streams one text chunk through
   KugelAudio and yields WAV pieces **as they are generated**, so the first
   audio reaches the client ~0.3 s after the chunk is ready instead of ~0.9 s
-  (measured; see ``test/model-parameters.md``). One ``stream_async`` call per
+  (measured; see ``docs/model-parameters.md``). One ``stream_async`` call per
   chunk over a pooled WebSocket (``reuse_connection`` + ``prewarm``); the
   KugelAudio doc's persistent ``streaming_session`` was measured *slower* to
   first audio with this SDK because its per-``send`` poll defers synthesis to
@@ -14,7 +14,7 @@ Two shapes:
   the startup health check and the fixed fallback-closing line, where first-
   audio latency does not matter.
 
-Both fall back to the EFRE Voxtral model (ADR 0040) when KugelAudio fails
+Both fall back to the DiReKT Voxtral model (ADR 0040) when KugelAudio fails
 before producing audio, or always under ``DEBUG``.
 """
 
@@ -52,7 +52,7 @@ async def prewarm() -> None:
 async def synthesize_stream(text: str, voice: PersonaVoice, language_id: str) -> AsyncIterator[bytes]:
     """Synthesize one text chunk, yielding WAV audio pieces as they arrive.
 
-    Falls back to one EFRE batch WAV if KugelAudio fails *before* producing any
+    Falls back to one DiReKT batch WAV if KugelAudio fails *before* producing any
     audio. Raises `KugelAudioError` if it fails *after* — a fresh synthesis
     would diverge from audio the user has already heard (ADR 0033), so the
     caller ends the Turn instead.
@@ -79,23 +79,23 @@ async def synthesize_stream(text: str, voice: PersonaVoice, language_id: str) ->
     except (KugelAudioError, TimeoutError, OSError) as e:
         if produced:
             raise KugelAudioError(f"KugelAudio stream failed after producing audio: {e}") from e
-        logger.warning("KugelAudio streaming failed before any audio, falling back to EFRE: %s", e)
+        logger.warning("KugelAudio streaming failed before any audio, falling back to DiReKT: %s", e)
         yield await _synthesize(text, voice)
 
 
 async def synthesize(text: str, voice: PersonaVoice, language_id: str) -> bytes:
     """One-shot: the whole chunk as a single WAV. KugelAudio by default,
-    EFRE on failure or under DEBUG.
+    DiReKT on failure or under DEBUG.
 
     KugelAudio wants the bare language code ("de", "en") here, not a full
     locale tag -- it rejects "de-DE"/"en-GB" with "Invalid request", which
-    then degrades silently into the EFRE fallback voice.
+    then degrades silently into the DiReKT fallback voice.
     """
     if not DEBUG:
         try:
             return await _synthesize_kugelaudio(text, voice, language_id)
         except (KugelAudioError, TimeoutError, OSError) as e:
-            logger.warning("KugelAudio TTS failed, falling back to EFRE: %s", e)
+            logger.warning("KugelAudio TTS failed, falling back to DiReKT: %s", e)
     return await _synthesize(text, voice)
 
 
@@ -115,11 +115,11 @@ async def _synthesize_kugelaudio(text: str, voice: PersonaVoice, language_id: st
 
 
 async def _synthesize(text: str, voice: PersonaVoice) -> bytes:
-    """EFRE Voxtral batch call, one retry (ADR 0016)."""
+    """DiReKT Voxtral batch call, one retry (ADR 0016)."""
     last_err: OpenAIError | None = None
     for attempt in range(2):
         try:
-            logger.info("Synthesizing speech via EFRE TTS (%s, voice=%s): %r", TTS_MODEL, voice.tts_voice, text)
+            logger.info("Synthesizing speech via DiReKT TTS (%s, voice=%s): %r", TTS_MODEL, voice.tts_voice, text)
             speech = await CLIENT.audio.speech.create(
                 model=TTS_MODEL,
                 voice=voice.tts_voice,
@@ -129,7 +129,7 @@ async def _synthesize(text: str, voice: PersonaVoice) -> bytes:
             return speech.content
         except OpenAIError as e:
             last_err = e
-            logger.error("EFRE TTS failed (attempt %d): %s", attempt + 1, e)
+            logger.error("DiReKT TTS failed (attempt %d): %s", attempt + 1, e)
     raise last_err  # type: ignore[misc]
 
 
@@ -141,3 +141,19 @@ def _pcm16_to_wav(pcm_bytes: bytes, sample_rate: int) -> bytes:
         wav.setframerate(sample_rate)
         wav.writeframes(pcm_bytes)
     return buf.getvalue()
+
+
+def duration_ms(wav_bytes: bytes) -> int:
+    """Playback length of one synthesized chunk.
+
+    Both backends deliver WAV -- KugelAudio's headerless PCM is wrapped above --
+    so the header is always there to read. 0 for anything unreadable: the
+    caller uses this to place the Persona on the Session's timeline (ADR 0051),
+    which must not be able to fail a call.
+    """
+    try:
+        with wave.open(io.BytesIO(wav_bytes)) as wav:
+            return round(wav.getnframes() * 1000 / wav.getframerate())
+    except (wave.Error, ZeroDivisionError, EOFError):
+        logger.warning("Synthesized chunk has no readable WAV header; timing it as 0 ms")
+        return 0

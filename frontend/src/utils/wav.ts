@@ -20,9 +20,10 @@ export function encodeWav(samples: Float32Array, sampleRate: number): Blob {
   view.setUint32(40, dataSize, true);
 
   let offset = 44;
-  for (let i = 0; i < samples.length; i++, offset += 2) {
-    const s = Math.max(-1, Math.min(1, samples[i]));
+  for (const sample of samples) {
+    const s = Math.max(-1, Math.min(1, sample));
     view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    offset += 2;
   }
 
   return new Blob([buffer], { type: "audio/wav" });
