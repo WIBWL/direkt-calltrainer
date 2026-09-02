@@ -85,7 +85,12 @@ async def synthesize_stream(text: str, voice: PersonaVoice, language_id: str) ->
 
 async def synthesize(text: str, voice: PersonaVoice, language_id: str) -> bytes:
     """One-shot: the whole chunk as a single WAV. KugelAudio by default,
-    DiReKT on failure or under DEBUG."""
+    DiReKT on failure or under DEBUG.
+
+    KugelAudio wants the bare language code ("de", "en") here, not a full
+    locale tag -- it rejects "de-DE"/"en-GB" with "Invalid request", which
+    then degrades silently into the DiReKT fallback voice.
+    """
     if not DEBUG:
         try:
             return await _synthesize_kugelaudio(text, voice, language_id)
@@ -136,3 +141,19 @@ def _pcm16_to_wav(pcm_bytes: bytes, sample_rate: int) -> bytes:
         wav.setframerate(sample_rate)
         wav.writeframes(pcm_bytes)
     return buf.getvalue()
+
+
+def duration_ms(wav_bytes: bytes) -> int:
+    """Playback length of one synthesized chunk.
+
+    Both backends deliver WAV -- KugelAudio's headerless PCM is wrapped above --
+    so the header is always there to read. 0 for anything unreadable: the
+    caller uses this to place the Persona on the Session's timeline (ADR 0051),
+    which must not be able to fail a call.
+    """
+    try:
+        with wave.open(io.BytesIO(wav_bytes)) as wav:
+            return round(wav.getnframes() * 1000 / wav.getframerate())
+    except (wave.Error, ZeroDivisionError, EOFError):
+        logger.warning("Synthesized chunk has no readable WAV header; timing it as 0 ms")
+        return 0

@@ -20,18 +20,25 @@ set in `conftest.py` before any backend module is imported. Keycloak auth
 `require_user`; `test_auth.py` verifies the real token logic against a
 throwaway RSA key and a stubbed JWKS.
 
+Personas and Scenarios live in the database since ADR 0041, so the suite owns
+its own value objects (`TEST_PERSONAS` / `TEST_SCENARIOS` in `conftest.py`) and
+the `fake_library` fixture serves them wherever the code would otherwise read
+the database. What the *shipped* library contains is a separate question,
+asserted against `scripts/seed_reference_data.py` — which ADR 0041 makes the
+source of that content, and which imports without a database.
+
 ## Traceability matrix
 
 | Area | Feature / ADR | Test file |
 |---|---|---|
 | Keycloak bearer-token verification | F-31, F-50, ADR 0009 | `test_auth.py` |
-| Setup screen: persona/scenario REST endpoints (+ auth gate) | F-43, F-44, F-15, F-31, F-50, F-01/03/04, ADR 0001, ADR 0006/0022, ADR 0009 | `test_setup_api.py` |
-| Persona & scenario libraries (data) | F-01, F-03, F-04, R-07, R-08, R-09, R-10, ADR 0006, ADR 0022 | `test_persona_scenario_library.py` |
-| Counterpart behaviour (LLM system prompt) | F-01, F-03, F-04, F-12, R-12, ADR 0006, ADR 0033/0037/0038 | `test_system_prompt.py` |
+| Setup screen: persona/scenario REST endpoints (+ auth gate) | F-43, F-44, F-15, F-31, F-50, F-01/03/04, ADR 0001, ADR 0009, ADR 0041, ADR 0043, ADR 0045 | `test_setup_api.py` |
+| Persona & scenario library: row mapping + seeded content | F-01, F-03, F-04, R-07..R-10, R-12, ADR 0041, ADR 0043, ADR 0045 | `test_persona_scenario_library.py` |
+| Counterpart behaviour (LLM system prompt) | F-01, F-03, F-04, F-12, R-12, ADR 0043, ADR 0045, ADR 0033/0037/0038 | `test_system_prompt.py` |
 | Live session loop & state model | F-46, F-01, F-12, F-52, R-52, ADR 0033 | `test_session_pipeline.py` |
 | Streaming TTS chunking | ADR 0033 | `test_chunking.py` |
-| Closing-intent detection | ADR 0037, F-01 | `test_closing_intent.py` |
-| Repetition guard + guaranteed sign-off | ADR 0038 | `test_repetition_guard.py` |
+| Closing-intent detection (both language packs) | ADR 0037, ADR 0043, F-01 | `test_closing_intent.py` |
+| Repetition guard + guaranteed sign-off | ADR 0038, ADR 0043 | `test_repetition_guard.py` |
 | `[CALL_END]` marker + foreign-script scrub | ADR 0033 | `test_call_end_marker.py` |
 | Barge-in / eager interruption | ADR 0035 | `test_barge_in.py` |
 | Pipeline fault tolerance (retry → graceful end) | ADR 0016, ADR 0033 | `test_pipeline_failure.py` |
@@ -39,21 +46,22 @@ throwaway RSA key and a stubbed JWKS.
 | WebSocket wire protocol & handshake (+ token in `session.start`) | F-46, F-50, ADR 0009, ADR 0033, ADR 0035 | `test_websocket_protocol.py` |
 | Centralized / per-session logging | ADR 0039 | `test_logging.py` |
 | Persistence schema (ORM metadata) | ADR 0025/0026/0029/0030/0032, F-09, F-12, F-14 | `test_persistence_schema.py` |
-| Documented gaps (current-state guards) | ADR 0034, F-09/10, F-13/48, F-53, F-56, ADR 0018/0019 | `test_documented_gaps.py` |
+| Documented gaps (current-state guards) | F-13/48, F-53, F-56, ADR 0006/0009 | `test_documented_gaps.py` |
 
 ## Not covered here
 
-* **Paraverbal analysis** (F-35–F-38, F-40, F-51, F-24, dashboard F-53) and
-  **AI feedback** (F-09, F-10) — not implemented yet (ADR 0018/0019 worker is
-  unbuilt). `test_documented_gaps.py` guards their absence so this suite flags
-  the day they land.
+* **Paraverbal measurement and the post-call wrap-up** (F-09, F-10, F-37,
+  F-51, F-53) — now implemented in `backend/feedback/` (ADR 0047–0051), but
+  not yet covered by tests of their own. The current-state guards that used
+  to assert their absence were removed when the feature landed; feature
+  tests for `metrics.py`, `acoustics.py` and `generator.py` are owed.
+  The cross-session dashboard (F-53) is still unbuilt.
 * **Frontend** (React hooks, in-browser Silero VAD / ADR 0036, streamed audio
   playback) — no JS test runner is configured. VAD confirmed-speech filtering
   is a browser-only concern.
 * **Real backend connectivity** — `scripts/check_backends.py` already does a
-  live OK/FAIL check against the configured STT/LLM/TTS models.
-* **Library breadth (F-03/F-04)** — the tests check that the persona/scenario
-  *shapes* are well-formed and that one budget-focused, price-pushing persona
-  and the support + pricing scenarios are representable. They do not assert a
-  broad catalogue: the code ships one persona and two of the three scenario
-  contexts in `docs/features.md`.
+  live OK/FAIL probe against the configured STT/LLM/TTS models.
+* **Whether the model actually follows the frame** — every prompt test here
+  asserts the *text handed to* the model. That the model then behaves (uses
+  the case, raises an objection once, ends at the right moment) is only
+  observable in real calls.

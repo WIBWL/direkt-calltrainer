@@ -1,23 +1,28 @@
 """FastAPI app: REST endpoints for setup data, WebSocket route for the live session, static frontend."""
 
+import asyncio
 import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from backend.api.session_ws import router as session_ws_router
+from backend.api.sessions import router as sessions_router
 from backend.auth import check_realm, require_user
 from backend.clients import tts
 from backend.clients.config import DIREKT_URL
 from backend.clients.health import check_backends
+from backend.db.provision import provision
+from backend.db.session import session_scope
 from backend.logging_config import configure_logging
-from backend.personas import PERSONAS
-from backend.scenarios import SCENARIOS
+from backend import library
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -40,7 +45,22 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     await check_backends()
     await tts.prewarm()
     await check_realm()  # mirrors the DiReKT check above, for the Keycloak realm
+    # Off the event loop: Alembic and the ORM are both synchronous.
+    await asyncio.to_thread(_provision_database)
     yield
+
+
+def _provision_database() -> None:
+    """Migrate and seed on startup, so a fresh `docker compose up` is usable.
+
+    Non-fatal, like the backend check above: without it every Session fails to
+    persist and silently loses its Feedback, but the call itself still works,
+    so a database problem must not stop the app from booting.
+    """
+    try:
+        logger.info("Database provisioned, reference rows created: %s", provision())
+    except Exception:
+        logger.exception("Database provisioning failed - Sessions will not be persisted")
 
 
 app = FastAPI(title="CallTrainer API", lifespan=lifespan)
@@ -56,28 +76,67 @@ app.add_middleware(
 )
 
 app.include_router(session_ws_router)
+app.include_router(sessions_router)
 
 FRONTEND_DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    """Plain health check — open, it's an infrastructure check."""
+    """Liveness: the process is up — open, it's an infrastructure check.
+
+    Deliberately touches nothing else, so a restart loop cannot be caused by a
+    dependency being briefly unavailable.
+    """
     return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def readiness() -> dict[str, str]:
+    """Readiness: the app can actually serve. Separate from liveness because
+    every endpoint below needs the database — an instance that answers "ok"
+    while Postgres is unreachable would keep receiving traffic it can only
+    answer with 503. This is the check compose.yaml asks."""
+    try:
+        with session_scope() as db:
+            db.execute(text("SELECT 1"))
+    except SQLAlchemyError as e:
+        logger.error("Readiness check failed: %s", e)
+        raise HTTPException(status_code=503, detail="Database unavailable") from e
+    return {"status": "ready"}
 
 
 # The setup lists require a valid Keycloak token (ADR 0009). The static SPA
 # mount below stays open so the login screen can load in the first place.
 @app.get("/api/personas", dependencies=[Depends(require_user)])
 def list_personas() -> list[dict[str, str]]:
-    """List personas available for session setup."""
-    return [{"id": p.id, "name": p.name, "role": p.role} for p in PERSONAS]
+    """List personas available for session setup.
+
+    Display fields only (ADR 0043) -- the English prompt fields stay on the
+    server. The language comes along because it is a property of the Persona and
+    not a separate choice, so the card has to say which one it speaks.
+
+    `id` on the wire is the natural key, never the primary key: the client sends
+    it straight back in session.start. Retired Personas are filtered out by the
+    library -- their rows stay, because stored Sessions reference them.
+    """
+    return [
+        {"id": p.id, "name": p.name, "role": p.role_label, "language": p.language_name}
+        for p in library.list_personas()
+    ]
 
 
 @app.get("/api/scenarios", dependencies=[Depends(require_user)])
 def list_scenarios() -> list[dict[str, str]]:
-    """List scenarios available for session setup."""
-    return [{"id": s.id, "name": s.name, "description": s.description} for s in SCENARIOS]
+    """List scenarios available for session setup.
+
+    Serves the short teaser, not the English call context the model reads, and
+    only active rows -- as above.
+    """
+    return [
+        {"id": s.id, "name": s.name, "short_description": s.short_description}
+        for s in library.list_scenarios()
+    ]
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIST_DIR, html=True, check_dir=False), name="frontend")

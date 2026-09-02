@@ -1,10 +1,14 @@
-"""The Scenario library (see CONTEXT.md).
+"""The Scenario value object the backend works with.
 
-The situational context of a call, independent of the Persona's character — any
-Persona can run any Scenario (ADR 0001), nothing to filter by. Code for now;
-ADR 0041 moves it into the database alongside the Personas.
+The Scenarios themselves live in the database and are loaded through
+`backend/library.py` (ADR 0041); this module only defines their shape.
+
+A Scenario has no language of its own (ADR 0043): the prompt fields are the
+English call context handed to the model, `short_description` the teaser shown
+in the UI. That is what lets any Persona run any Scenario regardless of the
+language the Persona speaks -- and ADR 0045 keeps it that way by putting the
+case here, stated about the case rather than about whoever is calling.
 """
-
 from dataclasses import dataclass
 
 
@@ -12,33 +16,15 @@ from dataclasses import dataclass
 class Scenario:
     id: str
     name: str
+    # Display: the one-line teaser on the selection card.
+    short_description: str
+    # Prompt: English call context -- the situation alone (ADR 0045).
     description: str
-
-
-SCENARIOS: list[Scenario] = [
-    Scenario(
-        id="cold-call-followup",
-        name="Offenes Anliegen zu bestehendem Vertrag",
-        description=(
-            "Der Kunde (die Persona) ruft den Nutzer an, der im Support "
-            "arbeitet. Der Kunde hat eine konkrete Frage oder ein offenes "
-            "Anliegen zu einem bestehenden Angebot oder Vertrag und ruft an, um "
-            "das zu klären. Ziel des Anrufs ist es, das Anliegen zu klären und "
-            "das Gespräch zu einem Abschluss zu führen."
-        ),
-    ),
-    Scenario(
-        id="price-cancellation-risk",
-        name="Kündigungsabsicht wegen Preis",
-        description=(
-            "Der Kunde (die Persona) ruft an, um mitzuteilen, dass er über "
-            "eine Kündigung oder ein Downgrade nachdenkt, weil ihm die "
-            "laufenden Kosten im Verhältnis zum Nutzen zu hoch erscheinen. Der "
-            "Kunde ist grundsätzlich noch offen für ein Gespräch, erwartet "
-            "aber eine überzeugende, nutzenorientierte Begründung, warum sich "
-            "die Ausgabe weiterhin lohnt. Ziel des Calls ist es, den Kunden "
-            "durch Preisverhandlung bzw. Einwandbehandlung zum Bleiben zu "
-            "bewegen."
-        ),
-    ),
-]
+    # Prompt: the case itself (ADR 0045). Facts of the case, what the caller
+    # wants out of the call, and the condition under which the caller counts
+    # the matter as settled. Empty is allowed and means "improvise", which is
+    # what a Scenario predating ADR 0045 -- or a user-authored one (ADR 0024)
+    # -- looks like.
+    case_facts: str = ""
+    call_goal: str = ""
+    success_condition: str = ""

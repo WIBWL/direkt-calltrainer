@@ -1,15 +1,15 @@
 """
-MkDocs-Hooks fuer die Projektdoku.
+MkDocs hooks for the project documentation.
 
-Zweck: Das ER-Diagramm auf docs/datenmodell.md soll nie veralten. Statt sich
-darauf zu verlassen, dass jemand nach einer Schemaaenderung von Hand
-scripts/generate_erd.py aufruft, erzeugt dieser Hook das Diagramm vor jedem
-Doku-Build neu aus backend/db/models.py.
+Purpose: the ER diagram on docs/datenmodell.md must never go stale. Rather than
+relying on someone calling scripts/generate_erd.py by hand after a schema
+change, this hook regenerates it from backend/db/models.py before every docs
+build.
 
-Faellt die Erzeugung aus — fehlendes Graphviz-Programm "dot", fehlende
-Python-Pakete —, bricht der Build NICHT ab. Es bleibt dann beim zuletzt
-eingecheckten docs/er_modell.svg, und im Build-Log steht eine Warnung. Die
-Doku laesst sich damit auch auf Rechnern ohne Graphviz bauen.
+If generation fails — no Graphviz "dot" binary, missing Python packages — the
+build does NOT abort. The last committed docs/er_modell.svg is used instead and
+a warning goes into the build log, so the docs still build on machines without
+Graphviz.
 """
 import importlib.util
 import logging
@@ -22,9 +22,10 @@ GENERATOR = os.path.join(PROJECT_ROOT, "scripts", "generate_erd.py")
 
 
 def _generator_main():
-    """Laedt scripts/generate_erd.py ueber seinen Pfad und gibt main() zurueck.
+    """Loads scripts/generate_erd.py by path and returns its main().
 
-    Ueber den Pfad statt per Import, weil scripts/ kein Python-Paket ist.
+    By path rather than by import, because scripts/ is not a Python package.
+    By path rather than by import, because scripts/ is not a Python package.
     """
     spec = importlib.util.spec_from_file_location("generate_erd", GENERATOR)
     modul = importlib.util.module_from_spec(spec)
@@ -32,16 +33,22 @@ def _generator_main():
     return modul.main
 
 
-def on_pre_build(config) -> None:
+def on_pre_build(config) -> None:  # pylint: disable=unused-argument
+    """MkDocs hook: regenerate the ER diagram before each docs build.
+
+    `config` is part of the hook signature MkDocs calls, not something this
+    hook needs.
+    """
     try:
         _generator_main()()
-        log.info("ER-Diagramm aus backend/db/models.py neu erzeugt.")
-    except Exception as exc:  # bewusst breit: der Build darf hieran nicht scheitern
+        log.info("Regenerated the ER diagram from backend/db/models.py.")
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        # Deliberately broad: the docs build must not fail because of this.
         log.warning(
-            "ER-Diagramm konnte nicht neu erzeugt werden (%s: %s). Die Doku zeigt "
-            "das zuletzt eingecheckte docs/er_modell.svg, das veraltet sein kann. "
-            "Fuer die Erzeugung werden das Graphviz-Programm 'dot' und die Pakete "
-            "aus requirements.txt benoetigt.",
+            "Could not regenerate the ER diagram (%s: %s). The docs will show the "
+            "last committed docs/er_modell.svg, which may be out of date. "
+            "Generating it needs the Graphviz 'dot' binary and the packages from "
+            "requirements.txt.",
             type(exc).__name__,
             exc,
         )

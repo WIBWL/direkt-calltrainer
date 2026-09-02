@@ -211,7 +211,7 @@ body {
 }
 
 .eyebrow {
-  font-family: var(--font-mono);
+  font-family: "IBM Plex Mono", monospace;
   text-transform: uppercase;
   letter-spacing: 0.18em;
   font-size: 0.7rem;
@@ -225,137 +225,6 @@ h1 {
   font-size: 1.75rem;
   letter-spacing: -0.02em;
   margin: 0 0 1.5rem;
-}
-
-/* The setup introduction explains the purpose of the first training step. */
-.setup-intro {
-  margin-bottom: 24px;
-}
-
-.setup-intro .eyebrow {
-  margin-bottom: 10px;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.4;
-  letter-spacing: 0.12em;
-}
-
-.setup-intro h1 {
-  margin: 0 0 10px;
-  font-size: 48px;
-  line-height: 1.08;
-  letter-spacing: -0.02em;
-}
-
-.setup-intro-description {
-  max-width: 800px;
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 17px;
-  line-height: 26px;
-}
-
-@media (max-width: 720px) {
-  .setup-intro h1 {
-    font-size: 36px;
-  }
-
-  .setup-intro-description {
-    font-size: 16px;
-    line-height: 24px;
-  }
-}
-
-/* Each setup section groups one decision into a separate card. */
-.setup-section {
-  width: 100%;
-  margin-bottom: 14px;
-  padding: 34px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-}
-
-.setup-section-content {
-  width: 100%;
-}
-
-/* The summary groups all confirmed choices into one compact panel. */
-.selection-summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0 0 14px;
-  padding: 8px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-filter);
-}
-
-/* Each item separates one confirmed value from the surrounding panel. */
-.selection-summary-item {
-  min-width: 0;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--color-surface);
-}
-
-.selection-summary-item dt {
-  margin-bottom: 4px;
-  color: var(--color-text-muted-secondary);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.selection-summary-item dd {
-  margin: 0;
-  color: var(--color-navy-900);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-/* Existing grids must not add extra space inside the section card. */
-.setup-section .persona-grid {
-  margin-bottom: 0;
-}
-
-/* The heading aligns the section number with its title and description. */
-.setup-section-heading {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.setup-section-index {
-  flex-shrink: 0;
-  color: #000000;
-  font-size: 17px;
-  line-height: 26px;
-}
-
-.setup-section-heading-text {
-  min-width: 0;
-}
-
-.setup-section-heading-text h2 {
-  margin: 0 0 4px;
-  color: var(--color-navy-900);
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-}
-
-.setup-section-heading-text p {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 16px;
-  line-height: 24px;
 }
 
 h2 {
@@ -411,13 +280,11 @@ h2 {
   border-color: var(--blue-light);
 }
 
-/* Selected cards use a subtle background to reinforce the active state. */
 .persona-card.selected {
   border-color: var(--blue);
   background: var(--color-surface-selected);
 }
 
-/* Selected choices use a filled circle with a visible check mark. */
 .persona-card.selected .choice-check {
   border-color: var(--color-blue-600);
   background: var(--color-blue-600);
@@ -436,30 +303,145 @@ h2 {
   line-height: 1.4;
 }
 
-.language-row {
+/* The setup introduction explains the purpose of the first training step. */
+.setup-intro {
+  margin-bottom: 24px;
+}
+
+.setup-intro .eyebrow {
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.12em;
+}
+
+.setup-intro h1 {
+  margin: 0 0 10px;
+  font-size: 48px;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.setup-intro-description {
+  max-width: 800px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 17px;
+  line-height: 26px;
+}
+
+@media (max-width: 720px) {
+  .setup-intro h1 {
+    font-size: 36px;
+  }
+
+  .setup-intro-description {
+    font-size: 16px;
+    line-height: 24px;
+  }
+}
+
+/* Each setup section groups one decision into a separate card. */
+.setup-section {
+  width: 100%;
+  margin-bottom: 14px;
+  padding: 34px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.setup-section-content {
+  width: 100%;
+}
+
+/* The heading aligns the section number with its title and description. */
+.setup-section-heading {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
 }
 
-.language-pill {
-  border: 2px solid var(--border);
+.setup-section-index {
+  flex-shrink: 0;
+  color: #000000;
+  font-size: 17px;
+  line-height: 26px;
+}
+
+.setup-section-heading-text {
+  min-width: 0;
+}
+
+.setup-section-heading-text h2 {
+  margin: 0 0 4px;
+  color: var(--color-navy-900);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.setup-section-heading-text p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 16px;
+  line-height: 24px;
+}
+
+/* The summary groups all confirmed choices into one compact panel. */
+.selection-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 8px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-filter);
+}
+
+.selection-summary-item {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.selection-summary-item dt {
+  margin-bottom: 4px;
+  color: var(--color-text-muted-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.selection-summary-item dd {
+  margin: 0;
+  color: var(--color-navy-900);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.setup-section .persona-grid {
+  margin-bottom: 0;
+}
+
+/* The language a Persona speaks. Read-only on purpose: it follows from the
+   Persona and is not a choice of its own (ADR 0043). */
+.language-badge {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 0.4rem 1rem;
-  background: #fff;
-  cursor: pointer;
-  font: inherit;
-  color: inherit;
-  transition: border-color 0.2s;
-}
-
-.language-pill:hover {
-  border-color: var(--blue-light);
-}
-
-.language-pill.selected {
-  border-color: var(--blue);
-  color: var(--navy-light);
+  padding: 0.1rem 0.55rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
 }
 
 label.upload {
@@ -489,7 +471,7 @@ input[type="file"] {
 }
 
 #status {
-  font-family: var(--font-mono);
+  font-family: "IBM Plex Mono", monospace;
   font-size: 0.8rem;
   letter-spacing: 0.02em;
   color: var(--text-muted);
@@ -1161,10 +1143,13 @@ audio {
     font-size: 22px;
   }
 
-  /* The summary switches to two columns when four columns become too narrow. */
   .selection-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+.muted {
+  color: var(--text-muted);
 }
 
 /* Very narrow screens display each summary value on its own row. */
@@ -1250,4 +1235,85 @@ audio {
   .app-footer-links {
     justify-content: flex-start;
   }
+}
+/* Marks a point as a strength or an improvement. Colour alone never carries
+   the meaning -- the two lists have their own headings. */
+.bullet {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 10px;
+  vertical-align: middle;
+}
+
+.bullet.success {
+  background: var(--success);
+}
+
+.bullet.danger {
+  background: var(--danger);
+}
+
+/* The call's statistics (F-53). A grid, not a row: every figure describes the
+   whole conversation, so they read as one block rather than as a sequence. */
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metric-name {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.metric-value {
+  font-size: 1.05rem;
+  color: var(--navy);
+}
+
+.sparkline {
+  margin-top: 4px;
+  stroke: var(--blue);
+  overflow: visible;
+}
+
+/* The note under the statistics saying they carry no target range (ADR 0048).
+   Kept visually quieter than the narrative -- it qualifies, it does not claim. */
+.metric-disclaimer {
+  margin: 8px 0 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--blue-light);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* --- Gesprächsprotokoll (F-12) ----------------------------------------- */
+
+.transcript-line {
+  margin: 0 0 0.6rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.transcript-line:last-child {
+  margin-bottom: 0;
+}
+
+/* Fixed width so the timestamps line up into a readable column. */
+.transcript-time {
+  flex: 0 0 3rem;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }
