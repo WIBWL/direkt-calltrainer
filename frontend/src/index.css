@@ -824,6 +824,75 @@ audio {
   }
 }
 
+/* Tablet layouts preserve the two-button row while allowing both controls to shrink. */
+@media (max-width: 720px) {
+  .call-panel {
+    min-height: 520px;
+    padding: 24px;
+  }
+
+  .call-controls {
+    width: 100%;
+  }
+
+  .mute-call-button,
+  .call-controls .end-call-button {
+    width: auto;
+    min-width: 0;
+    flex: 1 1 0;
+  }
+}
+
+/* Narrow phones stack controls and allow long scenario and persona names to wrap. */
+@media (max-width: 480px) {
+  .call-intro {
+    margin-bottom: 28px;
+  }
+
+  .call-intro h1 {
+    font-size: 32px;
+    overflow-wrap: anywhere;
+  }
+
+  .call-panel {
+    min-height: auto;
+    gap: 20px;
+    padding: 20px;
+    border-radius: 18px;
+  }
+
+  .call-persona-avatar {
+    width: 80px;
+    height: 80px;
+    font-size: 21px;
+  }
+
+  .call-persona-details {
+    width: 100%;
+  }
+
+  .call-persona-details h2,
+  .call-persona-details p {
+    font-size: 16px;
+  }
+
+  .call-status {
+    max-width: 100%;
+    flex-wrap: wrap;
+    text-align: center;
+  }
+
+  .call-controls {
+    flex-direction: column;
+  }
+
+  .mute-call-button,
+  .call-controls .end-call-button {
+    width: 100%;
+    flex: 0 0 44px;
+  }
+}
+
 /* The microphone page follows the centered 800px layout from the Figma screens. */
 .mic-check-page .setup-section {
   margin-bottom: 0;
