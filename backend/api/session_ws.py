@@ -19,7 +19,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy.exc import SQLAlchemyError
 
 from backend.auth import AuthContext, authenticate_ws
-from backend.logging_config import reset_session_log, session_id_scope
+from backend.logging_config import session_id_scope
 from backend import library
 from backend.personas import Persona
 from backend.scenarios import Scenario
@@ -52,7 +52,8 @@ async def session_ws(websocket: WebSocket) -> None:
 
     session_id = uuid.uuid4()
     started_at = datetime.now()
-    reset_session_log()
+    # The log file keeps every Session for the process's lifetime (ADR 0055);
+    # session_id_scope is what tags this call's lines so they stay separable.
     with session_id_scope(str(session_id)):
         orchestrator = SessionOrchestrator(persona, scenario)
         logger.info(

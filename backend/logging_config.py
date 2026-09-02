@@ -1,9 +1,10 @@
-"""Central logging setup: colored console + a per-Session file, both stamping
-every line with its Session (ADR 0039). Call `configure_logging()` once at startup.
+"""Central logging setup: colored console + a log file, both stamping every
+line with its Session (ADR 0039, ADR 0055). Call `configure_logging()` once at startup.
 
-The file holds only the current call — truncated on Session start, not appended.
-Useless for multi-Session monitoring and unsafe under concurrent calls, both
-accepted in ADR 0039 for one-call-at-a-time development.
+The file is opened fresh (truncated) once per process, then appended to for the
+rest of that run — it holds every Session since the last restart, not just the
+current call (ADR 0055 revised ADR 0039's per-Session truncation). The Session
+id on every line is what separates one call's lines from another's.
 """
 
 import contextlib
@@ -87,6 +88,10 @@ def configure_logging(log_file: str | Path = "logs/calltrainer.log") -> None:
     Replaces any handlers already on the root logger (e.g. gunicorn's own
     default "console" handler, installed on the root logger before this
     module is even imported) so this is the only thing writing our output.
+
+    The file is opened in `w` mode: one fresh log per process, kept for the
+    whole run (ADR 0055). A restart -- `docker compose up`, a reload -- starts
+    it over; nothing rotates or truncates it in between.
     """
     if _state.configured:
         return
@@ -108,17 +113,3 @@ def configure_logging(log_file: str | Path = "logs/calltrainer.log") -> None:
     _state.file_handler.setFormatter(logging.Formatter(_LOG_FORMAT, _DATE_FORMAT))
     _state.file_handler.addFilter(session_filter)
     root.addHandler(_state.file_handler)
-
-
-def reset_session_log() -> None:
-    """Empty the log file at the start of a Session (see session_ws.py) so it
-    always shows exactly one call. ADR 0039 covers why append was rejected."""
-    handler = _state.file_handler
-    if handler is None:
-        return
-    handler.acquire()
-    try:
-        handler.stream.seek(0)
-        handler.stream.truncate()
-    finally:
-        handler.release()

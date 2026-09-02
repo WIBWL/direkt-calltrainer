@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. The per-Session file truncation described below was revised by ADR 0055 — the file is now kept for the whole process run; everything else here still holds.
 
 ## Context
 

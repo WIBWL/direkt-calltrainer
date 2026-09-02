@@ -1,8 +1,9 @@
 """Centralized logging.
 
-Covers ADR 0039: colored per-module console output plus a per-session log
-file that is truncated at the start of each new session and carries the
-session id on every line.
+Covers ADR 0039 and ADR 0055: colored per-module console output plus a log
+file that is opened fresh once per process and then kept for the whole run
+(every Session, not just the current one), carrying the session id on every
+line so calls stay separable.
 """
 
 import logging
@@ -13,7 +14,6 @@ from backend import logging_config
 from backend.logging_config import (
     _SessionIdFilter,
     configure_logging,
-    reset_session_log,
     session_id_scope,
 )
 
@@ -66,18 +66,36 @@ def test_configure_logging_installs_console_and_file_handlers(tmp_path):
     handler_types = {type(h).__name__ for h in root.handlers}
     assert "StreamHandler" in handler_types
     assert "FileHandler" in handler_types
-    assert log_file.exists(), "the per-session log file is created (with parents)"
+    assert log_file.exists(), "the log file is created (with parents)"
 
 
-def test_reset_session_log_truncates_the_file(tmp_path):
+def test_log_file_keeps_lines_across_sessions(tmp_path):
+    """The file accumulates for the whole run -- a new Session does not clear
+    the previous one's lines (ADR 0055)."""
     log_file = tmp_path / "calltrainer.log"
     logging_config._state.configured = False
     configure_logging(log_file)
 
-    logging.getLogger("backend.test").info("first session noise")
+    with session_id_scope("session-one"):
+        logging.getLogger("backend.test").info("first call noise")
+    with session_id_scope("session-two"):
+        logging.getLogger("backend.test").info("second call noise")
     for h in logging.getLogger().handlers:
         h.flush()
-    assert log_file.read_text(encoding="utf-8").strip() != ""
 
-    reset_session_log()
-    assert log_file.read_text(encoding="utf-8") == "", "a new session starts from an empty log"
+    contents = log_file.read_text(encoding="utf-8")
+    assert "first call noise" in contents, "the earlier Session's lines are still there"
+    assert "second call noise" in contents
+    assert "[session session-one]" in contents and "[session session-two]" in contents
+
+
+def test_configure_logging_opens_the_file_fresh_each_process(tmp_path):
+    """`w` mode: a restart (a fresh configure_logging) starts the file over,
+    which is what bounds its growth (ADR 0055)."""
+    log_file = tmp_path / "calltrainer.log"
+    log_file.write_text("stale line from a previous run\n", encoding="utf-8")
+
+    logging_config._state.configured = False
+    configure_logging(log_file)
+
+    assert "stale line" not in log_file.read_text(encoding="utf-8")

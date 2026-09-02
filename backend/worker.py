@@ -18,7 +18,15 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> None:
-    configure_logging()
+    """Configure logging, then block forever processing feedback jobs.
+
+    RQ forks a child per job, so this only runs on Linux -- use the `worker`
+    container, not a host process, on Windows (see CLAUDE.md).
+    """
+    # Its own file, not the app's: both mount the same logs/ directory, and
+    # each process opens its log fresh on start (ADR 0055), so sharing one path
+    # would have whichever booted second truncate the other's log.
+    configure_logging("logs/worker.log")
     logger.info("Feedback worker starting, listening on %r", QUEUE_NAME)
     Worker([QUEUE_NAME], connection=connection()).work(with_scheduler=False)
 
