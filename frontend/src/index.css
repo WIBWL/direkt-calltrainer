@@ -1297,6 +1297,18 @@ audio {
   color: var(--text-muted);
 }
 
+/* What "phasengerechte Sprache" means, under the analysis of it (F-42,
+   ADR 0056). The selector carries `p` too, not just the class: `.card p`
+   is more specific than a bare class, so without the element this rule
+   loses its top margin to the margin reset every card applies. */
+.card p.phase-note {
+  margin: 0.9rem 0 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--blue-light);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
 /* --- Gesprächsprotokoll (F-12) ----------------------------------------- */
 
 .transcript-line {

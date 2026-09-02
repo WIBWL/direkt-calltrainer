@@ -108,6 +108,10 @@ def _feedback(feedback: db_models.Feedback | None) -> dict | None:
         return None
     return {
         "zusammenfassung": feedback.summary,
+        # NULL where the wrap-up carries no phase analysis (F-42) -- an older
+        # Session, or one whose model answer fell back to narrative only. The
+        # frontend drops the block rather than showing an empty one.
+        "phasensprache": feedback.phase_language,
         "punkte": [
             {"art": _PUNKT_ART[p.kind], "text": p.text, "turn_id": p.turn_id}
             for p in feedback.points

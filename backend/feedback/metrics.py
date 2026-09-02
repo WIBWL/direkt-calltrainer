@@ -225,6 +225,11 @@ METRICS: tuple[MetricDef, ...] = (
     # SHOULD / COULD -- seeded so the vocabulary is complete, but inactive and
     # without a derivation.
     MetricDef("konkretheit", "Sprachliche Konkretheit", None, "F-40", False),
+    # F-42 ships, but as prose and not as a figure: what it describes is a
+    # change of register across the call's three phases, which no single value
+    # carries and which would need a norm nobody measured to score. It is the
+    # `phasensprache` paragraph of the wrap-up (backend/feedback/generator.py).
+    # The row stays inactive and seeded so the vocabulary keeps its entry.
     MetricDef("phasengerechte_sprache", "Phasengerechte Sprache", None, "F-42", False),
     MetricDef("kongruenz", "Kongruenz von Inhalt und Stimme", None, "F-39", False),
 )

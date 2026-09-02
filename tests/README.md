@@ -46,16 +46,16 @@ source of that content, and which imports without a database.
 | WebSocket wire protocol & handshake (+ token in `session.start`) | F-46, F-50, ADR 0009, ADR 0033, ADR 0035 | `test_websocket_protocol.py` |
 | Centralized logging (session-tagged, kept for the whole run) | ADR 0039, ADR 0055 | `test_logging.py` |
 | Persistence schema (ORM metadata) | ADR 0025/0026/0029/0030/0032, F-09, F-12, F-14 | `test_persistence_schema.py` |
+| Wrap-up prompt & phase block (F-42) | F-09, F-42, ADR 0004, ADR 0049, ADR 0051, ADR 0056 | `test_wrapup_prompt.py` |
 | Documented gaps (current-state guards) | F-13/48, F-53, F-56, ADR 0006/0009 | `test_documented_gaps.py` |
 
 ## Not covered here
 
-* **Paraverbal measurement and the post-call wrap-up** (F-09, F-10, F-37,
-  F-51, F-53) — now implemented in `backend/feedback/` (ADR 0047–0051), but
-  not yet covered by tests of their own. The current-state guards that used
-  to assert their absence were removed when the feature landed; feature
-  tests for `metrics.py`, `acoustics.py` and `generator.py` are owed.
-  The cross-session dashboard (F-53) is still unbuilt.
+* **Paraverbal measurement and the post-call wrap-up** (F-10, F-37, F-51,
+  F-53) — implemented in `backend/feedback/` (ADR 0047–0051). Only the
+  wrap-up prompt is covered (`test_wrapup_prompt.py`, and the wire round
+  trip in `test_api.py`); feature tests for `metrics.py` and `acoustics.py`
+  are still owed. The cross-session dashboard (F-53) is still unbuilt.
 * **Frontend** (React hooks, in-browser Silero VAD / ADR 0036, streamed audio
   playback) — no JS test runner is configured. VAD confirmed-speech filtering
   is a browser-only concern.

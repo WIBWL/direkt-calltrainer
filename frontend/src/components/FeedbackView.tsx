@@ -24,6 +24,11 @@ const NOTICE: Record<string, string> = {
  * hands — so the figures here are the evidence behind the text, never a score.
  * Each one describes the whole call rather than a single utterance (ADR 0051).
  *
+ * The phase block (F-42) sits below the figures on purpose: it is the one part
+ * of the wrap-up that is about a change over the call rather than about a
+ * moment or a total, so it reads as a closing observation rather than as
+ * another statistic.
+ *
  * Owns the polling itself, so it is only running while this screen is mounted.
  */
 export default function FeedbackView({ sessionId }: { sessionId: string | null }) {
@@ -68,6 +73,20 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
             <p className="metric-disclaimer">
               Reine Messwerte, ohne Zielbereich: für diese Nutzergruppe gibt es keinen
               belegten Normwert, an dem sie zu messen wären.
+            </p>
+          </div>
+        </>
+      )}
+
+      {feedback.phasensprache && (
+        <>
+          <h2>Phasengerechte Sprache</h2>
+          <div className="card">
+            <p>{feedback.phasensprache}</p>
+            <p className="phase-note">
+              Ein Gespräch läuft in drei Phasen ab – Einstieg, Anliegen, Abschluss – und
+              der Tonfall soll mitgehen: warm, dann sachlich, dann wieder warm. Hier geht
+              es nur darum, ob er das getan hat, nicht darum, ob die Sache gelöst wurde.
             </p>
           </div>
         </>

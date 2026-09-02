@@ -78,7 +78,7 @@ Simuliert einen externen Kunden im Gespräch. Die Persona kann aus einer erweite
 
 ### Feedback-/Auswertungskomponente
 
-Erstellt nach Gesprächsende das qualitative Wrap-up (F-09) inkl. konkreter Verbesserungsvorschläge (F-10), basierend auf den Kennzahlen des Gesprächs (F-53) und dem Lautstärkeverlauf (F-37). Die Kennzahlen beschreiben jeweils das ganze Gespräch, nicht einzelne Redebeiträge (ADR 0051).
+Erstellt nach Gesprächsende das qualitative Wrap-up (F-09) inkl. konkreter Verbesserungsvorschläge (F-10), basierend auf den Kennzahlen des Gesprächs (F-53) und dem Lautstärkeverlauf (F-37). Die Kennzahlen beschreiben jeweils das ganze Gespräch, nicht einzelne Redebeiträge (ADR 0051). Ergänzend entsteht im selben Modellaufruf ein Textblock zur phasengerechten Sprache (F-42): ob der Sprachstil über Einstieg, Kernanliegen und Abschluss hinweg mitgewandert ist. Er ist bewusst Fließtext und keine Kennzahl, weil er eine Veränderung über das Gespräch hinweg beschreibt, die keine einzelne Zahl trägt (ADR 0056).
 
 ## 3.2 Technischer Kontext
 
@@ -167,6 +167,7 @@ Besonderheiten: Diese Analyse läuft parallel zur eigentlichen Gesprächssimulat
 - Nach Beendigung des Gesprächs durch den Nutzer wertet die Feedback-Komponente die gesammelten Analyseergebnisse aus Szenario 2 aus.
 - Es wird eine qualitative Zusammenfassung (Wrap-up) erstellt – keine reine Zahl/Score (F-09).
 - Konkrete, umsetzbare Verbesserungsvorschläge werden formuliert und nach Möglichkeit mit konkreten Gesprächsstellen verknüpft (F-10).
+- Ein eigener Textblock beurteilt die phasengerechte Sprache (F-42): Der Abschluss wird darin stärker gewichtet als die Gesprächsmitte, weil er die Erinnerung an das ganze Gespräch überproportional prägt – als Textgewicht, nicht als Punktabzug (ADR 0056).
 - Das Wrap-up wird dem Nutzer angezeigt.
 
 Besonderheiten: Die Qualität dieses Szenarios ist zentral für die Akzeptanz des Tools (siehe Qualitätsziele, Kapitel 1). Ein optionaler Score (F-14, COULD) kann ergänzend angezeigt werden, ersetzt aber nie das qualitative Feedback.

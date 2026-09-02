@@ -162,6 +162,14 @@ export interface Feedbackpunkt {
 
 export interface SessionFeedback {
   zusammenfassung: string;
+  /**
+   * F-42: one paragraph on whether the register moved with the phase of the
+   * call — warm in the opening, factual through the core business, warm again
+   * at the close. Prose rather than a Messung, because it describes a change
+   * over the call that no single number carries. NULL where the wrap-up has
+   * none; FeedbackView omits the block instead of showing it empty.
+   */
+  phasensprache: string | null;
   punkte: Feedbackpunkt[];
 }
 

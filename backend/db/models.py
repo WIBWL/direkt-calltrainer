@@ -353,6 +353,14 @@ class Feedback(Base):
         ForeignKey("session.session_id", ondelete="CASCADE"), unique=True
     )
     summary: Mapped[str] = mapped_column(Text)
+    # F-42, phase-appropriate language: one short narrative about how the
+    # trainee's register moved across the three phases of the call. Prose and
+    # not a Measurement, because the thing being described is a change of tone
+    # over time, which no single number carries -- and a number here would need
+    # a norm nobody measured (ADR 0051). Nullable: it is written by the same
+    # model call as `summary`, so a wrap-up that fell back to narrative-only,
+    # or one generated before this column existed, legitimately has none.
+    phase_language: Mapped[str | None] = mapped_column(Text)
     score: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 

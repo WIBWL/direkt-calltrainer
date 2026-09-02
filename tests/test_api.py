@@ -10,11 +10,13 @@ rest are what frontend/src/protocol.ts declares, so they are asserted verbatim
 here — a rename on this boundary is a frontend change, not a backend one.
 """
 import uuid
+from datetime import datetime
 
 import httpx
 import pytest
 from sqlalchemy.orm import Session as DbSession
 
+from backend.db.models import Feedback
 from backend.db.models import Persona as DbPersona
 from backend.db.models import Session
 from backend.session.models import Turn
@@ -169,6 +171,46 @@ async def test_speaker_is_translated_back_to_the_wire_vocabulary(
 
     body = (await api_client.get(f"/api/sessions/{extern_id}")).json()
     assert {t["sprecher"] for t in body["turns"]} == {"nutzer", "persona"}
+
+
+@pytest.mark.parametrize(
+    "stored, expected",
+    [
+        ("Im Einstieg klangen Sie warm, zum Abschluss sachlich.",
+         "Im Einstieg klangen Sie warm, zum Abschluss sachlich."),
+        (None, None),
+    ],
+    ids=["analysed", "not analysed"],
+)
+async def test_phase_block_reaches_the_wire_as_phasensprache(
+    api_client: httpx.AsyncClient,
+    db_session: DbSession,
+    stored: str | None,
+    expected: str | None,
+) -> None:
+    """F-42, and the same English-schema/German-wire split as `sprecher` above:
+    the column is `feedback.phase_language`, the key FeedbackView.tsx reads is
+    `phasensprache`.
+
+    NULL survives as null rather than becoming an empty string — the frontend
+    drops the block on falsiness, and a wrap-up generated before this existed
+    genuinely has no phase analysis to show."""
+    extern_id = uuid.uuid4()
+    _store(extern_id)
+    session_id = db_session.query(Session).one().session_id
+    db_session.add(
+        Feedback(
+            session_id=session_id,
+            summary="Zusammenfassung.",
+            phase_language=stored,
+            created_at=datetime.now(),
+        )
+    )
+    db_session.commit()
+
+    body = (await api_client.get(f"/api/sessions/{extern_id}")).json()
+
+    assert body["feedback"]["phasensprache"] == expected
 
 
 async def test_feedback_is_absent_until_the_worker_has_run(
