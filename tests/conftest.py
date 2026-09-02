@@ -29,10 +29,7 @@ covered in `test_tts_fallback.py` by patching the tts module directly.
 # pylint: disable=wrong-import-position,missing-function-docstring
 # pylint: disable=too-few-public-methods,redefined-outer-name
 
-import importlib.util
 import os
-import sys
-from pathlib import Path
 
 os.environ.setdefault("DIREKT_URL", "http://direkt.test.invalid")
 os.environ.setdefault("DIREKT_API_KEY", "test-direkt-key")
@@ -349,6 +346,11 @@ _ENV = dotenv_values(PROJECT_ROOT / ".env")
 _DB_SETTINGS = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
                 "POSTGRES_HOST", "POSTGRES_PORT")
 
+# Bounds the reachability probe so an unreachable server fails in a few seconds
+# instead of hanging on libpq's default. psycopg tries both the IPv6 and the
+# IPv4 address, so the wait is up to twice this.
+_DB_CONNECT_TIMEOUT = 3
+
 
 def _render(url: URL) -> str:
     """URL.__str__ masks the password, which makes the result unusable as a
@@ -414,19 +416,36 @@ def alembic_downgrade(url: str, revision: str) -> None:
         command.downgrade(Config(str(PROJECT_ROOT / "alembic.ini")), revision)
 
 
+@pytest.fixture(scope="session")
+def _reachable_postgres() -> URL:
+    """The configured server, probed once. If it is down, every persistence
+    test skips here in one shot -- without this each fixture re-times-out its
+    own connection, which turned an offline `pytest` into a multi-minute wait.
+    """
+    server = _server_url()  # skips if .env is incomplete
+    probe = create_engine(
+        server.set(database="postgres"),
+        connect_args={"connect_timeout": _DB_CONNECT_TIMEOUT},
+    )
+    try:
+        with probe.connect():
+            pass
+    except OperationalError as e:
+        pytest.skip(f"No reachable PostgreSQL server for the tests: {e}")
+    finally:
+        probe.dispose()
+    return server
+
+
 @pytest.fixture
-def empty_database() -> Iterator[str]:
+def empty_database(_reachable_postgres: URL) -> Iterator[str]:
     """A freshly created, entirely empty database. Dropped when the test ends."""
-    server = _server_url()
+    server = _reachable_postgres
     name = f"calltrainer_test_{uuid.uuid4().hex[:12]}"
     admin = create_engine(server.set(database="postgres"), isolation_level="AUTOCOMMIT")
 
-    try:
-        with admin.connect() as conn:
-            conn.execute(text(f'CREATE DATABASE "{name}"'))
-    except OperationalError as e:
-        admin.dispose()
-        pytest.skip(f"No reachable PostgreSQL server for the tests: {e}")
+    with admin.connect() as conn:
+        conn.execute(text(f'CREATE DATABASE "{name}"'))
 
     try:
         yield _render(server.set(database=name))
