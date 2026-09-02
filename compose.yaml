@@ -2,9 +2,14 @@ name: direkt-calltrainer
 services:
   app:
     image: direkt-calltrainer
+    # Pinned: praat-parselmouth ships no Linux aarch64 wheel, so an arm64 build
+    # falls back to the source tarball and fails to compile in python-slim.
+    platform: linux/amd64
     build:
       context: .
       dockerfile: ./Dockerfile
+      platforms:
+        - linux/amd64
       args:
         # The SPA needs these at `npm run build` time (see Dockerfile).
         VITE_OIDC_ISSUER: ${VITE_OIDC_ISSUER:-http://localhost:18081/realms/direkt}
@@ -70,9 +75,13 @@ services:
   # to run -- a stopped worker just means wrap-ups queue until it returns.
   worker:
     image: direkt-calltrainer
+    # Same image as app, so the same pin applies.
+    platform: linux/amd64
     build:
       context: .
       dockerfile: ./Dockerfile
+      platforms:
+        - linux/amd64
     command: ["python", "-m", "backend.worker"]
     env_file:
       - .env
