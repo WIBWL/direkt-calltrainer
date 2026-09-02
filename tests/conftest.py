@@ -29,7 +29,10 @@ covered in `test_tts_fallback.py` by patching the tts module directly.
 # pylint: disable=wrong-import-position,missing-function-docstring
 # pylint: disable=too-few-public-methods,redefined-outer-name
 
+import importlib.util
 import os
+import sys
+from pathlib import Path
 
 os.environ.setdefault("DIREKT_URL", "http://direkt.test.invalid")
 os.environ.setdefault("DIREKT_API_KEY", "test-direkt-key")
@@ -73,15 +76,85 @@ from sqlalchemy.exc import OperationalError  # noqa: E402
 from sqlalchemy.orm import Session as DbSession  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 
-from backend import auth  # noqa: E402
+from backend import auth, library  # noqa: E402
 from backend.app import app  # noqa: E402
 from backend.clients import llm, stt, tts  # noqa: E402
-from backend.personas import PERSONAS  # noqa: E402
-from backend.scenarios import SCENARIOS  # noqa: E402
-from backend.db.models import Language, MetricType, Persona, Scenario  # noqa: E402
+from backend.personas import Persona, PersonaVoice  # noqa: E402
+from backend.scenarios import Scenario  # noqa: E402
+# The ORM models keep a namespace: `Persona` and `Scenario` above are the value
+# objects the app passes around, and both names would otherwise collide here.
+from backend.db import models as db_models  # noqa: E402
 from backend.db.session import reset_engine, session_scope  # noqa: E402
 from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted  # noqa: E402
 from backend.session.models import Turn  # noqa: E402
+
+# Personas and Scenarios live in the database since ADR 0041, so the suite can
+# no longer import a hardcoded library -- and must not need a database to run.
+# These are test doubles: value objects of the same shape, owned by the suite.
+# Whether the *seeded* content is any good is a separate question, checked in
+# test_persona_scenario_library.py against the seed script.
+TEST_PERSONAS = [
+    Persona(
+        id="test-persona-de",
+        name="Thomas Brandt",
+        language_id="de",
+        language_name="Deutsch",
+        voice=PersonaVoice(tts_voice="de_male", kugelaudio_voice_id=1885),
+        role_label="Geschäftsführer, Fokus auf Strategie & Budget",
+        role="Managing director of a mid-sized company, focused on strategy and budget",
+        traits="matter-of-fact, time-conscious, an experienced negotiator",
+        behavior="You press for concrete answers and never settle for a vague one.",
+    ),
+    Persona(
+        id="test-persona-en",
+        name="Samantha Ferris",
+        language_id="en",
+        language_name="Englisch",
+        voice=PersonaVoice(tts_voice="de_female", kugelaudio_voice_id=1071),
+        role_label="Marketing-Managerin bei einem Kundenunternehmen",
+        role="Marketing manager at a company that is a customer of the user's",
+        traits="very polite, calm and composed, never pushy",
+        behavior="You stay friendly throughout, but keep asking until an answer is concrete.",
+    ),
+]
+
+TEST_SCENARIOS = [
+    Scenario(
+        id="test-scenario-support",
+        name="Offenes Anliegen zu bestehendem Vertrag",
+        short_description="Der Kunde ruft mit einer offenen Frage zu einem bestehenden Vertrag an.",
+        description=(
+            "The customer (the persona) is calling the user, who works in support, "
+            "about an unresolved issue with an existing contract."
+        ),
+    ),
+    Scenario(
+        id="test-scenario-price",
+        name="Kündigungsabsicht wegen Preis",
+        short_description="Der Kunde erwägt zu kündigen, weil ihm die Kosten zu hoch sind.",
+        description=(
+            "The customer (the persona) is calling to say they are considering "
+            "cancelling, because the running costs seem too high for the benefit."
+        ),
+    ),
+]
+
+
+REPO = Path(__file__).resolve().parent.parent
+
+
+def load_seed_module():
+    """The library's initial content (ADR 0041).
+
+    It moved from `scripts/seed_reference_data.py` into `backend/db/seed_data.py`
+    when provisioning became part of application startup, so this is a plain
+    import now -- kept as a function so the tests that check *what* the library
+    ships still have one place to get it from.
+    """
+    from backend.db import seed_data
+
+    return seed_data
+
 
 # A fixed caller for tests that don't care about auth (most of them).
 TEST_AUTH = auth.AuthContext(sub="test-subject", roles=[], token="test-token")
@@ -103,12 +176,29 @@ def _override_auth():
 
 @pytest.fixture
 def persona():
-    return PERSONAS[0]
+    return TEST_PERSONAS[0]
 
 
 @pytest.fixture
 def scenario():
-    return SCENARIOS[0]
+    return TEST_SCENARIOS[0]
+
+
+@pytest.fixture
+def fake_library(monkeypatch):
+    """Serve the test doubles in place of the database-backed library.
+
+    ADR 0041 put the database on the Session's start path, so anything that
+    goes through `/api/personas` or the `/ws/session` handshake would otherwise
+    need one. Patched on the `library` module itself, which is how both call
+    sites look the functions up."""
+    by_id = {p.id: p for p in TEST_PERSONAS}
+    by_key = {s.id: s for s in TEST_SCENARIOS}
+    monkeypatch.setattr(library, "list_personas", lambda: list(TEST_PERSONAS))
+    monkeypatch.setattr(library, "list_scenarios", lambda: list(TEST_SCENARIOS))
+    monkeypatch.setattr(library, "get_persona", by_id.get)
+    monkeypatch.setattr(library, "get_scenario", by_key.get)
+    return library
 
 
 class FakeLLM:
@@ -385,8 +475,8 @@ def app_database(migrated_database: str) -> Iterator[str]:
 
 @pytest.fixture
 def seeded_database(app_database: str) -> str:
-    """`app_database`, with the reference tables filled from personas.py /
-    scenarios.py / metrics.py — the state the application boots into.
+    """`app_database`, with the reference tables filled from seed_data.py /
+    metrics.py — the state the application boots into.
 
     For the setup endpoints, which read the persona and scenario tables
     (ADR 0041) and therefore have nothing to serve without this.
@@ -412,10 +502,10 @@ class ReferenceRows:
     `reference_data`. Shared so the Session-related tests describe the same
     starting world instead of each building their own."""
 
-    persona: Persona
-    scenario: Scenario
-    language: Language
-    metric_type: MetricType
+    persona: db_models.Persona
+    scenario: db_models.Scenario
+    language: db_models.Language
+    metric_type: db_models.MetricType
 
 
 @pytest.fixture
@@ -423,10 +513,11 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
     """Seeds the minimum reference data a Session needs, by hand rather than
     through the seed script, so these tests do not depend on what personas.py
     happens to contain."""
-    language = Language(code="de", name="Deutsch")
-    persona = Persona(
+    language = db_models.Language(code="de", name="Deutsch")
+    persona = db_models.Persona(
         key=PERSONA_KEY,
         name="Thomas Brandt",
+        role_label="Geschäftsführer, Strategie & Budget",
         role="Geschäftsführer",
         traits="sachlich",
         behavior="Verhalten",
@@ -436,14 +527,18 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
         tts_voice="de_male",
         active=True,
     )
-    scenario = Scenario(
+    scenario = db_models.Scenario(
         key=SCENARIO_KEY,
         scenario_type="Preisgespräch",
         title="Kündigungsabsicht",
+        short_description="Kunde erwägt zu kündigen.",
         description="Beschreibung",
+        case_facts="",
+        call_goal="",
+        success_condition="",
         active=True,
     )
-    metric_type = MetricType(
+    metric_type = db_models.MetricType(
         key=METRIC_KEY, name="Sprechtempo", unit="Wörter/min", feature_id="F-36", active=True
     )
     db_session.add_all([language, persona, scenario, metric_type])
@@ -470,15 +565,14 @@ def persist(
     # the feedback stack, which a collection-time import should not need.
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
 
-    persona = next(p for p in PERSONAS if p.id == PERSONA_KEY)
-    if persona_key != PERSONA_KEY:  # a key that is deliberately not seeded
-        persona = replace(persona, id=persona_key)
+    # A key other than PERSONA_KEY is deliberately one the seed did not write.
+    persona = replace(TEST_PERSONAS[0], id=persona_key)
     extern_id = extern_id or uuid.uuid4()
     persistence.persist_session(
         extern_id,
         str(uuid.uuid4()),
         persona,
-        replace(SCENARIOS[0], id=SCENARIO_KEY),
+        replace(TEST_SCENARIOS[0], id=SCENARIO_KEY),
         turns if turns is not None else [],
         SESSION_STARTED,
         reason,

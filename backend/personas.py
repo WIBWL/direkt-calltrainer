@@ -1,10 +1,18 @@
-"""The Persona library (see CONTEXT.md).
+"""The Persona value objects the backend works with.
 
-Code for now; ADR 0041 moves it into the database. Each Persona is bound to one
-language and one voice per backend (ADR 0043) — `tts_voice` on the DiReKT
-fallback, `kugelaudio_voice_id` on KugelAudio.
+The Personas themselves live in the database and are loaded through
+`backend/library.py` (ADR 0041); this module only defines their shape, so
+that `backend/session/` can depend on it without pulling in database access.
+
+Two kinds of text hang off a Persona (ADR 0043): the prompt fields the model
+reads, which are English, and the display fields the setup UI shows, which are
+in the UI language. `language_id` names neither of those — it is the language
+the Persona actually speaks in.
+
+A Persona carries the *manner* and nothing about the situation (ADR 0045):
+how it conducts itself, and the objections it tends to raise. What the call is
+about belongs to the Scenario.
 """
-
 from dataclasses import dataclass
 
 
@@ -19,34 +27,17 @@ class Persona:
     id: str
     name: str
     language_id: str
+    language_name: str
     voice: PersonaVoice
+    # Display: shown on the selection card.
+    role_label: str
+    # Prompt: English, read only by the system prompt.
     role: str
     traits: str
     behavior: str
-
-
-PERSONAS: list[Persona] = [
-    Persona(
-        id="thomas-brandt-ceo",
-        name="Thomas Brandt",
-        language_id="de",
-        voice=PersonaVoice(tts_voice="de_male", kugelaudio_voice_id=1885),
-        role=("Geschäftsführer, Fokus auf Strategie & Budget"),
-        traits=(
-            "sachlich, zeitbewusst, ungeduldig bei zu technischen Ausführungen, "
-            "verhandlungserfahren"
-        ),
-        behavior=(
-            "Du hast einen konkreten Grund für diesen Anruf (siehe Kontext des "
-            "Anrufs) und ein klares Ziel, das du im Gespräch erreichen willst. "
-            "Du reagierst kritisch und ungeduldig, wenn dein Gesprächspartner zu "
-            "technisch, ausweichend oder kompliziert antwortet, statt klar auf "
-            "deinen Nutzen einzugehen — du erwartest einfache, konkrete "
-            "Antworten statt Fachjargon. Besonders beim Preis bist du "
-            "hartnäckig und hakst nach, wenn eine Kostenrechtfertigung vage "
-            "bleibt. Du lässt dich durch eine kompetente, konkrete Antwort "
-            "überzeugen oder beruhigen, gibst dich aber nicht mit vagen "
-            "Ausflüchten zufrieden."
-        ),
-    ),
-]
+    # The objections this Persona tends to raise (R-12, ADR 0045). Ordered,
+    # English, and phrased as moves rather than as quotable lines: the model
+    # reuses quoted examples verbatim, and `persona_einwand` has no language
+    # column while a Persona's language is fixed. A tuple because the Persona
+    # is frozen.
+    objections: tuple[str, ...] = ()

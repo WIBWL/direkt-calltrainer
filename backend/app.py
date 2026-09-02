@@ -19,10 +19,10 @@ from backend.auth import check_realm, require_user
 from backend.clients import tts
 from backend.clients.config import DIREKT_URL
 from backend.clients.health import check_backends
-from backend.db import models as db_models
 from backend.db.provision import provision
 from backend.db.session import session_scope
 from backend.logging_config import configure_logging
+from backend import library
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -112,35 +112,31 @@ def readiness() -> dict[str, str]:
 def list_personas() -> list[dict[str, str]]:
     """List personas available for session setup.
 
-    Read from the persona table, not from backend/personas.py (ADR 0041): that
-    module only seeds it, and ADR 0024 has Users authoring their own Personas,
-    which have to live in the table. `id` on the wire is the natural key, never
-    the primary key — the client sends it straight back in session.start.
+    Display fields only (ADR 0043) -- the English prompt fields stay on the
+    server. The language comes along because it is a property of the Persona and
+    not a separate choice, so the card has to say which one it speaks.
 
-    Only active rows: a retired Persona stays in the table because stored
-    Sessions reference it, but it must not be offered for a new call.
+    `id` on the wire is the natural key, never the primary key: the client sends
+    it straight back in session.start. Retired Personas are filtered out by the
+    library -- their rows stay, because stored Sessions reference them.
     """
-    with session_scope() as db:
-        rows = (
-            db.query(db_models.Persona)
-            .filter_by(active=True)
-            .order_by(db_models.Persona.persona_id)
-            .all()
-        )
-        return [{"id": p.key, "name": p.name, "role": p.role} for p in rows]
+    return [
+        {"id": p.id, "name": p.name, "role": p.role_label, "language": p.language_name}
+        for p in library.list_personas()
+    ]
 
 
 @app.get("/api/scenarios", dependencies=[Depends(require_user)])
 def list_scenarios() -> list[dict[str, str]]:
-    """List scenarios available for session setup. From the table, as above."""
-    with session_scope() as db:
-        rows = (
-            db.query(db_models.Scenario)
-            .filter_by(active=True)
-            .order_by(db_models.Scenario.scenario_id)
-            .all()
-        )
-        return [{"id": s.key, "name": s.title, "description": s.description} for s in rows]
+    """List scenarios available for session setup.
+
+    Serves the short teaser, not the English call context the model reads, and
+    only active rows -- as above.
+    """
+    return [
+        {"id": s.id, "name": s.name, "short_description": s.short_description}
+        for s in library.list_scenarios()
+    ]
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIST_DIR, html=True, check_dir=False), name="frontend")

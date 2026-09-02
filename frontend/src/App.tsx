@@ -6,7 +6,7 @@ import FeedbackView from "./components/FeedbackView";
 import MicCheck from "./components/MicCheck";
 import TranscriptView from "./components/TranscriptView";
 import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
-import { useSessionSocket } from "./hooks/useSessionSocket";
+import { useSessionSocket, type CommittedSession } from "./hooks/useSessionSocket";
 import { useStreamedAudioPlayback } from "./hooks/useStreamedAudioPlayback";
 import type { TranscriptEntry } from "./protocol";
 
@@ -46,12 +46,16 @@ interface Persona {
   id: string;
   name: string;
   role: string;
+  // A Persona speaks exactly one language and the user cannot change it
+  // (ADR 0043), so the card has to say which one it is.
+  language: string;
 }
 
 interface Scenario {
   id: string;
   name: string;
-  description: string;
+  // The short teaser, not the call context the model gets.
+  short_description: string;
 }
 
 type Screen = "setup" | "mic-check" | "call" | "transcript";
@@ -79,17 +83,12 @@ export default function App() {
   } | null>(null);
   const personaName =
     personas.find((p) => p.id === personaId)?.name ?? restored?.personaName ?? "Persona";
-  // Forces a fresh Session even when persona/scenario didn't change — bumped
-  // right when a call ends normally, so the *next* Session (and its opening
-  // line) starts pre-warming immediately, before the user has asked for it.
-  const [generation, setGeneration] = useState(0);
-  // True right after an error ending, until the user explicitly restarts.
-  // Without this, a persistently-failing backend (e.g. the LLM gateway
-  // rejecting every request) would auto-pre-warm again immediately, fail
-  // again immediately, and loop forever with no backoff — confirmed in
-  // production as a tight reconnect storm. An error ending is therefore NOT
-  // auto-retried; only a deliberate "Neue Session starten" click reconnects.
-  const [needsReconnect, setNeedsReconnect] = useState(false);
+  // The committed Session: set when the user actually commits to one (the
+  // "Session starten" click), never by the selection itself — see ADR 0042.
+  // Nothing connects on its own, which is also what keeps a persistently
+  // failing backend from looping: a failed Session is only ever retried by
+  // another deliberate click, never automatically.
+  const [committed, setCommitted] = useState<CommittedSession | null>(null);
 
   useEffect(() => {
     apiFetch<Persona[]>("/api/personas")
@@ -109,11 +108,10 @@ export default function App() {
 
   // The Session (WebSocket + VAD + audio playback) lives here, at the App
   // level, not inside whichever screen happens to be showing — it connects
-  // as soon as personaId/scenarioId are known (i.e. on app load, well before
-  // "Session starten" is ever clicked) and its opening line is buffered
-  // (see useStreamedAudioPlayback's hold/activate) until the call screen
-  // actually appears. Speed matters more than a literal "screen order"
-  // mapping: anything that can be anticipated runs in the background.
+  // once the user commits to a Session, and its opening line is generated
+  // and buffered (see useStreamedAudioPlayback's hold/activate) while the
+  // microphone check is still on screen, so the Persona can start speaking
+  // the moment the call screen appears (ADR 0042).
   const playback = useStreamedAudioPlayback();
 
   // session.ended (e.g. after a natural [CALL_END]) can arrive while the
@@ -132,12 +130,22 @@ export default function App() {
   );
 
   const socket = useSessionSocket({
-    personaId,
-    scenarioId,
-    generation,
+    session: committed,
     onAudioChunk: playback.enqueue,
     onEnded: handleEnded,
   });
+
+  // Buffered opening audio belongs to exactly one connection (ADR 0042).
+  // Whenever `committed` changes, useSessionSocket above replaces the
+  // connection, so whatever the previous one buffered is audio from a
+  // Session that will never be conducted — drop it, and go back to holding.
+  // Both effects must key on `committed` and nothing else: if they drift
+  // apart, activate() starts replaying opening lines from abandoned
+  // Sessions back to back.
+  useEffect(() => {
+    playback.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- playback is stable-shaped; this must mirror the connection key above exactly
+  }, [committed]);
 
   useEffect(() => {
     if (pendingEnd === null) return;
@@ -150,11 +158,9 @@ export default function App() {
     setEndedSessionId(pendingEnd.sessionId);
     saveFinishedSession({ sessionId: pendingEnd.sessionId, turns: pendingEnd.turns, personaName });
     setScreen("transcript");
-    if (pendingEnd.reason === "error") {
-      setNeedsReconnect(true);
-    } else {
-      setGeneration((g) => g + 1);
-    }
+    // This Session is over — the next one connects when the user commits
+    // to it, not while the transcript is still being read (ADR 0042).
+    setCommitted(null);
     setPendingEnd(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- playback is stable-shaped; only isPlaying/pendingEnd should retrigger this
   }, [pendingEnd, playback.isPlaying]);
@@ -206,19 +212,33 @@ export default function App() {
     setScreen("call");
   }, [playback, socket.sendActivate]);
 
+  const handleStartSession = useCallback(() => {
+    if (personaId === null || scenarioId === null) return;
+    // A new object every time: that identity is what makes this a new
+    // Session for useSessionSocket, even when the pairing is unchanged.
+    setCommitted({ personaId, scenarioId });
+    setScreen("mic-check");
+  }, [personaId, scenarioId]);
+
+  // Abandoning the microphone check drops the Session that was committed to
+  // — the opening line generated for it is already spent, but there is no
+  // point holding the connection (and the server-side Session) open for it.
+  const handleCancelMicCheck = useCallback(() => {
+    setCommitted(null);
+    setScreen("setup");
+  }, []);
+
+  // Clears the stored finished Session too, so the wrap-up does not come
+  // back when the next Session ends (ADR 0042 handles the reconnect side).
   const handleRestart = useCallback(() => {
     saveFinishedSession(null);
-    if (needsReconnect) {
-      setGeneration((g) => g + 1);
-      setNeedsReconnect(false);
-    }
     setScreen("setup");
-  }, [needsReconnect]);
+  }, []);
 
   const readyForCall = personaId !== null && scenarioId !== null;
 
   if (screen === "mic-check") {
-    return <MicCheck onConfirmed={handleConfirmed} onCancel={() => setScreen("setup")} />;
+    return <MicCheck onConfirmed={handleConfirmed} onCancel={handleCancelMicCheck} />;
   }
 
   if (screen === "call") {
@@ -258,6 +278,7 @@ export default function App() {
           >
             <span className="persona-name">{p.name}</span>
             <span className="card-subtitle">{p.role}</span>
+            <span className="language-badge">{p.language}</span>
           </button>
         ))}
       </div>
@@ -272,7 +293,7 @@ export default function App() {
             type="button"
           >
             <span className="persona-name">{s.name}</span>
-            <span className="card-subtitle">{s.description}</span>
+            <span className="card-subtitle">{s.short_description}</span>
           </button>
         ))}
       </div>
@@ -281,7 +302,7 @@ export default function App() {
         className="start-call-button"
         type="button"
         disabled={!readyForCall}
-        onClick={() => setScreen("mic-check")}
+        onClick={handleStartSession}
       >
         Session starten
       </button>

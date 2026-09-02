@@ -4,6 +4,8 @@ Covers:
   F-46  Live-Call-Interface (one WebSocket per session, state + audio frames)
   ADR 0033  streamed protocol: a JSON 'chunk' message then a raw binary frame
   ADR 0035  a 'turn.interrupt' control message is understood
+  ADR 0041  the handshake resolves the ids through the database-backed
+            library, faked here so the test needs no database
   Handshake robustness: a missing/!= 'session.start' or an unknown
   persona/scenario id closes the socket with protocol-error code 1002; a
   missing/invalid token closes with 1008 (F-50/ADR 0009).
@@ -19,10 +21,8 @@ import pytest
 from fastapi import WebSocketDisconnect
 
 from backend.api import session_ws
-from backend.personas import PERSONAS
-from backend.scenarios import SCENARIOS
 from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted
-from tests.conftest import TEST_AUTH
+from tests.conftest import TEST_AUTH, TEST_PERSONAS, TEST_SCENARIOS
 
 # session_ws's ASGI helpers are underscore-prefixed; driving them directly is
 # the point of this module.
@@ -38,7 +38,12 @@ def _accept_test_token(monkeypatch):
     )
 
 
-_START = {"type": "session.start", "token": "test", "persona_id": PERSONAS[0].id, "scenario_id": SCENARIOS[0].id}
+_START = {
+    "type": "session.start",
+    "token": "test",
+    "persona_id": TEST_PERSONAS[0].id,
+    "scenario_id": TEST_SCENARIOS[0].id,
+}
 
 
 class FakeWebSocket:
@@ -83,10 +88,10 @@ class FakeWebSocket:
 _DISCONNECT = object()
 
 
-async def test_handshake_accepts_a_valid_session_start():
+async def test_handshake_accepts_a_valid_session_start(fake_library):
     ws = FakeWebSocket([_START])
     result = await session_ws._handshake(ws)
-    assert result == (PERSONAS[0], SCENARIOS[0], TEST_AUTH)
+    assert result == (TEST_PERSONAS[0], TEST_SCENARIOS[0], TEST_AUTH)
     assert ws.closed is None
 
 
@@ -102,7 +107,7 @@ async def test_handshake_rejects_a_missing_token():
     assert ws.closed[0] == 1008  # policy violation
 
 
-async def test_handshake_rejects_unknown_persona_or_scenario():
+async def test_handshake_rejects_unknown_persona_or_scenario(fake_library):
     ws = FakeWebSocket([{**_START, "persona_id": "does-not-exist"}])
     assert await session_ws._handshake(ws) is None
     assert ws.closed[0] == 1002

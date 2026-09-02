@@ -26,12 +26,6 @@ def _read(rel):
     return (REPO / rel).read_text(encoding="utf-8")
 
 
-def test_only_german_is_supported():
-    """ADR 0006: English was removed, not hidden. No language map beyond 'de'."""
-    orch = _read("backend/session/orchestrator.py")
-    assert '_LANGUAGE_NAMES_EN: dict[str, str] = {"de": "German"}' in orch
-
-
 def test_frontend_has_no_ui_language_switch_yet():
     """F-56: the DE/EN UI toggle is not implemented."""
     src_files = list((REPO / "frontend" / "src").rglob("*.ts*"))

@@ -72,7 +72,7 @@ async def test_scenarios_come_from_the_database(api_client: httpx.AsyncClient) -
     response = await api_client.get("/api/scenarios")
 
     assert response.status_code == 200
-    assert set(response.json()[0]) == {"id", "name", "description"}
+    assert set(response.json()[0]) == {"id", "name", "short_description"}
     assert response.json()[0]["id"] == SCENARIO_KEY
 
 

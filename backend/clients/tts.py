@@ -85,7 +85,12 @@ async def synthesize_stream(text: str, voice: PersonaVoice, language_id: str) ->
 
 async def synthesize(text: str, voice: PersonaVoice, language_id: str) -> bytes:
     """One-shot: the whole chunk as a single WAV. KugelAudio by default,
-    DiReKT on failure or under DEBUG."""
+    DiReKT on failure or under DEBUG.
+
+    KugelAudio wants the bare language code ("de", "en") here, not a full
+    locale tag -- it rejects "de-DE"/"en-GB" with "Invalid request", which
+    then degrades silently into the DiReKT fallback voice.
+    """
     if not DEBUG:
         try:
             return await _synthesize_kugelaudio(text, voice, language_id)

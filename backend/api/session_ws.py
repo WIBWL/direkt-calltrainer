@@ -16,11 +16,13 @@ from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from sqlalchemy.exc import SQLAlchemyError
 
 from backend.auth import AuthContext, authenticate_ws
 from backend.logging_config import reset_session_log, session_id_scope
-from backend.personas import PERSONAS, Persona
-from backend.scenarios import SCENARIOS, Scenario
+from backend import library
+from backend.personas import Persona
+from backend.scenarios import Scenario
 from backend.session import persistence
 from backend.session.models import (
     AudioChunk,
@@ -157,8 +159,16 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario, AuthConte
 
     persona_id = start.get("persona_id")
     scenario_id = start.get("scenario_id")
-    persona = next((p for p in PERSONAS if p.id == persona_id), None)
-    scenario = next((s for s in SCENARIOS if s.id == scenario_id), None)
+    try:
+        persona = library.get_persona(persona_id)
+        scenario = library.get_scenario(scenario_id)
+    except SQLAlchemyError as e:
+        # Not the client's fault, so not a protocol error (1002): the
+        # library is unreachable. ADR 0041 puts the database on the
+        # Session's start path, so this is a server-side failure.
+        logger.error("Handshake failed: could not read the library: %s", e)
+        await websocket.close(code=1011, reason="Persona/scenario library unavailable")
+        return None
     if persona is None or scenario is None:
         logger.warning("Handshake failed: unknown persona_id=%r/scenario_id=%r", persona_id, scenario_id)
         # Protocol Error (1002; https://websocket.org/reference/close-codes/)

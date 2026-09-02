@@ -94,6 +94,10 @@ class Persona(Base):
     persona_id: Mapped[int] = mapped_column(primary_key=True)
     key: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. thomas-brandt-ceo
     name: Mapped[str] = mapped_column(String(120))
+    # Display field: the label on the selection card, in the UI language. The
+    # prompt fields below are English (ADR 0043), so the two audiences this one
+    # column used to serve at once are two columns now.
+    role_label: Mapped[str] = mapped_column(String(120))
     role: Mapped[str] = mapped_column(String(120))
     traits: Mapped[str] = mapped_column(String(120))
     behavior: Mapped[str] = mapped_column(Text)
@@ -143,7 +147,21 @@ class Scenario(Base):
     # Not "type": that shadows the builtin wherever a row is unpacked.
     scenario_type: Mapped[str] = mapped_column(String(60))
     title: Mapped[str] = mapped_column(String(160))
+    # Display field: the one-line teaser under the title on the selection card,
+    # in the UI language. Deliberately short -- read at a glance, not by the
+    # model.
+    short_description: Mapped[str] = mapped_column(String(240))
+    # Prompt fields, English (ADR 0043). `description` is the situation alone;
+    # the three below carry the case (ADR 0045) -- what is true of it, what the
+    # caller wants out of the call, and when the caller counts the matter as
+    # settled. They are about the *case*, never about the caller, which is what
+    # lets any Persona run any Scenario (ADR 0001, ADR 0015). All three may be
+    # empty: a Scenario without them falls back to the improvisation the frame
+    # asked for before, which is what ADR 0024's user-authored ones will be.
     description: Mapped[str] = mapped_column(Text)
+    case_facts: Mapped[str] = mapped_column(Text)
+    call_goal: Mapped[str] = mapped_column(Text)
+    success_condition: Mapped[str] = mapped_column(Text)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="scenario")

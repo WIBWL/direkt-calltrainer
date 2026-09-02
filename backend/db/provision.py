@@ -10,8 +10,10 @@ seeded record is looked up by its natural key and either created or brought
 back to the seed state.
 
 Content sources:
-    Persona/Scenario -> backend/personas.py, backend/scenarios.py
-    Language         -> the language_ids the Personas use
+    Persona/Scenario -> backend/db/seed_data.py (ADR 0041: the database is the
+                        source of truth and that module carries its initial
+                        content; neither is hardcoded in the backend anymore)
+    Language         -> the language_id values the seeded Personas use
     MetricType       -> backend/feedback/metrics.py (METRICS), which also
                         derives the measurement rows, so the seeded inventory
                         and the analysis cannot drift apart.
@@ -27,35 +29,16 @@ from alembic.config import Config
 from sqlalchemy.orm import Session as DbSession
 
 from backend.db.models import Language, MetricType, Persona, PersonaObjection, Scenario
+from backend.db.seed_data import LANGUAGE_NAMES, PERSONAS, SCENARIOS
 from backend.db.session import session_scope
 from backend.feedback.metrics import METRICS
-from backend.personas import PERSONAS
-from backend.scenarios import SCENARIOS
 
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# --- Assumptions ---------------------------------------------------------
-# Columns the ORM requires but the hardcoded source modules do not provide:
-#
-# Persona.difficulty: not modelled in personas.py. "mittel" because
-#   the one existing Persona is demanding, but not an escalation case.
-# Persona.training_goal: not modelled in personas.py. Left empty rather than
-#   invented here — the Personas carry no training goal today.
-# Scenario.scenario_type: not modelled in scenarios.py. Derived from F-03
-#   ("Angebots- und Preisgespräche"), as the scenario aims at the closing.
-# Language.name: personas.py only carries the language code, so the
-#   display names live here, for the codes the Personas actually use.
-#
-# Persona.language_code, tts_voice and kugelaudio_voice_id do come from
-# personas.py: each Persona is bound to one language and one voice per TTS
-# backend (ADR 0043), and those belong in the table the app reads from
-# (ADR 0041) rather than only in the module that seeds it.
-DEFAULT_DIFFICULTY = "mittel"
-DEFAULT_TRAINING_GOAL = ""
-DEFAULT_SCENARIO_TYPE = "Angebots- und Preisgespräch"
-LANGUAGE_NAMES = {"de": "Deutsch", "en": "English"}
+# Every column the ORM requires is carried by seed_data.py, and its field names
+# match the columns one to one, so nothing is defaulted or mapped here.
 
 
 def provision() -> dict[str, int]:
@@ -81,8 +64,8 @@ def seed(db: DbSession) -> dict[str, int]:
     # so a Persona dropped from the seed has to stay readable for the Sessions
     # that already ran with it. /api/personas and /api/scenarios filter on
     # `active`, which is what actually removes it from the selection.
-    _deactivate_missing(db, Persona, {p.id for p in PERSONAS})
-    _deactivate_missing(db, Scenario, {s.id for s in SCENARIOS})
+    _deactivate_missing(db, Persona, {p["id"] for p in PERSONAS})
+    _deactivate_missing(db, Scenario, {s["id"] for s in SCENARIOS})
     # Languages are deliberately absent: a closed code list, never retired, and
     # a Session keeps pointing at the code it ran in.
     return created
@@ -124,33 +107,48 @@ def _seed_languages(db: DbSession) -> int:
     return sum(
         _upsert(db, Language, {"code": code},
                 {"name": LANGUAGE_NAMES.get(code, code)})[1]
-        for code in sorted({p.language_id for p in PERSONAS})
+        for code in sorted({p["language_id"] for p in PERSONAS})
     )
 
 
 def _seed_personas(db: DbSession) -> int:
-    # personas.py no longer models objections, so the seed state for every
-    # Persona is "none" and leftovers from earlier runs go. When objections
-    # return, the upsert logic for them returns too.
-    db.query(PersonaObjection).delete(synchronize_session=False)
-    return sum(
-        _upsert(db, Persona, {"key": p.id},
-                {"name": p.name, "role": p.role, "traits": p.traits,
-                 "behavior": p.behavior, "training_goal": DEFAULT_TRAINING_GOAL,
-                 "difficulty": DEFAULT_DIFFICULTY,
-                 "language_code": p.language_id,
-                 "tts_voice": p.voice.tts_voice,
-                 "kugelaudio_voice_id": p.voice.kugelaudio_voice_id,
-                 "active": True})[1]
-        for p in PERSONAS
-    )
+    created = 0
+    for p in PERSONAS:
+        row, was_created = _upsert(
+            db, Persona, {"key": p["id"]},
+            {"name": p["name"], "role_label": p["role_label"], "role": p["role"],
+             "traits": p["traits"], "behavior": p["behavior"],
+             "training_goal": p["training_goal"], "difficulty": p["difficulty"],
+             "active": True, "language_code": p["language_id"],
+             "tts_voice": p["tts_voice"],
+             "kugelaudio_voice_id": p["kugelaudio_voice_id"]})
+        created += was_created
+        _seed_objections(db, row, p["objections"])
+    return created
+
+
+def _seed_objections(db: DbSession, persona: Persona, objections) -> None:
+    """Bring one Persona's objections to the seed state (R-12, ADR 0045).
+
+    Replaced wholesale rather than upserted: the list is what carries meaning,
+    and `position` gives a single objection no natural key to match on. Not
+    counted as created rows -- `inventory()` already reports the table.
+    """
+    db.flush()  # a freshly created Persona needs its id before rows point at it
+    db.query(PersonaObjection).filter_by(
+        persona_id=persona.persona_id).delete(synchronize_session=False)
+    for index, text in enumerate(objections):
+        db.add(PersonaObjection(persona_id=persona.persona_id, position=index, text=text))
 
 
 def _seed_scenarios(db: DbSession) -> int:
     return sum(
-        _upsert(db, Scenario, {"key": s.id},
-                {"scenario_type": DEFAULT_SCENARIO_TYPE, "title": s.name,
-                 "description": s.description, "active": True})[1]
+        _upsert(db, Scenario, {"key": s["id"]},
+                {"scenario_type": s["scenario_type"], "title": s["name"],
+                 "short_description": s["short_description"],
+                 "description": s["description"], "case_facts": s["case_facts"],
+                 "call_goal": s["call_goal"],
+                 "success_condition": s["success_condition"]})[1]
         for s in SCENARIOS
     )
 

@@ -124,7 +124,8 @@ def _reference(db: DbSession, model: type, key: str):
     """A seeded reference row, by its natural key.
 
     Assigned through the relationship rather than the foreign key, so the
-    primary key never has to be named here.
+    primary key never has to be named here. Only Persona and Scenario go
+    through this -- the Feedback tables keep their German `schluessel`.
     """
     row = db.query(model).filter_by(key=key).one_or_none()
     if row is None:
