@@ -219,6 +219,8 @@ export default function App() {
             onRestart={handleRestart}
           />
         </main>
+
+        <AppFooter />
       </>
     );
   }
@@ -322,6 +324,8 @@ export default function App() {
           </p>
         )}
       </main>
+
+      <AppFooter />
     </>
   );
 }
