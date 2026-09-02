@@ -66,7 +66,10 @@ async def session_ws(websocket: WebSocket) -> None:
             # The persona speaks first (F-01): the opening Turn has no user
             # utterance, but is otherwise a normal interruptible Turn.
             outcome = await _run_turn_interruptible(
-                websocket, orchestrator.run_opening_turn(), orchestrator.start_playback
+                websocket,
+                orchestrator.run_opening_turn(),
+                orchestrator.start_playback,
+                orchestrator.note_barge_in,
             )
             if outcome in ("ok", "interrupted"):
                 reason = await _run_session(websocket, orchestrator, orchestrator.start_playback)
@@ -183,6 +186,9 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario, AuthConte
 # fall-through:
 _TurnResult = Literal["ok", "failed", "completed"]           # what _forward_turn_events reports
 _ControlMessage = Literal["end", "interrupt"]                 # what pre-empted an in-flight turn
+# A barge-in also carries how many ms of the reply the client actually played
+# (None from a client too old to report it); everything else pairs with None.
+_Control = tuple[_ControlMessage, int | None]
 _TurnOutcome = Literal["ok", "failed", "completed", "interrupted", "user"]  # after the control race
 _SessionEndReason = Literal["user", "error", "completed"]     # sent to the client in session.ended
 
@@ -216,7 +222,9 @@ async def _run_session(
             return "user"
 
         turn = orchestrator.run_turn(audio_bytes, "turn.webm", envelope.get("mime_type"))
-        outcome = await _run_turn_interruptible(websocket, turn, orchestrator.start_playback)
+        outcome = await _run_turn_interruptible(
+            websocket, turn, orchestrator.start_playback, orchestrator.note_barge_in
+        )
         if outcome == "interrupted":
             continue
         if outcome != "ok":
@@ -224,7 +232,10 @@ async def _run_session(
 
 
 async def _run_turn_interruptible(
-    websocket: WebSocket, events: AsyncIterator[TurnEvent], on_activate: Callable[[], None]
+    websocket: WebSocket,
+    events: AsyncIterator[TurnEvent],
+    on_activate: Callable[[], None],
+    on_barge_in: Callable[[int | None], None],
 ) -> _TurnOutcome:
     """Forwards one turn's events while racing session.end/disconnect/a user
     barge-in, so talking over the persona doesn't wait for it to finish."""
@@ -236,11 +247,16 @@ async def _run_turn_interruptible(
         forward_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await forward_task
+        kind, played_ms = control_task.result()
+        # Hand the played-through position to the orchestrator *before* the
+        # teardown below, since that is what triggers the turn's finalization.
+        if kind == "interrupt":
+            on_barge_in(played_ms)
         # Cancelling forward_task doesn't reliably tear down the turn
         # generator itself (see SessionOrchestrator._generate_reply); this does.
         await events.aclose()
-        if control_task.result() == "interrupt":
-            logger.info("User barged in")
+        if kind == "interrupt":
+            logger.info("User barged in (played %s ms of the reply)", played_ms)
             await websocket.send_json({"type": "state", "value": "listening"})
             return "interrupted"
         return "user"
@@ -253,9 +269,10 @@ async def _run_turn_interruptible(
 
 async def _wait_for_control_message(
     websocket: WebSocket, on_activate: Callable[[], None]
-) -> _ControlMessage:
+) -> _Control:
     """Waits for a client message that should interrupt the in-flight turn:
-    session.end/disconnect ends the session, turn.interrupt is a barge-in.
+    session.end/disconnect ends the session, turn.interrupt is a barge-in
+    (carrying how many ms of the reply the client played, ADR 0035).
 
     session.activate is neither -- it usually arrives *during* the opening
     turn, which is exactly the point (ADR 0051) -- so it starts the clock and
@@ -264,11 +281,19 @@ async def _wait_for_control_message(
     while True:
         envelope = await _receive_json(websocket)
         if envelope is None or envelope.get("type") == "session.end":
-            return "end"
+            return "end", None
         if envelope.get("type") == "turn.interrupt":
-            return "interrupt"
+            return "interrupt", _played_ms(envelope)
         if envelope.get("type") == "session.activate":
             on_activate()
+
+
+def _played_ms(envelope: dict) -> int | None:
+    """The `played_ms` a barge-in reports, when the client sent a usable one."""
+    value = envelope.get("played_ms")
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0:
+        return int(value)
+    return None
 
 
 async def _forward_turn_events(

@@ -62,6 +62,14 @@ export interface SessionEndMessage {
 /** The user talked over the persona; cut the in-flight reply short (barge-in, ADR 0035). */
 export interface TurnInterruptMessage {
   type: "turn.interrupt";
+  /**
+   * How many milliseconds of the in-flight persona reply actually played
+   * before the user cut in. The server commits only the utterances whose
+   * audio finished within this window to the conversation history — anything
+   * it streamed ahead but the client never played is discarded, so the next
+   * reply can't pick up from words that were never spoken aloud (ADR 0035).
+   */
+  played_ms: number;
 }
 
 /** Every message the client can send. Discriminated on `type`. */

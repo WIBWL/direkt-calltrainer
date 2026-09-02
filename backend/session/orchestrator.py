@@ -239,7 +239,11 @@ async def _attach_measurements(
     except AcousticsError as e:
         logger.info("Turn %d not measured: %s", turn.seq, e)
         return
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
+        # Deliberately catch-all: `analyze` runs Praat in a worker thread and
+        # can surface anything from the C extension. Per the docstring this leg
+        # is never load-bearing, so any failure here is logged and the Turn
+        # just carries no measurements -- it must not break the call.
         logger.exception("Paraverbal analysis failed for turn %d", turn.seq)
         return
     started_ms = max(0, ended_ms - measured.duration_ms)
@@ -248,6 +252,13 @@ async def _attach_measurements(
     turn.user_speech_ms += measured.duration_ms
     turn.pauses.extend(Pause(started_ms + p.offset_ms, p.duration_ms) for p in measured.pauses)
     turn.loudness_db.extend(measured.loudness_db)
+
+
+# A barge-in's reported playback position and the server's per-chunk audio
+# tally are two independent clocks (client wall-time vs. summed WAV durations),
+# so an utterance the user heard in full can land a little short of its
+# checkpoint. This slack keeps that from dropping it (ADR 0035).
+_BARGE_IN_GRACE_MS = 300
 
 
 class _ReplyProgress:
@@ -259,6 +270,12 @@ class _ReplyProgress:
         self.spoke_yet = False
         self.ends_call = False
         self.spoken_text = ""
+        # Cumulative playback length of the audio dispatched so far, and a
+        # snapshot of `spoken_text` at the end of each fully-synthesized chunk.
+        # On a barge-in these say which utterances fit inside the playback
+        # window the client reports it actually heard (ADR 0035).
+        self.audio_ms = 0
+        self.checkpoints: list[tuple[int, str]] = []
 
 
 def _strip_end_marker(text_chunk: str, progress: _ReplyProgress) -> str:
@@ -346,6 +363,9 @@ class SessionOrchestrator:
         ]
         self.turns: list[Turn] = []
         self._reopen_turn: Turn | None = None
+        # Set by note_barge_in() just before the turn generator is torn down, so
+        # _finalize_interrupted knows how much of the reply the client played.
+        self._barge_in_played_ms: int | None = None
 
     def _elapsed_ms(self) -> int:
         """Milliseconds since the Session started."""
@@ -395,6 +415,10 @@ class SessionOrchestrator:
     def _new_or_reopened_turn(self) -> tuple[Turn, bool]:
         """Reuses a still-open turn from a prior barge-in, else creates a
         fresh one; marks it unresolved so an early interruption still counts."""
+        # A stale position from a barge-in whose teardown never reached
+        # _finalize_interrupted (the generator finished first) must not carry
+        # into this turn's interruption.
+        self._barge_in_played_ms = None
         reopening = self._reopen_turn is not None
         turn = self._reopen_turn if reopening else Turn(seq=len(self.turns) + 1)
         if not reopening:
@@ -607,16 +631,48 @@ class SessionOrchestrator:
         carried = len(set(_long_sentences(self._previous_reply())) & sentences)
         return carried / len(sentences) > _RESTATEMENT_SHARE
 
+    def note_barge_in(self, played_ms: int | None) -> None:
+        """How much of the in-flight reply the client reports it actually played
+        before the user cut in. Recorded here rather than passed through the
+        generator teardown, which cannot carry an argument (ADR 0035)."""
+        self._barge_in_played_ms = played_ms
+
     def _finalize_interrupted(self, turn: Turn, progress: _ReplyProgress) -> None:
-        """Barge-in cleanup (ADR 0035). If audio was voiced, commit exactly that
-        text to history and close the Turn. If not, discard the text and leave
-        the Turn open so the next utterance continues the same question."""
-        if progress.spoke_yet:
-            turn.persona_text = progress.spoken_text.strip()
-            self._messages.append({"role": "assistant", "content": turn.persona_text})
+        """Barge-in cleanup (ADR 0035). Commit only the utterances whose audio
+        finished inside the playback window the client reports it heard, and
+        close the Turn. If nothing was heard in full, discard the reply and
+        leave the Turn open so the next utterance continues the same question.
+
+        "Dispatched as audio" is not "heard": the server streams chunks ahead of
+        playback and the client cuts the current one off mid-word, so committing
+        everything sent put sentences into the history the user never got, and
+        the next reply picked up from text that was never spoken aloud.
+        """
+        played_ms = self._barge_in_played_ms
+        self._barge_in_played_ms = None
+        if not progress.spoke_yet:
+            turn.persona_text = ""
+            return
+        heard = self._heard_text(progress, played_ms)
+        if heard:
+            turn.persona_text = heard
+            self._messages.append({"role": "assistant", "content": heard})
             self._reopen_turn = None
         else:
             turn.persona_text = ""
+
+    @staticmethod
+    def _heard_text(progress: _ReplyProgress, played_ms: int | None) -> str:
+        """The reply text the client actually heard: the last chunk checkpoint
+        whose audio finished within `played_ms`. `None` — an older client that
+        sends no position — falls back to every chunk that was dispatched."""
+        if played_ms is None:
+            return progress.spoken_text.strip()
+        heard = ""
+        for audio_ms, text in progress.checkpoints:
+            if audio_ms <= played_ms + _BARGE_IN_GRACE_MS:
+                heard = text
+        return heard
 
     async def _stream_and_synthesize(
         self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress
@@ -651,7 +707,13 @@ class SessionOrchestrator:
                     progress.spoke_yet = True
                 progress.chunk_seq += 1
                 self._note_persona_audio(turn, wav)
+                progress.audio_ms += tts.duration_ms(wav)
                 yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=wav)
+            if voiced:
+                # This chunk is fully synthesized: mark where its audio ends on
+                # the reply's playback clock, so a later barge-in can tell
+                # whether the user heard all of it (ADR 0035).
+                progress.checkpoints.append((progress.audio_ms, progress.spoken_text.strip()))
         except (KugelAudioError, OpenAIError, TimeoutError, OSError) as e:
             logger.error("TTS synthesis failed: %s", e)
             yield Failed(code="tts_failed", message=str(e))

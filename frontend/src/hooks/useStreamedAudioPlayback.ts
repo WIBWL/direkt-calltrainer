@@ -20,11 +20,18 @@ export function useStreamedAudioPlayback() {
   const scheduleChainRef = useRef<Promise<void>>(Promise.resolve());
   const heldRef = useRef(true);
   const heldChunksRef = useRef<ArrayBuffer[]>([]);
-  // Tracked so reset() can actually silence whatever's still playing when a
-  // call ends — without this, audio already scheduled (e.g. the Persona's
-  // closing line) would keep playing out through the speakers even after
-  // the app has moved on to the transcript screen.
-  const activeSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  // Tracked so reset()/interrupt() can silence whatever's still playing —
+  // without this, audio already scheduled (e.g. the Persona's closing line, or
+  // sentences streamed ahead of a barge-in) would keep playing out through the
+  // speakers. Each source carries its own scheduled start and length so a
+  // barge-in can tell how much of the current chunk was actually heard.
+  const activeSourcesRef = useRef<Map<AudioBufferSourceNode, { startAt: number; duration: number }>>(
+    new Map(),
+  );
+  // Milliseconds of the *current* persona reply that have actually played.
+  // Reset when a fresh reply's first chunk arrives (below) and read by
+  // interrupt() so the server only commits what the user heard (ADR 0035).
+  const playedMsRef = useRef(0);
 
   const getContext = useCallback(() => {
     if (!audioContextRef.current) {
@@ -40,6 +47,14 @@ export function useStreamedAudioPlayback() {
 
   const scheduleChunk = useCallback(
     (data: ArrayBuffer) => {
+      // Nothing pending or playing means this is the first chunk of a new
+      // persona reply — start its played-time tally from zero. (A long enough
+      // mid-reply TTS stall could also land here; the tally then under-counts,
+      // which only makes the server commit *less* on a barge-in — the safe way
+      // to be wrong.)
+      if (pendingCountRef.current === 0 && activeSourcesRef.current.size === 0) {
+        playedMsRef.current = 0;
+      }
       pendingCountRef.current += 1;
       setIsPlaying(true);
       // Chained so chunks are decoded+scheduled in arrival order even though
@@ -54,9 +69,11 @@ export function useStreamedAudioPlayback() {
           const startAt = Math.max(ctx.currentTime, nextStartTimeRef.current);
           source.start(startAt);
           nextStartTimeRef.current = startAt + audioBuffer.duration;
-          activeSourcesRef.current.add(source);
+          activeSourcesRef.current.set(source, { startAt, duration: audioBuffer.duration });
           source.onended = () => {
+            // Played to its end: the whole chunk counts as heard.
             activeSourcesRef.current.delete(source);
+            playedMsRef.current += audioBuffer.duration * 1000;
             finishPending();
           };
         } catch (e) {
@@ -88,8 +105,12 @@ export function useStreamedAudioPlayback() {
   }, [scheduleChunk]);
 
   const stopActiveSources = useCallback(() => {
-    for (const source of activeSourcesRef.current) {
+    const now = audioContextRef.current?.currentTime ?? 0;
+    for (const [source, { startAt, duration }] of activeSourcesRef.current) {
       source.onended = null; // avoid a double pendingCount decrement below
+      // Count only the part of this chunk that had actually played by now;
+      // a chunk still scheduled in the future (startAt > now) contributes 0.
+      playedMsRef.current += Math.min(duration, Math.max(0, now - startAt)) * 1000;
       try {
         source.stop();
       } catch {
@@ -105,15 +126,21 @@ export function useStreamedAudioPlayback() {
 
   const reset = useCallback(() => {
     stopActiveSources();
+    playedMsRef.current = 0;
     heldRef.current = true;
     heldChunksRef.current = [];
   }, [stopActiveSources]);
 
   /** Like reset(), but for a mid-call barge-in: stays live (not held) so
-   * the next Turn's chunks play immediately instead of buffering forever. */
-  const interrupt = useCallback(() => {
+   * the next Turn's chunks play immediately instead of buffering forever.
+   * Returns how many ms of the interrupted reply actually played, for the
+   * server to bound what it commits to history (ADR 0035). */
+  const interrupt = useCallback((): number => {
     stopActiveSources();
     heldChunksRef.current = [];
+    const played = Math.round(playedMsRef.current);
+    playedMsRef.current = 0;
+    return played;
   }, [stopActiveSources]);
 
   useEffect(() => {

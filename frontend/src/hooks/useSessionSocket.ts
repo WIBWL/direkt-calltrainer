@@ -147,12 +147,17 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
   }, []);
 
   /** Tells the server to stop the in-flight Turn (a user barge-in) and
-   * optimistically flips local state to "listening" right away. */
-  const sendInterrupt = useCallback(() => {
+   * optimistically flips local state to "listening" right away. `playedMs` is
+   * how much of the persona's reply actually played before the cut-in, so the
+   * server commits only what was heard to the history (ADR 0035). */
+  const sendInterrupt = useCallback((playedMs: number) => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    console.debug("[WS] -> turn.interrupt");
-    const interrupt: ClientMessage = { type: "turn.interrupt" };
+    console.debug("[WS] -> turn.interrupt", { playedMs });
+    const interrupt: ClientMessage = {
+      type: "turn.interrupt",
+      played_ms: Math.max(0, Math.round(playedMs)),
+    };
     ws.send(JSON.stringify(interrupt));
     setCallState("listening");
   }, []);

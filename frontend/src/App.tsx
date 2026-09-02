@@ -189,8 +189,8 @@ export default function App() {
   // Stable ([]) so startListening/stopListening below don't churn either.
   const handleBargeIn = useCallback(() => {
     if (displayStateRef.current === "listening") return;
-    playback.interrupt();
-    socket.sendInterrupt();
+    const playedMs = playback.interrupt();
+    socket.sendInterrupt(playedMs);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment above
   }, []);
 
