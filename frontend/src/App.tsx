@@ -283,6 +283,7 @@ export default function App() {
             languageLabel={selectedPersona?.language ?? "Sprache"}
             isMicrophoneMuted={isMicrophoneMuted}
             callState={displayState}
+            audioLevel={playback.audioLevel}
             error={socket.error ?? vad.micError}
             onToggleMicrophone={handleToggleMicrophone}
             onEndCall={socket.endSession}

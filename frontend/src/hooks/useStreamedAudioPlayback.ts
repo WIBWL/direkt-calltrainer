@@ -14,6 +14,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
  */
 export function useStreamedAudioPlayback() {
   const [isPlaying, setIsPlaying] = useState(false);
+
+  // Normalized 0..1 amplitude of the currently playing persona audio for the UI.
+  const [audioLevel, setAudioLevel] = useState(0);
+
+  // Web Audio analyser used to measure the actual amplitude of the persona's
+  // streamed TTS output so the call wave can react to real speech instead of
+  // playing a purely decorative animation.
+  const analyserRef = useRef<AnalyserNode | null>(null);
+
+  // requestAnimationFrame id for the audio meter loop. Kept in a ref so the
+  // loop can be cancelled cleanly when the hook is unmounted.
+  const meterFrameRef = useRef<number | null>(null);
+
   const audioContextRef = useRef<AudioContext | null>(null);
   const nextStartTimeRef = useRef(0);
   const pendingCountRef = useRef(0);
@@ -35,15 +48,77 @@ export function useStreamedAudioPlayback() {
 
   const getContext = useCallback(() => {
     if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContext();
+      const ctx = new AudioContext();
+
+      // Route persona playback through an AnalyserNode before it reaches the
+      // speakers. This leaves the audio unchanged while exposing its waveform.
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.75;
+      analyser.connect(ctx.destination);
+
+      audioContextRef.current = ctx;
+      analyserRef.current = analyser;
     }
+
     return audioContextRef.current;
+  }, []);
+
+  // Samples the currently playing persona audio once per animation frame and
+  // converts its RMS amplitude into a normalized 0..1 value for the UI.
+  const startMeter = useCallback(() => {
+    if (meterFrameRef.current !== null) return;
+
+    const update = () => {
+      const analyser = analyserRef.current;
+
+      if (!analyser) {
+        meterFrameRef.current = null;
+        return;
+      }
+
+      const samples = new Uint8Array(analyser.fftSize);
+      analyser.getByteTimeDomainData(samples);
+
+      let sumSquares = 0;
+
+      for (const sample of samples) {
+        const normalized = (sample - 128) / 128;
+        sumSquares += normalized * normalized;
+      }
+
+      // RMS gives us a stable approximation of the current signal strength.
+      const rms = Math.sqrt(sumSquares / samples.length);
+
+      // Speech RMS is naturally small, so scale it into a useful visual range.
+      const level = Math.min(1, rms * 5);
+
+      setAudioLevel(level);
+
+      meterFrameRef.current = requestAnimationFrame(update);
+    };
+
+    meterFrameRef.current = requestAnimationFrame(update);
+  }, []);
+
+  // Stops the audio meter and resets the visual level when persona playback ends.
+  const stopMeter = useCallback(() => {
+    if (meterFrameRef.current !== null) {
+      cancelAnimationFrame(meterFrameRef.current);
+      meterFrameRef.current = null;
+    }
+
+    setAudioLevel(0);
   }, []);
 
   const finishPending = useCallback(() => {
     pendingCountRef.current -= 1;
-    if (pendingCountRef.current === 0) setIsPlaying(false);
-  }, []);
+
+    if (pendingCountRef.current === 0) {
+      setIsPlaying(false);
+      stopMeter();
+    }
+  }, [stopMeter]);
 
   const scheduleChunk = useCallback(
     (data: ArrayBuffer) => {
@@ -65,7 +140,15 @@ export function useStreamedAudioPlayback() {
           const audioBuffer = await ctx.decodeAudioData(data.slice(0));
           const source = ctx.createBufferSource();
           source.buffer = audioBuffer;
-          source.connect(ctx.destination);
+          const analyser = analyserRef.current;
+
+          if (analyser) {
+            source.connect(analyser);
+            startMeter();
+          } else {
+            source.connect(ctx.destination);
+          }
+
           const startAt = Math.max(ctx.currentTime, nextStartTimeRef.current);
           source.start(startAt);
           nextStartTimeRef.current = startAt + audioBuffer.duration;
@@ -82,7 +165,7 @@ export function useStreamedAudioPlayback() {
         }
       });
     },
-    [getContext, finishPending],
+    [getContext, finishPending, startMeter],
   );
 
   const enqueue = useCallback(
@@ -122,7 +205,8 @@ export function useStreamedAudioPlayback() {
     nextStartTimeRef.current = 0;
     pendingCountRef.current = 0;
     setIsPlaying(false);
-  }, []);
+    stopMeter();
+  }, [stopMeter]);
 
   const reset = useCallback(() => {
     stopActiveSources();
@@ -145,9 +229,14 @@ export function useStreamedAudioPlayback() {
 
   useEffect(() => {
     return () => {
+      // Stop the meter loop before closing the AudioContext on unmount.
+      if (meterFrameRef.current !== null) {
+        cancelAnimationFrame(meterFrameRef.current);
+      }
+
       audioContextRef.current?.close();
     };
   }, []);
 
-  return { enqueue, activate, reset, interrupt, isPlaying };
+  return { enqueue, activate, reset, interrupt, isPlaying, audioLevel };
 }

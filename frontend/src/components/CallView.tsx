@@ -10,6 +10,7 @@ interface CallViewProps {
   languageLabel: string;
   isMicrophoneMuted: boolean;
   callState: CallState;
+  audioLevel: number;
   error: string | null;
   onToggleMicrophone: () => void;
   onEndCall: () => void;
@@ -48,6 +49,7 @@ export default function CallView({
   languageLabel,
   isMicrophoneMuted,
   callState,
+  audioLevel,
   error,
   onToggleMicrophone,
   onEndCall,
@@ -104,7 +106,7 @@ export default function CallView({
           </span>
         </p>
 
-        <CallAnimation state={callState} />
+        <CallAnimation state={callState} audioLevel={audioLevel} />
 
         {error && (
           <p id="status" className="error">
