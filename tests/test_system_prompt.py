@@ -81,6 +81,14 @@ def test_prompt_forbids_repeating_itself(prompt):
     assert "Never repeat yourself" in prompt
 
 
+def test_prompt_forbids_re_introducing_after_the_opening(prompt):
+    """ADR 0038: the model re-read its own introduction on the first turn or
+    two, so the frame states plainly that the opening already happened."""
+    lowered = prompt.lower()
+    assert "do not greet the user again" in lowered
+    assert "do not give your name again" in lowered
+
+
 def test_prompt_takes_the_spoken_language_from_the_persona(persona, scenario):
     """ADR 0043: instructions are English, and only the Persona's language pack
     decides what the model speaks."""

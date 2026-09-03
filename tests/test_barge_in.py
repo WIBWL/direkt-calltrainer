@@ -143,6 +143,43 @@ async def test_interrupt_before_a_full_utterance_was_heard_reopens_the_turn(
     assert any(isinstance(e, AudioChunk) for e in events)
 
 
+async def test_a_chunk_heard_almost_to_its_end_counts_as_heard(
+    persona, scenario, fake_pipeline, monkeypatch
+):
+    """Cutting in a moment before a sentence finishes commits that sentence and
+    closes the turn -- otherwise the whole thing is discarded, the turn
+    reopens, and the next reply re-delivers it from the top, which reads as if
+    the persona was never interrupted (ADR 0035)."""
+    monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 5000)
+    s1 = "Der erste Satz meiner Antwort ist inhaltlich vollstaendig und lang genug fuer seinen eigenen Chunk."
+    s2 = "Den zweiten Satz hoert der Nutzer gar nicht mehr, weil er kurz vorher schon dazwischenredet."
+    assert min(len(s1), len(s2)) >= 80
+    fake_pipeline.stt.transcripts = ["Bitte erklaeren Sie mir das.", "Was war der erste Satz?"]
+    fake_pipeline.llm.replies = [f"{s1} {s2}", "Kurz gesagt: es geht um den Preis."]
+
+    orch = SessionOrchestrator(persona, scenario)
+    gen = orch.run_turn(b"a", "turn.webm", "audio/webm")
+    # Drain past the second chunk's audio so the first chunk's checkpoint is
+    # recorded (it lands after that chunk's audio loop finishes).
+    seen = 0
+    async for event in gen:
+        if isinstance(event, AudioChunk):
+            seen += 1
+            if seen == 2:
+                break
+    orch.note_barge_in(4400)  # ~88% through the 5s first sentence
+    await gen.aclose()
+
+    assert orch.turns[0].persona_text == s1
+    assert orch._reopen_turn is None, "the sentence was heard, so the turn is closed"
+    assert orch._messages[-1] == {"role": "assistant", "content": s1}
+
+    events = await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
+    assert len(orch.turns) == 2, "the reaction is its own turn, not merged onto the first"
+    assert orch.turns[1].user_text == "Was war der erste Satz?"
+    assert any(isinstance(e, AudioChunk) for e in events)
+
+
 async def test_new_or_reopened_turn_bookkeeping(persona, scenario):
     orch = SessionOrchestrator(persona, scenario)
     t1, reopening1 = orch._new_or_reopened_turn()

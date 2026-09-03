@@ -178,6 +178,15 @@ neutral turn, does the persona re‑raise the same objection?
 shows up in practice. Keep the in‑code repetition guard (ADR 0038) regardless —
 sampling reduces the rate, it does not eliminate it.
 
+> **Follow‑up (2026‑09‑03).** The 0/8 above was a single cross‑turn objection
+> probe. In longer stalling calls `presence_penalty 1.5` does **not** stop the
+> model re‑emitting a whole paragraph verbatim once the conversation has
+> nothing new in it (reproduced live, ~4‑in‑7 stalling turns), and it does not
+> stop the persona re‑reading its own introduction on turn 1–2. Fixed in the
+> ADR 0038 amendment — prompt block + a per‑turn nudge quoting the persona's
+> last reply + regenerate‑before‑speaking for a re‑greeting — not by a
+> parameter change. The sampling values here are unchanged and still correct.
+
 ### `max_tokens`
 
 `250` is fine. It is a **safety cap, not a target** — normal replies use

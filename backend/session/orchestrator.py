@@ -5,8 +5,14 @@ call. The guards around the pipeline exist because Qwen3-4B misbehaves in
 specific, tested ways — copying the English prompt example (ADR 0043), ending
 calls too eagerly or not at all (ADR 0037), looping or restating a demand the
 user has already met (ADR 0038); each guard's own comment names what it
-catches. Retry policy: one retry per leg, then end
-the Session cleanly (ADR 0016, ADR 0033).
+catches. Repetition is fought on three fronts (ADR 0038): the system prompt
+forbids re-introducing, every turn carries a nudge quoting the persona's own
+last reply, and a reply that *opens* by greeting again is caught before it is
+spoken and regenerated once; the verbatim/oscillation/restatement checks stay
+as the backstop that ends a call the model has stopped moving forward. When
+the user asks to hear something again, the guards ease off once -- the persona
+is nudged to say it again, shorter -- then snap back if asked twice. Retry
+policy: one retry per leg, then end the Session cleanly (ADR 0016, ADR 0033).
 """
 
 import asyncio
@@ -166,6 +172,11 @@ def _build_system_prompt(persona: Persona, scenario: Scenario, pack: LanguagePac
         "the user has already answered is the same mistake: if part of the "
         "answer was unclear, ask about that part only, never the whole "
         "question over again.\n"
+        "You have already opened this call and said who you are. Do not greet "
+        "the user again, do not give your name again, and do not lay out your "
+        "reason for calling as though you were raising it for the first time — "
+        "they have heard all of that. Continue from where the conversation "
+        "actually is.\n"
         f"{pack.example_exchange}\n"
         "Before every reply, check first whether what you came for has "
         "already been given. A clear answer, or a specific commitment with an "
@@ -212,10 +223,63 @@ def _signals_closing(user_text: str, pack: LanguagePack) -> bool:
     return bool(pack.farewell_re.search(user_text) or pack.postpone_re.search(user_text))
 
 
+def _asks_to_repeat(user_text: str, pack: LanguagePack) -> bool:
+    """True if the user asked the persona to say something again — its name,
+    the last line, the question. Repeating is then the right answer, so the
+    turn drops the anti-repeat nudge and the re-introduction guard, and a
+    repeat of the *immediately previous* reply no longer ends the call
+    (ADR 0038). It is not a licence to parrot: `_CLARIFY_NUDGE` asks for the
+    same content reworded shorter, and a verbatim repeat of an *older* reply
+    still counts as a loop."""
+    return bool(pack.repeat_request_re.search(user_text))
+
+
 _CLOSING_NUDGE = (
     "The user just signaled the call is over. End it now: add one brief, "
     "friendly closing line, then finish your reply with exactly this "
     "marker and nothing after it: [CALL_END]."
+)
+
+
+# Carried on every turn past the opening (ADR 0038). presence_penalty does not
+# stop a 4B model re-emitting a whole reply when the call stalls, and the
+# system prompt's standing "never repeat yourself" is too far up-context to
+# bite -- quoting the actual previous reply right before the model answers is
+# what measurably moves it.
+_ANTI_REPEAT_NUDGE = (
+    'Your previous reply in this call was:\n"{previous}"\n'
+    "Say something genuinely different now: react to what the user just said, "
+    "press a point you have not pressed yet, give ground, or ask a new "
+    "question — in new words. Do not repeat or reword that reply, and do not "
+    "greet or introduce yourself again."
+)
+
+# Sent when a reply was caught opening with a greeting again and is being
+# regenerated (ADR 0038). The rejected opening is quoted so the retry has
+# something concrete to steer away from.
+_REGENERATE_NUDGE = (
+    'You just started your reply with:\n"{opening}"\n'
+    "That restarts the call — you have already greeted the user and said who "
+    "you are. Answer again without any greeting or self-introduction: pick up "
+    "the conversation where it stands and respond to the user's last message."
+)
+
+# The user asked to hear the last reply again (ADR 0038). Given half a chance
+# the 4B model reads its previous line back verbatim -- and a wall of text is
+# no clearer the second time -- so the ask is for the same content, reworded
+# shorter.
+_CLARIFY_NUDGE = (
+    "The user did not catch your previous reply. Say the same thing again, but "
+    "reworded: shorter, plainer words, one or two sentences. Do not read your "
+    "previous reply back word for word, and do not greet or introduce yourself."
+)
+
+# They have asked more than once now. A third rendering of the same content,
+# however worded, is not helping -- find out what is unclear or move on.
+_CLARIFY_AGAIN_NUDGE = (
+    "The user still did not follow, even after you rephrased. Do not put it a "
+    "third time. Ask which part is unclear, or give the single most important "
+    "point in one sentence and carry the call forward."
 )
 
 
@@ -259,6 +323,13 @@ async def _attach_measurements(
 # so an utterance the user heard in full can land a little short of its
 # checkpoint. This slack keeps that from dropping it (ADR 0035).
 _BARGE_IN_GRACE_MS = 300
+
+# ...and a chunk the user got most of the way through, they got the sense of.
+# Without this, cutting in a second before a sentence ends discards the whole
+# sentence, the turn reopens, and the next reply re-delivers everything from
+# the top -- which reads in the transcript as if the persona was never
+# interrupted at all (ADR 0035).
+_HEARD_FRACTION = 0.65
 
 
 class _ReplyProgress:
@@ -305,6 +376,44 @@ def _strip_foreign_script(text_chunk: str) -> str:
 
 
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
+_WORD_RE = re.compile(r"\w+", re.UNICODE)
+
+
+class _RegenerateReply(Exception):
+    """Raised out of the reply stream before any audio has gone out, to have
+    `_generate_reply` re-ask the model once (ADR 0038). Only for a reply that
+    *opens* by greeting again — the after-the-fact checks handle the rest, and
+    those can safely end the call because the reply was already spoken."""
+
+    def __init__(self, opening: str):
+        super().__init__(opening)
+        self.opening = opening
+
+
+def _first_sentence(text: str) -> str:
+    """The first sentence of a chunk of text, for comparing openings."""
+    return _SENTENCE_SPLIT_RE.split(text.strip(), maxsplit=1)[0].strip()
+
+
+def _word_set(text: str) -> set[str]:
+    return set(_WORD_RE.findall(text.lower()))
+
+
+def _word_overlap(a: str, b: str) -> float:
+    """Jaccard overlap of the two texts' word sets — 0.0 when either is empty."""
+    wa, wb = _word_set(a), _word_set(b)
+    if not wa or not wb:
+        return 0.0
+    return len(wa & wb) / len(wa | wb)
+
+
+# First sentence of a reply shares at least this fraction of its words with the
+# opening's — the model is reading its own introduction back out (ADR 0038).
+_REINTRO_OVERLAP = 0.6
+
+# Below this many words a reply's opening is an acknowledgement ("Ja, genau."),
+# not an introduction, whatever greeting token it happens to contain.
+_MIN_REINTRO_WORDS = 3
 
 # Below this, a whole reply repeating an earlier one is more likely a natural
 # short acknowledgement than the model looping (ADR 0038).
@@ -354,6 +463,12 @@ class SessionOrchestrator:
         self._language_id = persona.language_id
         self._pack = get_pack(persona.language_id)
         self._voice = persona.voice
+        # Only its first name is used, to spot the persona re-introducing
+        # itself ("hier ist Thomas ...") a second time (ADR 0038).
+        self._first_name = persona.name.split()[0].lower() if persona.name else ""
+        # Consecutive turns on which the user asked to hear something again
+        # (ADR 0038): the second one gets a firmer nudge than the first.
+        self._repeat_requests_in_a_row = 0
         # The authenticated caller is not held here: the Session is written by
         # backend/api/session_ws.py, which already has the AuthContext, so the
         # `sub` goes straight from the handshake to `session.subject_id`
@@ -478,13 +593,21 @@ class SessionOrchestrator:
             if turn.user_offset_ms is None:
                 turn.user_offset_ms = ended_ms  # unmeasured: the end is all we know
             closing = _signals_closing(turn.user_text, self._pack)
+            # The user asked to hear something again -- repeating the previous
+            # reply is then the answer, not a loop, but only for the first such
+            # turn in a row; a second re-dump is a loop like any other (ADR 0038).
+            if _asks_to_repeat(turn.user_text, self._pack):
+                self._repeat_requests_in_a_row += 1
+            else:
+                self._repeat_requests_in_a_row = 0
 
-            messages = self._messages
-            if closing:
-                messages = [*messages, {"role": "system", "content": _CLOSING_NUDGE}]
+            messages = self._messages_for_turn(closing)
 
             async with contextlib.aclosing(
-                self._generate_reply(turn, messages, progress, force_end_call=closing)
+                self._generate_reply(
+                    turn, messages, progress, force_end_call=closing,
+                    allow_repetition=self._repeat_requests_in_a_row == 1,
+                )
             ) as replies:
                 async for event in replies:
                     yield event
@@ -497,14 +620,40 @@ class SessionOrchestrator:
         finally:
             acoustics.cancel()  # no-op once awaited; releases the audio otherwise
 
+    def _messages_for_turn(self, closing: bool) -> list[dict[str, str]]:
+        """The history plus this turn's transient nudge -- never stored: the
+        closing push when the user has said goodbye (ADR 0037); a "say it
+        again, reworded shorter" push when the user asked to hear something
+        again (ADR 0038), firmer once they have asked twice; otherwise a
+        standing reminder quoting the persona's own last reply so it does not
+        come back reworded (ADR 0038)."""
+        if closing:
+            nudge = _CLOSING_NUDGE
+        elif self._repeat_requests_in_a_row >= 2:
+            nudge = _CLARIFY_AGAIN_NUDGE
+        elif self._repeat_requests_in_a_row == 1:
+            nudge = _CLARIFY_NUDGE
+        elif self._previous_reply():
+            nudge = _ANTI_REPEAT_NUDGE.format(previous=self._previous_reply())
+        else:
+            return self._messages
+        return [*self._messages, {"role": "system", "content": nudge}]
+
     async def _attempt_reply_with_retry(
-        self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress
+        self,
+        turn: Turn,
+        messages: list[dict[str, str]],
+        progress: _ReplyProgress,
+        guard_reintroduction: bool = False,
     ) -> AsyncIterator[TurnEvent]:
         """One reply attempt plus one retry on an LLM error. Yields the reply's
-        events; yields a Failed event and stops if it can't be delivered."""
+        events; yields a Failed event and stops if it can't be delivered. May
+        raise `_RegenerateReply` before the first audio (ADR 0038)."""
         for llm_attempt in range(2):  # initial attempt + one retry
             try:
-                stream = self._stream_and_synthesize(turn, messages, progress)
+                stream = self._stream_and_synthesize(
+                    turn, messages, progress, guard_reintroduction=guard_reintroduction
+                )
                 async with contextlib.aclosing(stream) as chunks:
                     async for event in chunks:
                         yield event
@@ -520,12 +669,54 @@ class SessionOrchestrator:
                     return
                 turn.persona_text = ""  # retry from scratch
 
-    async def _generate_reply(
-        self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress, force_end_call: bool = False
+    async def _stream_reply_with_regeneration(
+        self,
+        turn: Turn,
+        messages: list[dict[str, str]],
+        progress: _ReplyProgress,
+        force_end_call: bool,
+        allow_repetition: bool,
     ) -> AsyncIterator[TurnEvent]:
-        """Drive one reply attempt plus one retry on an LLM error.
-        Appends the finished reply to history and yields events."""
-        async with contextlib.aclosing(self._attempt_reply_with_retry(turn, messages, progress)) as events:
+        """The reply stream (one LLM attempt plus one retry on error), plus one
+        regeneration if it opened by greeting again (ADR 0038) — caught before
+        any audio, so the restart costs only an extra completion. Exempt: a
+        nudged closing (asked for a fresh goodbye) and a turn where the user
+        asked to hear something again (a greeting may be the answer)."""
+        for regeneration in range(2):  # first pass + one regeneration
+            guard = not force_end_call and not allow_repetition and regeneration == 0
+            try:
+                async with contextlib.aclosing(
+                    self._attempt_reply_with_retry(turn, messages, progress, guard_reintroduction=guard)
+                ) as events:
+                    async for event in events:
+                        yield event
+                return
+            except _RegenerateReply as restart:
+                logger.info(
+                    "Turn %d reply restarted the call (%r); regenerating once",
+                    turn.seq, restart.opening,
+                )
+                messages = [
+                    *messages,
+                    {"role": "system", "content": _REGENERATE_NUDGE.format(opening=restart.opening)},
+                ]
+                # Nothing was spoken, so only the marker flag can have moved.
+                turn.persona_text = ""
+                progress.ends_call = False
+
+    async def _generate_reply(
+        self,
+        turn: Turn,
+        messages: list[dict[str, str]],
+        progress: _ReplyProgress,
+        force_end_call: bool = False,
+        allow_repetition: bool = False,
+    ) -> AsyncIterator[TurnEvent]:
+        """Drive the reply and append the finished text to history, yielding
+        events. Gives up on a `Failed` leg."""
+        async with contextlib.aclosing(
+            self._stream_reply_with_regeneration(turn, messages, progress, force_end_call, allow_repetition)
+        ) as events:
             async for event in events:
                 yield event
                 if isinstance(event, Failed):
@@ -536,12 +727,17 @@ class SessionOrchestrator:
             # Words with no audio behind them (synthesis failed): place them on
             # the timeline as an instant, so the Transcript still reads in order.
             turn.persona_offset_ms = turn.persona_end_ms = self._elapsed_ms()
-        repeated_reply = bool(turn.persona_text) and (
-            self._repeats_last_reply(turn.persona_text) or
-            self._repeats_earlier_reply(turn.persona_text) or
-            _has_repeated_sentence(turn.persona_text)
+        spoke = bool(turn.persona_text)
+        # When the user asked for a repeat, repeating or restating the
+        # *immediately previous* reply is the answer, not a loop -- but a
+        # verbatim repeat of an *older* reply, and a sentence stuttered inside
+        # one reply, still are (ADR 0038).
+        repeated_reply = spoke and (
+            _has_repeated_sentence(turn.persona_text) or
+            self._repeats_earlier_reply(turn.persona_text, exclude_last=allow_repetition) or
+            (not allow_repetition and self._repeats_last_reply(turn.persona_text))
         )
-        restates = bool(turn.persona_text) and self._restates_previous_reply(turn.persona_text)
+        restates = spoke and not allow_repetition and self._restates_previous_reply(turn.persona_text)
         self._messages.append({"role": "assistant", "content": turn.persona_text})
 
         # force_end_call backstops [CALL_END]: a small model won't always
@@ -599,7 +795,7 @@ class SessionOrchestrator:
         whitespace) — the cross-Turn form of `_has_repeated_sentence` (ADR 0038)."""
         return bool(text.strip()) and self._previous_reply().strip().lower() == text.strip().lower()
 
-    def _repeats_earlier_reply(self, text: str) -> bool:
+    def _repeats_earlier_reply(self, text: str, exclude_last: bool = False) -> bool:
         """True if this reply reproduces one the persona gave further back than
         the previous Turn, verbatim modulo case and whitespace — an A-B-A-B
         oscillation, which `_repeats_last_reply` walks straight past because the
@@ -609,14 +805,18 @@ class SessionOrchestrator:
         being a loop, so only substantial ones count here — unlike
         `_repeats_last_reply`, where an exact back-to-back repeat is degenerate
         at any length.
+
+        `exclude_last` drops the immediately previous reply from the search:
+        when the user asked to hear it again, reproducing *that* one is the
+        answer, but reproducing one from further back is still a loop.
         """
         candidate = text.strip().lower()
         if len(candidate) < _MIN_LOOP_REPLY_CHARS:
             return False
-        return any(
-            m["role"] == "assistant" and m["content"].strip().lower() == candidate
-            for m in self._messages
-        )
+        earlier = [m["content"] for m in self._messages if m["role"] == "assistant"]
+        if exclude_last:
+            earlier = earlier[:-1]
+        return any(content.strip().lower() == candidate for content in earlier)
 
     def _restates_previous_reply(self, text: str) -> bool:
         """True if most of this reply was already in its predecessor — the
@@ -631,6 +831,38 @@ class SessionOrchestrator:
         carried = len(set(_long_sentences(self._previous_reply())) & sentences)
         return carried / len(sentences) > _RESTATEMENT_SHARE
 
+    def _assistant_lines(self) -> list[str]:
+        """Every reply the persona has given so far, oldest first. `[0]` is the
+        opening line once it exists; empty on the opening Turn itself."""
+        return [m["content"] for m in self._messages if m["role"] == "assistant"]
+
+    def _reintroduces(self, first_chunk: str) -> bool:
+        """Whether a reply *opens* by greeting or re-introducing after the call
+        is already under way — the model restarting the call instead of
+        continuing it (ADR 0038). Judged on the first chunk, before it is
+        spoken, so `_generate_reply` can regenerate rather than end the call.
+
+        Narrow on purpose: a greeting at the very start of the reply, plus
+        either the persona's own name or the opening's wording carried over.
+        A late "Guten Tag" mirrored back at a user who greeted first is the
+        one legitimate case, and it still costs only a regeneration."""
+        earlier = self._assistant_lines()
+        if not earlier:  # the opening Turn — greeting is correct here
+            return False
+        opener = first_chunk.strip()
+        words = _word_set(opener)
+        if len(words) < _MIN_REINTRO_WORDS:
+            return False
+        if not self._pack.regreeting_re.match(opener):
+            return False
+        # A greeting at the very start of a reply is already the tell; pair it
+        # with the persona naming itself again, or the opening's own wording
+        # carried straight over, so a greeting mirrored back at a late-greeting
+        # user is the only thing that slips through.
+        if self._first_name and self._first_name in words:
+            return True
+        return _word_overlap(opener, earlier[0]) >= _REINTRO_OVERLAP
+
     def note_barge_in(self, played_ms: int | None) -> None:
         """How much of the in-flight reply the client reports it actually played
         before the user cut in. Recorded here rather than passed through the
@@ -638,10 +870,10 @@ class SessionOrchestrator:
         self._barge_in_played_ms = played_ms
 
     def _finalize_interrupted(self, turn: Turn, progress: _ReplyProgress) -> None:
-        """Barge-in cleanup (ADR 0035). Commit only the utterances whose audio
-        finished inside the playback window the client reports it heard, and
-        close the Turn. If nothing was heard in full, discard the reply and
-        leave the Turn open so the next utterance continues the same question.
+        """Barge-in cleanup (ADR 0035). Commit the utterances whose audio the
+        client played through -- in full, or most of the way (`_HEARD_FRACTION`)
+        -- and close the Turn. If nothing was heard, discard the reply and leave
+        the Turn open so the next utterance continues the same question.
 
         "Dispatched as audio" is not "heard": the server streams chunks ahead of
         playback and the client cuts the current one off mid-word, so committing
@@ -663,23 +895,46 @@ class SessionOrchestrator:
 
     @staticmethod
     def _heard_text(progress: _ReplyProgress, played_ms: int | None) -> str:
-        """The reply text the client actually heard: the last chunk checkpoint
-        whose audio finished within `played_ms`. `None` — an older client that
-        sends no position — falls back to every chunk that was dispatched."""
+        """The reply text the client actually heard: the checkpoint text of the
+        last chunk whose audio the client played to its end, or at least
+        `_HEARD_FRACTION` of the way through (checkpoints carry the *cumulative*
+        audio length, so consecutive ones bracket each chunk). `None` — an older
+        client that sends no position — falls back to every dispatched chunk."""
         if played_ms is None:
             return progress.spoken_text.strip()
+        budget = played_ms + _BARGE_IN_GRACE_MS
         heard = ""
-        for audio_ms, text in progress.checkpoints:
-            if audio_ms <= played_ms + _BARGE_IN_GRACE_MS:
+        chunk_start = 0
+        for chunk_end, text in progress.checkpoints:
+            got_enough = chunk_end - chunk_start > 0 and (
+                budget >= chunk_start + _HEARD_FRACTION * (chunk_end - chunk_start)
+            )
+            if chunk_end <= budget or got_enough:
                 heard = text
+            chunk_start = chunk_end
         return heard
 
     async def _stream_and_synthesize(
-        self, turn: Turn, messages: list[dict[str, str]], progress: _ReplyProgress
+        self,
+        turn: Turn,
+        messages: list[dict[str, str]],
+        progress: _ReplyProgress,
+        guard_reintroduction: bool = False,
     ) -> AsyncIterator[TurnEvent]:
         """Stream one LLM completion; feed each sentence-sized chunk to TTS and
-        forward its audio sub-chunks to the client as they are generated."""
+        forward its audio sub-chunks to the client as they are generated.
+
+        When `guard_reintroduction` is set, the first chunk is checked against
+        the call so far *before* it is synthesized: a reply opening with a
+        fresh greeting raises `_RegenerateReply` here, and no audio goes out
+        (ADR 0038)."""
+        first_chunk = guard_reintroduction
         async for text_chunk in sentence_chunks(llm.stream_reply(messages)):
+            if first_chunk:
+                first_chunk = False
+                if self._reintroduces(text_chunk):
+                    raise _RegenerateReply(_first_sentence(text_chunk))
+
             text_chunk = _strip_end_marker(text_chunk, progress)
             text_chunk = _strip_foreign_script(text_chunk)
 

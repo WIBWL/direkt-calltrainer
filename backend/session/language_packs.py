@@ -9,6 +9,13 @@ keyed by the Persona's `language_id`:
   demonstrate the wrong thing.
 * `farewell_re` / `postpone_re` (ADR 0037) are matched against the *user's*
   transcribed speech, which is in the Persona's language, not English.
+* `regreeting_re` (ADR 0038) is matched against the *Persona's* own reply, to
+  catch it greeting or re-introducing itself after the call is already under
+  way -- a greeting is a phrase in the spoken language, not English.
+* `repeat_request_re` (ADR 0038) is matched against the *user's* speech: when
+  the user asks the persona to say something again ("wer sind Sie nochmal?",
+  "können Sie das wiederholen?"), repeating is the right answer, so that turn
+  is exempt from every repetition guard.
 * `fallback_closing_line` (ADR 0038) is spoken aloud to the user.
 * `user_closing_examples` / `vague_reassurance_examples` quote phrases the
   *user* would say, so they only help the model recognise them if they are in
@@ -41,6 +48,15 @@ class LanguagePack:
     vague_reassurance_examples: str
     farewell_re: re.Pattern[str]
     postpone_re: re.Pattern[str]
+    # Matched against the start of the Persona's own reply: the small model
+    # tends to restart the call from the top -- greeting again, name again --
+    # when it has run low on new things to say (ADR 0038). Anchored, because it
+    # is only a re-introduction when it is the *opening* of the reply.
+    regreeting_re: re.Pattern[str]
+    # Matched against the user's speech: an explicit "say that again" / "who
+    # are you?" makes repeating the correct move, so the turn is exempt from
+    # the repetition guards (ADR 0038).
+    repeat_request_re: re.Pattern[str]
     fallback_closing_line: str
 
 
@@ -90,6 +106,21 @@ _GERMAN = LanguagePack(
         r"muss (jetzt |gleich )?(auflegen|los|schluss machen)|gespräch (beenden|abbrechen))",
         re.IGNORECASE,
     ),
+    regreeting_re=re.compile(
+        r"^[\s\"'>-]*(guten (tag|morgen|abend)|hallo|hi\b|servus|moin|"
+        r"grüß (gott|dich)|sch(ö|oe)nen guten tag)",
+        re.IGNORECASE,
+    ),
+    repeat_request_re=re.compile(
+        r"(wie bitte\b|wer sind sie|wer war das\b|wer spricht|"
+        r"wie (war|ist) (ihr|der) name|(ihren|den) namen\b.*(nochmal|noch mal|wiederhol)|"
+        r"(nochmal|noch mal|noch einmal)\b.*(sagen|wiederhol|langsam)|"
+        r"(sag|sagen sie( mir)?|sprechen sie)\b.*(nochmal|noch mal|noch einmal|langsamer)|"
+        r"wiederholen sie|können sie das (bitte )?(nochmal |noch mal )?wiederhol|"
+        r"nicht (ganz |richtig |gut |so )?(verstanden|verstehen|mitbekommen|gehört|mitgekriegt)|"
+        r"schlecht (zu )?(verstehen|verstanden|hören))",
+        re.IGNORECASE,
+    ),
     fallback_closing_line="Vielen Dank für Ihre Zeit. Auf Wiederhören.",
 )
 
@@ -136,6 +167,20 @@ _ENGLISH = LanguagePack(
         r"no time (right now|at the moment|today)|"
         r"(have|need) to (go|run|hang up|dash)|wrap (this |it )?up|"
         r"end (the|this) call)",
+        re.IGNORECASE,
+    ),
+    regreeting_re=re.compile(
+        r"^[\s\"'>-]*(hello\b|hi\b|hey\b|good (morning|afternoon|evening)|"
+        r"good day)",
+        re.IGNORECASE,
+    ),
+    repeat_request_re=re.compile(
+        r"(pardon\b|sorry,? what|come again|say (that|it) again|"
+        r"who (are|is) (you|this|that)\b|who am i speaking|"
+        r"what('?s| is| was) your name( again)?|"
+        r"(could|can) you (please )?repeat|repeat (that|it)|(one|once) more time|"
+        r"(did|could)n'?t (quite )?(catch|hear|get) (that|you|what)|"
+        r"missed (that|what you said))",
         re.IGNORECASE,
     ),
     fallback_closing_line="Thank you for your time. Goodbye.",

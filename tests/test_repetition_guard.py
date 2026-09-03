@@ -1,4 +1,5 @@
-"""Degenerate-repetition guard and guaranteed closing line.
+"""Degenerate-repetition guard, re-introduction regeneration, and the
+guaranteed closing line.
 
 Covers ADR 0038:
   * a reply that repeats any earlier persona message (not just the
@@ -17,12 +18,17 @@ Covers ADR 0038:
     whole-reply check. It is a share of the reply and not a count of
     sentences, so a caller quoting one figure again while moving the call on
     is left alone.
+
+  * a reply that *opens* by greeting or re-introducing after the call is
+    under way is caught on its first chunk, before any audio, and the model
+    is re-asked once with an explicit nudge -- the call carries on rather
+    than ending, because the reply was never spoken.
 """
 
 import pytest
 
 from backend.session.language_packs import get_pack
-from backend.session.orchestrator import SessionOrchestrator, _has_repeated_sentence
+from backend.session.orchestrator import SessionOrchestrator, _asks_to_repeat, _has_repeated_sentence
 from tests.conftest import audio_chunks, collect, completed, states
 
 FALLBACK_LINE = get_pack("de").fallback_closing_line
@@ -43,7 +49,12 @@ OPENING = (
     "Guten Tag, hier ist Thomas Brandt, Geschaeftsfuehrer einer mittelstaendischen Firma. "
     "Ich rufe an wegen der Kosten fuer das Insight-Analytics-Paket."
 )
-ELABORATION = f"{OPENING} {FACTS} Wir denken inzwischen ernsthaft ueber eine Kuendigung nach."
+# Expands on the opening -- repeats its subject and one figure -- but does not
+# greet or name himself again, so the re-introduction guard leaves it alone.
+ELABORATION = (
+    "Es geht mir um die Kosten fuer das Insight-Analytics-Paket. "
+    f"{FACTS} Wir denken inzwischen ernsthaft ueber eine Kuendigung nach."
+)
 
 # pylint: disable=missing-function-docstring
 
@@ -158,12 +169,14 @@ async def test_a_reply_that_mostly_restates_its_predecessor_ends_the_call(
     assert "listening" not in states(events)
 
 
-async def test_repeating_the_opening_while_moving_on_does_not_end_the_call(
+async def test_expanding_on_the_opening_without_re_greeting_does_not_end_the_call(
     persona, scenario, fake_pipeline
 ):
     """The regression a share replaced a sentence count for: asked what he
-    wants, the caller repeats his opening and then says several new things.
-    That is the right answer to the question, not a loop."""
+    wants, the caller restates his subject and one figure and then says
+    several new things. That is the right answer to the question, not a loop,
+    and -- because he does not greet or name himself again -- not a
+    re-introduction either."""
     fake_pipeline.stt.transcripts = ["Was gibt es denn?", "Und was brauchen Sie von mir?"]
     fake_pipeline.llm.replies = [OPENING, ELABORATION]
 
@@ -172,6 +185,175 @@ async def test_repeating_the_opening_while_moving_on_does_not_end_the_call(
     events = await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
 
     assert completed(events).ends_call is False
+    # spoken as-is, not regenerated away
+    assert orch.turns[-1].persona_text == ELABORATION
+    assert len(fake_pipeline.llm.calls) == 2
+
+
+async def test_a_reply_that_opens_by_greeting_again_is_regenerated(persona, scenario, fake_pipeline):
+    """ADR 0038: the persona restarting the call from the top -- greeting
+    again, name again -- is caught on the first chunk and the model is
+    re-asked, before any of that greeting is synthesised."""
+    regreet = "Guten Tag, hier ist Thomas Brandt. Es geht um unseren Vertrag und die Kosten."
+    clean = "Die laufenden Kosten sind zu hoch, wir zahlen jeden Monat deutlich zu viel."
+    fake_pipeline.stt.transcripts = ["Guten Tag, wie kann ich helfen?"]
+    fake_pipeline.llm.replies = [
+        "Guten Tag, ich bin Thomas Brandt. Ich habe eine Frage zu unserem Vertrag.",  # opening
+        regreet,                                                                     # -> regenerate
+        clean,                                                                       # the retry
+    ]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_opening_turn())
+    events = await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+
+    spoken = b"".join(c.audio for c in audio_chunks(events))
+    assert b"hier ist Thomas Brandt" not in spoken  # the re-greeting never went out
+    assert clean.encode("utf-8") in spoken
+    assert orch.turns[-1].persona_text == clean
+    assert orch._messages[-1] == {"role": "assistant", "content": clean}  # pylint: disable=protected-access
+    assert len(fake_pipeline.llm.calls) == 3
+    assert completed(events).ends_call is False
+
+
+async def test_the_regeneration_nudge_quotes_the_rejected_opening(persona, scenario, fake_pipeline):
+    """The retry is given the greeting it must steer away from, verbatim."""
+    fake_pipeline.stt.transcripts = ["Guten Tag."]
+    fake_pipeline.llm.replies = [
+        "Guten Tag, ich bin Thomas Brandt. Es geht um den Vertrag.",   # opening
+        "Guten Tag, Thomas Brandt hier. Der Vertrag laeuft schlecht.",  # -> regenerate
+        "Der Vertrag laeuft aus dem Ruder, das muss sich aendern.",     # retry
+    ]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_opening_turn())
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+
+    retry_messages = fake_pipeline.llm.calls[-1]
+    assert any(
+        m["role"] == "system" and "Guten Tag, Thomas Brandt hier." in m["content"]
+        for m in retry_messages
+    )
+
+
+async def test_a_normal_turn_carries_a_nudge_quoting_the_previous_reply(persona, scenario, fake_pipeline):
+    """ADR 0038: every turn past the opening reminds the model of its own last
+    reply, so a reworded repeat is discouraged before it is generated."""
+    fake_pipeline.stt.transcripts = ["Und wie stellen Sie sich das vor?"]
+    fake_pipeline.llm.replies = [
+        "Ich moechte eine konkrete Zusage zum Preis, keine allgemeine Auskunft.",  # opening
+        "Also, konkret waere mir eine feste Zahl bis Freitag wichtig.",
+    ]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_opening_turn())
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+
+    sent = fake_pipeline.llm.calls[-1]
+    assert any(
+        m["role"] == "system" and "konkrete Zusage zum Preis" in m["content"]
+        for m in sent
+    )
+
+
+@pytest.mark.parametrize(
+    "text,pack_id,expected",
+    [
+        ("Verzeihung, wer sind Sie nochmals? Das habe ich nicht verstanden.", "de", True),
+        ("Wie war Ihr Name?", "de", True),
+        ("Können Sie das bitte wiederholen?", "de", True),
+        ("Sagen Sie das nochmal, bitte.", "de", True),
+        ("Wie bitte?", "de", True),
+        ("Ich schaue da nochmal in unser System.", "de", False),
+        ("Warum kostet das so viel?", "de", False),
+        ("Sorry, who are you again?", "en", True),
+        ("Could you repeat that?", "en", True),
+        ("I didn't catch that.", "en", True),
+        ("Let me check once more on my side.", "en", False),
+    ],
+)
+def test_asks_to_repeat_recognises_requests_for_a_repeat(text, pack_id, expected):
+    assert _asks_to_repeat(text, get_pack(pack_id)) is expected
+
+
+async def test_a_repeat_the_user_asked_for_does_not_end_the_call(persona, scenario, fake_pipeline):
+    """ADR 0038: 'wer sind Sie nochmal?' makes repeating the introduction the
+    right answer — the re-introduction guard, the verbatim check and the
+    restatement check all stand down for the immediately previous reply, and
+    the call carries on."""
+    intro = "Guten Tag, ich bin Thomas Brandt aus der Geschaeftsleitung. Es geht um den Vertrag."
+    fake_pipeline.stt.transcripts = ["Verzeihung, wer sind Sie nochmal? Das habe ich nicht verstanden."]
+    fake_pipeline.llm.replies = [intro, intro]  # opening, then the same again on request
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_opening_turn())
+    events = await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+
+    assert completed(events).ends_call is False
+    assert "listening" in states(events)
+    assert b"Thomas Brandt" in b"".join(c.audio for c in audio_chunks(events))  # re-introduced, not suppressed
+    assert len(fake_pipeline.llm.calls) == 2  # not regenerated
+
+
+async def test_a_requested_repeat_swaps_the_anti_repeat_nudge_for_a_clarify_nudge(
+    persona, scenario, fake_pipeline
+):
+    """The standing 'say something different' reminder would fight the user's
+    request; it is replaced by 'say it again, reworded shorter'."""
+    fake_pipeline.stt.transcripts = ["Wie war Ihr Name nochmal?"]
+    fake_pipeline.llm.replies = ["Mein Name ist Thomas Brandt.", "Thomas Brandt, gerne nochmal."]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_opening_turn())
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+
+    systems = [m["content"] for m in fake_pipeline.llm.calls[-1] if m["role"] == "system"]
+    assert not any("previous reply in this call" in s for s in systems)
+    assert any("did not catch your previous reply" in s for s in systems)
+
+
+async def test_asking_again_after_a_rephrase_gets_a_firmer_nudge(persona, scenario, fake_pipeline):
+    """A third rendering of the same content does not help — the persona is
+    told to ask what is unclear or move on."""
+    fake_pipeline.stt.transcripts = [
+        "Was haben Sie gesagt? Nicht verstanden.",
+        "Nochmal bitte, ich hab es wieder nicht mitbekommen.",
+    ]
+    fake_pipeline.llm.replies = [
+        "Der Preis ist zu hoch, wir zahlen jeden Monat achtzehnhundert Euro dafuer.",  # opening
+        "Der Preis ist zu hoch, monatlich achtzehnhundert Euro.",
+        "Achtzehnhundert Euro im Monat, das ist zu viel.",
+    ]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_opening_turn())
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+    await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
+
+    systems = [m["content"] for m in fake_pipeline.llm.calls[-1] if m["role"] == "system"]
+    assert any("Ask which part is unclear" in s for s in systems)
+
+
+async def test_re_dumping_an_older_reply_ends_the_call_even_when_a_repeat_was_asked(
+    persona, scenario, fake_pipeline
+):
+    """The exemption covers the *immediately previous* reply only: parroting one
+    from further back verbatim is still the loop the guard is for."""
+    a = "Ich brauche eine feste Zusage zum Preis, bitte eine konkrete Zahl mit Datum."
+    b = "Also gut, dann warte ich noch kurz auf Ihre Rueckmeldung dazu."
+    fake_pipeline.stt.transcripts = [
+        "Worum ging es?",
+        "Und was war Ihr Anliegen?",
+        "Sorry, was haben Sie da gesagt? Nicht verstanden.",
+    ]
+    fake_pipeline.llm.replies = [a, b, a]  # turn 3 re-dumps turn 1 verbatim
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_turn(b"1", "turn.webm", "audio/webm"))
+    await collect(orch.run_turn(b"2", "turn.webm", "audio/webm"))
+    events = await collect(orch.run_turn(b"3", "turn.webm", "audio/webm"))
+
+    assert completed(events).ends_call is True
 
 
 async def test_a_reply_of_pure_filler_ends_nothing(persona, scenario, fake_pipeline):

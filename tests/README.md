@@ -38,7 +38,7 @@ source of that content, and which imports without a database.
 | Live session loop & state model | F-46, F-01, F-12, F-52, R-52, ADR 0033 | `test_session_pipeline.py` |
 | Streaming TTS chunking | ADR 0033 | `test_chunking.py` |
 | Closing-intent detection (both language packs) | ADR 0037, ADR 0043, F-01 | `test_closing_intent.py` |
-| Repetition guard + guaranteed sign-off | ADR 0038, ADR 0043 | `test_repetition_guard.py` |
+| Repetition guard, re-introduction regeneration + guaranteed sign-off | ADR 0038, ADR 0043 | `test_repetition_guard.py` |
 | `[CALL_END]` marker + foreign-script scrub | ADR 0033 | `test_call_end_marker.py` |
 | Barge-in / eager interruption | ADR 0035 | `test_barge_in.py` |
 | Pipeline fault tolerance (retry → graceful end) | ADR 0016, ADR 0033 | `test_pipeline_failure.py` |
