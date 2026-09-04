@@ -155,6 +155,10 @@ def _build_system_prompt(persona: Persona, scenario: Scenario, pack: LanguagePac
         "other way around: never ask the user what their question or "
         "problem is, and never wait for them to explain why they're "
         "calling — you're the one with something to discuss.\n"
+        "You are also not the one who solves this: ideas, offers and remedies "
+        "come from the user. Your side of the call is to say what you need, "
+        "judge what you are offered, and press for what is still missing — "
+        "never to put the solution forward yourself.\n"
         f"Context of the call: {scenario.description}\n"
         f"{_case_block(scenario)}"
         f"Your name: {persona.name}. Introduce yourself by that name and "
@@ -245,13 +249,24 @@ _CLOSING_NUDGE = (
 # stop a 4B model re-emitting a whole reply when the call stalls, and the
 # system prompt's standing "never repeat yourself" is too far up-context to
 # bite -- quoting the actual previous reply right before the model answers is
-# what measurably moves it.
+# what measurably moves it. The same asymmetry applies to the role: the
+# standing rule sits in the system prompt and fades, while this nudge is what
+# demands something new every turn -- and the newest material in context is
+# whatever the user has just put on the table, so the cheapest way to comply is
+# to hand that back as the persona's own contribution. Observed: the persona
+# adopts the user's proposal, endorses it, then re-presents it as its own
+# solution. Only the concrete move is named here; the standing "you are not the
+# one who solves this" belongs in the system prompt, where it is paid once.
 _ANTI_REPEAT_NUDGE = (
     'Your previous reply in this call was:\n"{previous}"\n'
     "Say something genuinely different now: react to what the user just said, "
     "press a point you have not pressed yet, give ground, or ask a new "
-    "question — in new words. Do not repeat or reword that reply, and do not "
-    "greet or introduce yourself again."
+    "question about your own concern — in new words. Do not repeat or reword "
+    "that reply, and do not greet or introduce yourself again.\n"
+    "If the user has just put something on the table, respond to it — take "
+    "it, press it for the specifics it is still missing, or say why it falls "
+    "short — but never put that same offer forward yourself as though it "
+    "were your own idea."
 )
 
 # Sent when a reply was caught opening with a greeting again and is being
