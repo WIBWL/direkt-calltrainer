@@ -133,63 +133,81 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reconnecting on every callback identity change would tear down the call
   }, [session]);
 
-  const sendTurnAudio = useCallback((blob: Blob, mimeType: string) => {
+  /** The socket, but only while it can actually carry a message. */
+  const openSocket = useCallback(() => {
     const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      console.warn("[WS] dropped turn audio: socket not open", ws?.readyState);
-      return;
-    }
-    turnSeqRef.current += 1;
-    console.debug("[WS] -> turn.audio.meta", { turn_seq: turnSeqRef.current, size: blob.size, mimeType });
-    const meta: ClientMessage = { type: "turn.audio.meta", turn_seq: turnSeqRef.current, mime_type: mimeType };
-    ws.send(JSON.stringify(meta));
-    void blob.arrayBuffer().then((buf) => ws.send(buf));
+    return ws && ws.readyState === WebSocket.OPEN ? ws : null;
   }, []);
+
+  /** Sends one JSON control message. Reports whether it went out rather than
+   * calling that a loss: a caller with a fallback for a closed socket
+   * (endSession) takes it, so only the caller knows what a `false` means. */
+  const send = useCallback(
+    (message: ClientMessage): boolean => {
+      const ws = openSocket();
+      if (!ws) {
+        console.debug("[WS] not sent, socket not open", wsRef.current?.readyState, message);
+        return false;
+      }
+      console.debug("[WS] ->", message);
+      ws.send(JSON.stringify(message));
+      return true;
+    },
+    [openSocket],
+  );
+
+  /** One recorded Turn: the meta message and the audio it describes, in that
+   * order and on the same socket (ADR 0033). */
+  const sendTurnAudio = useCallback(
+    (blob: Blob, mimeType: string) => {
+      const ws = openSocket();
+      if (!ws) {
+        console.warn("[WS] dropped turn audio: socket not open", wsRef.current?.readyState);
+        return;
+      }
+      turnSeqRef.current += 1;
+      const meta: ClientMessage = {
+        type: "turn.audio.meta",
+        turn_seq: turnSeqRef.current,
+        mime_type: mimeType,
+      };
+      console.debug("[WS] ->", { ...meta, size: blob.size });
+      ws.send(JSON.stringify(meta));
+      void blob.arrayBuffer().then((buf) => ws.send(buf));
+    },
+    [openSocket],
+  );
 
   /** Tells the server to stop the in-flight Turn (a user barge-in) and
    * optimistically flips local state to "listening" right away. `playedMs` is
    * how much of the persona's reply actually played before the cut-in, so the
    * server commits only what was heard to the history (ADR 0035). */
-  const sendInterrupt = useCallback((playedMs: number) => {
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    console.debug("[WS] -> turn.interrupt", { playedMs });
-    const interrupt: ClientMessage = {
-      type: "turn.interrupt",
-      played_ms: Math.max(0, Math.round(playedMs)),
-    };
-    ws.send(JSON.stringify(interrupt));
-    setCallState("listening");
-  }, []);
+  const sendInterrupt = useCallback(
+    (playedMs: number) => {
+      const sent = send({ type: "turn.interrupt", played_ms: Math.max(0, Math.round(playedMs)) });
+      if (sent) setCallState("listening");
+    },
+    [send],
+  );
 
   /** Marks t=0 on the Session's timeline: the opening line starts playing now. */
   const sendActivate = useCallback(() => {
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    console.debug("[WS] -> session.activate");
-    const activate: ClientMessage = { type: "session.activate" };
-    ws.send(JSON.stringify(activate));
-  }, []);
+    send({ type: "session.activate" });
+  }, [send]);
 
   const endSession = useCallback(() => {
+    if (send({ type: "session.end" })) return;
+    // The handshake never finished, so the server will never send
+    // session.ended — end locally instead, so "Anruf beenden" always works,
+    // even in the brief window before the connection is established.
     const ws = wsRef.current;
-    if (!ws) return;
-    if (ws.readyState === WebSocket.OPEN) {
-      const end: ClientMessage = { type: "session.end" };
-      ws.send(JSON.stringify(end));
-      return;
-    }
-    if (ws.readyState === WebSocket.CONNECTING) {
-      // The handshake never finished, so the server will never send
-      // session.ended — end locally instead, so "Anruf beenden" always works,
-      // even in the brief window before the connection is established.
-      console.debug("[WS] ending before connection was established");
-      ws.close();
-      // No handshake means no Session was ever created, let alone persisted,
-      // so there is no id and no Feedback to wait for.
-      onEnded("user", [], null);
-    }
-  }, [onEnded]);
+    if (ws?.readyState !== WebSocket.CONNECTING) return;
+    console.debug("[WS] ending before connection was established");
+    ws.close();
+    // No handshake means no Session was ever created, let alone persisted,
+    // so there is no id and no Feedback to wait for.
+    onEnded("user", [], null);
+  }, [send, onEnded]);
 
   return { callState, error, sendTurnAudio, sendInterrupt, sendActivate, endSession };
 }

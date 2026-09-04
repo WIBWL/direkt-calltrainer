@@ -432,44 +432,6 @@ h2 {
   margin-bottom: 0;
 }
 
-/* The language a Persona speaks. Read-only on purpose: it follows from the
-   Persona and is not a choice of its own (ADR 0043). */
-.language-badge {
-  align-self: flex-start;
-  margin-top: 0.15rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0.1rem 0.55rem;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-}
-
-label.upload {
-  display: block;
-  border: 2px dashed var(--border);
-  border-radius: 20px;
-  padding: 2.5rem 1.5rem;
-  text-align: center;
-  cursor: pointer;
-  color: var(--text-muted);
-  background: #fff;
-  transition: border-color 0.2s, color 0.2s;
-}
-
-label.upload:hover {
-  border-color: var(--blue-light);
-  color: var(--navy-light);
-}
-
-label.upload.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-input[type="file"] {
-  display: none;
-}
-
 #status {
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.8rem;
@@ -489,10 +451,6 @@ input[type="file"] {
   color: var(--danger);
 }
 
-#status.success {
-  color: var(--success);
-}
-
 .card {
   background: #fff;
   border: 1px solid var(--border);
@@ -504,11 +462,6 @@ input[type="file"] {
 .card p {
   margin: 0;
   line-height: 1.5;
-}
-
-audio {
-  width: 100%;
-  border-radius: 999px;
 }
 
 .start-call-button,

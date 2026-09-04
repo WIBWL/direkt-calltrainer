@@ -1,6 +1,7 @@
 import type React from "react";
 
 import type { TranscriptEntry } from "../protocol";
+import { formatOffset } from "../utils/time";
 
 interface TranscriptViewProps {
   transcript: TranscriptEntry[];
@@ -9,12 +10,6 @@ interface TranscriptViewProps {
   /** The AI-generated wrap-up, shown above the log. Passed in rather than
    * fetched here, so this component stays the plain Transcript it is. */
   feedback?: React.ReactNode;
-}
-
-/** A position on the Session's timeline, as mm:ss. */
-function timestamp(offsetMs: number): string {
-  const seconds = Math.round(offsetMs / 1000);
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 /** The plain, unannotated post-call log of what was said (see CONTEXT.md's
@@ -45,7 +40,7 @@ export default function TranscriptView({
         <div className="card">
           {transcript.map((entry, i) => (
             <p className="transcript-line" key={i}>
-              <span className="transcript-time">{timestamp(entry.offset_ms)}</span>
+              <span className="transcript-time">{formatOffset(entry.offset_ms)}</span>
               <span>
                 <strong>{entry.sprecher === "nutzer" ? "Du" : personaName}:</strong> {entry.text}
               </span>

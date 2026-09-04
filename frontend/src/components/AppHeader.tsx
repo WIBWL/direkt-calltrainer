@@ -1,3 +1,5 @@
+import { cx } from "../utils/cx";
+
 // The header uses the current screen to highlight the matching training step.
 export type TrainingStep = "prepare" | "call" | "feedback";
 
@@ -6,10 +8,7 @@ interface AppHeaderProps {
 }
 
 // Keeping the step configuration here avoids duplicating the markup.
-const trainingSteps: Array<{
-  id: TrainingStep;
-  label: string;
-}> = [
+const trainingSteps: { id: TrainingStep; label: string }[] = [
   { id: "prepare", label: "Vorbereiten" },
   { id: "call", label: "Gespräch" },
   { id: "feedback", label: "Feedback" },
@@ -39,13 +38,11 @@ export default function AppHeader({ activeStep }: AppHeaderProps) {
             return (
               <li
                 key={step.id}
-                className={[
+                className={cx(
                   "training-progress-step",
-                  isActive ? "is-active" : "",
-                  isComplete ? "is-complete" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
+                  isActive && "is-active",
+                  isComplete && "is-complete",
+                )}
                 aria-current={isActive ? "step" : undefined}
               >
                 <span className="training-progress-number">{index + 1}</span>

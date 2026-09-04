@@ -16,6 +16,25 @@ export interface TranscriptEntry {
   offset_ms: number;
 }
 
+// --- Setup lists (GET /api/personas, GET /api/scenarios, backend/app.py) ---
+// Display fields only: the prompt text the model reads stays on the server.
+
+export interface Persona {
+  id: string;
+  name: string;
+  role: string;
+  // A Persona speaks exactly one language and the user cannot change it
+  // (ADR 0043), so the card has to say which one it is.
+  language: string;
+}
+
+export interface Scenario {
+  id: string;
+  name: string;
+  // The short teaser, not the call context the model gets.
+  short_description: string;
+}
+
 // --- Client -> Server ---
 
 /** First frame after the socket opens: names the Session and carries the token. */

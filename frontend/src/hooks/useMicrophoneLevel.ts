@@ -1,40 +1,42 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useAudioLevelMeter } from "./useAudioLevelMeter";
+
 /**
  * Measures the input level of the active microphone independently of the
- * conversation VAD used during a real training session.
+ * conversation VAD used during a real training session. The metering itself
+ * is shared with persona playback (see useAudioLevelMeter); what this hook
+ * owns is the capture stream behind it.
  */
 export function useMicrophoneLevel() {
-  const [level, setLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   // Browsers expose the device label only after microphone permission was granted.
   const [deviceLabel, setDeviceLabel] = useState<string | null>(null);
 
+  const { level, start: startMeter, stop: stopMeter } = useAudioLevelMeter();
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const rafRef = useRef<number | null>(null);
 
-  const poll = useCallback(() => {
-    const analyser = analyserRef.current;
-    if (!analyser) return;
+  const stop = useCallback(() => {
+    stopMeter();
 
-    const data = new Uint8Array(analyser.fftSize);
-    analyser.getByteTimeDomainData(data);
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
 
-    let sumSquares = 0;
+    audioContextRef.current?.close();
+    audioContextRef.current = null;
 
-    for (const sample of data) {
-      const normalized = (sample - 128) / 128;
-      sumSquares += normalized * normalized;
-    }
+    // The last device label stays visible after the completed test.
+  }, [stopMeter]);
 
-    setLevel(Math.sqrt(sumSquares / data.length));
-    rafRef.current = requestAnimationFrame(poll);
-  }, []);
+  /** Opens the microphone and starts metering it. Reports whether that worked,
+   * so the caller can show the failure as a state of its own instead of
+   * waiting for a level that is never going to arrive. */
+  const start = useCallback(async (): Promise<boolean> => {
+    stop(); // a retry must not leave the previous stream open
+    setError(null);
 
-  const start = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -45,32 +47,18 @@ export function useMicrophoneLevel() {
       const ctx = new AudioContext();
       audioContextRef.current = ctx;
 
-      const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 1024;
-      source.connect(analyser);
-      analyserRef.current = analyser;
+      ctx.createMediaStreamSource(stream).connect(analyser);
 
-      poll();
+      startMeter(analyser);
+      return true;
     } catch (e) {
+      stop(); // the failure may have come after getUserMedia handed over a live stream
       setError(e instanceof Error ? e.message : String(e));
+      return false;
     }
-  }, [poll]);
-
-  const stop = useCallback(() => {
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    rafRef.current = null;
-
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-
-    audioContextRef.current?.close();
-    audioContextRef.current = null;
-    analyserRef.current = null;
-
-    // Keep the last device label visible after the completed test.
-    setLevel(0);
-  }, []);
+  }, [startMeter, stop]);
 
   useEffect(() => stop, [stop]);
 
