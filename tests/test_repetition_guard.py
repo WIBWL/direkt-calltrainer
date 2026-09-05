@@ -30,6 +30,7 @@ import pytest
 from backend.session.language_packs import get_pack
 from backend.session.orchestrator import SessionOrchestrator, _asks_to_repeat
 from backend.session.repetition import has_repeated_sentence as _has_repeated_sentence
+from backend.session.repetition import restates
 from tests.conftest import audio_chunks, collect, completed, states
 
 FALLBACK_LINE = get_pack("de").fallback_closing_line
@@ -71,6 +72,35 @@ ELABORATION = (
 )
 def test_has_repeated_sentence(text, expected):
     assert _has_repeated_sentence(text) is expected
+
+
+_FACT = "Wir wurden im März doppelt belastet, einmal am dritten und einmal am siebzehnten."
+_AMOUNT = "Der Betrag lag bei vierhundertachtzig Euro pro Abbuchung."
+_DEADLINE = "Ich erwarte, dass Sie das bis Ende der Woche korrigieren."
+
+
+@pytest.mark.parametrize(
+    "previous, reply",
+    [
+        # One long sentence, carried over. As a *share* that is 100%, but a
+        # share of one is not a share -- it is "has this been said before",
+        # and saying a figure again because the user asked about it is what a
+        # caller does.
+        (f"{_FACT} {_AMOUNT} {_DEADLINE}", f"Ganz genau. {_AMOUNT}"),
+        (f"{_FACT} {_AMOUNT} {_DEADLINE}", _FACT),
+    ],
+)
+def test_a_single_carried_sentence_is_not_a_restatement(previous, reply):
+    """The guard ends the call, so its strictness must not depend on how many
+    sentences the reply happens to have. It used to: one carried sentence out
+    of one condemned a short confirmation, while the same sentence inside a
+    four-sentence reply was fine."""
+    assert restates(reply, previous) is False
+
+
+def test_a_reply_that_is_mostly_its_predecessor_still_ends_the_call():
+    """The case the guard exists for is untouched by the above."""
+    assert restates(f"{_FACT} {_AMOUNT}", f"{_FACT} {_AMOUNT} {_DEADLINE}") is True
 
 
 async def test_reply_repeating_the_previous_reply_ends_the_call(persona, scenario, fake_pipeline):

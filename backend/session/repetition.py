@@ -47,6 +47,14 @@ MIN_SENTENCE_LEN = 15
 # cases sit at 25% and 80%.
 RESTATEMENT_SHARE = 0.5
 
+# ...and a share needs more than one sentence to be a share *of*. With exactly
+# one the test degenerates into "has this sentence been said before", which
+# condemns a short confirmation — "Ganz genau. Der Betrag lag bei 480 Euro." is
+# one long sentence, carried over, and ended the call. A reply that really has
+# shrunk to one repeated sentence is caught on the next Turn by
+# `_repeats_last_reply`, which is the cheap direction of the same trade.
+MIN_RESTATEMENT_SENTENCES = 2
+
 
 def first_sentence(text: str) -> str:
     """The first sentence of a chunk of text, for comparing openings."""
@@ -85,10 +93,11 @@ def restates(text: str, previous: str) -> bool:
 
     A share of the reply, not a count of sentences: repeating one figure while
     adding new content is a real caller, repeating four fifths of the last reply
-    is the loop the guard is for.
+    is the loop the guard is for. Below `MIN_RESTATEMENT_SENTENCES` there is no
+    share to take, so the reply is left alone.
     """
     sentences = set(long_sentences(text))
-    if not sentences:
+    if len(sentences) < MIN_RESTATEMENT_SENTENCES:
         return False
     carried = len(set(long_sentences(previous)) & sentences)
     return carried / len(sentences) > RESTATEMENT_SHARE
