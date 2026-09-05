@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session as DbSession
@@ -81,7 +81,7 @@ async def _generate(session_id: int) -> None:
         session = db.get(db_models.Session, session_id)
         if session is None:
             raise LookupError(f"Session {session_id} does not exist")
-        _mark(db, session_id, "running")
+        _mark(db, session_id, db_models.JOB_RUNNING)
         dossier, valid_turns = _dossier(session)
         language = _LANGUAGE_NAMES_EN.get(session.language_code, session.language_code)
 
@@ -90,12 +90,12 @@ async def _generate(session_id: int) -> None:
     except Exception as e:
         logger.exception("Feedback generation failed for session %d", session_id)
         with session_scope() as db:
-            _mark(db, session_id, "failed", str(e))
+            _mark(db, session_id, db_models.JOB_FAILED, str(e))
         raise
 
     with session_scope() as db:
         _store(db, session_id, wrapup, valid_turns)
-        _mark(db, session_id, "done")
+        _mark(db, session_id, db_models.JOB_DONE)
     logger.info("Feedback stored for session %d (%d points)", session_id, len(wrapup.points))
 
 
@@ -409,7 +409,7 @@ def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) 
         # nobody analysed for its phases. An empty paragraph would not be.
         phase_language=wrapup.phase_language.strip() or None,
         score=None,  # ADR 0004: qualitative only, no score in the MVP
-        created_at=datetime.now(),
+        created_at=datetime.now(UTC),
     )
     feedback.points = [
         db_models.FeedbackPoint(
@@ -427,15 +427,17 @@ def _mark(db: DbSession, session_id: int, status: str, error_text: str | None = 
     """Move the Session's feedback job to `status` (ADR 0032)."""
     job = (
         db.query(db_models.AnalysisJob)
-        .filter_by(session_id=session_id, kind="feedback")
+        .filter_by(session_id=session_id, kind=db_models.JOB_KIND_FEEDBACK)
         .order_by(db_models.AnalysisJob.job_id.desc())
         .first()
     )
     if job is None:
-        job = db_models.AnalysisJob(session_id=session_id, kind="feedback", attempts=0)
+        job = db_models.AnalysisJob(
+            session_id=session_id, kind=db_models.JOB_KIND_FEEDBACK, attempts=0
+        )
         db.add(job)
     job.status = status
     job.error_text = error_text
-    job.updated_at = datetime.now()
-    if status == "running":
+    job.updated_at = datetime.now(UTC)
+    if status == db_models.JOB_RUNNING:
         job.attempts += 1

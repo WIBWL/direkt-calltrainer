@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session as DbSession
@@ -65,7 +65,7 @@ def persist_session(
             language_code=persona.language_id,
             status=_STATUS.get(reason, db_models.STATUS_ABORTED),
             started_at=started_at,
-            ended_at=datetime.now(),
+            ended_at=datetime.now(UTC),
         )
         session.turns = [
             db_models.Turn(
@@ -81,13 +81,46 @@ def persist_session(
         # The wrap-up itself is generated asynchronously (ADR 0018/0019); this
         # row is what makes its outcome queryable afterwards (ADR 0032).
         session.jobs = [db_models.AnalysisJob(
-            kind="feedback", status="queued", attempts=0, updated_at=datetime.now(),
+            kind=db_models.JOB_KIND_FEEDBACK,
+            status=db_models.JOB_QUEUED,
+            attempts=0,
+            updated_at=datetime.now(UTC),
         )]
         db.add(session)
         db.flush()
         logger.info("Session persisted: id=%d turns=%d measurements=%d",
                     session.session_id, len(session.turns), len(session.measurements))
         return session.session_id
+
+
+def mark_feedback_failed(session_id: int, error: str) -> None:
+    """Record that this Session's wrap-up will never be generated (ADR 0032).
+
+    For the one outcome the live path can be certain of: the job was never
+    handed to the queue, so nothing downstream will ever move its row off
+    "queued". The later transitions belong to feedback/generator.py -- a worker
+    that never received the job cannot write them.
+
+    Never raises. The caller is already handling a failure and must not be
+    given a second one; a status row is worth less than the transcript that is
+    on its way to the user either way.
+    """
+    try:
+        with session_scope() as db:
+            job = (
+                db.query(db_models.AnalysisJob)
+                .filter_by(session_id=session_id, kind=db_models.JOB_KIND_FEEDBACK)
+                .order_by(db_models.AnalysisJob.job_id.desc())
+                .first()
+            )
+            if job is None:
+                logger.warning("No feedback job to fail for session %d", session_id)
+                return
+            job.status = db_models.JOB_FAILED
+            job.error_text = error
+            job.updated_at = datetime.now(UTC)
+    except Exception:  # pylint: disable=broad-except
+        logger.exception("Feedback job could not be failed for session %d", session_id)
 
 
 def _write_analysis(

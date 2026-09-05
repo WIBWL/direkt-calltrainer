@@ -12,7 +12,7 @@ import json
 import logging
 import uuid
 from collections.abc import AsyncIterator, Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -51,7 +51,7 @@ async def session_ws(websocket: WebSocket) -> None:
     persona, scenario, auth = handshake
 
     session_id = uuid.uuid4()
-    started_at = datetime.now()
+    started_at = datetime.now(UTC)
     # The log file keeps every Session for the process's lifetime (ADR 0055);
     # session_id_scope is what tags this call's lines so they stay separable.
     with session_id_scope(str(session_id)):
@@ -135,8 +135,12 @@ async def _record(
         from backend.feedback import queue
 
         await asyncio.to_thread(queue.enqueue_feedback, db_id)
-    except Exception:
+    except Exception as e:
         logger.exception("Feedback could not be queued for session %d", db_id)
+        # The row persist_session just wrote says "queued" for a job nobody
+        # ever received. This is the only place that knows better, so it
+        # records it rather than leaving the row lying (ADR 0032).
+        await asyncio.to_thread(persistence.mark_feedback_failed, db_id, str(e))
 
 
 async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario, AuthContext] | None:

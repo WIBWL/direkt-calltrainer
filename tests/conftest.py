@@ -44,14 +44,21 @@ os.environ.setdefault("OIDC_ISSUER", "http://keycloak.test.invalid/realms/direkt
 # Deliberately unusable credentials, and the reason they are set here at all:
 # backend/clients/config.py calls load_dotenv() when the backend is first
 # imported, which would otherwise put the developer's real POSTGRES_* into the
-# environment for the whole test session. python-dotenv does not override
-# variables that are already set, so claiming them first is what keeps a stray
-# session_scope() out of the development database — it fails to connect instead
-# of quietly writing to it. The database fixtures below override all three for
-# the duration of a test that actually asks for one.
-os.environ.setdefault("POSTGRES_USER", "calltrainer-test-no-such-user")
-os.environ.setdefault("POSTGRES_PASSWORD", "not-a-real-password")
-os.environ.setdefault("POSTGRES_DB", "calltrainer-test-no-such-database")
+# environment for the whole test session. Claiming them first is what keeps a
+# stray session_scope() out of the development database — it fails to connect
+# instead of quietly writing to it. The database fixtures below override all
+# three for the duration of a test that actually asks for one.
+#
+# Assigned, not setdefault: a variable that is already set would win, and that
+# is exactly the case worth guarding against. Running the suite inside the app
+# container is one — compose loads .env through `env_file`, so the real
+# settings are in the environment before pytest starts, and setdefault left the
+# guard switched off precisely where it was needed. Overriding cannot break the
+# database tests: they read .env directly (`_ENV`, via dotenv_values below) and
+# never consult the environment for the server they connect to.
+os.environ["POSTGRES_USER"] = "calltrainer-test-no-such-user"
+os.environ["POSTGRES_PASSWORD"] = "not-a-real-password"
+os.environ["POSTGRES_DB"] = "calltrainer-test-no-such-database"
 
 import uuid  # noqa: E402
 from collections.abc import AsyncIterator, Iterator  # noqa: E402
@@ -573,6 +580,7 @@ def persist(
     reason: str = "user",
     turns: list[Turn] | None = None,
     persona_key: str = PERSONA_KEY,
+    subject: str = TEST_AUTH.sub,
 ) -> uuid.UUID:
     """Write a Session through the real write path; returns its extern_id.
 
@@ -589,7 +597,7 @@ def persist(
     extern_id = extern_id or uuid.uuid4()
     persistence.persist_session(
         extern_id,
-        str(uuid.uuid4()),
+        subject,
         persona,
         replace(TEST_SCENARIOS[0], id=SCENARIO_KEY),
         turns if turns is not None else [],

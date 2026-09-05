@@ -20,7 +20,7 @@ QUEUE_NAME = "feedback"
 # How long a queued job may wait before it is considered stale, and how long
 # one may run. Generous: the wrap-up is a single LLM call against a gateway
 # that is occasionally slow, and nobody is blocked while it works.
-_JOB_TIMEOUT_S = 300
+JOB_TIMEOUT_S = 300
 _RESULT_TTL_S = 3600
 
 
@@ -41,4 +41,4 @@ def _queue() -> Queue:
 
 def enqueue_feedback(session_id: int) -> None:
     """Hand one finished Session to the worker. Raises if Redis is unreachable."""
-    _queue().enqueue(generate_feedback, session_id, job_timeout=_JOB_TIMEOUT_S, result_ttl=_RESULT_TTL_S)
+    _queue().enqueue(generate_feedback, session_id, job_timeout=JOB_TIMEOUT_S, result_ttl=_RESULT_TTL_S)

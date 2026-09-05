@@ -30,8 +30,10 @@ from backend.app import app
 # The endpoints read the seeded tables (ADR 0041), so the seed content is what
 # they must return -- comparing against the test doubles would compare the
 # endpoint with something it never sees.
+from backend.db import models as db_models
 from backend.db.seed_data import LANGUAGE_NAMES, PERSONAS as SEEDED_PERSONAS
 from backend.db.seed_data import SCENARIOS as SEEDED_SCENARIOS
+from backend.db.session import session_scope
 
 # pylint: disable=missing-function-docstring,redefined-outer-name
 
@@ -118,6 +120,33 @@ async def test_scenarios_endpoint_withholds_the_case(client):
         assert "case_facts" not in entry
         assert "call_goal" not in entry
         assert "success_condition" not in entry
+
+
+async def test_a_deactivated_scenario_is_not_offered(client):
+    """A Scenario dropped from the seed is deactivated, never deleted -- stored
+    Sessions reference it (ADR 0026). `active` is therefore the whole mechanism
+    that takes it out of the selection, and the endpoint has to honour it, the
+    way the persona list already did.
+    """
+    retired = SEEDED_SCENARIOS[0]["id"]
+    with session_scope() as db:
+        db.query(db_models.Scenario).filter_by(key=retired).update({"active": False})
+
+    body = (await client.get("/api/scenarios")).json()
+
+    assert retired not in [s["id"] for s in body], "a retired Scenario stays on offer"
+    assert body, "only one Scenario was retired -- the rest must still be served"
+
+
+async def test_a_deactivated_persona_is_not_offered(client):
+    """The same rule on the persona side, which had no test of its own either."""
+    retired = SEEDED_PERSONAS[0]["id"]
+    with session_scope() as db:
+        db.query(db_models.Persona).filter_by(key=retired).update({"active": False})
+
+    body = (await client.get("/api/personas")).json()
+
+    assert retired not in [p["id"] for p in body], "a retired Persona stays on offer"
 
 
 async def test_persona_and_scenario_are_chosen_independently(client):

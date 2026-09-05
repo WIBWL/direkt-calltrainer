@@ -7,6 +7,11 @@ about SQLAlchemy sessions or detached instances.
 
 Deliberately uncached: an edited Persona or Scenario takes effect on the next
 Session, which is the whole point of loading them from the database.
+
+Both readers filter on `active`. Retired rows are deactivated rather than
+deleted, because a stored Session references them (ADR 0026, provision.py), so
+this filter is the entire mechanism that removes one from the selection --
+skipping it here would leave a retired row on offer.
 """
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -84,14 +89,21 @@ def get_persona(persona_id: str) -> Persona | None:
 
 
 def list_scenarios() -> list[Scenario]:
-    """Every selectable Scenario, ordered by title."""
+    """Every selectable Scenario, inactive ones left out, ordered by title."""
     with session_scope() as db:
-        rows = db.scalars(select(models.Scenario).order_by(models.Scenario.title)).all()
+        rows = db.scalars(
+            select(models.Scenario)
+            .where(models.Scenario.active)
+            .order_by(models.Scenario.title)
+        ).all()
         return [_to_scenario(row) for row in rows]
 
 
 def get_scenario(scenario_id: str) -> Scenario | None:
-    """The Scenario with this key, or None if it doesn't exist."""
+    """The Scenario with this key, or None if it doesn't exist or is inactive."""
     with session_scope() as db:
-        row = db.scalar(select(models.Scenario).where(models.Scenario.key == scenario_id))
+        row = db.scalar(
+            select(models.Scenario)
+            .where(models.Scenario.key == scenario_id, models.Scenario.active)
+        )
         return _to_scenario(row) if row is not None else None

@@ -121,6 +121,20 @@ async def test_a_session_cannot_be_reached_through_its_primary_key(
     assert response.status_code == 404
 
 
+async def test_another_users_session_is_not_readable(api_client: httpx.AsyncClient) -> None:
+    """Someone else's Session is indistinguishable from one that does not exist.
+
+    A 403 would confirm the id, which is what ADR 0050's unguessable id exists
+    to withhold, so the ownership check (ADR 0031) answers 404 as well.
+    """
+    extern_id = persist(subject="somebody-else")
+
+    response = await api_client.get(f"/api/sessions/{extern_id}")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Unknown session"
+
+
 async def test_stored_session_is_returned_in_the_transcript_shape(
     api_client: httpx.AsyncClient,
 ) -> None:
