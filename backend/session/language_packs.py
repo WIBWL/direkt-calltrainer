@@ -35,6 +35,17 @@ class LanguagePack:
 
     # The language's English name, interpolated into the English prompt frame.
     name_en: str
+    # Two short exchanges demonstrating register, sentence length and pacing in
+    # the target language -- never how a call should unfold. Four constraints
+    # shape them. They start mid-call and show no opening, because openings are
+    # what `opening_examples` is for: a second, smaller pool of opening lines
+    # here competes with it, and the model drew a name out of the smaller one
+    # ("Ostermann mein Name" reached a call whose Persona was called something
+    # else). For the same reason they name nobody at all. They sit in a domain
+    # no Scenario uses, because an example close to a Scenario's own subject
+    # gets reused as content instead of read as form. And they stay concrete,
+    # naming a date and a number, because that is the behaviour the frame asks
+    # for and a vague example would demonstrate the opposite.
     example_exchange: str
     # Several structurally different ways to open a call, in the target
     # language. The frame used to carry a single English one ('e.g. "Hi, this
@@ -63,20 +74,26 @@ class LanguagePack:
 _GERMAN = LanguagePack(
     name_en="German",
     example_exchange=(
-        "Example of the register, sentence length and pacing to aim for — this "
-        "says nothing about how a call should unfold, only how it should "
-        "sound. Invent your own content that fits YOUR actual scenario and "
-        "character; never reuse this text or its specifics. The dialogue is in "
-        "the language you must speak:\n"
-        '[Caller opens] "Guten Tag, hier ist Frau Beck von der Buchhaltung, '
-        'ich habe eine Frage zu unserer letzten Rechnung."\n'
-        '[Other person] "Guten Tag Frau Beck, worum geht es denn genau?"\n'
-        '[Caller] "Wir wurden für März doppelt belastet, einmal am 3. und '
-        'einmal am 17."\n'
-        '[Other person] "Das schaue ich mir an. Können Sie mir die '
-        'Rechnungsnummer nennen?"\n'
-        '[Caller] "Die habe ich gerade nicht griffbereit, aber es war ein '
-        'Betrag über 480 Euro."'
+        "Two examples of the register, sentence length and pacing to aim for. "
+        "They say nothing about how a call should unfold, only how it should "
+        "sound, and they pick up mid-call: how to open one is not their "
+        "subject. They are deliberately about matters that have nothing to do "
+        "with yours, and they name nobody -- the only name in your call is "
+        "your own, and their dates and figures are not yours either. Invent "
+        "your own content, fitting YOUR scenario and character. The dialogues "
+        "are in the language you must speak:\n"
+        '[Caller] "Die Lieferung sollte letzten Donnerstag kommen, da ist '
+        'aber nichts angekommen."\n'
+        '[Other person] "Das sehe ich mir an. Haben Sie eine Auftragsnummer?"\n'
+        '[Caller] "Die 4-7-2-9-1. Zugesagt war telefonisch der 14."\n'
+        '[Other person] "Ich sehe hier einen neuen Termin, den 29."\n'
+        '[Caller] "Das sind zwei Wochen später. Bekomme ich das schriftlich?"\n'
+        "\n"
+        '[Caller] "Ist im Kurs am Mittwoch noch ein Platz frei?"\n'
+        '[Other person] "Welcher Starttermin denn?"\n'
+        '[Caller] "Der Achtwochenkurs ab dem 6. Oktober."\n'
+        '[Other person] "Da sind noch zwei Plätze frei."\n'
+        '[Caller] "Gut. Bis wann muss ich mich entscheiden?"'
     ),
     opening_examples=(
         "Guten Tag, Beck mein Name, ich rufe an wegen unserer letzten Rechnung.\n"
@@ -128,19 +145,26 @@ _GERMAN = LanguagePack(
 _ENGLISH = LanguagePack(
     name_en="English",
     example_exchange=(
-        "Example of the register, sentence length and pacing to aim for — this "
-        "says nothing about how a call should unfold, only how it should "
-        "sound. Invent your own content that fits YOUR actual scenario and "
-        "character; never reuse this text or its specifics. The dialogue is in "
-        "the language you must speak:\n"
-        '[Caller opens] "Good morning, this is Claire Hughes from accounts, '
-        'I have got a question about our last invoice."\n'
-        '[Other person] "Good morning Ms Hughes, what is it about exactly?"\n'
-        '[Caller] "We were charged twice for March, once on the 3rd and once '
-        'on the 17th."\n'
-        '[Other person] "Let me look into that. Could you give me the invoice '
-        'number?"\n'
-        '[Caller] "I have not got it to hand, but it was around 480 pounds."'
+        "Two examples of the register, sentence length and pacing to aim for. "
+        "They say nothing about how a call should unfold, only how it should "
+        "sound, and they pick up mid-call: how to open one is not their "
+        "subject. They are deliberately about matters that have nothing to do "
+        "with yours, and they name nobody -- the only name in your call is "
+        "your own, and their dates and figures are not yours either. Invent "
+        "your own content, fitting YOUR scenario and character. The dialogues "
+        "are in the language you must speak:\n"
+        '[Caller] "The delivery was meant to arrive last Thursday and '
+        'nothing turned up."\n'
+        '[Other person] "Let me check. Do you have an order number?"\n'
+        '[Caller] "It is 4-7-2-9-1. I was given the 14th over the phone."\n'
+        '[Other person] "I have a new date here, the 29th."\n'
+        '[Caller] "That is two weeks later. Can I have that in writing?"\n'
+        "\n"
+        '[Caller] "Is there still a place on the Wednesday course?"\n'
+        '[Other person] "Which start date do you mean?"\n'
+        '[Caller] "The eight-week one, from 6 October."\n'
+        '[Other person] "There are two places left."\n'
+        '[Caller] "Good. When do I need to decide by?"'
     ),
     opening_examples=(
         "Hello, my name's Claire Hughes — I'm ringing about last month's "
