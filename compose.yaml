@@ -120,7 +120,13 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - 5432:5432
+      # Loopback only. The application never uses this: app and worker reach
+      # the database as `db` over the compose network. It is published for
+      # host-side work alone -- psql, a GUI client, `pytest` against a real
+      # server -- and a bare "5432:5432" would bind every interface, which
+      # matters because no deployment is decided yet (ADR 0020) and this file
+      # is the only description of how the system runs.
+      - 127.0.0.1:5432:5432
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -147,7 +153,11 @@ services:
       KC_HOSTNAME: http://localhost:18081
       KC_HEALTH_ENABLED: "true"
     ports:
-      - 18081:8080
+      # Loopback only, for the same reason as the database -- and more so here:
+      # the admin console below is reachable with admin/admin. Nothing is lost,
+      # KC_HOSTNAME pins the issuer to localhost anyway, so a login from
+      # another machine could not work regardless.
+      - 127.0.0.1:18081:8080
     volumes:
       - keycloak-data:/opt/keycloak/data
       - ./keycloak:/opt/keycloak/data/import:ro
@@ -161,6 +171,12 @@ services:
       start_period: 40s
 
 volumes:
+  # Named explicitly so `docker volume rm` can address it without guessing at
+  # Compose's project prefix. The value is the name Compose already generates,
+  # underscore included -- picking the prettier `direkt-calltrainer-pgdata`
+  # would point the database at a new, empty volume and appear to lose every
+  # stored Session.
   pgdata:
+    name: direkt-calltrainer_pgdata
   keycloak-data:
     name: direkt-calltrainer-keycloak-data
