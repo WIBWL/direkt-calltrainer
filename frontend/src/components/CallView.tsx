@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import type { CallState } from "../protocol";
+import { cx } from "../utils/cx";
+import { formatClock } from "../utils/time";
 import CallAnimation from "./CallAnimation";
 
 interface CallViewProps {
@@ -14,13 +16,6 @@ interface CallViewProps {
   error: string | null;
   onToggleMicrophone: () => void;
   onEndCall: () => void;
-}
-
-/** mm:ss for a non-negative second count. */
-function formatDuration(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 /** Initials for the persona avatar, limited to the first two name parts. */
@@ -64,14 +59,11 @@ export default function CallView({
     return () => window.clearInterval(id);
   }, []);
 
-  const formattedDuration = formatDuration(elapsedSeconds);
+  const formattedDuration = formatClock(elapsedSeconds);
 
   return (
     <>
-      <section
-        className="setup-intro call-intro"
-        aria-labelledby="call-page-title"
-      >
+      <section className="setup-intro call-intro" aria-labelledby="call-page-title">
         <div className="eyebrow">Gespräch läuft</div>
 
         <h1 id="call-page-title">{scenarioName}</h1>
@@ -117,9 +109,7 @@ export default function CallView({
         {/* The toggle state reflects whether local VAD microphone capture is paused. */}
         <div className="call-controls">
           <button
-            className={
-              "mute-call-button" + (isMicrophoneMuted ? " is-muted" : "")
-            }
+            className={cx("mute-call-button", isMicrophoneMuted && "is-muted")}
             type="button"
             aria-pressed={isMicrophoneMuted}
             onClick={onToggleMicrophone}
