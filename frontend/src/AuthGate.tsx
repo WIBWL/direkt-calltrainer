@@ -5,8 +5,7 @@ import { useAuth } from "react-oidc-context";
  * Renders `children` only for an authenticated user. While the session is being
  * restored or a redirect is in flight it shows a splash; otherwise the login
  * screen. Branching on `isLoading` first avoids flashing the login prompt on
- * every page load while the session is silently restored from storage. Mirrors
- * direkt-dataplatform's AuthGate.tsx.
+ * every page load while the session is silently restored from storage.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const auth = useAuth();
