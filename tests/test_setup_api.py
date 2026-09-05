@@ -94,7 +94,7 @@ async def test_scenarios_endpoint_lists_every_scenario_with_its_teaser(client):
         card = by_name[scenario["name"]]
         assert uuid.UUID(card["id"])
         assert card["short_description"] == scenario["short_description"]
-        assert card["herkunft"] == "vorlage"
+        assert card["origin"] == "builtin"
 
 
 async def test_scenarios_endpoint_withholds_the_english_call_context(client):
@@ -114,7 +114,7 @@ async def test_scenarios_endpoint_withholds_the_case(client):
     exercise they are about to practise."""
     body = (await client.get("/api/scenarios")).json()
     for entry in body:
-        assert set(entry) == {"id", "name", "short_description", "herkunft", "geteilt"}
+        assert set(entry) == {"id", "name", "short_description", "origin", "shared"}
         assert "case_facts" not in entry
         assert "call_goal" not in entry
         assert "success_condition" not in entry

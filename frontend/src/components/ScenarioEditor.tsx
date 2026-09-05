@@ -11,7 +11,7 @@ import {
   setScenarioVisibility,
   updateScenario,
   type ScenarioDraft,
-  type Sichtbarkeit,
+  type Visibility,
 } from "../scenarioLibrary";
 import ShareToggle from "./ShareToggle";
 
@@ -21,7 +21,7 @@ interface ScenarioEditorProps {
   /** The caller's company name, or null for the `default` tenant. Sharing is
    * offered only when it is set — "share" means "with my colleagues", which a
    * user with no company does not have (ADR 0060). */
-  companyLabel: string | null;
+  tenantName: string | null;
   onClose: () => void;
   /** Called after a successful save or delete. `savedId` is the id to select
    * next (the new/edited Scenario), or null after a delete. Closes the editor. */
@@ -39,37 +39,37 @@ const FIELDS: {
   required?: boolean;
 }[] = [
   { key: "name", label: "Titel", required: true },
-  { key: "kurzbeschreibung", label: "Kurzbeschreibung (auf der Karte)", required: true },
-  { key: "szenariotyp", label: "Kategorie (optional)" },
+  { key: "short_description", label: "Kurzbeschreibung (auf der Karte)", required: true },
+  { key: "scenario_type", label: "Kategorie (optional)" },
   {
-    key: "beschreibung",
+    key: "description",
     label: "Situation",
     hint: "Worum geht es im Anruf? Wird dem Modell als Kontext gegeben — kurz, aber konkret.",
     multiline: true,
     required: true,
   },
   {
-    key: "fallfakten",
+    key: "case_facts",
     label: "Fakten des Falls (optional)",
     hint: "Konkrete Zahlen, Namen, Daten. Leer lassen heißt: das Modell improvisiert.",
     multiline: true,
   },
-  { key: "anrufziel", label: "Ziel des Anrufs (optional)", multiline: true },
-  { key: "erfolgsbedingung", label: "Erfolgsbedingung (optional)", multiline: true },
+  { key: "call_goal", label: "Ziel des Anrufs (optional)", multiline: true },
+  { key: "success_condition", label: "Erfolgsbedingung (optional)", multiline: true },
 ];
 
 /** Create / edit / delete a user-authored Scenario (ADR 0058). Rendered as a
  * modal over the setup screen. */
 export default function ScenarioEditor({
   scenarioId,
-  companyLabel,
+  tenantName,
   onClose,
   onSaved,
   onRefresh,
 }: ScenarioEditorProps) {
   const isNew = scenarioId === null;
   const [draft, setDraft] = useState<ScenarioDraft>(EMPTY_DRAFT);
-  const [sichtbarkeit, setSichtbarkeit] = useState<Sichtbarkeit>("privat");
+  const [visibility, setVisibility] = useState<Visibility>("private");
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
@@ -83,9 +83,9 @@ export default function ScenarioEditor({
     getScenario(scenarioId)
       .then((detail) => {
         if (cancelled) return;
-        const { id: _id, sichtbarkeit: sicht, ...rest } = detail;
+        const { id: _id, visibility: vis, ...rest } = detail;
         setDraft(rest);
-        setSichtbarkeit(sicht);
+        setVisibility(vis);
       })
       .catch((e: unknown) =>
         setError(e instanceof ApiError && e.status === 404
@@ -101,8 +101,8 @@ export default function ScenarioEditor({
   const canSave =
     !saving &&
     draft.name.trim().length > 0 &&
-    draft.kurzbeschreibung.trim().length > 0 &&
-    draft.beschreibung.trim().length > 0;
+    draft.short_description.trim().length > 0 &&
+    draft.description.trim().length > 0;
 
   const handleSave = async () => {
     setSaving(true);
@@ -113,8 +113,8 @@ export default function ScenarioEditor({
         : await updateScenario(scenarioId as string, draft);
       // A new Scenario is created private; if the user ticked "share" in the
       // form, apply that now that it has an id.
-      if (isNew && sichtbarkeit === "unternehmen") {
-        await setScenarioVisibility(saved.id, "unternehmen");
+      if (isNew && visibility === "tenant") {
+        await setScenarioVisibility(saved.id, "tenant");
       }
       onSaved(saved.id);
     } catch (e: unknown) {
@@ -127,15 +127,15 @@ export default function ScenarioEditor({
     }
   };
 
-  const handleShareToggle = async (next: Sichtbarkeit) => {
-    const previous = sichtbarkeit;
-    setSichtbarkeit(next); // optimistic; for a new Scenario handleSave applies it
+  const handleShareToggle = async (next: Visibility) => {
+    const previous = visibility;
+    setVisibility(next); // optimistic; for a new Scenario handleSave applies it
     if (scenarioId === null) return;
     try {
       await setScenarioVisibility(scenarioId, next);
       onRefresh(); // the library list's badge/filter now change
     } catch {
-      setSichtbarkeit(previous);
+      setVisibility(previous);
       setError("Freigabe konnte nicht geändert werden.");
     }
   };
@@ -147,14 +147,14 @@ export default function ScenarioEditor({
     try {
       const doc = await extractPdf(file);
       const replace =
-        draft.fallfakten.trim().length === 0 ||
+        draft.case_facts.trim().length === 0 ||
         window.confirm("Das Fakten-Feld mit den Fakten aus dem PDF ersetzen?");
       if (replace) {
-        setDraft((d) => ({ ...d, fallfakten: doc.text }));
+        setDraft((d) => ({ ...d, case_facts: doc.text }));
         setPdfNote(
-          doc.zusammengefasst
-            ? `${doc.seiten} Seiten gelesen und zusammengefasst — bitte prüfen.`
-            : `${doc.seiten} Seiten gelesen. Zusammenfassung nicht möglich, Rohtext übernommen.`,
+          doc.summarised
+            ? `${doc.pages} Seiten gelesen und zusammengefasst — bitte prüfen.`
+            : `${doc.pages} Seiten gelesen. Zusammenfassung nicht möglich, Rohtext übernommen.`,
         );
       }
     } catch (e: unknown) {
@@ -217,7 +217,7 @@ export default function ScenarioEditor({
                     )}
                   </label>
 
-                  {field.key === "fallfakten" && (
+                  {field.key === "case_facts" && (
                     <div className="pdf-upload">
                       <label className="pdf-upload-button">
                         {pdfBusy ? "PDF wird ausgewertet …" : "Fakten aus PDF (KI)"}
@@ -244,11 +244,11 @@ export default function ScenarioEditor({
               ))}
             </div>
 
-            {companyLabel !== null && (
+            {tenantName !== null && (
               <ShareToggle
-                sichtbarkeit={sichtbarkeit}
+                visibility={visibility}
                 onChange={handleShareToggle}
-                label={`Mit ${companyLabel} teilen`}
+                label={`Mit ${tenantName} teilen`}
                 hint="Kolleginnen und Kollegen sehen dieses Szenario dann in ihrer Bibliothek."
               />
             )}

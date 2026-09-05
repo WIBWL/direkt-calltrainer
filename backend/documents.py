@@ -36,7 +36,7 @@ MAX_PAGES = 40
 # invoice or contract excerpt; a small model (ADR 0011) does a worse job with
 # more, and a training scenario is not built from a 50-page document.
 MAX_RAW_TEXT = 15000
-# The final text goes into the `fallfakten` field, so it cannot exceed its cap.
+# The final text goes into the `case_facts` field, so it cannot exceed its cap.
 MAX_TEXT = FIELD_LIMITS["case_facts"]
 
 _SUMMARY_SYSTEM = (
@@ -60,7 +60,7 @@ class DocumentError(ValueError):
 
 def reject_oversize_upload(size: int | None) -> None:
     """Raise if the upload's *declared* size is over the limit -- called before
-    `await datei.read()` so the route never buffers a huge file. `size` is None
+    `await file.read()` so the route never buffers a huge file. `size` is None
     when the client sends no Content-Length; `extract_pdf_text` then catches it
     on the real byte count."""
     if size is not None and size > MAX_UPLOAD_BYTES:

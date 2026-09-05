@@ -3,7 +3,7 @@
 Covers:
   F-58      a Scenario built from an uploaded document
   ADR 0024  user-authored Scenarios
-  ADR 0058  the /api/scenarios/dokument helper (text source for the Fakten field)
+  ADR 0058  the /api/scenarios/document helper (text source for the Fakten field)
   ADR 0059  the extracted text is sanitised; the LLM sees it as a document, not
             instructions
   ADR 0011  the document is condensed so a long one does not bury the frame
@@ -52,9 +52,9 @@ def _pdf(text: str) -> bytes:
 
 
 def test_extracts_the_text_and_page_count():
-    text, seiten = extract_pdf_text(_pdf("Kunde: 14 Lizenzen, 1180 Euro pro Monat."))
+    text, pages = extract_pdf_text(_pdf("Kunde: 14 Lizenzen, 1180 Euro pro Monat."))
     assert "14 Lizenzen" in text
-    assert seiten == 1
+    assert pages == 1
 
 
 def test_a_pdf_without_a_text_layer_is_rejected():
@@ -128,14 +128,14 @@ async def client(seeded_database, fake_llm):  # pylint: disable=unused-argument
 
 async def test_endpoint_returns_the_summarised_facts(client):
     resp = await client.post(
-        "/api/scenarios/dokument",
-        files={"datei": ("angebot.pdf", _pdf("40 Sitze, Vertrag bis März."), "application/pdf")},
+        "/api/scenarios/document",
+        files={"file": ("angebot.pdf", _pdf("40 Sitze, Vertrag bis März."), "application/pdf")},
     )
     assert resp.status_code == 200
     body = resp.json()
     assert "40 Sitze" in body["text"]
-    assert body["seiten"] == 1
-    assert body["zusammengefasst"] is True
+    assert body["pages"] == 1
+    assert body["summarised"] is True
 
 
 async def test_endpoint_falls_back_to_raw_text_when_the_llm_is_down(client, monkeypatch):
@@ -144,19 +144,19 @@ async def test_endpoint_falls_back_to_raw_text_when_the_llm_is_down(client, monk
 
     monkeypatch.setattr("backend.clients.llm.complete", down)
     resp = await client.post(
-        "/api/scenarios/dokument",
-        files={"datei": ("angebot.pdf", _pdf("40 Sitze, Vertrag bis März."), "application/pdf")},
+        "/api/scenarios/document",
+        files={"file": ("angebot.pdf", _pdf("40 Sitze, Vertrag bis März."), "application/pdf")},
     )
     assert resp.status_code == 200
     body = resp.json()
     assert "40 Sitze" in body["text"]  # the raw extraction
-    assert body["zusammengefasst"] is False
+    assert body["summarised"] is False
 
 
 async def test_endpoint_rejects_a_scanned_pdf_with_a_message(client):
     resp = await client.post(
-        "/api/scenarios/dokument",
-        files={"datei": ("scan.pdf", _pdf(""), "application/pdf")},
+        "/api/scenarios/document",
+        files={"file": ("scan.pdf", _pdf(""), "application/pdf")},
     )
     assert resp.status_code == 422
     assert "kein Text" in resp.json()["detail"]
@@ -168,7 +168,7 @@ async def test_endpoint_needs_a_token(client):
 
     app.dependency_overrides.pop(auth.require_user, None)
     resp = await client.post(
-        "/api/scenarios/dokument",
-        files={"datei": ("x.pdf", _pdf("x"), "application/pdf")},
+        "/api/scenarios/document",
+        files={"file": ("x.pdf", _pdf("x"), "application/pdf")},
     )
     assert resp.status_code == 401

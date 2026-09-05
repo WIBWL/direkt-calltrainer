@@ -78,7 +78,7 @@ async def test_scenarios_come_from_the_database(api_client: httpx.AsyncClient) -
 
     assert response.status_code == 200
     entry = response.json()[0]
-    assert set(entry) == {"id", "name", "short_description", "herkunft", "geteilt"}
+    assert set(entry) == {"id", "name", "short_description", "origin", "shared"}
     assert uuid.UUID(entry["id"])  # extern_id the client sends back in session.start
     assert entry["name"] == "Kündigungsabsicht"
 

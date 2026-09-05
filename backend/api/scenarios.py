@@ -1,20 +1,21 @@
 """REST routes for the Scenario library and User-authored Scenarios (ADR 0058).
 
 `GET /api/scenarios` feeds the selection screen: every Scenario the caller may
-see, each badged `vorlage` (a shipped built-in), `eigen` (one they authored) or
-`unternehmen` (shared by a colleague). The list withholds the prompt fields
-exactly as before (ADR 0043/0045) — they are the answer key to the exercise.
-The detail and write routes serve only the caller's own rows.
+see, each badged `builtin` (a shipped built-in), `own` (one they authored) or
+`tenant` (shared by a colleague). The list withholds the prompt fields exactly
+as before (ADR 0043/0045) — they are the answer key to the exercise. The detail
+and write routes serve only the caller's own rows.
 
-`POST /api/scenarios/dokument` (F-58) is a stateless helper: it extracts an
+`POST /api/scenarios/document` (F-58) is a stateless helper: it extracts an
 uploaded text-layer PDF and has the LLM condense it into a fact list for the
 editor's Fakten field (`backend/documents.py`), storing nothing.
 
-The wire stays German (protocol.ts). `backend/library.py` is the boundary to the
-English schema and does the sanitising (ADR 0059); this module only validates
-shape and length. A Scenario is addressed by its `extern_id` (ADR 0050); the
-write routes are owner-scoped by the Keycloak `sub` and the resolved tenant,
-never by anything the client sends.
+The wire vocabulary is English, matching the schema (ADR 0057, extended to this
+surface by ADR 0061). `backend/library.py` does the sanitising (ADR 0059); this
+module only validates shape and length and maps the card field `name` onto the
+`title` column. A Scenario is addressed by its `extern_id` (ADR 0050); the write
+routes are owner-scoped by the Keycloak `sub` and the resolved tenant, never by
+anything the client sends.
 """
 from __future__ import annotations
 
@@ -28,7 +29,7 @@ from backend import library
 from backend.api.deps import current_tenant, current_tenant_id
 from backend.auth import AuthContext, require_user
 from backend.authored_text import FIELD_LIMITS, clean
-from backend.db.models import VISIBILITY_PRIVATE, VISIBILITY_TENANT
+from backend.db.models import VISIBILITY_TENANT
 from backend.documents import (
     MAX_TEXT,
     DocumentError,
@@ -42,10 +43,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/scenarios")
 
-# Wire visibility <-> schema visibility. The User may only choose between these
-# two; `public` is a review decision (ADR 0060 phase 3).
-_SICHTBARKEIT = {"privat": VISIBILITY_PRIVATE, "unternehmen": VISIBILITY_TENANT}
-
 
 def _limited(field: str, *, required: bool):
     cap = FIELD_LIMITS[field]
@@ -54,48 +51,44 @@ def _limited(field: str, *, required: bool):
 
 
 class ScenarioInput(BaseModel):
-    """The fields an authoring caller sets. `name` / `kurzbeschreibung` are the
-    card; `beschreibung` and the three case fields are prompt input (ADR 0045)
+    """The fields an authoring caller sets. `name` / `short_description` are the
+    card; `description` and the three case fields are prompt input (ADR 0045)
     and may be left empty — an empty case means "improvise"."""
 
     name: str = _limited("title", required=True)
-    kurzbeschreibung: str = _limited("short_description", required=True)
-    szenariotyp: str = _limited("scenario_type", required=False)
+    short_description: str = _limited("short_description", required=True)
+    scenario_type: str = _limited("scenario_type", required=False)
     # The situation is what the model gets as context -- an authored Scenario
     # without it is not a scenario, so it is required (the built-in seed rows
     # all carry one; ADR 0045 only allows the *case* fields to be blank).
-    beschreibung: str = _limited("description", required=True)
-    fallfakten: str = _limited("case_facts", required=False)
-    anrufziel: str = _limited("call_goal", required=False)
-    erfolgsbedingung: str = _limited("success_condition", required=False)
+    description: str = _limited("description", required=True)
+    case_facts: str = _limited("case_facts", required=False)
+    call_goal: str = _limited("call_goal", required=False)
+    success_condition: str = _limited("success_condition", required=False)
 
     def to_library(self) -> dict:
-        """Wire names -> the English column names `backend/library.py` expects."""
-        return {
-            "title": self.name,
-            "short_description": self.kurzbeschreibung,
-            "scenario_type": self.szenariotyp,
-            "description": self.beschreibung,
-            "case_facts": self.fallfakten,
-            "call_goal": self.anrufziel,
-            "success_condition": self.erfolgsbedingung,
-        }
+        """1:1 with the schema columns, except the card field `name`, which is
+        the `title` column (ADR 0061)."""
+        data = self.model_dump()
+        data["title"] = data.pop("name")
+        return data
 
 
 class VisibilityInput(BaseModel):
-    sichtbarkeit: str = Field(..., pattern="^(privat|unternehmen)$")
+    # `private` <-> `tenant` only; `public` is a review decision (ADR 0060 phase 3).
+    visibility: str = Field(..., pattern="^(private|tenant)$")
 
 
-def _herkunft(scenario, subject: str) -> str:
-    """Who the Scenario belongs to, from the caller's point of view. `eigen`
-    wins over `unternehmen` -- the author still owns and can edit a Scenario
-    they shared; `geteilt` (below) is the separate "visible to the company"
-    flag the company filter uses."""
+def _origin(scenario, subject: str) -> str:
+    """Who the Scenario belongs to, from the caller's point of view. `own` wins
+    over `tenant` -- the author still owns and can edit a Scenario they shared;
+    `shared` (below) is the separate "visible to the company" flag the company
+    filter uses."""
     if scenario.created_by == subject:
-        return "eigen"
+        return "own"
     if scenario.visibility == VISIBILITY_TENANT:
-        return "unternehmen"
-    return "vorlage"
+        return "tenant"
+    return "builtin"
 
 
 def _card(scenario, subject: str) -> dict:
@@ -103,10 +96,10 @@ def _card(scenario, subject: str) -> dict:
         "id": scenario.id,
         "name": scenario.name,
         "short_description": scenario.short_description,
-        "herkunft": _herkunft(scenario, subject),
+        "origin": _origin(scenario, subject),
         # True once shared with the company -- for the author's own Scenarios
-        # too, which `herkunft` still reports as `eigen`.
-        "geteilt": scenario.visibility == VISIBILITY_TENANT,
+        # too, which `origin` still reports as `own`.
+        "shared": scenario.visibility == VISIBILITY_TENANT,
     }
 
 
@@ -116,13 +109,15 @@ def _detail(scenario) -> dict:
     return {
         "id": scenario.id,
         "name": scenario.name,
-        "kurzbeschreibung": scenario.short_description,
-        "szenariotyp": scenario.scenario_type,
-        "beschreibung": scenario.description,
-        "fallfakten": scenario.case_facts,
-        "anrufziel": scenario.call_goal,
-        "erfolgsbedingung": scenario.success_condition,
-        "sichtbarkeit": "unternehmen" if scenario.visibility == VISIBILITY_TENANT else "privat",
+        "short_description": scenario.short_description,
+        "scenario_type": scenario.scenario_type,
+        "description": scenario.description,
+        "case_facts": scenario.case_facts,
+        "call_goal": scenario.call_goal,
+        "success_condition": scenario.success_condition,
+        # Always `private` or `tenant` here -- `_detail` only runs for the
+        # caller's own rows, never a `public` built-in.
+        "visibility": scenario.visibility,
     }
 
 
@@ -131,35 +126,35 @@ def list_scenarios(
     user: AuthContext = Depends(require_user),
     tenant_id: int = Depends(current_tenant_id),
 ) -> list[dict]:
-    """Every Scenario the caller may select, each badged vorlage/eigen/unternehmen."""
+    """Every Scenario the caller may select, each badged builtin/own/tenant."""
     return [_card(s, user.sub) for s in library.list_scenarios(user.sub, tenant_id)]
 
 
-@router.post("/dokument")
+@router.post("/document")
 async def extract_document(
-    datei: UploadFile = File(...),
+    file: UploadFile = File(...),
     _user: AuthContext = Depends(require_user),
 ) -> dict:
     """Extract the text from an uploaded text-layer PDF and let the LLM condense
     it into a fact list for the editor's Fakten field (F-58). Stateless: nothing
     is stored, the client puts the returned text into the field and the User
-    edits it before saving. `zusammengefasst` is False when the LLM was
-    unreachable and the raw (truncated) text is returned instead."""
+    edits it before saving. `summarised` is False when the LLM was unreachable
+    and the raw (truncated) text is returned instead."""
     try:
-        reject_oversize_upload(datei.size)
-        data = await datei.read()
-        raw, seiten = extract_pdf_text(data)
+        reject_oversize_upload(file.size)
+        data = await file.read()
+        raw, pages = extract_pdf_text(data)
     except DocumentError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
     try:
         text = await summarise_facts(raw)
-        zusammengefasst = True
+        summarised = True
     except OpenAIError:
         logger.warning("Document summary failed; returning raw text", exc_info=True)
         text = clean(raw)[:MAX_TEXT].strip()
-        zusammengefasst = False
-    return {"text": text, "seiten": seiten, "zusammengefasst": zusammengefasst}
+        summarised = False
+    return {"text": text, "pages": pages, "summarised": summarised}
 
 
 # Defined before "/{extern_id}" so the literal path is matched first.
@@ -202,7 +197,7 @@ def update_scenario(
     return _detail(scenario)
 
 
-@router.put("/{extern_id}/sichtbarkeit")
+@router.put("/{extern_id}/visibility")
 def set_visibility(
     extern_id: str,
     body: VisibilityInput,
@@ -215,13 +210,13 @@ def set_visibility(
     # tenant has none, so `tenant` visibility would just expose the row to every
     # other company-less account. The UI hides the toggle for them; this is the
     # matching server guard.
-    if body.sichtbarkeit == "unternehmen" and tenant.is_default:
+    if body.visibility == "tenant" and tenant.is_default:
         raise HTTPException(
             status_code=409,
             detail="Ohne Unternehmen kann ein Szenario nicht geteilt werden.",
         )
     scenario = library.set_scenario_visibility(
-        extern_id, _SICHTBARKEIT[body.sichtbarkeit], user.sub, tenant.id
+        extern_id, body.visibility, user.sub, tenant.id
     )
     if scenario is None:
         raise HTTPException(status_code=404, detail="Unknown scenario")

@@ -13,7 +13,7 @@ interface SetupViewProps {
   scenarioFilter: LibraryFilter;
   onScenarioFilter: (f: LibraryFilter) => void;
   showScenarioFilter: boolean;
-  companyLabel: string | null;
+  tenantName: string | null;
   onNewScenario: () => void;
   onEditScenario: (id: string) => void;
   personas: Persona[];
@@ -39,7 +39,7 @@ export default function SetupView({
   scenarioFilter,
   onScenarioFilter,
   showScenarioFilter,
-  companyLabel,
+  tenantName,
   onNewScenario,
   onEditScenario,
   personas,
@@ -77,8 +77,8 @@ export default function SetupView({
           onFilter={onScenarioFilter}
           showFilter={showScenarioFilter}
           filterLabel="Szenarien filtern"
-          companyLabel={companyLabel}
-          newLabel="+ Eigenes Szenario"
+          tenantName={tenantName}
+          newLabel="+ Individuelles Szenario"
           onNew={onNewScenario}
           onEdit={onEditScenario}
         />

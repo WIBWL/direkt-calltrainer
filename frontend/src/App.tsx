@@ -14,7 +14,7 @@ import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useSessionSocket, type CommittedSession } from "./hooks/useSessionSocket";
 import { useStreamedAudioPlayback } from "./hooks/useStreamedAudioPlayback";
 import type { Persona, TranscriptEntry } from "./protocol";
-import { getUnternehmen, listScenarios, type ScenarioCard } from "./scenarioLibrary";
+import { getTenant, listScenarios, type ScenarioCard } from "./scenarioLibrary";
 import { loadFinishedSession, saveFinishedSession } from "./utils/finishedSession";
 
 type Screen = "setup" | "mic-check" | "call" | "transcript";
@@ -39,10 +39,10 @@ export default function App() {
   const [personaId, setPersonaId] = useState<string | null>(null);
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [scenarioFilter, setScenarioFilter] = useState<LibraryFilter>("alle");
+  const [scenarioFilter, setScenarioFilter] = useState<LibraryFilter>("all");
   const [editingScenario, setEditingScenario] = useState<EditorState>(null);
   // The caller's company (ADR 0060); null = default tenant, no company chip.
-  const [companyLabel, setCompanyLabel] = useState<string | null>(null);
+  const [tenantName, setTenantName] = useState<string | null>(null);
   // Tracks intentional muting separately from entering or leaving the call screen.
   const [isMicrophoneMuted, setIsMicrophoneMuted] = useState(false);
   // The input device picked in the mic-check screen; null = browser default.
@@ -112,9 +112,9 @@ export default function App() {
         setLoadError(`Szenarien konnten nicht geladen werden: ${e.message}`),
       );
 
-    getUnternehmen()
-      .then((u) => setCompanyLabel(u.name))
-      .catch(() => setCompanyLabel(null)); // no company filter if this fails
+    getTenant()
+      .then((t) => setTenantName(t.name))
+      .catch(() => setTenantName(null)); // no company filter if this fails
   }, [restored]);
 
   // A selected microphone that gets unplugged (mid-test or mid-call) falls
@@ -265,13 +265,13 @@ export default function App() {
   // to — the user authored something, a colleague shared something, or the user
   // is in a company at all.
   const showScenarioFilter =
-    companyLabel !== null || scenarios.some((s) => s.herkunft !== "vorlage");
+    tenantName !== null || scenarios.some((s) => s.origin !== "builtin");
   const scenarioItems = scenarios.map((s) => ({
     id: s.id,
     name: s.name,
     subtitle: s.short_description,
-    herkunft: s.herkunft,
-    geteilt: s.geteilt,
+    origin: s.origin,
+    shared: s.shared,
   }));
   const visibleScenarios = scenarioItems.filter((s) => matchesFilter(s, scenarioFilter));
 
@@ -335,7 +335,7 @@ export default function App() {
         scenarioFilter={scenarioFilter}
         onScenarioFilter={setScenarioFilter}
         showScenarioFilter={showScenarioFilter}
-        companyLabel={companyLabel}
+        tenantName={tenantName}
         onNewScenario={() => setEditingScenario({ id: null })}
         onEditScenario={(id) => setEditingScenario({ id })}
         personas={personas}
@@ -351,7 +351,7 @@ export default function App() {
       {editingScenario && (
         <ScenarioEditor
           scenarioId={editingScenario.id}
-          companyLabel={companyLabel}
+          tenantName={tenantName}
           onClose={() => setEditingScenario(null)}
           onSaved={handleScenarioSaved}
           onRefresh={() => void reloadScenarios()}

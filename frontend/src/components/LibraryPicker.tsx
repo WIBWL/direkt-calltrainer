@@ -1,23 +1,23 @@
-import type { Herkunft } from "../scenarioLibrary";
+import type { Origin } from "../scenarioLibrary";
 
-export type LibraryFilter = "alle" | "standard" | "eigen" | "unternehmen";
+export type LibraryFilter = "all" | "standard" | "own" | "tenant";
 
-/** Static labels; the "unternehmen" chip is labelled with the company name. */
-const FILTER_LABELS: Record<Exclude<LibraryFilter, "unternehmen">, string> = {
-  alle: "Alle",
+/** Static labels; the "tenant" chip is labelled with the company name. */
+const FILTER_LABELS: Record<Exclude<LibraryFilter, "tenant">, string> = {
+  all: "Alle",
   standard: "Standard",
-  eigen: "Eigene",
+  own: "Individuell",
 };
 
-const BASE_FILTERS = ["alle", "standard", "eigen"] as const;
+const BASE_FILTERS = ["all", "standard", "own"] as const;
 
 export interface LibraryItem {
   id: string;
   name: string;
   subtitle: string;
-  herkunft: Herkunft;
+  origin: Origin;
   /** Shared with the company (own or a colleague's). */
-  geteilt: boolean;
+  shared: boolean;
 }
 
 interface LibraryPickerProps {
@@ -31,28 +31,28 @@ interface LibraryPickerProps {
   filterLabel: string;
   /** The caller's company name (ADR 0060); null = default tenant, no company
    * chip or badge. */
-  companyLabel: string | null;
+  tenantName: string | null;
   newLabel: string;
   onNew: () => void;
   onEdit: (id: string) => void;
 }
 
-/** Whether an item passes the active filter. "unternehmen" = anything shared
- * with the company, the author's own shared Scenarios included. */
+/** Whether an item passes the active filter. "tenant" = anything shared with
+ * the company, the author's own shared Scenarios included. */
 export function matchesFilter(item: LibraryItem, filter: LibraryFilter): boolean {
-  if (filter === "alle") return true;
-  if (filter === "standard") return item.herkunft === "vorlage";
-  if (filter === "eigen") return item.herkunft === "eigen";
-  return item.geteilt;
+  if (filter === "all") return true;
+  if (filter === "standard") return item.origin === "builtin";
+  if (filter === "own") return item.origin === "own";
+  return item.shared;
 }
 
-function badgeLabel(item: LibraryItem, companyLabel: string | null): string {
-  if (item.herkunft === "eigen") return item.geteilt ? "Eigen · geteilt" : "Eigen";
-  if (item.herkunft === "unternehmen") return companyLabel ?? "Unternehmen";
+function badgeLabel(item: LibraryItem, tenantName: string | null): string {
+  if (item.origin === "own") return item.shared ? "Individuell · geteilt" : "Individuell";
+  if (item.origin === "tenant") return tenantName ?? "Unternehmen";
   return "Standard";
 }
 
-/** The Scenario selection grid: filter chips (Alle / Standard / Eigene /
+/** The Scenario selection grid: filter chips (Alle / Standard / Individuell /
  * <Unternehmen>), a "new" button, badged cards, and an edit affordance on the
  * caller's own rows (ADR 0058 / 0060). */
 export default function LibraryPicker({
@@ -63,7 +63,7 @@ export default function LibraryPicker({
   onFilter,
   showFilter,
   filterLabel,
-  companyLabel,
+  tenantName,
   newLabel,
   onNew,
   onEdit,
@@ -84,14 +84,14 @@ export default function LibraryPicker({
                 {FILTER_LABELS[f]}
               </button>
             ))}
-            {companyLabel && (
+            {tenantName && (
               <button
                 type="button"
-                className={"library-filter-chip" + (filter === "unternehmen" ? " active" : "")}
-                aria-pressed={filter === "unternehmen"}
-                onClick={() => onFilter("unternehmen")}
+                className={"library-filter-chip" + (filter === "tenant" ? " active" : "")}
+                aria-pressed={filter === "tenant"}
+                onClick={() => onFilter("tenant")}
               >
-                {companyLabel}
+                {tenantName}
               </button>
             )}
           </div>
@@ -105,7 +105,11 @@ export default function LibraryPicker({
         {items.map((item) => (
           <div key={item.id} className="card-wrap">
             <button
-              className={"persona-card" + (item.id === selectedId ? " selected" : "")}
+              className={
+                "persona-card" +
+                (item.id === selectedId ? " selected" : "") +
+                (item.origin === "own" ? " editable" : "")
+              }
               onClick={() => onSelect(item.id)}
               type="button"
               aria-pressed={item.id === selectedId}
@@ -118,13 +122,13 @@ export default function LibraryPicker({
               <span
                 className={
                   "card-badge card-badge-" +
-                  (item.herkunft === "eigen" && item.geteilt ? "geteilt" : item.herkunft)
+                  (item.origin === "own" && item.shared ? "shared" : item.origin)
                 }
               >
-                {badgeLabel(item, companyLabel)}
+                {badgeLabel(item, tenantName)}
               </span>
             </button>
-            {item.herkunft === "eigen" && (
+            {item.origin === "own" && (
               <button type="button" className="card-edit" onClick={() => onEdit(item.id)}>
                 Bearbeiten
               </button>

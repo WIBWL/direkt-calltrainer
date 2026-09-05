@@ -403,6 +403,12 @@ h2 {
   flex: 1;
 }
 
+/* Reserve room at the bottom for the absolutely-positioned "Bearbeiten" link
+   so it never sits on top of the card badge. */
+.persona-card.editable {
+  padding-bottom: 2.75rem;
+}
+
 .card-badge {
   align-self: flex-start;
   margin-top: 0.15rem;
@@ -414,24 +420,24 @@ h2 {
   text-transform: uppercase;
 }
 
-.card-badge-vorlage {
+.card-badge-builtin {
   background: var(--color-blue-100);
   color: var(--color-blue-600);
 }
 
-.card-badge-eigen {
+.card-badge-own {
   background: #e3f3ec;
   color: var(--color-success);
 }
 
-.card-badge-unternehmen {
+.card-badge-tenant {
   background: #ece3f7;
   color: #5b3a9c;
 }
 
 /* Own Scenario that has been shared with the company: reads as "mine" but
    signals it is out there. */
-.card-badge-geteilt {
+.card-badge-shared {
   background: #e3f3ec;
   color: var(--color-success);
   box-shadow: inset 0 0 0 1px #5b3a9c33;

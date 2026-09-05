@@ -1,22 +1,22 @@
-import type { Sichtbarkeit } from "../scenarioLibrary";
+import type { Visibility } from "../scenarioLibrary";
 
 interface ShareToggleProps {
-  sichtbarkeit: Sichtbarkeit;
-  onChange: (next: Sichtbarkeit) => void;
+  visibility: Visibility;
+  onChange: (next: Visibility) => void;
   label: string;
   hint?: string;
 }
 
 /** The single "share with my company" toggle (R-58 / ADR 0060): the entire
  * sharing interaction. Applies immediately, independent of the editor's Save. */
-export default function ShareToggle({ sichtbarkeit, onChange, label, hint }: ShareToggleProps) {
-  const shared = sichtbarkeit === "unternehmen";
+export default function ShareToggle({ visibility, onChange, label, hint }: ShareToggleProps) {
+  const shared = visibility === "tenant";
   return (
     <label className="share-toggle">
       <input
         type="checkbox"
         checked={shared}
-        onChange={(e) => onChange(e.target.checked ? "unternehmen" : "privat")}
+        onChange={(e) => onChange(e.target.checked ? "tenant" : "private")}
       />
       <span>
         <span className="share-toggle-label">{label}</span>
