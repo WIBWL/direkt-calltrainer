@@ -302,6 +302,7 @@ async def _attach_measurements(
         measured = await acoustics
     except AcousticsError as e:
         logger.info("Turn %d not measured: %s", turn.seq, e)
+        turn.user_acoustics_complete = False
         return
     except Exception:  # pylint: disable=broad-exception-caught
         # Deliberately catch-all: `analyze` runs Praat in a worker thread and
@@ -309,11 +310,12 @@ async def _attach_measurements(
         # is never load-bearing, so any failure here is logged and the Turn
         # just carries no measurements -- it must not break the call.
         logger.exception("Paraverbal analysis failed for turn %d", turn.seq)
+        turn.user_acoustics_complete = False
         return
     started_ms = max(0, ended_ms - measured.duration_ms)
     if turn.user_offset_ms is None:
         turn.user_offset_ms = started_ms
-    turn.user_speech_ms += measured.duration_ms
+    turn.user_speech_ms += measured.phonation_ms
     turn.pauses.extend(Pause(started_ms + p.offset_ms, p.duration_ms) for p in measured.pauses)
     turn.loudness_db.extend(measured.loudness_db)
 

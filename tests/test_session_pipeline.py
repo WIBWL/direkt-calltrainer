@@ -10,8 +10,15 @@ Covers:
 """
 
 import pytest
-
-from backend.session.models import AudioChunk, StateChanged, TurnCompleted
+from backend.feedback.acoustics import AcousticsError, TurnAcoustics
+from backend.feedback.metrics import measure
+from backend.session.models import (
+    AudioChunk,
+    StateChanged,
+    Turn,
+    TurnCompleted,
+    conversation,
+)
 from backend.session.orchestrator import SessionOrchestrator
 from tests.conftest import audio_chunks, collect, completed, states
 
@@ -124,3 +131,79 @@ async def test_transcript_is_assembled_across_turns_at_the_end(orch, fake_pipeli
             "persona_text": "Alles klar, das passt fuer mich.",
         },
     ]
+
+
+async def test_user_speech_time_uses_phonation_not_recording_duration(
+    orch, fake_pipeline, monkeypatch
+):
+    monkeypatch.setattr(
+        "backend.session.orchestrator.analyze",
+        lambda _audio: TurnAcoustics(
+            duration_ms=1500,
+            phonation_ms=900,
+            pauses=(),
+            loudness_db=(),
+        ),
+    )
+    fake_pipeline.stt.transcripts = ["Ich spreche mit einer Pause."]
+    fake_pipeline.llm.replies = ["Danke fuer die Information."]
+
+    await collect(orch.run_turn(b"audio", "turn.wav", "audio/wav"))
+
+    assert orch.turns[0].user_speech_ms == 900
+
+
+async def test_acoustics_failure_marks_turn_incomplete(
+    orch, fake_pipeline, monkeypatch
+):
+    def fail_analyze(_audio):
+        raise AcousticsError("test acoustics failure")
+
+    monkeypatch.setattr(
+        "backend.session.orchestrator.analyze",
+        fail_analyze,
+    )
+
+    fake_pipeline.stt.transcripts = ["Ich spreche trotz Messfehler."]
+    fake_pipeline.llm.replies = ["Danke fuer die Information."]
+
+    await collect(orch.run_turn(b"audio", "turn.wav", "audio/wav"))
+
+    assert orch.turns[0].user_acoustics_complete is False
+
+
+def test_incomplete_acoustics_skip_partial_metrics_and_fake_reaction() -> None:
+    turns = [
+        Turn(
+            seq=1,
+            persona_text="Guten Tag.",
+            persona_offset_ms=0,
+            persona_end_ms=1000,
+        ),
+        Turn(
+            seq=2,
+            user_text="Erster gemessener Beitrag.",
+            user_offset_ms=1500,
+            user_end_ms=2000,
+            user_speech_ms=500,
+            persona_text="Verstanden.",
+            persona_offset_ms=2100,
+            persona_end_ms=3100,
+        ),
+        Turn(
+            seq=3,
+            user_text="Zweiter Beitrag mit Messfehler.",
+            user_offset_ms=4000,
+            user_end_ms=4000,
+            user_acoustics_complete=False,
+        ),
+    ]
+
+    call = conversation(turns)
+    metric_keys = {metric.key for metric in measure(call)}
+
+    assert call.user_acoustics_complete is False
+    assert call.reactions_ms == (500,)
+    assert "talk_share" not in metric_keys
+    assert "pace" not in metric_keys
+    assert "word_count" in metric_keys

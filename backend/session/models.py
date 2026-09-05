@@ -43,6 +43,7 @@ class Turn:
     # timeline -- so a Turn reopened after a barge-in, and therefore spoken in
     # several fragments, needs no special case once the Session is folded up.
     user_speech_ms: int = 0
+    user_acoustics_complete: bool = True
     pauses: list[Pause] = field(default_factory=list)
     loudness_db: list[float | None] = field(default_factory=list)
 
@@ -98,8 +99,9 @@ def conversation(turns: Sequence[Turn]) -> Conversation:
     persona_stopped: int | None = None
 
     for turn in turns:
-        if turn.user_offset_ms is not None and persona_stopped is not None:
+        if turn.user_acoustics_complete and turn.user_offset_ms is not None and persona_stopped is not None:
             reactions.append(max(0, turn.user_offset_ms - persona_stopped))
+
         user_ms += turn.user_speech_ms
         pauses.extend(turn.pauses)
         loudness.extend(turn.loudness_db)
@@ -109,6 +111,9 @@ def conversation(turns: Sequence[Turn]) -> Conversation:
     return Conversation(
         user_text=" ".join(turn.user_text for turn in turns if turn.user_text),
         user_speech_ms=user_ms,
+        user_acoustics_complete=all(
+            turn.user_acoustics_complete for turn in turns if turn.user_text
+        ),
         persona_speech_ms=persona_ms,
         reactions_ms=tuple(reactions),
         pauses=tuple(pauses),

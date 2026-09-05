@@ -20,10 +20,17 @@ quietly turn into the score ADR 0004 rules out.
 No database and no network: `_messages` is a pure function and `_Wrapup` is a
 pydantic model.
 """
+from types import SimpleNamespace
 
 import pytest
 
-from backend.feedback.generator import _messages, _Wrapup
+from backend.db import models as db_models
+from backend.feedback.generator import (
+    _LANGUAGE_NAMES_EN,
+    _dossier,
+    _messages,
+    _Wrapup,
+)
 
 # The prompt builder and the response model are the units under test.
 # pylint: disable=protected-access,redefined-outer-name
@@ -110,3 +117,35 @@ def test_narrative_fallback_carries_no_phase_text() -> None:
     """ADR 0049's degradation path: an answer that never validates yields the
     prose alone. It has no phase analysis in it, and must not claim one."""
     assert _Wrapup(summary="Freitext ohne JSON.").phase_language == ""
+
+
+def test_english_language_code_maps_to_english() -> None:
+    assert _LANGUAGE_NAMES_EN["en"] == "English"
+
+
+def test_dossier_only_allows_user_turn_ids_for_citations() -> None:
+    session = SimpleNamespace(
+        measurements=[],
+        turns=[
+            SimpleNamespace(
+                turn_id=1,
+                seq_index=0,
+                speaker=db_models.SPEAKER_PERSONA,
+                start_offset_ms=0,
+                transcript="Guten Tag.",
+            ),
+            SimpleNamespace(
+                turn_id=2,
+                seq_index=1,
+                speaker=db_models.SPEAKER_USER,
+                start_offset_ms=1000,
+                transcript="Hallo.",
+            ),
+        ],
+    )
+
+    dossier, valid_turn_ids = _dossier(session)
+
+    assert "[turn_id=1]" in dossier
+    assert "[turn_id=2]" in dossier
+    assert valid_turn_ids == {2}

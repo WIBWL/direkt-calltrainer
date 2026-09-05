@@ -14,7 +14,8 @@ import uuid
 import pytest
 from sqlalchemy.orm import Session as DbSession
 
-from backend.db.models import Persona, Session
+from backend.db.models import AnalysisJob, Persona, Session
+from backend.session import persistence
 from backend.db.models import Turn as TurnRow
 from backend.session.models import Turn
 from tests.conftest import SESSION_STARTED, persist
@@ -147,3 +148,47 @@ def test_a_deactivated_persona_can_still_receive_a_session(db_session: DbSession
     persist(turns=_default_turns())
 
     assert db_session.query(Session).count() == 1
+
+
+def test_stale_running_feedback_job_is_marked_failed(
+    db_session: DbSession,
+) -> None:
+    persist(turns=_default_turns())
+
+    job = db_session.query(AnalysisJob).one()
+    job.status = "running"
+    db_session.commit()
+
+    count = persistence.fail_running_feedback_jobs(
+        "worker restarted"
+    )
+
+    db_session.expire_all()
+    job = db_session.query(AnalysisJob).one()
+
+    assert count == 1
+    assert job.status == "failed"
+    assert job.error_text == "worker restarted"
+
+
+def test_feedback_failure_marker_does_not_overwrite_done_job(
+    db_session: DbSession,
+) -> None:
+    persist(turns=_default_turns())
+
+    session = db_session.query(Session).one()
+    job = db_session.query(AnalysisJob).one()
+    job.status = "done"
+    job.error_text = None
+    db_session.commit()
+
+    persistence.mark_feedback_job_failed(
+        session.session_id,
+        "late worker failure",
+    )
+
+    db_session.expire_all()
+    job = db_session.query(AnalysisJob).one()
+
+    assert job.status == "done"
+    assert job.error_text is None
