@@ -1,10 +1,182 @@
+name: direkt-calltrainer
 services:
-  pjscalltrainer:
-    image: pjscalltrainer
+  app:
+    image: direkt-calltrainer
+    # Pinned: praat-parselmouth ships no Linux aarch64 wheel, so an arm64 build
+    # falls back to the source tarball and fails to compile in python-slim.
+    platform: linux/amd64
     build:
       context: .
       dockerfile: ./Dockerfile
+      platforms:
+        - linux/amd64
+      args:
+        # The SPA needs these at `npm run build` time (see Dockerfile).
+        VITE_OIDC_ISSUER: ${VITE_OIDC_ISSUER:-http://localhost:18081/realms/direkt}
+        VITE_OIDC_CLIENT_ID: ${VITE_OIDC_CLIENT_ID:-calltrainer-frontend}
     env_file:
       - .env
+    environment:
+      # The only part of the connection that differs from the host default:
+      # within the compose network the database is reachable as "db". User,
+      # password and database name come from the env_file, and the URL itself
+      # is assembled in backend/db/session.py.
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379
+      # The token `iss` and the browser's authority — reachable at localhost:18081
+      # from the host. The container can't reach that, so it fetches the keys
+      # over the compose network instead (backend/auth.py's OIDC_JWKS_URL).
+      OIDC_ISSUER: http://localhost:18081/realms/direkt
+      OIDC_JWKS_URL: http://keycloak:8080/realms/direkt/protocol/openid-connect/certs
     ports:
-      - 8000:8000
+      # Host port is deliberately non-standard to avoid clashes (e.g. mkdocs,
+      # other uvicorn/Django apps, all default to 8000). Container stays 8000.
+      - 8391:8000
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      # Readiness, not liveness: an instance that cannot reach the database can
+      # only answer 503, so it should not count as healthy. Uses Python because
+      # the image has no curl. start_period covers migrations and seeding, which
+      # run in the app's own lifespan handler (backend/db/provision.py).
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    develop:
+      watch:
+        # Backend code changes: synced into the running container and the
+        # gunicorn process restarted, without a full image rebuild.
+        - action: sync+restart
+          path: ./backend
+          target: /app/backend
+        # Anything that needs `pip install` or the frontend build re-run:
+        # cheap enough to just rebuild the image from scratch.
+        - action: rebuild
+          path: ./requirements.txt
+        - action: rebuild
+          path: ./frontend
+          ignore:
+            - node_modules/
+            - dist/
+
+  # The Feedback worker (ADR 0018/0019): same image and code as the app, a
+  # different process. It only ever touches Postgres and the LLM gateway, so
+  # it needs no port of its own and nothing depends on it being up for a call
+  # to run -- a stopped worker just means wrap-ups queue until it returns.
+  worker:
+    image: direkt-calltrainer
+    # Same image as app, so the same pin applies.
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      platforms:
+        - linux/amd64
+    command: ["python", "-m", "backend.worker"]
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./backend
+          target: /app/backend
+        - action: rebuild
+          path: ./requirements.txt
+
+  redis:
+    image: redis:8-alpine
+    # No volume: the queue holds in-flight jobs only. What must survive a
+    # restart is the job's outcome, and that lives in Postgres (ADR 0032).
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      # Loopback only. The application never uses this: app and worker reach
+      # the database as `db` over the compose network. It is published for
+      # host-side work alone -- psql, a GUI client, `pytest` against a real
+      # server -- and a bare "5432:5432" would bind every interface, which
+      # matters because no deployment is decided yet (ADR 0020) and this file
+      # is the only description of how the system runs.
+      - 127.0.0.1:5432:5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Local identity provider (ADR 0009). `start-dev` keeps realms in an embedded
+  # H2 file, so no DB of its own. `--import-realm` reads keycloak/direkt-realm.json
+  # at boot: the calltrainer-frontend client and the dev users alice/bob/carol
+  # (password = username). Import is SKIPPED if the realm already exists, so
+  # after editing the JSON: `docker compose down -v && docker compose up`.
+  # KC_HOSTNAME fixes the issuer to localhost:18081 no matter which host the
+  # token request arrived on; --hostname-strict=false lets the app container
+  # reach it as `keycloak:8080` for the JWKS. Host port 18081, not 18080, so it
+  # can run alongside another local Keycloak on the default port.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7
+    command: start-dev --import-realm --hostname-strict=false
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: http://localhost:18081
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      # Loopback only, for the same reason as the database -- and more so here:
+      # the admin console below is reachable with admin/admin. Nothing is lost,
+      # KC_HOSTNAME pins the issuer to localhost anyway, so a login from
+      # another machine could not work regardless.
+      - 127.0.0.1:18081:8080
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ./keycloak:/opt/keycloak/data/import:ro
+    healthcheck:
+      # KC 26 images carry no curl/wget; bash's /dev/tcp checks the HTTP port is
+      # accepting connections. Realm import finishes within `start_period`.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+volumes:
+  # Named explicitly so `docker volume rm` can address it without guessing at
+  # Compose's project prefix. The value is the name Compose already generates,
+  # underscore included -- picking the prettier `direkt-calltrainer-pgdata`
+  # would point the database at a new, empty volume and appear to lose every
+  # stored Session.
+  pgdata:
+    name: direkt-calltrainer_pgdata
+  keycloak-data:
+    name: direkt-calltrainer-keycloak-data

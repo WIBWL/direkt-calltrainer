@@ -7,7 +7,7 @@
 Im Gegensatz zu klassischen Verkaufstrainern liegt der Fokus nicht auf Abschlussquoten, sondern auf Kommunikation, Klarheit und Wirkung des Sprechenden, ohne dass umfangreiche kundenspezifische Fachkenntnisse vorausgesetzt werden (C-05):
 
 - Kommunikation, Klarheit und Wirkung des Sprechenden
-- Erkennung von Sprechverhalten (Intonation, Tempo, Lautstärke, Artikulation)
+- Erkennung von Sprechverhalten (Redeanteil, Fragen, Sprechtempo, Wortanzahl, Reaktionszeit, Sprechpausen, Lautstärke — ADR 0051)
 - Vermeidung von überlangen/überkomplexen Erklärungen
 
 Nach jedem Trainingsgespräch erhält der Nutzer ein qualitatives Wrap-up mit konkreten Verbesserungsvorschlägen statt eines reinen Scores.
@@ -48,7 +48,7 @@ Weitere Qualitätsanforderungen geringerer Priorität sind in Kapitel 10 aufgef�
 
 | ID | Randbedingung | Beschreibung | Quelle |
 |---|---|---|---|
-| C-01 | Sprache konfigurierbar | Das Training findet in der Sprache statt, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Die Sprache wird pro Trainings-Session ausgewählt, unabhängig von Szenario und Persona. Belegt sind Deutsch bei Solox sowie Englisch und teilweise Spanisch bei APPOLLO Systems. Siehe ADR 0023. | R-35 |
+| C-01 | Sprache konfigurierbar | Das Training findet in der Sprache statt, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Die Sprache ist an die Persona gebunden und ergibt sich aus deren Auswahl; Szenarien sind sprachneutral und mit jeder Persona kombinierbar. Belegt sind Deutsch bei Solox sowie Englisch und teilweise Spanisch bei APPOLLO Systems. Siehe ADR 0043 (löst ADR 0022 ab). | R-35 |
 | C-04 | Datenschutz nach DSGVO | Alle Daten, insbesondere Sprachaufzeichnungen und personenbezogene Daten, werden DSGVO-konform verarbeitet. Die Randbedingung begrenzt die Umsetzung aller übrigen Ziele und steht nicht als gleichrangiges Ziel neben ihnen. | rechtliche Vorgabe |
 | C-05 | Kein kundenspezifisches Fachwissen vorausgesetzt | Fachliches Know-how zu einzelnen Kunden oder Systemen wird nicht abgebildet, da sich die Fachlichkeit je Kundenlandschaft unterscheidet. Der Fokus liegt auf Kommunikation statt Fachlichkeit. | R-40, R-41 |
 | C-06 | Gesprächsdauer | Die zu trainierenden Gespräche reichen von kurzen Rückfragen bis zu Gesprächen von einer Stunde. | R-03 |
@@ -60,7 +60,7 @@ Weitere Qualitätsanforderungen geringerer Priorität sind in Kapitel 10 aufgef�
 | ID | Konvention | Beschreibung |
 |---|---|---|
 | C-09 | Anforderungsmanagement nach MoSCoW | Funktionale Anforderungen werden nach Must, Should, Could und Won't priorisiert. Priorität und Release-Zuordnung werden getrennt geführt. |
-| C-10 | Anforderungsdokumentation nach ISO/IEC/IEEE 29148 | Anforderungen werden in einer Anforderungsliste in Bedarfssprache geführt, mit Quelle und Typ. Aus dem Typ ergibt sich der Zielort: Funktionen in den Feature-Katalog, Qualitätsziele nach Kapitel 10, Randbedingungen nach Kapitel 2, Nicht-Ziele nach Kapitel 1. |
+| C-10 | Anforderungsdokumentation nach ISO/IEC/IEEE 29148 | Anforderungen werden in einer Anforderungsliste in Bedarfssprache geführt, mit Quelle und Typ. Aus dem Typ ergibt sich der Zielort: Funktionen in den Feature-Katalog, Qualitätsziele nach Kapitel 10, Randbedingungen nach Kapitel 2 |
 
 # 3. Kontextabgrenzung
 
@@ -78,7 +78,7 @@ Simuliert einen externen Kunden im Gespräch. Die Persona kann aus einer erweite
 
 ### Feedback-/Auswertungskomponente
 
-Erstellt nach Gesprächsende das qualitative Wrap-up (F-09) inkl. konkreter Verbesserungsvorschläge (F-10), basierend auf der Analyse des Sprechverhaltens (F-35, F-36, F-37, F-38, F-51, F-08).
+Erstellt nach Gesprächsende das qualitative Wrap-up (F-09) inkl. konkreter Verbesserungsvorschläge (F-10), basierend auf den Kennzahlen des Gesprächs (F-53) und dem Lautstärkeverlauf (F-37). Die Kennzahlen beschreiben jeweils das ganze Gespräch, nicht einzelne Redebeiträge (ADR 0051). Ergänzend entsteht im selben Modellaufruf ein Textblock zur phasengerechten Sprache (F-42): ob der Sprachstil über Einstieg, Kernanliegen und Abschluss hinweg mitgewandert ist. Er ist bewusst Fließtext und keine Kennzahl, weil er eine Veränderung über das Gespräch hinweg beschreibt, die keine einzelne Zahl trägt (ADR 0056).
 
 ## 3.2 Technischer Kontext
 
@@ -94,7 +94,7 @@ Primärer Zugangsweg im MVP (C-02). Erfasst Sprachsignal des Nutzers, gibt Sprac
 
 **Kanal / Schnittstelle:** Interne Schnittstelle
 
-Wandelt die gesprochene Nutzereingabe in Text um, als Grundlage für Sprachanalyse (F-35, F-36, F-37, F-38, F-51) und KI-Antwortgenerierung.
+Wandelt die gesprochene Nutzereingabe in Text um, als Grundlage für Sprachanalyse (F-36, F-41, F-08, F-51) und KI-Antwortgenerierung.
 
 ### Sprachsynthese (Text-to-Speech)
 
@@ -155,9 +155,10 @@ Besonderheiten: Der gesamte Zyklus muss in Echtzeit ablaufen (Q-03), da Verzöge
 
 ## 6.2 Szenario 2: Analyse des Sprechverhaltens während des Gesprächs
 
-- Während der Nutzer spricht, analysiert die Analyse-Komponente laufend Intonation (F-35), Sprechtempo (F-36), Lautstärke (F-37) und Artikulation (F-38).
-- Zusätzlich wird erkannt, ob ein Thema zu lang, zu kompliziert oder mit zu vielen Informationen erklärt wird (F-08) oder ob Stockungen, Füllwörtern und Unterbrechungen im Redefluss vorhanden sind (F-51)
-- Auffälligkeiten werden für das spätere Wrap-up gesammelt, nicht sofort während des Gesprächs unterbrochen oder angezeigt.
+- Während der Nutzer spricht, misst die Analyse-Komponente je Redebeitrag nur die Rohgrößen, die am Audio ablesbar sind (Sprechdauer, Pausen, Lautstärke) und rechnet sie auf die Zeitachse der Session um.
+- Die Kennzahlen entstehen erst am Gesprächsende aus allen Redebeiträgen zusammen und beschreiben jeweils das ganze Gespräch — Menge und Begründung siehe ADR 0051, Kennzahlenliste F-53.
+- Die Antwortzeit der KI wird mitgemessen und keinem Sprecher zugerechnet, damit sie nicht als Gesprächslücke des Nutzers erscheint (ADR 0051).
+- Ergebnisse werden für das spätere Wrap-up gesammelt, nicht während des Gesprächs angezeigt (ADR 0014).
 
 Besonderheiten: Diese Analyse läuft parallel zur eigentlichen Gesprächssimulation (Szenario 1), ohne den Gesprächsfluss zu unterbrechen. Die gesammelten Daten dienen als Grundlage für Szenario 3.
 
@@ -166,6 +167,7 @@ Besonderheiten: Diese Analyse läuft parallel zur eigentlichen Gesprächssimulat
 - Nach Beendigung des Gesprächs durch den Nutzer wertet die Feedback-Komponente die gesammelten Analyseergebnisse aus Szenario 2 aus.
 - Es wird eine qualitative Zusammenfassung (Wrap-up) erstellt – keine reine Zahl/Score (F-09).
 - Konkrete, umsetzbare Verbesserungsvorschläge werden formuliert und nach Möglichkeit mit konkreten Gesprächsstellen verknüpft (F-10).
+- Ein eigener Textblock beurteilt die phasengerechte Sprache (F-42): Der Abschluss wird darin stärker gewichtet als die Gesprächsmitte, weil er die Erinnerung an das ganze Gespräch überproportional prägt – als Textgewicht, nicht als Punktabzug (ADR 0056).
 - Das Wrap-up wird dem Nutzer angezeigt.
 
 Besonderheiten: Die Qualität dieses Szenarios ist zentral für die Akzeptanz des Tools (siehe Qualitätsziele, Kapitel 1). Ein optionaler Score (F-14, COULD) kann ergänzend angezeigt werden, ersetzt aber nie das qualitative Feedback.
@@ -201,7 +203,7 @@ Da Sprachaufzeichnungen und personenbezogene Daten verarbeitet werden, muss das 
 - Speicherung von Fortschrittsdaten einzelner Nutzer (F-13)
 - Übertragung von Sprachdaten an externe Dienste (z. B. Speech-to-Text-, Text-to-Speech- oder LLM-APIs)
 
-Für den MVP werden Sprachdaten, Transkripte und Feedback nicht über das Ende der Session hinaus gespeichert; danach ist die Speicherung auf der uni-gehosteten Datenplattform ausschließlich mit Einwilligung des Nutzers vorgesehen, die dieser jederzeit widerrufen sowie seine Daten selbst löschen kann (siehe ADR 0024).
+Sessiondaten werden bereits im MVP dauerhaft gespeichert, und zwar einmalig am Ende der Session in die projekteigene, uni-gehostete PostgreSQL-Datenbank (ADR 0010): Session-Metadaten, Transkripte, Messungen und Feedback. Sprachaufzeichnungen werden nicht gespeichert und existieren nur für die Dauer der laufenden Session. Sobald Nutzerkonten existieren (ADR 0009), ist die Einwilligung des Nutzers die alleinige Grundlage dafür, eine Session einer identifizierten Person zuzuordnen; der Nutzer kann sie jederzeit widerrufen und seine Daten selbst löschen. Solange es keine Konten gibt, ist der Datenschutzhinweis vor der ersten Aufzeichnung (F-49) Voraussetzung für die Nutzung (siehe ADR 0034, der ADR 0023 ablöst).
 
 ## 8.2 Umgang mit Feedback und Bewertung
 
@@ -238,32 +240,58 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0003 | No Human Trainer — Feedback Is Fully AI-Generated | angenommen | F-09, F-10 |
 | ADR 0004 | Feedback Is Qualitative, Not Score-Based | angenommen | Q-01, F-09, F-14, R-21 |
 | ADR 0005 | No Automated Enterprise/CRM Integration, No Sales KPIs | angenommen | C-05, F-26, F-45, R-45 |
-| ADR 0006 | Training Language Is German Only for the MVP | abgelöst durch ADR 0023 | C-01, R-35 |
+| ADR 0006 | Training Language Is German Only for the MVP | abgelöst durch ADR 0022 | C-01, R-35 |
 | ADR 0007 | Primary Access via PC + Headset, Mobile Optional | angenommen | C-02, C-03 |
 | ADR 0008 | Frontend Built with React and TypeScript | angenommen | F-46, F-50 |
 | ADR 0009 | Authentication via Keycloak (OIDC Authorization Code Flow + PKCE) | angenommen | C-04, F-31, F-50 |
-| ADR 0010 | Persistence Delegated to an External Datenplattform | angenommen | C-04, F-12, F-13, F-26, F-31 |
-| ADR 0011 | LLM Backend Is the University-Hosted EFRE-Direkt Gateway, Self-Contained | angenommen (durch ADR 0022 eingegrenzt) | Q-03, C-04, F-01 |
+| ADR 0010 | Own PostgreSQL Instance for Session Persistence | angenommen | C-04, F-12, F-13 |
+| ADR 0011 | LLM Backend Is the University-Hosted DiReKT Gateway, Self-Contained | angenommen (durch ADR 0021 eingegrenzt) | Q-03, C-04, F-01 |
 | ADR 0012 | Backend Built with Python and FastAPI | angenommen | Q-03 |
-| ADR 0013 | Turn-Based, Non-Streaming Pipeline for the MVP | angenommen | Q-03, F-01 |
-| ADR 0014 | Minimal Required Setup, Advanced Options Separate | angenommen | Q-02, F-43, R-34 |
-| ADR 0015 | Speech-Behavior Feedback Surfaces Only in the Post-Call Wrap-Up | angenommen | F-09, F-35, F-36, F-37, F-38, F-51 |
-| ADR 0016 | Persona Selection via Card View, Not a List | angenommen | Q-02, F-04, F-44 |
-| ADR 0017 | One Retry, Then Graceful Session End on Pipeline Failure | angenommen | Q-03, F-46 |
-| ADR 0018 | No Provider Abstraction Layer for STT/LLM/TTS | angenommen | |
-| ADR 0019 | Layered Modular Monolith for the Real-Time Path, Async Feedback Worker | angenommen | Q-03, F-09 |
-| ADR 0020 | Redis + RQ for the Feedback Job Queue | angenommen | F-09 |
-| ADR 0021 | Deployment on a University-Hosted Server | angenommen | C-04 |
-| ADR 0022 | STT and TTS Run as Separately Self-Hosted Local Models | angenommen | Q-03, C-04, F-01 |
-| ADR 0023 | Language as Independent Session Parameter | angenommen (löst ADR 0006 ab) | C-01, R-35 |
-| ADR 0024 | No Session Data Persisted Beyond the MVP; Consent-Gated Storage After | vorgeschlagen | C-04, F-12, F-13, F-48, F-49 |
-| ADR 0025 | User-Authored Scenario Context and Personas (Post-MVP) | angenommen | F-04, F-26, F-34, F-45 |
+| ADR 0013 | Minimal Required Setup, Advanced Options Separate | angenommen | Q-02, F-43, R-34 |
+| ADR 0014 | Speech-Behavior Feedback Surfaces Only in the Post-Call Wrap-Up | angenommen (eingegrenzt durch ADR 0051) | F-09, F-36, F-37, F-51, F-53 |
+| ADR 0015 | Persona Selection via Card View, Not a List | angenommen | Q-02, F-04, F-44 |
+| ADR 0016 | One Retry, Then Graceful Session End on Pipeline Failure | angenommen | Q-03, F-46 |
+| ADR 0017 | No Provider Abstraction Layer for STT/LLM/TTS | angenommen | |
+| ADR 0018 | Layered Modular Monolith for the Real-Time Path, Async Feedback Worker | angenommen | Q-03, F-09 |
+| ADR 0019 | Redis + RQ for the Feedback Job Queue | angenommen | F-09 |
+| ADR 0020 | Deployment on a University-Hosted Server | angenommen | C-04 |
+| ADR 0021 | STT and TTS Run as Separately Self-Hosted Local Models | angenommen | Q-03, C-04, F-01 |
+| ADR 0022 | Language as Independent Session Parameter | abgelöst durch ADR 0043 (löst ADR 0006 ab) | C-01, R-35 |
+| ADR 0023 | No Session Data Persisted Beyond the MVP; Consent-Gated Storage After | abgelöst durch ADR 0034 | C-04, F-12, F-13, F-48, F-49 |
+| ADR 0024 | User-Authored Scenario Context and Personas (Post-MVP) | angenommen | F-04, F-26, F-34, F-45 |
+| ADR 0025 | SQLAlchemy 2.0 as ORM | angenommen | |
+| ADR 0026 | Normalized Relational Schema for Session Persistence | angenommen | F-12, F-13 |
+| ADR 0027 | Alembic Migrations Autogenerated from ORM Metadata | angenommen | |
+| ADR 0028 | No Secondary Indexes Beyond Primary/Foreign Keys Yet | abgelöst durch ADR 0052 | |
+| ADR 0029 | JSONB for Flexible Per-Measurement Detail Data | angenommen | |
+| ADR 0030 | ER Diagram Generated from ORM Metadata | angenommen | |
+| ADR 0031 | Pseudonymous subject_id Placeholder Instead of a User Foreign Key | angenommen | C-04, F-31 |
+| ADR 0032 | AnalysisJob as a Persisted Entity for Async Job Status | angenommen | Q-07, F-09 |
+| ADR 0033 | Streaming Session Pipeline via Chunked TTS over WebSocket | angenommen | Q-03, F-01, F-46 |
+| ADR 0034 | Session Data Is Persisted in the MVP, Written Once at Session End | angenommen (löst ADR 0023 ab) | C-04, Q-03, F-12, F-13, F-48, F-49 |
+| ADR 0035 | Eager Client-Driven Barge-In Interruption | angenommen | Q-03, F-01, F-46 |
+| ADR 0036 | VAD Confirmed-Speech Threshold Instead of a Backchannel Word List | angenommen | Q-03, F-01 |
+| ADR 0037 | Closing-Intent Detection Is Regex-Based, Not an LLM Classifier | angenommen | Q-07, F-01 |
+| ADR 0038 | Guard Against Degenerate Repetition; Guarantee a Closing Line on Backstopped Endings | angenommen | Q-07, F-01 |
+| ADR 0039 | Centralized Logging — Colored Console, Per-Session-Truncated File, Not Committed | angenommen (Datei-Truncation überarbeitet durch ADR 0055) | |
+| ADR 0040 | TTS Defaults to KugelAudio with a DiReKT Fallback; Gemini Removed | angenommen (grenzt die TTS-Hälfte von ADR 0021 ein) | Q-03, Q-07, C-04, F-01 |
+| ADR 0041 | Personas and Scenarios Loaded from the Database | angenommen | F-03, F-04 |
+| ADR 0042 | Opening Turn Pre-Warmed at Session Commitment, Not on Selection | angenommen | Q-03, F-01 |
+| ADR 0043 | English Prompt Content, Session Language Bound to the Persona | angenommen (löst ADR 0022 ab) | C-01, R-35, F-03, F-04 |
+| ADR 0044 | Forward KugelAudio's Audio Sub-Chunks; No Persistent Streaming Session | angenommen (verfeinert die TTS-Strecke aus ADR 0033) | Q-03, F-01, F-46 |
+| ADR 0045 | Case Facts, Call Goal and Success Condition on the Scenario; Objections on the Persona | angenommen (erweitert ADR 0001) | F-01, F-03, F-04, R-12 |
+| ADR 0046 | Liveliness Is Pursued at the Prompt Layer Before the Turn-Taking Layer | vorgeschlagen | F-01 |
+| ADR 0047 | Praat via Parselmouth as the Paraverbal Measurement Engine | angenommen (eingegrenzt durch ADR 0051) | F-36, F-37, F-51, F-08 |
+| ADR 0048 | Paraverbal Analysis Runs Inline on In-Memory Audio; Audio Is Never Persisted | angenommen | Q-03, C-04, F-12, F-36, F-37, F-51 |
+| ADR 0049 | The Model Interprets Measurements, It Does Not Produce Them | angenommen | F-09, F-10, R-19, R-22 |
+| ADR 0050 | A Session Is Addressed by an Unguessable Id | angenommen | C-04, F-12 |
+| ADR 0051 | Statistics Describe the Whole Session and Carry No Invented Norms | angenommen (grenzt ADR 0014/0047/0048 ein) | Q-01, F-53, F-12 |
+| ADR 0052 | Index Every Foreign-Key Column | angenommen (löst ADR 0028 ab) | Q-03, F-12 |
+| ADR 0053 | Deterministic Constraint Names and Database-Enforced Vocabularies | angenommen | |
+| ADR 0054 | The Scenario Briefs the Trainee, Not Only the Persona | vorgeschlagen (erweitert ADR 0045) | Q-01, C-05, R-43 |
+| ADR 0055 | Log File Kept for the Whole Run, Not Truncated per Session | angenommen (überarbeitet ADR 0039) | |
 
-Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug, ADR 0018 eine reine Wartbarkeitsentscheidung ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
-
-TODO:
-- Veraltete Feature-IDs in den ADRs: ADR 0005 (F-27, F-28), ADR 0013 (F-21), ADR 0023 (F-18) und ADR 0024 (F-11) verweisen auf Nummern, die im heutigen features.md nicht mehr existieren. Im Index habe ich inhaltlich neu zugeordnet; die ADR-Texte selbst zeigen weiterhin ins Leere.
-- K-04 ist noch offen: initial_requirements.md:178 fordert, die Sprachänderung müsse in den Feature-Katalog zurückfließen, „wo F-18 derzeit Deutsch als MUST und F-25 Englisch als COULD führt". Beide IDs sind im Katalog bereits verschwunden, ohne Ersatz-Feature — die Sprache existiert heute nur noch als Randbedingung C-01. Ob das so gewollt ist, wäre zu klären.
+Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug; ADR 0017, 0025, 0027 bis 0030, 0039 und 0055 sind reine Wartbarkeits-, Werkzeug- oder Schemaentscheidungen ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 
 # 10. Qualitätsanforderungen
 
@@ -271,14 +299,14 @@ TODO:
 
 | ID | Kategorie | ISO 25010 | Beschreibung | Herkunft |
 |---|---|---|---|---|
-| Q-01 | Genauigkeit und Nachvollziehbarkeit der Gesprächsanalyse | Funktionale Korrektheit | Die Analyse erkennt auffälliges Sprechverhalten zutreffend und führt ihre Befunde auf konkrete Gesprächsstellen zurück. Die Rückmeldung ist als Wirkung auf den Gesprächspartner formuliert, nicht als objektives Urteil. | R-25, R-26 |
+| Q-01 | Genauigkeit und Nachvollziehbarkeit der Gesprächsanalyse | Funktionale Korrektheit | Die Analyse erkennt auffälliges Sprechverhalten zutreffend und führt ihre Befunde auf konkrete Gesprächsstellen zurück. Die Rückmeldung ist als Wirkung auf den Gesprächspartner formuliert, nicht als objektives Urteil. | R-19, R-25, R-26 |
 | Q-02 | Bedienbarkeit ohne Einarbeitung | Interaktionsfähigkeit | Ein Erstnutzer startet ein Training ohne Anleitung. Pflichteinstellungen sind minimal und klar sichtbar, Zusatzoptionen treten zurück. | R-32, R-33, R-34 |
 | Q-03 | Echtzeitfähigkeit des Gesprächsflusses | Leistungseffizienz | Die Kette aus Spracherkennung, Antwortgenerierung und Sprachsynthese antwortet ohne wahrnehmbare Verzögerung. | Systementwurf |
 | Q-04 | Qualitative statt quantitative Bewertung | Funktionale Angemessenheit | Die Rückmeldung ist differenziert und reduziert das Ergebnis nicht auf einen einzelnen Zahlenwert. | R-21 |
 | Q-05 | Regelmäßigkeit der Rückmeldung | Interaktionsfähigkeit | Der Nutzer erhält bei fortlaufender Nutzung regelmäßig Rückmeldung. Ohne diese Regelmäßigkeit ist die Annahme des Werkzeugs nicht zu erwarten. | R-27 |
-| Q-06 | Flexibilität der Trainingssituation | Funktionale Angemessenheit | Das System unterstützt unterschiedliche Szenario-Typen und Gesprächslängen von kurzen Support-Fällen bis zu einstündigen Gesprächen. | R-03, R-09, R-10 |
+| Q-06 | Flexibilität der Trainingssituation | Funktionale Angemessenheit | Das System unterstützt unterschiedliche Szenario-Typen und Gesprächslängen von kurzen Support-Fällen bis zu einstündigen Gesprächen. | R-03, R-09 |
 | Q-07 | Zuverlässigkeit der Verarbeitungskette | Zuverlässigkeit | Der Ausfall einer Komponente führt nicht zum unbemerkten Abbruch des Gesprächs. | Systementwurf |
-| Q-08 | Austauschbarkeit der Sprach- und Modellkomponenten | Wartbarkeit | Sprachmodell, Spracherkennung und Sprachsynthese sind wechselbar, ohne die übrige Anwendung anzupassen. | Systementwurf, C-11 |
+| Q-08 | Austauschbarkeit der Sprach- und Modellkomponenten | Wartbarkeit | Sprachmodell, Spracherkennung und Sprachsynthese sind wechselbar, ohne die übrige Anwendung anzupassen. | Systementwurf |
 | Q-09 | Schutz der Sprach- und Personendaten | Sicherheit | Sprachdaten werden nur innerhalb des dokumentierten Rahmens verarbeitet. Konkretisiert die Randbedingung C-04. | C-04 |
 
 ## 10.2 Qualitätsszenarien
@@ -296,14 +324,14 @@ Da die technische Lösungsstrategie (Kapitel 4) noch nicht final festgelegt ist,
 | Nr. | Risiko | Beschreibung | Gegenmaßnahme |
 |---|---|---|---|
 | RI-01 | Echtzeitfähigkeit der Sprach- und LLM-Schnittstellen | Die Kombination aus Spracherkennung, Antwortgenerierung und Sprachsynthese muss in Echtzeit ablaufen (Q-03). Externe Schnittstellen können Latenzschwankungen aufweisen, die den natürlichen Gesprächsfluss beeinträchtigen. | Latenz je Teilstrecke getrennt messen, um den Engpass zu bestimmen. Frühzeitige Tests mit den infrage kommenden Anbietern vor der finalen technischen Festlegung (Kapitel 4). |
-| RI-02 | Unklare Datenschutz-Umsetzung | Datenschutzkonformität ist eine nicht verhandelbare Randbedingung (C-04). Hosting-Ort, Speicherdauer und Einwilligungsprozess sind grundsätzlich entschieden (ADR 0024). Offen ist die technische Umsetzung der Selbstlösch-Funktion auf der Datenplattform sowie der Einwilligungsverwaltung im Frontend. | Löschfunktion und Einwilligungsoberfläche früh mitplanen, nicht nachträglich ergänzen. |
+| RI-02 | Unklare Datenschutz-Umsetzung | Datenschutzkonformität ist eine nicht verhandelbare Randbedingung (C-04). Hosting-Ort und Einwilligungsprozess sind grundsätzlich entschieden (ADR 0034). Das Risiko ist gestiegen, seit Sessiondaten bereits im MVP gespeichert werden: Es gibt damit auch im MVP dauerhaft gespeicherte Daten, aber noch keine festgelegte Speicherdauer, keine Aufbewahrungsfrist und mangels Nutzerkonten keine Einwilligungsverwaltung. Der technische Löschpfad existiert inzwischen — die Fremdschlüssel kaskadieren in der Datenbank (ADR 0052/0053) —, aber niemand ruft ihn auf: Es fehlen die Frist und die Selbstbedienungsfunktion. | Speicherdauer festlegen und Löschfunktion umsetzen, bevor Nutzer außerhalb der Pilotgruppe das System verwenden. Datenschutzhinweis (F-49) vor der ersten Aufzeichnung als Voraussetzung behandeln. Einwilligungsoberfläche zusammen mit der Authentifizierung (ADR 0009) planen, nicht nachträglich ergänzen. |
 
 ### Fachliche Risiken
 
 | Nr. | Risiko | Beschreibung | Gegenmaßnahme |
 |---|---|---|---|
-| RI-03 | Widersprüchliche Erwartungen der Pilotunternehmen | Solox lehnt einen vertrieblichen Fokus für die eigenen Rollen ab, APPOLLO Systems will ausdrücklich Angebots- und Preisgespräche sowie Einwandbehandlung trainieren (Konflikt K-01). Beide sind Pilotnutzer. Ohne Entscheidung besteht die Gefahr, dass das System für beide Seiten unpassend zugeschnitten wird. | Entscheidung als ADR festhalten. Naheliegend ist, Vertrieb als einen Szenario-Typ unter mehreren zu führen und die Abgrenzung auf fachliche Tiefe statt auf die Gesprächsart zu beziehen. |
-| RI-04 | Fehlende kundenspezifische Fachlichkeit | Der bewusste Verzicht auf eine kundenspezifische Wissensbasis (C-05) vereinfacht die Umsetzung, könnte aber dazu führen, dass Gespräche für erfahrene Nutzer zu oberflächlich oder unrealistisch wirken. Zusätzlich ist die Abgrenzung nicht mehr unstrittig: APPOLLO Systems will einen eigenen Gesprächsleitfaden als Bewertungsgrundlage einbringen (R-43, Konflikt K-03). | Frühes Nutzerfeedback beider Pilotunternehmen einholen. Die Unterscheidung zwischen fachlichem Wissen und Gesprächsleitfaden schriftlich festhalten. |
+| RI-03 | Widersprüchliche Erwartungen der Pilotunternehmen — **gelöst** | Solox lehnt einen vertrieblichen Fokus für die eigenen Rollen ab (R-46), APPOLLO Systems will ausdrücklich Angebots- und Preisgespräche sowie Einwandbehandlung trainieren (R-10, R-12). Beide sind Pilotnutzer. Das Risiko bestand darin, das System auf eine der beiden Erwartungen zuzuschneiden und damit für die andere Seite unpassend zu machen. Es wurde kurz nach seinem Aufkommen ausgeräumt. | **Gelöst durch das Führen mehrerer passender Szenarien statt einer Produktausrichtung.** F-03 führt ohnehin drei Szenario-Typen nebeneinander; das Angebots- und Preisgespräch ist einer davon und nicht der Zuschnitt des Werkzeugs. Jede Seite wählt die Szenarien, die zu ihren Rollen passen: Verhandlungsnahes Training steht bereit, ohne dass es jemand wählen muss. Damit gibt es keine Ausrichtung, gegen die sich ein Pilotunternehmen wehren müsste, und keine gesonderte Entscheidung zu treffen. Voraussetzung ist allein, dass beide Seiten in der Bibliothek tatsächlich besetzt sind — nachgewiesen im [Szenario- und Persona-Katalog](scenario-catalogue.md). |
+| RI-04 | Fehlende kundenspezifische Fachlichkeit | Der bewusste Verzicht auf eine kundenspezifische Wissensbasis (C-05) vereinfacht die Umsetzung, könnte aber dazu führen, dass Gespräche für erfahrene Nutzer zu oberflächlich oder unrealistisch wirken. Abgefedert wird das durch die optionale, nutzergesteuerte Bereitstellung eigener Dokumente (F-26, F-45). | Frühes Nutzerfeedback beider Pilotunternehmen einholen. Umfang und Wirkung der nutzergesteuerten Dokumentenbereitstellung früh mit beiden Pilotunternehmen abgleichen. |
 | RI-05 | Subjektivität des Feedbacks | Gespräche werden von den Beteiligten unterschiedlich wahrgenommen (R-25). Ein maschinell erzeugtes qualitatives Feedback (F-09, F-10) könnte als unpassend, ungenau oder demotivierend empfunden werden, wenn es nicht sorgfältig formuliert ist. Betrifft unmittelbar Q-01, da Nachvollziehbarkeit die Voraussetzung für Vertrauen in die Rückmeldung ist. | Feedback als Wirkung auf den Gesprächspartner formulieren, nicht als objektives Urteil. Tonalität und Formulierungsrichtlinien festlegen und iterativ anhand echten Nutzerfeedbacks verfeinern. |
 | RI-06 | Geringe Akzeptanz bei komplexer Bedienung | In beiden Erhebungen wurde eine unklare oder überladene Benutzeroberfläche als zentrales Nutzungshemmnis genannt. Wird Q-02 nicht ausreichend beachtet, sinkt die Akzeptanz erheblich, unabhängig von der fachlichen Qualität des Trainings. | Frühzeitige Usability-Tests. Minimale Pflichteinstellungen bereits im ersten benutzbaren Prototyp umsetzen. |
 
@@ -317,11 +345,11 @@ Erste Implementierung hat begonnen. Technische Schulden sind einzutragen.
 | Begriff | Definition |
 |---|---|
 | Architecture Decision Record (ADR) | Kurzes, fortlaufend nummeriertes Dokument, das genau eine architektonisch bedeutsame Entscheidung mit Kontext, Status und Konsequenzen festhält. Wird eine Entscheidung revidiert, bleibt der alte Eintrag bestehen und wird als abgelöst gekennzeichnet. |
-| Datenplattform | Extern betriebener, über OIDC authentifizierter Dienst, an den das System hochgeladene Dokumente und Session-Daten zur Speicherung übergibt. Das Produkt hält keine eigene Datenhaltung vor. |
-| EFRE-Direkt | Von der Hochschule bereitgestellter Dienst zur Erzeugung der Persona-Dialoge. Seine Nutzung ist eine Rahmenbedingung des Projekts und nicht das Ergebnis einer Auswahl unter konkurrierenden Anbietern. |
+| Data Platform | Extern betriebener, über OIDC authentifizierter Dienst, über den das System hochgeladene Dokumente und große Dateien wie Gesprächsaufzeichnungen überträgt. Der Dienst dient allein dem Datentransfer; gespeichert werden die Daten in der projekteigenen PostgreSQL-Datenbank (ADR 0010). |
+| DiReKT | Von der Hochschule bereitgestellter Dienst zur Erzeugung der Persona-Dialoge. Seine Nutzung ist eine Rahmenbedingung des Projekts und nicht das Ergebnis einer Auswahl unter konkurrierenden Anbietern. |
 | Feedback | Qualitative, verhaltensbezogene Rückmeldung zu einer abgeschlossenen Session mit konkreten Verbesserungsvorschlägen. Sie wird vollständig vom KI-System erzeugt; eine menschliche Trainerrolle ist im Produkt nicht vorgesehen. |
-| Persona | Charakterprofil des KI-Gesprächspartners einer Session, das dessen Rolle, Verhalten und Schwierigkeitsgrad beschreibt. Die Persona ist unabhängig vom Szenario konfigurierbar. |
+| Persona | Charakterprofil des KI-Gesprächspartners einer Session, das dessen Rolle, Verhalten und Schwierigkeitsgrad beschreibt. Die Persona ist unabhängig vom Szenario konfigurierbar und legt zugleich die Sprache und die Stimme des Gesprächs fest. |
 | Persona-Bibliothek | Offene, erweiterbare Sammlung der auswählbaren Personas. Neue Personas können aufgenommen werden, ohne die Session- oder Szenario-Logik zu verändern. |
-| Session | Ein einzelnes simuliertes Telefongespräch zwischen Nutzer und KI-Gesprächspartner, konfiguriert über Szenario, Persona und Sprache. Die Session ist die zentrale Trainings- und Auswertungseinheit, auf die sich das Feedback bezieht. |
-| Sprache | Eigenständiger, vom Nutzer wählbarer Session-Parameter, der festlegt, in welcher Sprache das Trainingsgespräch geführt wird. Die Sprache ist keine Eigenschaft einer einzelnen Persona. |
+| Session | Ein einzelnes simuliertes Telefongespräch zwischen Nutzer und KI-Gesprächspartner, konfiguriert über Szenario und Persona. Die Sprache ergibt sich aus der Persona und ist kein eigener Auswahlparameter. Die Session ist die zentrale Trainings- und Auswertungseinheit, auf die sich das Feedback bezieht. |
+| Sprache | Die Sprache, in der das Trainingsgespräch geführt wird. Sie ist eine Eigenschaft der Persona und wird mit deren Auswahl festgelegt (ADR 0043); Szenarien sind sprachneutral. Davon zu unterscheiden ist die Sprache der Prompt-Inhalte, die einheitlich Englisch ist. |
 | Szenario | Situativer Rahmen einer Session, also Anlass und beabsichtigter Verlauf des Gesprächs. Das Szenario ist unabhängig von der Persona konfigurierbar. |

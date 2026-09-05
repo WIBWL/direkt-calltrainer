@@ -4,6 +4,22 @@ py-version=3.12
 
 ignore=.venv,venv,dist,.git
 
+# Alembic generates the revision files and drives them through `op`, whose
+# members are attached at runtime -- pylint sees an empty module and reports
+# E1101 for every operation. Excluded for the same reason as in .flake8: the
+# files are generated, and a human reviews each one before it is applied.
+ignore-paths=^backend/db/migrations/versions/.*$
+
+# alembic.context is populated by Alembic at migration runtime, so a static
+# read of the module finds none of the members env.py legitimately calls.
+ignored-modules=alembic.context
+
+# Project root is the import root, so `backend.*` resolves in scripts/ (which
+# add it to sys.path themselves at runtime). Uses source-roots rather than an
+# init-hook that prepends "." to sys.path -- the latter shadows stdlib modules
+# like collections.abc when pylint runs with a different working directory.
+source-roots=.
+
 [MESSAGES CONTROL]
 # Responsibility: logic, design metrics, and docstrings only.
 # PEP8 style and formatting is enforced by flake8 -- disabled here to avoid duplication.
@@ -18,6 +34,17 @@ disable=
     W0511,  # fixme            -- ignore TODO/FIXME comments
     W0611,  # unused-import    -- flake8 (F401) owns this
     W1203,  # logging-fstring-interpolation -- f-strings in logging calls
+    C0114,  # missing-module-docstring -- not required for plain data/config modules
+            # (personas.py, scenarios.py etc.) where the data speaks for itself;
+            # function/method docstrings (C0116) are still enforced for actual logic.
+    C0115,  # missing-class-docstring -- same reasoning, for simple dataclasses
+            # (Persona, Scenario, PersonaVoice) whose fields are self-explanatory.
+    R0903,  # too-few-public-methods -- SQLAlchemy models and dataclasses are
+            # declarations, not behaviour; every class in backend/db/models.py
+            # would otherwise be flagged forever.
+    W0621,  # redefined-outer-name -- a pytest test takes its fixtures as
+            # parameters named after them; this is the framework's design, not
+            # shadowing. Unavoidable in tests/ and harmless elsewhere.
 
 # Enable specific messages (overrides disable)
 # enable=

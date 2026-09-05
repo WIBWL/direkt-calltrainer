@@ -1,0 +1,17 @@
+# ADR 0016: One Retry, Then Graceful Session End on Pipeline Failure
+
+## Status
+
+Accepted
+
+## Context
+
+The Session loop chains three calls per turn: STT, dialogue generation, TTS. Dialogue generation runs against the university-hosted DiReKT gateway (ADR 0011); STT and TTS run against separately self-hosted local models (ADR 0021). arc42 flags the resulting availability/fault-tolerance behavior as an explicit gap (Kapitel 6). Any of the three steps can fail mid-turn, e.g. on a timeout.
+
+## Decision
+
+We will retry a failed pipeline step once automatically. If the retry also fails, we will end the Session cleanly and show the user a clear, non-technical message, rather than leaving the Session hanging or exposing a raw error.
+
+## Consequences
+
+Short transient blips against any of these three services are absorbed without disrupting the user, while a real outage ends the Session predictably instead of hanging indefinitely. The tradeoff: a failure past the retry always ends the whole Session — there is no per-turn recovery that lets the user simply try that turn again and keep going.
