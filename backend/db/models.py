@@ -12,10 +12,18 @@ user-facing content and in the documentation.
 Deletes are declared twice on purpose: `ondelete` on the foreign key so the
 database enforces them even for raw SQL, and `passive_deletes=True` on the
 matching relationship so the ORM lets it do the work instead of issuing one
-statement per child row. Ownership edges cascade; the optional back-references
-from a FeedbackPoint are set to NULL, because the point still says something
-without the Turn it pointed at. Foreign keys into the reference tables carry no
-ondelete at all — a Persona with stored Sessions must not be deletable.
+statement per child row. Ownership edges cascade. The optional back-references
+from a FeedbackPoint into rows the Session owns — the Turn and the Finding it
+came from — are set to NULL, because the point still says something without
+them. Every foreign key into a reference table carries no ondelete at all, the
+optional ones included: a Persona or a MetricType with rows behind it must not
+be deletable, and a rule that holds for one such column but not its neighbour
+would be no rule at all.
+
+Column defaults (`active`, `attempts`, `extern_id`) are Python-side only, with
+no `server_default`. They apply to writes through the ORM, which is the only
+writer the application has -- but unlike the deletes above, this rule does not
+reach raw SQL: a row inserted by hand in `psql` has to name them itself.
 
 Every foreign-key column is indexed. Postgres indexes the referenced primary
 key but never the referencing side, so without this a delete of one Session
@@ -38,6 +46,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     Uuid,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -64,9 +73,22 @@ POINT_IMPROVEMENT = "improvement"
 POINT_KINDS = (POINT_STRENGTH, POINT_IMPROVEMENT)
 
 # AnalysisJob vocabulary (ADR 0032). Kept here next to the schema, because the
-# CHECK constraints below are what actually enforce them.
-JOB_KINDS = ("analysis", "feedback")
-JOB_STATUSES = ("queued", "running", "done", "failed")
+# CHECK constraints below are what actually enforce them. Only "feedback" is
+# ever written: the acoustic analysis runs inline in the live path since ADR
+# 0047/0048 and is persisted with the Session, so "analysis" stays inactive.
+JOB_KIND_ANALYSIS = "analysis"
+JOB_KIND_FEEDBACK = "feedback"
+JOB_KINDS = (JOB_KIND_ANALYSIS, JOB_KIND_FEEDBACK)
+
+# A misspelling on the way in is caught by the CHECK constraint; one on the way
+# out is not -- a query for a status that does not exist simply matches nothing,
+# and api/sessions.py reads "no job" as "failed". Hence names, like the three
+# vocabularies above have.
+JOB_QUEUED = "queued"
+JOB_RUNNING = "running"
+JOB_DONE = "done"
+JOB_FAILED = "failed"
+JOB_STATUSES = (JOB_QUEUED, JOB_RUNNING, JOB_DONE, JOB_FAILED)
 
 
 def _one_of(column: str, values: tuple[str, ...]) -> CheckConstraint:
@@ -267,6 +289,10 @@ class Turn(Base):
     __tablename__ = "turn"
     __table_args__ = (
         _one_of("speaker", SPEAKERS),
+        # The API orders the transcript by seq_index alone, so a duplicate
+        # would make the order of those two lines arbitrary -- and arbitrary
+        # differently on each read.
+        UniqueConstraint("session_id", "seq_index"),
         CheckConstraint("seq_index >= 0", name="seq_index_non_negative"),
         CheckConstraint("start_offset_ms >= 0", name="start_offset_non_negative"),
         # A negative duration would be a bug in the measurement, not a
@@ -302,6 +328,12 @@ class Measurement(Base):
     """
 
     __tablename__ = "measurement"
+    # "Exactly one set per Session" is the invariant the docstring above states;
+    # this is what enforces it. Without it a second writer -- a retried job, a
+    # future "recalculate" -- would store a second speaking rate for the same
+    # call and the wrap-up would show both.
+    __table_args__ = (UniqueConstraint("session_id", "metric_type_id"),)
+
     measurement_id: Mapped[int] = mapped_column(primary_key=True)
     session_id: Mapped[int] = mapped_column(
         ForeignKey("session.session_id", ondelete="CASCADE"), index=True
@@ -325,12 +357,19 @@ class Finding(Base):
     """
 
     __tablename__ = "finding"
+    __table_args__ = (
+        # Same invariant as Turn's offsets, which are checked the same way.
+        CheckConstraint(
+            "offset_ms IS NULL OR offset_ms >= 0", name="offset_non_negative"
+        ),
+    )
+
     finding_id: Mapped[int] = mapped_column(primary_key=True)
     session_id: Mapped[int] = mapped_column(
         ForeignKey("session.session_id", ondelete="CASCADE"), index=True
     )
     metric_type_id: Mapped[int | None] = mapped_column(
-        ForeignKey("metric_type.metric_type_id", ondelete="SET NULL"), index=True
+        ForeignKey("metric_type.metric_type_id"), index=True
     )
     category: Mapped[str] = mapped_column(String(60))
     # Milliseconds from the start of the Session, where the finding has a
@@ -349,6 +388,9 @@ class Feedback(Base):
 
     __tablename__ = "feedback"
     feedback_id: Mapped[int] = mapped_column(primary_key=True)
+    # The only foreign key in this file without an explicit `index=True`, and
+    # the exception is only apparent: `unique` already creates the index, and
+    # ADR 0052 is about the index existing, not about how it got there.
     session_id: Mapped[int] = mapped_column(
         ForeignKey("session.session_id", ondelete="CASCADE"), unique=True
     )
@@ -390,8 +432,11 @@ class FeedbackPoint(Base):
     finding_id: Mapped[int | None] = mapped_column(
         ForeignKey("finding.finding_id", ondelete="SET NULL"), index=True
     )
+    # No ondelete, unlike the two above: those point at rows the Session owns,
+    # this one at a reference table, which must stay undeletable while anything
+    # references it.
     metric_type_id: Mapped[int | None] = mapped_column(
-        ForeignKey("metric_type.metric_type_id", ondelete="SET NULL"), index=True
+        ForeignKey("metric_type.metric_type_id"), index=True
     )
     # POINT_STRENGTH or POINT_IMPROVEMENT, see the constants above.
     kind: Mapped[str] = mapped_column(String(20))

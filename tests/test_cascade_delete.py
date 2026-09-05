@@ -180,6 +180,20 @@ def test_raw_sql_delete_also_clears_the_subtree(db_session: DbSession) -> None:
 
 
 @pytest.mark.usefixtures("session_with_full_subtree")
+def test_a_metric_type_in_use_cannot_be_deleted(db_session: DbSession) -> None:
+    """The same rule as for a Persona, and the one the schema used to state
+    twice over: `measurement` refuses the delete while `finding` and
+    `feedback_point` once offered to null their reference instead. They no
+    longer do -- a reference table is undeletable while anything points at it,
+    without exception (ADR 0026).
+    """
+    with pytest.raises(IntegrityError):
+        db_session.execute(text("DELETE FROM metric_type"))
+        db_session.commit()
+    db_session.rollback()
+
+
+@pytest.mark.usefixtures("session_with_full_subtree")
 def test_a_persona_with_sessions_cannot_be_deleted(db_session: DbSession) -> None:
     """Reference tables deliberately do *not* cascade: removing a Persona must
     fail loudly rather than silently taking every Session it ever ran with."""
