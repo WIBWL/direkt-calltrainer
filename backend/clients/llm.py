@@ -58,19 +58,22 @@ async def stream_reply(messages: list[dict[str, str]]) -> AsyncIterator[str]:
 _MAX_FEEDBACK_TOKENS = 900
 
 
-async def complete(messages: list[dict[str, str]]) -> str:
-    """One non-streamed completion, for the post-call wrap-up (ADR 0049).
+async def complete(
+    messages: list[dict[str, str]], *, max_tokens: int = _MAX_FEEDBACK_TOKENS
+) -> str:
+    """One non-streamed completion — the post-call wrap-up (ADR 0049) and the
+    document summary for an authored Scenario (F-58).
 
     Nothing is waiting on the first token here, unlike stream_reply, so the
     caller gets the finished text in one piece and can validate it as a whole.
     """
-    logger.info("Generating feedback via LLM (%s)...", LLM_MODEL)
+    logger.info("LLM completion (%s, max_tokens=%d)...", LLM_MODEL, max_tokens)
     completion = await LLM_CLIENT.chat.completions.create(
         model=LLM_MODEL,
         messages=messages,
-        max_tokens=_MAX_FEEDBACK_TOKENS,
-        # Low but not zero: the wrap-up should read naturally, while staying
-        # close to the findings it was given rather than embroidering them.
+        max_tokens=max_tokens,
+        # Low but not zero: the output should read naturally while staying close
+        # to the input it was given rather than embroidering it.
         temperature=0.3,
         extra_body={"chat_template_kwargs": {"enable_thinking": False}},
     )

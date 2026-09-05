@@ -34,11 +34,13 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     Text,
     Uuid,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -68,6 +70,15 @@ POINT_KINDS = (POINT_STRENGTH, POINT_IMPROVEMENT)
 JOB_KINDS = ("analysis", "feedback")
 JOB_STATUSES = ("queued", "running", "done", "failed")
 
+# Persona.visibility / Scenario.visibility (ADR 0058): who may see an authored
+# row in their library. A shipped built-in is 'public'; a User's own row starts
+# 'private'; 'tenant' (added by ADR 0060) shares it with the author's company
+# and requires `tenant_id` to be set (a second CHECK enforces that).
+VISIBILITY_PRIVATE = "private"
+VISIBILITY_TENANT = "tenant"
+VISIBILITY_PUBLIC = "public"
+VISIBILITIES = (VISIBILITY_PRIVATE, VISIBILITY_TENANT, VISIBILITY_PUBLIC)
+
 
 def _one_of(column: str, values: tuple[str, ...]) -> CheckConstraint:
     """A CHECK restricting `column` to `values`.
@@ -80,19 +91,97 @@ def _one_of(column: str, values: tuple[str, ...]) -> CheckConstraint:
     return CheckConstraint(f"{column} IN ({allowed})", name=f"{column}_valid")
 
 
-class Persona(Base):
-    """The simulated conversation partner. This table — not `backend/personas.py`
-    — is the source of truth (ADR 0041); that module only seeds it, and ADR 0024
-    has Users authoring their own Personas, which have to live here.
+def _tenant_visibility_needs_a_tenant() -> CheckConstraint:
+    """`visibility = 'tenant'` is meaningless without an owning tenant (ADR 0060),
+    so the two are tied at the database."""
+    return CheckConstraint(
+        "visibility <> 'tenant' OR tenant_id IS NOT NULL",
+        name="tenant_visibility_needs_a_tenant",
+    )
 
-    A Persona has exactly one Language and one voice per TTS backend (ADR 0043),
-    so all three are attributes here rather than something a User picks per
-    Session.
+
+class _AuthoredContent:
+    """The columns shared by the `scenario` table and, for schema symmetry, the
+    `persona` table. A mixin so the set is defined once and cannot drift between
+    the two.
+
+    Three independent axes: `created_by` is authorship (ADR 0058), `tenant_id`
+    is ownership by a company (ADR 0060, NULL for a shipped built-in),
+    `visibility` is who may see the row. Only `scenario` rows are ever written
+    with non-default values here — Personas are curated (ADR 0058). Each table
+    still adds the CHECKs to its own `__table_args__`; they cannot live on the
+    mixin.
+    """
+
+    # Keycloak `sub` of the author, NULL on a shipped built-in. A plain string
+    # with no foreign key, for the same reason `session.subject_id` is one
+    # (ADR 0031): there is still no user table to point at.
+    created_by: Mapped[str | None] = mapped_column(String(64), index=True)
+    # The owning company (ADR 0060). NULL = a global built-in. Set on every
+    # authored row, even a private one, so sharing is a `visibility` flip. Its
+    # index is the composite `(tenant_id, visibility)` each table declares below
+    # (ADR 0060) -- that covers the FK too, `tenant_id` being its first column.
+    tenant_id: Mapped[int | None] = mapped_column(ForeignKey("tenant.tenant_id"))
+    visibility: Mapped[str] = mapped_column(String(12), default=VISIBILITY_PRIVATE)
+    # The id the outside world uses (ADR 0050). An authored row has no natural
+    # `key` slug, and a sequential primary key must never leave the backend.
+    extern_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, unique=True, default=uuid.uuid4
+    )
+    # A DB default rather than the app-sets-it style used elsewhere: a reference
+    # row is written from the seed upsert and from the Scenario authoring
+    # endpoints, and a single server-side clock keeps the two consistent.
+    # `text("now()")` rather than `func.now()` so the model reads identically to
+    # the `sa.text("now()")` the migration emits.
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+    # `onupdate` is enough because every edit to a reference row goes through
+    # the ORM in backend/library.py, never raw SQL.
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=text("now()"),
+        onupdate=text("now()"),
+    )
+
+
+class Tenant(Base):
+    """A company whose members share the Scenarios they author (ADR 0060,
+    R-58). Seeded by hand for the pilot (`solox`, `appollo`) plus a `default`
+    tenant for Users with no company. `extern_ref` is the stable key a request
+    resolves to — a Keycloak Organization alias once that is enabled (phase 2),
+    the seed key until then. Not deactivated: an authored row keeps pointing at
+    the tenant it belonged to."""
+
+    __tablename__ = "tenant"
+    tenant_id: Mapped[int] = mapped_column(primary_key=True)
+    extern_ref: Mapped[str] = mapped_column(String(64), unique=True)
+    name: Mapped[str] = mapped_column(String(120))
+
+
+class Persona(_AuthoredContent, Base):
+    """The simulated conversation partner. This table — not `backend/personas.py`
+    — is the source of truth (ADR 0041); that module only seeds it.
+
+    Personas are curated, not User-authored (ADR 0058) — the `_AuthoredContent`
+    columns are here only for schema symmetry with `scenario` and never get a
+    non-default value. A Persona has exactly one Language and one voice per TTS
+    backend (ADR 0043).
     """
 
     __tablename__ = "persona"
+    __table_args__ = (
+        _one_of("visibility", VISIBILITIES),
+        _tenant_visibility_needs_a_tenant(),
+        # The visibility filter's hot path (ADR 0060). Named explicitly, as a
+        # multi-column index must be; the convention only auto-names by the
+        # first column.
+        Index("ix_persona_tenant_id_visibility", "tenant_id", "visibility"),
+    )
     persona_id: Mapped[int] = mapped_column(primary_key=True)
-    key: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. thomas-brandt-ceo
+    # e.g. thomas-brandt-ceo. Nullable for symmetry with `scenario.key`
+    # (ADR 0058), though every Persona is a built-in and does carry a slug.
+    key: Mapped[str | None] = mapped_column(String(60), unique=True)
     name: Mapped[str] = mapped_column(String(120))
     # Display field: the label on the selection card, in the UI language. The
     # prompt fields below are English (ADR 0043), so the two audiences this one
@@ -137,13 +226,21 @@ class PersonaObjection(Base):
     persona: Mapped["Persona"] = relationship(back_populates="objections")
 
 
-class Scenario(Base):
+class Scenario(_AuthoredContent, Base):
     """The situational context of a Session. Like Persona, this table is the
     source of truth and `backend/scenarios.py` only seeds it (ADR 0041)."""
 
     __tablename__ = "scenario"
+    __table_args__ = (
+        _one_of("visibility", VISIBILITIES),
+        _tenant_visibility_needs_a_tenant(),
+        # The visibility filter's hot path -- `/api/scenarios` and every
+        # `get_scenario` in the Session pipeline (ADR 0060).
+        Index("ix_scenario_tenant_id_visibility", "tenant_id", "visibility"),
+    )
     scenario_id: Mapped[int] = mapped_column(primary_key=True)
-    key: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. cold-call-followup
+    # e.g. cold-call-followup. Nullable since ADR 0058 -- see Persona.key.
+    key: Mapped[str | None] = mapped_column(String(60), unique=True)
     # Not "type": that shadows the builtin wherever a row is unpacked.
     scenario_type: Mapped[str] = mapped_column(String(60))
     title: Mapped[str] = mapped_column(String(160))

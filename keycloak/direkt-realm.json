@@ -9,6 +9,15 @@
   "resetPasswordAllowed": false,
   "editUsernameAllowed": false,
 
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "config": { "kc.user.profile.config": ["{\"unmanagedAttributePolicy\":\"ENABLED\"}"] }
+      }
+    ]
+  },
+
   "clients": [
     {
       "clientId": "calltrainer-frontend",
@@ -56,6 +65,18 @@
             "id.token.claim": "true",
             "userinfo.token.claim": "true"
           }
+        },
+        {
+          "name": "calltrainer tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "tenant",
+            "claim.name": "tenant",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
         }
       ]
     }
@@ -63,30 +84,36 @@
 
   "users": [
     {
+      "id": "00000000-0000-4000-8000-00000000a11c",
       "username": "alice",
       "enabled": true,
       "emailVerified": true,
       "email": "alice@example.test",
       "firstName": "Alice",
       "lastName": "Example",
+      "attributes": { "tenant": ["solox"] },
       "credentials": [{ "type": "password", "value": "alice", "temporary": false }]
     },
     {
+      "id": "00000000-0000-4000-8000-000000000b0b",
       "username": "bob",
       "enabled": true,
       "emailVerified": true,
       "email": "bob@example.test",
       "firstName": "Bob",
       "lastName": "Example",
+      "attributes": { "tenant": ["solox"] },
       "credentials": [{ "type": "password", "value": "bob", "temporary": false }]
     },
     {
+      "id": "00000000-0000-4000-8000-00000000ca01",
       "username": "carol",
       "enabled": true,
       "emailVerified": true,
       "email": "carol@example.test",
       "firstName": "Carol",
       "lastName": "Example",
+      "attributes": { "tenant": ["appollo"] },
       "credentials": [{ "type": "password", "value": "carol", "temporary": false }]
     }
   ]

@@ -115,14 +115,21 @@ def _write_analysis(
     ]
 
 
-def _reference(db: DbSession, model: type, key: str):
-    """A seeded reference row, by its natural key.
+def _reference(db: DbSession, model: type, extern_id: str):
+    """The Persona / Scenario row a Session points at, by its `extern_id`.
 
-    Assigned through the relationship rather than the foreign key, so the
-    primary key never has to be named here. Only Persona and Scenario go
-    through this -- the Feedback tables are attached directly, by id.
+    That is what the value object carries as `.id` since ADR 0058 (an authored
+    row has no `key` slug). Assigned through the relationship rather than the
+    foreign key, so the primary key never has to be named here -- only Persona
+    and Scenario go through this, the Feedback tables are attached directly, by
+    id. `active` is not checked -- a Session may reference a since-retired row,
+    same as before.
     """
-    row = db.query(model).filter_by(key=key).one_or_none()
+    try:
+        ref = uuid.UUID(str(extern_id))
+    except (ValueError, TypeError) as e:
+        raise LookupError(f"{model.__name__} {extern_id!r} is not a valid id") from e
+    row = db.query(model).filter_by(extern_id=ref).one_or_none()
     if row is None:
-        raise LookupError(f"{model.__name__} {key!r} is not seeded")
+        raise LookupError(f"{model.__name__} {extern_id!r} is not seeded")
     return row

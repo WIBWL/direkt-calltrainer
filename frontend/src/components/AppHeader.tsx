@@ -1,3 +1,5 @@
+import { useAuth } from "react-oidc-context";
+
 import { cx } from "../utils/cx";
 
 // The header uses the current screen to highlight the matching training step.
@@ -13,6 +15,42 @@ const trainingSteps: { id: TrainingStep; label: string }[] = [
   { id: "call", label: "Gespräch" },
   { id: "feedback", label: "Feedback" },
 ];
+
+/** Username + log-out (log-in when somehow not authenticated) in the top-right
+ * corner. `useAuth` works here because AppHeader always renders inside the
+ * AuthProvider (see main.tsx). */
+function AuthControl() {
+  const auth = useAuth();
+  const name =
+    (auth.user?.profile.preferred_username as string | undefined) ??
+    (auth.user?.profile.name as string | undefined) ??
+    "";
+
+  if (!auth.isAuthenticated) {
+    return (
+      <button
+        type="button"
+        className="app-header-auth"
+        onClick={() => void auth.signinRedirect()}
+      >
+        Anmelden
+      </button>
+    );
+  }
+
+  return (
+    <div className="app-header-user">
+      {name && <span className="app-header-username">{name}</span>}
+      <button
+        type="button"
+        className="app-header-auth"
+        onClick={() => void auth.signoutRedirect()}
+      >
+        Abmelden
+      </button>
+    </div>
+  );
+}
 
 export default function AppHeader({ activeStep }: AppHeaderProps) {
   const activeStepIndex = trainingSteps.findIndex((step) => step.id === activeStep);
@@ -55,6 +93,8 @@ export default function AppHeader({ activeStep }: AppHeaderProps) {
             );
           })}
         </ol>
+
+        <AuthControl />
       </div>
     </header>
   );

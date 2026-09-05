@@ -105,6 +105,9 @@ services:
 
   redis:
     image: redis:8-alpine
+    # `warning` silences the module-load and "ready to accept connections"
+    # notices at boot; nothing here needs Redis's own info logs.
+    command: ["redis-server", "--loglevel", "warning"]
     # No volume: the queue holds in-flight jobs only. What must survive a
     # restart is the job's outcome, and that lives in Postgres (ADR 0032).
     healthcheck:
@@ -146,6 +149,9 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
       KC_HOSTNAME: http://localhost:18081
       KC_HEALTH_ENABLED: "true"
+      # Quarkus/Infinispan/Hibernate boot chatter drowns everything else in the
+      # compose logs; WARN keeps the "started in Ns" line and errors.
+      KC_LOG_LEVEL: WARN
     ports:
       - 18081:8080
     volumes:

@@ -24,6 +24,8 @@ Covers:
   R-12  spontaneous objections
 """
 
+import uuid
+
 import pytest
 
 from backend.db import models
@@ -42,9 +44,15 @@ SEED = load_seed_module()
 # --- the mapping: database row -> value object --------------------------
 
 
+_PERSONA_EXTERN_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
+
+
 def _persona_row(**overrides):
     fields = {
         "key": "row-persona",
+        "extern_id": _PERSONA_EXTERN_ID,
+        "created_by": None,
+        "visibility": models.VISIBILITY_PUBLIC,
         "name": "Thomas Brandt",
         "role_label": "Geschäftsführer, Fokus auf Strategie & Budget",
         "role": "Managing director of a mid-sized company",
@@ -66,7 +74,9 @@ def test_persona_row_maps_onto_the_value_object():
     plain dataclass."""
     persona = _to_persona(_persona_row())
     assert isinstance(persona, Persona)
-    assert persona.id == "row-persona"
+    # ADR 0058: the value object's id is the extern_id (what the client uses),
+    # not the internal `key` slug.
+    assert persona.id == str(_PERSONA_EXTERN_ID)
     assert persona.name == "Thomas Brandt"
     assert persona.role == "Managing director of a mid-sized company"
     assert persona.traits == "matter-of-fact, time-conscious"
@@ -95,9 +105,13 @@ def test_persona_mapping_carries_language_and_both_voices():
 def test_scenario_row_maps_onto_the_value_object():
     """ADR 0043: `short_description` is the teaser shown, `description` the
     English call context the model reads."""
+    extern_id = uuid.UUID("22222222-2222-2222-2222-222222222222")
     scenario = _to_scenario(
         models.Scenario(
             key="row-scenario",
+            extern_id=extern_id,
+            created_by=None,
+            visibility=models.VISIBILITY_PUBLIC,
             scenario_type="Angebots- und Preisgespräch",
             title="Kündigungsabsicht wegen Preis",
             short_description="Der Kunde erwägt zu kündigen.",
@@ -105,7 +119,7 @@ def test_scenario_row_maps_onto_the_value_object():
         )
     )
     assert isinstance(scenario, Scenario)
-    assert scenario.id == "row-scenario"
+    assert scenario.id == str(extern_id)
     assert scenario.name == "Kündigungsabsicht wegen Preis"
     assert scenario.short_description == "Der Kunde erwägt zu kündigen."
     assert scenario.description.startswith("The customer")

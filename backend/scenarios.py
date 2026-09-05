@@ -28,3 +28,11 @@ class Scenario:
     case_facts: str = ""
     call_goal: str = ""
     success_condition: str = ""
+    # A loose category label (e.g. "Preisgespräch"). Authored rows set it too;
+    # nothing in the prompt reads it, so it stays optional.
+    scenario_type: str = ""
+    # Authorship (ADR 0058) and visibility (`private`/`tenant`/`public`; `tenant`
+    # is ADR 0060). Carried so `backend/api/scenarios.py` can badge a card and
+    # gate editing; `library.py` always sets both. The defaults are a built-in.
+    created_by: str | None = None
+    visibility: str = "public"

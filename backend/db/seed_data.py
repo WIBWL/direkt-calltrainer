@@ -27,6 +27,16 @@ tables, so provision.py writes them straight through without mapping.
 # the Persona speaks is decided by language_id alone.
 LANGUAGE_NAMES = {"de": "Deutsch", "en": "Englisch"}
 
+# Tenants (ADR 0060, R-58). The two pilot companies plus a `default` tenant that
+# every User with no company (dev users included) resolves to. `extern_ref` is
+# the stable key `backend/tenants.py` resolves to -- a Keycloak Organization
+# alias once that is enabled (phase 2), this string until then.
+TENANTS = [
+    {"extern_ref": "default", "name": "Ohne Unternehmen"},
+    {"extern_ref": "solox", "name": "Solox"},
+    {"extern_ref": "appollo", "name": "APPOLLO"},
+]
+
 PERSONAS = [
     {
         "id": "thomas-brandt-ceo",

@@ -191,10 +191,15 @@ def fake_library(monkeypatch):
     sites look the functions up."""
     by_id = {p.id: p for p in TEST_PERSONAS}
     by_key = {s.id: s for s in TEST_SCENARIOS}
+    # Personas are curated (no scoping); a Scenario read is scoped to the
+    # caller's `sub` + tenant (ADR 0058/0060), which the doubles ignore -- the real
+    # visibility query is tested against a database in test_authored_content.py.
+    # The WS handshake's tenant resolution is stubbed so it needs no database.
     monkeypatch.setattr(library, "list_personas", lambda: list(TEST_PERSONAS))
-    monkeypatch.setattr(library, "list_scenarios", lambda: list(TEST_SCENARIOS))
-    monkeypatch.setattr(library, "get_persona", by_id.get)
-    monkeypatch.setattr(library, "get_scenario", by_key.get)
+    monkeypatch.setattr(library, "list_scenarios", lambda subject, tenant_id=1: list(TEST_SCENARIOS))
+    monkeypatch.setattr(library, "get_persona", lambda extern_id: by_id.get(extern_id))
+    monkeypatch.setattr(library, "get_scenario", lambda extern_id, subject=None, tenant_id=1: by_key.get(extern_id))
+    monkeypatch.setattr("backend.api.session_ws.resolve_tenant_id", lambda auth: 1)
     return library
 
 
@@ -533,6 +538,9 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
     through the seed script, so these tests do not depend on what personas.py
     happens to contain."""
     language = db_models.Language(code="de", name="Deutsch")
+    # The default tenant every caller with no company resolves to (ADR 0060).
+    default_tenant = db_models.Tenant(extern_ref="default", name="Ohne Unternehmen")
+    # Built-ins: public and authored by nobody (ADR 0058), like a seeded row.
     persona = db_models.Persona(
         key=PERSONA_KEY,
         name="Thomas Brandt",
@@ -545,6 +553,7 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
         language_code="de",
         tts_voice="de_male",
         active=True,
+        visibility=db_models.VISIBILITY_PUBLIC,
     )
     scenario = db_models.Scenario(
         key=SCENARIO_KEY,
@@ -556,11 +565,12 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
         call_goal="",
         success_condition="",
         active=True,
+        visibility=db_models.VISIBILITY_PUBLIC,
     )
     metric_type = db_models.MetricType(
         key=METRIC_KEY, name="Sprechtempo", unit="Wörter/min", feature_id="F-36", active=True
     )
-    db_session.add_all([language, persona, scenario, metric_type])
+    db_session.add_all([language, default_tenant, persona, scenario, metric_type])
     db_session.commit()
     return ReferenceRows(
         persona=persona, scenario=scenario, language=language, metric_type=metric_type
@@ -584,14 +594,21 @@ def persist(
     # the feedback stack, which a collection-time import should not need.
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
 
-    # A key other than PERSONA_KEY is deliberately one the seed did not write.
-    persona = replace(TEST_PERSONAS[0], id=persona_key)
+    # The value object the write path receives carries the row's `extern_id` as
+    # `.id` since ADR 0058, so resolve it from the reference row the fixture
+    # inserted. A `persona_key` the fixture did not write yields a random id,
+    # which exercises the LookupError path.
+    with session_scope() as db:
+        prow = db.query(db_models.Persona).filter_by(key=persona_key).one_or_none()
+        srow = db.query(db_models.Scenario).filter_by(key=SCENARIO_KEY).one_or_none()
+    persona = replace(TEST_PERSONAS[0], id=str(prow.extern_id) if prow else str(uuid.uuid4()))
+    scenario = replace(TEST_SCENARIOS[0], id=str(srow.extern_id) if srow else str(uuid.uuid4()))
     extern_id = extern_id or uuid.uuid4()
     persistence.persist_session(
         extern_id,
         str(uuid.uuid4()),
         persona,
-        replace(TEST_SCENARIOS[0], id=SCENARIO_KEY),
+        scenario,
         turns if turns is not None else [],
         SESSION_STARTED,
         reason,

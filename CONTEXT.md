@@ -20,6 +20,10 @@ _Avoid_: Persona, situation
 The character traits of the AI-simulated conversation partner within a Session — e.g. impatient, calm, confrontational. Combined independently with a Scenario.
 _Avoid_: Scenario, character, counterpart
 
+**Tenant**:
+The company a User belongs to, and the owner of the Scenarios its members author (docs/adr/0060). One of three independent properties of an authored Scenario: authorship (who wrote it, docs/adr/0058), ownership (which Tenant it belongs to — none, for a shipped built-in), and visibility (who may see it). Distinct from the User: colleagues share a Tenant. The pilot Tenants are Solox and APPOLLO. Personas are curated, not authored, so they have no Tenant.
+_Avoid_: Mandant (in code/schema — it stays "tenant"), organization, company, account
+
 **Language**:
 The language a Session's simulated conversation is conducted in. Not a Session parameter of its own: it follows from the selected Persona, which carries exactly one language and voice (docs/adr/0043, superseding the earlier per-Session model). Only German is supported so far.
 _Avoid_: Locale

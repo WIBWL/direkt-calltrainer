@@ -72,6 +72,10 @@ nav:
       - ADR 0054 - The Scenario Briefs the Trainee: adr/0054-scenario-briefing-for-the-trainee.md
       - ADR 0055 - One Log File for the Whole Run: adr/0055-log-file-kept-for-the-whole-run.md
       - ADR 0056 - Phasengerechte Sprache Is a Paragraph, Not a Metric: adr/0056-phase-appropriate-language-as-prose.md
+      - ADR 0057 - English Wire Vocabulary: adr/0057-english-wire-vocabulary.md
+      - ADR 0058 - User-Authored Scenarios: adr/0058-user-authored-scenarios.md
+      - ADR 0059 - User-Authored Scenario Text Is Information, Not Instructions: adr/0059-user-authored-prompt-content.md
+      - ADR 0060 - Tenant Model and Company Sharing for Authored Scenarios: adr/0060-tenant-model-and-visibility.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
   # site is served at the root (mkdocs serve / mkdocs build + static server).

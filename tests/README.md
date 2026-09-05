@@ -32,8 +32,12 @@ source of that content, and which imports without a database.
 | Area | Feature / ADR | Test file |
 |---|---|---|
 | Keycloak bearer-token verification | F-31, F-50, ADR 0009 | `test_auth.py` |
-| Setup screen: persona/scenario REST endpoints (+ auth gate) | F-43, F-44, F-15, F-31, F-50, F-01/03/04, ADR 0001, ADR 0009, ADR 0041, ADR 0043, ADR 0045 | `test_setup_api.py` |
+| Setup screen: persona/scenario REST endpoints (+ auth gate) | F-43, F-44, F-15, F-31, F-50, F-01/03/04, ADR 0001, ADR 0009, ADR 0041, ADR 0043, ADR 0045, ADR 0058 | `test_setup_api.py` |
 | Persona & scenario library: row mapping + seeded content | F-01, F-03, F-04, R-07..R-10, R-12, ADR 0041, ADR 0043, ADR 0045 | `test_persona_scenario_library.py` |
+| User-authored Scenarios: ownership, tenant visibility, sharing | F-34, F-59, R-58, ADR 0024, ADR 0050, ADR 0058, ADR 0059, ADR 0060 | `test_authored_content.py` |
+| PDF text extraction for an authored Scenario | F-58, ADR 0024, ADR 0058, ADR 0059 | `test_scenario_documents.py` |
+| Tenant resolution (org claim → e-mail domain → default) | R-58, ADR 0060 | `test_tenants.py` |
+| Sanitising authored Scenario text before it reaches the prompt | ADR 0024, ADR 0059 | `test_authored_text.py` |
 | Counterpart behaviour (LLM system prompt) | F-01, F-03, F-04, F-12, R-12, ADR 0043, ADR 0045, ADR 0033/0037/0038 | `test_system_prompt.py` |
 | Live session loop & state model | F-46, F-01, F-12, F-52, R-52, ADR 0033 | `test_session_pipeline.py` |
 | Streaming TTS chunking | ADR 0033 | `test_chunking.py` |

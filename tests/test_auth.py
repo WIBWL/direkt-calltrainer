@@ -57,6 +57,17 @@ def test_token_without_roles_claim_is_fine():
     assert not ctx.roles
 
 
+def test_tenant_claim_is_surfaced():
+    """ADR 0060: the `tenant` claim (a Keycloak user attribute) is what
+    `backend/tenants.py` resolves a company from."""
+    assert auth.verify_token(_token(tenant="solox")).tenant == "solox"
+
+
+def test_absent_or_blank_tenant_claim_is_none():
+    assert auth.verify_token(_token()).tenant is None
+    assert auth.verify_token(_token(tenant="   ")).tenant is None
+
+
 @pytest.mark.parametrize(
     "bad",
     [

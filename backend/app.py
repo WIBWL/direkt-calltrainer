@@ -7,22 +7,24 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from backend.api.personas import router as personas_router
+from backend.api.scenarios import router as scenarios_router
 from backend.api.session_ws import router as session_ws_router
 from backend.api.sessions import router as sessions_router
-from backend.auth import check_realm, require_user
+from backend.api.tenant import router as tenant_router
+from backend.auth import check_realm
 from backend.clients import tts
 from backend.clients.config import DIREKT_URL
 from backend.clients.health import check_backends
 from backend.db.provision import provision
 from backend.db.session import session_scope
 from backend.logging_config import configure_logging
-from backend import library
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -75,6 +77,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(personas_router)
+app.include_router(scenarios_router)
+app.include_router(tenant_router)
 app.include_router(session_ws_router)
 app.include_router(sessions_router)
 
@@ -106,37 +111,7 @@ def readiness() -> dict[str, str]:
     return {"status": "ready"}
 
 
-# The setup lists require a valid Keycloak token (ADR 0009). The static SPA
-# mount below stays open so the login screen can load in the first place.
-@app.get("/api/personas", dependencies=[Depends(require_user)])
-def list_personas() -> list[dict[str, str]]:
-    """List personas available for session setup.
-
-    Display fields only (ADR 0043) -- the English prompt fields stay on the
-    server. The language comes along because it is a property of the Persona and
-    not a separate choice, so the card has to say which one it speaks.
-
-    `id` on the wire is the natural key, never the primary key: the client sends
-    it straight back in session.start. Retired Personas are filtered out by the
-    library -- their rows stay, because stored Sessions reference them.
-    """
-    return [
-        {"id": p.id, "name": p.name, "role": p.role_label, "language": p.language_name}
-        for p in library.list_personas()
-    ]
-
-
-@app.get("/api/scenarios", dependencies=[Depends(require_user)])
-def list_scenarios() -> list[dict[str, str]]:
-    """List scenarios available for session setup.
-
-    Serves the short teaser, not the English call context the model reads, and
-    only active rows -- as above.
-    """
-    return [
-        {"id": s.id, "name": s.name, "short_description": s.short_description}
-        for s in library.list_scenarios()
-    ]
-
-
+# The setup lists (backend/api/personas.py, scenarios.py) require a valid
+# Keycloak token (ADR 0009). The static SPA mount below stays open so the login
+# screen can load in the first place.
 app.mount("/", StaticFiles(directory=FRONTEND_DIST_DIR, html=True, check_dir=False), name="frontend")

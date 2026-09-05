@@ -125,6 +125,34 @@ body {
   color: var(--color-navy-900);
 }
 
+.app-header-user {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.app-header-username {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+.app-header-auth {
+  border: 1px solid var(--color-blue-300);
+  background: var(--color-surface);
+  color: var(--color-blue-600);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.app-header-auth:hover {
+  border-color: var(--color-blue-600);
+}
+
 .training-progress {
   display: flex;
   align-items: center;
@@ -312,6 +340,288 @@ h2 {
   font-size: 0.8rem;
   color: var(--text-muted);
   line-height: 1.4;
+}
+
+/* --- Scenario library: authored vs built-in (ADR 0058) --- */
+
+.library-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.library-filter {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  background: var(--color-surface-filter);
+  border-radius: 999px;
+}
+
+.library-filter-chip {
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.library-filter-chip.active {
+  background: var(--color-surface);
+  color: var(--color-navy-900);
+  box-shadow: 0 1px 2px rgba(3, 37, 62, 0.12);
+}
+
+.library-new-button {
+  margin-left: auto;
+  border: 1px dashed var(--color-blue-300);
+  background: var(--color-surface);
+  color: var(--color-blue-600);
+  border-radius: 12px;
+  padding: 0.5rem 0.9rem;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.library-new-button:hover {
+  border-color: var(--color-blue-600);
+}
+
+.card-wrap {
+  position: relative;
+  display: flex;
+}
+
+.card-wrap .persona-card {
+  flex: 1;
+}
+
+.card-badge {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.card-badge-vorlage {
+  background: var(--color-blue-100);
+  color: var(--color-blue-600);
+}
+
+.card-badge-eigen {
+  background: #e3f3ec;
+  color: var(--color-success);
+}
+
+.card-badge-unternehmen {
+  background: #ece3f7;
+  color: #5b3a9c;
+}
+
+/* Own Scenario that has been shared with the company: reads as "mine" but
+   signals it is out there. */
+.card-badge-geteilt {
+  background: #e3f3ec;
+  color: var(--color-success);
+  box-shadow: inset 0 0 0 1px #5b3a9c33;
+}
+
+.card-edit {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  border: 0;
+  background: transparent;
+  padding: 0.1rem 0.3rem;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--color-blue-600);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* --- Scenario editor modal --- */
+
+.editor-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 37, 62, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  z-index: 50;
+}
+
+.editor-panel {
+  width: min(640px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border-radius: 16px;
+  padding: 1.5rem;
+}
+
+.editor-panel h2 {
+  margin: 0 0 1rem;
+  color: var(--color-navy-900);
+}
+
+.editor-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.editor-field-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+.editor-field-hint {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.editor-field input,
+.editor-field textarea {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  resize: vertical;
+}
+
+.editor-field input:focus,
+.editor-field textarea:focus {
+  outline: 2px solid var(--color-blue-300);
+  outline-offset: 1px;
+}
+
+/* --- PDF upload in the scenario editor (F-58) --- */
+
+.pdf-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: -0.4rem;
+}
+
+.pdf-upload-button {
+  align-self: flex-start;
+  display: inline-block;
+  border: 1px dashed var(--color-blue-300);
+  background: var(--color-surface);
+  color: var(--color-blue-600);
+  border-radius: 8px;
+  padding: 0.35rem 0.8rem;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.pdf-upload-button:hover {
+  border-color: var(--color-blue-600);
+}
+
+.pdf-upload-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.pdf-upload-note {
+  font-size: 0.78rem;
+  color: var(--color-success);
+}
+
+/* --- Share-with-company toggle (R-58) --- */
+
+.share-toggle {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin-top: 1.1rem;
+  padding: 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-filter);
+  cursor: pointer;
+}
+
+.share-toggle input {
+  margin-top: 0.15rem;
+}
+
+.share-toggle-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+.share-toggle-hint {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.editor-actions-spacer {
+  flex: 1;
+}
+
+.editor-actions button {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 10px;
+  padding: 0.5rem 1rem;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.editor-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.editor-save {
+  border-color: var(--color-blue-600) !important;
+  background: var(--color-blue-600) !important;
+  color: var(--color-surface);
+}
+
+.editor-delete {
+  border-color: var(--color-danger) !important;
+  color: var(--color-danger);
 }
 
 /* The setup introduction explains the purpose of the first training step. */

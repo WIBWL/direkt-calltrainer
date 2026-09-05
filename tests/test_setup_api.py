@@ -22,6 +22,8 @@ what the seed *wrote* — which is exactly what makes comparing against them a
 meaningful assertion rather than a tautology.
 """
 
+import uuid
+
 import httpx
 import pytest
 
@@ -56,16 +58,15 @@ async def test_personas_endpoint_lists_every_persona_with_card_fields(client):
     assert resp.status_code == 200
     body = resp.json()
     assert len(body) == len(SEEDED_PERSONAS)
-    # Keyed rather than zipped: the endpoint orders by name, the seed by nothing
-    # in particular, and neither ordering is what this test is about.
-    by_id = {entry["id"]: entry for entry in body}
+    # Keyed by name: `id` on the wire is the extern_id UUID now (ADR 0058), not
+    # the seed slug, and the endpoint orders by name while the seed does not.
+    by_name = {entry["name"]: entry for entry in body}
     for persona in SEEDED_PERSONAS:
-        assert by_id[persona["id"]] == {
-            "id": persona["id"],
-            "name": persona["name"],
-            "role": persona["role_label"],
-            "language": LANGUAGE_NAMES[persona["language_id"]],
-        }
+        card = by_name[persona["name"]]
+        assert uuid.UUID(card["id"])  # a valid opaque id, not the slug
+        assert card["role"] == persona["role_label"]
+        assert card["language"] == LANGUAGE_NAMES[persona["language_id"]]
+        assert set(card) == {"id", "name", "role", "language"}  # personas aren't authored
         assert persona["name"] and persona["role_label"], "a card needs a visible name and role"
 
 
@@ -88,13 +89,12 @@ async def test_scenarios_endpoint_lists_every_scenario_with_its_teaser(client):
     assert resp.status_code == 200
     body = resp.json()
     assert len(body) == len(SEEDED_SCENARIOS)
-    by_id = {entry["id"]: entry for entry in body}
+    by_name = {entry["name"]: entry for entry in body}
     for scenario in SEEDED_SCENARIOS:
-        assert by_id[scenario["id"]] == {
-            "id": scenario["id"],
-            "name": scenario["name"],
-            "short_description": scenario["short_description"],
-        }
+        card = by_name[scenario["name"]]
+        assert uuid.UUID(card["id"])
+        assert card["short_description"] == scenario["short_description"]
+        assert card["herkunft"] == "vorlage"
 
 
 async def test_scenarios_endpoint_withholds_the_english_call_context(client):
@@ -114,7 +114,7 @@ async def test_scenarios_endpoint_withholds_the_case(client):
     exercise they are about to practise."""
     body = (await client.get("/api/scenarios")).json()
     for entry in body:
-        assert set(entry) == {"id", "name", "short_description"}
+        assert set(entry) == {"id", "name", "short_description", "herkunft", "geteilt"}
         assert "case_facts" not in entry
         assert "call_goal" not in entry
         assert "success_condition" not in entry

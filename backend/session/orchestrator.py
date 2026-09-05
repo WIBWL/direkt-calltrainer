@@ -25,6 +25,7 @@ from collections.abc import AsyncIterator
 from kugelaudio.exceptions import KugelAudioError
 from openai import OpenAIError
 
+from backend.authored_text import AUTHORED_SCENARIO_NOTE
 from backend.clients import llm, stt, tts
 from backend.feedback.acoustics import AcousticsError, Pause, TurnAcoustics, analyze
 from backend.personas import Persona
@@ -155,6 +156,7 @@ def _build_system_prompt(persona: Persona, scenario: Scenario, pack: LanguagePac
         "other way around: never ask the user what their question or "
         "problem is, and never wait for them to explain why they're "
         "calling — you're the one with something to discuss.\n"
+        f"{AUTHORED_SCENARIO_NOTE if scenario.created_by else ''}"
         f"Context of the call: {scenario.description}\n"
         f"{_case_block(scenario)}"
         f"Your name: {persona.name}. Introduce yourself by that name and "

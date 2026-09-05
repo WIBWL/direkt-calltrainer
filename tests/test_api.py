@@ -20,7 +20,7 @@ from backend.db.models import Feedback, FeedbackPoint
 from backend.db.models import Persona as DbPersona
 from backend.db.models import Session
 from backend.session.models import Turn
-from tests.conftest import METRIC_KEY, PERSONA_KEY, SCENARIO_KEY, persist
+from tests.conftest import METRIC_KEY, persist
 
 pytestmark = pytest.mark.usefixtures("reference_data")
 
@@ -65,8 +65,10 @@ async def test_personas_come_from_the_database(api_client: httpx.AsyncClient) ->
     response = await api_client.get("/api/personas")
 
     assert response.status_code == 200
-    assert [p["id"] for p in response.json()] == [PERSONA_KEY]
-    assert response.json()[0]["name"] == "Thomas Brandt"
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["name"] == "Thomas Brandt"
+    assert uuid.UUID(body[0]["id"])  # extern_id, not the slug (ADR 0058)
 
 
 async def test_scenarios_come_from_the_database(api_client: httpx.AsyncClient) -> None:
@@ -75,8 +77,10 @@ async def test_scenarios_come_from_the_database(api_client: httpx.AsyncClient) -
     response = await api_client.get("/api/scenarios")
 
     assert response.status_code == 200
-    assert set(response.json()[0]) == {"id", "name", "short_description"}
-    assert response.json()[0]["id"] == SCENARIO_KEY
+    entry = response.json()[0]
+    assert set(entry) == {"id", "name", "short_description", "herkunft", "geteilt"}
+    assert uuid.UUID(entry["id"])  # extern_id the client sends back in session.start
+    assert entry["name"] == "Kündigungsabsicht"
 
 
 async def test_deactivated_persona_is_not_offered_for_a_new_call(

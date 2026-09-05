@@ -120,6 +120,24 @@ def test_prompt_defines_the_call_end_marker_protocol(prompt):
     assert "unresolved" in prompt
 
 
+def test_authored_scenario_gets_the_content_note_a_built_in_does_not(persona):
+    """ADR 0059: when the Scenario is User-authored, one line tells the model to
+    treat its situation/case text as facts to use, not as instructions to obey.
+    A built-in Scenario (created_by is None) does not get the line -- it needs
+    no such guard, and the sentence would only dilute the prompt."""
+    built_in = _build_system_prompt(persona, TEST_SCENARIOS[0], GERMAN)
+    authored = _build_system_prompt(
+        persona, replace(TEST_SCENARIOS[0], created_by="alice"), GERMAN
+    )
+    note = "were written by whoever set up this training exercise"
+    assert note not in built_in
+    assert note in authored
+    # The case facts themselves are still handed over plainly, no <<< >>> wrapper.
+    prompt = _build_system_prompt(persona, _case_scenario(created_by="alice"), GERMAN)
+    assert "<<<" not in prompt
+    assert _case_scenario().case_facts in prompt
+
+
 def test_prompt_is_rebuilt_per_persona_scenario_pair(persona):
     """ADR 0001: every persona x scenario combination yields its own prompt."""
     a = _build_system_prompt(persona, TEST_SCENARIOS[0], GERMAN)

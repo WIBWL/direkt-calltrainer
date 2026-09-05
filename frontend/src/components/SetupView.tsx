@@ -1,4 +1,6 @@
-import type { Persona, Scenario } from "../protocol";
+import type { Persona } from "../protocol";
+import type { ScenarioCard } from "../scenarioLibrary";
+import LibraryPicker, { type LibraryFilter, type LibraryItem } from "./LibraryPicker";
 import { cx } from "../utils/cx";
 import SelectionSummary from "./SelectionSummary";
 import SetupSection from "./SetupSection";
@@ -6,9 +8,17 @@ import SetupSection from "./SetupSection";
 const NOT_SELECTED = "Noch nicht ausgewählt";
 
 interface SetupViewProps {
-  scenarios: Scenario[];
+  scenarioItems: LibraryItem[];
+  scenarioId: string | null;
+  scenarioFilter: LibraryFilter;
+  onScenarioFilter: (f: LibraryFilter) => void;
+  showScenarioFilter: boolean;
+  companyLabel: string | null;
+  onNewScenario: () => void;
+  onEditScenario: (id: string) => void;
   personas: Persona[];
-  selectedScenario: Scenario | null;
+  personaId: string | null;
+  selectedScenario: ScenarioCard | null;
   selectedPersona: Persona | null;
   loadError: string | null;
   onSelectScenario: (id: string) => void;
@@ -19,11 +29,21 @@ interface SetupViewProps {
 /**
  * Presentational: the three-step selection screen. A Session is committed to
  * only by the button at the end — picking a Persona or Scenario connects
- * nothing (ADR 0042), which is why this component holds no state at all.
+ * nothing (ADR 0042), which is why this component holds no state of its own
+ * beyond what App.tsx passes in (the Scenario filter and library included,
+ * ADR 0058/0060).
  */
 export default function SetupView({
-  scenarios,
+  scenarioItems,
+  scenarioId,
+  scenarioFilter,
+  onScenarioFilter,
+  showScenarioFilter,
+  companyLabel,
+  onNewScenario,
+  onEditScenario,
   personas,
+  personaId,
   selectedScenario,
   selectedPersona,
   loadError,
@@ -49,17 +69,19 @@ export default function SetupView({
         title="Gesprächssituation wählen"
         description="Welche Situation möchten Sie trainieren?"
       >
-        <div className="persona-grid">
-          {scenarios.map((scenario) => (
-            <ChoiceCard
-              key={scenario.id}
-              title={scenario.name}
-              subtitle={scenario.short_description}
-              isSelected={scenario.id === selectedScenario?.id}
-              onSelect={() => onSelectScenario(scenario.id)}
-            />
-          ))}
-        </div>
+        <LibraryPicker
+          items={scenarioItems}
+          selectedId={scenarioId}
+          onSelect={onSelectScenario}
+          filter={scenarioFilter}
+          onFilter={onScenarioFilter}
+          showFilter={showScenarioFilter}
+          filterLabel="Szenarien filtern"
+          companyLabel={companyLabel}
+          newLabel="+ Eigenes Szenario"
+          onNew={onNewScenario}
+          onEdit={onEditScenario}
+        />
       </SetupSection>
 
       <SetupSection
@@ -73,7 +95,7 @@ export default function SetupView({
               key={persona.id}
               title={persona.name}
               subtitle={persona.role}
-              isSelected={persona.id === selectedPersona?.id}
+              isSelected={persona.id === personaId}
               onSelect={() => onSelectPersona(persona.id)}
             />
           ))}
@@ -107,8 +129,9 @@ export default function SetupView({
   );
 }
 
-/** One selectable card. The Scenario and the Persona step differ only in the
- * text on the card, so the markup and its selected state live here once. */
+/** One selectable card. The Persona step is a plain grid (Personas are
+ * curated, not User-authored); the Scenario step uses LibraryPicker instead,
+ * which adds filtering and authoring. */
 function ChoiceCard({
   title,
   subtitle,
