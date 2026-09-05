@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session as DbSession
 from backend.clients import llm
 from backend.db import models as db_models
 from backend.db.session import session_scope
+from backend.feedback import jobs
 
 logger = logging.getLogger(__name__)
 
@@ -77,50 +78,37 @@ def generate_feedback(session_id: int) -> None:
 
 
 async def _generate(session_id: int) -> None:
+    # The whole job sits inside one failure boundary: the post-call screen
+    # polls on this job's status, so anything that raises has to close the row.
     session_exists = False
-
     try:
         with session_scope() as db:
             session = db.get(db_models.Session, session_id)
             if session is None:
                 raise LookupError(f"Session {session_id} does not exist")
-
             session_exists = True
-            _mark(db, session_id, "running")
+            jobs.mark(db, session_id, "running")
             dossier, valid_turns = _dossier(session)
-            language = _LANGUAGE_NAMES_EN.get(
-                session.language_code,
-                session.language_code,
-            )
+            language = _LANGUAGE_NAMES_EN.get(session.language_code, session.language_code)
 
         wrapup = await _ask(dossier, language)
 
         with session_scope() as db:
             _store(db, session_id, wrapup, valid_turns)
-            _mark(db, session_id, "done")
-
-        logger.info(
-            "Feedback stored for session %d (%d points)",
-            session_id,
-            len(wrapup.points),
-        )
-
-    except Exception as e:
-        logger.exception(
-            "Feedback generation failed for session %d",
-            session_id,
-        )
-
+            jobs.mark(db, session_id, "done")
+        logger.info("Feedback stored for session %d (%d points)", session_id, len(wrapup.points))
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.exception("Feedback generation failed for session %d", session_id)
+        # `jobs.mark` creates the row where it finds none, so a Session that
+        # does not exist must not reach it.
         if session_exists:
             try:
                 with session_scope() as db:
-                    _mark(db, session_id, "failed", str(e))
-            except Exception:
-                logger.exception(
-                    "Could not mark feedback job failed for session %d",
-                    session_id,
-                )
-
+                    jobs.mark(db, session_id, "failed", str(e))
+            except Exception:  # pylint: disable=broad-exception-caught
+                # Re-raising here would lose the original error; the client
+                # falls back to its own timeout instead.
+                logger.exception("Could not mark feedback job failed for session %d", session_id)
         raise
 
 
@@ -152,8 +140,7 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
             f'    [turn_id={turn.turn_id}] {_timestamp(turn.start_offset_ms)} '
             f'{speaker}: "{turn.transcript}"'
         )
-        if turn.speaker == db_models.SPEAKER_USER:
-            turn_ids.add(turn.turn_id)
+        turn_ids.add(turn.turn_id)
     return "\n".join(lines), turn_ids
 
 
@@ -383,26 +370,12 @@ async def _ask(dossier: str, language: str) -> _Wrapup:
     """
     messages = _messages(dossier, language)
     raw = ""
-
     for attempt in range(2):  # initial attempt + one retry
+        raw = await llm.complete(messages)
         try:
-            raw = await llm.complete(messages)
             return _Wrapup.model_validate_json(_unwrap(raw))
         except (ValidationError, ValueError) as e:
-            logger.warning(
-                "Wrap-up did not validate (attempt %d): %s",
-                attempt + 1,
-                e,
-            )
-        except Exception as e:
-            logger.warning(
-                "Wrap-up request failed (attempt %d): %s",
-                attempt + 1,
-                e,
-            )
-            if attempt == 1:
-                raise
-
+            logger.warning("Wrap-up did not validate (attempt %d): %s", attempt + 1, e)
     logger.warning("Falling back to a narrative-only wrap-up")
     return _Wrapup(summary=_unfenced_text(raw))
 
@@ -461,21 +434,3 @@ def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) 
         for index, (kind, point) in enumerate(wrapup.points)
     ]
     db.add(feedback)
-
-
-def _mark(db: DbSession, session_id: int, status: str, error_text: str | None = None) -> None:
-    """Move the Session's feedback job to `status` (ADR 0032)."""
-    job = (
-        db.query(db_models.AnalysisJob)
-        .filter_by(session_id=session_id, kind="feedback")
-        .order_by(db_models.AnalysisJob.job_id.desc())
-        .first()
-    )
-    if job is None:
-        job = db_models.AnalysisJob(session_id=session_id, kind="feedback", attempts=0)
-        db.add(job)
-    job.status = status
-    job.error_text = error_text
-    job.updated_at = datetime.now()
-    if status == "running":
-        job.attempts += 1

@@ -155,9 +155,11 @@ Besonderheiten: Der gesamte Zyklus muss in Echtzeit ablaufen (Q-03), da Verzöge
 
 ## 6.2 Szenario 2: Analyse des Sprechverhaltens während des Gesprächs
 
-- Während der Nutzer spricht, misst die Analyse-Komponente je Redebeitrag nur die Rohgrößen, die am Audio ablesbar sind (Sprechdauer, Pausen, Lautstärke) und rechnet sie auf die Zeitachse der Session um.
+- Während der Nutzer spricht, misst die Analyse-Komponente je Redebeitrag nur die Rohgrößen, die am Audio ablesbar sind (Aufnahmedauer, reine Sprechzeit ohne Pausen, Pausen, Lautstärke) und rechnet sie auf die Zeitachse der Session um.
+- Redeanteil und Sprechtempo teilen durch verschiedene Größen: der Redeanteil durch die Aufnahmedauer, weil nur diese mit der synthetisierten Persona-Stimme vergleichbar ist, das Sprechtempo durch die reine Sprechzeit.
 - Die Kennzahlen entstehen erst am Gesprächsende aus allen Redebeiträgen zusammen und beschreiben jeweils das ganze Gespräch — Menge und Begründung siehe ADR 0051, Kennzahlenliste F-53.
 - Die Antwortzeit der KI wird mitgemessen und keinem Sprecher zugerechnet, damit sie nicht als Gesprächslücke des Nutzers erscheint (ADR 0051).
+- Schlägt die Messung eines Redebeitrags fehl, hält der Redebeitrag das fest: Redeanteil und Sprechtempo entfallen dann für das ganze Gespräch, und aus diesem Beitrag wird keine Reaktionszeit abgeleitet. Eine fehlende Zahl ist ehrlicher als eine, die still zu niedrig ausfällt (ADR 0048, ADR 0051).
 - Ergebnisse werden für das spätere Wrap-up gesammelt, nicht während des Gesprächs angezeigt (ADR 0014).
 
 Besonderheiten: Diese Analyse läuft parallel zur eigentlichen Gesprächssimulation (Szenario 1), ohne den Gesprächsfluss zu unterbrechen. Die gesammelten Daten dienen als Grundlage für Szenario 3.
@@ -290,8 +292,10 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0053 | Deterministic Constraint Names and Database-Enforced Vocabularies | angenommen | |
 | ADR 0054 | The Scenario Briefs the Trainee, Not Only the Persona | vorgeschlagen (erweitert ADR 0045) | Q-01, C-05, R-43 |
 | ADR 0055 | Log File Kept for the Whole Run, Not Truncated per Session | angenommen (überarbeitet ADR 0039) | |
+| ADR 0056 | Phase-Appropriate Language Is a Paragraph, Not a Metric | angenommen (ergänzt ADR 0049/0051) | F-42, F-09 |
+| ADR 0057 | English Wire Vocabulary | angenommen (ergänzt ADR 0026) | |
 
-Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug; ADR 0017, 0025, 0027 bis 0030, 0039 und 0055 sind reine Wartbarkeits-, Werkzeug- oder Schemaentscheidungen ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
+Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug; ADR 0017, 0025, 0027 bis 0030, 0039, 0055 und 0057 sind reine Wartbarkeits-, Werkzeug- oder Schemaentscheidungen ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 
 # 10. Qualitätsanforderungen
 

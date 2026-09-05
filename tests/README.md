@@ -35,7 +35,7 @@ source of that content, and which imports without a database.
 | Setup screen: persona/scenario REST endpoints (+ auth gate) | F-43, F-44, F-15, F-31, F-50, F-01/03/04, ADR 0001, ADR 0009, ADR 0041, ADR 0043, ADR 0045 | `test_setup_api.py` |
 | Persona & scenario library: row mapping + seeded content | F-01, F-03, F-04, R-07..R-10, R-12, ADR 0041, ADR 0043, ADR 0045 | `test_persona_scenario_library.py` |
 | Counterpart behaviour (LLM system prompt) | F-01, F-03, F-04, F-12, R-12, ADR 0043, ADR 0045, ADR 0033/0037/0038 | `test_system_prompt.py` |
-| Live session loop & state model | F-46, F-01, F-12, F-52, R-52, ADR 0033 | `test_session_pipeline.py` |
+| Live session loop & state model (+ what a Turn's acoustics record) | F-46, F-01, F-12, F-52, R-52, ADR 0033, ADR 0047, ADR 0048 | `test_session_pipeline.py` |
 | Streaming TTS chunking | ADR 0033 | `test_chunking.py` |
 | Closing-intent detection (both language packs) | ADR 0037, ADR 0043, F-01 | `test_closing_intent.py` |
 | Repetition guard, re-introduction regeneration + guaranteed sign-off | ADR 0038, ADR 0043 | `test_repetition_guard.py` |
@@ -46,7 +46,9 @@ source of that content, and which imports without a database.
 | WebSocket wire protocol & handshake (+ token in `session.start`) | F-46, F-50, ADR 0009, ADR 0033, ADR 0035 | `test_websocket_protocol.py` |
 | Centralized logging (session-tagged, kept for the whole run) | ADR 0039, ADR 0055 | `test_logging.py` |
 | Persistence schema (ORM metadata) | ADR 0025/0026/0029/0030/0032, F-09, F-12, F-14 | `test_persistence_schema.py` |
-| Wrap-up prompt & phase block (F-42) | F-09, F-42, ADR 0004, ADR 0049, ADR 0051, ADR 0056 | `test_wrapup_prompt.py` |
+| Session statistics: what each metric divides by, and what suppresses it | F-08, F-24, F-36, F-41, F-51, F-53, ADR 0047, ADR 0048, ADR 0051 | `test_metrics.py` |
+| Wrap-up prompt & phase block (F-42) | F-09, F-42, F-43, ADR 0004, ADR 0043, ADR 0049, ADR 0051, ADR 0056 | `test_wrapup_prompt.py` |
+| Feedback job lifecycle: every path that can strand `analysis_job.status` | F-42, F-53, ADR 0019, ADR 0032, ADR 0050 | `test_feedback_jobs.py` |
 | Documented gaps (current-state guards) | F-13/48, F-53, F-56, ADR 0006/0009 | `test_documented_gaps.py` |
 
 ## Not covered here

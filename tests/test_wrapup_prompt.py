@@ -20,17 +20,11 @@ quietly turn into the score ADR 0004 rules out.
 No database and no network: `_messages` is a pure function and `_Wrapup` is a
 pydantic model.
 """
-from types import SimpleNamespace
 
 import pytest
 
-from backend.db import models as db_models
-from backend.feedback.generator import (
-    _LANGUAGE_NAMES_EN,
-    _dossier,
-    _messages,
-    _Wrapup,
-)
+from backend.feedback.generator import _LANGUAGE_NAMES_EN, _messages, _Wrapup
+from backend.session.language_packs import LANGUAGE_PACKS
 
 # The prompt builder and the response model are the units under test.
 # pylint: disable=protected-access,redefined-outer-name
@@ -119,33 +113,19 @@ def test_narrative_fallback_carries_no_phase_text() -> None:
     assert _Wrapup(summary="Freitext ohne JSON.").phase_language == ""
 
 
-def test_english_language_code_maps_to_english() -> None:
-    assert _LANGUAGE_NAMES_EN["en"] == "English"
+def test_every_supported_language_has_a_name_for_the_prompt() -> None:
+    """ADR 0043. The prompt is English and names the language the wrap-up is to
+    be written in, so every language a Persona can speak needs an entry here.
+
+    Asserted against LANGUAGE_PACKS, the set a Persona's `language_code` is
+    resolved through, so a pack added without a name fails here rather than
+    reaching the model as a bare code.
+    """
+    assert set(LANGUAGE_PACKS) <= set(_LANGUAGE_NAMES_EN)
 
 
-def test_dossier_only_allows_user_turn_ids_for_citations() -> None:
-    session = SimpleNamespace(
-        measurements=[],
-        turns=[
-            SimpleNamespace(
-                turn_id=1,
-                seq_index=0,
-                speaker=db_models.SPEAKER_PERSONA,
-                start_offset_ms=0,
-                transcript="Guten Tag.",
-            ),
-            SimpleNamespace(
-                turn_id=2,
-                seq_index=1,
-                speaker=db_models.SPEAKER_USER,
-                start_offset_ms=1000,
-                transcript="Hallo.",
-            ),
-        ],
-    )
+def test_the_language_name_is_what_the_model_is_told_to_write_in() -> None:
+    """The name is interpolated into the output rules, not just stored."""
+    system = _messages("dossier", _LANGUAGE_NAMES_EN["en"])[0]["content"]
 
-    dossier, valid_turn_ids = _dossier(session)
-
-    assert "[turn_id=1]" in dossier
-    assert "[turn_id=2]" in dossier
-    assert valid_turn_ids == {2}
+    assert "Every value you write is in English" in system

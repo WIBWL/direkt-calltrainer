@@ -21,7 +21,7 @@ from backend.feedback.metrics import Conversation
 
 
 @dataclass
-class Turn:
+class Turn:  # pylint: disable=too-many-instance-attributes
     """One exchange within a Session (see CONTEXT.md). Distinct from the
     persisted `turn` row (ADR 0026), which is one utterance of one speaker."""
 
@@ -42,7 +42,15 @@ class Turn:
     # audio was still in memory and already rebased onto the Session's
     # timeline -- so a Turn reopened after a barge-in, and therefore spoken in
     # several fragments, needs no special case once the Session is folded up.
+    #
+    # How long the recording ran, and how much of that was speech rather than
+    # silence. Redeanteil divides by the first (the Persona's side is audio
+    # duration too), Sprechtempo by the second.
     user_speech_ms: int = 0
+    user_phonation_ms: int = 0
+    # False once any fragment of this Turn failed to measure: its words still
+    # count while its milliseconds do not, so the figures above are short by an
+    # unknown amount and `user_offset_ms` is a fallback rather than a reading.
     user_acoustics_complete: bool = True
     pauses: list[Pause] = field(default_factory=list)
     loudness_db: list[float | None] = field(default_factory=list)
@@ -95,14 +103,18 @@ def conversation(turns: Sequence[Turn]) -> Conversation:
     reactions: list[int] = []
     pauses: list[Pause] = []
     loudness: list[float | None] = []
-    user_ms = persona_ms = 0
+    user_ms = user_phonation = persona_ms = 0
     persona_stopped: int | None = None
 
     for turn in turns:
-        if turn.user_acoustics_complete and turn.user_offset_ms is not None and persona_stopped is not None:
+        # An unmeasured Turn's offset is the *end* of the user's speech, which
+        # read as a reaction time would be inflated by the whole utterance.
+        if (turn.user_acoustics_complete and
+                turn.user_offset_ms is not None and
+                persona_stopped is not None):
             reactions.append(max(0, turn.user_offset_ms - persona_stopped))
-
         user_ms += turn.user_speech_ms
+        user_phonation += turn.user_phonation_ms
         pauses.extend(turn.pauses)
         loudness.extend(turn.loudness_db)
         persona_ms += _span(turn.persona_offset_ms, turn.persona_end_ms) or 0
@@ -111,6 +123,8 @@ def conversation(turns: Sequence[Turn]) -> Conversation:
     return Conversation(
         user_text=" ".join(turn.user_text for turn in turns if turn.user_text),
         user_speech_ms=user_ms,
+        user_phonation_ms=user_phonation,
+        # Only Turns the user spoke in: the opening Turn has no audio to measure.
         user_acoustics_complete=all(
             turn.user_acoustics_complete for turn in turns if turn.user_text
         ),

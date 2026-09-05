@@ -31,9 +31,11 @@ def _store(extern_id: uuid.UUID) -> None:
         turns=[
             Turn(seq=1, persona_text="Brandt hier.",
                  persona_offset_ms=0, persona_end_ms=1500),
+            # Both durations: Sprechtempo, the one metric type the reference
+            # fixture seeds, is a rate over phonation.
             Turn(seq=2,
                  user_text="Guten Tag!", user_offset_ms=1800, user_end_ms=2700,
-                 user_speech_ms=900,
+                 user_speech_ms=900, user_phonation_ms=700,
                  persona_text="Zu teuer.",
                  persona_offset_ms=3000, persona_end_ms=4100),
         ],

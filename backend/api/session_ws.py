@@ -21,6 +21,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from backend.auth import AuthContext, authenticate_ws
 from backend.logging_config import session_id_scope
 from backend import library
+from backend.feedback import jobs
 from backend.personas import Persona
 from backend.scenarios import Scenario
 from backend.session import persistence
@@ -131,24 +132,20 @@ async def _record(
         return
     try:
         # Imported here, not at module scope: the live path must not need
-        # Redis to be importable, let alone reachable.
+        # Redis to be importable, let alone reachable. `jobs` stays at module
+        # scope -- it touches only the database, and the handler below needs it
+        # bound even when this import is what failed.
         from backend.feedback import queue
 
         await asyncio.to_thread(queue.enqueue_feedback, db_id)
     except Exception as e:
         logger.exception("Feedback could not be queued for session %d", db_id)
-
+        # The row was committed with the Session and says "queued", but nothing
+        # will ever run it.
         try:
-            await asyncio.to_thread(
-                persistence.mark_feedback_job_failed,
-                db_id,
-                str(e),
-            )
+            await asyncio.to_thread(jobs.mark_failed, db_id, str(e))
         except Exception:
-            logger.exception(
-                "Feedback job for session %d could not be marked failed",
-                db_id,
-            )
+            logger.exception("Feedback job for session %d could not be marked failed", db_id)
 
 
 async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario, AuthContext] | None:
