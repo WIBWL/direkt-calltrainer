@@ -37,11 +37,6 @@ _STATUS = {
     "error": db_models.STATUS_ABORTED,
 }
 
-# Who spoke, in the wire protocol's vocabulary -> in the schema's. The wire
-# stays German (the frontend reads these keys); the column is English and
-# constrained to SPEAKERS, so the two have to be translated here.
-_SPEAKER = {"nutzer": db_models.SPEAKER_USER, "persona": db_models.SPEAKER_PERSONA}
-
 
 def persist_session(
     extern_id: uuid.UUID,
@@ -74,10 +69,10 @@ def persist_session(
         )
         session.turns = [
             db_models.Turn(
-                speaker=_SPEAKER[spoken.sprecher],
+                speaker=spoken.speaker,
                 seq_index=index,
                 start_offset_ms=spoken.offset_ms,
-                duration_ms=spoken.dauer_ms,
+                duration_ms=spoken.duration_ms,
                 transcript=spoken.text,
             )
             for index, spoken in enumerate(utterances(turns))
@@ -111,12 +106,12 @@ def _write_analysis(
     metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType).all()}
     session.measurements = [
         db_models.Measurement(
-            metric_type_id=metric_ids[m.schluessel],
-            value=Decimal(f"{m.wert:.4f}"),
+            metric_type_id=metric_ids[m.key],
+            value=Decimal(f"{m.value:.4f}"),
             detail_json=m.detail,
         )
         for m in metrics.measure(call)
-        if m.schluessel in metric_ids
+        if m.key in metric_ids
     ]
 
 
@@ -125,7 +120,7 @@ def _reference(db: DbSession, model: type, key: str):
 
     Assigned through the relationship rather than the foreign key, so the
     primary key never has to be named here. Only Persona and Scenario go
-    through this -- the Feedback tables keep their German `schluessel`.
+    through this -- the Feedback tables are attached directly, by id.
     """
     row = db.query(model).filter_by(key=key).one_or_none()
     if row is None:

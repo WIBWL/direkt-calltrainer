@@ -42,7 +42,7 @@ export default function TranscriptView({
             <p className="transcript-line" key={i}>
               <span className="transcript-time">{formatOffset(entry.offset_ms)}</span>
               <span>
-                <strong>{entry.sprecher === "nutzer" ? "Du" : personaName}:</strong> {entry.text}
+                <strong>{entry.speaker === "user" ? "Du" : personaName}:</strong> {entry.text}
               </span>
             </p>
           ))}

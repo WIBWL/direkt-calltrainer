@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (see also ADR 0057, which extends "identifiers are English" from the schema to the wire)
 
 ## Context
 

@@ -155,8 +155,8 @@ def _seed_scenarios(db: DbSession) -> int:
 
 def _seed_metric_types(db: DbSession) -> int:
     return sum(
-        _upsert(db, MetricType, {"key": m.schluessel},
-                {"name": m.bezeichnung, "unit": m.einheit,
-                 "feature_id": m.feature_id, "active": m.aktiv})[1]
+        _upsert(db, MetricType, {"key": m.key},
+                {"name": m.name, "unit": m.unit,
+                 "feature_id": m.feature_id, "active": m.active})[1]
         for m in METRICS
     )

@@ -6,9 +6,9 @@ header on REST, and inside the `session.start` message on the WebSocket
 (browsers can't header a `WebSocket`). This module verifies it against the
 realm's JWKS.
 
-Mirrors `direkt-dataplatform`'s `shared-backend/src/index.ts`. Deliberately no
-role *check* (docs/adr/0009): any valid realm token may use the app. `roles` is
-still carried so a check can be added later without reshaping this.
+Deliberately no role *check* (docs/adr/0009): any valid realm token may use
+the app. `roles` is still carried so a check can be added later without
+reshaping this.
 """
 
 import logging

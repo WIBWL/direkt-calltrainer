@@ -137,7 +137,7 @@ services:
   # KC_HOSTNAME fixes the issuer to localhost:18081 no matter which host the
   # token request arrived on; --hostname-strict=false lets the app container
   # reach it as `keycloak:8080` for the JWKS. Host port 18081, not 18080, so it
-  # can run alongside direkt-dataplatform's Keycloak.
+  # can run alongside another local Keycloak on the default port.
   keycloak:
     image: quay.io/keycloak/keycloak:26.7
     command: start-dev --import-realm --hostname-strict=false

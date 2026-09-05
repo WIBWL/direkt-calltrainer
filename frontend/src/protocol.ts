@@ -4,14 +4,20 @@
  * separately, immediately after the "meta"/"chunk" message that describes them.
  */
 
-/** The animation the call screen shows; driven by the server's `state` message. */
+/** The call's current phase: sets the wave's color and the sr-only label, and
+ * gates whether the waveform reacts to audio at all — only "speaking" does;
+ * the actual amplitude comes from useStreamedAudioPlayback's audioLevel, not
+ * from this value (see CallAnimation). Usually driven by the server's `state`
+ * message, but the client also sets it directly: optimistically on barge-in
+ * (ADR 0035, useSessionSocket's sendInterrupt) and held at "speaking" while
+ * trailing audio is still playing out (App.tsx's displayState). */
 export type CallState = "listening" | "thinking" | "speaking";
 
-/** One line of the post-call Gesprächsprotokoll, placed on the Session's
- * timeline. Flattened server-side (backend/session/models.py) so this log and
- * the persisted one cannot disagree about who spoke when. */
+/** One line of the post-call transcript, placed on the Session's timeline.
+ * Flattened server-side (backend/session/models.py) so this log and the
+ * persisted one cannot disagree about who spoke when. */
 export interface TranscriptEntry {
-  sprecher: "nutzer" | "persona";
+  speaker: "user" | "persona";
   text: string;
   offset_ms: number;
 }
@@ -155,50 +161,51 @@ export type ServerMessage =
 
 export type FeedbackStatus = "queued" | "running" | "done" | "failed";
 
-export interface Messung {
-  schluessel: string;
-  bezeichnung: string;
-  einheit: string | null;
-  wert: number;
+export interface Measurement {
+  key: string;
+  name: string;
+  unit: string | null;
+  value: number;
   /** ADR 0029's free-form payload: curves, sub-measures, pause positions. */
   detail: Record<string, unknown> | null;
 }
 
 export interface SessionTurn {
   turn_id: number;
-  sprecher: "nutzer" | "persona";
+  speaker: "user" | "persona";
   start_offset_ms: number;
   /** NULL where the utterance has no measured end. */
-  dauer_ms: number | null;
-  transkript: string;
+  duration_ms: number | null;
+  transcript: string;
 }
 
-export interface Feedbackpunkt {
-  art: "staerke" | "verbesserung";
+export interface FeedbackPoint {
+  kind: "strength" | "improvement";
   text: string;
   turn_id: number | null;
 }
 
 export interface SessionFeedback {
-  zusammenfassung: string;
+  summary: string;
   /**
    * F-42: one paragraph on whether the register moved with the phase of the
    * call — warm in the opening, factual through the core business, warm again
-   * at the close. Prose rather than a Messung, because it describes a change
-   * over the call that no single number carries. NULL where the wrap-up has
-   * none; FeedbackView omits the block instead of showing it empty.
+   * at the close. Prose rather than a Measurement, because it describes a
+   * change over the call that no single number carries. NULL where the
+   * wrap-up has none; FeedbackView omits the block instead of showing it
+   * empty.
    */
-  phasensprache: string | null;
-  punkte: Feedbackpunkt[];
+  phase_language: string | null;
+  points: FeedbackPoint[];
 }
 
 export interface SessionDetail {
   session_id: string;
   persona: string;
-  szenario: string;
+  scenario: string;
   status: FeedbackStatus;
   turns: SessionTurn[];
   /** Statistics for the whole call, not per utterance (ADR 0051). */
-  messungen: Messung[];
+  measurements: Measurement[];
   feedback: SessionFeedback | null;
 }

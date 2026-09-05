@@ -1,5 +1,5 @@
 interface SparklineProps {
-  /** A curve from Messung.detail_json, sampled at a fixed rate; null marks a
+  /** A curve from Measurement.detail, sampled at a fixed rate; null marks a
    * stretch with no value (silence, for loudness). */
   values: (number | null)[];
   label: string;
@@ -10,7 +10,7 @@ const HEIGHT = 28;
 
 /**
  * The course of one metric across the whole call, drawn from the curve Praat
- * measured (ADR 0047/0051) and stored in Messung.detail_json (ADR 0029).
+ * measured (ADR 0047/0051) and stored in Measurement.detail (ADR 0029).
  *
  * Inline SVG rather than a charting library: it is one polyline, and the app
  * has no chart dependency to justify for it. Gaps are breaks in the line, not

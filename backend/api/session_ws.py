@@ -84,9 +84,9 @@ async def session_ws(websocket: WebSocket) -> None:
 
         # Flattened by the same function the persisted Turn rows come from, so
         # the log the user sees cannot disagree with the one that was stored --
-        # and carries the offsets that make it a timestamped Gesprächsprotokoll.
+        # and carries the offsets that make it a timestamped transcript.
         transcript = [
-            {"sprecher": u.sprecher, "text": u.text, "offset_ms": u.offset_ms}
+            {"speaker": u.speaker, "text": u.text, "offset_ms": u.offset_ms}
             for u in utterances(orchestrator.turns)
         ]
         # Before session.ended, so the row exists by the time the client can

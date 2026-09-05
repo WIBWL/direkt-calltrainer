@@ -1,6 +1,6 @@
 """The Persona and Scenario library, read from the database (ADR 0041).
 
-The one place where the `persona` and `szenario` reference tables are read
+The one place where the `persona` and `scenario` reference tables are read
 and mapped onto the frozen value objects the rest of the backend uses.
 Callers get plain dataclasses, so nothing outside this module has to know
 about SQLAlchemy sessions or detached instances.

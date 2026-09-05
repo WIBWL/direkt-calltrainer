@@ -510,7 +510,7 @@ def seeded_database(app_database: str) -> str:
 
 PERSONA_KEY = "thomas-brandt-ceo"
 SCENARIO_KEY = "price-cancellation-risk"
-METRIC_KEY = "tempo"
+METRIC_KEY = "pace"
 
 SESSION_STARTED = datetime(2026, 8, 27, 10, 0, 0, tzinfo=UTC)
 

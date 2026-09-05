@@ -6,7 +6,7 @@ client is looking at, and the client polls until it settles.
 
 Measurements sit next to the Turns rather than inside them: each one describes
 the whole call (ADR 0051). What stays per Turn is the Transcript itself, with
-the offset that makes it a timestamped Gesprächsprotokoll.
+the offset that makes it a timestamped transcript.
 
 A Session is addressed by its `extern_id`, never by its primary key
 (ADR 0050). A valid realm token is required like everywhere else (ADR 0009),
@@ -14,10 +14,9 @@ but no owner check is made on top of it: the route is reached from the screen
 that just finished the call, and the unguessable id is what keeps one user's
 wrap-up out of another's reach. A sequential key would be neither.
 
-The schema is English (ADR 0026), the wire is German: the keys below and the
-values of `sprecher` and `art` are what frontend/src/protocol.ts declares and
-TranscriptView/FeedbackView compare against, so they are translated back here
-rather than changed. This module is the boundary between the two vocabularies.
+The wire matches the schema (ADR 0057): the dicts below pass the ORM's own
+English column values straight through to frontend/src/protocol.ts, with no
+translation step.
 """
 
 from __future__ import annotations
@@ -32,12 +31,6 @@ from backend.db import models as db_models
 from backend.db.session import session_scope
 
 router = APIRouter(prefix="/api/sessions", dependencies=[Depends(require_user)])
-
-# Schema vocabulary -> wire vocabulary. The inverse of the maps in
-# backend/session/persistence.py and backend/feedback/generator.py.
-_SPRECHER = {db_models.SPEAKER_USER: "nutzer", db_models.SPEAKER_PERSONA: "persona"}
-_PUNKT_ART = {db_models.POINT_STRENGTH: "staerke",
-              db_models.POINT_IMPROVEMENT: "verbesserung"}
 
 
 @router.get("/{extern_id}")
@@ -64,10 +57,10 @@ def get_session(extern_id: uuid.UUID) -> dict:
         return {
             "session_id": str(session.extern_id),
             "persona": session.persona.name,
-            "szenario": session.scenario.title,
+            "scenario": session.scenario.title,
             "status": _feedback_status(session),
             "turns": [_turn(t) for t in sorted(session.turns, key=lambda t: t.seq_index)],
-            "messungen": [_messung(m) for m in session.measurements],
+            "measurements": [_measurement(m) for m in session.measurements],
             "feedback": _feedback(session.feedback),
         }
 
@@ -86,20 +79,20 @@ def _feedback_status(session: db_models.Session) -> str:
 def _turn(turn: db_models.Turn) -> dict:
     return {
         "turn_id": turn.turn_id,
-        "sprecher": _SPRECHER[turn.speaker],
+        "speaker": turn.speaker,
         "start_offset_ms": turn.start_offset_ms,
-        "dauer_ms": turn.duration_ms,
-        "transkript": turn.transcript,
+        "duration_ms": turn.duration_ms,
+        "transcript": turn.transcript,
     }
 
 
-def _messung(messung: db_models.Measurement) -> dict:
+def _measurement(measurement: db_models.Measurement) -> dict:
     return {
-        "schluessel": messung.metric_type.key,
-        "bezeichnung": messung.metric_type.name,
-        "einheit": messung.metric_type.unit,
-        "wert": float(messung.value),
-        "detail": messung.detail_json,
+        "key": measurement.metric_type.key,
+        "name": measurement.metric_type.name,
+        "unit": measurement.metric_type.unit,
+        "value": float(measurement.value),
+        "detail": measurement.detail_json,
     }
 
 
@@ -107,13 +100,13 @@ def _feedback(feedback: db_models.Feedback | None) -> dict | None:
     if feedback is None:
         return None
     return {
-        "zusammenfassung": feedback.summary,
+        "summary": feedback.summary,
         # NULL where the wrap-up carries no phase analysis (F-42) -- an older
         # Session, or one whose model answer fell back to narrative only. The
         # frontend drops the block rather than showing an empty one.
-        "phasensprache": feedback.phase_language,
-        "punkte": [
-            {"art": _PUNKT_ART[p.kind], "text": p.text, "turn_id": p.turn_id}
+        "phase_language": feedback.phase_language,
+        "points": [
+            {"kind": p.kind, "text": p.text, "turn_id": p.turn_id}
             for p in feedback.points
         ],
     }

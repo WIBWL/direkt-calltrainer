@@ -1,10 +1,10 @@
-import type { Feedbackpunkt, Messung } from "../protocol";
+import type { FeedbackPoint, Measurement } from "../protocol";
 import { useSessionFeedback } from "../hooks/useSessionFeedback";
 import Sparkline from "./Sparkline";
 
 /** How many decimals a metric reads naturally in. Counts are whole things;
  * seconds and percentages are not. */
-const DECIMALS: Record<string, number> = { fragen: 0, wortanzahl: 0, tempo: 0, redeanteil: 0 };
+const DECIMALS: Record<string, number> = { questions: 0, word_count: 0, pace: 0, talk_share: 0 };
 
 /** Everything that is not a finished wrap-up is a one-line notice. There is
  * no entry for "ready": the hook reports it only once feedback is present. */
@@ -42,32 +42,32 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
     );
   }
 
-  const { feedback, messungen } = detail;
+  const { feedback, measurements } = detail;
 
   return (
     <>
       <div className="card">
-        <p>{feedback.zusammenfassung}</p>
+        <p>{feedback.summary}</p>
       </div>
 
       <PointList
         title="Das lief gut"
-        points={feedback.punkte.filter((p) => p.art === "staerke")}
+        points={feedback.points.filter((p) => p.kind === "strength")}
         tone="success"
       />
       <PointList
         title="Daran können Sie arbeiten"
-        points={feedback.punkte.filter((p) => p.art === "verbesserung")}
+        points={feedback.points.filter((p) => p.kind === "improvement")}
         tone="danger"
       />
 
-      {messungen.length > 0 && (
+      {measurements.length > 0 && (
         <>
           <h2>Zahlen zum Gespräch</h2>
           <div className="card">
             <div className="metric-grid">
-              {messungen.map((m) => (
-                <Metric key={m.schluessel} messung={m} />
+              {measurements.map((m) => (
+                <Metric key={m.key} measurement={m} />
               ))}
             </div>
             <p className="metric-disclaimer">
@@ -78,11 +78,11 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
         </>
       )}
 
-      {feedback.phasensprache && (
+      {feedback.phase_language && (
         <>
           <h2>Phasengerechte Sprache</h2>
           <div className="card">
-            <p>{feedback.phasensprache}</p>
+            <p>{feedback.phase_language}</p>
             <p className="phase-note">
               Ein Gespräch läuft in drei Phasen ab – Einstieg, Anliegen, Abschluss – und
               der Tonfall soll mitgehen: warm, dann sachlich, dann wieder warm. Hier geht
@@ -101,7 +101,7 @@ function PointList({
   tone,
 }: {
   title: string;
-  points: Feedbackpunkt[];
+  points: FeedbackPoint[];
   tone: "success" | "danger";
 }) {
   if (points.length === 0) return null;
@@ -120,18 +120,18 @@ function PointList({
   );
 }
 
-function Metric({ messung }: { messung: Messung }) {
+function Metric({ measurement }: { measurement: Measurement }) {
   // The one metric with a course rather than a single number: loudness across
   // the whole call, as Praat measured it at a fixed rate (ADR 0047/0051).
-  const verlauf = messung.detail?.verlauf_db as (number | null)[] | undefined;
-  const decimals = DECIMALS[messung.schluessel] ?? 1;
+  const curve = measurement.detail?.curve_db as (number | null)[] | undefined;
+  const decimals = DECIMALS[measurement.key] ?? 1;
   return (
     <div className="metric">
-      <span className="metric-name">{messung.bezeichnung}</span>
+      <span className="metric-name">{measurement.name}</span>
       <span className="metric-value">
-        {messung.wert.toFixed(decimals)} {messung.einheit ?? ""}
+        {measurement.value.toFixed(decimals)} {measurement.unit ?? ""}
       </span>
-      {verlauf && <Sparkline values={verlauf} label={`${messung.bezeichnung} im Gesprächsverlauf`} />}
+      {curve && <Sparkline values={curve} label={`${measurement.name} im Gesprächsverlauf`} />}
     </div>
   );
 }

@@ -69,11 +69,11 @@ def test_phase_block_stays_off_the_score_ladder(system_prompt: str) -> None:
 
 
 def test_prompt_asks_for_four_keys_including_the_phase_block(system_prompt: str) -> None:
-    """The key is an identifier on the wire (protocol.ts reads `phasensprache`),
+    """The key is an identifier on the wire (protocol.ts reads `phase_language`),
     so it is named in the rule, in the shape, and in the closing reminder —
     the three places a small model reads a key name from."""
-    assert "zusammenfassung, phasensprache, staerken, verbesserungen" in system_prompt
-    assert '"phasensprache": "one paragraph' in system_prompt
+    assert "summary, phase_language, strengths, improvements" in system_prompt
+    assert '"phase_language": "one paragraph' in system_prompt
     assert "The four keys stay in English" in system_prompt
     assert "three keys" not in system_prompt
 
@@ -87,12 +87,12 @@ def test_prompt_forbids_markup_inside_the_phase_paragraph(system_prompt: str) ->
 def test_answer_carrying_the_phase_paragraph_parses() -> None:
     """The happy path: the fourth key lands in the field the store writes."""
     wrapup = _Wrapup.model_validate_json(
-        '{"zusammenfassung": "Kurz.", '
-        '"phasensprache": "Im Einstieg klangen Sie warm.", '
-        '"staerken": [], "verbesserungen": []}'
+        '{"summary": "Kurz.", '
+        '"phase_language": "Im Einstieg klangen Sie warm.", '
+        '"strengths": [], "improvements": []}'
     )
 
-    assert wrapup.phasensprache == "Im Einstieg klangen Sie warm."
+    assert wrapup.phase_language == "Im Einstieg klangen Sie warm."
 
 
 def test_answer_dropping_the_phase_paragraph_still_parses() -> None:
@@ -100,13 +100,13 @@ def test_answer_dropping_the_phase_paragraph_still_parses() -> None:
     ones. Losing the whole wrap-up over that would be the wrong trade, so the
     field is defaulted and the block simply does not appear."""
     wrapup = _Wrapup.model_validate_json(
-        '{"zusammenfassung": "Kurz.", "staerken": [], "verbesserungen": []}'
+        '{"summary": "Kurz.", "strengths": [], "improvements": []}'
     )
 
-    assert wrapup.phasensprache == ""
+    assert wrapup.phase_language == ""
 
 
 def test_narrative_fallback_carries_no_phase_text() -> None:
     """ADR 0049's degradation path: an answer that never validates yields the
     prose alone. It has no phase analysis in it, and must not claim one."""
-    assert _Wrapup(zusammenfassung="Freitext ohne JSON.").phasensprache == ""
+    assert _Wrapup(summary="Freitext ohne JSON.").phase_language == ""

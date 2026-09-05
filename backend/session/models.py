@@ -51,10 +51,10 @@ class Turn:
 class Utterance:
     """One side of one exchange, on the Session's timeline."""
 
-    sprecher: Literal["nutzer", "persona"]
+    speaker: Literal["user", "persona"]
     text: str
     offset_ms: int
-    dauer_ms: int | None
+    duration_ms: int | None
 
 
 def utterances(turns: Sequence[Turn]) -> list[Utterance]:
@@ -72,7 +72,7 @@ def utterances(turns: Sequence[Turn]) -> list[Utterance]:
     for turn in turns:
         if turn.user_text:
             spoken.append(Utterance(
-                "nutzer", turn.user_text, turn.user_offset_ms or 0,
+                "user", turn.user_text, turn.user_offset_ms or 0,
                 _span(turn.user_offset_ms, turn.user_end_ms),
             ))
         if turn.persona_text:

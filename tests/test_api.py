@@ -5,9 +5,9 @@ Covers the round trip that is the whole point of persisting a Session at all
 (ADR 0034, F-12): write it through `persist_session`, read it back through
 `GET /api/sessions/{extern_id}`, and get the same conversation out.
 
-The schema is English but the wire is German: `sprecher`, `transkript` and the
-rest are what frontend/src/protocol.ts declares, so they are asserted verbatim
-here — a rename on this boundary is a frontend change, not a backend one.
+The wire matches the schema (ADR 0057): the keys below are what
+frontend/src/protocol.ts declares, and they are the ORM's own column names
+passed straight through, so they are asserted verbatim here.
 """
 import uuid
 from datetime import datetime
@@ -16,11 +16,11 @@ import httpx
 import pytest
 from sqlalchemy.orm import Session as DbSession
 
-from backend.db.models import Feedback
+from backend.db.models import Feedback, FeedbackPoint
 from backend.db.models import Persona as DbPersona
 from backend.db.models import Session
 from backend.session.models import Turn
-from tests.conftest import PERSONA_KEY, SCENARIO_KEY, persist
+from tests.conftest import METRIC_KEY, PERSONA_KEY, SCENARIO_KEY, persist
 
 pytestmark = pytest.mark.usefixtures("reference_data")
 
@@ -33,6 +33,7 @@ def _store(extern_id: uuid.UUID) -> None:
                  persona_offset_ms=0, persona_end_ms=1500),
             Turn(seq=2,
                  user_text="Guten Tag!", user_offset_ms=1800, user_end_ms=2700,
+                 user_speech_ms=900,
                  persona_text="Zu teuer.",
                  persona_offset_ms=3000, persona_end_ms=4100),
         ],
@@ -134,9 +135,9 @@ async def test_stored_session_is_returned_in_the_transcript_shape(
     body = response.json()
     assert body["session_id"] == str(extern_id)
     assert body["persona"] == "Thomas Brandt"
-    assert body["szenario"] == "Kündigungsabsicht"
+    assert body["scenario"] == "Kündigungsabsicht"
     assert set(body["turns"][0]) == {
-        "turn_id", "sprecher", "start_offset_ms", "dauer_ms", "transkript",
+        "turn_id", "speaker", "start_offset_ms", "duration_ms", "transcript",
     }
 
 
@@ -149,20 +150,20 @@ async def test_transcript_comes_back_in_speaking_order(
 
     body = (await api_client.get(f"/api/sessions/{extern_id}")).json()
 
-    assert [(t["sprecher"], t["transkript"]) for t in body["turns"]] == [
+    assert [(t["speaker"], t["transcript"]) for t in body["turns"]] == [
         ("persona", "Brandt hier."),
-        ("nutzer", "Guten Tag!"),
+        ("user", "Guten Tag!"),
         ("persona", "Zu teuer."),
     ]
-    assert [t["dauer_ms"] for t in body["turns"]] == [1500, 900, 1100]
+    assert [t["duration_ms"] for t in body["turns"]] == [1500, 900, 1100]
 
 
-async def test_speaker_is_translated_back_to_the_wire_vocabulary(
+async def test_speaker_matches_the_schema_vocabulary(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """The column is `speaker` in ('user', 'persona'); the wire says `sprecher`
-    in ('nutzer', 'persona'), which TranscriptView.tsx compares against. The
-    two must not be allowed to drift into each other."""
+    """The column is `speaker` in ('user', 'persona'); the wire uses the same
+    key and the same values (ADR 0057), which TranscriptView.tsx compares
+    against. The two must not be allowed to drift apart."""
     extern_id = uuid.uuid4()
     _store(extern_id)
 
@@ -170,7 +171,24 @@ async def test_speaker_is_translated_back_to_the_wire_vocabulary(
     assert {t.speaker for t in stored.turns} == {"user", "persona"}
 
     body = (await api_client.get(f"/api/sessions/{extern_id}")).json()
-    assert {t["sprecher"] for t in body["turns"]} == {"nutzer", "persona"}
+    assert {t["speaker"] for t in body["turns"]} == {"user", "persona"}
+
+
+async def test_measurements_reach_the_wire_with_the_schema_vocabulary(
+    api_client: httpx.AsyncClient,
+) -> None:
+    """`messungen`/`schluessel`/`bezeichnung`/`einheit`/`wert` are gone (ADR
+    0057); the metric_type/measurement columns pass straight through."""
+    extern_id = uuid.uuid4()
+    _store(extern_id)
+
+    body = (await api_client.get(f"/api/sessions/{extern_id}")).json()
+
+    assert len(body["measurements"]) == 1
+    measurement = body["measurements"][0]
+    assert set(measurement) == {"key", "name", "unit", "value", "detail"}
+    assert measurement["key"] == METRIC_KEY
+    assert measurement["value"] > 0
 
 
 @pytest.mark.parametrize(
@@ -182,15 +200,14 @@ async def test_speaker_is_translated_back_to_the_wire_vocabulary(
     ],
     ids=["analysed", "not analysed"],
 )
-async def test_phase_block_reaches_the_wire_as_phasensprache(
+async def test_phase_block_reaches_the_wire_as_phase_language(
     api_client: httpx.AsyncClient,
     db_session: DbSession,
     stored: str | None,
     expected: str | None,
 ) -> None:
-    """F-42, and the same English-schema/German-wire split as `sprecher` above:
-    the column is `feedback.phase_language`, the key FeedbackView.tsx reads is
-    `phasensprache`.
+    """F-42: the column is `feedback.phase_language` and the wire uses the same
+    key (ADR 0057), which FeedbackView.tsx reads.
 
     NULL survives as null rather than becoming an empty string — the frontend
     drops the block on falsiness, and a wrap-up generated before this existed
@@ -210,7 +227,34 @@ async def test_phase_block_reaches_the_wire_as_phasensprache(
 
     body = (await api_client.get(f"/api/sessions/{extern_id}")).json()
 
-    assert body["feedback"]["phasensprache"] == expected
+    assert body["feedback"]["phase_language"] == expected
+
+
+async def test_feedback_points_reach_the_wire_with_the_schema_vocabulary(
+    api_client: httpx.AsyncClient,
+    db_session: DbSession,
+) -> None:
+    """`punkte`/`art`/`staerke`/`verbesserung` are gone (ADR 0057); a point's
+    `kind` is `feedback_point.kind`'s own value, unmapped."""
+    extern_id = uuid.uuid4()
+    _store(extern_id)
+    session_id = db_session.query(Session).one().session_id
+    feedback = Feedback(
+        session_id=session_id, summary="Zusammenfassung.", created_at=datetime.now(),
+    )
+    feedback.points = [
+        FeedbackPoint(position=0, kind="strength", text="Klar formuliert."),
+        FeedbackPoint(position=1, kind="improvement", text="Kürzer antworten."),
+    ]
+    db_session.add(feedback)
+    db_session.commit()
+
+    body = (await api_client.get(f"/api/sessions/{extern_id}")).json()
+
+    assert [(p["kind"], p["text"]) for p in body["feedback"]["points"]] == [
+        ("strength", "Klar formuliert."),
+        ("improvement", "Kürzer antworten."),
+    ]
 
 
 async def test_feedback_is_absent_until_the_worker_has_run(

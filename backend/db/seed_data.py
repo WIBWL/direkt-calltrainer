@@ -1,4 +1,4 @@
-"""Initial content for the `persona` and `szenario` reference tables.
+"""Initial content for the `persona` and `scenario` reference tables.
 
 ADR 0041 made the database the source of truth for both, so this content is
 seed state and not a runtime source: `backend/library.py` reads the tables,
@@ -50,11 +50,11 @@ PERSONAS = [
             "matter for you immediately and you say so; you do not keep "
             "grinding once you have one"
         ),
-        # Not modelled before this script took over the content: "mittel"
+        # Not modelled before this script took over the content: "medium"
         # because this Persona is demanding but not an escalation case, and
         # no training goal has been written for it yet.
         "training_goal": "",
-        "difficulty": "mittel",
+        "difficulty": "medium",
         "language_id": "de",
         "tts_voice": "de_male",
         "kugelaudio_voice_id": 1885,
@@ -89,7 +89,7 @@ PERSONAS = [
             "it. Once an answer is concrete you accept it warmly and stop"
         ),
         "training_goal": "",
-        "difficulty": "leicht",
+        "difficulty": "easy",
         "language_id": "en",
         # tts_voice is a German voice because the DiReKT fallback has no
         # English one — see the note above.
@@ -103,10 +103,10 @@ PERSONAS = [
     },
 ]
 
-# --- Szenarien ----------------------------------------------------------
+# --- Scenarios -----------------------------------------------------------
 # `scenario_type` follows F-03's categories of Scenario types.
 #
-# Szenarien carry no language of their own (ADR 0043). "name" and
+# Scenarios carry no language of their own (ADR 0043). "name" and
 # "short_description" are the display texts in the UI language; the rest is the
 # English call context the model reads — which is what lets any Persona run any
 # Scenario regardless of the language that Persona speaks.
@@ -123,7 +123,7 @@ PERSONAS = [
 SCENARIOS = [
     {
         "id": "cold-call-followup",
-        "scenario_type": "Angebots- und Preisgespräch",
+        "scenario_type": "Offer & Pricing Call",
         "name": "Offenes Anliegen zu bestehendem Vertrag",
         "short_description": (
             "Der Kunde ruft mit einer offenen Frage zu einem bestehenden "
@@ -154,7 +154,7 @@ SCENARIOS = [
     },
     {
         "id": "price-cancellation-risk",
-        "scenario_type": "Angebots- und Preisgespräch",
+        "scenario_type": "Offer & Pricing Call",
         "name": "Kündigungsabsicht wegen Preis",
         "short_description": (
             "Der Kunde erwägt zu kündigen, weil ihm die laufenden Kosten zu "

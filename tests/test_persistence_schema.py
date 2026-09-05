@@ -58,7 +58,7 @@ def test_metric_type_links_a_measurement_to_a_feature():
     traced back to a functional requirement in docs/features.md."""
     cols = {c.name for c in models.MetricType.__table__.columns}
     assert "feature_id" in cols
-    assert "key" in cols  # e.g. 'redeanteil', 'tempo'
+    assert "key" in cols  # e.g. 'talk_share', 'pace'
 
 
 def test_measurement_detail_is_jsonb():
