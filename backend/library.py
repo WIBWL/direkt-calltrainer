@@ -34,7 +34,7 @@ from backend.scenarios import Scenario
 # case fields are prompt input (ADR 0045); `title` / `short_description` are the
 # card. Everything else on the row (ids, ownership, `active`) is set here.
 _SCENARIO_FIELDS = (
-    "title", "short_description", "scenario_type",
+    "title", "short_description",
     "description", "case_facts", "call_goal", "success_condition",
 )
 
@@ -69,7 +69,6 @@ def _to_scenario(row: models.Scenario) -> Scenario:
         id=str(row.extern_id),
         name=row.title,
         short_description=row.short_description,
-        scenario_type=row.scenario_type,
         description=row.description,
         case_facts=row.case_facts,
         call_goal=row.call_goal,

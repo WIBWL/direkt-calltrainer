@@ -61,10 +61,13 @@ extra sentence only competes for the small model's attention (ADR 0056).
 ### 3. Hard length caps at the boundary — `FIELD_LIMITS`
 
 Each authored field has a maximum length checked in the Pydantic request model,
-not just trusted to the `Text` column: 160 for the title, 240 for the
-short description, 2000 for the situation and each case field. A long field
+not just trusted to the `Text` column — a few hundred characters for the card
+fields, a couple of thousand for the situation and each case field. A long field
 buries the rules and eats a small context window. The caps are tighter than a
 genuine Scenario needs.
+
+The exact values live in `backend/authored_text.py` and have been tuned since;
+the editor reads them from the API rather than carrying its own copy (ADR 0063).
 
 ### 4. `beschreibung` (the situation) is required
 
@@ -76,17 +79,23 @@ fields may be blank (ADR 0045: blank means "improvise").
 
 `POST /api/scenarios/dokument` (F-58) takes a **text-layer** PDF, pulls its text
 with `pypdf` (no OCR — a scan is rejected with a message that says so), and hands
-it to the LLM (`llm.complete`) with a fixed prompt: *extract only the concrete
-facts that could matter as call background — names, figures, dates, terms, prior
-events — drop boilerplate, write a short German fact list*. The text is framed
-to the model as a document to summarise, never as instructions, and both the
-input (capped at ~15 kB) and the output run through `clean()`. The result goes
-into the Fakten field for the User to review and edit; the file is never stored.
+it to the LLM (`llm.complete`, in thinking mode — off the live path, latency is
+free) with a fixed prompt: *extract only the concrete facts that could matter as
+call background — names, figures, dates, terms, prior events — drop boilerplate,
+write a short German fact list*. The text is framed to the model as a document
+to summarise, never as instructions, and both the input and the output run
+through `clean()`. The result goes into the Fakten field for the User to review
+and edit; the file is never stored.
+
+The only size limit is the 10 MB upload gate (a memory bound) and the
+`case_facts` field cap on the output. Page count and extracted length are **not**
+capped: a document under 10 MB is handed to the model whole. If it does not fit
+the model's context the gateway 400s and the raw (truncated) text is returned
+with a flag, the same path as an unreachable LLM.
 
 Why summarise rather than raise the field cap: a whole document dropped into the
 prompt buries the frame for a 4B model (ADR 0011), and 2 kB of dense facts is
-more useful to it than 10 kB of contract prose. If the LLM is unreachable the
-raw (truncated) text is returned with a flag so the editor says so.
+more useful to it than 10 kB of contract prose.
 
 This is a deliberate simplification of ADR 0005 / ADR 0024, which route uploads
 through the external Data Platform. That path is for Session-scoped context

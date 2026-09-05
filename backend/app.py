@@ -61,7 +61,8 @@ def _provision_database() -> None:
     """
     try:
         logger.info("Database provisioned, reference rows created: %s", provision())
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
+        # Any provisioning failure is non-fatal on purpose (see the docstring).
         logger.exception("Database provisioning failed - Sessions will not be persisted")
 
 

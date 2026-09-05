@@ -38,7 +38,7 @@ _STATUS = {
 }
 
 
-def persist_session(
+def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     extern_id: uuid.UUID,
     subject_id: str,
     persona: Persona,

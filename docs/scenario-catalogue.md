@@ -70,7 +70,7 @@ ADR 0001 und ADR 0045 trennen strikt: die **Persona** trägt die *Art und Weise*
 | Fall | `case_facts` | Zahlen, Fristen, Vorgeschichte. Über den *Fall*, nie über den Anrufer |
 | Anrufziel | `call_goal` | was der **Anrufer** erreichen will, ein Satz |
 | Erledigt wenn | `success_condition` | die beobachtbare Bedingung, ab der der Anrufer die Sache als geklärt ansieht |
-| Typ | `type` | einer der drei Typen aus **F-03** |
+| Typ | *(Katalogattribut, kein Datenfeld)* | einer der drei Typen aus **F-03** (kurzer Support-Fall / beratendes Projektgespräch / Angebots- und Preisgespräch) — Kennzahl der Ausgewogenheit, siehe 6.1 |
 | Dauer | — | kurz / mittel / lang. **Eigene Achse**, nicht mit dem Typ zu verwechseln. Spanne aus **C-06** (R-03) |
 | Vertriebsnähe | *(Katalogattribut, kein Datenfeld)* | neutral / beratungsnah / verhandlungsnah — dient der Ausgewogenheit der Bibliothek, siehe 2.1 |
 | Trainingsfokus | — | die Analyse-Features, die in diesem Fall greifen |

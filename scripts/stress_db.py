@@ -18,6 +18,11 @@ afterwards -- the same approach the persistence tests take.
 
 Exit code is 0 only if no operation failed.
 """
+# duplicate-code: this script deliberately re-implements the throwaway-database
+# helpers from tests/conftest.py (which it cannot import) and copies the wrap-up
+# read from backend/api/sessions.py verbatim -- benchmarking the *exact* query is
+# the point.
+# pylint: disable=duplicate-code
 
 from __future__ import annotations
 
@@ -47,9 +52,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # scripts/stress_db.py` without PYTHONPATH -- the same shape as
 # scripts/seed_reference_data.py.
 # pylint: disable=wrong-import-position,import-outside-toplevel
+from backend import library  # noqa: E402
 from backend.feedback.acoustics import Pause  # noqa: E402
-from backend.personas import PERSONAS  # noqa: E402
-from backend.scenarios import SCENARIOS  # noqa: E402
 from backend.session.models import Turn  # noqa: E402
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -267,6 +271,12 @@ def write_load(
     written: list[uuid.UUID] = []
     lock = threading.Lock()
 
+    # Read the seeded reference rows straight from the throwaway database (the
+    # hardcoded lists moved into the tables, ADR 0041). `database_env` is active
+    # around every write_load call in main().
+    personas = library.list_personas()
+    scenarios = library.list_scenarios("stress", 1)
+
     def one(index: int) -> None:
         rng = random.Random(index)
         extern_id = uuid.uuid4()
@@ -275,8 +285,8 @@ def write_load(
             persist_session(
                 extern_id=extern_id,
                 subject_id=f"stress-{index % 50:03d}",
-                persona=PERSONAS[index % len(PERSONAS)],
-                scenario=SCENARIOS[index % len(SCENARIOS)],
+                persona=personas[index % len(personas)],
+                scenario=scenarios[index % len(scenarios)],
                 turns=turns,
                 started_at=datetime.now() - timedelta(minutes=3),
                 reason="completed",

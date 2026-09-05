@@ -6,11 +6,18 @@ parameters below are Qwen3-specific, tuned by measurement (docs/model-parameters
 """
 
 import logging
+import re
 from collections.abc import AsyncIterator
 
 from backend.clients.config import LLM_CLIENT, LLM_MODEL
 
 logger = logging.getLogger(__name__)
+
+# In thinking mode the reasoning trace is delivered out-of-band as
+# `reasoning_content` when the gateway runs a reasoning parser, and inline as a
+# <think>...</think> block when it does not. Strip the inline form so a caller
+# never has to know which deployment it is talking to.
+_THINK_BLOCK_RE = re.compile(r"\s*<think>.*?</think>\s*", re.DOTALL)
 
 # Upper bound on worst-case latency and cost per reply, not a target length:
 # the system prompt already constrains replies to short, realistic sentences,
@@ -59,22 +66,45 @@ _MAX_FEEDBACK_TOKENS = 900
 
 
 async def complete(
-    messages: list[dict[str, str]], *, max_tokens: int = _MAX_FEEDBACK_TOKENS
+    messages: list[dict[str, str]],
+    *,
+    max_tokens: int | None = _MAX_FEEDBACK_TOKENS,
+    think: bool = False,
 ) -> str:
     """One non-streamed completion — the post-call wrap-up (ADR 0049) and the
     document summary for an authored Scenario (F-58).
 
     Nothing is waiting on the first token here, unlike stream_reply, so the
     caller gets the finished text in one piece and can validate it as a whole.
+
+    `max_tokens=None` leaves the output bounded only by the model's context
+    window — the document summary uses it, because its own length rule is a
+    character cap, not a token one, and thinking mode needs unpredictable room
+    for its trace.
+
+    `think=True` runs the model in reasoning mode: it is slower and spends part
+    of the budget on a hidden trace, but extracts markedly better. Only safe off
+    the live path, where latency costs nobody anything and the reply is not
+    streamed (thinking mode is catastrophic on stream_reply — see
+    docs/research/model-parameters.md). The document summary uses it; the wrap-up
+    does not.
     """
-    logger.info("LLM completion (%s, max_tokens=%d)...", LLM_MODEL, max_tokens)
+    logger.info(
+        "LLM completion (%s, max_tokens=%s, think=%s)...", LLM_MODEL, max_tokens, think
+    )
     completion = await LLM_CLIENT.chat.completions.create(
         model=LLM_MODEL,
         messages=messages,
-        max_tokens=max_tokens,
-        # Low but not zero: the output should read naturally while staying close
-        # to the input it was given rather than embroidering it.
-        temperature=0.3,
-        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+        **({"max_tokens": max_tokens} if max_tokens is not None else {}),
+        # Thinking mode: Qwen3's documented sampling for it (a low temperature
+        # there degrades into repetition). Non-thinking: low but not zero, so the
+        # output reads naturally while staying close to its input.
+        temperature=0.6 if think else 0.3,
+        **({"top_p": 0.95} if think else {}),
+        extra_body={
+            "chat_template_kwargs": {"enable_thinking": think},
+            **({"top_k": 20, "min_p": 0} if think else {}),
+        },
     )
-    return completion.choices[0].message.content or ""
+    text = completion.choices[0].message.content or ""
+    return _THINK_BLOCK_RE.sub("", text).strip() if think else text

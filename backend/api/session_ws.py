@@ -107,7 +107,7 @@ async def session_ws(websocket: WebSocket) -> None:
         logger.info("Session ended (%s)", reason)
 
 
-async def _record(
+async def _record(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     session_id: uuid.UUID,
     subject_id: str,
     persona: Persona,
@@ -127,16 +127,16 @@ async def _record(
             persistence.persist_session,
             session_id, subject_id, persona, scenario, orchestrator.turns, started_at, reason,
         )
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         logger.exception("Session could not be persisted; it is lost")
         return
     try:
         # Imported here, not at module scope: the live path must not need
         # Redis to be importable, let alone reachable.
-        from backend.feedback import queue
+        from backend.feedback import queue  # pylint: disable=import-outside-toplevel
 
         await asyncio.to_thread(queue.enqueue_feedback, db_id)
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         logger.exception("Feedback could not be queued for session %d", db_id)
 
 

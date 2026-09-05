@@ -9,6 +9,7 @@ Covers:
             `tenant`. Every read is scoped to the caller and their tenant; the
             client never supplies either.
   ADR 0059  authored text is sanitised on the way in
+  ADR 0063  the editor's field-length caps come from the API, not a mirror
   ADR 0050  a row is addressed by its unguessable extern_id
 
 Runs against a seeded throwaway database (needs Postgres, skips without one).
@@ -20,6 +21,7 @@ import pytest
 
 from backend import auth
 from backend.app import app
+from backend.authored_text import FIELD_LIMITS
 from tests.conftest import TEST_AUTH
 
 # pylint: disable=missing-function-docstring,redefined-outer-name
@@ -122,6 +124,24 @@ async def test_an_oversize_field_is_rejected(client, as_user):
     as_user(ALICE)
     resp = await client.post("/api/scenarios", json={**_NEW, "description": "x" * 5000})
     assert resp.status_code == 422
+
+
+async def test_field_limits_endpoint_reports_the_api_caps(client, as_user):
+    """ADR 0063: the editor caps its inputs from this endpoint, not a bundled
+    mirror. It is keyed by the draft field names, so `title` is reported as the
+    card field `name`."""
+    as_user(ALICE)
+    limits = (await client.get("/api/scenarios/field-limits")).json()
+
+    assert set(limits) == {
+        "name", "short_description", "description",
+        "case_facts", "call_goal", "success_condition",
+    }
+    assert limits["name"] == FIELD_LIMITS["title"]
+    assert limits["case_facts"] == FIELD_LIMITS["case_facts"]
+    # An equivalent field one over its reported cap is refused.
+    over = {**_NEW, "short_description": "x" * (limits["short_description"] + 1)}
+    assert (await client.post("/api/scenarios", json=over)).status_code == 422
 
 
 async def test_control_tokens_are_stripped_from_a_stored_scenario(client, as_user):

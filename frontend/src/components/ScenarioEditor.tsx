@@ -6,10 +6,12 @@ import {
   deleteScenario,
   EMPTY_DRAFT,
   extractPdf,
-  FIELD_LIMITS,
+  FALLBACK_FIELD_LIMITS,
+  getFieldLimits,
   getScenario,
   setScenarioVisibility,
   updateScenario,
+  type FieldLimits,
   type ScenarioDraft,
   type Visibility,
 } from "../scenarioLibrary";
@@ -31,32 +33,51 @@ interface ScenarioEditorProps {
   onRefresh: () => void;
 }
 
+/** The placeholder is the field's guidance in one short line, greyed out while
+ * the field is empty — so there is no separate always-visible hint. */
 const FIELDS: {
   key: keyof ScenarioDraft;
   label: string;
-  hint?: string;
+  placeholder: string;
   multiline?: boolean;
   required?: boolean;
 }[] = [
-  { key: "name", label: "Titel", required: true },
-  { key: "short_description", label: "Kurzbeschreibung (auf der Karte)", required: true },
-  { key: "scenario_type", label: "Kategorie (optional)" },
+  { key: "name", label: "Titel", placeholder: "Kurzer, sprechender Titel", required: true },
+  {
+    key: "short_description",
+    label: "Kurzbeschreibung",
+    placeholder: "Ein Satz für die Auswahlkarte",
+    required: true,
+  },
   {
     key: "description",
     label: "Situation",
-    hint: "Worum geht es im Anruf? Wird dem Modell als Kontext gegeben — kurz, aber konkret.",
+    placeholder: "Worum geht es im Anruf? Kurz, aber konkret.",
     multiline: true,
     required: true,
   },
   {
     key: "case_facts",
     label: "Fakten des Falls (optional)",
-    hint: "Konkrete Zahlen, Namen, Daten. Leer lassen heißt: das Modell improvisiert.",
+    placeholder: "Zahlen, Namen, Daten. Leer = Modell improvisiert.",
     multiline: true,
   },
-  { key: "call_goal", label: "Ziel des Anrufs (optional)", multiline: true },
-  { key: "success_condition", label: "Erfolgsbedingung (optional)", multiline: true },
+  {
+    key: "call_goal",
+    label: "Ziel des Anrufs (optional)",
+    placeholder: "Was will der Anrufer erreichen?",
+    multiline: true,
+  },
+  {
+    key: "success_condition",
+    label: "Erfolgsbedingung (optional)",
+    placeholder: "Woran ist das Anliegen geklärt?",
+    multiline: true,
+  },
 ];
+
+/** Seconds as m:ss, for the "PDF wird ausgewertet …" counter. */
+const formatElapsed = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 /** Create / edit / delete a user-authored Scenario (ADR 0058). Rendered as a
  * modal over the setup screen. */
@@ -69,12 +90,27 @@ export default function ScenarioEditor({
 }: ScenarioEditorProps) {
   const isNew = scenarioId === null;
   const [draft, setDraft] = useState<ScenarioDraft>(EMPTY_DRAFT);
+  const [limits, setLimits] = useState<FieldLimits>(FALLBACK_FIELD_LIMITS);
   const [visibility, setVisibility] = useState<Visibility>("private");
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfElapsed, setPdfElapsed] = useState(0);
   const [pdfNote, setPdfNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    // Cap the inputs from the same limits the API validates against, rather
+    // than a bundled copy that drifts (ADR 0063). On failure the fallback
+    // stands and the server still rejects an over-long field.
+    getFieldLimits()
+      .then((l) => !cancelled && setLimits(l))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (scenarioId === null) return;
@@ -144,6 +180,14 @@ export default function ScenarioEditor({
     setPdfBusy(true);
     setPdfNote(null);
     setError(null);
+    // No real ETA is possible (thinking-mode length varies), so just count up
+    // so the user can see it is still working, not frozen.
+    setPdfElapsed(0);
+    const started = Date.now();
+    const ticker = window.setInterval(
+      () => setPdfElapsed(Math.round((Date.now() - started) / 1000)),
+      1000,
+    );
     try {
       const doc = await extractPdf(file);
       const replace =
@@ -160,6 +204,7 @@ export default function ScenarioEditor({
     } catch (e: unknown) {
       setError(e instanceof ApiError && e.detail ? e.detail : "Das PDF konnte nicht gelesen werden.");
     } finally {
+      window.clearInterval(ticker);
       setPdfBusy(false);
     }
   };
@@ -188,60 +233,79 @@ export default function ScenarioEditor({
         ) : (
           <>
             <div className="editor-fields">
-              {FIELDS.map((field) => (
-                <Fragment key={field.key}>
-                  <label className="editor-field">
-                    <span className="editor-field-label">
-                      {field.label}
-                      {field.required && <span aria-hidden="true"> *</span>}
-                    </span>
-                    {field.hint && <span className="editor-field-hint">{field.hint}</span>}
-                    {field.multiline ? (
-                      <textarea
-                        value={draft[field.key]}
-                        maxLength={FIELD_LIMITS[field.key]}
-                        rows={3}
-                        onChange={(e) =>
-                          setDraft((d) => ({ ...d, [field.key]: e.target.value }))
-                        }
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        value={draft[field.key]}
-                        maxLength={FIELD_LIMITS[field.key]}
-                        onChange={(e) =>
-                          setDraft((d) => ({ ...d, [field.key]: e.target.value }))
-                        }
-                      />
-                    )}
-                  </label>
-
-                  {field.key === "case_facts" && (
-                    <div className="pdf-upload">
-                      <label className="pdf-upload-button">
-                        {pdfBusy ? "PDF wird ausgewertet …" : "Fakten aus PDF (KI)"}
-                        <input
-                          type="file"
-                          accept="application/pdf,.pdf"
-                          disabled={pdfBusy}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            e.target.value = ""; // allow re-selecting the same file
-                            if (file) void handlePdf(file);
-                          }}
-                        />
-                      </label>
-                      <span className="editor-field-hint">
-                        Nur PDFs mit auslesbarem Text (keine Scans). Die KI zieht die
-                        relevanten Fakten heraus; das Ergebnis landet im Feld und kann
-                        dort bearbeitet werden.
+              {FIELDS.map((field) => {
+                const value = draft[field.key];
+                const limit = limits[field.key];
+                return (
+                  <Fragment key={field.key}>
+                    <label className="editor-field">
+                      <span className="editor-field-label">
+                        <span>
+                          {field.label}
+                          {field.required && <span aria-hidden="true"> *</span>}
+                        </span>
+                        <span
+                          className={
+                            "editor-field-count" +
+                            (value.length >= limit ? " is-full" : "")
+                          }
+                          aria-hidden="true"
+                        >
+                          {value.length} / {limit}
+                        </span>
                       </span>
-                      {pdfNote && <span className="pdf-upload-note">{pdfNote}</span>}
-                    </div>
-                  )}
-                </Fragment>
-              ))}
+                      {field.multiline ? (
+                        <textarea
+                          value={value}
+                          placeholder={field.placeholder}
+                          maxLength={limit}
+                          rows={3}
+                          onChange={(e) =>
+                            setDraft((d) => ({ ...d, [field.key]: e.target.value }))
+                          }
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={value}
+                          placeholder={field.placeholder}
+                          maxLength={limit}
+                          onChange={(e) =>
+                            setDraft((d) => ({ ...d, [field.key]: e.target.value }))
+                          }
+                        />
+                      )}
+                    </label>
+
+                    {field.key === "case_facts" && (
+                      <div className="pdf-upload">
+                        <label className="pdf-upload-button">
+                          {pdfBusy
+                            ? `PDF wird ausgewertet … (${formatElapsed(pdfElapsed)})`
+                            : "Fakten aus PDF (KI)"}
+                          <input
+                            type="file"
+                            accept="application/pdf,.pdf"
+                            disabled={pdfBusy}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              e.target.value = ""; // allow re-selecting the same file
+                              if (file) void handlePdf(file);
+                            }}
+                          />
+                        </label>
+                        <span className="editor-field-hint">
+                          Nur PDFs mit auslesbarem Text (keine Scans). Die KI zieht die
+                          relevanten Fakten heraus; das Ergebnis landet im Feld und kann
+                          dort bearbeitet werden. Bei großen Dokumenten kann das über
+                          eine Minute dauern.
+                        </span>
+                        {pdfNote && <span className="pdf-upload-note">{pdfNote}</span>}
+                      </div>
+                    )}
+                  </Fragment>
+                );
+              })}
             </div>
 
             {tenantName !== null && (

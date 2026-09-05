@@ -31,23 +31,15 @@ import re
 # Field name -> maximum length. The Scenario API request models enforce it on
 # every authored write (ADR 0059); it is tighter than a genuine Scenario needs
 # because a long field buries the frame and eats a small model's context window
-# (ADR 0011). The Persona field caps are here too -- nothing authors a Persona
-# (ADR 0058), but `test_authored_text.py` holds the seed content to these
-# numbers, so Persona authoring could be switched on without re-checking seeds.
+# (ADR 0011). Scenario fields only -- Personas are curated, not authored
+# (ADR 0058), so nothing caps their length.
 FIELD_LIMITS = {
-    "title": 160,
-    "short_description": 240,
-    "scenario_type": 60,
-    "description": 2000,
-    "case_facts": 2000,
-    "call_goal": 2000,
-    "success_condition": 2000,
-    "name": 120,
-    "role_label": 120,
-    "role": 200,
-    "traits": 200,
-    "behavior": 2000,
-    "training_goal": 2000,
+    "title": 50,
+    "short_description": 100,
+    "description": 500,
+    "case_facts": 3000,
+    "call_goal": 500,
+    "success_condition": 500,
 }
 
 # `[call end]` / `[call_end]` / `[callend]`, any case -- the exact shape the

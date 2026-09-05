@@ -77,6 +77,8 @@ nav:
       - ADR 0059 - User-Authored Scenario Text Is Information, Not Instructions: adr/0059-user-authored-prompt-content.md
       - ADR 0060 - Tenant Model and Company Sharing for Authored Scenarios: adr/0060-tenant-model-and-visibility.md
       - ADR 0061 - English Wire Vocabulary for the Scenario Library: adr/0061-english-wire-vocabulary-for-the-scenario-library.md
+      - ADR 0062 - Drop the scenario_type Label: adr/0062-drop-the-scenario-type-label.md
+      - ADR 0063 - Scenario Field Limits Served From One Source: adr/0063-scenario-field-limits-from-one-source.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
   # site is served at the root (mkdocs serve / mkdocs build + static server).

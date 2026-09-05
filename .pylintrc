@@ -8,11 +8,22 @@ ignore=.venv,venv,dist,.git
 # members are attached at runtime -- pylint sees an empty module and reports
 # E1101 for every operation. Excluded for the same reason as in .flake8: the
 # files are generated, and a human reviews each one before it is applied.
-ignore-paths=^backend/db/migrations/versions/.*$
+# pylint matches this with re.match, so the `(^|.*[\\/])` prefix is what lets it
+# hit the path however an editor passes it -- workspace-relative, absolute, or
+# with Windows backslashes -- not just the repo-root-relative form.
+ignore-paths=(^|.*[\\/])migrations[\\/]versions[\\/].*
 
-# alembic.context is populated by Alembic at migration runtime, so a static
-# read of the module finds none of the members env.py legitimately calls.
-ignored-modules=alembic.context
+# alembic.context and alembic.op are populated by Alembic at migration runtime,
+# so a static read of either finds none of the members env.py / a revision
+# legitimately calls (op.add_column etc.). parselmouth.praat is a submodule of a
+# compiled C extension -- a static read cannot resolve the import (E0401).
+ignored-modules=alembic.context,alembic.op,parselmouth.praat
+
+# parselmouth is a compiled C extension (praat-parselmouth); pylint cannot see
+# its members from a static read. Listing it here lets pylint import it for
+# run-time introspection instead of reporting I1101 for every Sound/PraatError
+# reference in backend/feedback/acoustics.py.
+extension-pkg-allow-list=parselmouth
 
 # Project root is the import root, so `backend.*` resolves in scripts/ (which
 # add it to sys.path themselves at runtime). Uses source-roots rather than an

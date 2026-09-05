@@ -57,7 +57,6 @@ class ScenarioInput(BaseModel):
 
     name: str = _limited("title", required=True)
     short_description: str = _limited("short_description", required=True)
-    scenario_type: str = _limited("scenario_type", required=False)
     # The situation is what the model gets as context -- an authored Scenario
     # without it is not a scenario, so it is required (the built-in seed rows
     # all carry one; ADR 0045 only allows the *case* fields to be blank).
@@ -110,7 +109,6 @@ def _detail(scenario) -> dict:
         "id": scenario.id,
         "name": scenario.name,
         "short_description": scenario.short_description,
-        "scenario_type": scenario.scenario_type,
         "description": scenario.description,
         "case_facts": scenario.case_facts,
         "call_goal": scenario.call_goal,
@@ -155,6 +153,20 @@ async def extract_document(
         text = clean(raw)[:MAX_TEXT].strip()
         summarised = False
     return {"text": text, "pages": pages, "summarised": summarised}
+
+
+# `FIELD_LIMITS` is keyed by column name; `title` reaches the client as the card
+# field `name` (ADR 0061), so the editor's limits endpoint reports it that way.
+_LIMIT_FIELD_NAMES = {"title": "name"}
+
+
+# Defined before "/{extern_id}" so the literal path is matched first.
+@router.get("/field-limits")
+def field_limits(_user: AuthContext = Depends(require_user)) -> dict[str, int]:
+    """The maximum length the API enforces for each authorable Scenario field.
+    The editor caps its inputs from here, so its limits are the same source that
+    validates them rather than a hand-kept mirror that drifts (ADR 0063)."""
+    return {_LIMIT_FIELD_NAMES.get(f, f): cap for f, cap in FIELD_LIMITS.items()}
 
 
 # Defined before "/{extern_id}" so the literal path is matched first.

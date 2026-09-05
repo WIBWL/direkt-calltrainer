@@ -241,8 +241,6 @@ class Scenario(_AuthoredContent, Base):
     scenario_id: Mapped[int] = mapped_column(primary_key=True)
     # e.g. cold-call-followup. Nullable since ADR 0058 -- see Persona.key.
     key: Mapped[str | None] = mapped_column(String(60), unique=True)
-    # Not "type": that shadows the builtin wherever a row is unpacked.
-    scenario_type: Mapped[str] = mapped_column(String(60))
     title: Mapped[str] = mapped_column(String(160))
     # Display field: the one-line teaser under the title on the selection card,
     # in the UI language. Deliberately short -- read at a glance, not by the

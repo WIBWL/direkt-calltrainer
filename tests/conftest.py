@@ -148,7 +148,7 @@ def load_seed_module():
     import now -- kept as a function so the tests that check *what* the library
     ships still have one place to get it from.
     """
-    from backend.db import seed_data
+    from backend.db import seed_data  # pylint: disable=import-outside-toplevel
 
     return seed_data
 
@@ -197,7 +197,7 @@ def fake_library(monkeypatch):
     # The WS handshake's tenant resolution is stubbed so it needs no database.
     monkeypatch.setattr(library, "list_personas", lambda: list(TEST_PERSONAS))
     monkeypatch.setattr(library, "list_scenarios", lambda subject, tenant_id=1: list(TEST_SCENARIOS))
-    monkeypatch.setattr(library, "get_persona", lambda extern_id: by_id.get(extern_id))
+    monkeypatch.setattr(library, "get_persona", by_id.get)
     monkeypatch.setattr(library, "get_scenario", lambda extern_id, subject=None, tenant_id=1: by_key.get(extern_id))
     monkeypatch.setattr("backend.api.session_ws.resolve_tenant_id", lambda auth: 1)
     return library
@@ -557,7 +557,6 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
     )
     scenario = db_models.Scenario(
         key=SCENARIO_KEY,
-        scenario_type="Preisgespräch",
         title="Kündigungsabsicht",
         short_description="Kunde erwägt zu kündigen.",
         description="Beschreibung",

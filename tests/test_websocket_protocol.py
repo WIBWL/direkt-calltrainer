@@ -25,8 +25,10 @@ from backend.session.models import AudioChunk, Failed, StateChanged, TurnComplet
 from tests.conftest import TEST_AUTH, TEST_PERSONAS, TEST_SCENARIOS
 
 # session_ws's ASGI helpers are underscore-prefixed; driving them directly is
-# the point of this module.
-# pylint: disable=missing-function-docstring,missing-class-docstring,protected-access,redefined-outer-name
+# the point of this module. `unused-argument`: a test takes `fake_library` only
+# to activate the fixture.
+# pylint: disable=missing-function-docstring,missing-class-docstring,protected-access
+# pylint: disable=redefined-outer-name,unused-argument
 
 
 @pytest.fixture(autouse=True)

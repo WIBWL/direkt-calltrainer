@@ -31,7 +31,6 @@ export interface ScenarioCard {
 export interface ScenarioDraft {
   name: string;
   short_description: string;
-  scenario_type: string;
   description: string;
   case_facts: string;
   call_goal: string;
@@ -43,22 +42,31 @@ export interface ScenarioDetail extends ScenarioDraft {
   visibility: Visibility;
 }
 
-/** Mirrors backend/authored_text.py FIELD_LIMITS, so the field is rejected
- * client-side before a round trip rather than coming back a 422. */
-export const FIELD_LIMITS: Record<keyof ScenarioDraft, number> = {
-  name: 160,
-  short_description: 240,
-  scenario_type: 60,
-  description: 2000,
-  case_facts: 2000,
-  call_goal: 2000,
-  success_condition: 2000,
+export type FieldLimits = Record<keyof ScenarioDraft, number>;
+
+/** Max length per authorable field. The backend (`backend/authored_text.py`
+ * FIELD_LIMITS) is the single source of truth and validates against it; the
+ * editor calls `getFieldLimits()` so its input caps track that automatically.
+ * This constant is only the offline fallback if that request fails — the server
+ * still rejects an over-long field with a 422 either way. Keep it roughly in
+ * step, but it does not need to be exact. */
+export const FALLBACK_FIELD_LIMITS: FieldLimits = {
+  name: 50,
+  short_description: 100,
+  description: 500,
+  case_facts: 3000,
+  call_goal: 500,
+  success_condition: 500,
 };
+
+/** The lengths the API currently enforces, keyed by the same field names as
+ * `ScenarioDraft`. Fetched once when the editor opens. */
+export const getFieldLimits = () =>
+  apiFetch<FieldLimits>("/api/scenarios/field-limits");
 
 export const EMPTY_DRAFT: ScenarioDraft = {
   name: "",
   short_description: "",
-  scenario_type: "",
   description: "",
   case_facts: "",
   call_goal: "",

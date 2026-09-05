@@ -170,7 +170,7 @@ def _seed_objections(db: DbSession, persona: Persona, objections) -> None:
 def _seed_scenarios(db: DbSession) -> int:
     return sum(
         _upsert(db, Scenario, {"key": s["id"]},
-                {"scenario_type": s["scenario_type"], "title": clean(s["name"]),
+                {"title": clean(s["name"]),
                  "short_description": clean(s["short_description"]),
                  "description": clean(s["description"]),
                  "case_facts": clean(s["case_facts"]),

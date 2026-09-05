@@ -114,8 +114,6 @@ PERSONAS = [
 ]
 
 # --- Scenarios -----------------------------------------------------------
-# `scenario_type` follows F-03's categories of Scenario types.
-#
 # Scenarios carry no language of their own (ADR 0043). "name" and
 # "short_description" are the display texts in the UI language; the rest is the
 # English call context the model reads — which is what lets any Persona run any
@@ -133,7 +131,6 @@ PERSONAS = [
 SCENARIOS = [
     {
         "id": "cold-call-followup",
-        "scenario_type": "Offer & Pricing Call",
         "name": "Offenes Anliegen zu bestehendem Vertrag",
         "short_description": (
             "Der Kunde ruft mit einer offenen Frage zu einem bestehenden "
@@ -164,7 +161,6 @@ SCENARIOS = [
     },
     {
         "id": "price-cancellation-risk",
-        "scenario_type": "Offer & Pricing Call",
         "name": "Kündigungsabsicht wegen Preis",
         "short_description": (
             "Der Kunde erwägt zu kündigen, weil ihm die laufenden Kosten zu "
