@@ -9,6 +9,14 @@ would emit a drop of every German table and a create of every English one,
 destroying whatever Sessions are already stored. Renaming in place keeps the
 rows and lets Postgres carry the foreign keys along by itself.
 
+One assumption is worth naming, because nothing here enforces it: the old
+constraint names below are the ones a replayed chain produces. The initial
+revision creates its foreign keys unnamed, and the convention in
+backend/db/base.py -- which Alembic applies when replaying it -- arrived with
+this revision. A database created before that carries Postgres' own
+`<table>_<column>_fkey` names, and the drops below would not find them. The
+tests always replay from empty, so they only ever see the case that works.
+
 Five changes in one revision, because they only make sense together (each one
 alone would leave the schema half-converted):
 

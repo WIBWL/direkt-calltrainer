@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from backend.db.models import Language, MetricType, Persona, PersonaObjection, Scenario
 from backend.db.seed_data import LANGUAGE_NAMES, PERSONAS, SCENARIOS
-from backend.db.session import session_scope
+from backend.db.session import advisory_lock, session_scope
 from backend.feedback.metrics import METRICS
 
 logger = logging.getLogger(__name__)
@@ -48,8 +48,20 @@ def provision() -> dict[str, int]:
     # Keep our logging setup; see the note in migrations/env.py.
     config.attributes["configure_logging"] = False
     command.upgrade(config, "head")
-    with session_scope() as db:
-        return seed(db)
+    # Seeding needs the same guard the migration has. `_upsert` reads a row,
+    # then writes it; two processes starting together both read "not there"
+    # and the second insert fails on the natural key. The transaction rolls
+    # back, so nothing is corrupted -- but the loser logs "Database
+    # provisioning failed", which is the message a real outage produces too.
+    #
+    # The same key as the migration, taken only now: migrations/env.py has
+    # released it by the time command.upgrade returns. Holding both at once
+    # would be this process waiting on itself, since each takes it on its own
+    # connection.
+    logger.info("Seeding reference data...")
+    with advisory_lock():
+        with session_scope() as db:
+            return seed(db)
 
 
 def seed(db: DbSession) -> dict[str, int]:
@@ -133,6 +145,13 @@ def _seed_objections(db: DbSession, persona: Persona, objections) -> None:
     Replaced wholesale rather than upserted: the list is what carries meaning,
     and `position` gives a single objection no natural key to match on. Not
     counted as created rows -- `inventory()` already reports the table.
+
+    These rows are therefore recreated on every seed run and their ids are not
+    stable: nothing may reference an objection by id, because the row it names
+    is gone after the next startup. A feature that needs to cite one has to
+    give objections a stable key first, or address them by persona and
+    position. The same absence of a natural key that forces the rewrite is
+    what makes the ids unusable as a reference.
     """
     db.flush()  # a freshly created Persona needs its id before rows point at it
     db.query(PersonaObjection).filter_by(

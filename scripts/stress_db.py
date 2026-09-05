@@ -34,7 +34,7 @@ from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from dotenv import dotenv_values
 from sqlalchemy import URL, create_engine, text
@@ -278,7 +278,7 @@ def write_load(
                 persona=PERSONAS[index % len(PERSONAS)],
                 scenario=SCENARIOS[index % len(SCENARIOS)],
                 turns=turns,
-                started_at=datetime.now() - timedelta(minutes=3),
+                started_at=datetime.now(UTC) - timedelta(minutes=3),
                 reason="completed",
             )
         with lock:

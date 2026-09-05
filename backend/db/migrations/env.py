@@ -1,3 +1,4 @@
+import logging
 import sys
 from logging.config import fileConfig
 from pathlib import Path
@@ -14,7 +15,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 load_dotenv(PROJECT_ROOT / ".env")
 
 from backend.db.models import Base  # noqa: E402
-from backend.db.session import build_database_url  # noqa: E402
+from backend.db.session import PROVISION_LOCK_KEY, build_database_url  # noqa: E402
 
 config = context.config
 
@@ -53,10 +54,11 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-# Arbitrary but fixed: any process migrating this schema uses the same key, so
-# two of them serialise instead of racing. Postgres advisory locks are scoped to
-# the database, so a test's throwaway database never blocks the real one.
-MIGRATION_LOCK_KEY = 8_243_119
+# The key lives in backend/db/session.py, because provisioning takes it for the
+# seeding step too (backend/db/provision.py) and both halves have to serialise
+# against each other. Postgres advisory locks are scoped to the database, so a
+# test's throwaway database never blocks the real one.
+MIGRATION_LOCK_KEY = PROVISION_LOCK_KEY
 
 
 def run_migrations_online() -> None:
@@ -73,6 +75,14 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
+        # Announced before the wait, not after: pg_advisory_lock blocks without
+        # a deadline, so a process that hangs mid-migration stops every other
+        # one here with no output at all. Waiting is the right behaviour -- an
+        # app that boots on an un-migrated schema loses Sessions quietly, which
+        # is worse than a visible stall -- but the stall should say so.
+        logging.getLogger("alembic.runtime.migration").info(
+            "Waiting for the migration advisory lock"
+        )
         connection.execute(text("SELECT pg_advisory_lock(:key)"), {"key": MIGRATION_LOCK_KEY})
         # Committed straight away: the execute above opened a transaction, and
         # leaving it open would swallow Alembic's own, rolling the migrations

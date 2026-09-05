@@ -11,7 +11,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import lru_cache
 
-from sqlalchemy import URL, Engine, create_engine
+from sqlalchemy import URL, Engine, create_engine, text
 # Aliased because "Session" is also an entity of this schema (models.Session).
 from sqlalchemy.orm import Session as DbSession
 from sqlalchemy.orm import sessionmaker
@@ -21,6 +21,12 @@ from sqlalchemy.orm import sessionmaker
 # reachable as "db" rather than on localhost.
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = "5432"
+
+# Any process that provisions the database takes this lock first, so the app
+# and the worker starting together serialise instead of racing. Held by one
+# process at a time and never nested, so migrating and seeding can share it:
+# each acquires it, finishes, and releases before the other step begins.
+PROVISION_LOCK_KEY = 8_243_119
 
 POOL_SIZE = 5
 POOL_MAX_OVERFLOW = 5
@@ -55,8 +61,12 @@ def build_database_url() -> URL:
         "postgresql+psycopg",
         username=os.environ["POSTGRES_USER"],
         password=os.environ["POSTGRES_PASSWORD"],
-        host=os.environ.get("POSTGRES_HOST", DEFAULT_HOST),
-        port=int(os.environ.get("POSTGRES_PORT", DEFAULT_PORT)),
+        # `or`, not a get() default: an .env that names the variable without
+        # a value ("POSTGRES_PORT=") yields "", which is not missing as far as
+        # get() is concerned -- and int("") then raises where the check above
+        # would have said what was wrong.
+        host=os.environ.get("POSTGRES_HOST") or DEFAULT_HOST,
+        port=int(os.environ.get("POSTGRES_PORT") or DEFAULT_PORT),
         database=os.environ["POSTGRES_DB"],
     )
 
@@ -100,8 +110,18 @@ def reset_engine() -> None:
     wants — but it also means a later change to the POSTGRES_* settings has no
     effect. Tests use this to point the application at their own throwaway
     database; nothing in the running application calls it.
+
+    Disposed before it is forgotten: an engine that is merely unreferenced
+    keeps its pooled connections open until it is collected, and those hold
+    open the database a test is about to drop.
     """
-    get_engine.cache_clear()
+    # The disables are the same pylint blind spot as above: calling the
+    # memoised function in this block makes it lose track of lru_cache's
+    # wrapper, and it then reads the no-argument cache_clear() as a call with
+    # too many arguments.
+    if get_engine.cache_info().currsize:  # pylint: disable=too-many-function-args
+        get_engine().dispose()
+    get_engine.cache_clear()  # pylint: disable=too-many-function-args
     _session_factory.cache_clear()
 
 
@@ -122,3 +142,22 @@ def session_scope() -> Iterator[DbSession]:
         raise
     finally:
         db.close()
+
+
+@contextmanager
+def advisory_lock(key: int = PROVISION_LOCK_KEY) -> Iterator[None]:
+    """Serialises a block of work across processes, on a connection of its own.
+
+    A Postgres advisory lock belongs to the session that took it, so this holds
+    one connection for the duration. The commit right after acquiring matters:
+    the execute opened a transaction, and leaving it open would put the caller
+    inside it. The lock is session-scoped and outlives that commit.
+    """
+    with get_engine().connect() as connection:
+        connection.execute(text("SELECT pg_advisory_lock(:key)"), {"key": key})
+        connection.commit()
+        try:
+            yield
+        finally:
+            connection.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": key})
+            connection.commit()
