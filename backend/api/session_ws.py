@@ -248,16 +248,25 @@ async def _run_turn_interruptible(
     done, _ = await asyncio.wait({forward_task, control_task}, return_when=asyncio.FIRST_COMPLETED)
 
     if control_task in done:
+        kind, played_ms = control_task.result()
+        # Hand the played-through position to the orchestrator before *any* of
+        # the teardown below, because either half of it can finalize the turn.
+        # Cancelling forward_task delivers the CancelledError into whatever it
+        # is suspended in -- and while the reply is being generated that is the
+        # turn generator itself, parked on the TTS gateway, whose own handler
+        # then runs _finalize_interrupted immediately. That is the common case:
+        # synthesis is a network round trip, forwarding a chunk to the socket is
+        # not. Setting the position after the cancel therefore lost it exactly
+        # when it mattered, and the finalizer fell back to committing every
+        # dispatched chunk -- the behaviour ADR 0035 exists to prevent.
+        if kind == "interrupt":
+            on_barge_in(played_ms)
         forward_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await forward_task
-        kind, played_ms = control_task.result()
-        # Hand the played-through position to the orchestrator *before* the
-        # teardown below, since that is what triggers the turn's finalization.
-        if kind == "interrupt":
-            on_barge_in(played_ms)
-        # Cancelling forward_task doesn't reliably tear down the turn
-        # generator itself (see SessionOrchestrator._generate_reply); this does.
+        # Still needed: when forward_task was suspended in a socket send
+        # instead, the cancel unwinds only the forwarder and leaves the
+        # generator parked at its yield. This closes it in that case.
         await events.aclose()
         if kind == "interrupt":
             logger.info("User barged in (played %s ms of the reply)", played_ms)
