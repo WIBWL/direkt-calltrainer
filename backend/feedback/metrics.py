@@ -43,6 +43,7 @@ class Conversation:
 
     user_text: str = ""
     user_speech_ms: int = 0
+    user_acoustics_complete: bool = True
     # Only ever a denominator, for the user's share of the speaking time.
     persona_speech_ms: int = 0
     # One entry per exchange: how long the user took to start replying,
@@ -102,7 +103,11 @@ def _talk_share(call: Conversation) -> Measurement | None:
     # failed (ADR 0048), not that the speaker stayed silent. Reporting the
     # share anyway would put a 0% or a 100% in front of the user as though it
     # had been measured -- exactly what `measure` refuses to do elsewhere.
-    if not spoken or (call.user_text and not call.user_speech_ms):
+    if (
+        not call.user_acoustics_complete or
+        not spoken or
+        (call.user_text and not call.user_speech_ms)
+    ):
         return None
     return Measurement(
         "talk_share",
@@ -141,8 +146,13 @@ def _pace(call: Conversation) -> Measurement | None:
     hundred milliseconds long per utterance and this rate reads slightly slow.
     """
     words = _count_words(call.user_text)
-    if not words or not call.user_speech_ms:
+    if (
+        not call.user_acoustics_complete or
+        not words or
+        not call.user_speech_ms
+    ):
         return None
+
     return Measurement("pace", words * _MS_PER_MINUTE / call.user_speech_ms)
 
 

@@ -135,8 +135,20 @@ async def _record(
         from backend.feedback import queue
 
         await asyncio.to_thread(queue.enqueue_feedback, db_id)
-    except Exception:
+    except Exception as e:
         logger.exception("Feedback could not be queued for session %d", db_id)
+
+        try:
+            await asyncio.to_thread(
+                persistence.mark_feedback_job_failed,
+                db_id,
+                str(e),
+            )
+        except Exception:
+            logger.exception(
+                "Feedback job for session %d could not be marked failed",
+                db_id,
+            )
 
 
 async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario, AuthContext] | None:

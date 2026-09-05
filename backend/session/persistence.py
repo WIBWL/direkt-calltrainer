@@ -90,6 +90,48 @@ def persist_session(
         return session.session_id
 
 
+def mark_feedback_job_failed(session_id: int, error_text: str) -> None:
+    """Mark the persisted feedback job failed when it could not be queued."""
+    with session_scope() as db:
+        job = (
+            db.query(db_models.AnalysisJob)
+            .filter_by(session_id=session_id, kind="feedback")
+            .order_by(db_models.AnalysisJob.job_id.desc())
+            .first()
+        )
+
+        if job is None:
+            raise LookupError(
+                f"Feedback job for session {session_id} does not exist"
+            )
+
+        if job.status not in {"queued", "running"}:
+            return
+
+        job.status = "failed"
+        job.error_text = error_text
+        job.updated_at = datetime.now()
+
+
+def fail_running_feedback_jobs(error_text: str) -> int:
+    """Fail feedback jobs left running by a previous worker process."""
+    with session_scope() as db:
+        jobs = (
+            db.query(db_models.AnalysisJob)
+            .filter_by(kind="feedback", status="running")
+            .all()
+        )
+
+        now = datetime.now()
+
+        for job in jobs:
+            job.status = "failed"
+            job.error_text = error_text
+            job.updated_at = now
+
+        return len(jobs)
+
+
 def _write_analysis(
     db: DbSession, session: db_models.Session, call: metrics.Conversation
 ) -> None:

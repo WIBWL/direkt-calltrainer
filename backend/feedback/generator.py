@@ -30,7 +30,7 @@ from backend.db.session import session_scope
 
 logger = logging.getLogger(__name__)
 
-_LANGUAGE_NAMES_EN = {"de": "German"}
+_LANGUAGE_NAMES_EN = {"de": "German", "en": "English"}
 
 # A fenced ```json block is the most common way a small model wraps structured
 # output despite being told not to; unwrap it rather than failing the parse.
@@ -77,26 +77,51 @@ def generate_feedback(session_id: int) -> None:
 
 
 async def _generate(session_id: int) -> None:
-    with session_scope() as db:
-        session = db.get(db_models.Session, session_id)
-        if session is None:
-            raise LookupError(f"Session {session_id} does not exist")
-        _mark(db, session_id, "running")
-        dossier, valid_turns = _dossier(session)
-        language = _LANGUAGE_NAMES_EN.get(session.language_code, session.language_code)
+    session_exists = False
 
     try:
-        wrapup = await _ask(dossier, language)
-    except Exception as e:
-        logger.exception("Feedback generation failed for session %d", session_id)
         with session_scope() as db:
-            _mark(db, session_id, "failed", str(e))
-        raise
+            session = db.get(db_models.Session, session_id)
+            if session is None:
+                raise LookupError(f"Session {session_id} does not exist")
 
-    with session_scope() as db:
-        _store(db, session_id, wrapup, valid_turns)
-        _mark(db, session_id, "done")
-    logger.info("Feedback stored for session %d (%d points)", session_id, len(wrapup.points))
+            session_exists = True
+            _mark(db, session_id, "running")
+            dossier, valid_turns = _dossier(session)
+            language = _LANGUAGE_NAMES_EN.get(
+                session.language_code,
+                session.language_code,
+            )
+
+        wrapup = await _ask(dossier, language)
+
+        with session_scope() as db:
+            _store(db, session_id, wrapup, valid_turns)
+            _mark(db, session_id, "done")
+
+        logger.info(
+            "Feedback stored for session %d (%d points)",
+            session_id,
+            len(wrapup.points),
+        )
+
+    except Exception as e:
+        logger.exception(
+            "Feedback generation failed for session %d",
+            session_id,
+        )
+
+        if session_exists:
+            try:
+                with session_scope() as db:
+                    _mark(db, session_id, "failed", str(e))
+            except Exception:
+                logger.exception(
+                    "Could not mark feedback job failed for session %d",
+                    session_id,
+                )
+
+        raise
 
 
 # --- Prompt ---------------------------------------------------------------
@@ -127,7 +152,8 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
             f'    [turn_id={turn.turn_id}] {_timestamp(turn.start_offset_ms)} '
             f'{speaker}: "{turn.transcript}"'
         )
-        turn_ids.add(turn.turn_id)
+        if turn.speaker == db_models.SPEAKER_USER:
+            turn_ids.add(turn.turn_id)
     return "\n".join(lines), turn_ids
 
 
@@ -357,12 +383,26 @@ async def _ask(dossier: str, language: str) -> _Wrapup:
     """
     messages = _messages(dossier, language)
     raw = ""
+
     for attempt in range(2):  # initial attempt + one retry
-        raw = await llm.complete(messages)
         try:
+            raw = await llm.complete(messages)
             return _Wrapup.model_validate_json(_unwrap(raw))
         except (ValidationError, ValueError) as e:
-            logger.warning("Wrap-up did not validate (attempt %d): %s", attempt + 1, e)
+            logger.warning(
+                "Wrap-up did not validate (attempt %d): %s",
+                attempt + 1,
+                e,
+            )
+        except Exception as e:
+            logger.warning(
+                "Wrap-up request failed (attempt %d): %s",
+                attempt + 1,
+                e,
+            )
+            if attempt == 1:
+                raise
+
     logger.warning("Falling back to a narrative-only wrap-up")
     return _Wrapup(summary=_unfenced_text(raw))
 
