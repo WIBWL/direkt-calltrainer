@@ -6,11 +6,11 @@ Superseded by ADR 0052 (Index Every Foreign-Key Column)
 
 ## Context
 
-Defining the initial schema (ADR 0026), each table needed a decision on which columns to index beyond what a primary key implicitly provides. Candidate additional indexes were already visible at this stage — e.g. `session.subject_id` (looked up per user), or `turn.session_id`/`messung.turn_id`/`befund.turn_id` (looked up per Session when assembling Feedback) — but none of the actual read/query code for these tables exists yet; the backend does not query this schema at all so far.
+Defining the initial schema (ADR 0026), each table needed a decision on which columns to index beyond what a primary key implicitly provides. Candidate additional indexes were already visible at this stage — e.g. `session.subject_id` (looked up per user), or `turn.session_id`/`measurement.turn_id`/`finding.turn_id` (looked up per Session when assembling Feedback) — but none of the actual read/query code for these tables exists yet; the backend does not query this schema at all so far.
 
 ## Decision
 
-The initial schema and migration declare only the constraints SQLAlchemy needs for data integrity — primary keys, foreign keys, and the uniqueness constraints that encode real business rules (the stable natural keys `persona.schluessel`, `szenario.schluessel` and `metrik_typ.schluessel`, plus `feedback.session_id` for its 1:1 relationship to Session), and no additional secondary indexes.
+The initial schema and migration declare only the constraints SQLAlchemy needs for data integrity — primary keys, foreign keys, and the uniqueness constraints that encode real business rules (the stable natural keys `persona.key`, `scenario.key` and `metric_type.key`, plus `feedback.session_id` for its 1:1 relationship to Session), and no additional secondary indexes.
 
 ## Consequences
 

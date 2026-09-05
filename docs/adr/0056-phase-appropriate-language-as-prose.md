@@ -6,7 +6,7 @@ Accepted. Applies ADR 0049 and ADR 0051 to F-42.
 
 ## Context
 
-F-42 (COULD, from R-13) asks the system to recognise the phase a conversation is in and to judge whether the register fits it. The metric inventory in `backend/feedback/metrics.py` has carried a `phasengerechte_sprache` entry since ADR 0051 — seeded so the vocabulary is complete, inactive, and with no derivation behind it.
+F-42 (COULD, from R-13) asks the system to recognise the phase a conversation is in and to judge whether the register fits it. The metric inventory in `backend/feedback/metrics.py` has carried a `phase_appropriate_language` entry since ADR 0051 — seeded so the vocabulary is complete, inactive, and with no derivation behind it.
 
 The underlying model of a service encounter (Packard, Li & Berger 2024) is a sequence of three phases with a different register in each: an **Opening** that is warm and relationship-oriented, a **Core Business** stretch that is factual and respects the caller's time, and a **Closing** that returns to warmth. The finding that matters for training is not about any one phase but about the *movement* between them. A caller whose agent stays factual from the first word to the last rates the encounter lower on empathy and satisfaction even when every answer was correct.
 
@@ -16,7 +16,7 @@ The same source names a second effect: the peak-end rule, under which the closin
 
 ## Decision
 
-**F-42 ships as prose, not as a Measurement.** The wrap-up gains a fourth field, `feedback.phase_language`, written in the same LLM call as the summary and the two point lists and shown as its own block below the figures in `FeedbackView`. The inactive `phasengerechte_sprache` metric stays inactive and keeps its seeded row; nothing will ever derive a value for it.
+**F-42 ships as prose, not as a Measurement.** The wrap-up gains a fourth field, `feedback.phase_language`, written in the same LLM call as the summary and the two point lists and shown as its own block below the figures in `FeedbackView`. The inactive `phase_appropriate_language` metric stays inactive and keeps its seeded row; nothing will ever derive a value for it.
 
 The reason is the shape of the observation, not squeamishness about numbers. What the feature reports is a change of register over time. A single figure cannot carry a trajectory, and three figures — one per phase — would need the three norms ADR 0051 declined to invent, one for each.
 
