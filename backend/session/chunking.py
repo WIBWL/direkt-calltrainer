@@ -8,7 +8,16 @@ while the rest of the reply is still generating.
 import re
 from collections.abc import AsyncIterator
 
-_SENTENCE_END_RE = re.compile(r"[.!?]\s*$")
+# A full stop straight after a digit is not the end of a sentence: German
+# writes ordinals and thousands that way ("6. Juli", "1.400"), and while a
+# reply is streaming the buffer ends at that stop long before the rest of
+# the date arrives. Flushing there splits one sentence across two synthesis
+# calls, which is an audible gap. `clients/speech_text.py` takes the
+# characters back out before the text is spoken; this keeps the chunk whole
+# on the way there. The cost is that a sentence genuinely ending in a number
+# ("Wir zahlen 850.") no longer flushes early -- it goes out with the next
+# one, or as the trailing remainder.
+_SENTENCE_END_RE = re.compile(r"(?<!\d)[.!?]\s*$")
 # A listening test at 40/150, 80/250 and 120/300 chars found 80/250 most
 # natural: smaller chunks were choppier (no prosody continuity into the next),
 # larger ones only added latency before the first was ready.
