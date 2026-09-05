@@ -198,8 +198,8 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
   const endSession = useCallback(() => {
     if (send({ type: "session.end" })) return;
     // The handshake never finished, so the server will never send
-    // session.ended — end locally instead, so "Anruf beenden" always works,
-    // even in the brief window before the connection is established.
+    // session.ended — end locally instead, so the end-call button always
+    // works, even in the brief window before the connection is established.
     const ws = wsRef.current;
     if (ws?.readyState !== WebSocket.CONNECTING) return;
     console.debug("[WS] ending before connection was established");

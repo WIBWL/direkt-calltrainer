@@ -1,11 +1,5 @@
 import type { CallState } from "../protocol";
 
-const LABELS: Record<CallState, string> = {
-  listening: "Du bist am Zug",
-  thinking: "Persona denkt nach",
-  speaking: "Persona spricht",
-};
-
 // Maximum heights of the five waveform bars when the persona audio reaches
 // its highest measured amplitude.
 const WAVE_BAR_MAX_HEIGHTS = [10, 16, 24, 16, 10] as const;
@@ -15,7 +9,12 @@ const MIN_BAR_HEIGHT = 4;
 
 /**
  * Pure state indicator for the live call — no transcript text, ever (ADR 0014
- * extended to cover live text, not just live behavioral feedback).
+ * extended to cover live text, not just live behavioral feedback), and no
+ * spoken phase announcement for a screen reader either: a real phone call
+ * gives a blind caller no narrated "listening/thinking/speaking" either, just
+ * the other person's voice and the gaps around it, which the persona's actual
+ * audio already provides. Entirely `aria-hidden`, so nothing here talks over
+ * the call itself.
  */
 export default function CallAnimation({
   state,
@@ -31,12 +30,8 @@ export default function CallAnimation({
     state === "speaking" ? Math.max(0, Math.min(1, audioLevel)) : 0;
 
   return (
-    <div
-      className={`call-animation call-animation-${state}`}
-      role="status"
-      aria-live="polite"
-    >
-      <div className="call-wave" aria-hidden="true">
+    <div className={`call-animation call-animation-${state}`} aria-hidden="true">
+      <div className="call-wave">
         {WAVE_BAR_MAX_HEIGHTS.map((maxHeight, index) => {
           // Scale each bar between its idle height and individual maximum
           // according to the actual amplitude of the persona audio.
@@ -52,8 +47,6 @@ export default function CallAnimation({
           );
         })}
       </div>
-
-      <p className="call-state-label">{LABELS[state]}</p>
     </div>
   );
 }

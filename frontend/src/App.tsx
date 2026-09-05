@@ -91,8 +91,8 @@ export default function App() {
   // timing. Don't tear the Session down immediately: stash it and let the
   // effect below act on it once the tail audio has actually finished, so
   // the goodbye is heard instead of getting cut off mid-sentence. This only
-  // applies to natural/error endings — when the user clicks "Anruf
-  // beenden", the call ends immediately instead (see the effect below).
+  // applies to natural/error endings — when the user clicks the end-call
+  // button, the call ends immediately instead (see the effect below).
   const handleEnded = useCallback(
     (reason: PendingEnd["reason"], turns: TranscriptEntry[], sessionId: string | null) => {
       setPendingEnd({ reason, turns, sessionId });

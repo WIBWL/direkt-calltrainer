@@ -720,19 +720,6 @@ h2 {
   }
 }
 
-/* Keep the changing state available to assistive technology without adding live text to the UI. */
-.call-state-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 /* Tablet layouts preserve the two-button row while allowing both controls to shrink. */
 @media (max-width: 720px) {
   .call-panel {
