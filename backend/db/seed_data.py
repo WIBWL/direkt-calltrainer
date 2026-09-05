@@ -66,7 +66,7 @@ PERSONAS = [
         "difficulty": "mittel",
         "language_id": "de",
         "tts_voice": "de_male",
-        "kugelaudio_voice_id": 1885,
+        "kugelaudio_voice_id": 1657,
         # R-12 / ADR 0045: moves, not quotable lines -- the model reuses quoted
         # examples verbatim, and these have to work in any Scenario.
         "objections": [
@@ -222,7 +222,7 @@ SCENARIOS = [
             "14 March, three and a half hours on 2 April, and again this "
             "morning since 09:10 — still down as this call starts. After "
             "the second outage a permanent fix was promised for the following "
-            "release, which shipped on 18 April. The contract covers 30 seats "
+            "release, which shipped on 18 April. The contract covers 30 licences "
             "at 2,400 euros a month and guarantees 99.5 percent monthly "
             "availability, which allows approximately three and a half hours "
             "of downtime in a 30-day month, with service credits of five "
@@ -260,21 +260,21 @@ SCENARIOS = [
             "department, and wants a concrete next step before the call ends."
         ),
         "case_facts": (
-            "The current licence covers 18 seats at 1,440 euros a month, which "
-            "is 80 euros a seat. The second department would add 12 people, "
-            "bringing the total to 30 seats. The published price list has a "
-            "volume tier starting at 25 seats at 72 euros a seat, so the same "
-            "30 seats come to 2,160 euros a month at tier price against 2,400 "
+            "The current licence covers 18 users at 1,440 euros a month, which "
+            "is 80 euros each. The second department would add 12 people, "
+            "bringing the total to 30. The published price list has a volume "
+            "tier starting at 25 users at 72 euros each, so the same 30 come "
+            "to 2,160 euros a month at tier price against 2,400 "
             "euros at the current rate. The budget for this is approved only "
             "until the quarter closes on 30 June. Thursday afternoon and "
             "Friday morning are both free for an hour-long walkthrough."
         ),
         "call_goal": (
-            "Get a per-seat figure for the full 30 seats and a walkthrough "
+            "Get a price for the full 30 users and a walkthrough "
             "actually scheduled, before the budget window closes on 30 June."
         ),
         "success_condition": (
-            "a per-seat figure for 30 seats is named and a specific day and "
+            "a price for 30 users is named and a specific day and "
             "time for the walkthrough is agreed. An offer to send something "
             "over is only a result if a date comes with it."
         ),
@@ -301,24 +301,25 @@ SCENARIOS = [
             "and has no notes from it."
         ),
         "case_facts": (
-            "The first call was on 11 May with a colleague the persona knows "
-            "only as Frau Sandner. Four things are remembered from it: 25 "
-            "seats at 68 euros a seat, so 1,700 euros a month; a two-month "
-            "trial period with the right to cancel; onboarding included at no "
-            "charge, which is otherwise a one-off 1,200 euros; and a start "
-            "date of 1 July. None of it was ever confirmed in writing — the "
-            "only record is a single line in the persona's own notes. The "
-            "internal approval to sign expires on 6 June."
+            "The first call was on 11 May, with a colleague the persona knows "
+            "only as Frau Sandner. What the persona took away from it: 25 "
+            "licences at 68 euros each, so 1,700 euros a month, a two-month "
+            "trial period that can be cancelled, onboarding thrown in at no "
+            "charge — otherwise a one-off 1,200 euros — and a start on "
+            "1 July. None of it was confirmed in writing; the only record is "
+            "a line in the persona's own notes. The internal approval to sign "
+            "expires on 6 June."
         ),
         "call_goal": (
-            "Get those four points confirmed and a signature under way before "
-            "the internal approval expires on 6 June."
+            "Get the agreement confirmed the way you understood it, and a "
+            "signature under way before your internal approval expires on "
+            "6 June."
         ),
         "success_condition": (
-            "each of the four points is either confirmed or corrected with a "
-            "reason given, and a concrete next step towards signature is named "
-            "with a date on it. Checking back with the colleague first is a "
-            "result too, as long as a date comes with it."
+            "the terms are confirmed as you understood them, or you are told "
+            "where they actually differ and why — and a step towards "
+            "signature is agreed with a date on it. Checking back with the "
+            "colleague first is a result too, as long as a date comes with it."
         ),
     },
 ]
