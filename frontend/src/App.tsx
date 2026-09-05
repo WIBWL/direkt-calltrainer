@@ -9,6 +9,7 @@ import MicCheck from "./components/MicCheck";
 import ScenarioEditor from "./components/ScenarioEditor";
 import SetupView from "./components/SetupView";
 import TranscriptView from "./components/TranscriptView";
+import { useMicrophoneDevices } from "./hooks/useMicrophoneDevices";
 import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useSessionSocket, type CommittedSession } from "./hooks/useSessionSocket";
 import { useStreamedAudioPlayback } from "./hooks/useStreamedAudioPlayback";
@@ -44,6 +45,10 @@ export default function App() {
   const [companyLabel, setCompanyLabel] = useState<string | null>(null);
   // Tracks intentional muting separately from entering or leaving the call screen.
   const [isMicrophoneMuted, setIsMicrophoneMuted] = useState(false);
+  // The input device picked in the mic-check screen; null = browser default.
+  // Carries over into the call the same way isMicrophoneMuted does.
+  const [micDeviceId, setMicDeviceId] = useState<string | null>(null);
+  const { devices: micDevices, refresh: refreshMicDevices } = useMicrophoneDevices();
   // Lazy initializer: read once on mount, not on every render.
   const [restored] = useState(loadFinishedSession);
   const [screen, setScreen] = useState<Screen>(restored ? "transcript" : "setup");
@@ -111,6 +116,15 @@ export default function App() {
       .then((u) => setCompanyLabel(u.name))
       .catch(() => setCompanyLabel(null)); // no company filter if this fails
   }, [restored]);
+
+  // A selected microphone that gets unplugged (mid-test or mid-call) falls
+  // back to the browser default rather than failing every getUserMedia call
+  // with a stale exact deviceId from then on.
+  useEffect(() => {
+    if (micDeviceId !== null && !micDevices.some((d) => d.deviceId === micDeviceId)) {
+      setMicDeviceId(null);
+    }
+  }, [micDevices, micDeviceId]);
 
   // The Session (WebSocket + VAD + audio playback) lives here, at the App
   // level, not inside whichever screen happens to be showing — it connects
@@ -190,7 +204,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment above
   }, []);
 
-  const vad = useMicrophoneVAD(handleBargeIn, socket.sendTurnAudio);
+  const vad = useMicrophoneVAD(handleBargeIn, socket.sendTurnAudio, micDeviceId);
 
   useEffect(() => {
     vad.preload();
@@ -269,7 +283,14 @@ export default function App() {
   if (screen === "mic-check") {
     return (
       <AppLayout step="prepare" pageClassName="mic-check-page">
-        <MicCheck onConfirmed={handleConfirmed} onCancel={handleCancelMicCheck} />
+        <MicCheck
+          deviceId={micDeviceId}
+          devices={micDevices}
+          onDeviceChange={setMicDeviceId}
+          onDevicesRefresh={refreshMicDevices}
+          onConfirmed={handleConfirmed}
+          onCancel={handleCancelMicCheck}
+        />
       </AppLayout>
     );
   }

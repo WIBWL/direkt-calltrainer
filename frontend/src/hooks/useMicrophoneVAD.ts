@@ -5,6 +5,21 @@ import { encodeWav } from "../utils/wav";
 
 const SAMPLE_RATE = 16000;
 
+/** Mirrors vad-web's own default constraints (real-time-vad.js's
+ * getStream/resumeStream) so picking a device doesn't also drop echo
+ * cancellation etc. for the whole call. */
+function getMicStream(deviceId: string | null): Promise<MediaStream> {
+  return navigator.mediaDevices.getUserMedia({
+    audio: {
+      channelCount: 1,
+      echoCancellation: true,
+      autoGainControl: true,
+      noiseSuppression: true,
+      ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+    },
+  });
+}
+
 /**
  * Arms the microphone for the whole call — including while the Persona is
  * "thinking"/"speaking" — so the user can barge in at any time.
@@ -12,10 +27,18 @@ const SAMPLE_RATE = 16000;
 export function useMicrophoneVAD(
   onSpeechRealStart: () => void,
   onTurnAudio: (blob: Blob, mimeType: string) => void,
+  deviceId: string | null,
 ) {
   const [micError, setMicError] = useState<string | null>(null);
   const vadRef = useRef<Awaited<ReturnType<typeof MicVAD.new>> | null>(null);
   const initRef = useRef<Promise<void> | null>(null);
+
+  // MicVAD.new() below runs once, ever (see initRef), so its getStream/
+  // resumeStream closures capture whatever deviceId was current at that
+  // point -- reading it from a ref instead means a later selection still
+  // takes effect on the next pause()/start() cycle (e.g. the mute toggle).
+  const deviceIdRef = useRef(deviceId);
+  deviceIdRef.current = deviceId;
 
   const ensureVad = useCallback(async () => {
     if (!initRef.current) {
@@ -23,6 +46,8 @@ export function useMicrophoneVAD(
         baseAssetPath: "/vad/",
         onnxWASMBasePath: "/vad/",
         startOnLoad: false,
+        getStream: () => getMicStream(deviceIdRef.current),
+        resumeStream: () => getMicStream(deviceIdRef.current),
         // vad-web's own defaults (0.3 / 0.25) leave only a 0.05 gap between
         // the positive/negative thresholds — narrower than Silero's own
         // authors recommend (a 0.15 gap, per vad-web's frame-processor

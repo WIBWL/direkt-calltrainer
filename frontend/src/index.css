@@ -1164,6 +1164,21 @@ h2 {
   white-space: nowrap;
 }
 
+/* Fills the dd's existing box look -- the picker, not just a status label now. */
+.mic-device-select {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
 /* Every test state uses the centered Figma test-area layout. */
 .mic-test-panel {
   width: 100%;

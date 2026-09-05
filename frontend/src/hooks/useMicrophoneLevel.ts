@@ -7,12 +7,13 @@ import { useAudioLevelMeter } from "./useAudioLevelMeter";
  * conversation VAD used during a real training session. The metering itself
  * is shared with persona playback (see useAudioLevelMeter); what this hook
  * owns is the capture stream behind it.
+ *
+ * `deviceId` selects which input to open — `null` leaves it to the browser's
+ * own default. Re-created every render, so `start()` always reads the current
+ * value; MicCheck restarts the test when it changes while running.
  */
-export function useMicrophoneLevel() {
+export function useMicrophoneLevel(deviceId: string | null) {
   const [error, setError] = useState<string | null>(null);
-
-  // Browsers expose the device label only after microphone permission was granted.
-  const [deviceLabel, setDeviceLabel] = useState<string | null>(null);
 
   const { level, start: startMeter, stop: stopMeter } = useAudioLevelMeter();
   const streamRef = useRef<MediaStream | null>(null);
@@ -38,11 +39,10 @@ export function useMicrophoneLevel() {
     setError(null);
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+      });
       streamRef.current = stream;
-
-      const [audioTrack] = stream.getAudioTracks();
-      setDeviceLabel(audioTrack?.label || null);
 
       const ctx = new AudioContext();
       audioContextRef.current = ctx;
@@ -58,9 +58,9 @@ export function useMicrophoneLevel() {
       setError(e instanceof Error ? e.message : String(e));
       return false;
     }
-  }, [startMeter, stop]);
+  }, [deviceId, startMeter, stop]);
 
   useEffect(() => stop, [stop]);
 
-  return { level, error, deviceLabel, start, stop };
+  return { level, error, start, stop };
 }
