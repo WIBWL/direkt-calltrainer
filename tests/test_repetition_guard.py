@@ -28,7 +28,8 @@ Covers ADR 0038:
 import pytest
 
 from backend.session.language_packs import get_pack
-from backend.session.orchestrator import SessionOrchestrator, _asks_to_repeat, _has_repeated_sentence
+from backend.session.orchestrator import SessionOrchestrator, _asks_to_repeat
+from backend.session.repetition import has_repeated_sentence as _has_repeated_sentence
 from tests.conftest import audio_chunks, collect, completed, states
 
 FALLBACK_LINE = get_pack("de").fallback_closing_line

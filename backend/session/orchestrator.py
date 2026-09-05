@@ -30,6 +30,7 @@ from backend.feedback.acoustics import AcousticsError, Pause, TurnAcoustics, ana
 from backend.personas import Persona
 from backend.scenarios import Scenario
 from backend.session.chunking import sentence_chunks
+from backend.session import repetition
 from backend.session.language_packs import LanguagePack, get_pack, signals_closing
 from backend.session.models import AudioChunk, Failed, StateChanged, Turn, TurnCompleted, TurnEvent
 
@@ -378,10 +379,6 @@ def _strip_foreign_script(text_chunk: str) -> str:
     return _FOREIGN_SCRIPT_RE.sub("", text_chunk).strip()
 
 
-_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
-_WORD_RE = re.compile(r"\w+", re.UNICODE)
-
-
 class _RegenerateReply(Exception):
     """Raised out of the reply stream before any audio has gone out, to have
     `_generate_reply` re-ask the model once (ADR 0038). Only for a reply that
@@ -391,66 +388,6 @@ class _RegenerateReply(Exception):
     def __init__(self, opening: str):
         super().__init__(opening)
         self.opening = opening
-
-
-def _first_sentence(text: str) -> str:
-    """The first sentence of a chunk of text, for comparing openings."""
-    return _SENTENCE_SPLIT_RE.split(text.strip(), maxsplit=1)[0].strip()
-
-
-def _word_set(text: str) -> set[str]:
-    return set(_WORD_RE.findall(text.lower()))
-
-
-def _word_overlap(a: str, b: str) -> float:
-    """Jaccard overlap of the two texts' word sets — 0.0 when either is empty."""
-    wa, wb = _word_set(a), _word_set(b)
-    if not wa or not wb:
-        return 0.0
-    return len(wa & wb) / len(wa | wb)
-
-
-# First sentence of a reply shares at least this fraction of its words with the
-# opening's — the model is reading its own introduction back out (ADR 0038).
-_REINTRO_OVERLAP = 0.6
-
-# Below this many words a reply's opening is an acknowledgement ("Ja, genau."),
-# not an introduction, whatever greeting token it happens to contain.
-_MIN_REINTRO_WORDS = 3
-
-# Below this, a whole reply repeating an earlier one is more likely a natural
-# short acknowledgement than the model looping (ADR 0038).
-_MIN_LOOP_REPLY_CHARS = 30
-
-
-# Below this, a shared sentence means shared filler ("Ja, genau.", "Ich
-# verstehe.") rather than shared content, so short ones are not compared.
-_MIN_SENTENCE_LEN = 15
-
-
-def _long_sentences(text: str) -> list[str]:
-    """The sentences of one reply worth comparing: normalised, filler dropped."""
-    sentences = (sentence.strip().lower() for sentence in _SENTENCE_SPLIT_RE.split(text))
-    return [sentence for sentence in sentences if len(sentence) >= _MIN_SENTENCE_LEN]
-
-
-def _has_repeated_sentence(text: str) -> bool:
-    """True if a non-trivial sentence repeats within one reply — the model
-    looping (ADR 0038). Short fragments ("Ja.", "Okay.") don't count."""
-    sentences = _long_sentences(text)
-    return len(sentences) != len(set(sentences))
-
-
-# ADR 0038's verbatim check never fires on the failure below it: the Persona
-# varies its opening sentence and carries the same block underneath it
-# unchanged, Turn after Turn, so no two replies are ever wholly identical --
-# the gap ADR 0038's own Consequences name. What separates a restatement from
-# a caller legitimately quoting a figure twice is not *whether* a sentence
-# came back but *how much* of the reply is old: a reply that repeats its
-# opening and then says seven new things has moved the call on, one that is
-# four fifths its predecessor has not. Measured against a real call, those two
-# cases sit at 25% and 80%.
-_RESTATEMENT_SHARE = 0.5
 
 
 class SessionOrchestrator:
@@ -736,7 +673,7 @@ class SessionOrchestrator:
         # verbatim repeat of an *older* reply, and a sentence stuttered inside
         # one reply, still are (ADR 0038).
         repeated_reply = spoke and (
-            _has_repeated_sentence(turn.persona_text) or
+            repetition.has_repeated_sentence(turn.persona_text) or
             self._repeats_earlier_reply(turn.persona_text, exclude_last=allow_repetition) or
             (not allow_repetition and self._repeats_last_reply(turn.persona_text))
         )
@@ -796,7 +733,7 @@ class SessionOrchestrator:
 
     def _repeats_last_reply(self, text: str) -> bool:
         """True if this reply repeats its predecessor verbatim (modulo case and
-        whitespace) — the cross-Turn form of `_has_repeated_sentence` (ADR 0038)."""
+        whitespace) — the cross-Turn form of `repetition.has_repeated_sentence` (ADR 0038)."""
         return bool(text.strip()) and self._previous_reply().strip().lower() == text.strip().lower()
 
     def _repeats_earlier_reply(self, text: str, exclude_last: bool = False) -> bool:
@@ -815,7 +752,7 @@ class SessionOrchestrator:
         answer, but reproducing one from further back is still a loop.
         """
         candidate = text.strip().lower()
-        if len(candidate) < _MIN_LOOP_REPLY_CHARS:
+        if len(candidate) < repetition.MIN_LOOP_REPLY_CHARS:
             return False
         earlier = [m["content"] for m in self._messages if m["role"] == "assistant"]
         if exclude_last:
@@ -824,16 +761,8 @@ class SessionOrchestrator:
 
     def _restates_previous_reply(self, text: str) -> bool:
         """True if most of this reply was already in its predecessor — the
-        partial form of `_repeats_last_reply` (ADR 0038).
-
-        A share of the reply, not a count of sentences: repeating one figure
-        while adding new content is a real caller, repeating four fifths of
-        the last reply is the loop the guard is for."""
-        sentences = set(_long_sentences(text))
-        if not sentences:
-            return False
-        carried = len(set(_long_sentences(self._previous_reply())) & sentences)
-        return carried / len(sentences) > _RESTATEMENT_SHARE
+        partial form of `_repeats_last_reply` (ADR 0038)."""
+        return repetition.restates(text, self._previous_reply())
 
     def _assistant_lines(self) -> list[str]:
         """Every reply the persona has given so far, oldest first. `[0]` is the
@@ -854,8 +783,8 @@ class SessionOrchestrator:
         if not earlier:  # the opening Turn — greeting is correct here
             return False
         opener = first_chunk.strip()
-        words = _word_set(opener)
-        if len(words) < _MIN_REINTRO_WORDS:
+        words = repetition.word_set(opener)
+        if len(words) < repetition.MIN_REINTRO_WORDS:
             return False
         if not self._pack.regreeting_re.match(opener):
             return False
@@ -865,7 +794,7 @@ class SessionOrchestrator:
         # user is the only thing that slips through.
         if self._first_name and self._first_name in words:
             return True
-        return _word_overlap(opener, earlier[0]) >= _REINTRO_OVERLAP
+        return repetition.word_overlap(opener, earlier[0]) >= repetition.REINTRO_OVERLAP
 
     def note_barge_in(self, played_ms: int | None) -> None:
         """How much of the in-flight reply the client reports it actually played
@@ -946,7 +875,7 @@ class SessionOrchestrator:
             if first_chunk:
                 first_chunk = False
                 if self._reintroduces(text_chunk):
-                    raise _RegenerateReply(_first_sentence(text_chunk))
+                    raise _RegenerateReply(repetition.first_sentence(text_chunk))
 
             text_chunk = _strip_end_marker(text_chunk, progress)
             text_chunk = _strip_foreign_script(text_chunk)
