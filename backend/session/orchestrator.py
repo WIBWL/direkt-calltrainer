@@ -30,7 +30,7 @@ from backend.feedback.acoustics import AcousticsError, Pause, TurnAcoustics, ana
 from backend.personas import Persona
 from backend.scenarios import Scenario
 from backend.session.chunking import sentence_chunks
-from backend.session.language_packs import LanguagePack, get_pack
+from backend.session.language_packs import LanguagePack, get_pack, signals_closing
 from backend.session.models import AudioChunk, Failed, StateChanged, Turn, TurnCompleted, TurnEvent
 
 logger = logging.getLogger(__name__)
@@ -219,8 +219,8 @@ _END_CALL_RE = re.compile(r"\[\s*call[_\s]?end\s*\]", re.IGNORECASE)
 def _signals_closing(user_text: str, pack: LanguagePack) -> bool:
     """True if the user's message is an explicit farewell or a request to
     postpone/continue the call elsewhere. Matched against the user's own
-    speech, so the patterns come from the language pack, not from here."""
-    return bool(pack.farewell_re.search(user_text) or pack.postpone_re.search(user_text))
+    speech, so the whole check lives in the language pack, not here."""
+    return signals_closing(pack, user_text)
 
 
 def _asks_to_repeat(user_text: str, pack: LanguagePack) -> bool:

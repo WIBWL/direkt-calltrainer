@@ -28,8 +28,18 @@ Adding a language means adding one entry here plus a Persona row carrying that
 import re
 from dataclasses import dataclass
 
+# Clause boundaries. The veto below only looks back to the nearest one, because
+# a negation belongs to its own clause: "Ich kann nicht länger warten, auf
+# Wiederhören" really is a goodbye, while "sagen Sie nicht einfach tschüss" is
+# not, and the comma is what separates the two.
+_CLAUSE_END_RE = re.compile(r"[,;.!?]")
+
 
 @dataclass(frozen=True)
+# A configuration record, not an object with behaviour: one field per thing
+# about a language that cannot be English. Splitting it to satisfy the limit
+# would scatter what belongs together.
+# pylint: disable=too-many-instance-attributes
 class LanguagePack:
     """Everything about one supported conversation language."""
 
@@ -57,7 +67,33 @@ class LanguagePack:
     # are you?" makes repeating the correct move, so the turn is exempt from
     # the repetition guards (ADR 0038).
     repeat_request_re: re.Pattern[str]
+    # Words that, standing in the same clause as a matched farewell or
+    # postponement, mean the phrase is being *talked about* rather than used:
+    # a negation ("sagen Sie nicht einfach tschüss"), or a marker putting it in
+    # the future ("bevor wir auf Wiederhören sagen, hätte ich noch eine
+    # Frage"). Both were observed to end a call the user was still in the
+    # middle of, which is the expensive direction of error -- a missed signal
+    # costs one extra turn, a false one cuts the conversation off.
+    closing_veto_re: re.Pattern[str]
     fallback_closing_line: str
+
+
+def signals_closing(pack: LanguagePack, user_text: str) -> bool:
+    """True if the user really signalled the call is over.
+
+    A bare `search` is not enough: these phrases also appear as the object of a
+    sentence rather than as its act -- "sagen Sie nicht einfach tschüss", "bevor
+    wir auf Wiederhören sagen, hätte ich noch eine Frage". So a match only
+    counts when its own clause does not veto it.
+    """
+    for pattern in (pack.farewell_re, pack.postpone_re):
+        match = pattern.search(user_text)
+        if match is None:
+            continue
+        clause = _CLAUSE_END_RE.split(user_text[: match.start()])[-1]
+        if not pack.closing_veto_re.search(clause):
+            return True
+    return False
 
 
 _GERMAN = LanguagePack(
@@ -102,7 +138,9 @@ _GERMAN = LanguagePack(
     postpone_re=re.compile(
         r"(ein andere[rs]? mal|andermal|anders (fortsetzen|weiterführen|weitermachen)|"
         r"später (nochmal|weiter|zurückrufen)|melde mich (nochmal|später|wieder)|"
-        r"rufe? (sie |dich )?(nochmal|später|zurück)|keine zeit (mehr|gerade)|"
+        # "keine Zeit mehr *für* X" is a complaint about X, not a request to
+        # hang up -- and complaint Scenarios are exactly where it turns up.
+        r"rufe? (sie |dich )?(nochmal|später|zurück)|keine zeit (mehr|gerade)\b(?!\s*f(ü|ue)r)|"
         r"muss (jetzt |gleich )?(auflegen|los|schluss machen)|gespräch (beenden|abbrechen))",
         re.IGNORECASE,
     ),
@@ -117,9 +155,16 @@ _GERMAN = LanguagePack(
         r"(nochmal|noch mal|noch einmal)\b.*(sagen|wiederhol|langsam)|"
         r"(sag|sagen sie( mir)?|sprechen sie)\b.*(nochmal|noch mal|noch einmal|langsamer)|"
         r"wiederholen sie|können sie das (bitte )?(nochmal |noch mal )?wiederhol|"
-        r"nicht (ganz |richtig |gut |so )?(verstanden|verstehen|mitbekommen|gehört|mitgekriegt)|"
+        # Not followed by a reason clause: "das habe ich nicht verstanden" asks
+        # for a repeat, "ich kann nicht verstehen, warum ..." is an objection to
+        # the substance and must not put the persona into repeat mode.
+        r"nicht (ganz |richtig |gut |so )?(verstanden|verstehen|mitbekommen|gehört|mitgekriegt)"
+        r"\b(?!\s*,?\s*(warum|wieso|weshalb|dass))|"
         r"schlecht (zu )?(verstehen|verstanden|hören))",
         re.IGNORECASE,
+    ),
+    closing_veto_re=re.compile(
+        r"\b(nicht|kein\w*|nie|niemals|bevor|ehe)\b", re.IGNORECASE
     ),
     fallback_closing_line="Vielen Dank für Ihre Zeit. Auf Wiederhören.",
 )
@@ -183,6 +228,7 @@ _ENGLISH = LanguagePack(
         r"missed (that|what you said))",
         re.IGNORECASE,
     ),
+    closing_veto_re=re.compile(r"\bnot\b|n'?t\b|\bnever\b|\bbefore\b", re.IGNORECASE),
     fallback_closing_line="Thank you for your time. Goodbye.",
 )
 
