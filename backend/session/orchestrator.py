@@ -347,6 +347,9 @@ class _ReplyProgress:
         # window the client reports it actually heard (ADR 0035).
         self.audio_ms = 0
         self.checkpoints: list[tuple[int, str]] = []
+        # Set once the finished reply is in the history: past that point a late
+        # barge-in (over the tail still playing) must not re-finalize the turn.
+        self.committed = False
 
 
 def _strip_end_marker(text_chunk: str, progress: _ReplyProgress) -> str:
@@ -739,6 +742,7 @@ class SessionOrchestrator:
         )
         restates = spoke and not allow_repetition and self._restates_previous_reply(turn.persona_text)
         self._messages.append({"role": "assistant", "content": turn.persona_text})
+        progress.committed = True
 
         # force_end_call backstops [CALL_END]: a small model won't always
         # include the marker even when told to (confirmed in testing).
@@ -882,6 +886,15 @@ class SessionOrchestrator:
         """
         played_ms = self._barge_in_played_ms
         self._barge_in_played_ms = None
+        if progress.committed:
+            # The reply finished and reached the history before the interrupt
+            # arrived -- the server streams ahead, so the client was still
+            # playing the tail of a turn already over here. Committing again
+            # would store it twice, and trimming persona_text to the heard part
+            # leaves the Transcript at odds with the history. Only the close is
+            # owed: run_turn's job, had the teardown not pre-empted it.
+            self._reopen_turn = None
+            return
         if not progress.spoke_yet:
             turn.persona_text = ""
             return
