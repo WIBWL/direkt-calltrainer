@@ -2020,3 +2020,37 @@ h2 {
   font-variant-numeric: tabular-nums;
   color: var(--color-text-muted-secondary);
 }
+
+.feedback-transcript-card .transcript-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 50%;
+  background: var(--color-blue-100);
+  color: var(--color-navy-900);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.feedback-transcript-card .transcript-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.feedback-transcript-card .transcript-speaker {
+  margin-bottom: 4px;
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 700;
+  color: var(--color-navy-900);
+}
+
+.feedback-transcript-card .transcript-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-text-muted-secondary);
+}
