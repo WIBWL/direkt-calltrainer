@@ -129,6 +129,17 @@ Qwen3 thinking mode is catastrophic here: multi‑second first‑token latency a
 no usable output within any sane token budget. The current code is right; this
 note is so nobody "cleans up" the `extra_body`.
 
+**Where thinking *is* used:** `llm.complete(think=True)` for the PDF fact
+extraction (F‑58, `backend/documents.py`). That call is off the live path — the
+user is waiting on a spinner in the Scenario editor, not on audio — and it is
+not streamed, so neither failure mode above applies. It sets **no `max_tokens`**
+(the fact list is bounded by a character cap, and the reasoning trace needs
+unpredictable room); the answer is validated as a whole, and if the document is
+too large to fit the context the gateway 400s and the caller falls back to the
+raw text. Sampling follows Qwen3's thinking‑mode card: `temperature 0.6,
+top_p 0.95, top_k 20, min_p 0`. The wrap‑up generator deliberately stays
+non‑thinking (its own tuning, ADR 0056).
+
 ### Sampling parameters
 
 Qwen3's model card gives explicit **non‑thinking** recommendations:

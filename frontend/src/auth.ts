@@ -8,7 +8,7 @@ import { oidcAuthority, oidcClientId, oidcRedirectUri } from "./oidcConfig";
  * Constructed here (not by react-oidc-context from settings) so api.ts and
  * useSessionSocket.ts can read the live token at request time
  * (`userManager.getUser()`) rather than a copy captured during render — silent
- * renew is then picked up automatically. Mirrors direkt-dataplatform's auth.ts.
+ * renew is then picked up automatically.
  */
 export const userManager = new UserManager({
   authority: oidcAuthority,

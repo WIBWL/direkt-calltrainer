@@ -78,3 +78,33 @@ def test_pcm16_to_wav_produces_a_valid_mono_16bit_wav():
         assert w.getsampwidth() == 2
         assert w.getframerate() == 24000
         assert w.readframes(w.getnframes()) == pcm
+
+
+async def test_empty_kugelaudio_stream_falls_back_to_direkt(monkeypatch):
+    """A cleanly finished KugelAudio stream without audio must use the fallback."""
+    monkeypatch.setattr(tts, "DEBUG", False)
+
+    class EmptyStreamingTTS:
+        async def stream_async(self, **_kwargs):
+            # An async generator that yields nothing -- a stream that finishes
+            # cleanly with no audio.
+            if False:  # pylint: disable=using-constant-test
+                yield None
+
+    class EmptyKugelAudioClient:
+        tts = EmptyStreamingTTS()
+
+    direkt_calls = 0
+
+    async def fake_direkt(_text, _voice):
+        nonlocal direkt_calls
+        direkt_calls += 1
+        return b"DIREKT-WAV"
+
+    monkeypatch.setattr(tts, "KUGELAUDIO_CLIENT", EmptyKugelAudioClient())
+    monkeypatch.setattr(tts, "_synthesize", fake_direkt)
+
+    out = await tts.synthesize("Hallo.", VOICE, "de")
+
+    assert out == b"DIREKT-WAV"
+    assert direkt_calls == 1

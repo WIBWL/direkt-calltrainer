@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. The connection setting the Decision names has since been dropped in favour of the `POSTGRES_*` values (see ADR 0010 and the Consequences); the mechanism is unchanged.
 
 ## Context
 
@@ -14,4 +14,6 @@ We will use Alembic for migrations, with `target_metadata` pointed at `Base.meta
 
 ## Consequences
 
-Schema changes are driven from one place — the ORM models — and autogeneration catches most routine cases (new tables, new columns), cutting down on manual DDL-writing errors. This relies on autogenerate's known blind spots being caught during review: data migrations and some constraint or rename changes need to be hand-edited into the generated script, which is why the initial migration (`30351586b0a1_create_initial_persistence_schema.py`) was committed with Alembic's own "please adjust!" autogenerate comment still in place. Anyone running migrations, including in CI, needs a valid `DATABASE_URL` available at that point.
+Schema changes are driven from one place — the ORM models — and autogeneration catches most routine cases (new tables, new columns), cutting down on manual DDL-writing errors. This relies on autogenerate's known blind spots being caught during review: data migrations and some constraint or rename changes need to be hand-edited into the generated script, which is why the initial migration (`30351586b0a1_create_initial_persistence_schema.py`) was committed with Alembic's own "please adjust!" autogenerate comment still in place. Anyone running migrations, including in CI, needs the `POSTGRES_*` settings available at that point.
+
+There is no `DATABASE_URL` any more. `env.py` calls `build_database_url()` from `backend/db/session.py` — the same function the application uses — and assembles the URL from `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` plus the optional `POSTGRES_HOST`/`POSTGRES_PORT` on every run. That is what guarantees migrations cannot run against a different database than the app, and it keeps the password in one place instead of duplicating a URL across `.env` and `compose.yaml` (ADR 0010 records the same change from its side). Only the ready-made variable the Decision names was dropped; reading the connection from `.env` at runtime rather than from `alembic.ini` is exactly what still happens.

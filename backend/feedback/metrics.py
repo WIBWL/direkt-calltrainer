@@ -1,14 +1,14 @@
-"""The MetrikTyp inventory and the derivation of a Session's Messung rows.
+"""The MetricType inventory and the derivation of a Session's Measurement rows.
 
 Single source of truth for the metrics: one entry per metric holds both its
-reference data (what backend/db/provision.py writes into the metrik_typ table)
+reference data (what backend/db/provision.py writes into the metric_type table)
 and how its value is derived. Adding a metric is one entry here, not a change
 spread over a seed and an analysis path.
 
 Every metric describes the whole call, not one utterance (ADR 0051): the
 inventory follows F-53's list of Kennzahlen -- Redeanteil, Fragen, Sprechtempo,
 Wortanzahl, Reaktionszeit, Pausen -- plus the loudness curve of F-37. The Prio
-column of docs/features.md drives `aktiv`; an inactive metric carries no
+column of docs/features.md drives `active`; an inactive metric carries no
 `derive` and produces nothing, so the MVP's scope stays unambiguous.
 
 This module knows nothing about Praat. It turns the numbers acoustics.py
@@ -42,7 +42,13 @@ class Conversation:
     """
 
     user_text: str = ""
+    # How long the user's audio ran, and how much of that was speech rather
+    # than silence. Only the first is comparable with `persona_speech_ms`.
     user_speech_ms: int = 0
+    user_phonation_ms: int = 0
+    # False when a Turn's measurement failed, leaving both figures short by an
+    # unknown amount (ADR 0048).
+    user_acoustics_complete: bool = True
     # Only ever a denominator, for the user's share of the speaking time.
     persona_speech_ms: int = 0
     # One entry per exchange: how long the user took to start replying,
@@ -56,10 +62,10 @@ class Conversation:
 
 @dataclass(frozen=True)
 class Measurement:
-    """One Messung to be written against a Session: a value plus ADR 0029's detail."""
+    """One Measurement to be written against a Session: a value plus ADR 0029's detail."""
 
-    schluessel: str
-    wert: float
+    key: str
+    value: float
     detail: dict | None = None
 
 
@@ -70,13 +76,13 @@ Deriver = Callable[[Conversation], "Measurement | None"]
 
 @dataclass(frozen=True)
 class MetricDef:
-    """One row of the metrik_typ reference table, plus how to compute and judge it."""
+    """One row of the metric_type reference table, plus how to compute and judge it."""
 
-    schluessel: str
-    bezeichnung: str
-    einheit: str | None
+    key: str
+    name: str
+    unit: str | None
     feature_id: str
-    aktiv: bool
+    active: bool
     derive: Deriver | None = None
 
 
@@ -84,8 +90,8 @@ def measure(call: Conversation) -> list[Measurement]:
     """Derive every active metric for one finished Session.
 
     A metric that cannot be computed for this call is absent from the result
-    rather than present with a stand-in value: a missing Messung row is honest,
-    a zero would be read as a measurement.
+    rather than present with a stand-in value: a missing Measurement row is
+    honest, a zero would be read as a measurement.
     """
     derived = (metric.derive(call) for metric in METRICS if metric.derive)
     return [m for m in derived if m is not None]
@@ -94,24 +100,32 @@ def measure(call: Conversation) -> list[Measurement]:
 # --- Derivations ----------------------------------------------------------
 
 
-def _redeanteil(call: Conversation) -> Measurement | None:
+def _talk_share(call: Conversation) -> Measurement | None:
     """F-24. The user's share of the time either side actually spoke -- speaking
-    time, not wall-clock, so the model's own latency dilutes neither share."""
+    time, not wall-clock, so the model's own latency dilutes neither share.
+
+    Audio duration on both sides: the Persona's figure is the length of the
+    audio synthesized for it, so the user's has to be the length of their
+    recording. Phonation as the numerator would strip the user's silences and
+    not the Persona's, reporting that difference as a smaller share.
+    """
     spoken = call.user_speech_ms + call.persona_speech_ms
     # Words with no measured speaking time behind them mean the measurement
     # failed (ADR 0048), not that the speaker stayed silent. Reporting the
     # share anyway would put a 0% or a 100% in front of the user as though it
     # had been measured -- exactly what `measure` refuses to do elsewhere.
-    if not spoken or (call.user_text and not call.user_speech_ms):
+    if not call.user_acoustics_complete or not spoken:
+        return None
+    if call.user_text and not call.user_speech_ms:
         return None
     return Measurement(
-        "redeanteil",
+        "talk_share",
         call.user_speech_ms * 100 / spoken,
-        {"nutzer_ms": call.user_speech_ms, "persona_ms": call.persona_speech_ms},
+        {"user_ms": call.user_speech_ms, "persona_ms": call.persona_speech_ms},
     )
 
 
-def _fragen(call: Conversation) -> Measurement | None:
+def _questions(call: Conversation) -> Measurement | None:
     """F-41. Questions the user asked -- the observable trace of active
     listening, and the one thing a caller notices the absence of.
 
@@ -122,11 +136,11 @@ def _fragen(call: Conversation) -> Measurement | None:
     words = _count_words(call.user_text)
     if not words:
         return None
-    fragen = call.user_text.count("?")
-    return Measurement("fragen", float(fragen), {"pro_100_woerter": fragen * 100 / words})
+    questions = call.user_text.count("?")
+    return Measurement("questions", float(questions), {"per_100_words": questions * 100 / words})
 
 
-def _tempo(call: Conversation) -> Measurement | None:
+def _pace(call: Conversation) -> Measurement | None:
     """F-36. Words per minute of speaking time, since that is the unit the user
     thinks in. The gaps between utterances are excluded, so this says how fast
     they talk rather than how much of the call they filled.
@@ -136,17 +150,18 @@ def _tempo(call: Conversation) -> Measurement | None:
     for, so the comparison would measure a setting, not the user; it is left
     out until the partner is a person.
 
-    Note what the denominator contains: the client's VAD pads each recording
-    with its pre-speech and redemption frames, so `user_speech_ms` runs a few
-    hundred milliseconds long per utterance and this rate reads slightly slow.
+    The denominator is phonation: Praat's silence segmentation (the same pass
+    that yields F-51's pauses) drops the silences inside the utterance along
+    with the pre-speech and redemption frames the client's VAD pads each
+    recording with, leaving only time the user was actually speaking in.
     """
     words = _count_words(call.user_text)
-    if not words or not call.user_speech_ms:
+    if not call.user_acoustics_complete or not words or not call.user_phonation_ms:
         return None
-    return Measurement("tempo", words * _MS_PER_MINUTE / call.user_speech_ms)
+    return Measurement("pace", words * _MS_PER_MINUTE / call.user_phonation_ms)
 
 
-def _wortanzahl(call: Conversation) -> Measurement | None:
+def _word_count(call: Conversation) -> Measurement | None:
     """F-08. How much the user said in total, with sentence length alongside it
     as the observable trace of an over-packed explanation. Whether it actually
     was one is a judgment for the wrap-up, not for this number."""
@@ -155,26 +170,26 @@ def _wortanzahl(call: Conversation) -> Measurement | None:
         return None
     sentences = [s for s in _SENTENCE_END_RE.split(call.user_text) if _count_words(s)]
     return Measurement(
-        "wortanzahl",
+        "word_count",
         float(words),
-        {"saetze": len(sentences), "woerter_pro_satz": words / len(sentences) if sentences else None},
+        {"sentence_count": len(sentences), "words_per_sentence": words / len(sentences) if sentences else None},
     )
 
 
-def _reaktionszeit(call: Conversation) -> Measurement | None:
+def _reaction_time(call: Conversation) -> Measurement | None:
     """F-53. Average seconds between the Persona falling silent and the user
     starting to speak. The model's own thinking and speaking time falls outside
     this window by construction, so a slow gateway cannot read as hesitation."""
     if not call.reactions_ms:
         return None
     return Measurement(
-        "reaktionszeit",
+        "reaction_time",
         fmean(call.reactions_ms) / _MS_PER_SECOND,
-        {"laengste_s": max(call.reactions_ms) / _MS_PER_SECOND, "anzahl": len(call.reactions_ms)},
+        {"longest_s": max(call.reactions_ms) / _MS_PER_SECOND, "count": len(call.reactions_ms)},
     )
 
 
-def _pausen(call: Conversation) -> Measurement | None:
+def _pauses(call: Conversation) -> Measurement | None:
     """F-51. Average length of a silent stretch inside the user's own speech.
 
     Only pauses within an utterance count. A hesitation long enough to trip the
@@ -184,17 +199,17 @@ def _pausen(call: Conversation) -> Measurement | None:
         return None
     durations = [p.duration_ms for p in call.pauses]
     return Measurement(
-        "pausen",
+        "pauses",
         fmean(durations) / _MS_PER_SECOND,
         {
-            "anzahl": len(durations),
-            "gesamt_s": sum(durations) / _MS_PER_SECOND,
-            "pausen": [{"ab_ms": p.offset_ms, "dauer_ms": p.duration_ms} for p in call.pauses],
+            "count": len(durations),
+            "total_s": sum(durations) / _MS_PER_SECOND,
+            "pause_events": [{"start_ms": p.offset_ms, "duration_ms": p.duration_ms} for p in call.pauses],
         },
     )
 
 
-def _lautstaerke(call: Conversation) -> Measurement | None:
+def _loudness(call: Conversation) -> Measurement | None:
     """F-37. Dynamic range across the whole call as the measure of vocal
     presence, with the curve behind it. A range rather than a level, for the
     reason given on TurnAcoustics.loudness_db (ADR 0047)."""
@@ -203,9 +218,9 @@ def _lautstaerke(call: Conversation) -> Measurement | None:
         return None
     margin = len(audible) // 20  # 5th to 95th percentile, ignoring the extremes
     return Measurement(
-        "lautstaerke",
+        "loudness",
         audible[-1 - margin] - audible[margin],
-        {"verlauf_db": list(call.loudness_db)},
+        {"curve_db": list(call.loudness_db)},
     )
 
 
@@ -215,23 +230,23 @@ METRICS: tuple[MetricDef, ...] = (
     # Active -- F-53's Kennzahlen, plus F-37's loudness curve. No metric
     # carries a target range: there is no validated norm for this population,
     # and a made-up threshold is a score in disguise (ADR 0004/0051).
-    MetricDef("redeanteil", "Redeanteil", "%", "F-24", True, _redeanteil),
-    MetricDef("fragen", "Fragen an den Gesprächspartner", "Anzahl", "F-41", True, _fragen),
-    MetricDef("tempo", "Sprechtempo", "Wörter/min", "F-36", True, _tempo),
-    MetricDef("wortanzahl", "Gesprochene Wörter", "Wörter", "F-08", True, _wortanzahl),
-    MetricDef("reaktionszeit", "Reaktionszeit", "s", "F-53", True, _reaktionszeit),
-    MetricDef("pausen", "Sprechpausen", "s", "F-51", True, _pausen),
-    MetricDef("lautstaerke", "Lautstärke", "dB", "F-37", True, _lautstaerke),
+    MetricDef("talk_share", "Redeanteil", "%", "F-24", True, _talk_share),
+    MetricDef("questions", "Fragen an den Gesprächspartner", "Anzahl", "F-41", True, _questions),
+    MetricDef("pace", "Sprechtempo", "Wörter/min", "F-36", True, _pace),
+    MetricDef("word_count", "Gesprochene Wörter", "Wörter", "F-08", True, _word_count),
+    MetricDef("reaction_time", "Reaktionszeit", "s", "F-53", True, _reaction_time),
+    MetricDef("pauses", "Sprechpausen", "s", "F-51", True, _pauses),
+    MetricDef("loudness", "Lautstärke", "dB", "F-37", True, _loudness),
     # SHOULD / COULD -- seeded so the vocabulary is complete, but inactive and
     # without a derivation.
-    MetricDef("konkretheit", "Sprachliche Konkretheit", None, "F-40", False),
+    MetricDef("concreteness", "Sprachliche Konkretheit", None, "F-40", False),
     # F-42 ships, but as prose and not as a figure: what it describes is a
     # change of register across the call's three phases, which no single value
     # carries and which would need a norm nobody measured to score. It is the
-    # `phasensprache` paragraph of the wrap-up (backend/feedback/generator.py).
+    # `phase_language` paragraph of the wrap-up (backend/feedback/generator.py).
     # The row stays inactive and seeded so the vocabulary keeps its entry.
-    MetricDef("phasengerechte_sprache", "Phasengerechte Sprache", None, "F-42", False),
-    MetricDef("kongruenz", "Kongruenz von Inhalt und Stimme", None, "F-39", False),
+    MetricDef("phase_appropriate_language", "Phasengerechte Sprache", None, "F-42", False),
+    MetricDef("congruence", "Kongruenz von Inhalt und Stimme", None, "F-39", False),
 )
 
 

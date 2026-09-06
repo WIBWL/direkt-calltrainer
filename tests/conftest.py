@@ -44,14 +44,21 @@ os.environ.setdefault("OIDC_ISSUER", "http://keycloak.test.invalid/realms/direkt
 # Deliberately unusable credentials, and the reason they are set here at all:
 # backend/clients/config.py calls load_dotenv() when the backend is first
 # imported, which would otherwise put the developer's real POSTGRES_* into the
-# environment for the whole test session. python-dotenv does not override
-# variables that are already set, so claiming them first is what keeps a stray
-# session_scope() out of the development database — it fails to connect instead
-# of quietly writing to it. The database fixtures below override all three for
-# the duration of a test that actually asks for one.
-os.environ.setdefault("POSTGRES_USER", "calltrainer-test-no-such-user")
-os.environ.setdefault("POSTGRES_PASSWORD", "not-a-real-password")
-os.environ.setdefault("POSTGRES_DB", "calltrainer-test-no-such-database")
+# environment for the whole test session. Claiming them first is what keeps a
+# stray session_scope() out of the development database — it fails to connect
+# instead of quietly writing to it. The database fixtures below override all
+# three for the duration of a test that actually asks for one.
+#
+# Assigned, not setdefault: a variable that is already set would win, and that
+# is exactly the case worth guarding against. Running the suite inside the app
+# container is one — compose loads .env through `env_file`, so the real
+# settings are in the environment before pytest starts, and setdefault left the
+# guard switched off precisely where it was needed. Overriding cannot break the
+# database tests: they read .env directly (`_ENV`, via dotenv_values below) and
+# never consult the environment for the server they connect to.
+os.environ["POSTGRES_USER"] = "calltrainer-test-no-such-user"
+os.environ["POSTGRES_PASSWORD"] = "not-a-real-password"
+os.environ["POSTGRES_DB"] = "calltrainer-test-no-such-database"
 
 import uuid  # noqa: E402
 from collections.abc import AsyncIterator, Iterator  # noqa: E402
@@ -148,7 +155,7 @@ def load_seed_module():
     import now -- kept as a function so the tests that check *what* the library
     ships still have one place to get it from.
     """
-    from backend.db import seed_data
+    from backend.db import seed_data  # pylint: disable=import-outside-toplevel
 
     return seed_data
 
@@ -191,10 +198,15 @@ def fake_library(monkeypatch):
     sites look the functions up."""
     by_id = {p.id: p for p in TEST_PERSONAS}
     by_key = {s.id: s for s in TEST_SCENARIOS}
+    # Personas are curated (no scoping); a Scenario read is scoped to the
+    # caller's `sub` + tenant (ADR 0058/0060), which the doubles ignore -- the real
+    # visibility query is tested against a database in test_authored_content.py.
+    # The WS handshake's tenant resolution is stubbed so it needs no database.
     monkeypatch.setattr(library, "list_personas", lambda: list(TEST_PERSONAS))
-    monkeypatch.setattr(library, "list_scenarios", lambda: list(TEST_SCENARIOS))
+    monkeypatch.setattr(library, "list_scenarios", lambda subject, tenant_id=1: list(TEST_SCENARIOS))
     monkeypatch.setattr(library, "get_persona", by_id.get)
-    monkeypatch.setattr(library, "get_scenario", by_key.get)
+    monkeypatch.setattr(library, "get_scenario", lambda extern_id, subject=None, tenant_id=1: by_key.get(extern_id))
+    monkeypatch.setattr("backend.api.session_ws.resolve_tenant_id", lambda auth: 1)
     return library
 
 
@@ -347,9 +359,23 @@ _DB_SETTINGS = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
                 "POSTGRES_HOST", "POSTGRES_PORT")
 
 # Bounds the reachability probe so an unreachable server fails in a few seconds
-# instead of hanging on libpq's default. psycopg tries both the IPv6 and the
-# IPv4 address, so the wait is up to twice this.
+# instead of hanging on libpq's default.
 _DB_CONNECT_TIMEOUT = 3
+
+
+def _loopback(host: str) -> str:
+    """`localhost` -> `127.0.0.1` for the test database server.
+
+    The persistence tests talk to a *local* Postgres — the `db` container's
+    forwarded port. On Windows `localhost` resolves to `::1` first, but Docker
+    Desktop's port forward binds IPv4 only, so every connect wastes the libpq
+    connect timeout on the v6 address before falling back — with dozens of
+    throwaway databases each opened several times, that turns a 45-second run
+    into minutes or an outright hang (the Alembic engine has no timeout at all).
+    Pinning the loopback name sidesteps it and changes nothing on a stack that
+    was already answering on v4. A real hostname in POSTGRES_HOST is left alone.
+    """
+    return "127.0.0.1" if host in ("localhost", "::1") else host
 
 
 def _render(url: URL) -> str:
@@ -369,7 +395,7 @@ def _server_url() -> URL:
         "postgresql+psycopg",
         username=_ENV["POSTGRES_USER"],
         password=_ENV["POSTGRES_PASSWORD"],
-        host=_ENV.get("POSTGRES_HOST") or "localhost",
+        host=_loopback(_ENV.get("POSTGRES_HOST") or "localhost"),
         port=int(_ENV.get("POSTGRES_PORT") or 5432),
         database=_ENV["POSTGRES_DB"],
     )
@@ -510,7 +536,7 @@ def seeded_database(app_database: str) -> str:
 
 PERSONA_KEY = "thomas-brandt-ceo"
 SCENARIO_KEY = "price-cancellation-risk"
-METRIC_KEY = "tempo"
+METRIC_KEY = "pace"
 
 SESSION_STARTED = datetime(2026, 8, 27, 10, 0, 0, tzinfo=UTC)
 
@@ -533,6 +559,9 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
     through the seed script, so these tests do not depend on what personas.py
     happens to contain."""
     language = db_models.Language(code="de", name="Deutsch")
+    # The default tenant every caller with no company resolves to (ADR 0060).
+    default_tenant = db_models.Tenant(extern_ref="default", name="Ohne Unternehmen")
+    # Built-ins: public and authored by nobody (ADR 0058), like a seeded row.
     persona = db_models.Persona(
         key=PERSONA_KEY,
         name="Thomas Brandt",
@@ -545,10 +574,10 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
         language_code="de",
         tts_voice="de_male",
         active=True,
+        visibility=db_models.VISIBILITY_PUBLIC,
     )
     scenario = db_models.Scenario(
         key=SCENARIO_KEY,
-        scenario_type="Preisgespräch",
         title="Kündigungsabsicht",
         short_description="Kunde erwägt zu kündigen.",
         description="Beschreibung",
@@ -556,11 +585,12 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
         call_goal="",
         success_condition="",
         active=True,
+        visibility=db_models.VISIBILITY_PUBLIC,
     )
     metric_type = db_models.MetricType(
         key=METRIC_KEY, name="Sprechtempo", unit="Wörter/min", feature_id="F-36", active=True
     )
-    db_session.add_all([language, persona, scenario, metric_type])
+    db_session.add_all([language, default_tenant, persona, scenario, metric_type])
     db_session.commit()
     return ReferenceRows(
         persona=persona, scenario=scenario, language=language, metric_type=metric_type
@@ -573,6 +603,7 @@ def persist(
     reason: str = "user",
     turns: list[Turn] | None = None,
     persona_key: str = PERSONA_KEY,
+    subject: str = TEST_AUTH.sub,
 ) -> uuid.UUID:
     """Write a Session through the real write path; returns its extern_id.
 
@@ -584,14 +615,21 @@ def persist(
     # the feedback stack, which a collection-time import should not need.
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
 
-    # A key other than PERSONA_KEY is deliberately one the seed did not write.
-    persona = replace(TEST_PERSONAS[0], id=persona_key)
+    # The value object the write path receives carries the row's `extern_id` as
+    # `.id` since ADR 0058, so resolve it from the reference row the fixture
+    # inserted. A `persona_key` the fixture did not write yields a random id,
+    # which exercises the LookupError path.
+    with session_scope() as db:
+        prow = db.query(db_models.Persona).filter_by(key=persona_key).one_or_none()
+        srow = db.query(db_models.Scenario).filter_by(key=SCENARIO_KEY).one_or_none()
+    persona = replace(TEST_PERSONAS[0], id=str(prow.extern_id) if prow else str(uuid.uuid4()))
+    scenario = replace(TEST_SCENARIOS[0], id=str(srow.extern_id) if srow else str(uuid.uuid4()))
     extern_id = extern_id or uuid.uuid4()
     persistence.persist_session(
         extern_id,
-        str(uuid.uuid4()),
+        subject,
         persona,
-        replace(TEST_SCENARIOS[0], id=SCENARIO_KEY),
+        scenario,
         turns if turns is not None else [],
         SESSION_STARTED,
         reason,

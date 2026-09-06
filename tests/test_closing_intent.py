@@ -13,7 +13,7 @@ import pytest
 
 from backend.session.language_packs import get_pack
 from backend.session.models import TurnCompleted
-from backend.session.orchestrator import SessionOrchestrator, _signals_closing
+from backend.session.orchestrator import SessionOrchestrator, _asks_to_repeat, _signals_closing
 from tests.conftest import collect, completed, states
 
 # _signals_closing is the unit under test here.
@@ -84,6 +84,76 @@ def test_recognises_english_farewells_and_postponements(text):
 )
 def test_english_patterns_do_not_fire_on_ordinary_conversation(text):
     assert _signals_closing(text, ENGLISH) is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # The phrase is the object of the sentence, not its act.
+        "Bevor wir auf Wiederhören sagen, hätte ich noch eine Frage.",
+        "Sagen Sie nicht einfach tschüss und legen auf, das akzeptiere ich nicht.",
+        # "no time *for* X" is a complaint about X. Complaint Scenarios are
+        # seeded, so this is where it turns up.
+        "Ich habe keine Zeit mehr für diese ständigen Verzögerungen!",
+        "Ich will das Gespräch gar nicht beenden, ich will eine Lösung.",
+    ],
+)
+def test_a_farewell_that_is_only_mentioned_does_not_end_the_call(text):
+    """language_packs.py states the trade: a missed signal costs one extra turn,
+    a false one cuts the conversation off. These all contain a closing phrase
+    while saying the opposite of goodbye, and each one used to end the call."""
+    assert _signals_closing(text, GERMAN) is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Ich kann nicht länger warten, auf Wiederhören.",
+        "Ich habe gerade keine Zeit, machen wir das ein anderes Mal.",
+    ],
+)
+def test_a_negation_in_an_earlier_clause_still_leaves_a_real_goodbye_standing(text):
+    """The veto is scoped to the closing phrase's own clause. A negation on the
+    other side of a comma belongs to a different statement and must not
+    suppress a genuine farewell."""
+    assert _signals_closing(text, GERMAN) is True
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "I won't be able to sort this out today, goodbye.",
+        "I have no time right now.",
+    ],
+)
+def test_english_closings_survive_the_veto(text):
+    assert _signals_closing(text, ENGLISH) is True
+
+
+def test_english_mentioned_farewell_does_not_end_the_call():
+    assert _signals_closing("Do not just say goodbye and hang up on me.", ENGLISH) is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # An objection to the substance, not a request to hear it again.
+        "Ich kann nicht verstehen, warum Sie mir das nicht erstatten!",
+        "Ich habe nicht verstanden, wieso das so lange dauert.",
+    ],
+)
+def test_an_objection_is_not_a_request_to_repeat(text):
+    """A false repeat request costs a whole turn: the persona re-delivers its
+    last line instead of answering the objection (ADR 0038)."""
+    assert _asks_to_repeat(text, GERMAN) is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["Das habe ich nicht verstanden.", "Wie bitte?", "Können Sie das nochmal sagen?"],
+)
+def test_genuine_repeat_requests_still_register(text):
+    assert _asks_to_repeat(text, GERMAN) is True
 
 
 def test_each_language_uses_its_own_patterns():

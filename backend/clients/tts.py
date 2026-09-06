@@ -122,6 +122,10 @@ async def _synthesize_kugelaudio(text: str, voice: PersonaVoice, language_id: st
         if isinstance(event, AudioChunk):
             pcm += event.audio
             sample_rate = event.sample_rate
+
+    if not pcm:
+        raise KugelAudioError("KugelAudio returned no audio")
+
     return _pcm16_to_wav(bytes(pcm), sample_rate)
 
 

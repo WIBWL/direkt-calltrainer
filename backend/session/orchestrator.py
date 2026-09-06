@@ -25,12 +25,14 @@ from collections.abc import AsyncIterator
 from kugelaudio.exceptions import KugelAudioError
 from openai import OpenAIError
 
+from backend.authored_text import AUTHORED_SCENARIO_NOTE
 from backend.clients import llm, stt, tts
 from backend.feedback.acoustics import AcousticsError, Pause, TurnAcoustics, analyze
 from backend.personas import Persona
 from backend.scenarios import Scenario
 from backend.session.chunking import sentence_chunks
-from backend.session.language_packs import LanguagePack, get_pack
+from backend.session import repetition
+from backend.session.language_packs import LanguagePack, get_pack, signals_closing
 from backend.session.models import AudioChunk, Failed, StateChanged, Turn, TurnCompleted, TurnEvent
 
 logger = logging.getLogger(__name__)
@@ -159,6 +161,7 @@ def _build_system_prompt(persona: Persona, scenario: Scenario, pack: LanguagePac
         "come from the user. Your side of the call is to say what you need, "
         "judge what you are offered, and press for what is still missing — "
         "never to put the solution forward yourself.\n"
+        f"{AUTHORED_SCENARIO_NOTE if scenario.created_by else ''}"
         f"Context of the call: {scenario.description}\n"
         f"{_case_block(scenario)}"
         f"Your name: {persona.name}. Introduce yourself by that name and "
@@ -224,8 +227,8 @@ _END_CALL_RE = re.compile(r"\[\s*call[_\s]?end\s*\]", re.IGNORECASE)
 def _signals_closing(user_text: str, pack: LanguagePack) -> bool:
     """True if the user's message is an explicit farewell or a request to
     postpone/continue the call elsewhere. Matched against the user's own
-    speech, so the patterns come from the language pack, not from here."""
-    return bool(pack.farewell_re.search(user_text) or pack.postpone_re.search(user_text))
+    speech, so the whole check lives in the language pack, not here."""
+    return signals_closing(pack, user_text)
 
 
 def _asks_to_repeat(user_text: str, pack: LanguagePack) -> bool:
@@ -318,6 +321,7 @@ async def _attach_measurements(
         measured = await acoustics
     except AcousticsError as e:
         logger.info("Turn %d not measured: %s", turn.seq, e)
+        turn.user_acoustics_complete = False
         return
     except Exception:  # pylint: disable=broad-exception-caught
         # Deliberately catch-all: `analyze` runs Praat in a worker thread and
@@ -325,11 +329,13 @@ async def _attach_measurements(
         # is never load-bearing, so any failure here is logged and the Turn
         # just carries no measurements -- it must not break the call.
         logger.exception("Paraverbal analysis failed for turn %d", turn.seq)
+        turn.user_acoustics_complete = False
         return
     started_ms = max(0, ended_ms - measured.duration_ms)
     if turn.user_offset_ms is None:
         turn.user_offset_ms = started_ms
     turn.user_speech_ms += measured.duration_ms
+    turn.user_phonation_ms += measured.phonation_ms
     turn.pauses.extend(Pause(started_ms + p.offset_ms, p.duration_ms) for p in measured.pauses)
     turn.loudness_db.extend(measured.loudness_db)
 
@@ -363,6 +369,9 @@ class _ReplyProgress:
         # window the client reports it actually heard (ADR 0035).
         self.audio_ms = 0
         self.checkpoints: list[tuple[int, str]] = []
+        # Set once the finished reply is in the history: past that point a late
+        # barge-in (over the tail still playing) must not re-finalize the turn.
+        self.committed = False
 
 
 def _strip_end_marker(text_chunk: str, progress: _ReplyProgress) -> str:
@@ -391,10 +400,6 @@ def _strip_foreign_script(text_chunk: str) -> str:
     return _FOREIGN_SCRIPT_RE.sub("", text_chunk).strip()
 
 
-_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
-_WORD_RE = re.compile(r"\w+", re.UNICODE)
-
-
 class _RegenerateReply(Exception):
     """Raised out of the reply stream before any audio has gone out, to have
     `_generate_reply` re-ask the model once (ADR 0038). Only for a reply that
@@ -404,66 +409,6 @@ class _RegenerateReply(Exception):
     def __init__(self, opening: str):
         super().__init__(opening)
         self.opening = opening
-
-
-def _first_sentence(text: str) -> str:
-    """The first sentence of a chunk of text, for comparing openings."""
-    return _SENTENCE_SPLIT_RE.split(text.strip(), maxsplit=1)[0].strip()
-
-
-def _word_set(text: str) -> set[str]:
-    return set(_WORD_RE.findall(text.lower()))
-
-
-def _word_overlap(a: str, b: str) -> float:
-    """Jaccard overlap of the two texts' word sets — 0.0 when either is empty."""
-    wa, wb = _word_set(a), _word_set(b)
-    if not wa or not wb:
-        return 0.0
-    return len(wa & wb) / len(wa | wb)
-
-
-# First sentence of a reply shares at least this fraction of its words with the
-# opening's — the model is reading its own introduction back out (ADR 0038).
-_REINTRO_OVERLAP = 0.6
-
-# Below this many words a reply's opening is an acknowledgement ("Ja, genau."),
-# not an introduction, whatever greeting token it happens to contain.
-_MIN_REINTRO_WORDS = 3
-
-# Below this, a whole reply repeating an earlier one is more likely a natural
-# short acknowledgement than the model looping (ADR 0038).
-_MIN_LOOP_REPLY_CHARS = 30
-
-
-# Below this, a shared sentence means shared filler ("Ja, genau.", "Ich
-# verstehe.") rather than shared content, so short ones are not compared.
-_MIN_SENTENCE_LEN = 15
-
-
-def _long_sentences(text: str) -> list[str]:
-    """The sentences of one reply worth comparing: normalised, filler dropped."""
-    sentences = (sentence.strip().lower() for sentence in _SENTENCE_SPLIT_RE.split(text))
-    return [sentence for sentence in sentences if len(sentence) >= _MIN_SENTENCE_LEN]
-
-
-def _has_repeated_sentence(text: str) -> bool:
-    """True if a non-trivial sentence repeats within one reply — the model
-    looping (ADR 0038). Short fragments ("Ja.", "Okay.") don't count."""
-    sentences = _long_sentences(text)
-    return len(sentences) != len(set(sentences))
-
-
-# ADR 0038's verbatim check never fires on the failure below it: the Persona
-# varies its opening sentence and carries the same block underneath it
-# unchanged, Turn after Turn, so no two replies are ever wholly identical --
-# the gap ADR 0038's own Consequences name. What separates a restatement from
-# a caller legitimately quoting a figure twice is not *whether* a sentence
-# came back but *how much* of the reply is old: a reply that repeats its
-# opening and then says seven new things has moved the call on, one that is
-# four fifths its predecessor has not. Measured against a real call, those two
-# cases sit at 25% and 80%.
-_RESTATEMENT_SHARE = 0.5
 
 
 class SessionOrchestrator:
@@ -662,9 +607,9 @@ class SessionOrchestrator:
         progress: _ReplyProgress,
         guard_reintroduction: bool = False,
     ) -> AsyncIterator[TurnEvent]:
-        """One reply attempt plus one retry on an LLM error. Yields the reply's
-        events; yields a Failed event and stops if it can't be delivered. May
-        raise `_RegenerateReply` before the first audio (ADR 0038)."""
+        """One reply attempt plus one retry on an LLM error or empty completion.
+        Yields the reply's events; yields a Failed event and stops if it can't be
+        delivered. May raise `_RegenerateReply` before the first audio (ADR 0038)."""
         for llm_attempt in range(2):  # initial attempt + one retry
             try:
                 stream = self._stream_and_synthesize(
@@ -675,7 +620,19 @@ class SessionOrchestrator:
                         yield event
                         if isinstance(event, Failed):
                             return
-                return  # streamed to completion without an LLM-side error
+                if turn.persona_text.strip():
+                    return
+
+                # A completion can finish cleanly without producing any usable text.
+                # Treat that like an LLM failure: otherwise the Turn would complete
+                # successfully with an empty Persona reply in the conversation history.
+                logger.warning("LLM returned an empty reply (attempt %d)", llm_attempt + 1)
+                if llm_attempt == 1:
+                    yield Failed(
+                        code="llm_failed",
+                        message="Language model returned an empty reply.",
+                    )
+                    return
             except OpenAIError as e:
                 logger.error("LLM request failed (attempt %d): %s", llm_attempt + 1, e)
                 # Retry only before any audio has gone out (ADR 0033): a fresh
@@ -749,12 +706,13 @@ class SessionOrchestrator:
         # verbatim repeat of an *older* reply, and a sentence stuttered inside
         # one reply, still are (ADR 0038).
         repeated_reply = spoke and (
-            _has_repeated_sentence(turn.persona_text) or
+            repetition.has_repeated_sentence(turn.persona_text) or
             self._repeats_earlier_reply(turn.persona_text, exclude_last=allow_repetition) or
             (not allow_repetition and self._repeats_last_reply(turn.persona_text))
         )
         restates = spoke and not allow_repetition and self._restates_previous_reply(turn.persona_text)
         self._messages.append({"role": "assistant", "content": turn.persona_text})
+        progress.committed = True
 
         # force_end_call backstops [CALL_END]: a small model won't always
         # include the marker even when told to (confirmed in testing).
@@ -808,7 +766,7 @@ class SessionOrchestrator:
 
     def _repeats_last_reply(self, text: str) -> bool:
         """True if this reply repeats its predecessor verbatim (modulo case and
-        whitespace) — the cross-Turn form of `_has_repeated_sentence` (ADR 0038)."""
+        whitespace) — the cross-Turn form of `repetition.has_repeated_sentence` (ADR 0038)."""
         return bool(text.strip()) and self._previous_reply().strip().lower() == text.strip().lower()
 
     def _repeats_earlier_reply(self, text: str, exclude_last: bool = False) -> bool:
@@ -827,7 +785,7 @@ class SessionOrchestrator:
         answer, but reproducing one from further back is still a loop.
         """
         candidate = text.strip().lower()
-        if len(candidate) < _MIN_LOOP_REPLY_CHARS:
+        if len(candidate) < repetition.MIN_LOOP_REPLY_CHARS:
             return False
         earlier = [m["content"] for m in self._messages if m["role"] == "assistant"]
         if exclude_last:
@@ -836,16 +794,8 @@ class SessionOrchestrator:
 
     def _restates_previous_reply(self, text: str) -> bool:
         """True if most of this reply was already in its predecessor — the
-        partial form of `_repeats_last_reply` (ADR 0038).
-
-        A share of the reply, not a count of sentences: repeating one figure
-        while adding new content is a real caller, repeating four fifths of
-        the last reply is the loop the guard is for."""
-        sentences = set(_long_sentences(text))
-        if not sentences:
-            return False
-        carried = len(set(_long_sentences(self._previous_reply())) & sentences)
-        return carried / len(sentences) > _RESTATEMENT_SHARE
+        partial form of `_repeats_last_reply` (ADR 0038)."""
+        return repetition.restates(text, self._previous_reply())
 
     def _assistant_lines(self) -> list[str]:
         """Every reply the persona has given so far, oldest first. `[0]` is the
@@ -866,8 +816,8 @@ class SessionOrchestrator:
         if not earlier:  # the opening Turn — greeting is correct here
             return False
         opener = first_chunk.strip()
-        words = _word_set(opener)
-        if len(words) < _MIN_REINTRO_WORDS:
+        words = repetition.word_set(opener)
+        if len(words) < repetition.MIN_REINTRO_WORDS:
             return False
         if not self._pack.regreeting_re.match(opener):
             return False
@@ -877,7 +827,7 @@ class SessionOrchestrator:
         # user is the only thing that slips through.
         if self._first_name and self._first_name in words:
             return True
-        return _word_overlap(opener, earlier[0]) >= _REINTRO_OVERLAP
+        return repetition.word_overlap(opener, earlier[0]) >= repetition.REINTRO_OVERLAP
 
     def note_barge_in(self, played_ms: int | None) -> None:
         """How much of the in-flight reply the client reports it actually played
@@ -898,6 +848,15 @@ class SessionOrchestrator:
         """
         played_ms = self._barge_in_played_ms
         self._barge_in_played_ms = None
+        if progress.committed:
+            # The reply finished and reached the history before the interrupt
+            # arrived -- the server streams ahead, so the client was still
+            # playing the tail of a turn already over here. Committing again
+            # would store it twice, and trimming persona_text to the heard part
+            # leaves the Transcript at odds with the history. Only the close is
+            # owed: run_turn's job, had the teardown not pre-empted it.
+            self._reopen_turn = None
+            return
         if not progress.spoke_yet:
             turn.persona_text = ""
             return
@@ -949,13 +908,12 @@ class SessionOrchestrator:
             if first_chunk:
                 first_chunk = False
                 if self._reintroduces(text_chunk):
-                    raise _RegenerateReply(_first_sentence(text_chunk))
+                    raise _RegenerateReply(repetition.first_sentence(text_chunk))
 
             text_chunk = _strip_end_marker(text_chunk, progress)
             text_chunk = _strip_foreign_script(text_chunk)
 
             if text_chunk:
-                turn.persona_text += text_chunk + " "
                 async for event in self._speak(turn, text_chunk, progress):
                     yield event
                     if isinstance(event, Failed):
@@ -972,6 +930,9 @@ class SessionOrchestrator:
             async for wav in tts.synthesize_stream(text_chunk, self._voice, self._language_id):
                 if not voiced:
                     voiced = True
+                    # Only commit Persona text once TTS has actually produced audio.
+                    # Otherwise a silent TTS stream would leave an unheard reply in the Turn.
+                    turn.persona_text += text_chunk + " "
                     progress.spoken_text += text_chunk + " "
                 if not progress.spoke_yet:
                     yield StateChanged(state="speaking")
@@ -985,6 +946,12 @@ class SessionOrchestrator:
                 # the reply's playback clock, so a later barge-in can tell
                 # whether the user heard all of it (ADR 0035).
                 progress.checkpoints.append((progress.audio_ms, progress.spoken_text.strip()))
+            else:
+                logger.error("TTS synthesis returned no audio")
+                yield Failed(
+                    code="tts_failed",
+                    message="Text-to-speech returned no audio.",
+                )
         except (KugelAudioError, OpenAIError, TimeoutError, OSError) as e:
             logger.error("TTS synthesis failed: %s", e)
             yield Failed(code="tts_failed", message=str(e))

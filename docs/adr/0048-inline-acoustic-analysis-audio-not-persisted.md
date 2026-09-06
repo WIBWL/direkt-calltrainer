@@ -18,6 +18,8 @@ We will measure each Turn's paraverbal features inline, on a worker thread start
 
 A failure inside the measurement is not a pipeline failure. ADR 0016's retry-once-then-end policy governs the legs the conversation depends on; this is not one of them, so a Turn that cannot be measured contributes no numbers and the call continues.
 
+Such a Turn records that it was not measured. Its transcript still arrives, because STT is a separate leg that succeeded, so silence about the failure would be indistinguishable downstream from a speaker who said those words in no time at all. The flag is what lets the Session's statistics tell the two apart.
+
 ## Consequences
 
 The measurement runs concurrently with a network wait the Session was already paying for, so it costs no wall-clock time and Q-03 is untouched. That holds only while Praat stays fast relative to the gateway — the assumption to re-check if measurement ever grows more expensive.

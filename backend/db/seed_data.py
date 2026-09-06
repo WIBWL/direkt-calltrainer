@@ -1,4 +1,4 @@
-"""Initial content for the `persona` and `szenario` reference tables.
+"""Initial content for the `persona` and `scenario` reference tables.
 
 ADR 0041 made the database the source of truth for both, so this content is
 seed state and not a runtime source: `backend/library.py` reads the tables,
@@ -27,6 +27,16 @@ tables, so provision.py writes them straight through without mapping.
 # the Persona speaks is decided by language_id alone.
 LANGUAGE_NAMES = {"de": "Deutsch", "en": "Englisch"}
 
+# Tenants (ADR 0060, R-58). The two pilot companies plus a `default` tenant that
+# every User with no company (dev users included) resolves to. `extern_ref` is
+# the stable key `backend/tenants.py` resolves to -- a Keycloak Organization
+# alias once that is enabled (phase 2), this string until then.
+TENANTS = [
+    {"extern_ref": "default", "name": "Ohne Unternehmen"},
+    {"extern_ref": "solox", "name": "Solox"},
+    {"extern_ref": "appollo", "name": "APPOLLO"},
+]
+
 PERSONAS = [
     {
         "id": "thomas-brandt-ceo",
@@ -54,7 +64,7 @@ PERSONAS = [
             "it immediately and you say so; you do not keep grinding once you "
             "have one"
         ),
-        # Not modelled before this script took over the content: "mittel"
+        # Not modelled before this script took over the content: "medium"
         # because this Persona is demanding but not an escalation case.
         # Note that `training_goal` does not reach the model: neither the
         # `Persona` value type nor `library._to_persona` carries it yet.
@@ -63,7 +73,7 @@ PERSONAS = [
             "muss eine Zahl, einen Termin oder einen Namen liefern, statt "
             "allgemein zu bleiben."
         ),
-        "difficulty": "mittel",
+        "difficulty": "medium",
         "language_id": "de",
         "tts_voice": "de_male",
         "kugelaudio_voice_id": 1657,
@@ -102,7 +112,7 @@ PERSONAS = [
             "auch wenn sie nichts bekommt — der Nutzer muss selbst merken, "
             "dass die Frage noch offen ist."
         ),
-        "difficulty": "leicht",
+        "difficulty": "easy",
         "language_id": "en",
         # tts_voice is a German voice because the DiReKT fallback has no
         # English one — see the note above.
@@ -116,10 +126,8 @@ PERSONAS = [
     },
 ]
 
-# --- Szenarien ----------------------------------------------------------
-# `scenario_type` follows F-03's categories of Scenario types.
-#
-# Szenarien carry no language of their own (ADR 0043). "name" and
+# --- Scenarios -----------------------------------------------------------
+# Scenarios carry no language of their own (ADR 0043). "name" and
 # "short_description" are the display texts in the UI language; the rest is the
 # English call context the model reads — which is what lets any Persona run any
 # Scenario regardless of the language that Persona speaks.
@@ -136,7 +144,6 @@ PERSONAS = [
 SCENARIOS = [
     {
         "id": "cold-call-followup",
-        "scenario_type": "Angebots- und Preisgespräch",
         "name": "Offenes Anliegen zu bestehendem Vertrag",
         "short_description": (
             "Der Kunde ruft mit einer offenen Frage zu einem bestehenden "
@@ -167,7 +174,6 @@ SCENARIOS = [
     },
     {
         "id": "price-cancellation-risk",
-        "scenario_type": "Angebots- und Preisgespräch",
         "name": "Kündigungsabsicht wegen Preis",
         "short_description": (
             "Der Kunde erwägt zu kündigen, weil ihm die laufenden Kosten zu "
@@ -205,7 +211,6 @@ SCENARIOS = [
     # and a Persona that presses for specifics will surface it if they do not.
     {
         "id": "escalation-repeated-outage",
-        "scenario_type": "Beschwerde und Eskalation",
         "name": "Wiederholter Ausfall trotz Zusage",
         "short_description": (
             "Der dritte Ausfall in sieben Wochen, und der versprochene Fix "
@@ -248,7 +253,6 @@ SCENARIOS = [
     # where an unreliable [CALL_END] shows up soonest.
     {
         "id": "upsell-seat-expansion",
-        "scenario_type": "Terminvereinbarung und Ausbau",
         "name": "Ausbau auf eine zweite Abteilung",
         "short_description": (
             "Der Kunde will ein zweites Team aufschalten und braucht dafür "
@@ -288,7 +292,6 @@ SCENARIOS = [
     # may or may not have been promised is the whole hook.
     {
         "id": "closing-after-handover",
-        "scenario_type": "Abschlussgespräch nach Übergabe",
         "name": "Abschluss nach Erstgespräch mit Kollegin",
         "short_description": (
             "Der Kunde ruft zum Abschluss zurück und beruft sich auf Zusagen "

@@ -1,7 +1,7 @@
 // OIDC configuration, read from build-time Vite env (repo-root .env, via
-// vite.config's `envDir`). The reference project (direkt-dataplatform) serves
-// this at runtime because it ships one image to many hosts; Calltrainer builds
-// one image per deploy, so a build-time value is enough.
+// vite.config's `envDir`). A one-image-many-hosts deployment would need this
+// resolved at runtime instead; Calltrainer builds one image per deploy, so a
+// build-time value is enough.
 
 // Required, deliberately without a default: every candidate value is wrong in
 // some environment, and getting it wrong does not fail at build — the app just

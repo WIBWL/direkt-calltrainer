@@ -28,9 +28,18 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy.orm import Session as DbSession
 
-from backend.db.models import Language, MetricType, Persona, PersonaObjection, Scenario
-from backend.db.seed_data import LANGUAGE_NAMES, PERSONAS, SCENARIOS
-from backend.db.session import session_scope
+from backend.authored_text import clean
+from backend.db.models import (
+    Language,
+    MetricType,
+    Persona,
+    PersonaObjection,
+    Scenario,
+    Tenant,
+    VISIBILITY_PUBLIC,
+)
+from backend.db.seed_data import LANGUAGE_NAMES, PERSONAS, SCENARIOS, TENANTS
+from backend.db.session import advisory_lock, session_scope
 from backend.feedback.metrics import METRICS
 
 logger = logging.getLogger(__name__)
@@ -48,14 +57,27 @@ def provision() -> dict[str, int]:
     # Keep our logging setup; see the note in migrations/env.py.
     config.attributes["configure_logging"] = False
     command.upgrade(config, "head")
-    with session_scope() as db:
-        return seed(db)
+    # Seeding needs the same guard the migration has. `_upsert` reads a row,
+    # then writes it; two processes starting together both read "not there"
+    # and the second insert fails on the natural key. The transaction rolls
+    # back, so nothing is corrupted -- but the loser logs "Database
+    # provisioning failed", which is the message a real outage produces too.
+    #
+    # The same key as the migration, taken only now: migrations/env.py has
+    # released it by the time command.upgrade returns. Holding both at once
+    # would be this process waiting on itself, since each takes it on its own
+    # connection.
+    logger.info("Seeding reference data...")
+    with advisory_lock():
+        with session_scope() as db:
+            return seed(db)
 
 
 def seed(db: DbSession) -> dict[str, int]:
     """Bring the reference tables to the seed state; returns rows created."""
     created = {
         "Language": _seed_languages(db),
+        "Tenant": _seed_tenants(db),
         "Persona": _seed_personas(db),
         "Scenario": _seed_scenarios(db),
         "MetricType": _seed_metric_types(db),
@@ -71,6 +93,15 @@ def seed(db: DbSession) -> dict[str, int]:
     return created
 
 
+def _seed_tenants(db: DbSession) -> int:
+    """The pilot companies plus the `default` tenant (ADR 0060). Never
+    deactivated -- an authored row keeps pointing at the tenant it belonged to."""
+    return sum(
+        _upsert(db, Tenant, {"extern_ref": t["extern_ref"]}, {"name": t["name"]})[1]
+        for t in TENANTS
+    )
+
+
 def _deactivate_missing(db: DbSession, model, seeded_keys: set[str]) -> None:
     """Sets `active` to False on every row the seed no longer contains."""
     (
@@ -84,7 +115,7 @@ def inventory(db: DbSession) -> dict[str, int]:
     """Row counts of the reference tables, for the CLI's summary line."""
     return {
         model.__name__: db.query(model).count()
-        for model in (Language, Persona, PersonaObjection, Scenario, MetricType)
+        for model in (Language, Tenant, Persona, PersonaObjection, Scenario, MetricType)
     }
 
 
@@ -111,17 +142,23 @@ def _seed_languages(db: DbSession) -> int:
     )
 
 
+# Seed text goes through the same sanitiser as authored text (ADR 0059): it is
+# team-written and expected to be a no-op, so a change here is a seed bug caught
+# at provisioning rather than a surprise in a live prompt.
 def _seed_personas(db: DbSession) -> int:
     created = 0
     for p in PERSONAS:
         row, was_created = _upsert(
             db, Persona, {"key": p["id"]},
-            {"name": p["name"], "role_label": p["role_label"], "role": p["role"],
-             "traits": p["traits"], "behavior": p["behavior"],
-             "training_goal": p["training_goal"], "difficulty": p["difficulty"],
+            {"name": clean(p["name"]), "role_label": clean(p["role_label"]),
+             "role": clean(p["role"]), "traits": clean(p["traits"]),
+             "behavior": clean(p["behavior"]),
+             "training_goal": clean(p["training_goal"]), "difficulty": p["difficulty"],
              "active": True, "language_code": p["language_id"],
              "tts_voice": p["tts_voice"],
-             "kugelaudio_voice_id": p["kugelaudio_voice_id"]})
+             "kugelaudio_voice_id": p["kugelaudio_voice_id"],
+             # A shipped built-in belongs to nobody and everybody (ADR 0058).
+             "created_by": None, "visibility": VISIBILITY_PUBLIC})
         created += was_created
         _seed_objections(db, row, p["objections"])
     return created
@@ -133,30 +170,40 @@ def _seed_objections(db: DbSession, persona: Persona, objections) -> None:
     Replaced wholesale rather than upserted: the list is what carries meaning,
     and `position` gives a single objection no natural key to match on. Not
     counted as created rows -- `inventory()` already reports the table.
+
+    These rows are therefore recreated on every seed run and their ids are not
+    stable: nothing may reference an objection by id, because the row it names
+    is gone after the next startup. A feature that needs to cite one has to
+    give objections a stable key first, or address them by persona and
+    position. The same absence of a natural key that forces the rewrite is
+    what makes the ids unusable as a reference.
     """
     db.flush()  # a freshly created Persona needs its id before rows point at it
     db.query(PersonaObjection).filter_by(
         persona_id=persona.persona_id).delete(synchronize_session=False)
     for index, text in enumerate(objections):
-        db.add(PersonaObjection(persona_id=persona.persona_id, position=index, text=text))
+        db.add(PersonaObjection(
+            persona_id=persona.persona_id, position=index, text=clean(text)))
 
 
 def _seed_scenarios(db: DbSession) -> int:
     return sum(
         _upsert(db, Scenario, {"key": s["id"]},
-                {"scenario_type": s["scenario_type"], "title": s["name"],
-                 "short_description": s["short_description"],
-                 "description": s["description"], "case_facts": s["case_facts"],
-                 "call_goal": s["call_goal"],
-                 "success_condition": s["success_condition"]})[1]
+                {"title": clean(s["name"]),
+                 "short_description": clean(s["short_description"]),
+                 "description": clean(s["description"]),
+                 "case_facts": clean(s["case_facts"]),
+                 "call_goal": clean(s["call_goal"]),
+                 "success_condition": clean(s["success_condition"]),
+                 "created_by": None, "visibility": VISIBILITY_PUBLIC})[1]
         for s in SCENARIOS
     )
 
 
 def _seed_metric_types(db: DbSession) -> int:
     return sum(
-        _upsert(db, MetricType, {"key": m.schluessel},
-                {"name": m.bezeichnung, "unit": m.einheit,
-                 "feature_id": m.feature_id, "active": m.aktiv})[1]
+        _upsert(db, MetricType, {"key": m.key},
+                {"name": m.name, "unit": m.unit,
+                 "feature_id": m.feature_id, "active": m.active})[1]
         for m in METRICS
     )

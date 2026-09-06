@@ -6,11 +6,11 @@ Accepted
 
 ## Context
 
-`Messung` (a measurement of a `MetrikTyp` within a `Turn` — e.g. tempo, intonation) stores one numeric value (`wert`) per row. The underlying speech analysis can also produce a variable-shaped detail payload alongside that value — for example a time series of how a metric evolved across the turn — which differs per metric type and isn't known in advance as a fixed set of columns.
+`Measurement` (a measurement of a `MetricType` within a `Turn` — e.g. tempo, intonation) stores one numeric value (`value`) per row. The underlying speech analysis can also produce a variable-shaped detail payload alongside that value — for example a time series of how a metric evolved across the turn — which differs per metric type and isn't known in advance as a fixed set of columns.
 
 ## Decision
 
-We added `Messung.detail_json` as a nullable `JSONB` column, using `sqlalchemy.dialects.postgresql.JSONB` specifically, rather than a portable/dialect-neutral JSON type or a separate table per metric-type detail shape.
+We added `Measurement.detail_json` as a nullable `JSONB` column, using `sqlalchemy.dialects.postgresql.JSONB` specifically, rather than a portable/dialect-neutral JSON type or a separate table per metric-type detail shape.
 
 ## Consequences
 

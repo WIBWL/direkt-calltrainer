@@ -2,11 +2,11 @@
 
 ## Status
 
-Accepted, narrowed by ADR 0051: Praat remains the engine, but only for duration, pauses and loudness. The pitch and voice-quality analysis this ADR originally covered (F-35, F-38) is no longer collected.
+Accepted, narrowed by ADR 0051: Praat remains the engine, but only for duration, the phonation time its silence segmentation yields alongside the pauses, and loudness. The pitch and voice-quality analysis this ADR originally covered (F-35, F-38) is no longer collected.
 
 ## Context
 
-Several MUST features rest on numbers derived from the user's waveform. ADR 0026 modelled the results as `Messung` rows and ADR 0029 gave them a `detail_json` column for the contours, but the measurement engine itself was never chosen.
+Several MUST features rest on numbers derived from the user's waveform. ADR 0026 modelled the results as `Measurement` rows and ADR 0029 gave them a `detail_json` column for the contours, but the measurement engine itself was never chosen.
 
 The candidates were a hand-rolled DSP layer on numpy/scipy, a general-purpose MIR library, or Praat driven from Python through Parselmouth. Praat is the reference implementation for phonetic analysis: its algorithms are the ones the literature cites, and its defaults encode decades of tuning against real speech. librosa is built for music information retrieval and has no silence-segmentation primitive shaped like Praat's. A hand-rolled layer would mean reimplementing autocorrelation pitch tracking and being wrong about it in ways nobody on the team is equipped to notice.
 

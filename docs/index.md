@@ -58,5 +58,11 @@ Sie sind in der Leitung. Wählen Sie eine Option:
 - [ADR 0052 — Index Every Foreign-Key Column](adr/0052-index-every-foreign-key-column.md)
 - [ADR 0053 — Deterministic Constraint Names and Database-Enforced Vocabularies](adr/0053-named-constraints-and-database-enforced-vocabularies.md)
 - [ADR 0054 — The Scenario Briefs the Trainee, Not Only the Persona](adr/0054-scenario-briefing-for-the-trainee.md)
+- [ADR 0055 — One Log File for the Whole Run](adr/0055-log-file-kept-for-the-whole-run.md)
+- [ADR 0056 — Phasengerechte Sprache Is a Paragraph, Not a Metric](adr/0056-phase-appropriate-language-as-prose.md)
+- [ADR 0057 — English Wire Vocabulary](adr/0057-english-wire-vocabulary.md)
+- [ADR 0058 — User-Authored Scenarios](adr/0058-user-authored-scenarios.md)
+- [ADR 0059 — User-Authored Scenario Text Is Information, Not Instructions](adr/0059-user-authored-prompt-content.md)
+- [ADR 0060 — Tenant Model and Company Sharing for Authored Scenarios](adr/0060-tenant-model-and-visibility.md)
 
 *Vielen Dank für Ihren Anruf. Bitte legen Sie nach der Lektüre nicht auf — es warten noch mehr ADRs auf Sie.*

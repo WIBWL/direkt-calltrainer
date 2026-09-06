@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session as DbSession
@@ -37,13 +37,8 @@ _STATUS = {
     "error": db_models.STATUS_ABORTED,
 }
 
-# Who spoke, in the wire protocol's vocabulary -> in the schema's. The wire
-# stays German (the frontend reads these keys); the column is English and
-# constrained to SPEAKERS, so the two have to be translated here.
-_SPEAKER = {"nutzer": db_models.SPEAKER_USER, "persona": db_models.SPEAKER_PERSONA}
 
-
-def persist_session(
+def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     extern_id: uuid.UUID,
     subject_id: str,
     persona: Persona,
@@ -70,14 +65,14 @@ def persist_session(
             language_code=persona.language_id,
             status=_STATUS.get(reason, db_models.STATUS_ABORTED),
             started_at=started_at,
-            ended_at=datetime.now(),
+            ended_at=datetime.now(UTC),
         )
         session.turns = [
             db_models.Turn(
-                speaker=_SPEAKER[spoken.sprecher],
+                speaker=spoken.speaker,
                 seq_index=index,
                 start_offset_ms=spoken.offset_ms,
-                duration_ms=spoken.dauer_ms,
+                duration_ms=spoken.duration_ms,
                 transcript=spoken.text,
             )
             for index, spoken in enumerate(utterances(turns))
@@ -86,7 +81,10 @@ def persist_session(
         # The wrap-up itself is generated asynchronously (ADR 0018/0019); this
         # row is what makes its outcome queryable afterwards (ADR 0032).
         session.jobs = [db_models.AnalysisJob(
-            kind="feedback", status="queued", attempts=0, updated_at=datetime.now(),
+            kind=db_models.JOB_KIND_FEEDBACK,
+            status=db_models.JOB_QUEUED,
+            attempts=0,
+            updated_at=datetime.now(UTC),
         )]
         db.add(session)
         db.flush()
@@ -111,23 +109,30 @@ def _write_analysis(
     metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType).all()}
     session.measurements = [
         db_models.Measurement(
-            metric_type_id=metric_ids[m.schluessel],
-            value=Decimal(f"{m.wert:.4f}"),
+            metric_type_id=metric_ids[m.key],
+            value=Decimal(f"{m.value:.4f}"),
             detail_json=m.detail,
         )
         for m in metrics.measure(call)
-        if m.schluessel in metric_ids
+        if m.key in metric_ids
     ]
 
 
-def _reference(db: DbSession, model: type, key: str):
-    """A seeded reference row, by its natural key.
+def _reference(db: DbSession, model: type, extern_id: str):
+    """The Persona / Scenario row a Session points at, by its `extern_id`.
 
-    Assigned through the relationship rather than the foreign key, so the
-    primary key never has to be named here. Only Persona and Scenario go
-    through this -- the Feedback tables keep their German `schluessel`.
+    That is what the value object carries as `.id` since ADR 0058 (an authored
+    row has no `key` slug). Assigned through the relationship rather than the
+    foreign key, so the primary key never has to be named here -- only Persona
+    and Scenario go through this, the Feedback tables are attached directly, by
+    id. `active` is not checked -- a Session may reference a since-retired row,
+    same as before.
     """
-    row = db.query(model).filter_by(key=key).one_or_none()
+    try:
+        ref = uuid.UUID(str(extern_id))
+    except (ValueError, TypeError) as e:
+        raise LookupError(f"{model.__name__} {extern_id!r} is not a valid id") from e
+    row = db.query(model).filter_by(extern_id=ref).one_or_none()
     if row is None:
-        raise LookupError(f"{model.__name__} {key!r} is not seeded")
+        raise LookupError(f"{model.__name__} {extern_id!r} is not seeded")
     return row

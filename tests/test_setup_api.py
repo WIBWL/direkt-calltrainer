@@ -22,6 +22,8 @@ what the seed *wrote* — which is exactly what makes comparing against them a
 meaningful assertion rather than a tautology.
 """
 
+import uuid
+
 import httpx
 import pytest
 
@@ -30,8 +32,10 @@ from backend.app import app
 # The endpoints read the seeded tables (ADR 0041), so the seed content is what
 # they must return -- comparing against the test doubles would compare the
 # endpoint with something it never sees.
+from backend.db import models as db_models
 from backend.db.seed_data import LANGUAGE_NAMES, PERSONAS as SEEDED_PERSONAS
 from backend.db.seed_data import SCENARIOS as SEEDED_SCENARIOS
+from backend.db.session import session_scope
 
 # pylint: disable=missing-function-docstring,redefined-outer-name
 
@@ -56,16 +60,15 @@ async def test_personas_endpoint_lists_every_persona_with_card_fields(client):
     assert resp.status_code == 200
     body = resp.json()
     assert len(body) == len(SEEDED_PERSONAS)
-    # Keyed rather than zipped: the endpoint orders by name, the seed by nothing
-    # in particular, and neither ordering is what this test is about.
-    by_id = {entry["id"]: entry for entry in body}
+    # Keyed by name: `id` on the wire is the extern_id UUID now (ADR 0058), not
+    # the seed slug, and the endpoint orders by name while the seed does not.
+    by_name = {entry["name"]: entry for entry in body}
     for persona in SEEDED_PERSONAS:
-        assert by_id[persona["id"]] == {
-            "id": persona["id"],
-            "name": persona["name"],
-            "role": persona["role_label"],
-            "language": LANGUAGE_NAMES[persona["language_id"]],
-        }
+        card = by_name[persona["name"]]
+        assert uuid.UUID(card["id"])  # a valid opaque id, not the slug
+        assert card["role"] == persona["role_label"]
+        assert card["language"] == LANGUAGE_NAMES[persona["language_id"]]
+        assert set(card) == {"id", "name", "role", "language"}  # personas aren't authored
         assert persona["name"] and persona["role_label"], "a card needs a visible name and role"
 
 
@@ -88,13 +91,12 @@ async def test_scenarios_endpoint_lists_every_scenario_with_its_teaser(client):
     assert resp.status_code == 200
     body = resp.json()
     assert len(body) == len(SEEDED_SCENARIOS)
-    by_id = {entry["id"]: entry for entry in body}
+    by_name = {entry["name"]: entry for entry in body}
     for scenario in SEEDED_SCENARIOS:
-        assert by_id[scenario["id"]] == {
-            "id": scenario["id"],
-            "name": scenario["name"],
-            "short_description": scenario["short_description"],
-        }
+        card = by_name[scenario["name"]]
+        assert uuid.UUID(card["id"])
+        assert card["short_description"] == scenario["short_description"]
+        assert card["origin"] == "builtin"
 
 
 async def test_scenarios_endpoint_withholds_the_english_call_context(client):
@@ -114,10 +116,37 @@ async def test_scenarios_endpoint_withholds_the_case(client):
     exercise they are about to practise."""
     body = (await client.get("/api/scenarios")).json()
     for entry in body:
-        assert set(entry) == {"id", "name", "short_description"}
+        assert set(entry) == {"id", "name", "short_description", "origin", "shared"}
         assert "case_facts" not in entry
         assert "call_goal" not in entry
         assert "success_condition" not in entry
+
+
+async def test_a_deactivated_scenario_is_not_offered(client):
+    """A Scenario dropped from the seed is deactivated, never deleted -- stored
+    Sessions reference it (ADR 0026). `active` is therefore the whole mechanism
+    that takes it out of the selection, and the endpoint has to honour it, the
+    way the persona list already did.
+    """
+    retired = SEEDED_SCENARIOS[0]["id"]
+    with session_scope() as db:
+        db.query(db_models.Scenario).filter_by(key=retired).update({"active": False})
+
+    body = (await client.get("/api/scenarios")).json()
+
+    assert retired not in [s["id"] for s in body], "a retired Scenario stays on offer"
+    assert body, "only one Scenario was retired -- the rest must still be served"
+
+
+async def test_a_deactivated_persona_is_not_offered(client):
+    """The same rule on the persona side, which had no test of its own either."""
+    retired = SEEDED_PERSONAS[0]["id"]
+    with session_scope() as db:
+        db.query(db_models.Persona).filter_by(key=retired).update({"active": False})
+
+    body = (await client.get("/api/personas")).json()
+
+    assert retired not in [p["id"] for p in body], "a retired Persona stays on offer"
 
 
 async def test_persona_and_scenario_are_chosen_independently(client):

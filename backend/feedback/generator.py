@@ -6,7 +6,7 @@ judge one against a norm nobody measured (ADR 0051). Its citations are checked
 against the Session, which is what ADR 0004's "traceable" and F-10's "Bezug auf
 konkrete Gesprächsstellen" require.
 
-It writes four things, not three: F-42's phasensprache paragraph comes out of
+It writes four things, not three: F-42's phase_language paragraph comes out of
 the same call as the summary and the two lists. One call rather than a second
 one of its own, because the phases are read off the same transcript and a
 second round trip would buy nothing but latency and a second way to fail.
@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session as DbSession
@@ -27,23 +27,18 @@ from sqlalchemy.orm import Session as DbSession
 from backend.clients import llm
 from backend.db import models as db_models
 from backend.db.session import session_scope
+from backend.feedback import jobs
 
 logger = logging.getLogger(__name__)
 
-_LANGUAGE_NAMES_EN = {"de": "German"}
+_LANGUAGE_NAMES_EN = {"de": "German", "en": "English"}
 
-# The wrap-up's own vocabulary -> the schema's. The model is prompted in German
-# and answers with "staerke"/"verbesserung" (the same words the frontend reads
-# back out of the API), while feedback_point.kind is English and constrained to
-# POINT_KINDS. backend/api/sessions.py holds the inverse.
-_POINT_KIND = {"staerke": db_models.POINT_STRENGTH,
-               "verbesserung": db_models.POINT_IMPROVEMENT}
 # A fenced ```json block is the most common way a small model wraps structured
 # output despite being told not to; unwrap it rather than failing the parse.
 _FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
 
 
-class _Punkt(BaseModel):
+class _Point(BaseModel):
     text: str
     turn_id: int | None = None
 
@@ -57,19 +52,19 @@ class _Wrapup(BaseModel):
     decide the feedback instead of the call.
     """
 
-    zusammenfassung: str
+    summary: str
     # F-42. Defaulted rather than required: it is the newest thing the prompt
     # asks for and the one a small model is likeliest to drop, and losing a
     # whole wrap-up over a missing paragraph would be the wrong trade.
-    phasensprache: str = ""
-    staerken: list[_Punkt] = []
-    verbesserungen: list[_Punkt] = []
+    phase_language: str = ""
+    strengths: list[_Point] = []
+    improvements: list[_Point] = []
 
     @property
-    def punkte(self) -> list[tuple[str, _Punkt]]:
-        """Every point as (art, point), strengths first -- the display order."""
-        return [("staerke", p) for p in self.staerken] + [
-            ("verbesserung", p) for p in self.verbesserungen
+    def points(self) -> list[tuple[str, _Point]]:
+        """Every point as (kind, point), strengths first -- the display order."""
+        return [(db_models.POINT_STRENGTH, p) for p in self.strengths] + [
+            (db_models.POINT_IMPROVEMENT, p) for p in self.improvements
         ]
 
 
@@ -83,26 +78,38 @@ def generate_feedback(session_id: int) -> None:
 
 
 async def _generate(session_id: int) -> None:
-    with session_scope() as db:
-        session = db.get(db_models.Session, session_id)
-        if session is None:
-            raise LookupError(f"Session {session_id} does not exist")
-        _mark(db, session_id, "running")
-        dossier, valid_turns = _dossier(session)
-        language = _LANGUAGE_NAMES_EN.get(session.language_code, session.language_code)
-
+    # The whole job sits inside one failure boundary: the post-call screen
+    # polls on this job's status, so anything that raises has to close the row.
+    session_exists = False
     try:
-        wrapup = await _ask(dossier, language)
-    except Exception as e:
-        logger.exception("Feedback generation failed for session %d", session_id)
         with session_scope() as db:
-            _mark(db, session_id, "failed", str(e))
-        raise
+            session = db.get(db_models.Session, session_id)
+            if session is None:
+                raise LookupError(f"Session {session_id} does not exist")
+            session_exists = True
+            jobs.mark(db, session_id, db_models.JOB_RUNNING)
+            dossier, valid_turns = _dossier(session)
+            language = _LANGUAGE_NAMES_EN.get(session.language_code, session.language_code)
 
-    with session_scope() as db:
-        _store(db, session_id, wrapup, valid_turns)
-        _mark(db, session_id, "done")
-    logger.info("Feedback stored for session %d (%d points)", session_id, len(wrapup.punkte))
+        wrapup = await _ask(dossier, language)
+
+        with session_scope() as db:
+            _store(db, session_id, wrapup, valid_turns)
+            jobs.mark(db, session_id, db_models.JOB_DONE)
+        logger.info("Feedback stored for session %d (%d points)", session_id, len(wrapup.points))
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.exception("Feedback generation failed for session %d", session_id)
+        # `jobs.mark` creates the row where it finds none, so a Session that
+        # does not exist must not reach it.
+        if session_exists:
+            try:
+                with session_scope() as db:
+                    jobs.mark(db, session_id, db_models.JOB_FAILED, str(e))
+            except Exception:  # pylint: disable=broad-exception-caught
+                # Re-raising here would lose the original error; the client
+                # falls back to its own timeout instead.
+                logger.exception("Could not mark feedback job failed for session %d", session_id)
+        raise
 
 
 # --- Prompt ---------------------------------------------------------------
@@ -152,7 +159,7 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
     a rejected and an accepted one, and gives the model a test to throw its
     own points out with. The limits of ADR 0049 and ADR 0051 are unchanged.
 
-    The phasensprache section (F-42) is the one part not built out of points.
+    The phase_language section (F-42) is the one part not built out of points.
     It asks for prose about a *change* over the call -- warm in the opening,
     factual through the core business, warm again at the close -- which is a
     shape no single figure carries, so it is deliberately not a Measurement.
@@ -248,7 +255,7 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
         "date. Something like „I will come back to you by Friday with a firm "
         "appointment“ would have given them something to hold on to.'\n"
         "\n"
-        "# The phasensprache block\n"
+        "# The phase_language block\n"
         "A separate piece of feedback, about one thing only: whether the way "
         "the trainee spoke changed with the phase of the call. A service call "
         "runs through three phases in this order, and the register is meant "
@@ -281,7 +288,7 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
         "text than the other two phases, and where the closing is the weakest "
         "of the three, make it the phase your suggestion is about.\n"
         "H6. This block is about register, not about results. Whether the "
-        "matter was actually solved belongs in staerken and verbesserungen.\n"
+        "matter was actually solved belongs in strengths and improvements.\n"
         "H7. Every other rule still holds here: quote the trainee's own words "
         "with the timestamp (P1), never grade the call (N1), never measure a "
         "figure against a norm (F2), and never make the Caller the subject "
@@ -299,8 +306,8 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
         "Answer with a single JSON object and nothing else -- no prose, no "
         "explanation, no markdown fence.\n"
         "O1. Use exactly these four keys, spelled exactly like this, in this "
-        "order, all four always present: zusammenfassung, phasensprache, "
-        "staerken, verbesserungen. The keys are identifiers, not text: never "
+        "order, all four always present: summary, phase_language, "
+        "strengths, improvements. The keys are identifiers, not text: never "
         "translate them, never add a key.\n"
         f"O2. Every value you write is in {language}. The keys stay as they "
         "are.\n"
@@ -313,9 +320,9 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
         "single quotes. Never a straight double quote: forget the backslash "
         "in front of one and the whole answer is unreadable.\n"
         "O5. If no utterances are listed under the transcript heading, write "
-        "a zusammenfassung saying that there is nothing to review, leave both "
-        "lists empty, and make phasensprache an empty string.\n"
-        "O6. phasensprache is a single paragraph of four to six sentences of "
+        "a summary saying that there is nothing to review, leave both "
+        "lists empty, and make phase_language an empty string.\n"
+        "O6. phase_language is a single paragraph of four to six sentences of "
         f"plain {language} prose: no headings, no bullet characters, no line "
         "breaks, and no phase name used as a label -- name a phase inside a "
         "sentence. Walk the three phases in the order they happened, say for "
@@ -324,14 +331,14 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
         "written out as a sentence they could say aloud.\n"
         "\n"
         "Shape:\n"
-        '{"zusammenfassung": "2-4 sentences: what the caller wanted, how the '
+        '{"summary": "2-4 sentences: what the caller wanted, how the '
         'trainee handled it, and where the call ended up", '
-        '"phasensprache": "one paragraph on how the register moved through '
+        '"phase_language": "one paragraph on how the register moved through '
         'opening, core business and closing, ending in the sentence to say '
         'instead", '
-        '"staerken": [{"text": "one thing the trainee did well, built from '
+        '"strengths": [{"text": "one thing the trainee did well, built from '
         'P1 and P2", "turn_id": <id, or null>}], '
-        '"verbesserungen": [{"text": "one thing to do differently, built from '
+        '"improvements": [{"text": "one thing to do differently, built from '
         'P1, P2 and P3, ending in the sentence to say instead", '
         '"turn_id": <id, or null>}]}\n'
         "\n"
@@ -339,7 +346,7 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
         "Every point quotes this call or a given figure with its timestamp; "
         "every improvement ends in a full sentence to say; no figure appears "
         "that was not given to you; no point would survive being moved to "
-        "another call; phasensprache covers all three phases or names the one "
+        "another call; phase_language covers all three phases or names the one "
         "the call never reached, and gives the closing the most room.\n"
         "\n"
         f"The four keys stay in English. Every value is written in {language}. "
@@ -370,7 +377,7 @@ async def _ask(dossier: str, language: str) -> _Wrapup:
         except (ValidationError, ValueError) as e:
             logger.warning("Wrap-up did not validate (attempt %d): %s", attempt + 1, e)
     logger.warning("Falling back to a narrative-only wrap-up")
-    return _Wrapup(zusammenfassung=_unfenced_text(raw))
+    return _Wrapup(summary=_unfenced_text(raw))
 
 
 def _unwrap(raw: str) -> str:
@@ -409,39 +416,21 @@ def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) 
         db.flush()
     feedback = db_models.Feedback(
         session_id=session_id,
-        summary=wrapup.zusammenfassung,
+        summary=wrapup.summary,
         # NULL rather than "" where the model gave us nothing: the frontend
         # leaves the block out entirely then, which is honest about a call
         # nobody analysed for its phases. An empty paragraph would not be.
-        phase_language=wrapup.phasensprache.strip() or None,
+        phase_language=wrapup.phase_language.strip() or None,
         score=None,  # ADR 0004: qualitative only, no score in the MVP
-        created_at=datetime.now(),
+        created_at=datetime.now(UTC),
     )
     feedback.points = [
         db_models.FeedbackPoint(
             position=index,
-            kind=_POINT_KIND[art],
-            text=punkt.text,
-            turn_id=punkt.turn_id if punkt.turn_id in turn_ids else None,
+            kind=kind,
+            text=point.text,
+            turn_id=point.turn_id if point.turn_id in turn_ids else None,
         )
-        for index, (art, punkt) in enumerate(wrapup.punkte)
+        for index, (kind, point) in enumerate(wrapup.points)
     ]
     db.add(feedback)
-
-
-def _mark(db: DbSession, session_id: int, status: str, fehlertext: str | None = None) -> None:
-    """Move the Session's feedback job to `status` (ADR 0032)."""
-    job = (
-        db.query(db_models.AnalysisJob)
-        .filter_by(session_id=session_id, kind="feedback")
-        .order_by(db_models.AnalysisJob.job_id.desc())
-        .first()
-    )
-    if job is None:
-        job = db_models.AnalysisJob(session_id=session_id, kind="feedback", attempts=0)
-        db.add(job)
-    job.status = status
-    job.error_text = fehlertext
-    job.updated_at = datetime.now()
-    if status == "running":
-        job.attempts += 1

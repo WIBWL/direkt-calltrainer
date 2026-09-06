@@ -80,9 +80,9 @@ with its own members, invitation flows, and optionally its own identity provider
 
 **Pro**
 
-- Identity stays in the IdP, where it belongs — consistent with ADR 0009 ("mirror
-  direkt-dataplatform"). If the data platform adopts it too, both share the same
-  tenant structure.
+- Identity stays in the IdP, where it belongs — consistent with ADR 0009's
+  approach. If the data platform adopts it too, both share the same tenant
+  structure.
 - No onboarding / invitation / admin UI to build in Calltrainer.
 - A user can belong to multiple Organizations (e.g. external consultants).
 

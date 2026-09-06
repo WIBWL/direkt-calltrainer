@@ -45,7 +45,7 @@ commitment with an actual action, amount, or timeframe"*. That is prose, judged
 per reply. ADR 0037's regex and ADR 0038's repetition guard exist to catch what
 that judgment misses.
 
-**`persona_einwand` has been empty since it was created.** ADR 0026 modelled a
+**`persona_objection` has been empty since it was created.** ADR 0026 modelled a
 Persona's typical objections as ordered rows; `scripts/seed_reference_data.py`
 seeds every Persona with an empty list, and `backend/library.py` does not load
 the relation. R-12 ("Nutzer wollen den Umgang mit spontanen Einwänden
@@ -59,7 +59,7 @@ make the case itself explicit.
 
 ### The Scenario carries the case
 
-`szenario` gains three prompt fields, English and language-neutral per ADR 0043,
+`scenario` gains three prompt fields, English and language-neutral per ADR 0043,
 so every Persona × Scenario pairing stays valid:
 
 - **`fallfakten`** — the facts of the case: product, figures, dates, history.
@@ -87,12 +87,12 @@ for a use still to be found; `schwierigkeitsgrad` in particular is a plausible
 summary of what `verhalten` now states outright, and the natural thing to show
 on the selection card of ADR 0015.
 
-`persona_einwand` is filled with three to four rows per Persona, loaded by
+`persona_objection` is filled with three to four rows per Persona, loaded by
 `backend/library.py` and rendered into the system prompt.
 
 Objections are written in English, as *moves* rather than as verbatim lines —
 "pushes back that the figure is above what was budgeted", not a quoted German
-sentence. Two reasons. `persona_einwand` has no language column while a Persona
+sentence. Two reasons. `persona_objection` has no language column while a Persona
 has a fixed language (ADR 0043), so a quoted line would have to be authored per
 language. And quoted examples are reused verbatim by this model: the frame's
 opening examples had to be multiplied for exactly that reason, and a single
@@ -132,7 +132,7 @@ the case facts unprompted rather than producing them when asked, and that it
 works the objections as a checklist. Both are addressed by frame wording alone,
 so both need the same kind of empirical check the opening examples got.
 
-Migration and content follow: three columns on a seeded `szenario` table, which
+Migration and content follow: three columns on a seeded `scenario` table, which
 per this repository's own warning autogenerate will emit as `NOT NULL` without a
 backfill; the `Scenario` value object and the seed content; a `joinedload` for
 `Persona.einwaende` in `backend/library.py`, since it returns detached rows; the
