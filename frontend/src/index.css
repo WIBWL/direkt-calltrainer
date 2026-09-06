@@ -3208,3 +3208,58 @@ h2 {
     padding-top: 40px;
   }
 }
+
+.login-hero-badge {
+  width: max-content;
+  min-width: 262px;
+  height: 30px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #cbdbe6;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--color-blue-600);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(3, 37, 62, 0.03);
+}
+
+.login-hero-badge-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+
+.login-hero-title {
+  max-width: 650px;
+  margin: 28px 0 24px;
+  font-family: var(--font-display);
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  color: var(--color-navy-900);
+}
+
+.login-hero-description {
+  max-width: 640px;
+  margin: 0 0 30px;
+  color: var(--color-text-muted-secondary);
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+@media (max-width: 620px) {
+  .login-hero-title {
+    font-size: 38px;
+  }
+
+  .login-hero-description {
+    font-size: 16px;
+  }
+}
