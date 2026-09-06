@@ -4,9 +4,12 @@ import { ApiError, apiFetch } from "../api";
 import type { SessionDetail } from "../protocol";
 
 const POLL_INTERVAL_MS = 2000;
-// Generation is one LLM call and normally lands in a few seconds. Well past
-// that, the worker is not coming; say so rather than leave a spinner running.
-const POLL_TIMEOUT_MS = 60_000;
+// Must not be shorter than the backend's JOB_TIMEOUT_S (backend/feedback/
+// queue.py): giving up earlier reports a failure on work that is still running,
+// and with no listing endpoint that wrap-up is then gone for good. Generation
+// is asked in thinking mode and may be retried once, so "a few seconds" no
+// longer bounds it. Only this block waits, the transcript renders either way.
+const POLL_TIMEOUT_MS = 600_000;
 // A request that keeps failing outright is a broken backend, not a slow one.
 const MAX_CONSECUTIVE_ERRORS = 3;
 

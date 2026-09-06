@@ -62,7 +62,11 @@ async def stream_reply(messages: list[dict[str, str]]) -> AsyncIterator[str]:
 # The wrap-up is a whole document rather than one spoken line, so it needs a
 # far larger budget than _MAX_REPLY_TOKENS -- and it is generated after the
 # call, where latency costs nobody anything.
-_MAX_FEEDBACK_TOKENS = 900
+# It runs in thinking mode, so this covers the trace as well as the answer;
+# sized for the worst case, because running out inside the trace yields no
+# answer at all. Capped rather than None so a repetition loop cannot run to the
+# RQ job timeout.
+_MAX_FEEDBACK_TOKENS = 4000
 
 
 async def complete(
@@ -83,11 +87,10 @@ async def complete(
     for its trace.
 
     `think=True` runs the model in reasoning mode: it is slower and spends part
-    of the budget on a hidden trace, but extracts markedly better. Only safe off
-    the live path, where latency costs nobody anything and the reply is not
-    streamed (thinking mode is catastrophic on stream_reply — see
-    docs/research/model-parameters.md). The document summary uses it; the wrap-up
-    does not.
+    of the budget on a hidden trace, but extracts and writes markedly better.
+    Only safe off the live path, where latency costs nobody anything and the
+    reply is not streamed. Both callers use it: the document
+    summary, and the wrap-up, whose German grammar breaks down without it.
     """
     logger.info(
         "LLM completion (%s, max_tokens=%s, think=%s)...", LLM_MODEL, max_tokens, think
@@ -107,4 +110,19 @@ async def complete(
         },
     )
     text = completion.choices[0].message.content or ""
-    return _THINK_BLOCK_RE.sub("", text).strip() if think else text
+    return _strip_reasoning(text) if think else text
+
+
+def _strip_reasoning(text: str) -> str:
+    """The answer out of a thinking-mode reply, or "" if there is no answer yet.
+
+    A `<think>` that never closes means the budget ran out mid-reasoning, so
+    nothing after it was written. Returning the trace would be worse than
+    returning nothing: it is full of `{`, and the wrap-up's caller scrapes JSON
+    out of the reply, the model's deliberation would become its answer.
+    """
+    stripped = _THINK_BLOCK_RE.sub("", text)
+    if "<think>" in stripped:
+        logger.warning("Reasoning trace did not close — the token budget ran out inside it")
+        return ""
+    return stripped.strip()

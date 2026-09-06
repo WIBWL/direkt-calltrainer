@@ -137,8 +137,30 @@ not streamed, so neither failure mode above applies. It sets **no `max_tokens`**
 unpredictable room); the answer is validated as a whole, and if the document is
 too large to fit the context the gateway 400s and the caller falls back to the
 raw text. Sampling follows Qwen3's thinking‑mode card: `temperature 0.6,
-top_p 0.95, top_k 20, min_p 0`. The wrap‑up generator deliberately stays
-non‑thinking (its own tuning, ADR 0056).
+top_p 0.95, top_k 20, min_p 0`.
+
+**The wrap‑up generator uses it too** (`backend/feedback/generator.py::_ask`),
+since 2026‑09‑06. It previously ran non‑thinking at `temperature 0.3` with no
+`top_p`/`top_k`/`min_p` — vLLM's untruncated defaults — and the symptom was
+broken German grammar in the free‑text feedback: wrong case and gender endings,
+English word order. That is a 4B AWQ model writing German prose from an English
+brief (ADR 0043) in a single pass; the trace is the cheapest revision pass, and
+it is free in the worker.
+
+Two things moved with it:
+
+* `_MAX_FEEDBACK_TOKENS` `900 → 4000`: the budget now covers the trace as well
+  as the answer, and running out inside the trace yields no answer at all. Kept
+  capped (unlike the PDF summary) so a repetition loop cannot run to the job
+  timeout.
+* `llm._strip_reasoning` returns `""` for an inline `<think>` that never closes.
+  The caller scrapes a JSON object out of the reply and a trace is full of `{`,
+  so returning the trace would parse the model's deliberation as its answer.
+
+**Not measured against the gateway yet**: written from the model card and the
+failure modes above. Worth a before/after on real Sessions once `DIREKT_URL` is
+reachable; if the trace eats the budget in practice, raise the cap before
+reverting.
 
 ### Sampling parameters
 
