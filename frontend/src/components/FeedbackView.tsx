@@ -80,6 +80,20 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
         </div>
       </div>
 
+      {feedback.phase_language && (
+        <section className="feedback-phase-card">
+          <div className="feedback-phase-eyebrow">GESPRÄCHSFÜHRUNG</div>
+          <h2 className="feedback-phase-title">Phasengerechte Sprache</h2>
+
+          <p className="feedback-phase-text">{feedback.phase_language}</p>
+
+          <p className="feedback-phase-note">
+            Betrachtet wird, ob sich die Gesprächsführung passend zwischen Einstieg,
+            Anliegen und Abschluss verändert.
+          </p>
+        </section>
+      )}
+
       {measurements.length > 0 && (
         <>
           <h2>Zahlen zum Gespräch</h2>
@@ -97,19 +111,6 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
         </>
       )}
 
-      {feedback.phase_language && (
-        <>
-          <h2>Phasengerechte Sprache</h2>
-          <div className="card">
-            <p>{feedback.phase_language}</p>
-            <p className="phase-note">
-              Ein Gespräch läuft in drei Phasen ab – Einstieg, Anliegen, Abschluss – und
-              der Tonfall soll mitgehen: warm, dann sachlich, dann wieder warm. Hier geht
-              es nur darum, ob er das getan hat, nicht darum, ob die Sache gelöst wurde.
-            </p>
-          </div>
-        </>
-      )}
     </>
   );
 }
@@ -129,39 +130,39 @@ function PointList({
 }) {
   if (points.length === 0) return null;
   return (
-  <section className={`feedback-point-card ${tone}`}>
-    <div className="feedback-point-header">
-      <div className="feedback-point-icon" aria-hidden="true">
-        {tone === "success" ? "✓" : "!"}
+    <section className={`feedback-point-card ${tone}`}>
+      <div className="feedback-point-header">
+        <div className="feedback-point-icon" aria-hidden="true">
+          {tone === "success" ? "✓" : "!"}
+        </div>
+
+        <div>
+          <div className="feedback-point-eyebrow">{eyebrow}</div>
+          <h2 className="feedback-point-title">{title}</h2>
+        </div>
       </div>
 
-      <div>
-        <div className="feedback-point-eyebrow">{eyebrow}</div>
-        <h2 className="feedback-point-title">{title}</h2>
+      <div className="feedback-point-list">
+        {points.map((point, i) => {
+          const turn =
+            point.turn_id !== null
+              ? turns.find((candidate) => candidate.turn_id === point.turn_id)
+              : undefined;
+
+          return (
+            <div className="feedback-point-item" key={i}>
+              {turn && (
+                <span className="feedback-point-time">
+                  {formatOffset(turn.start_offset_ms)}
+                </span>
+              )}
+              <p>{point.text}</p>
+            </div>
+          );
+        })}
       </div>
-    </div>
-
-    <div className="feedback-point-list">
-      {points.map((point, i) => {
-        const turn =
-          point.turn_id !== null
-            ? turns.find((candidate) => candidate.turn_id === point.turn_id)
-            : undefined;
-
-        return (
-          <div className="feedback-point-item" key={i}>
-            {turn && (
-              <span className="feedback-point-time">
-                {formatOffset(turn.start_offset_ms)}
-              </span>
-            )}
-            <p>{point.text}</p>
-          </div>
-        );
-      })}
-    </div>
-  </section>
-);
+    </section>
+  );
 }
 
 function Metric({ measurement }: { measurement: Measurement }) {
