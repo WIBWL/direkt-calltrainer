@@ -116,7 +116,61 @@ Speichert ggf. Gesprächsaufzeichnungen (F-12, SHOULD) und Fortschrittsdaten (F-
 
 # 4. Lösungsstrategie
 
-*TODO: Zentrale Technologie-Entscheidungen und architektonischer Ansatz zur Erreichung der Qualitätsziele (z. B. Echtzeit-Audio-Pipeline, LLM-basierte Feedback-Generierung).*
+Dieses Kapitel fasst die tragenden Entscheidungen des ersten Prototyps zusammen. Es begründet sie nicht — die Begründung steht jeweils im zugehörigen ADR, indiziert in Kapitel 9. Der Prototyp ist lauffähig; die hier genannten Entscheidungen sind damit umgesetzt und nicht mehr nur vorgesehen.
+
+## 4.1 Technologieentscheidungen
+
+| Bereich | Entscheidung | ADR |
+|---|---|---|
+| Frontend | Single-Page-Anwendung in React und TypeScript, vom Backend mit ausgeliefert | 0008 |
+| Backend | Python mit FastAPI | 0012 |
+| Architekturstil | Geschichteter modularer Monolith für den Echtzeitpfad, asynchroner Worker für die Nachbereitung | 0018 |
+| Sprach- und Dialogmodelle | Uni-gehostetes DiReKT-Gateway für STT und LLM; getrennt selbst gehostete lokale Modelle statt eines externen Anbieters | 0011, 0021 |
+| Sprachsynthese | KugelAudio als Standard, DiReKT als Rückfallebene | 0040 |
+| Sprecherwechsel | Silero-VAD im Browser; das Turn-Ende wird erkannt, nicht per Knopfdruck gesetzt | 0036 |
+| Transport | Eine WebSocket-Verbindung je Session, Audio in Chunks in beide Richtungen | 0033, 0044 |
+| Persistenz | Eigene PostgreSQL-Instanz, SQLAlchemy 2.0, Alembic-Migrationen aus den ORM-Metadaten | 0010, 0025, 0026, 0027 |
+| Hintergrundverarbeitung | Redis mit RQ als Job-Queue | 0019 |
+| Authentifizierung | Keycloak, OIDC Authorization Code Flow mit PKCE | 0009 |
+| Paraverbale Messung | Praat über Parselmouth | 0047 |
+| Betrieb | Uni-gehosteter Server, Docker Compose | 0020 |
+
+## 4.2 Ansatz je Qualitätsziel
+
+### Q-03 Echtzeitfähigkeit des Gesprächsflusses
+
+Der Engpass ist die Kette aus Spracherkennung, Antwortgenerierung und Sprachsynthese. Sie wird nicht als Blockkette abgearbeitet, sondern an jeder Stelle überlappt:
+
+- Die Antwort wird gestreamt erzeugt und abschnittsweise synthetisiert; jeder Teilabschnitt geht an den Client, sobald er entsteht. Die Wiedergabe beginnt, bevor die Antwort fertig generiert ist (ADR 0033, ADR 0044).
+- Der Eröffnungssatz wird vorgewärmt, während der Nutzer den Mikrofontest durchläuft — die Wartezeit wird in eine Phase gelegt, in der ohnehin gewartet wird (ADR 0042).
+- Der Nutzer kann die Persona unterbrechen, statt ihre Antwort abwarten zu müssen (ADR 0035).
+- Alles Blockierende — Datenbankzugriffe, akustische Messung, Erzeugung der Rückmeldung — läuft außerhalb des Event-Loops, der das Audio streamt; die Nachbereitung erst nach Gesprächsende im Worker (ADR 0018, ADR 0019, ADR 0034).
+- Die Modelle laufen im eigenen Netz statt bei einem externen Anbieter, wodurch die Latenz kontrollierbar bleibt (ADR 0011, ADR 0021).
+
+### Q-01 Genauigkeit und Nachvollziehbarkeit der Gesprächsanalyse
+
+- **Messen und Deuten sind getrennt.** Kennzahlen werden deterministisch berechnet; das Modell interpretiert sie, erzeugt sie aber nicht (ADR 0049).
+- **Keine erfundenen Normen.** Es gibt keinen Score und keine Zielkorridore, weil für diese Nutzergruppe keiner validiert ist; eine erfundene Schwelle wäre ein verkappter Score (ADR 0004, ADR 0051).
+- **Nichts wird gegen die Persona gemessen.** Sie ist eine synthetische Stimme; ein Vergleich mit ihr würde eine TTS-Einstellung als Aussage über den Nutzer ausgeben (ADR 0051).
+- **Rückmeldung erst nach dem Gespräch**, damit sie den Gesprächsfluss nicht stört und im Zusammenhang beurteilt werden kann (ADR 0014).
+
+### Q-02 Bedienbarkeit ohne Einarbeitung
+
+- Vor dem Training sind genau zwei Entscheidungen zu treffen: Persona und Szenario. Jede Kombination ist zulässig, es gibt nichts zu filtern und nichts falsch zu machen (ADR 0001, ADR 0015).
+- Kartenauswahl statt Liste; die Sprache ist keine eigene Auswahl, sondern ergibt sich aus der Persona (ADR 0015, ADR 0043).
+- Während des Gesprächs wird kein Text angezeigt, nur der Zustand *zuhören / denken / sprechen*. Das Transkript erscheint vollständig danach (ADR 0014).
+
+### C-04 Datenschutz als begrenzende Randbedingung
+
+- Sprachaufzeichnungen werden nicht gespeichert. Sie werden im Arbeitsspeicher gemessen und danach verworfen (ADR 0048).
+- Sessiondaten werden einmalig am Gesprächsende geschrieben, nicht fortlaufend während des Gesprächs (ADR 0034).
+- Eine Session wird über eine nicht erratbare Kennung adressiert; der Primärschlüssel bleibt intern (ADR 0050).
+
+## 4.3 Organisatorische Ansätze
+
+- **Jede Architekturentscheidung wird als ADR festgehalten** (ADR 0000). Kapitel 9 ist nur der Index.
+- **Bibliotheksinhalte liegen in der Datenbank, nicht im Code** (ADR 0041). Neue Personas und Szenarien sind Daten, kein Deployment — Voraussetzung dafür, dass Nutzer sie später selbst anlegen (ADR 0024).
+- **Bewusst keine Abstraktionsschicht über STT, LLM und TTS** (ADR 0017). Bei drei Anbietern kostet sie mehr, als sie einbringt; ein Wechsel ist eine überschaubare Änderung an einer bekannten Stelle.
 
 # 5. Bausteinsicht
 
@@ -142,7 +196,7 @@ Speichert ggf. Gesprächsaufzeichnungen (F-12, SHOULD) und Fortschrittsdaten (F-
 
 # 6. Laufzeitsicht
 
-*Hinweis: Die Laufzeitsicht baut methodisch auf der Bausteinsicht (Kapitel 5) auf, die noch nicht final ausgearbeitet ist, da hierfür noch technische Grundentscheidungen (u. a. LLM-Anbieter, konkrete Systemarchitektur, siehe Kapitel 4) ausstehen. Die folgenden Szenarien sind daher auf funktionaler Ebene beschrieben und noch nicht an konkrete Bausteine/Komponenten gebunden. Sobald Kapitel 4 und 5 konkretisiert sind, sollten die Szenarien entsprechend angepasst und die Bausteine referenziert werden.*
+*Hinweis: Die Laufzeitsicht baut methodisch auf der Bausteinsicht (Kapitel 5) auf, die noch nicht ausgearbeitet ist. Die technischen Grundentscheidungen stehen inzwischen fest und sind in Kapitel 4 beschrieben; die Szenarien hier sind aber weiterhin auf funktionaler Ebene formuliert und nicht an konkrete Bausteine gebunden. Sobald Kapitel 5 vorliegt, sind sie entsprechend zu binden (siehe TS-01).*
 
 ## 6.1 Szenario 1: Start und Ablauf eines Trainingsgesprächs
 
@@ -228,7 +282,7 @@ Gilt übergreifend für alle Bildschirme/Interaktionspunkte des Systems:
 Betrifft alle Komponenten, die am Gesprächsfluss beteiligt sind (Spracherkennung, KI-Antwortgenerierung, Sprachsynthese):
 
 - Durchgängige Anforderung an geringe Latenz, um einen natürlichen Gesprächsfluss zu ermöglichen (Q-03)
-- Dieses Konzept wird bei der technischen Umsetzung aller Echtzeit-relevanten Bausteine berücksichtigt werden müssen (relevant für Kapitel 4/5)
+- Umgesetzt wird das durch überlappende statt sequenzielle Verarbeitung der Kette aus Spracherkennung, Antwortgenerierung und Sprachsynthese; die Einzelheiten stehen in Kapitel 4.2
 
 # 9. Architekturentscheidungen
 
@@ -319,7 +373,7 @@ TODO
 
 # 11. Risiken und technische Schulden
 
-Da die technische Lösungsstrategie (Kapitel 4) noch nicht final festgelegt ist, sind einige Risiken hier bewusst allgemeiner formuliert und sollten nach Konkretisierung von Kapitel 4/5 präzisiert werden.
+Die Risiken in 11.1 begleiten das Vorhaben unabhängig vom Umsetzungsstand. Die technischen Schulden in 11.2 sind demgegenüber Befunde am gebauten Prototyp: bewusst in Kauf genommene oder nachträglich erkannte Verkürzungen, die heute tragen, aber Folgekosten haben.
 
 ## 11.1 Risiken
 
@@ -327,7 +381,7 @@ Da die technische Lösungsstrategie (Kapitel 4) noch nicht final festgelegt ist,
 
 | Nr. | Risiko | Beschreibung | Gegenmaßnahme |
 |---|---|---|---|
-| RI-01 | Echtzeitfähigkeit der Sprach- und LLM-Schnittstellen | Die Kombination aus Spracherkennung, Antwortgenerierung und Sprachsynthese muss in Echtzeit ablaufen (Q-03). Externe Schnittstellen können Latenzschwankungen aufweisen, die den natürlichen Gesprächsfluss beeinträchtigen. | Latenz je Teilstrecke getrennt messen, um den Engpass zu bestimmen. Frühzeitige Tests mit den infrage kommenden Anbietern vor der finalen technischen Festlegung (Kapitel 4). |
+| RI-01 | Echtzeitfähigkeit der Sprach- und LLM-Schnittstellen | Die Kombination aus Spracherkennung, Antwortgenerierung und Sprachsynthese muss in Echtzeit ablaufen (Q-03). Externe Schnittstellen können Latenzschwankungen aufweisen, die den natürlichen Gesprächsfluss beeinträchtigen. | Die technische Festlegung ist erfolgt (Kapitel 4): Modelle im eigenen Netz, gestreamte Verarbeitung statt Blockkette, Vorwärmen des Eröffnungssatzes. Das Risiko ist damit gemindert, aber nicht ausgeräumt — die Modelle laufen auf geteilter Hardware (ADR 0020), und die Latenz je Teilstrecke wird bislang nicht systematisch gemessen. Offen: Messpunkte je Teilstrecke, um den Engpass unter Last zu bestimmen. |
 | RI-02 | Unklare Datenschutz-Umsetzung | Datenschutzkonformität ist eine nicht verhandelbare Randbedingung (C-04). Hosting-Ort und Einwilligungsprozess sind grundsätzlich entschieden (ADR 0034). Das Risiko ist gestiegen, seit Sessiondaten bereits im MVP gespeichert werden: Es gibt damit auch im MVP dauerhaft gespeicherte Daten, aber noch keine festgelegte Speicherdauer, keine Aufbewahrungsfrist und mangels Nutzerkonten keine Einwilligungsverwaltung. Der technische Löschpfad existiert inzwischen — die Fremdschlüssel kaskadieren in der Datenbank (ADR 0052/0053) —, aber niemand ruft ihn auf: Es fehlen die Frist und die Selbstbedienungsfunktion. | Speicherdauer festlegen und Löschfunktion umsetzen, bevor Nutzer außerhalb der Pilotgruppe das System verwenden. Datenschutzhinweis (F-49) vor der ersten Aufzeichnung als Voraussetzung behandeln. Einwilligungsoberfläche zusammen mit der Authentifizierung (ADR 0009) planen, nicht nachträglich ergänzen. |
 
 ### Fachliche Risiken
@@ -341,8 +395,46 @@ Da die technische Lösungsstrategie (Kapitel 4) noch nicht final festgelegt ist,
 
 ## 11.2 Technische Schulden
 
-TODO
-Erste Implementierung hat begonnen. Technische Schulden sind einzutragen.
+Stand: erster lauffähiger Prototyp. Die Spalte *Art* unterscheidet, ob eine Schuld bewusst eingegangen wurde oder nachträglich aufgefallen ist — nur die zweite Sorte ist ein Versäumnis.
+
+### Architekturdokumentation
+
+| Nr. | Schuld | Art | Wirkung | Abtragen durch |
+|---|---|---|---|---|
+| TS-01 | Kapitel 5 (Bausteinsicht) ist unausgefüllt, Kapitel 6 (Laufzeitsicht) ist deshalb nicht an Bausteine gebunden. | aufgefallen | Der Prototyp ist gebaut, aber seine Struktur ist nirgends dokumentiert. Neue Mitwirkende müssen sie aus dem Code erschließen. | Kapitel 5 aus dem bestehenden Code nachziehen, danach die Szenarien in Kapitel 6 an die Bausteine binden. |
+
+### Prüfbarkeit
+
+| Nr. | Schuld | Art | Wirkung | Abtragen durch |
+|---|---|---|---|---|
+| TS-02 | Es gibt kein Eval-Setup für Prompt-Änderungen. | bewusst | Jede Änderung am Systemprompt — und damit an F-01 — ist argumentiert, nicht gemessen. Ob eine Kürzung oder eine neue Regel das Gespräch verbessert, ist derzeit Meinung. | Kleines Eval-Skript: dieselbe Persona × Szenario, N Läufe mit und ohne Änderung, Vergleich von Antwortlänge und Turn-Anzahl. Der Rücklauf synthetisierter Sprache durch die Spracherkennung hat sich bereits als objektiver Prüfgriff bewährt. |
+| TS-03 | Das Frontend hat keinen Testrunner. | bewusst | Sprecherwechsel, Wiedergabe-Warteschlange und Unterbrechen sind ausschließlich manuell geprüft. Genau dort lagen bereits Fehler, die kein Backend-Test finden konnte. | Testrunner einrichten und zuerst die Wiedergabe-Warteschlange abdecken. |
+| TS-04 | Tests konnten sich stillschweigend selbst überspringen: Datenbanktests fanden ihre Zugangsdaten im Container nicht und meldeten sich als *übersprungen* statt als Fehler. | aufgefallen | 49 Tests prüften über längere Zeit nichts, ohne dass es auffiel; nach Behebung fanden sie vier echte Fehler. | Ein übersprungener Test darf im Regellauf nicht unbemerkt bleiben — Zugangsdaten im Container verfügbar machen und die Suite mit einer Mindestzahl ausgeführter Tests absichern. |
+| TS-05 | Der Vite-Dev-Server startet die Anwendung nicht mehr; die WASM-Bausteine der Spracherkennung im Browser scheitern dort. | aufgefallen | Frontend-Änderungen sind nur über den Produktionsbuild im Container prüfbar. Das verlängert jede Rückkopplungsschleife spürbar. | Ursache im Zusammenspiel von Vite und onnxruntime-web klären, sonst dauerhaft auf den Containerpfad festlegen und den Dev-Server aus der Dokumentation nehmen. |
+
+### Umsetzung
+
+| Nr. | Schuld | Art | Wirkung | Abtragen durch |
+|---|---|---|---|---|
+| TS-06 | Datenbankmigrationen kollidieren, ohne dass die Versionsverwaltung einen Konflikt meldet — die Dateien heißen verschieden und werden kommentarlos vereinigt. | aufgefallen | Der Fehler zeigt sich erst beim Anwendungsstart. Einmal aufgetreten, mit dem Ergebnis, dass Gespräche unbemerkt nicht gespeichert wurden. | Nach jedem Zusammenführen die Anzahl der Migrations-Endpunkte prüfen, nicht die Konfliktliste. Automatisierbar. |
+| TS-07 | Das Schema ist englisch benannt, die Schnittstelle zum Frontend deutsch; eine Übersetzungsschicht liegt dazwischen. | bewusst | Jede Umbenennung muss an zwei Stellen gedacht werden. Wird die Schicht übersehen, bricht die Oberfläche, ohne dass ein Backend-Test anschlägt. | Vor der ersten externen Schnittstelle entscheiden, welche der beiden Sprachen die Schnittstelle führt. |
+| TS-08 | Eine Tabelle für Einzelbefunde besteht im Schema, hat aber weder Schreiber noch Leser. | bewusst | Totes Schema. Es kostet nichts im Betrieb, täuscht aber eine Funktion vor, die es nicht gibt. | Entweder mit dem Pilotbetrieb befüllen oder entfernen. |
+| TS-09 | Die Python-Version ist festgenagelt, weil die verwendete ORM-Fassung auf neueren Fassungen nicht mehr lädt. | aufgefallen | Sicherheitsaktualisierungen der Sprachumgebung sind blockiert. | ORM anheben, danach die Festlegung nachziehen. |
+| TS-10 | Für die Zeilenenden gibt es keine im Projekt hinterlegte Konvention, obwohl auf verschiedenen Betriebssystemen gearbeitet wird. | aufgefallen | Änderungen erscheinen größer, als sie sind; Zeilenenden verrauschen die Historie. | Konvention hinterlegen. |
+| TS-11 | Für die Sprachsynthese besteht nur auf Deutsch eine funktionierende Rückfallebene. | aufgefallen | Fällt der Standardanbieter aus, liest bei einer englischsprachigen Persona ein deutsches Stimmmodell den englischen Text. Es kommt Audio, es wird kein Fehler gemeldet, und auffallen würde es nur am Klang. | Englische Rückfallebene beschaffen oder den Ausfall hörbar machen, statt still falsch zu synthetisieren. |
+
+### Inhalt
+
+| Nr. | Schuld | Art | Wirkung | Abtragen durch |
+|---|---|---|---|---|
+| TS-12 | Von den drei Szenario-Typen aus F-03 ist in der Bibliothek bislang einer belegt. | bewusst | F-03 ist ein MUST und noch nicht erfüllt. Die Bibliothek bildet die Arbeitswirklichkeit nur eines der beiden Pilotunternehmen ab — was RI-03 entgegensteht. | Die im Szenario- und Persona-Katalog aufbereiteten Kandidaten anlegen; die Belege dafür liegen vor. |
+| TS-13 | Der Trainee erhält vor dem Gespräch keine Einweisung in seinen Fall, während die Persona Fallfakten, Anrufziel und Erfolgsbedingung im Prompt hat. | aufgefallen | Der Nutzer verteidigt eine Position, die er nicht kennt. Betrifft unmittelbar Q-01: Eine Rückmeldung zur Argumentation ist nicht haltbar, wenn nie gesagt wurde, wofür argumentiert werden sollte. | Umsetzung nach ADR 0054. |
+
+### Betrieb und Datenschutz
+
+| Nr. | Schuld | Art | Wirkung | Abtragen durch |
+|---|---|---|---|---|
+| TS-14 | Der technische Löschpfad besteht, aber es gibt weder eine Aufbewahrungsfrist noch eine Selbstbedienungsfunktion. | bewusst | Gespeicherte Sessiondaten wachsen unbegrenzt. Voraussetzung für jede Nutzung außerhalb der Pilotgruppe. | Frist festlegen und Löschfunktion umsetzen; siehe RI-02, mit dem diese Schuld denselben Gegenstand hat. |
 
 # 12. Glossar
 
