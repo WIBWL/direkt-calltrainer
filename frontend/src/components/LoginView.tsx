@@ -108,10 +108,11 @@ export default function LoginView({
           </div>
 
           {errorMessage ? (
-            <p id="status" className="error">
-              Anmeldung fehlgeschlagen: {errorMessage}
-            </p>
-          ) : null}
+            <div className="login-error" role="alert">
+                <strong>Anmeldung fehlgeschlagen</strong>
+                <span>{errorMessage}</span>
+            </div>
+        ) : null}
 
           <button
             type="button"
