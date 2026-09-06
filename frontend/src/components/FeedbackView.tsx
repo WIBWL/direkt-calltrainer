@@ -95,22 +95,21 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
       )}
 
       {measurements.length > 0 && (
-        <>
-          <h2>Zahlen zum Gespräch</h2>
-          <div className="card">
-            <div className="metric-grid">
-              {measurements.map((m) => (
-                <Metric key={m.key} measurement={m} />
-              ))}
-            </div>
-            <p className="metric-disclaimer">
-              Reine Messwerte, ohne Zielbereich: für diese Nutzergruppe gibt es keinen
-              belegten Normwert, an dem sie zu messen wären.
-            </p>
-          </div>
-        </>
-      )}
+        <section className="feedback-metrics-section">
+          <div className="feedback-metrics-eyebrow">ERGÄNZENDE AUSWERTUNG</div>
+          <h2 className="feedback-metrics-title">Kennzahlen zum Gespräch</h2>
 
+          <div className="metric-grid">
+            {measurements.map((measurement) => (
+              <Metric key={measurement.key} measurement={measurement} />
+            ))}
+          </div>
+
+          <p className="metric-disclaimer">
+            Die Kennzahlen dienen als ergänzende Orientierung und werden nicht automatisch bewertet.
+          </p>
+        </section>
+      )}
     </>
   );
 }
