@@ -1,4 +1,5 @@
-import type { FeedbackPoint, Measurement } from "../protocol";
+import type { FeedbackPoint, Measurement, SessionTurn } from "../protocol";
+import { formatOffset } from "../utils/time";
 import { useSessionFeedback } from "../hooks/useSessionFeedback";
 import Sparkline from "./Sparkline";
 
@@ -42,7 +43,7 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
     );
   }
 
-  const { feedback, measurements } = detail;
+  const { feedback, measurements, turns } = detail;
 
   return (
     <>
@@ -57,6 +58,7 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
           eyebrow="STÄRKEN"
           title="Das gelang gut"
           points={feedback.points.filter((p) => p.kind === "strength")}
+          turns={turns}
           tone="success"
         />
 
@@ -64,6 +66,7 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
           eyebrow="WEITERENTWICKELN"
           title="Das können Sie verbessern"
           points={feedback.points.filter((p) => p.kind === "improvement")}
+          turns={turns}
           tone="danger"
         />
       </div>
@@ -106,11 +109,13 @@ function PointList({
   eyebrow,
   title,
   points,
+  turns,
   tone,
 }: {
   eyebrow: string;
   title: string;
   points: FeedbackPoint[];
+  turns: SessionTurn[];
   tone: "success" | "danger";
 }) {
   if (points.length === 0) return null;
@@ -128,11 +133,23 @@ function PointList({
     </div>
 
     <div className="feedback-point-list">
-      {points.map((point, i) => (
-        <div className="feedback-point-item" key={i}>
-          <p>{point.text}</p>
-        </div>
-      ))}
+      {points.map((point, i) => {
+        const turn =
+          point.turn_id !== null
+            ? turns.find((candidate) => candidate.turn_id === point.turn_id)
+            : undefined;
+
+        return (
+          <div className="feedback-point-item" key={i}>
+            {turn && (
+              <span className="feedback-point-time">
+                {formatOffset(turn.start_offset_ms)}
+              </span>
+            )}
+            <p>{point.text}</p>
+          </div>
+        );
+      })}
     </div>
   </section>
 );
