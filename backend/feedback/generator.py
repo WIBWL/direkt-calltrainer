@@ -367,11 +367,16 @@ async def _ask(dossier: str, language: str) -> _Wrapup:
 
     A response that never validates still produces Feedback -- the summary
     without its evidence links -- because showing the user nothing is worse.
+
+    Asked in thinking mode: this is the one call that writes paragraphs of
+    German prose, from an English brief (ADR 0043) on a 4B model (ADR 0011),
+    where agreement and word order come apart in a single pass. The trace is
+    the revision pass, and it is free in the worker (ADR 0018/0019).
     """
     messages = _messages(dossier, language)
     raw = ""
     for attempt in range(2):  # initial attempt + one retry
-        raw = await llm.complete(messages)
+        raw = await llm.complete(messages, think=True)
         try:
             return _Wrapup.model_validate_json(_unwrap(raw))
         except (ValidationError, ValueError) as e:
