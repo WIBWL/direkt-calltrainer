@@ -32,24 +32,38 @@ export default function TranscriptView({
       </div>
       {feedback}
 
-      <h2>Gesprächsprotokoll</h2>
+      <section className="feedback-transcript-section">
+        <div className="feedback-transcript-heading">
+          <div>
+            <div className="feedback-transcript-eyebrow">GESPRÄCH IM DETAIL</div>
+            <h2 className="feedback-transcript-title">Vollständiges Transkript</h2>
+          </div>
 
-      {transcript.length === 0 ? (
-        <div className="card">
-          <p>Es wurden keine Turns aufgezeichnet.</p>
+          <span className="feedback-transcript-count">
+            {transcript.length} Beiträge
+          </span>
         </div>
-      ) : (
-        <div className="card">
-          {transcript.map((entry, i) => (
-            <p className="transcript-line" key={i}>
-              <span className="transcript-time">{formatOffset(entry.offset_ms)}</span>
-              <span>
-                <strong>{entry.speaker === "user" ? "Du" : personaName}:</strong> {entry.text}
-              </span>
-            </p>
-          ))}
-        </div>
-      )}
+
+        {transcript.length === 0 ? (
+          <div className="feedback-transcript-card">
+            <p>Es wurden keine Turns aufgezeichnet.</p>
+          </div>
+        ) : (
+          <div className="feedback-transcript-card">
+            {transcript.map((entry, i) => (
+              <p className="transcript-line" key={i}>
+                <span className="transcript-time">
+                  {formatOffset(entry.offset_ms)}
+                </span>
+                <span>
+                  <strong>{entry.speaker === "user" ? "Du" : personaName}:</strong>{" "}
+                  {entry.text}
+                </span>
+              </p>
+            ))}
+          </div>
+        )}
+      </section>
 
       <button className="restart-button" type="button" onClick={onRestart}>
         Neue Session starten
