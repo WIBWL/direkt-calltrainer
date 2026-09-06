@@ -17,7 +17,7 @@ import pytest
 from backend.feedback.acoustics import AcousticsError, TurnAcoustics
 from backend.session.models import AudioChunk, StateChanged, TurnCompleted
 from backend.session.orchestrator import SessionOrchestrator
-from tests.conftest import audio_chunks, collect, completed, states
+from tests.conftest import audio_chunks, collect, completed, failure, states
 
 # pylint: disable=missing-function-docstring,redefined-outer-name
 
@@ -178,3 +178,19 @@ async def test_an_unmeasurable_turn_says_so(orch, fake_pipeline, monkeypatch, er
     # An unmeasurable Turn is not a failed one.
     assert completed(events) is not None
     assert orch.turns[0].persona_text == "Danke fuer die Information."
+
+
+async def test_empty_llm_reply_fails_after_retry(orch, fake_pipeline):
+    """An empty model response must not complete the Turn successfully."""
+    fake_pipeline.stt.transcripts = ["Bitte erklären Sie mir das."]
+    fake_pipeline.llm.replies = ["", ""]
+
+    events = await collect(
+        orch.run_turn(b"a", "turn.webm", "audio/webm")
+    )
+
+    assert len(fake_pipeline.llm.calls) == 2
+    assert failure(events) is not None
+    assert failure(events).code == "llm_failed"
+    assert completed(events) is None
+    assert not audio_chunks(events)

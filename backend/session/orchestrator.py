@@ -589,9 +589,9 @@ class SessionOrchestrator:
         progress: _ReplyProgress,
         guard_reintroduction: bool = False,
     ) -> AsyncIterator[TurnEvent]:
-        """One reply attempt plus one retry on an LLM error. Yields the reply's
-        events; yields a Failed event and stops if it can't be delivered. May
-        raise `_RegenerateReply` before the first audio (ADR 0038)."""
+        """One reply attempt plus one retry on an LLM error or empty completion.
+        Yields the reply's events; yields a Failed event and stops if it can't be
+        delivered. May raise `_RegenerateReply` before the first audio (ADR 0038)."""
         for llm_attempt in range(2):  # initial attempt + one retry
             try:
                 stream = self._stream_and_synthesize(
@@ -602,7 +602,19 @@ class SessionOrchestrator:
                         yield event
                         if isinstance(event, Failed):
                             return
-                return  # streamed to completion without an LLM-side error
+                if turn.persona_text.strip():
+                    return
+
+                # A completion can finish cleanly without producing any usable text.
+                # Treat that like an LLM failure: otherwise the Turn would complete
+                # successfully with an empty Persona reply in the conversation history.
+                logger.warning("LLM returned an empty reply (attempt %d)", llm_attempt + 1)
+                if llm_attempt == 1:
+                    yield Failed(
+                        code="llm_failed",
+                        message="Language model returned an empty reply.",
+                    )
+                    return
             except OpenAIError as e:
                 logger.error("LLM request failed (attempt %d): %s", llm_attempt + 1, e)
                 # Retry only before any audio has gone out (ADR 0033): a fresh
