@@ -14,7 +14,12 @@ import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useSessionSocket, type CommittedSession } from "./hooks/useSessionSocket";
 import { useStreamedAudioPlayback } from "./hooks/useStreamedAudioPlayback";
 import type { Persona, TranscriptEntry } from "./protocol";
-import { getTenant, listScenarios, type ScenarioCard } from "./scenarioLibrary";
+import {
+  getTenant,
+  listScenarios,
+  type ScenarioCard,
+  type ScenarioDraft,
+} from "./scenarioLibrary";
 import { loadFinishedSession, saveFinishedSession } from "./utils/finishedSession";
 
 type Screen = "setup" | "mic-check" | "call" | "transcript";
@@ -25,8 +30,9 @@ interface PendingEnd {
   sessionId: string | null;
 }
 
-/** null = closed; { id: null } = new; { id } = editing that row. */
-type EditorState = { id: string | null } | null;
+/** null = closed; { id: null } = new; { id } = editing that row. `draft`
+ * pre-fills a new one — the drafted follow-up (F-60). */
+type EditorState = { id: string | null; draft?: ScenarioDraft } | null;
 
 /**
  * Owns the training flow: which screen is showing, what has been selected, and
@@ -290,8 +296,22 @@ export default function App() {
 
   const handleScenarioSaved = (savedId: string | null) => {
     setEditingScenario(null);
+    // Selects the saved row, so a follow-up is already picked for the next Session.
     void reloadScenarios(savedId);
   };
+
+  // Rendered over the setup screen and the post-call screen alike: the
+  // follow-up (F-60) is offered where the feedback is.
+  const scenarioEditor = editingScenario && (
+    <ScenarioEditor
+      scenarioId={editingScenario.id}
+      initialDraft={editingScenario.draft ?? null}
+      tenantName={tenantName}
+      onClose={() => setEditingScenario(null)}
+      onSaved={handleScenarioSaved}
+      onRefresh={() => void reloadScenarios()}
+    />
+  );
 
   if (screen === "mic-check") {
     return (
@@ -334,8 +354,14 @@ export default function App() {
           transcript={transcript}
           personaName={personaName}
           onRestart={handleRestart}
-          feedback={<FeedbackView sessionId={endedSessionId} />}
+          feedback={
+            <FeedbackView
+              sessionId={endedSessionId}
+              onFollowUpDraft={(draft) => setEditingScenario({ id: null, draft })}
+            />
+          }
         />
+        {scenarioEditor}
       </AppLayout>
     );
   }
@@ -361,15 +387,7 @@ export default function App() {
         onStart={handleStartSession}
       />
 
-      {editingScenario && (
-        <ScenarioEditor
-          scenarioId={editingScenario.id}
-          tenantName={tenantName}
-          onClose={() => setEditingScenario(null)}
-          onSaved={handleScenarioSaved}
-          onRefresh={() => void reloadScenarios()}
-        />
-      )}
+      {scenarioEditor}
     </AppLayout>
   );
 }
