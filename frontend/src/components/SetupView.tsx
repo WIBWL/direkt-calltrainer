@@ -1,3 +1,7 @@
+import { Link } from "react-router-dom";
+
+import { useConsentContext } from "../ConsentContext";
+import { ROUTES } from "../routes";
 import type { Persona } from "../protocol";
 import type { ScenarioCard } from "../scenarioLibrary";
 import LibraryPicker, { type LibraryFilter, type LibraryItem } from "./LibraryPicker";
@@ -51,6 +55,8 @@ export default function SetupView({
   onSelectPersona,
   onStart,
 }: SetupViewProps) {
+  const { consent } = useConsentContext();
+
   return (
     <>
       <section className="setup-intro" aria-labelledby="setup-page-title">
@@ -109,6 +115,19 @@ export default function SetupView({
           language={selectedPersona?.language ?? NOT_SELECTED}
           voice="Durch Persona festgelegt"
         />
+
+        {/* Said before the call, not after it (ADR 0066). Someone who declined
+            storage should learn that this training will leave no record while
+            they can still change their mind — finding out afterwards, with the
+            transcript already gone, is finding out too late. */}
+        {consent && !consent.allows_storage && (
+          <p className="setup-storage-note">
+            Dieses Training wird <strong>nicht gespeichert</strong>. Sie sehen das
+            Gesprächsprotokoll direkt im Anschluss. Eine Auswertung gibt es nicht, und in Ihrer
+            Trainingshistorie erscheint das Gespräch später nicht.{" "}
+            <Link to={ROUTES.profile}>Im Profil ändern</Link>
+          </p>
+        )}
 
         <button
           className="start-call-button"

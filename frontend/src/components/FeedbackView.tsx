@@ -1,5 +1,11 @@
-import type { FeedbackPoint, Measurement, SessionTurn } from "../protocol";
+import type {
+  FeedbackPoint,
+  Measurement,
+  SessionDetail,
+  SessionTurn,
+} from "../protocol";
 import { formatOffset } from "../utils/time";
+
 import { useSessionFeedback } from "../hooks/useSessionFeedback";
 import Sparkline from "./Sparkline";
 
@@ -42,8 +48,23 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
       </div>
     );
   }
+  return <FeedbackReport detail={detail} />;
+}
 
+/**
+ * The wrap-up itself, given data that has already been fetched.
+ *
+ * Split from the component above so a screen that already holds a
+ * `SessionDetail` — the history's detail page, which needs the Transcript from
+ * the same response — can render the report without asking for it again.
+ *
+ * Renders nothing when the Session carries no wrap-up. What to say instead is
+ * the caller's to decide, because the honest sentence differs: on the post-call
+ * screen one is still being generated, in the history none ever was.
+ */
+export function FeedbackReport({ detail }: { detail: SessionDetail }) {
   const { feedback, measurements, turns, persona, scenario } = detail;
+  if (!feedback) return null;
 
   return (
     <>
@@ -102,23 +123,39 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
         </section>
       )}
 
-      {measurements.length > 0 && (
-        <section className="feedback-metrics-section">
-          <div className="feedback-metrics-eyebrow">ERGÄNZENDE AUSWERTUNG</div>
-          <h2 className="feedback-metrics-title">Kennzahlen zum Gespräch</h2>
-
-          <div className="metric-grid">
-            {measurements.map((measurement) => (
-              <Metric key={measurement.key} measurement={measurement} />
-            ))}
-          </div>
-
-          <p className="metric-disclaimer">
-            Die Kennzahlen dienen als ergänzende Orientierung und werden nicht automatisch bewertet.
-          </p>
-        </section>
-      )}
+      <MetricSection measurements={measurements} />
     </>
+  );
+}
+
+/**
+ * The call's statistics (F-53), which exist independently of the narrative:
+ * they are computed while the call runs (ADR 0047/0048) and stored with the
+ * Session, so a Session whose wrap-up never got generated still has them.
+ *
+ * Never a judgement, only a reading — ADR 0051 declined to invent the norms
+ * that would be needed to say whether a figure is good, and the note under the
+ * grid says so rather than leaving the user to assume a direction.
+ */
+export function MetricSection({ measurements }: { measurements: Measurement[] }) {
+  if (measurements.length === 0) return null;
+
+  return (
+    <section className="feedback-metrics-section">
+      <div className="feedback-metrics-eyebrow">ERGÄNZENDE AUSWERTUNG</div>
+      <h2 className="feedback-metrics-title">Kennzahlen zum Gespräch</h2>
+
+      <div className="metric-grid">
+        {measurements.map((measurement) => (
+          <Metric key={measurement.key} measurement={measurement} />
+        ))}
+      </div>
+
+      <p className="metric-disclaimer">
+        Reine Messwerte, ohne Zielbereich: für diese Nutzergruppe gibt es keinen
+        belegten Normwert, an dem sie zu messen wären.
+      </p>
+    </section>
   );
 }
 

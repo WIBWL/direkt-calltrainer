@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useAuth } from "react-oidc-context";
+import { useLocation } from "react-router-dom";
 
 /**
  * Renders `children` only for an authenticated user. While the session is being
@@ -9,6 +10,9 @@ import { useAuth } from "react-oidc-context";
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const auth = useAuth();
+  // The router's location, not window.location: inside a Router the two agree,
+  // but reading it here is what makes the dependency explicit.
+  const location = useLocation();
 
   if (auth.isLoading || auth.activeNavigator) {
     return <p id="status">{auth.activeNavigator ? "Weiterleitung …" : "Lädt …"}</p>;
@@ -36,7 +40,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         style={{ marginTop: "1.5rem" }}
         onClick={() =>
           void auth.signinRedirect({
-            state: { returnTo: window.location.pathname + window.location.search },
+            state: { returnTo: location.pathname + location.search },
           })
         }
       >

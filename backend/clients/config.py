@@ -36,6 +36,18 @@ CLIENT = AsyncOpenAI(base_url=f"{DIREKT_URL}/v1", api_key=_required_env("DIREKT_
 # model on every call — lets the app run without KugelAudio credentials.
 DEBUG = os.environ.get("DEBUG", "").lower() in ("1", "true", "yes")
 
+# Optional, default off, and deliberately its own switch rather than a second
+# meaning for DEBUG: it decides whether what people say aloud is written into
+# the log file.
+#
+# Off, the pipeline logs how long an utterance was and nothing about what was
+# in it. On, it logs the text — which is personal data, sitting in a file that
+# no deletion path reaches (ADR 0066). That is defensible while diagnosing a
+# model, and indefensible in a running pilot, so it is opt-in, named for what
+# it does, and announced at boot (`app.py`'s lifespan) so it cannot be left on
+# unnoticed.
+LOG_TRANSCRIPTS = os.environ.get("LOG_TRANSCRIPTS", "").lower() in ("1", "true", "yes")
+
 # STT config.
 STT_CLIENT = CLIENT
 STT_MODEL = _required_env("STT_MODEL")
