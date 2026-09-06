@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { useAuth } from "react-oidc-context";
 import { useLocation } from "react-router-dom";
 
+import LoginView from "./components/LoginView";
+
 /**
  * Renders `children` only for an authenticated user. While the session is being
  * restored or a redirect is in flight it shows a splash; otherwise the login
@@ -10,6 +12,7 @@ import { useLocation } from "react-router-dom";
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const auth = useAuth();
+
   // The router's location, not window.location: inside a Router the two agree,
   // but reading it here is what makes the dependency explicit.
   const location = useLocation();
@@ -23,29 +26,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   return (
-    <>
-      <div className="eyebrow">Calltrainer</div>
-      <h1>Anmeldung erforderlich</h1>
-      <div className="card">
-        <p>Bitte melden Sie sich an, um ein Training zu starten.</p>
-        {auth.error ? (
-          <p id="status" className="error">
-            Anmeldung fehlgeschlagen: {auth.error.message}
-          </p>
-        ) : null}
-      </div>
-      <button
-        type="button"
-        className="start-call-button"
-        style={{ marginTop: "1.5rem" }}
-        onClick={() =>
-          void auth.signinRedirect({
-            state: { returnTo: location.pathname + location.search },
-          })
-        }
-      >
-        Mit Keycloak anmelden
-      </button>
-    </>
+    <LoginView
+      errorMessage={auth.error?.message}
+      onLogin={() =>
+        void auth.signinRedirect({
+          state: { returnTo: location.pathname + location.search },
+        })
+      }
+    />
   );
 }
