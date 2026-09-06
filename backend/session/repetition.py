@@ -56,9 +56,114 @@ RESTATEMENT_SHARE = 0.5
 MIN_RESTATEMENT_SENTENCES = 2
 
 
+# A reply that opens with this many of the user's own words, in order, is
+# reading their line back before answering it -- seen on the Turn after a
+# barge-in, where the nudge's "react to what they just said" was resolved by
+# reciting it. Two words ("Ja, gut") are a natural pick-up; three in a row are
+# not.
+MIN_ECHO_WORDS = 3
+
+
+def strip_echoed_prefix(text: str, echo: str) -> str:
+    """`text` without a leading verbatim repeat of `echo` (word-wise, case and
+    punctuation aside), or unchanged if it does not open with one. Cut at the
+    end of the last echoed word, then the punctuation the echo carried along."""
+    echoed = WORD_RE.findall(echo.lower())
+    if len(echoed) < MIN_ECHO_WORDS:
+        return text
+    end = 0
+    for i, match in enumerate(WORD_RE.finditer(text)):
+        if i == len(echoed):
+            break
+        if match.group().lower() != echoed[i]:
+            return text
+        end = match.end()
+    else:
+        if end == 0:
+            return text
+    return text[end:].lstrip(" \t,.;:!?-—…\"'")
+
+
 def first_sentence(text: str) -> str:
     """The first sentence of a chunk of text, for comparing openings."""
     return SENTENCE_SPLIT_RE.split(text.strip(), maxsplit=1)[0].strip()
+
+
+def last_sentence(text: str) -> str:
+    """The last sentence of a reply, for judging how it ends."""
+    return SENTENCE_SPLIT_RE.split(text.strip())[-1].strip()
+
+
+def without_first_sentence(text: str) -> str:
+    """`text` minus its first sentence -- the tail of a reply that opened
+    mid-sentence, continuing the line the user had cut off (ADR 0035)."""
+    parts = SENTENCE_SPLIT_RE.split(text.strip(), maxsplit=1)
+    return parts[1].strip() if len(parts) > 1 else ""
+
+
+# A sentence that opens with this many of the cut-off sentence's words, in
+# order, is that sentence picked back up from the top -- finished this time,
+# and usually reworded towards the end, which is why the whole sentence is
+# never the thing compared. Under MIN_RESUME_WORDS the fragment ("Ich will")
+# is too little to match on.
+MIN_RESUME_WORDS = 3
+RESUME_PREFIX_WORDS = 5
+
+
+def resumes(sentence: str, cut_off: str) -> bool:
+    """True if `sentence` starts the way the cut-off sentence did (ADR 0035)."""
+    fragment = WORD_RE.findall(cut_off.lower())
+    if len(fragment) < MIN_RESUME_WORDS:
+        return False
+    k = min(RESUME_PREFIX_WORDS, len(fragment))
+    return WORD_RE.findall(sentence.lower())[:k] == fragment[:k]
+
+
+def drop_resumed_sentences(text: str, cut_off: str) -> tuple[str, list[str]]:
+    """`text` without the sentences that pick the cut-off sentence back up
+    from the top, plus the ones dropped. The user cut that sentence off on
+    purpose; the reply after a barge-in is for what they said, not for
+    finishing it (ADR 0035)."""
+    kept: list[str] = []
+    dropped: list[str] = []
+    for sentence in SENTENCE_SPLIT_RE.split(text.strip()):
+        clean = sentence.strip()
+        if clean and resumes(clean, cut_off):
+            dropped.append(clean)
+        elif clean:
+            kept.append(clean)
+    return " ".join(kept), dropped
+
+
+def said_sentences(lines) -> set[str]:
+    """Every sentence in `lines` long enough to count as content, normalised --
+    what the persona has already said in this call, for `drop_said_sentences`.
+    The floor is `MIN_LOOP_REPLY_CHARS`, the same one the cross-Turn verbatim
+    check uses: a short line recurs naturally, a long one does not."""
+    said: set[str] = set()
+    for line in lines:
+        said.update(s for s in long_sentences(line) if len(s) >= MIN_LOOP_REPLY_CHARS)
+    return said
+
+
+def drop_said_sentences(text: str, said: set[str]) -> tuple[str, list[str]]:
+    """`text` without the sentences already in `said`, plus the ones dropped.
+
+    The chunk-level form of the restatement check, applied *before* a chunk is
+    spoken: the model varies its opening sentence and carries the same block
+    underneath it Turn after Turn (the failure ADR 0038 names), and after a
+    barge-in it re-delivers the cut-off part wholesale. Dropping the carried
+    sentences lets the new ones through instead of ending the call over them.
+    """
+    kept: list[str] = []
+    dropped: list[str] = []
+    for sentence in SENTENCE_SPLIT_RE.split(text.strip()):
+        clean = sentence.strip()
+        if len(clean) >= MIN_LOOP_REPLY_CHARS and clean.lower() in said:
+            dropped.append(clean)
+        elif clean:
+            kept.append(clean)
+    return " ".join(kept), dropped
 
 
 def word_set(text: str) -> set[str]:

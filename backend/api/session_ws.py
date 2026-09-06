@@ -73,7 +73,9 @@ async def session_ws(websocket: WebSocket) -> None:
                 orchestrator.start_playback,
                 orchestrator.note_barge_in,
             )
-            if outcome in ("ok", "interrupted"):
+            if outcome == "interrupted" and orchestrator.ended:
+                reason = "completed"  # talked over the goodbye; the ending stands (ADR 0035)
+            elif outcome in ("ok", "interrupted"):
                 reason = await _run_session(websocket, orchestrator, orchestrator.start_playback)
             else:
                 # The opening Turn itself ended the Session: "failed" is the Turn
@@ -95,6 +97,7 @@ async def session_ws(websocket: WebSocket) -> None:
         # ask for its Feedback -- a 404 then means the write genuinely failed,
         # not that the client was merely early.
         await _record(session_id, auth.sub, persona, scenario, orchestrator, started_at, reason)
+        orchestrator.close()  # a notes refresh still in flight has no reader (ADR 0071)
         try:
             await websocket.send_json({"type": "session.ended", "reason": reason, "transcript": transcript})
             await websocket.close()
@@ -266,6 +269,12 @@ async def _run_session(
             websocket, turn, orchestrator.start_playback, orchestrator.note_barge_in
         )
         if outcome == "interrupted":
+            # A barge-in over the tail of the reply that ended the call: the
+            # goodbye is in the history and the decision stands. Carrying on
+            # here ran a whole further Turn, and a second goodbye, on a call
+            # that was already over (ADR 0035).
+            if orchestrator.ended:
+                return "completed"
             continue
         if outcome != "ok":
             return "error" if outcome == "failed" else outcome

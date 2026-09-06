@@ -41,7 +41,13 @@ from backend.scenarios import Scenario
 _SCENARIO_FIELDS = (
     "title", "short_description",
     "description", "case_facts", "call_goal", "success_condition",
+    "category",
 )
+
+# Authorable fields whose column is nullable, so an explicit None is a value --
+# "no category" -- and has to reach the row rather than being skipped. Every
+# other field maps to a NOT NULL column and must never be handed one.
+_NULLABLE_SCENARIO_FIELDS = frozenset({"category"})
 
 
 def _to_persona(row: models.Persona) -> Persona:
@@ -78,6 +84,7 @@ def _to_scenario(row: models.Scenario) -> Scenario:
         case_facts=row.case_facts,
         call_goal=row.call_goal,
         success_condition=row.success_condition,
+        category=row.category,
         created_by=row.created_by,
         visibility=row.visibility,
     )
@@ -267,10 +274,13 @@ def set_scenario_visibility(
 def _sanitised(data: dict, fields: tuple[str, ...]) -> dict:
     """Pick the authorable fields out of `data` and run the string ones through
     `clean` (ADR 0059). A field the caller omitted is left out, so the same
-    helper serves create (all fields) and a partial update."""
+    helper serves create (all fields) and a partial update. A None reaches the
+    row only for a nullable column -- that is how a category is cleared."""
     out = {}
     for field in fields:
-        if field not in data or data[field] is None:
+        if field not in data:
+            continue
+        if data[field] is None and field not in _NULLABLE_SCENARIO_FIELDS:
             continue
         value = data[field]
         out[field] = clean(value) if isinstance(value, str) else value

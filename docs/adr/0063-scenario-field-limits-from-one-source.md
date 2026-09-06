@@ -36,9 +36,18 @@ specific numbers.
 The endpoint is behind the same bearer token as the rest of `/api`, and is
 declared before `/{extern_id}` so the literal path wins.
 
+`FIELD_LIMITS` holds exactly the authorable Scenario fields and nothing else. It
+used to carry six Persona caps as well (`name`, `role_label`, `role`, `traits`,
+`behavior`, `training_goal`), which no request model ever read: Personas are
+curated, not authored (ADR 0058), so there is no authoring endpoint to validate
+them against. Only a seed-length test consulted them, kept alive against a
+Persona-authoring feature that does not exist. They are gone. Persona seed text
+still runs through `clean()` on the way in and a test still asserts that is a
+no-op; that guard never needed the caps.
+
 ## Consequences
 
-One request when the editor opens, for six integers. The form's `maxLength` now
+One request when the editor opens, for the six Scenario caps. The form's `maxLength` now
 always matches what the API will accept; tuning a limit is a one-line change in
 `authored_text.py` with nothing else to update. A test
 (`test_authored_content.py`) pins the endpoint to `FIELD_LIMITS` and checks the

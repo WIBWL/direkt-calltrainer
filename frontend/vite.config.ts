@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -6,6 +7,16 @@ export default defineConfig({
   envDir: "../",
   server: {
     port: 5173,
+  },
+  // The only automated frontend tests: the live-call audio path, whose
+  // barge-in races are invisible to `tsc` and impossible to catch by hand
+  // reliably (see useStreamedAudioPlayback / useSessionSocket specs). Not a
+  // general component-test setup — jsdom plus hand-written Web Audio / Web
+  // Socket fakes, nothing more.
+  test: {
+    environment: "jsdom",
+    setupFiles: ["src/test/setup.ts"],
+    include: ["src/**/*.test.{ts,tsx}"],
   },
   // @ricky0123/vad-web (Silero VAD) must stay prebundled — it's CJS-only, so
   // Vite's dev server can't resolve its named exports otherwise. Its

@@ -28,9 +28,10 @@ Covers ADR 0038:
 import pytest
 
 from backend.session.language_packs import get_pack
+from backend.session.models import Failed
 from backend.session.orchestrator import SessionOrchestrator, _asks_to_repeat
 from backend.session.repetition import has_repeated_sentence as _has_repeated_sentence
-from backend.session.repetition import restates
+from backend.session.repetition import drop_said_sentences, long_sentences, restates, strip_echoed_prefix
 from tests.conftest import audio_chunks, collect, completed, states
 
 FALLBACK_LINE = get_pack("de").fallback_closing_line
@@ -106,7 +107,10 @@ def test_a_reply_that_is_mostly_its_predecessor_still_ends_the_call():
 async def test_reply_repeating_the_previous_reply_ends_the_call(persona, scenario, fake_pipeline):
     line = "Ich brauche dazu bitte eine konkrete Zahl von Ihnen."
     fake_pipeline.stt.transcripts = ["Ich schaue mal nach.", "Einen Moment noch."]
-    fake_pipeline.llm.replies = [line, line]  # second turn repeats the first verbatim
+    # The second turn repeats the first verbatim -- caught on its opening and
+    # re-asked once; the third copy is that regeneration looping again, which
+    # is spoken and ends the call (2026-09-06 amendment).
+    fake_pipeline.llm.replies = [line, line, line]
 
     orch = SessionOrchestrator(persona, scenario)
     await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
@@ -115,6 +119,7 @@ async def test_reply_repeating_the_previous_reply_ends_the_call(persona, scenari
     tc = completed(events)
     assert tc is not None and tc.ends_call is True
     assert "listening" not in states(events)
+    assert len(fake_pipeline.llm.calls) == 3, "one regeneration, then the backstop"
 
 
 async def test_reply_oscillating_back_to_an_earlier_reply_ends_the_call(persona, scenario, fake_pipeline):
@@ -123,7 +128,7 @@ async def test_reply_oscillating_back_to_an_earlier_reply_ends_the_call(persona,
     a = "Ich brauche dazu bitte eine konkrete Zahl von Ihnen, sonst kommen wir nicht weiter."
     b = "Also gut, dann warte ich noch einen Moment auf Ihre Rueckmeldung dazu."
     fake_pipeline.stt.transcripts = ["Einen Moment.", "Ich schaue nach.", "Gleich habe ich es."]
-    fake_pipeline.llm.replies = [a, b, a]
+    fake_pipeline.llm.replies = [a, b, a, a]  # the last `a`: the regeneration looping again
 
     orch = SessionOrchestrator(persona, scenario)
     await collect(orch.run_turn(b"1", "turn.webm", "audio/webm"))
@@ -183,21 +188,29 @@ async def test_nudged_ending_trusts_the_models_own_goodbye(persona, scenario, fa
     assert FALLBACK_LINE not in orch.turns[-1].persona_text
 
 
-async def test_a_reply_that_mostly_restates_its_predecessor_ends_the_call(
+async def test_a_reply_that_mostly_restates_its_predecessor_is_trimmed_to_what_is_new(
     persona, scenario, fake_pipeline
 ):
-    """ADR 0038: four of five sentences carried over is the loop the guard is
-    for, and it ends the call with the fixed sign-off."""
+    """ADR 0038 (2026-09-06 amendment): four of five sentences carried over
+    are dropped from the chunks before synthesis; the fifth is spoken and the
+    call goes on. Ending on a restatement is now the backstop for the one
+    regeneration attempt only (see the tests further down)."""
     fake_pipeline.stt.transcripts = ["Worum geht es denn?", "Welche Module nutzen Sie?"]
     fake_pipeline.llm.replies = [FACTS, RESTATEMENT]
+    carried = set(long_sentences(FACTS))
+    fresh = [s for s in long_sentences(RESTATEMENT) if s not in carried]
+    assert len(fresh) == 1, "the fixture: one new sentence among the carried ones"
 
     orch = SessionOrchestrator(persona, scenario)
     await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
     events = await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
 
-    assert completed(events).ends_call is True
-    assert FALLBACK_LINE in orch.turns[-1].persona_text
-    assert "listening" not in states(events)
+    assert completed(events).ends_call is False
+    spoken = orch.turns[-1].persona_text
+    assert FALLBACK_LINE not in spoken
+    assert fresh[0] in spoken.lower(), "the new sentence is spoken"
+    assert not any(old in spoken.lower() for old in carried), "the carried ones are not"
+    assert "listening" in states(events)
 
 
 async def test_expanding_on_the_opening_without_re_greeting_does_not_end_the_call(
@@ -415,3 +428,185 @@ async def test_a_shared_short_sentence_is_not_a_restatement(persona, scenario, f
     events = await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
 
     assert completed(events).ends_call is False
+
+
+@pytest.mark.parametrize(
+    ("reply", "user_line", "expected"),
+    [
+        # The live case: the question read back, then the actual answer.
+        (
+            "Verzeihung, mit wem rede ich da? Ich bin Thomas Brandt.",
+            "Verzeihung, mit wem rede ich da?",
+            "Ich bin Thomas Brandt.",
+        ),
+        # Case and punctuation do not matter, only the words in order.
+        ("ja sagen sie gerne mal was die frage ist -- also:", "Ja, sagen Sie gerne mal, was die Frage ist.", "also:"),
+        # The whole chunk was the echo: nothing left to say from it.
+        ("Verzeihung, mit wem rede ich da?", "Verzeihung, mit wem rede ich da?", ""),
+        # A two-word pick-up is how people talk, not an echo.
+        ("Ja gut, dann machen wir das so.", "Ja gut.", "Ja gut, dann machen wir das so."),
+        # Sharing the first words is not reading the line back.
+        ("Verzeihung, mit Ihrem Vertrag stimmt etwas nicht.", "Verzeihung, mit wem rede ich da?",
+         "Verzeihung, mit Ihrem Vertrag stimmt etwas nicht."),
+        # An echo further in is left alone -- only the opening is the tell.
+        ("Also: mit wem rede ich da, fragen Sie?", "Mit wem rede ich da", "Also: mit wem rede ich da, fragen Sie?"),
+    ],
+)
+def test_strip_echoed_prefix(reply, user_line, expected):
+    assert strip_echoed_prefix(reply, user_line) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "said", "expected", "dropped"),
+    [
+        # A new opener, then a block already said, then something new.
+        (
+            "Nein, das passt nicht. Ich will eine konkrete Antwort, einen Namen oder ein Datum. "
+            "Das Ticket ist offen.",
+            {"ich will eine konkrete antwort, einen namen oder ein datum."},
+            "Nein, das passt nicht. Das Ticket ist offen.",
+            ["Ich will eine konkrete Antwort, einen Namen oder ein Datum."],
+        ),
+        # Short lines recur naturally and are never dropped.
+        (
+            "Ja, genau. Das sehe ich auch so.",
+            {"ja, genau.", "das sehe ich auch so."},
+            "Ja, genau. Das sehe ich auch so.",
+            [],
+        ),
+        # Nothing said before: untouched.
+        (
+            "Alles neu hier, ganz ohne Wiederholung von irgendetwas.",
+            set(),
+            "Alles neu hier, ganz ohne Wiederholung von irgendetwas.",
+            [],
+        ),
+    ],
+)
+def test_drop_said_sentences(text, said, expected, dropped):
+    assert drop_said_sentences(text, said) == (expected, dropped)
+
+
+async def test_a_block_carried_over_under_a_new_opener_is_dropped_before_it_is_spoken(
+    persona, scenario, fake_pipeline
+):
+    """ADR 0038's named failure: a varied first sentence, the same block
+    underneath. The block is dropped from the chunk, the new sentences are
+    spoken, and the call goes on."""
+    block = "Das Ticket wurde vor elf Tagen geoeffnet, und ein Rueckruf war fest zugesagt."
+    fake_pipeline.stt.transcripts = ["Ich schaue nach.", "Es tut mir leid, das dauert noch."]
+    fake_pipeline.llm.replies = [
+        f"{block} Ich brauche dazu bitte eine konkrete Zahl von Ihnen.",
+        f"Das ist mir zu wenig. {block} Wann kann ich mit einer Antwort rechnen?",
+    ]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+    events = await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
+
+    assert completed(events).ends_call is False
+    assert orch.turns[1].persona_text == "Das ist mir zu wenig. Wann kann ich mit einer Antwort rechnen?"
+    assert orch._messages[-1]["content"] == orch.turns[1].persona_text  # pylint: disable=protected-access
+
+
+async def test_a_reply_that_is_nothing_but_the_users_line_is_re_asked_once(persona, scenario, fake_pipeline):
+    """Seen live: "36 Stunden, das geht nicht früher." came back verbatim as
+    the whole reply. The echo guard's stripping left nothing, so the reply is
+    re-asked with the echo quoted -- and the fresh attempt is what is spoken."""
+    line = "36 Stunden, das geht nicht frueher."
+    fake_pipeline.stt.transcripts = [line]
+    fake_pipeline.llm.replies = [line, "Gut, dann nehme ich die 36 Stunden. Melden Sie sich bitte, sobald es laeuft."]
+
+    orch = SessionOrchestrator(persona, scenario)
+    events = await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+
+    assert completed(events).ends_call is False
+    assert len(fake_pipeline.llm.calls) == 2
+    retry = fake_pipeline.llm.calls[-1][-1]
+    assert retry["role"] == "system"
+    assert "repeated the user's own words" in retry["content"] and line in retry["content"]
+    assert orch.turns[-1].persona_text.startswith("Gut, dann nehme ich die 36 Stunden")
+
+
+async def test_an_echo_that_survives_the_re_ask_ends_the_call_with_the_sign_off_not_an_error(
+    persona, scenario, fake_pipeline
+):
+    """The regeneration echoed too. Nothing is left to say, and that is the
+    ADR 0038 ending -- the sign-off and a completed Session -- not the empty-
+    reply error path, which is for a completion that produced no text at all."""
+    line = "36 Stunden, das geht nicht frueher."
+    fake_pipeline.stt.transcripts = [line]
+    fake_pipeline.llm.replies = [line, line]
+
+    orch = SessionOrchestrator(persona, scenario)
+    events = await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+
+    assert not any(isinstance(e, Failed) for e in events), "not an error"
+    assert completed(events).ends_call is True
+    assert FALLBACK_LINE in orch.turns[-1].persona_text
+    assert line not in orch.turns[-1].persona_text
+
+
+# The live case behind the next two tests: after two barge-ins the history
+# held two short cut-off lines, and the model answered an offer by reproducing
+# one of them word for word -- dash included -- which the loop guard could only
+# meet by ending the call.
+_LINE_A = "Das ist ein Problem, das wir seit einem Monat haben, und es hat einen Supportversprechen gegeben."
+_LINE_B = "Das Problem ist, dass die Ausfuhren fuer eines der zwei Konten nicht funktionieren, seit elf Tagen."
+
+
+async def test_a_reply_opening_with_a_sentence_already_said_is_regenerated_not_spoken(
+    persona, scenario, fake_pipeline, monkeypatch
+):
+    """The first chunk repeats a sentence from earlier in the call verbatim ->
+    caught before synthesis, re-asked once with the repeat quoted, and the
+    fresh attempt is what gets spoken. A copied cut-off dash in that attempt is
+    scrubbed too. The call goes on (ADR 0038, ADR 0035)."""
+    monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 10000)
+    fake_pipeline.stt.transcripts = [
+        "Was ist denn genau das Problem?",
+        "Ich schaue mir das Ticket gerade an.",
+        "Kann ich Ihnen eine Erstattung anbieten?",
+    ]
+    fake_pipeline.llm.replies = [
+        f"{_LINE_A} Ich will wissen, wann es wieder funktioniert.",
+        _LINE_B,
+        f"{_LINE_A} Ich will—",            # the loop: line A again, dash and all
+        "Eine Erstattung— ja, das waere ein Anfang, aber ich brauche auch einen Termin.",
+    ]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+    # Line A played in full, "Ich will" of the second chunk, then the barge-in:
+    # the history now holds "<line A> Ich will—", as in the live call.
+    orch.note_late_barge_in(12000)
+    assert orch._messages[-1]["content"] == f"{_LINE_A} Ich will—"  # pylint: disable=protected-access
+    await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
+
+    events = await collect(orch.run_turn(b"c", "turn.webm", "audio/webm"))
+
+    assert completed(events).ends_call is False
+    retry = fake_pipeline.llm.calls[-1]
+    assert retry[-1]["role"] == "system" and "already said exactly that" in retry[-1]["content"]
+    assert _LINE_A in retry[-1]["content"], "the repeated opening is quoted"
+    spoken = orch.turns[-1].persona_text
+    assert spoken.startswith("Eine Erstattung ja, das waere ein Anfang"), spoken
+    assert "—" not in spoken and _LINE_A not in spoken
+
+
+async def test_a_regeneration_that_loops_again_still_ends_the_call(
+    persona, scenario, fake_pipeline
+):
+    """One fresh attempt, not an endless retry: if the regenerated reply is a
+    verbatim repeat as well, it is spoken and the standing loop guard ends the
+    call with a goodbye, as before (ADR 0038)."""
+    fake_pipeline.stt.transcripts = ["Was ist denn genau das Problem?", "Ich schaue nach.", "Und jetzt?"]
+    fake_pipeline.llm.replies = [_LINE_A, _LINE_B, _LINE_A, _LINE_A]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+    await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
+    events = await collect(orch.run_turn(b"c", "turn.webm", "audio/webm"))
+
+    assert len(fake_pipeline.llm.calls) == 4, "exactly one regeneration"
+    assert completed(events).ends_call is True

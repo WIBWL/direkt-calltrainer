@@ -23,5 +23,9 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // The Vitest specs and their fakes are transpiled by esbuild (`npm test`),
+  // never emitted — keep them out of the production type-check/build so their
+  // test-only globals don't have to be wired into this config.
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test"]
 }
