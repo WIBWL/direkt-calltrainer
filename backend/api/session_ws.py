@@ -97,7 +97,7 @@ async def session_ws(websocket: WebSocket) -> None:
         # ask for its Feedback -- a 404 then means the write genuinely failed,
         # not that the client was merely early.
         await _record(session_id, auth.sub, persona, scenario, orchestrator, started_at, reason)
-        orchestrator.close()  # a notes refresh still in flight has no reader (ADR 0069)
+        orchestrator.close()  # a notes refresh still in flight has no reader (ADR 0071)
         try:
             await websocket.send_json({"type": "session.ended", "reason": reason, "transcript": transcript})
             await websocket.close()

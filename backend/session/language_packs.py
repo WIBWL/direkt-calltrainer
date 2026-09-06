@@ -83,7 +83,7 @@ class LanguagePack:
     # Whisper does not return an empty transcript on near-silence; it invents
     # a fixed phrase in the audio's language ("Vielen Dank.", "Amen.", a
     # subtitle credit). A whole transcript matching one of these is not a
-    # Turn (docs/research/model-parameters.md; ADR 0069). Whole-message
+    # Turn (docs/research/model-parameters.md; ADR 0071). Whole-message
     # patterns only: "Nein, danke, das passt" is a real answer.
     stt_phantom_re: re.Pattern[str]
     fallback_closing_line: str
@@ -96,7 +96,7 @@ _ANNOTATION_RE = re.compile(r"^\s*[*\[(][^*\]\)]*[*\])]\s*[.!?]*\s*$")
 
 def is_phantom(pack: LanguagePack, user_text: str) -> bool:
     """True if the transcript is Whisper inventing speech on near-silence -- a
-    VAD misfire, not a Turn (ADR 0069)."""
+    VAD misfire, not a Turn (ADR 0071)."""
     stripped = user_text.strip()
     return not stripped or bool(_ANNOTATION_RE.match(stripped)) or bool(pack.stt_phantom_re.match(stripped))
 

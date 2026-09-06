@@ -1,4 +1,4 @@
-"""Whisper's phantom transcripts do not become Turns (ADR 0069; the guard
+"""Whisper's phantom transcripts do not become Turns (ADR 0071; the guard
 docs/research/model-parameters.md left open).
 
 On near-silence Whisper invents a phrase -- "Vielen Dank.", "Amen.", a

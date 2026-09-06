@@ -17,13 +17,15 @@ wrong: the block has to name all three phases, has to give the closing more
 room than the middle (the peak-end effect the feature rests on), and must not
 quietly turn into the score ADR 0004 rules out.
 
-No database and no network: `_messages` is a pure function and `_Wrapup` is a
-pydantic model.
+No database and no network: `_messages` is a pure function, `_Wrapup` is a
+pydantic model, and the two tests that reach `_ask`/`_strip_reasoning` stub or
+bypass the model call.
 """
 
 import pytest
 
-from backend.feedback.generator import _LANGUAGE_NAMES_EN, _messages, _Wrapup
+from backend.clients.llm import _strip_reasoning
+from backend.feedback.generator import _ask, _LANGUAGE_NAMES_EN, _messages, _Wrapup
 from backend.session.language_packs import LANGUAGE_PACKS
 
 # The prompt builder and the response model are the units under test.
@@ -129,3 +131,43 @@ def test_the_language_name_is_what_the_model_is_told_to_write_in() -> None:
     system = _messages("dossier", _LANGUAGE_NAMES_EN["en"])[0]["content"]
 
     assert "Every value you write is in English" in system
+
+
+async def test_the_wrapup_is_asked_in_thinking_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ADR 0011/0043: paragraphs of German prose from an English brief on a 4B
+    model, where a single pass loses agreement and word order.
+
+    Asserted on the call, not the output -- what the trace does to the German is
+    the one thing a test cannot check.
+    """
+    calls: list[dict] = []
+    # Tells "left at llm.complete's default" apart from "explicitly None",
+    # which is what the PDF summary passes and this call must not.
+    unset = object()
+
+    async def fake_complete(messages, *, max_tokens=unset, think=False):
+        calls.append({"messages": messages, "max_tokens": max_tokens, "think": think})
+        return '{"summary": "Kurz.", "phase_language": "", "strengths": [], "improvements": []}'
+
+    monkeypatch.setattr("backend.clients.llm.complete", fake_complete)
+
+    await _ask("Transcript, timestamped from the start of the call:", "German")
+
+    assert len(calls) == 1, "one attempt is enough when the answer validates"
+    assert calls[0]["think"] is True
+    # The wrap-up keeps the cap; only the PDF summary (F-58) drops it, having a
+    # character cap instead. Uncapped, a trace could run to the job timeout.
+    assert calls[0]["max_tokens"] is unset
+    assert "Transcript" in calls[0]["messages"][1]["content"]
+
+
+def test_an_unfinished_reasoning_trace_yields_no_answer() -> None:
+    """A `<think>` that never closes means the budget ran out mid-trace, so
+    nothing after it was written.
+
+    Returning the trace would be worse than nothing: `_unwrap` scrapes the first
+    `{` out of the reply, and a trace deliberating about JSON is full of them --
+    the model's reasoning would be stored and shown as its feedback.
+    """
+    assert _strip_reasoning("<think>Let me consider {\"summary\": ...") == ""
+    assert _strip_reasoning("<think>done</think>\n{\"summary\": \"Kurz.\"}") == '{"summary": "Kurz."}'

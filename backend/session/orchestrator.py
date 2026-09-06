@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 _END_CALL_RE = re.compile(r"\[\s*call[_\s]?end\s*\]", re.IGNORECASE)
 
-# How many history messages the model reads verbatim (ADR 0069): the last
+# How many history messages the model reads verbatim (ADR 0071): the last
 # three exchanges. Everything before them reaches the model only as its notes.
 HISTORY_WINDOW = 6
 
@@ -189,12 +189,12 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes
         self._language_id = persona.language_id
         self._pack = get_pack(persona.language_id)
         self._voice = persona.voice
-        # Kept for the call-state notes (ADR 0069), which name the caller and
+        # Kept for the call-state notes (ADR 0071), which name the caller and
         # weigh the call against the Scenario's goal and success condition.
         self._persona = persona
         self._scenario = scenario
         # The caller's notes: what the model reads in place of the history
-        # beyond the last few exchanges (ADR 0069). Refreshed in the background
+        # beyond the last few exchanges (ADR 0071). Refreshed in the background
         # after every completed exchange, so a refresh never sits on the path
         # to the next reply; empty until the first exchange has completed.
         self._state = ""
@@ -329,7 +329,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes
                 return
             if is_phantom(self._pack, user_text):
                 # A VAD misfire transcribed as "*Titelm*" or "Vielen Dank." once
-                # became a Turn and derailed the call (ADR 0069). Nothing was
+                # became a Turn and derailed the call (ADR 0071). Nothing was
                 # said: no reply, no history, and a Turn opened for it is
                 # taken back -- a reopened one just stays open.
                 logger.info("Turn %d: transcript is a Whisper phantom (%d chars); no Turn", turn.seq, len(user_text))
@@ -381,7 +381,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes
             acoustics.cancel()  # no-op once awaited; releases the audio otherwise
 
     def _messages_for_turn(self, closing: bool, interrupted: Turn | None) -> list[dict[str, str]]:
-        """What the model reads for this reply (ADR 0069): the system prompt,
+        """What the model reads for this reply (ADR 0071): the system prompt,
         its notes on the call so far, the last `HISTORY_WINDOW` messages
         verbatim, and this turn's transient nudge -- never the whole history,
         which a 4B model misreads past a handful of exchanges (it attributed
@@ -417,7 +417,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes
 
     def _schedule_state_refresh(self, turn: Turn) -> None:
         """Refresh the caller's notes from this Turn's exchange, in the
-        background (ADR 0069). Called when a reply is committed and again when
+        background (ADR 0071). Called when a reply is committed and again when
         a barge-in trims it -- the notes must only ever record what the user
         heard -- so a refresh still running for the same exchange is replaced."""
         if not turn.user_text or not turn.persona_text:

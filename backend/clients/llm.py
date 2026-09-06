@@ -62,7 +62,11 @@ async def stream_reply(messages: list[dict[str, str]]) -> AsyncIterator[str]:
 # The wrap-up is a whole document rather than one spoken line, so it needs a
 # far larger budget than _MAX_REPLY_TOKENS -- and it is generated after the
 # call, where latency costs nobody anything.
-_MAX_FEEDBACK_TOKENS = 900
+# It runs in thinking mode, so this covers the trace as well as the answer;
+# sized for the worst case, because running out inside the trace yields no
+# answer at all. Capped rather than None so a repetition loop cannot run to the
+# RQ job timeout.
+_MAX_FEEDBACK_TOKENS = 4000
 
 
 async def complete(
@@ -71,8 +75,9 @@ async def complete(
     max_tokens: int | None = _MAX_FEEDBACK_TOKENS,
     think: bool = False,
 ) -> str:
-    """One non-streamed completion — the post-call wrap-up (ADR 0049) and the
-    document summary for an authored Scenario (F-58).
+    """One non-streamed completion — the post-call wrap-up (ADR 0049), the
+    document summary for an authored Scenario (F-58) and the follow-up Scenario
+    drafted from a Session's Feedback (F-60).
 
     Nothing is waiting on the first token here, unlike stream_reply, so the
     caller gets the finished text in one piece and can validate it as a whole.
@@ -83,11 +88,11 @@ async def complete(
     for its trace.
 
     `think=True` runs the model in reasoning mode: it is slower and spends part
-    of the budget on a hidden trace, but extracts markedly better. Only safe off
-    the live path, where latency costs nobody anything and the reply is not
-    streamed (thinking mode is catastrophic on stream_reply — see
-    docs/research/model-parameters.md). The document summary uses it; the wrap-up
-    does not.
+    of the budget on a hidden trace, but extracts and writes markedly better.
+    Only safe off the live path, where latency costs nobody anything and the
+    reply is not streamed. All three callers use it: the document summary, the
+    follow-up draft, and the wrap-up, whose German grammar breaks down without
+    it.
     """
     logger.info(
         "LLM completion (%s, max_tokens=%s, think=%s)...", LLM_MODEL, max_tokens, think
@@ -107,4 +112,47 @@ async def complete(
         },
     )
     text = completion.choices[0].message.content or ""
-    return _THINK_BLOCK_RE.sub("", text).strip() if think else text
+    return _strip_reasoning(text) if think else text
+
+
+def _strip_reasoning(text: str) -> str:
+    """The answer out of a thinking-mode reply, or "" if there is no answer yet.
+
+    A `<think>` that never closes means the budget ran out mid-reasoning, so
+    nothing after it was written. Returning the trace would be worse than
+    returning nothing: it is full of `{`, and the wrap-up's caller scrapes JSON
+    out of the reply, the model's deliberation would become its answer.
+    """
+    stripped = _THINK_BLOCK_RE.sub("", text)
+    if "<think>" in stripped:
+        logger.warning("Reasoning trace did not close — the token budget ran out inside it")
+        return ""
+    return stripped.strip()
+
+
+# --- Reading a structured reply -------------------------------------------
+#
+# Two callers ask for JSON off the live path, the wrap-up (ADR 0049) and the
+# follow-up draft (F-60), and a small model (ADR 0011) fences its output
+# however plainly it is told not to. So the unwrapping lives here, once, next
+# to the call that produced the text.
+
+_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
+
+
+def json_object(raw: str) -> str:
+    """The JSON object out of whatever the model wrapped it in. ValueError if
+    there is none — a cue to retry or fall back, not an error worth a
+    traceback."""
+    fenced = _FENCE_RE.search(raw)
+    candidate = fenced.group(1) if fenced else raw
+    start, end = candidate.find("{"), candidate.rfind("}")
+    if start == -1 or end <= start:
+        raise ValueError("no JSON object in the response")
+    return candidate[start:end + 1]
+
+
+def without_fenced_blocks(raw: str) -> str:
+    """`raw` with every fenced block removed, content and all — the prose, for a
+    caller that has given up on parsing the reply."""
+    return _FENCE_RE.sub("", raw)

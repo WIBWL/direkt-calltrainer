@@ -62,6 +62,7 @@ source of that content, and which imports without a database.
 | Persona & scenario library: row mapping + seeded content | F-01, F-03, F-04, R-07..R-10, R-12, ADR 0041, ADR 0043, ADR 0045 | `test_persona_scenario_library.py` |
 | User-authored Scenarios: ownership, tenant visibility, sharing | F-34, F-59, R-58, ADR 0024, ADR 0050, ADR 0058, ADR 0059, ADR 0060 | `test_authored_content.py` |
 | PDF text extraction for an authored Scenario | F-58, ADR 0024, ADR 0058, ADR 0059 | `test_scenario_documents.py` |
+| Follow-up Scenario drafted from a Session's feedback (what the model is and is not given, and the refusals) | F-60, F-10, ADR 0043, ADR 0050, ADR 0051, ADR 0059, ADR 0069 | `test_followup_scenario.py` |
 | Tenant resolution (org claim → e-mail domain → default) | R-58, ADR 0060 | `test_tenants.py` |
 | Sanitising authored Scenario text before it reaches the prompt | ADR 0024, ADR 0059 | `test_authored_text.py` |
 | Counterpart behaviour (LLM system prompt) | F-01, F-03, F-04, F-12, R-12, ADR 0043, ADR 0045, ADR 0033/0037/0038 | `test_system_prompt.py` |
@@ -71,8 +72,8 @@ source of that content, and which imports without a database.
 | Repetition guard, re-introduction regeneration + guaranteed sign-off | ADR 0038, ADR 0043 | `test_repetition_guard.py` |
 | `[CALL_END]` marker + foreign-script scrub | ADR 0033 | `test_call_end_marker.py` |
 | Barge-in / eager interruption (incl. the note-barge-in ordering contract, a late interrupt over a committed reply's tail, the `[unterbrochen]` transcript marker, and the cut-off dash + one-Turn nudge that keep the model in the conversation afterwards) | ADR 0035 | `test_barge_in.py`, `test_barge_in_ordering.py` |
-| The caller's notes and the history window: the model reads notes + the last three exchanges, the guards and the Transcript keep the full record; background refresh, refresh-on-trim, failure keeps stale notes | ADR 0069 | `test_call_state.py` |
-| Whisper phantom transcripts ("*Titelm*", "Vielen Dank.") are no Turn | ADR 0069 | `test_stt_phantom.py` |
+| The caller's notes and the history window: the model reads notes + the last three exchanges, the guards and the Transcript keep the full record; background refresh, refresh-on-trim, failure keeps stale notes | ADR 0071 | `test_call_state.py` |
+| Whisper phantom transcripts ("*Titelm*", "Vielen Dank.") are no Turn | ADR 0071 | `test_stt_phantom.py` |
 | Pipeline fault tolerance (retry → graceful end) | ADR 0016, ADR 0033 | `test_pipeline_failure.py` |
 | TTS backend selection & fallback | ADR 0040 | `test_tts_fallback.py` |
 | A KugelAudio stream left before `final` drops the pooled socket and re-warms; the orchestrator closes an abandoned stream at once (the one-chunk audio offset after a barge-in) | ADR 0044 (amendment) | `test_tts_stream_reset.py` |
@@ -81,7 +82,7 @@ source of that content, and which imports without a database.
 | Persistence schema (ORM metadata) and the invariants the database enforces (unique measurement/turn) | ADR 0025/0026/0029/0032/0051/0053, F-09, F-12, F-14 | `test_persistence_schema.py` |
 | Session statistics: what each metric divides by, and what suppresses it | F-08, F-24, F-36, F-41, F-51, F-53, ADR 0047, ADR 0048, ADR 0051 | `test_metrics.py` |
 | Async wrap-up job status (queued → running → done/failed), and every path that can strand it | F-09, F-10, ADR 0019, ADR 0032, ADR 0034, ADR 0050 | `test_feedback_job_status.py` |
-| Wrap-up prompt & phase block (F-42) | F-09, F-42, F-43, ADR 0004, ADR 0043, ADR 0049, ADR 0051, ADR 0056 | `test_wrapup_prompt.py` |
+| Wrap-up prompt & phase block (F-42), and the thinking-mode call it is asked with | F-09, F-42, F-43, ADR 0004, ADR 0011, ADR 0043, ADR 0049, ADR 0051, ADR 0056 | `test_wrapup_prompt.py` |
 | Documented gaps (current-state guards) | F-13/48, F-53, F-56, ADR 0006/0009 | `test_documented_gaps.py` |
 
 ## Not covered here

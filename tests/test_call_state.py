@@ -1,4 +1,4 @@
-"""The caller's notes and the history window (ADR 0069).
+"""The caller's notes and the history window (ADR 0071).
 
 Past a handful of exchanges the 4B model misread the raw transcript -- it
 attributed its own case to the user and asked about it for eight Turns. So

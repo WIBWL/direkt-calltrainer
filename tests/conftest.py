@@ -223,7 +223,7 @@ class FakeLLM:
         self.replies = list(replies or ["Alles klar, danke."])
         self.calls = []
         self.fail_times = 0
-        # `complete` is the call-state notes refresh (ADR 0069): one call per
+        # `complete` is the call-state notes refresh (ADR 0071): one call per
         # completed exchange. Empty by default, so the notes stay off and the
         # message list the older tests index into is unchanged.
         self.states = []

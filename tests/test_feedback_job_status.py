@@ -74,8 +74,13 @@ def _job(db: DbSession, session_id: int) -> AnalysisJob:
 
 def _stub_model(monkeypatch, reply) -> None:
     """Replace the wrap-up's model call. `reply` is the text to answer with, or
-    a callable invoked instead (to observe state, or to fail)."""
-    async def complete(messages: list[dict[str, str]]) -> str:
+    a callable invoked instead (to observe state, or to fail).
+
+    The keyword-only arguments mirror `llm.complete`'s real signature, which the
+    generator calls with `think=True`.
+    """
+    async def complete(messages: list[dict[str, str]], *,
+                       max_tokens: int | None = None, think: bool = False) -> str:
         return reply(messages) if callable(reply) else reply
 
     monkeypatch.setattr(llm, "complete", complete)

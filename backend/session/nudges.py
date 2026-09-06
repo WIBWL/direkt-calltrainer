@@ -12,7 +12,7 @@ together, against transcripts.
 
 import re
 
-# Frames the caller's notes in the model's view of the call (ADR 0069). They
+# Frames the caller's notes in the model's view of the call (ADR 0071). They
 # sit right after the system prompt, ahead of the last few exchanges, and are
 # marked as established fact so the model does not re-ask what they record.
 STATE_NOTES_FRAME = (

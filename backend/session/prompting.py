@@ -3,12 +3,12 @@ prompt, assembled from a Persona, a Scenario and a language pack.
 
 Prose, not control flow: every sentence here was written against a transcript
 in which Qwen3-4B did the wrong thing without it (ADR 0037, ADR 0038, ADR
-0043, ADR 0045, ADR 0069), and is read and revised the same way. Moved out of
+0043, ADR 0045, ADR 0071), and is read and revised the same way. Moved out of
 `orchestrator.py` for the same reason as `nudges.py`: that module is at its
 line ceiling, and these builders share nothing with the Turn machinery but
 the names it imports.
 
-The system prompt is deliberately short and sectioned (ADR 0069). The earlier
+The system prompt is deliberately short and sectioned (ADR 0071). The earlier
 version ran to ~1.5k tokens of English rules, and a 4B model does not follow
 forty rules -- it copies phrases out of them, and it turned the case facts it
 was handed into questions for the user ("Haben Sie den Callback versprochen?").
@@ -58,7 +58,7 @@ def _case_block(scenario: Scenario) -> str:
     empty field must not produce a dangling heading. The facts carry an
     ownership line: handed over bare, the model turned "a callback was
     promised" into "Haben Sie den Callback versprochen?" and asked the user
-    about its own case for eight Turns (ADR 0069). The success condition
+    about its own case for eight Turns (ADR 0071). The success condition
     carries a usage rule: handed over bare, the model read it out as a demand
     every Turn instead of weighing the call against it."""
     parts = []
@@ -205,7 +205,7 @@ def build_system_prompt(
     )
 
 
-# The call-state notes (ADR 0069): the one summarisation call per exchange
+# The call-state notes (ADR 0071): the one summarisation call per exchange
 # that keeps the model's view of the call short. Structured and factual on
 # purpose -- a 4B model extracts three labelled lines reliably where it loses
 # the thread in ten Turns of transcript.
@@ -215,7 +215,7 @@ STATE_MAX_TOKENS = 160
 def build_state_prompt(
     previous_notes: str, user_text: str, persona_text: str, persona: Persona, scenario: Scenario
 ) -> list[dict[str, str]]:
-    """The messages for one refresh of the caller's notes (ADR 0069)."""
+    """The messages for one refresh of the caller's notes (ADR 0071)."""
     settled = (
         f"The caller considers the matter settled when: {scenario.success_condition}\n"
         if scenario.success_condition else ""

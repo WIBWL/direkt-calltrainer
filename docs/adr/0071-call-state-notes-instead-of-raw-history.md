@@ -1,4 +1,4 @@
-# ADR 0069: The Model Reads Its Notes and the Last Exchanges, Not the Whole History
+# ADR 0071: The Model Reads Its Notes and the Last Exchanges, Not the Whole History
 
 ## Status
 
