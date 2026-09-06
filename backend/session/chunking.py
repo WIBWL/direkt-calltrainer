@@ -8,7 +8,15 @@ while the rest of the reply is still generating.
 import re
 from collections.abc import AsyncIterator
 
-_SENTENCE_END_RE = re.compile(r"[.!?]\s*$")
+# A period straight after a digit is not a sentence end: it is the thousands
+# separator ("1.500 Euro"), an ordinal ("am 3. Mai") or a section number, and
+# the tokens arrive split exactly there. Flushing on it sent "… 1." and
+# "500 Euro …" to TTS as two chunks -- spoken as "eins." and "fünfhundert",
+# stored as "1. 500" in the history the model then read back -- and split one
+# sentence over two chunks, out of reach of the sentence-level dedup. A
+# sentence that genuinely ends in a number waits for the next sentence end, or
+# the stream's end; nothing is lost.
+_SENTENCE_END_RE = re.compile(r"(?<!\d)[.!?]\s*$")
 # A listening test at 40/150, 80/250 and 120/300 chars found 80/250 most
 # natural: smaller chunks were choppier (no prosody continuity into the next),
 # larger ones only added latency before the first was ready.

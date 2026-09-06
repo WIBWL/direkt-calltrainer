@@ -70,9 +70,12 @@ source of that content, and which imports without a database.
 | Closing-intent detection (both language packs) | ADR 0037, ADR 0043, F-01 | `test_closing_intent.py` |
 | Repetition guard, re-introduction regeneration + guaranteed sign-off | ADR 0038, ADR 0043 | `test_repetition_guard.py` |
 | `[CALL_END]` marker + foreign-script scrub | ADR 0033 | `test_call_end_marker.py` |
-| Barge-in / eager interruption (incl. the note-barge-in ordering contract and a late interrupt over a committed reply's tail) | ADR 0035 | `test_barge_in.py`, `test_barge_in_ordering.py` |
+| Barge-in / eager interruption (incl. the note-barge-in ordering contract, a late interrupt over a committed reply's tail, the `[unterbrochen]` transcript marker, and the cut-off dash + one-Turn nudge that keep the model in the conversation afterwards) | ADR 0035 | `test_barge_in.py`, `test_barge_in_ordering.py` |
+| The caller's notes and the history window: the model reads notes + the last three exchanges, the guards and the Transcript keep the full record; background refresh, refresh-on-trim, failure keeps stale notes | ADR 0069 | `test_call_state.py` |
+| Whisper phantom transcripts ("*Titelm*", "Vielen Dank.") are no Turn | ADR 0069 | `test_stt_phantom.py` |
 | Pipeline fault tolerance (retry → graceful end) | ADR 0016, ADR 0033 | `test_pipeline_failure.py` |
 | TTS backend selection & fallback | ADR 0040 | `test_tts_fallback.py` |
+| A KugelAudio stream left before `final` drops the pooled socket and re-warms; the orchestrator closes an abandoned stream at once (the one-chunk audio offset after a barge-in) | ADR 0044 (amendment) | `test_tts_stream_reset.py` |
 | WebSocket wire protocol & handshake (+ token in `session.start`) | F-46, F-50, ADR 0009, ADR 0033, ADR 0035 | `test_websocket_protocol.py` |
 | Centralized logging (session-tagged, kept for the whole run) | ADR 0039, ADR 0055 | `test_logging.py` |
 | Persistence schema (ORM metadata) and the invariants the database enforces (unique measurement/turn) | ADR 0025/0026/0029/0032/0051/0053, F-09, F-12, F-14 | `test_persistence_schema.py` |

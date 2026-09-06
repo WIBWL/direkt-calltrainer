@@ -74,6 +74,26 @@ async def test_long_unpunctuated_run_is_force_split_at_a_word_boundary():
     assert " ".join(chunks).split() == "".join(tokens).split()
 
 
+async def test_a_period_after_a_digit_does_not_end_a_sentence():
+    """The tokens arrive split exactly at the thousands separator ("1", ".",
+    "050 Euro"), and flushing there sent "… 1." and "050 Euro …" to TTS as two
+    chunks -- spoken as "eins." / "fünfhundert", stored as "1. 050" -- and put
+    one sentence out of reach of the sentence-level dedup (ADR 0038)."""
+    chunks = await _chunks(
+        "Wir hatten vor zwei Monaten 1", ".", "050 Euro für 14 Lizenzen",
+        ", und jetzt ist der Preis auf 1", ".", "180 Euro gestiegen", ".",
+        " Das ist ein Zuwachs von 12 Prozent", ".",
+    )
+    assert chunks[0].startswith("Wir hatten vor zwei Monaten 1.050 Euro")
+    assert "1.180 Euro gestiegen." in chunks[0]
+    assert not any(c.rstrip().endswith("1.") for c in chunks)
+
+
+async def test_an_ordinal_does_not_end_a_sentence():
+    chunks = await _chunks("Der Rückruf war für den 3", ". ", "September zugesagt worden", ".")
+    assert chunks == ["Der Rückruf war für den 3. September zugesagt worden."]
+
+
 async def test_empty_stream_yields_nothing():
     assert await _chunks() == []
     assert await _chunks("", "   ", "") == []

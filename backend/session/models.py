@@ -28,6 +28,11 @@ class Turn:  # pylint: disable=too-many-instance-attributes
     seq: int
     persona_text: str = ""
     user_text: str = ""
+    # True once the user talked over this Turn's Persona reply and only the
+    # heard part was kept (ADR 0035). Kept off `persona_text` so the LLM history
+    # and the metrics never see it -- `utterances()` is the only reader, adding
+    # the visible "[unterbrochen]" marker to the transcript line.
+    persona_interrupted: bool = False
 
     # The two utterances placed on the Session's timeline, in milliseconds from
     # its start; None until that utterance has happened. The Persona's window is
@@ -72,7 +77,8 @@ def utterances(turns: Sequence[Turn]) -> list[Utterance]:
     Within one Turn the user speaks first: their text is the reply to the
     *previous* Turn's Persona line, and this Turn's Persona line answers it.
     Empty sides are skipped -- the opening Turn has no user text, and an
-    interrupted one may have no Persona text.
+    interrupted one may have no Persona text. A Persona line the user cut off
+    ends with a visible "[unterbrochen]" marker (ADR 0035).
 
     The single place that knows this ordering: both the Transcript sent over
     the WebSocket and the persisted Turn rows are built from it.
@@ -85,8 +91,11 @@ def utterances(turns: Sequence[Turn]) -> list[Utterance]:
                 _span(turn.user_offset_ms, turn.user_end_ms),
             ))
         if turn.persona_text:
+            text = turn.persona_text
+            if turn.persona_interrupted:
+                text = f"{text} ... [unterbrochen]"
             spoken.append(Utterance(
-                "persona", turn.persona_text, turn.persona_offset_ms or 0,
+                "persona", text, turn.persona_offset_ms or 0,
                 _span(turn.persona_offset_ms, turn.persona_end_ms),
             ))
     return spoken

@@ -16,8 +16,23 @@ Two shapes:
 
 Both fall back to the DiReKT Voxtral model (ADR 0040) when KugelAudio fails
 before producing audio, or always under ``DEBUG``.
+
+**A stream left before its ``final`` frame poisons the pooled socket** (ADR
+0044 amendment). ``stream_async`` sends the request on the shared connection
+and reads frames until ``final`` -- with no request id to tell one request's
+frames from the next. A barge-in closes the Turn generator mid-stream, so that
+request's remaining audio *and* its ``final`` stay queued on the socket; the
+next ``stream_async`` then yields that stale audio as its own, ends on the stale
+``final``, and leaves its own frames for the call after it -- a one-chunk
+offset that persists for the life of the connection. Live, that was the
+persona's last sentence arriving at the start of the *next* Turn, every Turn,
+once a call had been interrupted mid-sentence. So ``synthesize_stream`` drops
+the pooled connection whenever it is left short of ``final`` and re-warms a
+fresh one off the critical path (``kugelaudio==1.9.0`` has no public call for
+this; ``_close_ws_connection`` is the one it uses internally).
 """
 
+import asyncio
 import io
 import logging
 import wave
@@ -73,6 +88,7 @@ async def synthesize_stream(text: str, voice: PersonaVoice, language_id: str) ->
         KUGELAUDIO_MODEL, voice.kugelaudio_voice_id, language_id, text,
     )
     produced = False
+    finished = False  # the request's `final` frame was read: the socket is clean
     try:
         async for event in KUGELAUDIO_CLIENT.tts.stream_async(
             text=text,
@@ -83,11 +99,39 @@ async def synthesize_stream(text: str, voice: PersonaVoice, language_id: str) ->
             if isinstance(event, AudioChunk):
                 produced = True
                 yield _pcm16_to_wav(event.audio, event.sample_rate)
+            elif isinstance(event, dict) and event.get("final"):
+                finished = True
     except (KugelAudioError, TimeoutError, OSError) as e:
         if produced:
             raise KugelAudioError(f"KugelAudio stream failed after producing audio: {e}") from e
         logger.warning("KugelAudio streaming failed before any audio, falling back to DiReKT: %s", e)
         yield await _synthesize(text, voice)
+    finally:
+        # Reached on every exit: exhausted, failed, cancelled, or closed by the
+        # caller after a barge-in. Anything short of `final` leaves this
+        # request's frames on the shared socket (module docstring).
+        if not finished:
+            await _reset_pooled_connection()
+
+
+# Fire-and-forget re-warms, referenced so the loop cannot collect them mid-flight.
+_background: set[asyncio.Task[None]] = set()
+
+
+async def _reset_pooled_connection() -> None:
+    """Drop the pooled streaming socket and warm a fresh one in the background.
+
+    The next chunk pays a cold handshake only if it arrives before the re-warm
+    completes -- after a barge-in that is the next *Turn*, seconds away."""
+    try:
+        # No public equivalent in kugelaudio 1.9.0 (module docstring).
+        await KUGELAUDIO_CLIENT.tts._close_ws_connection()  # pylint: disable=protected-access
+    except Exception as e:  # pylint: disable=broad-exception-caught  # a dead socket must not fail the Turn
+        logger.warning("KugelAudio pooled connection could not be closed: %s", e)
+    logger.info("KugelAudio pooled connection dropped after an unfinished stream; re-warming")
+    task = asyncio.create_task(prewarm())
+    _background.add(task)
+    task.add_done_callback(_background.discard)
 
 
 async def synthesize(text: str, voice: PersonaVoice, language_id: str) -> bytes:

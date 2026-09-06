@@ -36,6 +36,10 @@ ENGLISH = get_pack("en")
         "Ich habe gerade keine Zeit mehr dafür.",
         "Ich muss jetzt auflegen.",
         "Lassen Sie uns das Gespräch beenden.",
+        # Said to the persona live and missed: the inflected verb before the noun.
+        "Ja, ich beende das Gespräch jetzt hier.",
+        "Ich beende das Telefonat.",
+        "Ich lege jetzt auf.",
     ],
 )
 def test_recognises_farewells_and_postponements(text):
@@ -49,6 +53,10 @@ def test_recognises_farewells_and_postponements(text):
         "Das verstehe ich nicht ganz, erklären Sie das nochmal.",
         "Warum kostet das denn so viel?",
         "Ich bin mit dem Preis nicht zufrieden.",
+        # The veto reads only the clause before a match, so the trailing
+        # negation is guarded in the pattern itself.
+        "Ich beende das Gespräch nicht, ich habe noch eine Frage.",
+        "Ich lege Wert auf eine schnelle Lösung.",
     ],
 )
 def test_does_not_fire_on_ordinary_conversation(text):

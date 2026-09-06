@@ -165,17 +165,31 @@ async def test_receive_json_tolerates_malformed_input():
 
 
 class _FakeOrchestrator:
-    """Just the two hooks _run_session calls between turns."""
+    """Just the hooks _run_session calls, plus a one-event `run_turn` whose
+    reply ends the call (for the revive test below)."""
 
     def __init__(self):
         self.late_barge_ins = []
+        self.barge_ins = []
         self.activated = 0
+        self.ended = False
+        self.turns_run = 0
 
     def start_playback(self):
         self.activated += 1
 
     def note_late_barge_in(self, played_ms):
         self.late_barge_ins.append(played_ms)
+
+    def note_barge_in(self, played_ms):
+        self.barge_ins.append(played_ms)
+
+    async def run_turn(self, _audio, _filename, _content_type):
+        self.turns_run += 1
+        yield StateChanged(state="speaking")
+        yield AudioChunk(turn_seq=self.turns_run, chunk_seq=1, audio=b"goodbye")
+        self.ended = True  # this reply ended the call
+        yield TurnCompleted(turn_seq=self.turns_run, ends_call=True)
 
 
 async def test_run_session_routes_a_between_turns_interrupt_to_the_orchestrator():
@@ -192,3 +206,24 @@ async def test_run_session_routes_a_between_turns_interrupt_to_the_orchestrator(
 
     assert reason == "user"
     assert orch.late_barge_ins == [1500]
+
+
+async def test_a_barge_in_over_the_goodbye_ends_the_session_instead_of_reviving_it():
+    """The reply that ends the call is streamed ahead like any other, so the
+    user's interrupt over its tail arrives while (or just after) that Turn is
+    ending the Session. It used to win: the loop carried on and ran a further
+    Turn on a finished call, heard as random text after the goodbye. The
+    orchestrator's `ended` now settles it (ADR 0035)."""
+    ws = FakeWebSocket([
+        {"type": "turn.audio.meta", "turn_seq": 1, "mime_type": "audio/wav"},
+        b"user-audio",
+        {"type": "turn.interrupt", "played_ms": 400},   # over the goodbye's tail
+        {"type": "turn.audio.meta", "turn_seq": 2, "mime_type": "audio/wav"},  # must never be consumed
+        b"more-audio",
+    ])
+    orch = _FakeOrchestrator()
+
+    reason = await session_ws._run_session(ws, orch, orch.start_playback)
+
+    assert reason == "completed"
+    assert orch.turns_run == 1, "no further Turn on a finished call"

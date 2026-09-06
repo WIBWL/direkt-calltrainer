@@ -75,7 +75,30 @@ class LanguagePack:
     # middle of, which is the expensive direction of error -- a missed signal
     # costs one extra turn, a false one cuts the conversation off.
     closing_veto_re: re.Pattern[str]
+    # Matched against the *persona's* last sentence when it carries an
+    # unprompted [CALL_END] (ADR 0037): a demand or an open question there
+    # means the model lost the thread, not that the call is over. Narrow, like
+    # the user-side patterns, and a farewell in the same sentence overrides it.
+    still_pressing_re: re.Pattern[str]
+    # Whisper does not return an empty transcript on near-silence; it invents
+    # a fixed phrase in the audio's language ("Vielen Dank.", "Amen.", a
+    # subtitle credit). A whole transcript matching one of these is not a
+    # Turn (docs/research/model-parameters.md; ADR 0069). Whole-message
+    # patterns only: "Nein, danke, das passt" is a real answer.
+    stt_phantom_re: re.Pattern[str]
     fallback_closing_line: str
+
+
+# Whisper's non-speech annotations -- "*Titelm*", "[Musik]", "(Applaus)" -- are
+# language-independent; the phantom phrases are per pack.
+_ANNOTATION_RE = re.compile(r"^\s*[*\[(][^*\]\)]*[*\])]\s*[.!?]*\s*$")
+
+
+def is_phantom(pack: LanguagePack, user_text: str) -> bool:
+    """True if the transcript is Whisper inventing speech on near-silence -- a
+    VAD misfire, not a Turn (ADR 0069)."""
+    stripped = user_text.strip()
+    return not stripped or bool(_ANNOTATION_RE.match(stripped)) or bool(pack.stt_phantom_re.match(stripped))
 
 
 def signals_closing(pack: LanguagePack, user_text: str) -> bool:
@@ -141,7 +164,13 @@ _GERMAN = LanguagePack(
         # "keine Zeit mehr *für* X" is a complaint about X, not a request to
         # hang up -- and complaint Scenarios are exactly where it turns up.
         r"rufe? (sie |dich )?(nochmal|später|zurück)|keine zeit (mehr|gerade)\b(?!\s*f(ü|ue)r)|"
-        r"muss (jetzt |gleich )?(auflegen|los|schluss machen)|gespräch (beenden|abbrechen))",
+        r"muss (jetzt |gleich )?(auflegen|los|schluss machen)|gespräch (beenden|abbrechen)|"
+        # The inflected forms -- "ich beende das Gespräch jetzt", "ich lege
+        # jetzt auf" -- were said to the persona and missed. The look-ahead
+        # keeps "ich beende das Gespräch nicht" out, since the veto only reads
+        # the clause *before* a match.
+        r"beende\w*(?:\s+\w+){0,3}\s+(gespräch|telefonat)(?!\s+(noch\s+)?nicht\b)|"
+        r"lege?\s+(jetzt\s+|dann\s+|gleich\s+)?auf\b)",
         re.IGNORECASE,
     ),
     regreeting_re=re.compile(
@@ -165,6 +194,18 @@ _GERMAN = LanguagePack(
     ),
     closing_veto_re=re.compile(
         r"\b(nicht|kein\w*|nie|niemals|bevor|ehe)\b", re.IGNORECASE
+    ),
+    # "Ich will wissen, wann ..." / "Ich muss wissen ..." / "Wann wird ..." --
+    # the shapes the persona's demands took in the calls that ended on them.
+    still_pressing_re=re.compile(
+        r"\b(ich (will|möchte|muss|brauche|erwarte)\b|wann (wird|ist|kommt|funktioniert|bekomme)\b|"
+        r"ich warte (auf|noch)\b)",
+        re.IGNORECASE,
+    ),
+    stt_phantom_re=re.compile(
+        r"^\W*(vielen dank( fürs zuschauen)?|amen|untertitel\w*( (des|der|von) [\w\s,.-]+)?|"
+        r"copyright [\w\s,.-]+)\W*$",
+        re.IGNORECASE,
     ),
     fallback_closing_line="Vielen Dank für Ihre Zeit. Auf Wiederhören.",
 )
@@ -229,6 +270,15 @@ _ENGLISH = LanguagePack(
         re.IGNORECASE,
     ),
     closing_veto_re=re.compile(r"\bnot\b|n'?t\b|\bnever\b|\bbefore\b", re.IGNORECASE),
+    still_pressing_re=re.compile(
+        r"\b(i (want|need|must|expect|require)\b|when (will|is|does|can)\b|i'?m (still )?waiting\b)",
+        re.IGNORECASE,
+    ),
+    stt_phantom_re=re.compile(
+        r"^\W*(thank you( for watching)?|thanks for watching|amen|subtitles? by [\w\s,.-]+|"
+        r"copyright [\w\s,.-]+)\W*$",
+        re.IGNORECASE,
+    ),
     fallback_closing_line="Thank you for your time. Goodbye.",
 )
 

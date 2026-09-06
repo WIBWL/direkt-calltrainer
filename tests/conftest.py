@@ -223,6 +223,19 @@ class FakeLLM:
         self.replies = list(replies or ["Alles klar, danke."])
         self.calls = []
         self.fail_times = 0
+        # `complete` is the call-state notes refresh (ADR 0069): one call per
+        # completed exchange. Empty by default, so the notes stay off and the
+        # message list the older tests index into is unchanged.
+        self.states = []
+        self.state_calls = []
+        self.state_fail_times = 0
+
+    async def complete(self, messages, **_kwargs):
+        self.state_calls.append(messages)
+        if self.state_fail_times > 0:
+            self.state_fail_times -= 1
+            raise OpenAIError("simulated notes failure")
+        return self.states.pop(0) if self.states else ""
 
     def stream_reply(self, messages):
         self.calls.append(messages)
@@ -304,6 +317,7 @@ def fake_pipeline(monkeypatch):
     tts_fake = FakeTTS()
 
     monkeypatch.setattr(llm, "stream_reply", llm_fake.stream_reply)
+    monkeypatch.setattr(llm, "complete", llm_fake.complete)
     monkeypatch.setattr(stt, "transcribe", stt_fake.transcribe)
     monkeypatch.setattr(tts, "synthesize_stream", tts_fake.synthesize_stream)
     monkeypatch.setattr(tts, "synthesize", tts_fake.synthesize)
