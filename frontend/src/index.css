@@ -1935,3 +1935,18 @@ h2 {
   line-height: 1.5;
   color: var(--color-text-muted-secondary);
 }
+
+.feedback-metrics-section .metric-loudness {
+  grid-column: 1 / -1;
+  min-height: 140px;
+}
+
+.feedback-metrics-section .metric-loudness .metric-value {
+  margin-top: 8px;
+}
+
+.feedback-metrics-section .metric-loudness .sparkline {
+  width: 100%;
+  height: 48px;
+  margin-top: 16px;
+}
