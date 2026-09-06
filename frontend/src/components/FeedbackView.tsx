@@ -173,7 +173,10 @@ function Metric({ measurement }: { measurement: Measurement }) {
     <div className={`metric${measurement.key === "loudness" ? " metric-loudness" : ""}`}>
       <span className="metric-name">{measurement.name}</span>
       <span className="metric-value">
-        {measurement.value.toFixed(decimals)} {measurement.unit ?? ""}
+        {measurement.value.toFixed(decimals)}
+        {measurement.unit && measurement.unit !== "Anzahl"
+          ? ` ${measurement.unit}`
+          : ""}
       </span>
       {curve && <Sparkline values={curve} label={`${measurement.name} im Gesprächsverlauf`} />}
     </div>
