@@ -411,16 +411,32 @@ def database_env(url: str) -> Iterator[None]:
                 os.environ[key] = was
 
 
+def _alembic_config() -> Config:
+    """Alembic settings for a programmatic migration inside the test process.
+
+    `configure_logging=False` is the same opt-out `backend/db/provision.py`
+    uses, and for the same reason: migrations/env.py otherwise calls
+    fileConfig(), which disables every logger that already exists — including
+    the application's own. In the app that would silently cost logging for the
+    rest of the process; here it silently costs it for the rest of the test
+    session, which is how a test that asserts on log output came to fail only
+    when a database test happened to run before it.
+    """
+    config = Config(str(PROJECT_ROOT / "alembic.ini"))
+    config.attributes["configure_logging"] = False
+    return config
+
+
 def alembic_upgrade(url: str, revision: str = "head") -> None:
     """Migrates `url` up to `revision`."""
     with database_env(url):
-        command.upgrade(Config(str(PROJECT_ROOT / "alembic.ini")), revision)
+        command.upgrade(_alembic_config(), revision)
 
 
 def alembic_downgrade(url: str, revision: str) -> None:
     """Migrates `url` back down to `revision`."""
     with database_env(url):
-        command.downgrade(Config(str(PROJECT_ROOT / "alembic.ini")), revision)
+        command.downgrade(_alembic_config(), revision)
 
 
 @pytest.fixture(scope="session")
@@ -581,12 +597,17 @@ def persist(
     turns: list[Turn] | None = None,
     persona_key: str = PERSONA_KEY,
     subject: str = TEST_AUTH.sub,
+    started_at: datetime = SESSION_STARTED,
 ) -> uuid.UUID:
     """Write a Session through the real write path; returns its extern_id.
 
     persist_session() opens its own session_scope(), so this needs the
     `app_database` fixture rather than `db_session` — the two see the same
     database, but only the former is what the application itself connects to.
+
+    `started_at` defaults to a fixed instant, so a test that does not care
+    about time gets a reproducible one; the history tests override it, because
+    the order the listing returns is the thing they are checking.
     """
     # Imported here, not at module scope: importing the write path pulls in
     # the feedback stack, which a collection-time import should not need.
@@ -601,7 +622,7 @@ def persist(
         persona,
         replace(TEST_SCENARIOS[0], id=SCENARIO_KEY),
         turns if turns is not None else [],
-        SESSION_STARTED,
+        started_at,
         reason,
     )
     return extern_id

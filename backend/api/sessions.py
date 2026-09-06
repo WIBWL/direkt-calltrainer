@@ -1,4 +1,5 @@
-"""REST route for a finished Session: its Transcript, statistics and Feedback.
+"""REST routes for finished Sessions: the caller's history, and one Session's
+Transcript, statistics and Feedback.
 
 The Feedback is generated asynchronously (ADR 0019), so the Session becomes
 readable before its wrap-up exists. `status` says which of the two states the
@@ -24,14 +25,123 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import selectinload
 
+from backend import deletion
 from backend.auth import AuthContext, require_user
 from backend.db import models as db_models
 from backend.db.session import session_scope
 
 router = APIRouter(prefix="/api/sessions", dependencies=[Depends(require_user)])
+
+# Page size for the history. The default is what one screen of history shows;
+# the cap is what keeps a single request from loading a heavy user's whole
+# past, since the trend view asks for as much as it is allowed.
+DEFAULT_PAGE_SIZE = 20
+MAX_PAGE_SIZE = 100
+
+
+@router.get("")
+def list_sessions(
+    caller: AuthContext = Depends(require_user),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    offset: int = Query(0, ge=0),
+) -> dict:
+    """The caller's own finished Sessions, newest first (F-13/F-48).
+
+    Filtered by `subject_id` and by nothing else: there is no route to anyone
+    else's history, and no id to guess at, because ownership is the query here
+    rather than a check applied after one (ADR 0031). That column is indexed
+    for exactly this query -- see migration 18f5098dfb1b.
+
+    Carries each Session's Measurements, which is what makes one request serve
+    both screens: the history list reads the metadata, the progress view reads
+    the values as one point per Session (ADR 0051 already guarantees exactly
+    one per metric). `detail_json` is deliberately dropped -- the loudness
+    curve alone is larger than everything else here put together, and no view
+    over several Sessions plots it.
+
+    What it does not carry is the wrap-up text -- that stays on the detail
+    route. It does say whether one exists, under a name of its own: `status`
+    here is `session.status` (ADR 0057) and must keep meaning that, so the
+    wrap-up's state is `feedback_status` and never `status`.
+    """
+    with session_scope() as db:
+        query = (
+            db.query(db_models.Session)
+            .filter_by(subject_id=caller.sub)
+            .options(
+                selectinload(db_models.Session.measurements)
+                .selectinload(db_models.Measurement.metric_type),
+                selectinload(db_models.Session.persona),
+                selectinload(db_models.Session.scenario),
+                # Two more queries per page, not two per row: selectinload
+                # batches them, so the wrap-up flag costs the same at 20 rows
+                # as at one.
+                selectinload(db_models.Session.feedback),
+                selectinload(db_models.Session.jobs),
+            )
+        )
+        # Before the slice, and on the filtered query: the client needs to know
+        # whether more pages exist, which the page itself cannot say.
+        total = query.order_by(None).count()
+        sessions = (
+            # session_id breaks a tie on the timestamp. Two Sessions can share
+            # a started_at -- it comes from the client's `session.activate` --
+            # and an order Postgres is free to choose would put them in a
+            # different sequence on each read, which paginates badly: a row can
+            # appear on two pages or on none.
+            query.order_by(
+                db_models.Session.started_at.desc(),
+                db_models.Session.session_id.desc(),
+            )
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+        return {
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "sessions": [_session_summary(s) for s in sessions],
+        }
+
+
+def _session_summary(session: db_models.Session) -> dict:
+    """One row of the history. `status` is `session.status` here -- completed
+    or aborted (ADR 0057) -- not the feedback status the detail route reports
+    under the same key; that one is `feedback_status`.
+
+    Both wrap-up fields are present because they answer different questions.
+    `has_feedback` is "is there something to open", which is what the row's
+    link is worth; `feedback_status` is why not, which is what distinguishes a
+    wrap-up still being generated from one that will never arrive. Deriving
+    either from the other would be a guess: a job reading `done` whose feedback
+    row is missing is exactly the case the reader must not paper over.
+    """
+    return {
+        "session_id": str(session.extern_id),
+        "persona": session.persona.name,
+        "scenario": session.scenario.title,
+        "status": session.status,
+        "has_feedback": session.feedback is not None,
+        "feedback_status": _feedback_status(session),
+        # Explicit isoformat rather than leaving it to the serializer: the wire
+        # format is part of what the frontend parses, not an incidental
+        # property of how this dict happens to be encoded.
+        "started_at": session.started_at.isoformat(),
+        "ended_at": session.ended_at.isoformat() if session.ended_at else None,
+        "measurements": [
+            {
+                "key": m.metric_type.key,
+                "name": m.metric_type.name,
+                "unit": m.metric_type.unit,
+                "value": float(m.value),
+            }
+            for m in session.measurements
+        ],
+    }
 
 
 @router.get("/{extern_id}")
@@ -66,6 +176,30 @@ def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user
             "measurements": [_measurement(m) for m in session.measurements],
             "feedback": _feedback(session.feedback),
         }
+
+
+@router.delete("/{extern_id}", status_code=204, response_class=Response)
+def delete_one_session(
+    extern_id: uuid.UUID, caller: AuthContext = Depends(require_user)
+) -> Response:
+    """Delete one of the caller's own stored trainings (ADR 0060).
+
+    204 on success, 404 for an id that does not exist *or* is not the caller's
+    — the same answer the read route gives, for the same reason (ADR 0050): a
+    distinct response would confirm that an id exists, which is what makes it
+    worth guessing at.
+
+    Not idempotent in the HTTP sense on purpose: a second DELETE of the same id
+    is a 404, because by then it is indistinguishable from a wrong id. The
+    underlying operation is idempotent — nothing breaks — but the route will
+    not claim a training was deleted twice.
+    """
+    with session_scope() as db:
+        if not deletion.delete_session(db, caller.sub, extern_id):
+            raise HTTPException(status_code=404, detail="Unknown session")
+    # Returned explicitly rather than annotated `-> None`: FastAPI derives a
+    # response model from the annotation, and a 204 may not carry a body.
+    return Response(status_code=204)
 
 
 def _feedback_status(session: db_models.Session) -> str:
