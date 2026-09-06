@@ -3802,3 +3802,17 @@ h2 {
     text-align: left;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .login-submit-button {
+    transition: none;
+  }
+
+  .login-submit-button:hover {
+    transform: none;
+  }
+
+  .auth-status-spinner {
+    animation-duration: 1.6s;
+  }
+}
