@@ -1765,3 +1765,24 @@ h2 {
   line-height: 1.5;
   color: var(--color-navy-900);
 }
+
+.feedback-point-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.feedback-point-time {
+  flex-shrink: 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: #eaf4fa;
+  color: var(--color-blue-600);
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 500;
+}
+
+.feedback-point-item p {
+  flex: 1;
+}
