@@ -24,6 +24,8 @@ class PersonaVoice:
 
 @dataclass(frozen=True)
 class Persona:
+    # `id` is the row's `extern_id` (ADR 0050/0058), the value the client sends
+    # back in `session.start`.
     id: str
     name: str
     language_id: str

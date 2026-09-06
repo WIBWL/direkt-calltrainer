@@ -49,7 +49,7 @@ def _run_seed(database_url: str) -> str:
 
 def _counts(url: str) -> dict[str, int]:
     engine = create_engine(url)
-    tables = ["language", "persona", "persona_objection", "scenario", "metric_type"]
+    tables = ["language", "tenant", "persona", "persona_objection", "scenario", "metric_type"]
     try:
         with engine.connect() as conn:
             return {t: conn.execute(text(f"SELECT count(*) FROM {t}")).scalar_one() for t in tables}
@@ -66,6 +66,7 @@ def test_seed_populates_the_reference_tables(migrated_database: str) -> None:
     assert counts["scenario"] > 0
     assert counts["language"] > 0
     assert counts["metric_type"] > 0
+    assert counts["tenant"] >= 3  # solox, appollo, default (ADR 0060)
 
 
 def test_seed_is_idempotent(migrated_database: str) -> None:
@@ -109,10 +110,11 @@ def test_seed_deactivates_personas_it_no_longer_contains(migrated_database: str)
         with engine.begin() as conn:
             conn.execute(
                 text(
-                    "INSERT INTO persona (key, name, role_label, role, traits, behavior,"
-                    " training_goal, difficulty, language_code, tts_voice, active)"
-                    " VALUES ('retired-persona', 'Alt', 'Alt', 'Alt', 'alt', 'alt', '', 'mittel',"
-                    " 'de', 'de_male', true)"
+                    "INSERT INTO persona (key, extern_id, name, role_label, role, traits,"
+                    " behavior, training_goal, difficulty, language_code, tts_voice,"
+                    " active, visibility)"
+                    " VALUES ('retired-persona', gen_random_uuid(), 'Alt', 'Alt', 'Alt',"
+                    " 'alt', 'alt', '', 'mittel', 'de', 'de_male', true, 'public')"
                 )
             )
 

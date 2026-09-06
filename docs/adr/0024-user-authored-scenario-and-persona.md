@@ -21,4 +21,10 @@ Both remain optional, advanced-tier configuration, kept out of the required mini
 
 ## Consequences
 
+> **Followed up by:** the storage, API and editor for authored **Scenarios** are
+> designed in ADR 0058; the prompt-injection question in ADR 0059; the
+> tenant/company-sharing model in ADR 0060. Authored **Personas** were dropped —
+> a Persona is a curated character with a fixed voice, so `/api/personas` stays
+> read-only (see ADR 0058).
+
 Advanced users gain more control over Session realism and the counterpart's behavior without complicating the minimal MVP setup, since this is deferred beyond MVP. Uploaded files keep routing through the Data Platform; free-text Scenario and Persona input will need storage of its own in the Session schema (ADR 0010), not yet designed. User-authored Personas raise open questions left for a future ADR: whether they appear in the same card-based library UI (ADR 0015) or as a separate "my personas" space, whether they need any moderation or validation before being used as system-prompt content, and how they interact with Language as an independent Session parameter (ADR 0022). Feeding raw user-supplied text (files and free text) toward the LLM as context or persona definition also widens the prompt-injection surface, which needs to be addressed at implementation time.

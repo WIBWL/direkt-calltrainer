@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import type { MicDevice } from "../hooks/useMicrophoneDevices";
 import { useMicrophoneLevel } from "../hooks/useMicrophoneLevel";
 import SetupSection from "./SetupSection";
 
@@ -13,13 +14,28 @@ const HEARD_THRESHOLD = 0.02;
 type TestPhase = "idle" | "running" | "failed" | "passed";
 
 interface MicCheckProps {
+  /** null = browser default. */
+  deviceId: string | null;
+  devices: MicDevice[];
+  onDeviceChange: (deviceId: string | null) => void;
+  /** Labels are empty until permission is granted once — call after a
+   * successful test to pick up the real names. */
+  onDevicesRefresh: () => void;
   onConfirmed: () => void;
   onCancel: () => void;
 }
 
-/** Pre-call microphone test: lets the user confirm that recording works before a session starts. */
-export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
-  const { level, error, deviceLabel, start, stop } = useMicrophoneLevel();
+/** Pre-call microphone test: lets the user pick an input device and confirm
+ * that recording works before a session starts. */
+export default function MicCheck({
+  deviceId,
+  devices,
+  onDeviceChange,
+  onDevicesRefresh,
+  onConfirmed,
+  onCancel,
+}: MicCheckProps) {
+  const { level, error, start, stop } = useMicrophoneLevel(deviceId);
 
   // The microphone stays inactive until the user deliberately starts the test.
   const [phase, setPhase] = useState<TestPhase>("idle");
@@ -38,8 +54,19 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
   // The same user-triggered handler starts the initial test and any later retry.
   const startTest = async () => {
     setPhase("running");
-    if (!(await start())) setPhase("failed");
+    if (await start()) {
+      onDevicesRefresh(); // labels are only real once permission was granted
+    } else {
+      setPhase("failed");
+    }
   };
+
+  // Picking a different device while the meter is live must not keep the old
+  // stream open — restart against the new one instead of silently ignoring it.
+  useEffect(() => {
+    if (phase === "running") void startTest();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a deviceId change (not every re-render) should restart the running test
+  }, [deviceId]);
 
   return (
     <>
@@ -59,11 +86,26 @@ export default function MicCheck({ onConfirmed, onCancel }: MicCheckProps) {
         title="Mikrofon prüfen"
         description="Sprechen Sie nach dem Start einen kurzen Testsatz."
       >
-        {/* This field reports the active device without suggesting unsupported device selection. */}
         <dl className="mic-device-information">
           <div className="mic-device-information-row">
-            <dt>Mikrofon</dt>
-            <dd>{deviceLabel || "Standardmikrofon"}</dd>
+            <dt>
+              <label htmlFor="mic-device-select">Mikrofon</label>
+            </dt>
+            <dd>
+              <select
+                id="mic-device-select"
+                className="mic-device-select"
+                value={deviceId ?? ""}
+                onChange={(e) => onDeviceChange(e.target.value || null)}
+              >
+                <option value="">Standardmikrofon</option>
+                {devices.map((device, index) => (
+                  <option key={device.deviceId} value={device.deviceId}>
+                    {device.label || `Mikrofon ${index + 1}`}
+                  </option>
+                ))}
+              </select>
+            </dd>
           </div>
         </dl>
 

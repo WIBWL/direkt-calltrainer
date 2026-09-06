@@ -20,6 +20,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from backend.auth import AuthContext, authenticate_ws
 from backend.logging_config import session_id_scope
+from backend.tenants import resolve_tenant_id
 from backend import library
 from backend.feedback import jobs
 from backend.personas import Persona
@@ -107,7 +108,7 @@ async def session_ws(websocket: WebSocket) -> None:
         logger.info("Session ended (%s)", reason)
 
 
-async def _record(
+async def _record(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     session_id: uuid.UUID,
     subject_id: str,
     persona: Persona,
@@ -127,7 +128,7 @@ async def _record(
             persistence.persist_session,
             session_id, subject_id, persona, scenario, orchestrator.turns, started_at, reason,
         )
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         logger.exception("Session could not be persisted; it is lost")
         return
     try:
@@ -135,15 +136,31 @@ async def _record(
         # Redis to be importable, let alone reachable. `jobs` stays at module
         # scope -- it touches only the database, and the handler below needs it
         # bound even when this import is what failed.
-        from backend.feedback import queue
+        from backend.feedback import queue  # pylint: disable=import-outside-toplevel
 
         await asyncio.to_thread(queue.enqueue_feedback, db_id)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception("Feedback could not be queued for session %d", db_id)
         # The row persist_session just wrote says "queued" for a job nobody
         # ever received. This is the only place that knows better, so it
         # records it rather than leaving the row lying (ADR 0032).
         await asyncio.to_thread(jobs.mark_failed, db_id, str(e))
+
+
+def _load_selection(
+    persona_id: str | None, scenario_id: str | None, auth: AuthContext
+) -> tuple[Persona | None, Scenario | None]:
+    """The Persona and Scenario the handshake names, read together in one worker
+    thread -- `session_scope()` is synchronous and nothing blocking may run on
+    the event loop that streams live audio (CLAUDE.md, ADR 0034).
+
+    The Scenario is scoped to the caller and their company (ADR 0060): a
+    built-in, one shared with their tenant, or one of their own -- never another
+    User's private Scenario. Personas are all built-ins, so they are not scoped.
+    """
+    persona = library.get_persona(persona_id)
+    scenario = library.get_scenario(scenario_id, auth.sub, resolve_tenant_id(auth))
+    return persona, scenario
 
 
 async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario, AuthContext] | None:
@@ -171,8 +188,9 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario, AuthConte
     persona_id = start.get("persona_id")
     scenario_id = start.get("scenario_id")
     try:
-        persona = library.get_persona(persona_id)
-        scenario = library.get_scenario(scenario_id)
+        persona, scenario = await asyncio.to_thread(
+            _load_selection, persona_id, scenario_id, auth
+        )
     except SQLAlchemyError as e:
         # Not the client's fault, so not a protocol error (1002): the
         # library is unreachable. ADR 0041 puts the database on the

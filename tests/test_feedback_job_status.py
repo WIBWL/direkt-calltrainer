@@ -31,6 +31,9 @@ from backend.feedback.queue import JOB_TIMEOUT_S
 from backend.session.models import Turn
 from tests.conftest import persist
 
+# `app_database` is taken by several tests only to activate the fixture.
+# pylint: disable=unused-argument
+
 pytestmark = pytest.mark.usefixtures("reference_data")
 
 # What the stubbed model returns; the shape `_Wrapup` validates. The keys are

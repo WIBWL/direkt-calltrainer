@@ -86,7 +86,9 @@ async def test_empty_kugelaudio_stream_falls_back_to_direkt(monkeypatch):
 
     class EmptyStreamingTTS:
         async def stream_async(self, **_kwargs):
-            if False:
+            # An async generator that yields nothing -- a stream that finishes
+            # cleanly with no audio.
+            if False:  # pylint: disable=using-constant-test
                 yield None
 
     class EmptyKugelAudioClient:

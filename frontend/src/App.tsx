@@ -4,13 +4,17 @@ import { apiFetch } from "./api";
 import AppLayout from "./components/AppLayout";
 import CallView from "./components/CallView";
 import FeedbackView from "./components/FeedbackView";
+import { matchesFilter, type LibraryFilter } from "./components/LibraryPicker";
 import MicCheck from "./components/MicCheck";
+import ScenarioEditor from "./components/ScenarioEditor";
 import SetupView from "./components/SetupView";
 import TranscriptView from "./components/TranscriptView";
+import { useMicrophoneDevices } from "./hooks/useMicrophoneDevices";
 import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useSessionSocket, type CommittedSession } from "./hooks/useSessionSocket";
 import { useStreamedAudioPlayback } from "./hooks/useStreamedAudioPlayback";
-import type { Persona, Scenario, TranscriptEntry } from "./protocol";
+import type { Persona, TranscriptEntry } from "./protocol";
+import { getTenant, listScenarios, type ScenarioCard } from "./scenarioLibrary";
 import { loadFinishedSession, saveFinishedSession } from "./utils/finishedSession";
 
 type Screen = "setup" | "mic-check" | "call" | "transcript";
@@ -21,6 +25,9 @@ interface PendingEnd {
   sessionId: string | null;
 }
 
+/** null = closed; { id: null } = new; { id } = editing that row. */
+type EditorState = { id: string | null } | null;
+
 /**
  * Owns the training flow: which screen is showing, what has been selected, and
  * the live Session behind it. Everything visible is delegated to a screen
@@ -28,12 +35,20 @@ interface PendingEnd {
  */
 export default function App() {
   const [personas, setPersonas] = useState<Persona[]>([]);
-  const [scenarios, setScenarios] = useState<Scenario[]>([]);
+  const [scenarios, setScenarios] = useState<ScenarioCard[]>([]);
   const [personaId, setPersonaId] = useState<string | null>(null);
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [scenarioFilter, setScenarioFilter] = useState<LibraryFilter>("all");
+  const [editingScenario, setEditingScenario] = useState<EditorState>(null);
+  // The caller's company (ADR 0060); null = default tenant, no company chip.
+  const [tenantName, setTenantName] = useState<string | null>(null);
   // Tracks intentional muting separately from entering or leaving the call screen.
   const [isMicrophoneMuted, setIsMicrophoneMuted] = useState(false);
+  // The input device picked in the mic-check screen; null = browser default.
+  // Carries over into the call the same way isMicrophoneMuted does.
+  const [micDeviceId, setMicDeviceId] = useState<string | null>(null);
+  const { devices: micDevices, refresh: refreshMicDevices } = useMicrophoneDevices();
   // Lazy initializer: read once on mount, not on every render.
   const [restored] = useState(loadFinishedSession);
   const [screen, setScreen] = useState<Screen>(restored ? "transcript" : "setup");
@@ -52,6 +67,23 @@ export default function App() {
   // another deliberate click, never automatically.
   const [committed, setCommitted] = useState<CommittedSession | null>(null);
 
+  // Reloaded after the user creates, edits, shares or deletes a row, so a
+  // refetch shows the change without a full page reload. `select` (when passed)
+  // is the id to select next — the saved row, or the first remaining one if it
+  // was deleted.
+  const reloadScenarios = useCallback(
+    (select?: string | null) =>
+      listScenarios()
+        .then((data) => {
+          setScenarios(data);
+          if (select !== undefined) setScenarioId(select ?? data[0]?.id ?? null);
+        })
+        .catch((e) =>
+          setLoadError(`Szenarien konnten nicht geladen werden: ${e.message}`),
+        ),
+    [],
+  );
+
   const selectedPersona = personas.find((persona) => persona.id === personaId) ?? null;
   const selectedScenario = scenarios.find((scenario) => scenario.id === scenarioId) ?? null;
   // A reload restores the post-call screen without a selection to look the
@@ -67,15 +99,32 @@ export default function App() {
         setPersonas(data);
         if (!restored && data[0]) setPersonaId(data[0].id);
       })
-      .catch((e: Error) => setLoadError(`Personas konnten nicht geladen werden: ${e.message}`));
+      .catch((e) =>
+        setLoadError(`Personas konnten nicht geladen werden: ${e.message}`),
+      );
 
-    apiFetch<Scenario[]>("/api/scenarios")
+    listScenarios()
       .then((data) => {
         setScenarios(data);
         if (!restored && data[0]) setScenarioId(data[0].id);
       })
-      .catch((e: Error) => setLoadError(`Szenarien konnten nicht geladen werden: ${e.message}`));
+      .catch((e) =>
+        setLoadError(`Szenarien konnten nicht geladen werden: ${e.message}`),
+      );
+
+    getTenant()
+      .then((t) => setTenantName(t.name))
+      .catch(() => setTenantName(null)); // no company filter if this fails
   }, [restored]);
+
+  // A selected microphone that gets unplugged (mid-test or mid-call) falls
+  // back to the browser default rather than failing every getUserMedia call
+  // with a stale exact deviceId from then on.
+  useEffect(() => {
+    if (micDeviceId !== null && !micDevices.some((d) => d.deviceId === micDeviceId)) {
+      setMicDeviceId(null);
+    }
+  }, [micDevices, micDeviceId]);
 
   // The Session (WebSocket + VAD + audio playback) lives here, at the App
   // level, not inside whichever screen happens to be showing — it connects
@@ -155,7 +204,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment above
   }, []);
 
-  const vad = useMicrophoneVAD(handleBargeIn, socket.sendTurnAudio);
+  const vad = useMicrophoneVAD(handleBargeIn, socket.sendTurnAudio, micDeviceId);
 
   useEffect(() => {
     vad.preload();
@@ -212,10 +261,36 @@ export default function App() {
     setScreen("setup");
   }, []);
 
+  // The filter chips appear once there is more than just built-ins to filter
+  // to — the user authored something, a colleague shared something, or the user
+  // is in a company at all.
+  const showScenarioFilter =
+    tenantName !== null || scenarios.some((s) => s.origin !== "builtin");
+  const scenarioItems = scenarios.map((s) => ({
+    id: s.id,
+    name: s.name,
+    subtitle: s.short_description,
+    origin: s.origin,
+    shared: s.shared,
+  }));
+  const visibleScenarios = scenarioItems.filter((s) => matchesFilter(s, scenarioFilter));
+
+  const handleScenarioSaved = (savedId: string | null) => {
+    setEditingScenario(null);
+    void reloadScenarios(savedId);
+  };
+
   if (screen === "mic-check") {
     return (
       <AppLayout step="prepare" pageClassName="mic-check-page">
-        <MicCheck onConfirmed={handleConfirmed} onCancel={handleCancelMicCheck} />
+        <MicCheck
+          deviceId={micDeviceId}
+          devices={micDevices}
+          onDeviceChange={setMicDeviceId}
+          onDevicesRefresh={refreshMicDevices}
+          onConfirmed={handleConfirmed}
+          onCancel={handleCancelMicCheck}
+        />
       </AppLayout>
     );
   }
@@ -255,8 +330,16 @@ export default function App() {
   return (
     <AppLayout step="prepare" pageClassName="setup-page">
       <SetupView
-        scenarios={scenarios}
+        scenarioItems={visibleScenarios}
+        scenarioId={scenarioId}
+        scenarioFilter={scenarioFilter}
+        onScenarioFilter={setScenarioFilter}
+        showScenarioFilter={showScenarioFilter}
+        tenantName={tenantName}
+        onNewScenario={() => setEditingScenario({ id: null })}
+        onEditScenario={(id) => setEditingScenario({ id })}
         personas={personas}
+        personaId={personaId}
         selectedScenario={selectedScenario}
         selectedPersona={selectedPersona}
         loadError={loadError}
@@ -264,6 +347,16 @@ export default function App() {
         onSelectPersona={setPersonaId}
         onStart={handleStartSession}
       />
+
+      {editingScenario && (
+        <ScenarioEditor
+          scenarioId={editingScenario.id}
+          tenantName={tenantName}
+          onClose={() => setEditingScenario(null)}
+          onSaved={handleScenarioSaved}
+          onRefresh={() => void reloadScenarios()}
+        />
+      )}
     </AppLayout>
   );
 }

@@ -17,11 +17,13 @@ from dotenv import load_dotenv
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
+# pylint: disable=wrong-import-position  # sys.path is set up just above
 from backend.db.provision import inventory, provision  # noqa: E402
 from backend.db.session import session_scope  # noqa: E402
 
 
 def main() -> None:
+    """Provision the database, then print what was created and what is there."""
     load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
     created = provision()
     with session_scope() as db:
