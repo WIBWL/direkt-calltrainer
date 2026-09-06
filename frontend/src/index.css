@@ -1248,3 +1248,845 @@ h2 {
   font-size: 0.8rem;
   color: var(--text-muted);
 }
+
+/* --- Header: brand link and account chip -------------------------------- */
+/* The header grew navigation when the app grew a second page. Both ends of it
+   collapse to their non-interactive form during a call, because leaving the
+   page would discard a Session that is never written back (ADR 0034). */
+
+.app-brand-link {
+  text-decoration: none;
+  border-radius: var(--radius-control);
+  flex-shrink: 0;
+}
+
+.app-brand-link:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 4px;
+}
+
+/* Only present when the header shows no training steps; keeps the brand left
+   and the account right instead of letting them meet in the middle. */
+.app-header-spacer {
+  flex: 1;
+}
+
+.account-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 6px 14px 6px 6px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  text-decoration: none;
+  color: var(--color-navy-900);
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.account-chip:hover {
+  background: var(--color-surface-selected);
+  border-color: var(--color-border);
+}
+
+.account-chip:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 2px;
+}
+
+.account-chip.is-active {
+  background: var(--color-blue-100);
+  border-color: var(--color-border-subtle);
+}
+
+/* During a call: present, but plainly not a control. */
+.account-chip.is-locked {
+  opacity: 0.45;
+  padding-right: 6px;
+  cursor: default;
+}
+
+.account-avatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-navy-900);
+  color: var(--color-surface);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.account-chip-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  /* A long display name must not push the training steps around. */
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The name is the first thing to go when the header runs out of room — the
+   avatar alone still identifies the account and still opens the profile. */
+@media (max-width: 720px) {
+  .account-chip-name {
+    display: none;
+  }
+
+  .account-chip {
+    padding-right: 6px;
+  }
+}
+
+/* --- Profile screen (F-31, F-49) ---------------------------------------- */
+
+.profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  border-radius: var(--radius-card);
+  /* Sits above the cards below it rather than being one of them: this block is
+     who you are, the cards are what is known about you. */
+  background: var(--color-navy-900);
+  color: var(--color-surface);
+}
+
+.profile-identity-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-avatar {
+  width: 62px;
+  height: 62px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-blue-600);
+  color: var(--color-surface);
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.profile-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.profile-email {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--color-blue-300);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+
+/* A quiet aside next to a value, for the rare case worth flagging (an
+   unverified address). Lowercase and unboxed on purpose -- it qualifies the
+   value, it is not a label on it. */
+.profile-flag {
+  margin-left: 10px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.profile-signout {
+  flex-shrink: 0;
+  align-self: center;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: none;
+  padding: 0.6rem 1.25rem;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--color-surface);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.profile-signout:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--color-surface);
+}
+
+.profile-signout:focus-visible {
+  outline: 2px solid var(--color-blue-300);
+  outline-offset: 2px;
+}
+
+/* Label/value pairs. A two-column grid rather than a table: the values wrap
+   (a `sub` is long, a realm URL longer) and a table would either scroll the
+   page sideways or truncate them. */
+.profile-facts {
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) 1fr;
+  gap: 10px 24px;
+  margin: 0;
+}
+
+.profile-facts dt {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  /* Aligns the label to the first line of a value that wraps. */
+  padding-top: 1px;
+}
+
+.profile-facts dd {
+  margin: 0;
+  color: var(--color-navy-900);
+  overflow-wrap: anywhere;
+}
+
+.profile-page .card p + p {
+  margin-top: 0.9rem;
+}
+
+.profile-paragraph {
+  line-height: 1.5;
+}
+
+/* Same treatment the statistics disclaimer gets: it qualifies what is above
+   it rather than making a claim of its own. */
+.profile-page p.profile-note {
+  margin: 1rem 0 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--color-blue-300);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+/* A section describing something that does not exist yet. Deliberately not
+   styled as a warning — nothing is wrong, it is simply not built. */
+.profile-pending {
+  border-style: dashed;
+  background: transparent;
+}
+
+@media (max-width: 560px) {
+  .profile-identity {
+    flex-wrap: wrap;
+  }
+
+  .profile-signout {
+    width: 100%;
+  }
+
+  .profile-facts {
+    grid-template-columns: 1fr;
+    gap: 2px 0;
+  }
+
+  .profile-facts dd {
+    margin-bottom: 12px;
+  }
+}
+
+/* --- Training history (F-48) -------------------------------------------- */
+/* One row per training. Rows rather than cards: a history is scanned for the
+   one call you have in mind, and a stack of thin lines compares far better
+   than a grid of boxes. */
+
+.profile-section {
+  margin-top: 1.5rem;
+}
+
+.session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-choice);
+  background: var(--color-surface);
+  /* Clips the first and last row's hover fill to the rounded corners. */
+  overflow: hidden;
+}
+
+.session-list li + li {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 13px 18px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s;
+}
+
+.session-row:hover {
+  background: var(--color-surface-selected);
+}
+
+.session-row:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: -2px;
+}
+
+/* Fixed width so the dates line up into a column that can be read downwards. */
+.session-row-date {
+  flex: 0 0 10.5rem;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.session-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.session-row-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-row-persona {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  min-width: 0;
+}
+
+/* Small state labels on a history row. Tinted rather than solid, and stating
+   a fact rather than raising an alarm: a call that was abandoned, or one whose
+   wrap-up never got written, is a thing that happened, not the user's mistake.
+   Colour is a second channel here, never the only one -- each chip says in
+   words what its colour repeats, so it survives being read in greyscale or by
+   someone who does not separate green from red. */
+.chip {
+  margin-left: 8px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* A wrap-up exists and can be opened. */
+.chip-success {
+  background: #e3f2ec;
+  color: var(--color-success);
+}
+
+/* One is on its way — the worker has not finished yet. */
+.chip-pending {
+  background: var(--color-blue-100);
+  color: var(--color-blue-600);
+}
+
+/* None was written and none is coming. Muted red: it closes off an
+   expectation, but nothing went wrong that the user could have prevented. */
+.chip-absent {
+  background: #f7e7e5;
+  color: var(--color-danger);
+}
+
+/* Plain statements of fact, e.g. that a call was abandoned. */
+.chip-neutral {
+  background: var(--color-surface-filter);
+  color: var(--color-text-muted);
+}
+
+.session-row-duration {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.session-row-chevron {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-top: 1.5px solid var(--color-blue-300);
+  border-right: 1.5px solid var(--color-blue-300);
+  transform: rotate(45deg);
+  transition: border-color 0.15s;
+}
+
+.session-row:hover .session-row-chevron {
+  border-color: var(--color-blue-600);
+}
+
+.session-more {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: none;
+  padding: 0.7rem 1.25rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--color-blue-600);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.session-more:hover:not(:disabled) {
+  background: var(--color-surface-selected);
+}
+
+.session-more:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* On a narrow screen the date moves above the title instead of squeezing it. */
+@media (max-width: 560px) {
+  .session-row {
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+
+  .session-row-date {
+    flex: 0 0 100%;
+    order: -1;
+    font-size: 0.8rem;
+  }
+
+  .session-row-main {
+    flex: 1 1 auto;
+  }
+}
+
+/* --- Back link and page lead -------------------------------------------- */
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: var(--color-blue-600);
+  text-decoration: none;
+}
+
+.back-link::before {
+  content: "← ";
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+/* The one-line subtitle under a page heading — who the call was with. Sits in
+   the margin the h1 leaves, so it reads as part of the heading block. */
+.page-lead {
+  margin: -1rem 0 1.5rem;
+  color: var(--color-text-muted);
+}
+
+/* --- Storage consent (ADR 0060) ----------------------------------------- */
+
+/* Replaces the app rather than floating over it: the decision has to be made,
+   and dimming a usable screen behind it would suggest otherwise. */
+.consent-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--color-background);
+  overflow-y: auto;
+}
+
+.consent-dialog {
+  width: min(560px, 100%);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 32px;
+}
+
+.consent-dialog h1 {
+  font-size: 1.4rem;
+  margin-bottom: 1.25rem;
+}
+
+.consent-dialog p {
+  margin: 0 0 0.9rem;
+  line-height: 1.55;
+}
+
+.consent-highlight {
+  padding: 12px 14px;
+  border-radius: var(--radius-control);
+  background: var(--color-blue-100);
+}
+
+.consent-dialog p.consent-note {
+  margin-top: 1.25rem;
+  padding-left: 12px;
+  border-left: 3px solid var(--color-blue-300);
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+/* Both answers are real answers, so both get a real button. A muted "no" next
+   to a bright "yes" is a dark pattern, and it would undermine the very consent
+   this dialog exists to collect. */
+.consent-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 1.5rem;
+}
+
+.consent-button {
+  flex: 1;
+  border-radius: 999px;
+  padding: 0.85rem 1.25rem;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, opacity 0.2s;
+}
+
+.consent-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.consent-button-primary {
+  border: 1px solid var(--color-navy-900);
+  background: var(--color-navy-900);
+  color: var(--color-surface);
+}
+
+.consent-button-primary:hover:not(:disabled) {
+  background: var(--color-blue-600);
+  border-color: var(--color-blue-600);
+}
+
+.consent-button-secondary {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-navy-900);
+}
+
+.consent-button-secondary:hover:not(:disabled) {
+  background: var(--color-surface-selected);
+}
+
+.consent-button-danger {
+  border: 1px solid var(--color-danger);
+  background: var(--color-danger);
+  color: var(--color-surface);
+}
+
+.consent-button-danger:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.consent-error {
+  color: var(--color-danger);
+}
+
+.consent-result {
+  color: var(--color-success);
+}
+
+/* --- Consent on the profile --------------------------------------------- */
+
+.consent-status {
+  margin: 0 0 0.75rem;
+}
+
+/* The chip carries a left margin for use inline in a history row; as a
+   standalone status it should sit flush. */
+.consent-status .chip {
+  margin-left: 0;
+}
+
+.profile-page .card .consent-confirm {
+  margin-top: 1rem;
+  padding: 14px 16px;
+  border: 1px dashed var(--color-danger);
+  border-radius: var(--radius-control);
+}
+
+.profile-page .card .consent-confirm p {
+  margin: 0 0 0.9rem;
+  line-height: 1.5;
+}
+
+.consent-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.consent-confirm-actions .cancel-button {
+  width: auto;
+  margin-top: 0;
+  padding: 0.85rem 1rem;
+}
+
+.profile-page .card .consent-button {
+  flex: 0 0 auto;
+  margin-top: 1rem;
+}
+
+.consent-confirm .consent-button {
+  margin-top: 0;
+}
+
+/* --- Storage notice on the setup screen --------------------------------- */
+
+.setup-storage-note {
+  margin: 0 0 1rem;
+  padding: 12px 14px;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-filter);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.setup-storage-note a {
+  color: var(--color-blue-600);
+}
+
+/* --- Deleting one training (ADR 0060) ----------------------------------- */
+
+.session-delete {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.session-delete p {
+  margin: 0 0 0.9rem;
+  line-height: 1.5;
+}
+
+/* Quiet by default: this sits under a page the user came to read, and the
+   destructive weight belongs on the confirmation, not on the way in. */
+.session-delete-trigger {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--color-danger);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.session-delete-trigger:hover {
+  opacity: 0.8;
+}
+
+/* --- Where the data goes (F-49) ----------------------------------------- */
+
+.processing-notice {
+  margin-top: 1.25rem;
+  padding: 14px 16px;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-filter);
+}
+
+.processing-notice.is-compact {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.processing-notice-lead {
+  margin: 0 0 0.6rem;
+  font-weight: 600;
+}
+
+.processing-notice-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  line-height: 1.5;
+}
+
+.processing-notice-list li + li {
+  margin-top: 0.5rem;
+}
+
+/* --- The three deletion paths, told apart -------------------------------- */
+/* A list, not prose: they are three different things with three different
+   reaches, and a paragraph blurs exactly the distinction that matters. */
+
+.deletion-paths {
+  margin: 0 0 1.25rem;
+}
+
+.deletion-paths dt {
+  font-weight: 600;
+  margin-top: 0.9rem;
+}
+
+.deletion-paths dt:first-child {
+  margin-top: 0;
+}
+
+.deletion-paths dd {
+  margin: 0.2rem 0 0;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+/* Says something the user would otherwise find out too late, so it is the one
+   block on this page allowed to raise its voice. */
+.profile-page .card p.profile-warning {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-control);
+  border-left: 3px solid var(--color-danger);
+  background: #fdf4f3;
+  line-height: 1.5;
+}
+
+/* --- Retention (ADR 0061) ------------------------------------------------ */
+
+.retention {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.profile-page .card .retention p {
+  margin: 0 0 0.9rem;
+  line-height: 1.5;
+}
+
+.profile-page .card .retention .consent-button {
+  margin-top: 0;
+}
+
+/* --- Legal pages (imprint, privacy, accessibility) ----------------------- */
+/* Long documents rather than screens, so they get reading measure, generous
+   line height and headings that structure rather than decorate. */
+
+.legal-page h1 {
+  margin-bottom: 2rem;
+}
+
+.legal-body {
+  line-height: 1.65;
+}
+
+.legal-body h2 {
+  margin: 2.25rem 0 0.75rem;
+  font-size: 1.15rem;
+  color: var(--color-navy-900);
+}
+
+.legal-body h3 {
+  margin: 1.75rem 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-blue-600);
+}
+
+.legal-body p {
+  margin: 0 0 1rem;
+}
+
+.legal-body ul {
+  margin: 0 0 1rem;
+  padding-left: 1.2rem;
+}
+
+.legal-body li {
+  margin-bottom: 0.6rem;
+}
+
+.legal-body a {
+  color: var(--color-blue-600);
+  overflow-wrap: anywhere;
+}
+
+/* Bare URLs, listed rather than linked, exactly as the source page has them. */
+.legal-links {
+  list-style: none;
+  padding-left: 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.legal-links li {
+  margin-bottom: 0.25rem;
+  overflow-wrap: anywhere;
+}
+
+/* The Art. 21 notice is set in capitals in the original and stays that way:
+   it is a legally prescribed form, not a styling choice. Letter-spacing and a
+   smaller size keep a wall of capitals readable. */
+.legal-uppercase {
+  font-size: 0.85rem;
+  letter-spacing: 0.01em;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+/* Marks the draft, and the two facts still to be filled in. Loud on purpose:
+   an unreviewed privacy statement must not be mistakable for a final one. */
+.legal-review-note {
+  margin-bottom: 2rem;
+  padding: 14px 16px;
+  border: 1px dashed var(--color-danger);
+  border-radius: var(--radius-control);
+  background: #fdf4f3;
+}
+
+.legal-review-note p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.legal-open {
+  background: #fdf0c8;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--color-navy-900);
+  font-size: 0.9em;
+}
+
+/* The date a legal document was last revised, and the one-line opener on the
+   notes page. Both sit above the body and set it up rather than joining it. */
+.legal-date {
+  margin: -0.5rem 0 2rem;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.legal-body p.legal-lead {
+  font-size: 1.05rem;
+  margin-bottom: 1.5rem;
+}
