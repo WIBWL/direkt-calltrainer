@@ -52,16 +52,21 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
         <p className="feedback-summary-text">{feedback.summary}</p>
       </div>
 
-      <PointList
-        title="Das lief gut"
-        points={feedback.points.filter((p) => p.kind === "strength")}
-        tone="success"
-      />
-      <PointList
-        title="Daran können Sie arbeiten"
-        points={feedback.points.filter((p) => p.kind === "improvement")}
-        tone="danger"
-      />
+      <div className="feedback-details">
+        <PointList
+          eyebrow="STÄRKEN"
+          title="Das gelang gut"
+          points={feedback.points.filter((p) => p.kind === "strength")}
+          tone="success"
+        />
+
+        <PointList
+          eyebrow="WEITERENTWICKELN"
+          title="Das können Sie verbessern"
+          points={feedback.points.filter((p) => p.kind === "improvement")}
+          tone="danger"
+        />
+      </div>
 
       {measurements.length > 0 && (
         <>
@@ -98,28 +103,39 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
 }
 
 function PointList({
+  eyebrow,
   title,
   points,
   tone,
 }: {
+  eyebrow: string;
   title: string;
   points: FeedbackPoint[];
   tone: "success" | "danger";
 }) {
   if (points.length === 0) return null;
   return (
-    <>
-      <h2>{title}</h2>
+  <section className={`feedback-point-card ${tone}`}>
+    <div className="feedback-point-header">
+      <div className="feedback-point-icon" aria-hidden="true">
+        {tone === "success" ? "✓" : "!"}
+      </div>
+
+      <div>
+        <div className="feedback-point-eyebrow">{eyebrow}</div>
+        <h2 className="feedback-point-title">{title}</h2>
+      </div>
+    </div>
+
+    <div className="feedback-point-list">
       {points.map((point, i) => (
-        <div className="card" key={i}>
-          <p>
-            <span className={`bullet ${tone}`} aria-hidden="true" />
-            {point.text}
-          </p>
+        <div className="feedback-point-item" key={i}>
+          <p>{point.text}</p>
         </div>
       ))}
-    </>
-  );
+    </div>
+  </section>
+);
 }
 
 function Metric({ measurement }: { measurement: Measurement }) {
