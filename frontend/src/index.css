@@ -3813,6 +3813,6 @@ h2 {
   }
 
   .auth-status-spinner {
-  animation: none;
-}
+    animation: none;
+  }
 }
