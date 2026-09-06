@@ -359,9 +359,23 @@ _DB_SETTINGS = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
                 "POSTGRES_HOST", "POSTGRES_PORT")
 
 # Bounds the reachability probe so an unreachable server fails in a few seconds
-# instead of hanging on libpq's default. psycopg tries both the IPv6 and the
-# IPv4 address, so the wait is up to twice this.
+# instead of hanging on libpq's default.
 _DB_CONNECT_TIMEOUT = 3
+
+
+def _loopback(host: str) -> str:
+    """`localhost` -> `127.0.0.1` for the test database server.
+
+    The persistence tests talk to a *local* Postgres — the `db` container's
+    forwarded port. On Windows `localhost` resolves to `::1` first, but Docker
+    Desktop's port forward binds IPv4 only, so every connect wastes the libpq
+    connect timeout on the v6 address before falling back — with dozens of
+    throwaway databases each opened several times, that turns a 45-second run
+    into minutes or an outright hang (the Alembic engine has no timeout at all).
+    Pinning the loopback name sidesteps it and changes nothing on a stack that
+    was already answering on v4. A real hostname in POSTGRES_HOST is left alone.
+    """
+    return "127.0.0.1" if host in ("localhost", "::1") else host
 
 
 def _render(url: URL) -> str:
@@ -381,7 +395,7 @@ def _server_url() -> URL:
         "postgresql+psycopg",
         username=_ENV["POSTGRES_USER"],
         password=_ENV["POSTGRES_PASSWORD"],
-        host=_ENV.get("POSTGRES_HOST") or "localhost",
+        host=_loopback(_ENV.get("POSTGRES_HOST") or "localhost"),
         port=int(_ENV.get("POSTGRES_PORT") or 5432),
         database=_ENV["POSTGRES_DB"],
     )
