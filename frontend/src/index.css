@@ -1615,3 +1615,17 @@ h2 {
   font-size: 0.8rem;
   color: var(--text-muted);
 }
+
+/* --- Feedback page --- */
+
+.feedback-intro {
+  margin-bottom: 20px;
+}
+
+.feedback-title {
+  margin: 0;
+  font-size: 48px;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: var(--color-navy-900);
+}

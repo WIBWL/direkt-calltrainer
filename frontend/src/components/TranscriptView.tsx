@@ -26,8 +26,10 @@ export default function TranscriptView({
 }: TranscriptViewProps) {
   return (
     <>
-      <div className="eyebrow">TRAINING ABGESCHLOSSEN</div>
-      <h1>Ihr Gesprächsfeedback</h1>
+      <div className="feedback-intro">
+        <div className="eyebrow">TRAINING ABGESCHLOSSEN</div>
+        <h1 className="feedback-title">Ihr Gesprächsfeedback</h1>
+      </div>
       {feedback}
 
       <h2>Gesprächsprotokoll</h2>
