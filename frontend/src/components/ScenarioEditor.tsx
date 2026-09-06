@@ -2,6 +2,8 @@ import { Fragment, useEffect, useState } from "react";
 
 import { ApiError } from "../api";
 import {
+  CATEGORIES,
+  CATEGORY_LABELS,
   createScenario,
   deleteScenario,
   EMPTY_DRAFT,
@@ -11,8 +13,10 @@ import {
   getScenario,
   setScenarioVisibility,
   updateScenario,
+  type CategoryChoice,
   type FieldLimits,
   type ScenarioDraft,
+  type TextField,
   type Visibility,
 } from "../scenarioLibrary";
 import ShareToggle from "./ShareToggle";
@@ -36,7 +40,7 @@ interface ScenarioEditorProps {
 /** The placeholder is the field's guidance in one short line, greyed out while
  * the field is empty — so there is no separate always-visible hint. */
 const FIELDS: {
-  key: keyof ScenarioDraft;
+  key: TextField;
   label: string;
   placeholder: string;
   multiline?: boolean;
@@ -233,6 +237,31 @@ export default function ScenarioEditor({
         ) : (
           <>
             <div className="editor-fields">
+              <label className="editor-field">
+                <span className="editor-field-label">
+                  <span>Kategorie</span>
+                </span>
+                <select
+                  value={draft.category}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, category: e.target.value as CategoryChoice }))
+                  }
+                >
+                  {/* Optional on purpose (ADR 0064): a Scenario that fits none
+                      of the three is better uncategorised than filed wrongly.
+                      It then shows under "Alle" and under no category. */}
+                  <option value="">Ohne Kategorie</option>
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {CATEGORY_LABELS[c]}
+                    </option>
+                  ))}
+                </select>
+                <span className="editor-field-hint">
+                  Bestimmt, unter welchem Filter das Szenario in der Bibliothek auftaucht.
+                </span>
+              </label>
+
               {FIELDS.map((field) => {
                 const value = draft[field.key];
                 const limit = limits[field.key];

@@ -101,6 +101,27 @@ VISIBILITY_TENANT = "tenant"
 VISIBILITY_PUBLIC = "public"
 VISIBILITIES = (VISIBILITY_PRIVATE, VISIBILITY_TENANT, VISIBILITY_PUBLIC)
 
+# Scenario.category (ADR 0064): what kind of call a Scenario is, and the
+# vocabulary the library's category filter runs on. A closed CHECK-enforced
+# list, unlike the free-text `scenario_type` it replaces -- that one had no
+# vocabulary and no reader, and both are why it went.
+#
+# Four values refining F-03's three call contexts: `operations` is F-03's short
+# support cases, `requirements` its consultative project talks, and `pricing` /
+# `closing` split its offer-and-pricing calls, because negotiating a rate and
+# getting a signature are different exercises.
+#
+# NULL is allowed and means "not categorised": an authored row from before this
+# column existed has no value to backfill with, and inventing one would file it
+# under a context nobody chose. Such a row shows under "Alle" and nowhere else.
+CATEGORY_OPERATIONS = "operations"
+CATEGORY_REQUIREMENTS = "requirements"
+CATEGORY_PRICING = "pricing"
+CATEGORY_CLOSING = "closing"
+SCENARIO_CATEGORIES = (
+    CATEGORY_OPERATIONS, CATEGORY_REQUIREMENTS, CATEGORY_PRICING, CATEGORY_CLOSING,
+)
+
 
 def _one_of(column: str, values: tuple[str, ...]) -> CheckConstraint:
     """A CHECK restricting `column` to `values`.
@@ -255,6 +276,7 @@ class Scenario(_AuthoredContent, Base):
     __tablename__ = "scenario"
     __table_args__ = (
         _one_of("visibility", VISIBILITIES),
+        _one_of("category", SCENARIO_CATEGORIES),
         _tenant_visibility_needs_a_tenant(),
         # The visibility filter's hot path -- `/api/scenarios` and every
         # `get_scenario` in the Session pipeline (ADR 0060).
@@ -279,6 +301,10 @@ class Scenario(_AuthoredContent, Base):
     case_facts: Mapped[str] = mapped_column(Text)
     call_goal: Mapped[str] = mapped_column(Text)
     success_condition: Mapped[str] = mapped_column(Text)
+    # Display/filter field, never read by the prompt (ADR 0064): one of
+    # SCENARIO_CATEGORIES, or NULL for a Scenario that was never categorised.
+    # The CHECK above is NULL-tolerant, which is what allows that.
+    category: Mapped[str | None] = mapped_column(String(20))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="scenario")

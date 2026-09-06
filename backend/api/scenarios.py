@@ -29,7 +29,7 @@ from backend import library
 from backend.api.deps import current_tenant, current_tenant_id
 from backend.auth import AuthContext, require_user
 from backend.authored_text import FIELD_LIMITS, clean
-from backend.db.models import VISIBILITY_TENANT
+from backend.db.models import SCENARIO_CATEGORIES, VISIBILITY_TENANT
 from backend.documents import (
     MAX_TEXT,
     DocumentError,
@@ -50,6 +50,11 @@ def _limited(field: str, *, required: bool):
         else Field("", max_length=cap)
 
 
+# "" (no category) or one of the three F-03 contexts (ADR 0064). Kept in step
+# with the CHECK constraint by deriving it from the same tuple.
+_CATEGORY_PATTERN = "^(" + "|".join(SCENARIO_CATEGORIES) + "|)$"
+
+
 class ScenarioInput(BaseModel):
     """The fields an authoring caller sets. `name` / `short_description` are the
     card; `description` and the three case fields are prompt input (ADR 0045)
@@ -64,12 +69,18 @@ class ScenarioInput(BaseModel):
     case_facts: str = _limited("case_facts", required=False)
     call_goal: str = _limited("call_goal", required=False)
     success_condition: str = _limited("success_condition", required=False)
+    # Display/filter only (ADR 0064), never prompt input -- and a closed
+    # vocabulary rather than the free text it replaces, so the value the
+    # category filter runs on is one the database will accept. "" is the empty
+    # choice the editor offers and reaches the column as NULL.
+    category: str = Field("", pattern=_CATEGORY_PATTERN)
 
     def to_library(self) -> dict:
         """1:1 with the schema columns, except the card field `name`, which is
-        the `title` column (ADR 0061)."""
+        the `title` column (ADR 0061), and the empty category, which is NULL."""
         data = self.model_dump()
         data["title"] = data.pop("name")
+        data["category"] = data["category"] or None
         return data
 
 
@@ -95,6 +106,9 @@ def _card(scenario, subject: str) -> dict:
         "id": scenario.id,
         "name": scenario.name,
         "short_description": scenario.short_description,
+        # Null for an uncategorised Scenario; the category filter then only
+        # shows it under "Alle" (ADR 0064).
+        "category": scenario.category,
         "origin": _origin(scenario, subject),
         # True once shared with the company -- for the author's own Scenarios
         # too, which `origin` still reports as `own`.
@@ -113,6 +127,8 @@ def _detail(scenario) -> dict:
         "case_facts": scenario.case_facts,
         "call_goal": scenario.call_goal,
         "success_condition": scenario.success_condition,
+        # "" rather than null, so the editor's select has a value to sit on.
+        "category": scenario.category or "",
         # Always `private` or `tenant` here -- `_detail` only runs for the
         # caller's own rows, never a `public` built-in.
         "visibility": scenario.visibility,

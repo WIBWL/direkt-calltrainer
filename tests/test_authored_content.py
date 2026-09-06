@@ -10,6 +10,8 @@ Covers:
             client never supplies either.
   ADR 0059  authored text is sanitised on the way in
   ADR 0063  the editor's field-length caps come from the API, not a mirror
+  ADR 0064  the Scenario category: optional, from a closed vocabulary, and the
+            value the library's category filter runs on
   ADR 0050  a row is addressed by its unguessable extern_id
 
 Runs against a seeded throwaway database (needs Postgres, skips without one).
@@ -257,3 +259,53 @@ async def test_tenant_endpoint_names_the_company_or_null(client, as_user):
 
     as_user(ALICE)  # no tenant claim, no e-mail -> default tenant
     assert (await client.get("/api/tenant")).json() == {"name": None}
+
+
+# --- ADR 0064: the category an author may set -------------------------------
+
+
+async def test_an_authored_scenario_keeps_the_category_it_was_given(client, as_user):
+    as_user(ALICE)
+    created = (await client.post("/api/scenarios", json={**_NEW, "category": "pricing"})).json()
+    assert created["category"] == "pricing"
+    card = next(
+        c for c in (await client.get("/api/scenarios")).json() if c["id"] == created["id"]
+    )
+    assert card["category"] == "pricing"
+
+
+async def test_a_category_left_out_is_no_category(client, as_user):
+    """Optional on purpose: a Scenario that fits none of the three contexts is
+    better uncategorised than filed under one nobody chose. It reaches the
+    column as NULL and the card as null."""
+    as_user(ALICE)
+    created = (await client.post("/api/scenarios", json=_NEW)).json()
+    assert created["category"] == ""
+    card = next(
+        c for c in (await client.get("/api/scenarios")).json() if c["id"] == created["id"]
+    )
+    assert card["category"] is None
+
+
+async def test_a_category_can_be_changed_and_cleared_again(client, as_user):
+    """An edit is a full PATCH, so clearing the select has to reach the row --
+    the empty choice is a value, not an omission."""
+    as_user(ALICE)
+    created = (await client.post("/api/scenarios", json={**_NEW, "category": "operations"})).json()
+    edited = await client.patch(
+        f"/api/scenarios/{created['id']}", json={**_NEW, "category": "requirements"}
+    )
+    assert edited.json()["category"] == "requirements"
+    cleared = await client.patch(
+        f"/api/scenarios/{created['id']}", json={**_NEW, "category": ""}
+    )
+    assert cleared.json()["category"] == ""
+
+
+async def test_a_category_outside_the_vocabulary_is_rejected(client, as_user):
+    """The API validates against the same list the CHECK constraint holds, so a
+    value the database would refuse never reaches it -- the free-text field of
+    the free-text field it replaces is not coming back."""
+    as_user(ALICE)
+    resp = await client.post("/api/scenarios", json={**_NEW, "category": "vertrieb"})
+    assert resp.status_code == 422

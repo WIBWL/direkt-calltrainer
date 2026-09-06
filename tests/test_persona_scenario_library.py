@@ -24,6 +24,7 @@ Covers:
   R-12  spontaneous objections
 """
 
+import re
 import uuid
 
 import pytest
@@ -293,3 +294,88 @@ def test_seeded_persona_behaviour_carries_no_situation():
         lowered = entry["behavior"].lower()
         assert "reason for this call" not in lowered, entry["id"]
         assert "context of the call" not in lowered, entry["id"]
+
+
+# --- ADR 0064: the category the library filter runs on ----------------------
+
+
+def test_every_seeded_scenario_carries_a_valid_category():
+    """ADR 0064: a shipped Scenario that no category filter finds is one nobody
+    selects, and the value has to be one the CHECK constraint accepts."""
+    for entry in SEED.SCENARIOS:
+        assert entry["category"] in models.SCENARIO_CATEGORIES, entry["id"]
+
+
+def test_the_seeded_library_fills_every_category():
+    """F-03: short support cases, consultative project talks and pricing calls
+    are each trainable, and no filter option is empty on a fresh install. Before
+    the scenario catalogue landed, the consultative context had no Scenario at
+    all."""
+    assert {e["category"] for e in SEED.SCENARIOS} == set(models.SCENARIO_CATEGORIES)
+
+
+def test_scenario_row_maps_its_category():
+    """`library._to_scenario` carries the column onto the value object, which is
+    what `/api/scenarios` badges the card from."""
+    row = models.Scenario(
+        key="row-category", title="t", short_description="s", description="d",
+        case_facts="", call_goal="", success_condition="", category="requirements",
+    )
+    assert _to_scenario(row).category == "requirements"
+    row.category = None
+    assert _to_scenario(row).category is None
+
+
+# --- ADR 0043: the prompt fields are English --------------------------------
+
+# Two cheap signals that a German sentence slipped into a field the model reads
+# as English. Neither is a language detector: the umlaut check is exact for the
+# text this library actually contains, and the word list holds only forms that
+# cannot also be English ("die", "man", "war", "will", "in", "so" are German
+# words too and are deliberately absent).
+_UMLAUTS = re.compile(r"[äöüÄÖÜß]")
+_GERMAN_ONLY = re.compile(
+    r"\b(ohne|nicht|und|oder|sind|wird|eine|einen|dass|sich|auch|aber|sehr|"
+    r"kein|keine|wenn|weil|damit|schon|noch|nur|zwischen|werden|haben)\b",
+    re.IGNORECASE,
+)
+
+# The four fields interpolated into the system prompt (ADR 0045). `name` and
+# `short_description` are display text and stay German on purpose.
+_PROMPT_FIELDS = ("description", "case_facts", "call_goal", "success_condition")
+
+
+@pytest.mark.parametrize("entry", SEED.SCENARIOS, ids=lambda e: e["id"])
+def test_seeded_scenario_prompt_fields_are_english(entry):
+    """ADR 0043: a Scenario carries no language of its own, which is what lets
+    any Persona run it. German in one of these fields would reach a Persona
+    speaking English and is invisible until someone plays that pairing.
+
+    This caught a real one: `call_goal` ended "...what it will cost, ohne
+    Fachbegriffe" after an edit that was only meant to remove a dash.
+    """
+    for field in _PROMPT_FIELDS:
+        text = entry[field]
+        assert not _UMLAUTS.search(text), f"{entry['id']}.{field}: umlaut in an English field"
+        found = _GERMAN_ONLY.search(text)
+        assert found is None, f"{entry['id']}.{field}: German word {found.group()!r}"
+
+
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_seeded_persona_prompt_fields_are_english(entry):
+    """Same for the Persona's prompt fields. `name` and `role_label` are display
+    text; `training_goal` is not read by the model at all (see library.py) and
+    is deliberately German."""
+    for field in ("role", "traits", "behavior"):
+        text = entry[field]
+        assert not _UMLAUTS.search(text), f"{entry['id']}.{field}: umlaut in an English field"
+        found = _GERMAN_ONLY.search(text)
+        assert found is None, f"{entry['id']}.{field}: German word {found.group()!r}"
+
+
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_seeded_persona_objections_are_english(entry):
+    """R-12 / ADR 0045: the objections are English moves, not quoted lines."""
+    for text in entry["objections"]:
+        assert not _UMLAUTS.search(text), f"{entry['id']}: umlaut in an objection"
+        assert _GERMAN_ONLY.search(text) is None, f"{entry['id']}: German in an objection"

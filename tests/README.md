@@ -45,15 +45,15 @@ source of that content, and which imports without a database.
 | Area | Feature / ADR | Test file |
 |---|---|---|
 | Keycloak bearer-token verification | F-31, F-50, ADR 0009 | `test_auth.py` |
-| Setup screen: persona/scenario REST endpoints (+ auth gate, deactivated rows withheld) | F-43, F-44, F-15, F-31, F-50, F-01/03/04, ADR 0001, ADR 0009, ADR 0026, ADR 0041, ADR 0043, ADR 0045, ADR 0058 | `test_setup_api.py` |
+| Setup screen: persona/scenario REST endpoints (+ auth gate, deactivated rows withheld) | F-43, F-44, F-15, F-31, F-50, F-01/03/04, ADR 0001, ADR 0009, ADR 0026, ADR 0041, ADR 0043, ADR 0045, ADR 0058, ADR 0064 | `test_setup_api.py` |
 | Session read route: `extern_id`, ownership (404 for foreign and unknown alike), wire shape | F-09, F-12, F-42, ADR 0031, ADR 0034, ADR 0050, ADR 0057 | `test_api.py` |
 | Session write path: one row plus utterances, one transaction | F-12, ADR 0026, ADR 0034 | `test_save_session.py` |
 | Cascade delete: the Session subtree goes, reference data stays, used reference rows are undeletable | ADR 0026, ADR 0034, ADR 0052 | `test_cascade_delete.py` |
 | Migration chain in both directions, naming convention, FK indexes | ADR 0027, ADR 0052, ADR 0053 | `test_migrations.py` |
 | Seed idempotency and deactivation | ADR 0041 | `test_seed.py` |
 | No test reaches the development database | ADR 0034 | `test_database_isolation.py` |
-| Persona & scenario library: row mapping + seeded content | F-01, F-03, F-04, R-07..R-10, R-12, ADR 0041, ADR 0043, ADR 0045 | `test_persona_scenario_library.py` |
-| User-authored Scenarios: ownership, tenant visibility, sharing | F-34, F-59, R-58, ADR 0024, ADR 0050, ADR 0058, ADR 0059, ADR 0060 | `test_authored_content.py` |
+| Persona & scenario library: row mapping + seeded content | F-01, F-03, F-04, R-07..R-10, R-12, ADR 0041, ADR 0043, ADR 0045, ADR 0064 | `test_persona_scenario_library.py` |
+| User-authored Scenarios: ownership, tenant visibility, sharing | F-34, F-59, R-58, ADR 0024, ADR 0050, ADR 0058, ADR 0059, ADR 0060, ADR 0064 | `test_authored_content.py` |
 | PDF text extraction for an authored Scenario | F-58, ADR 0024, ADR 0058, ADR 0059 | `test_scenario_documents.py` |
 | Tenant resolution (org claim → e-mail domain → default) | R-58, ADR 0060 | `test_tenants.py` |
 | Sanitising authored Scenario text before it reaches the prompt | ADR 0024, ADR 0059 | `test_authored_text.py` |

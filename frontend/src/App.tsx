@@ -4,7 +4,13 @@ import { apiFetch } from "./api";
 import AppLayout from "./components/AppLayout";
 import CallView from "./components/CallView";
 import FeedbackView from "./components/FeedbackView";
-import { matchesFilter, type LibraryFilter } from "./components/LibraryPicker";
+import {
+  CATEGORY_FILTERS,
+  matchesCategory,
+  matchesFilter,
+  type CategoryFilter,
+  type LibraryFilter,
+} from "./components/LibraryPicker";
 import MicCheck from "./components/MicCheck";
 import ScenarioEditor from "./components/ScenarioEditor";
 import SetupView from "./components/SetupView";
@@ -28,6 +34,10 @@ interface PendingEnd {
 /** null = closed; { id: null } = new; { id } = editing that row. */
 type EditorState = { id: string | null } | null;
 
+/** Every level 1 value, including "tenant": counting it costs nothing when the
+ * caller has no company, and the picker decides whether to offer the option. */
+const ORIGIN_FILTERS: LibraryFilter[] = ["all", "standard", "own", "followup", "tenant"];
+
 /**
  * Owns the training flow: which screen is showing, what has been selected, and
  * the live Session behind it. Everything visible is delegated to a screen
@@ -40,6 +50,8 @@ export default function App() {
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [scenarioFilter, setScenarioFilter] = useState<LibraryFilter>("all");
+  // The F-03 call context filter (ADR 0064), independent of the origin chips.
+  const [scenarioCategory, setScenarioCategory] = useState<CategoryFilter>("all");
   const [editingScenario, setEditingScenario] = useState<EditorState>(null);
   // The caller's company (ADR 0060); null = default tenant, no company chip.
   const [tenantName, setTenantName] = useState<string | null>(null);
@@ -261,19 +273,27 @@ export default function App() {
     setScreen("setup");
   }, []);
 
-  // The filter chips appear once there is more than just built-ins to filter
-  // to — the user authored something, a colleague shared something, or the user
-  // is in a company at all.
-  const showScenarioFilter =
-    tenantName !== null || scenarios.some((s) => s.origin !== "builtin");
   const scenarioItems = scenarios.map((s) => ({
     id: s.id,
     name: s.name,
     subtitle: s.short_description,
     origin: s.origin,
     shared: s.shared,
+    category: s.category,
   }));
-  const visibleScenarios = scenarioItems.filter((s) => matchesFilter(s, scenarioFilter));
+  // The two levels combine: level 1 picks whose Scenario it is, level 2 what
+  // kind of call it is (ADR 0064).
+  const byOrigin = scenarioItems.filter((s) => matchesFilter(s, scenarioFilter));
+  const byCategory = scenarioItems.filter((s) => matchesCategory(s, scenarioCategory));
+  const visibleScenarios = byOrigin.filter((s) => matchesCategory(s, scenarioCategory));
+  // Each row is counted against the *other* row's selection, never its own, so
+  // an option's number is what picking it would actually yield.
+  const scenarioOriginCounts = Object.fromEntries(
+    ORIGIN_FILTERS.map((f) => [f, byCategory.filter((s) => matchesFilter(s, f)).length]),
+  ) as Record<LibraryFilter, number>;
+  const scenarioCategoryCounts = Object.fromEntries(
+    CATEGORY_FILTERS.map((c) => [c, byOrigin.filter((s) => matchesCategory(s, c)).length]),
+  ) as Record<CategoryFilter, number>;
 
   const handleScenarioSaved = (savedId: string | null) => {
     setEditingScenario(null);
@@ -334,7 +354,10 @@ export default function App() {
         scenarioId={scenarioId}
         scenarioFilter={scenarioFilter}
         onScenarioFilter={setScenarioFilter}
-        showScenarioFilter={showScenarioFilter}
+        scenarioOriginCounts={scenarioOriginCounts}
+        scenarioCategory={scenarioCategory}
+        onScenarioCategory={setScenarioCategory}
+        scenarioCategoryCounts={scenarioCategoryCounts}
         tenantName={tenantName}
         onNewScenario={() => setEditingScenario({ id: null })}
         onEditScenario={(id) => setEditingScenario({ id })}

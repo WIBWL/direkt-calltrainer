@@ -28,6 +28,10 @@ class Scenario:
     case_facts: str = ""
     call_goal: str = ""
     success_condition: str = ""
+    # Display/filter only, never part of the prompt (ADR 0064): one of
+    # `backend.db.models.SCENARIO_CATEGORIES`, or None for a Scenario that
+    # carries no category. F-03's three call contexts, made selectable.
+    category: str | None = None
     # Authorship (ADR 0058) and visibility (`private`/`tenant`/`public`; `tenant`
     # is ADR 0060). Carried so `backend/api/scenarios.py` can badge a card and
     # gate editing; `library.py` always sets both. The defaults are a built-in.
