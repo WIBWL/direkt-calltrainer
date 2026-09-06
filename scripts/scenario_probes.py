@@ -1,10 +1,10 @@
 """The scripted trainee for `scripts/play_scenarios.py`.
 
-Five user turns per call, the same five for every Scenario, so the transcripts
+Six user turns per call, the same six for every Scenario, so the transcripts
 are comparable: the only thing that varies between two runs of different
 Scenarios is the system prompt.
 
-Four of the five are generic. The fourth is written per Scenario, because it has
+Five of the six are generic. The fourth is written per Scenario, because it has
 to satisfy that Scenario's `success_condition`, and those differ: one wants a
 figure with a validity date, another wants four points recapped. A single line
 cannot do both, and a generic one would fail everywhere, which would make the
@@ -19,21 +19,28 @@ clean run. "I'll look into it and get back to you" is exactly such a phrase:
 `get back to you` is in the English `postpone_re`.
 
 `check_probes()` therefore validates every line against both packs, and the
-script refuses to run if it fails. Probes 1 to 4 must not signal closing;
-probe 5 must.
+script refuses to run if it fails. Probes 1 to 5 must not signal closing;
+probe 6 must.
+
+Slot 5 exists so the measurement is not one Turn wide. The condition is met in
+slot 4, and if the farewell followed immediately, a persona that needs a beat to
+register what it was just given would be indistinguishable from one that never
+registers it at all. Slot 5 offers nothing new and concedes nothing, so a call
+that ends there ended on the persona's own reading of the case.
 """
 from __future__ import annotations
 
 from backend.session.language_packs import LANGUAGE_PACKS, signals_closing
 
 # Probe slots, in order. Slot 4 is filled per Scenario from CONCRETE_ANSWERS.
-ACCEPT, PULL_FACTS, VAGUE, CONCRETE, FAREWELL = range(5)
+ACCEPT, PULL_FACTS, VAGUE, CONCRETE, SETTLE, FAREWELL = range(6)
 
 PROBE_PURPOSE = {
     ACCEPT: "Annahme des Gesprächs",
     PULL_FACTS: "Fakten ziehen",
     VAGUE: "vage Zusage, muss zurückgewiesen werden",
     CONCRETE: "konkrete Antwort, muss die Erfolgsbedingung erfüllen",
+    SETTLE: "neutraler Anschluss, lässt der Persona einen zweiten Zug zum Selbstbeenden",
     FAREWELL: "Verabschiedung, muss den Anruf beenden",
 }
 
@@ -54,6 +61,9 @@ GENERIC: dict[str, dict[int, str]] = {
         # rules a bare promise to look into it out; cold-call-followup says so
         # word for word, because that already happened eleven days ago.
         VAGUE: "Verstehe. Das nehme ich so mit und kümmere mich darum.",
+        # Concedes nothing and adds nothing: whoever closes here closed on what
+        # was already on the table in slot 4.
+        SETTLE: "So ist das bei uns hinterlegt. Passt das für Sie?",
         FAREWELL: "Dann machen wir das so. Vielen Dank für den Anruf, auf Wiederhören.",
     },
     "en": {
@@ -67,6 +77,7 @@ GENERIC: dict[str, dict[int, str]] = {
         ),
         # "I'll get back to you" would trip postpone_re and end the call.
         VAGUE: "I see. I will take that away and look into it.",
+        SETTLE: "That is how it is recorded on our side. Does that work for you?",
         FAREWELL: "Then let us do it that way. Thank you for calling, goodbye.",
     },
 }
@@ -336,7 +347,7 @@ FALLBACK_CONCRETE = {
 
 
 def probes_for(scenario_key: str | None, language: str) -> tuple[list[str], bool]:
-    """The five user turns for one run, and whether slot 4 is the fallback."""
+    """The six user turns for one run, and whether slot 4 is the fallback."""
     generic = GENERIC[language]
     tailored = CONCRETE_ANSWERS.get(scenario_key or "", {}).get(language)
     return (
@@ -345,6 +356,7 @@ def probes_for(scenario_key: str | None, language: str) -> tuple[list[str], bool
             generic[PULL_FACTS],
             generic[VAGUE],
             tailored or FALLBACK_CONCRETE[language],
+            generic[SETTLE],
             generic[FAREWELL],
         ],
         tailored is None,
@@ -371,7 +383,7 @@ def check_probes() -> list[str]:
                 closes = signals_closing(pack, text)
                 if slot == FAREWELL and not closes:
                     problems.append(
-                        f"{language}/{name}: probe 5 does not signal closing, "
+                        f"{language}/{name}: probe {FAREWELL + 1} does not signal closing, "
                         f"so the backstop is never exercised"
                     )
                 elif slot != FAREWELL and closes:

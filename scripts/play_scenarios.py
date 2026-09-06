@@ -23,11 +23,12 @@ What is real and what is not:
 So this exercises the dialogue, not the audio path. `scripts/check_backends.py`
 covers STT and TTS.
 
-The trainee is scripted in `scripts/scenario_probes.py`: five turns, four of
+The trainee is scripted in `scripts/scenario_probes.py`: six turns, five of
 them the same everywhere, the fourth written per Scenario to satisfy that
-Scenario's `success_condition`. Read that module's docstring before changing a
-probe; a probe that trips `signals_closing` ends the call early and looks like a
-clean short run.
+Scenario's `success_condition`, and the fifth a neutral follow-up that gives the
+persona a second Turn to close on its own before the farewell forces the issue.
+Read that module's docstring before changing a probe; a probe that trips
+`signals_closing` ends the call early and looks like a clean short run.
 
 Usage:
     docker compose exec app python scripts/play_scenarios.py
@@ -74,6 +75,7 @@ from backend.session.models import Failed, TurnCompleted  # noqa: E402
 from scripts.scenario_probes import (  # noqa: E402
     CONCRETE,
     FAREWELL,
+    SETTLE,
     VAGUE,
     PROBE_PURPOSE,
     check_probes,
@@ -255,7 +257,7 @@ async def _drain(events) -> tuple[bool, str | None]:
 
 
 async def play(persona: Persona, scenario: Scenario) -> RunRecord:
-    """One pairing, five probes, or fewer if the call ends early."""
+    """One pairing, six probes, or fewer if the call ends early."""
     pack = get_pack(persona.language_id)
     probes, used_fallback = probes_for(scenario_key_of(scenario), persona.language_id)
     session = orch.SessionOrchestrator(persona, scenario)
@@ -459,7 +461,7 @@ def _systemic_markdown(results: list[tuple[RunRecord, list[str]]]) -> str:
     total = len(results)
     if not total:
         return ""
-    satisfied = sum(1 for r, _ in results if closing_slot(r) == CONCRETE)
+    satisfied = sum(1 for r, _ in results if closing_slot(r) in (CONCRETE, SETTLE))
     farewell = sum(1 for r, _ in results if closing_slot(r) == FAREWELL)
     never = sum(1 for r, _ in results if closing_slot(r) is None)
     return "\n".join([
@@ -470,8 +472,8 @@ def _systemic_markdown(results: list[tuple[RunRecord, list[str]]]) -> str:
         "",
         "| | |",
         "|---|---|",
-        f"| bei erfüllter Erfolgsbedingung (Sonde 4) | {satisfied} von {total} |",
-        f"| erst auf die Verabschiedung (Sonde 5) | {farewell} von {total} |",
+        f"| bei erfüllter Erfolgsbedingung (Sonde 4 oder 5) | {satisfied} von {total} |",
+        f"| erst auf die Verabschiedung (Sonde 6) | {farewell} von {total} |",
         f"| nie, Ende über Backstop oder Wiederholungswächter | {never} von {total} |",
         "",
         "Der Prompt verlangt den ersten Fall ausdrücklich (`Once it has been"

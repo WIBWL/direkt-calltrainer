@@ -9,11 +9,18 @@ Persona's language, so they live in the language pack rather than in the
 English prompt frame. Both packs are exercised here.
 """
 
+from dataclasses import replace
+
 import pytest
 
 from backend.session.language_packs import get_pack
 from backend.session.models import TurnCompleted
-from backend.session.orchestrator import SessionOrchestrator, _asks_to_repeat, _signals_closing
+from backend.session.orchestrator import (
+    _SETTLEMENT_CHECK_AFTER_REPLIES,
+    SessionOrchestrator,
+    _asks_to_repeat,
+    _signals_closing,
+)
 from tests.conftest import collect, completed, states
 
 # _signals_closing is the unit under test here.
@@ -189,3 +196,87 @@ async def test_closing_nudge_is_added_to_the_llm_messages(persona, scenario, fak
         m["role"] == "system" and "call is over" in m["content"].lower()
         for m in sent_messages
     )
+
+
+def _standing_nudge(orch, replies=3):
+    """The transient system message a turn past the opening carries.
+
+    `replies` is how far into the call it is: the settlement check is withheld
+    until the persona has given `_SETTLEMENT_CHECK_AFTER_REPLIES` of them."""
+    for i in range(replies):
+        orch._messages.append({"role": "assistant", "content": f"Antwort {i}."})
+    return orch._messages_for_turn(closing=False)[-1]["content"]
+
+
+def test_standing_nudge_restates_the_success_condition(persona, scenario):
+    """The criterion the call ends on is carried on every turn past the
+    opening, not only in the system prompt.
+
+    Played over the whole seeded library (`scripts/play_scenarios.py`), no
+    pairing ever closed on the Turn its condition was met: the permission sat
+    far up-context while the nudge next to the reply offered nothing but moves
+    that carry the call on.
+    """
+    with_condition = replace(scenario, success_condition="a refund date is named")
+    nudge = _standing_nudge(SessionOrchestrator(persona, with_condition))
+
+    assert "a refund date is named" in nudge
+    assert "close the call the way your instructions describe" in nudge
+
+
+def test_standing_nudge_does_not_spell_out_the_marker(persona, scenario):
+    """The first cut of this nudge ended on "finish your reply with exactly this
+    marker: [CALL_END]", and the persona duly appended it to its own opening
+    question: 32 of 34 pairings hung up by probe 3. Read as an instruction
+    rather than a condition, the marker in this position is the instruction.
+    The closing protocol stays in the system prompt; the nudge only points at
+    it."""
+    nudge = _standing_nudge(SessionOrchestrator(persona, scenario))
+
+    assert "[CALL_END]" not in nudge
+
+
+def test_standing_nudge_puts_the_open_case_first(persona, scenario):
+    """The settlement check and `_ANTI_REPEAT_NUDGE` sit in one message and pull
+    opposite ways. The open case is the branch that has to come first: ending a
+    call mid-conversation is the more expensive failure (ADR 0037), and the
+    first cut of this check proved it by ending 32 of 34 runs by probe 3."""
+    nudge = _standing_nudge(SessionOrchestrator(persona, scenario))
+
+    assert "press a point you have not pressed yet" in nudge
+    assert "carry the call on" in nudge
+    assert nudge.index("press a point you have not pressed yet") < nudge.index("carry the call on")
+
+
+def test_settlement_check_falls_back_without_a_success_condition(persona, scenario):
+    """ADR 0024/0045: an authored Scenario can leave the condition blank, and
+    the check still has to name something to weigh the call against."""
+    nudge = _standing_nudge(SessionOrchestrator(persona, scenario))
+
+    assert "what you came for has been given" in nudge
+
+
+def test_settlement_check_is_withheld_over_the_opening_exchanges(persona, scenario):
+    """Nine of ten premature hang-ups in the seeded run landed on the user's
+    very first reply, where the persona has only just said what it wants. The
+    check cannot be answered honestly there, and the model answered it wrong."""
+    early = _standing_nudge(
+        SessionOrchestrator(persona, replace(scenario, success_condition="a date is named")),
+        replies=_SETTLEMENT_CHECK_AFTER_REPLIES - 1,
+    )
+
+    assert "a date is named" not in early
+    # The anti-repeat nudge is untouched by the gate.
+    assert "Say something genuinely different now" in early
+
+
+def test_closing_turn_carries_only_the_closing_nudge(persona, scenario):
+    """The user has already said goodbye: the call is ending either way, and a
+    second, longer instruction beside it only competes with it."""
+    orch = SessionOrchestrator(persona, replace(scenario, success_condition="a date is named"))
+    orch._messages.append({"role": "assistant", "content": "Vorherige Antwort."})
+
+    nudge = orch._messages_for_turn(closing=True)[-1]["content"]
+
+    assert "call is over" in nudge.lower()
+    assert "a date is named" not in nudge

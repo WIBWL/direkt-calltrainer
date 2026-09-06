@@ -14,6 +14,9 @@ the user asks to hear something again, the guards ease off once -- the persona
 is nudged to say it again, shorter -- then snap back if asked twice. Retry
 policy: one retry per leg, then end the Session cleanly (ADR 0016, ADR 0033).
 """
+# pylint: disable=too-many-lines  # what the length is: the system prompt and the
+# per-turn nudges, each with the comment naming the observed failure it catches.
+# Moving the text out would put that rationale a file away from the code sending it.
 
 import asyncio
 import contextlib
@@ -201,18 +204,14 @@ def _build_system_prompt(persona: Persona, scenario: Scenario, pack: LanguagePac
         "To end it: add one brief, friendly closing line (accept what you "
         "were given, thank them, say goodbye), then finish your reply with "
         "exactly this marker on its own and nothing after it: [CALL_END]. "
-        "Never end the call "
-        "while you still consider your concern unresolved, are still "
-        "pressing for information, or have only gotten a vague reassurance "
-        f"with no specifics ({pack.vague_reassurance_examples}) — a "
-        "frustrated reply, or an empty promise with no actual "
-        "content, is not by itself a reason to hang up; keep pushing for "
-        "specifics instead, the way a real caller would. But once the "
-        "specifics are actually on the table, carrying on is the same "
-        "mistake in the other direction. Only include the "
-        "marker when the call should truly end — never otherwise, never in the "
-        "same reply as a question or a statement that the issue isn't "
-        "resolved yet, and never explain or mention the marker itself.\n"
+        "Never end the call while your concern is still unresolved: a vague "
+        f"reassurance with no specifics ({pack.vague_reassurance_examples}), "
+        "a frustrated reply or an empty promise is not a reason to hang up — "
+        "keep pushing for specifics, the way a real caller would. Once they "
+        "are on the table, carrying on is the same mistake in the other "
+        "direction. Never put the marker in the same reply as a question or "
+        "as a statement that the issue isn't resolved, and never explain or "
+        "mention the marker itself.\n"
         f"Reply exclusively in {pack.name_en}, every single time regardless of "
         "what language the user writes in, in short, realistic sentences "
         "the way people actually talk on the phone. Stay true to the role "
@@ -272,6 +271,44 @@ _ANTI_REPEAT_NUDGE = (
     "short — but never put that same offer forward yourself as though it "
     "were your own idea."
 )
+
+# Appended to the standing nudge above, so that the criterion the call ends on
+# is the last thing in context before the model answers. It already stands in
+# the system prompt, but the same recency problem applies to it as to the
+# anti-repeat rule -- and worse: `_ANTI_REPEAT_NUDGE` offers three moves, all of
+# which carry the call on (press, give ground, ask something new), so the
+# instruction sitting nearest the reply argued against closing. Played over every
+# seeded Scenario against every Persona (`scripts/play_scenarios.py`), no pairing
+# ever ended the call on the Turn its condition was met; the persona re-asked
+# what had just been answered instead.
+#
+# The wording is the measured one, not the obvious one (ADR 0065). Written as an
+# instruction -- "finish your reply with exactly this marker: [CALL_END]" -- it
+# read as an order rather than a condition, and the persona appended the marker
+# to its own opening question: 32 of 34 pairings hung up by probe 3. So the
+# marker itself is not named here (the protocol stays in the system prompt, this
+# only points at it), the open case is the branch stated first, and closing is
+# gated on being able to quote back what met the criterion.
+_SETTLEMENT_CHECK = (
+    "\nOne question to settle before you send that reply. What ends this call is: "
+    "{criterion}. Has the user actually given you that, in words you could quote "
+    "back to them? Count what arrived piece by piece, and what you had to ask "
+    "twice to get. If any part of it is still open, or you are about to ask a "
+    "question of your own, then it has not been given: answer as described above "
+    "and carry the call on. Only if you could quote it back has it been given, "
+    "and then stop pressing -- accept it in your own words, thank them, and close "
+    "the call the way your instructions describe."
+)
+
+# What the check weighs the call against when the Scenario carries no success
+# condition -- a user-authored one (ADR 0024), or one predating ADR 0045. Vaguer
+# by necessity; the position in context is what does the work either way.
+_GENERIC_CRITERION = "what you came for has been given"
+
+# Replies the persona has to have given -- its opening plus two answers --
+# before the settlement check is attached at all. See `_settlement_check`.
+_SETTLEMENT_CHECK_AFTER_REPLIES = 3
+
 
 # Sent when a reply was caught opening with a greeting again and is being
 # regenerated (ADR 0038). The rejected opening is quoted so the retry has
@@ -411,7 +448,7 @@ class _RegenerateReply(Exception):
         self.opening = opening
 
 
-class SessionOrchestrator:
+class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # one call's state
     """One instance per Session. Holds the LLM message history and the Turn
     list, driving one STT → dialogue → TTS pass per Turn. A barge-in can leave a
     Turn open (`_reopen_turn`) for the next utterance to continue (ADR 0035)."""
@@ -430,6 +467,10 @@ class SessionOrchestrator:
         # Consecutive turns on which the user asked to hear something again
         # (ADR 0038): the second one gets a firmer nudge than the first.
         self._repeat_requests_in_a_row = 0
+        # Restated in the per-turn nudge (`_settlement_check`) and not only in
+        # the system prompt: it is the criterion the call ends on, and up there
+        # it sat too far from the reply to bite.
+        self._success_condition = scenario.success_condition
         # The authenticated caller is not held here: the Session is written by
         # backend/api/session_ws.py, which already has the AuthContext, so the
         # `sub` goes straight from the handshake to `session.subject_id`
@@ -587,7 +628,13 @@ class SessionOrchestrator:
         again, reworded shorter" push when the user asked to hear something
         again (ADR 0038), firmer once they have asked twice; otherwise a
         standing reminder quoting the persona's own last reply so it does not
-        come back reworded (ADR 0038)."""
+        come back reworded (ADR 0038), followed by the settlement check that
+        reads the call against the Scenario's success condition.
+
+        The settlement check rides on that standing nudge alone. On a closing
+        turn the call is already ending, and on a repeat-request turn the user
+        asked to hear something again, which is not a moment to weigh the
+        matter settled."""
         if closing:
             nudge = _CLOSING_NUDGE
         elif self._repeat_requests_in_a_row >= 2:
@@ -595,10 +642,33 @@ class SessionOrchestrator:
         elif self._repeat_requests_in_a_row == 1:
             nudge = _CLARIFY_NUDGE
         elif self._previous_reply():
-            nudge = _ANTI_REPEAT_NUDGE.format(previous=self._previous_reply())
+            nudge = (
+                _ANTI_REPEAT_NUDGE.format(previous=self._previous_reply()) +
+                self._settlement_check()
+            )
         else:
             return self._messages
         return [*self._messages, {"role": "system", "content": nudge}]
+
+    def _settlement_check(self) -> str:
+        """The reminder that the call may end now, phrased around this
+        Scenario's success condition where it has one.
+
+        Withheld over the first exchanges. Measured over the seeded library,
+        this check on the opening exchanges is where it does damage and nothing
+        else: nine of ten premature hang-ups landed on the user's very first
+        reply, where the persona has only just said what it wants and the
+        trainee cannot yet have met a condition. Asking whether the matter is
+        settled there is a question with one possible answer, and the model
+        answered it wrong. It cannot cost a real closing either: the persona
+        opens the call and states its case, so the earliest turn on which a
+        condition can honestly be met is the one this lets through.
+        """
+        replies = sum(1 for m in self._messages if m["role"] == "assistant")
+        if replies < _SETTLEMENT_CHECK_AFTER_REPLIES:
+            return ""
+        criterion = self._success_condition.strip() or _GENERIC_CRITERION
+        return _SETTLEMENT_CHECK.format(criterion=criterion)
 
     async def _attempt_reply_with_retry(
         self,
