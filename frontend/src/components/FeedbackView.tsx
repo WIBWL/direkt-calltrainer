@@ -43,10 +43,18 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
     );
   }
 
-  const { feedback, measurements, turns } = detail;
+  const { feedback, measurements, turns, persona, scenario } = detail;
 
   return (
     <>
+      <div className="feedback-meta" aria-label="Trainingsdetails">
+        <span>{scenario}</span>
+        <span className="feedback-meta-separator" aria-hidden="true">
+          ·
+        </span>
+        <span>{persona}</span>
+      </div>
+
       <div className="card feedback-summary-card">
         <div className="feedback-summary-kicker">QUALITATIVE EINORDNUNG</div>
         <h2 className="feedback-summary-title">Zusammenfassung</h2>
