@@ -320,8 +320,27 @@ class Scenario(_AuthoredContent, Base):
     # The CHECK above is NULL-tolerant, which is what allows that.
     category: Mapped[str | None] = mapped_column(String(20))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # The Session whose Feedback this Scenario was drafted from (ADR 0069),
+    # NULL for every hand-authored row and every built-in. Unique, so the
+    # worker cannot draft a second one for the same Session -- which is what
+    # scripts/requeue_feedback.py would otherwise cause.
+    # `SET NULL` rather than a cascade: a later Session may have been played on
+    # this row, and `session.scenario_id` is NOT NULL with no `ondelete`
+    # (ADR 0026), so the row outlives its source, deactivated (deletion.py).
+    derived_from_session_id: Mapped[int | None] = mapped_column(
+        # use_alter: this edge and `session.scenario_id` point at each other, and
+        # without it SQLAlchemy cannot order the two tables and warns on every
+        # metadata sort.
+        ForeignKey("session.session_id", ondelete="SET NULL", use_alter=True),
+        unique=True,
+        index=True,
+    )
 
-    sessions: Mapped[list["Session"]] = relationship(back_populates="scenario")
+    # `foreign_keys` because there are now two edges between these tables --
+    # this one, and the provenance column above.
+    sessions: Mapped[list["Session"]] = relationship(
+        back_populates="scenario", foreign_keys="Session.scenario_id"
+    )
 
 
 class Language(Base):
@@ -393,7 +412,9 @@ class Session(Base):
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     persona: Mapped["Persona"] = relationship(back_populates="sessions")
-    scenario: Mapped["Scenario"] = relationship(back_populates="sessions")
+    scenario: Mapped["Scenario"] = relationship(
+        back_populates="sessions", foreign_keys=[scenario_id]
+    )
     language: Mapped["Language"] = relationship(back_populates="sessions")
     turns: Mapped[list["Turn"]] = relationship(
         back_populates="session", cascade="all, delete-orphan", passive_deletes=True

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { ApiError, apiFetch } from "../api";
 import type { SessionDetail } from "../protocol";
@@ -20,10 +20,18 @@ export type StoredSessionState = "loading" | "ready" | "missing" | "failed";
  * A Session without a wrap-up is therefore `ready` here, not an error: the
  * Transcript and the figures are still there, and the caller says plainly that
  * the narrative is not.
+ *
+ * `reload` is the one thing that reads it a second time: the caller can edit
+ * the follow-up Scenario this Session produced (F-60), and the card shown here
+ * would otherwise keep the title it had before that edit.
  */
 export function useStoredSession(sessionId: string | null) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [state, setState] = useState<StoredSessionState>("loading");
+  // Bumped by `reload`; the effect keys on it, so there is one fetch path and
+  // not a second copy of it.
+  const [nonce, setNonce] = useState(0);
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   useEffect(() => {
     if (sessionId === null) {
@@ -51,7 +59,7 @@ export function useStoredSession(sessionId: string | null) {
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [sessionId, nonce]);
 
-  return { detail, state };
+  return { detail, state, reload };
 }

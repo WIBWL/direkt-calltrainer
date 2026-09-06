@@ -202,12 +202,22 @@ export interface SessionFeedback {
 export interface SessionDetail {
   session_id: string;
   persona: string;
+  /** The Persona's own id (ADR 0050), for starting the follow-up below
+   * against the same partner — `persona` above is only its display name. */
+  persona_id: string;
   scenario: string;
   status: FeedbackStatus;
   turns: SessionTurn[];
   /** Statistics for the whole call, not per utterance (ADR 0051). */
   measurements: Measurement[];
   feedback: SessionFeedback | null;
+  /**
+   * The Scenario the worker drafted from this Session's feedback (F-60,
+   * ADR 0069), or null — because there were no improvement points to build one
+   * from, because it is still being written, or because the User has since
+   * deleted it. The card only; the editor loads the rest by id.
+   */
+  follow_up: { id: string; name: string; short_description: string } | null;
 }
 
 // --- Session history (GET /api/sessions, ADR 0064) -------------------------

@@ -16,6 +16,10 @@ _Avoid_: Trainee, learner, customer
 The situational context configured for a Session — e.g. the caller's reason for calling or goal. Independent of the simulated counterpart's character traits (see Persona). Carries a **Category**: what kind of call it is, one of `operations`, `requirements`, `pricing` or `closing` (docs/adr/0064), four values refining F-03's three call contexts. Display and filter only, never reaches the prompt. Optional: a Scenario may have none.
 _Avoid_: Persona, situation. For the Category: type, Szenariotyp (the free-text `scenario_type` column it replaces is gone; see docs/adr/0064)
 
+**Follow-up Scenario** (_Folgeszenario_):
+The Scenario written automatically from a finished Session's Feedback, one per Session that has improvement points (docs/adr/0069). A Scenario in every other respect — the User owns it, edits it, shares it and plays it against any Persona — so it is a category, not a kind: it is set apart only by the Session it came from, and it leaves the library when that Session is deleted. Not a repeat of the call it came from: a new case in the same subject area, built so that what the Feedback asked for is the way through it.
+_Avoid_: Follow-up call, next session, exercise
+
 **Persona**:
 The character traits of the AI-simulated conversation partner within a Session — e.g. impatient, calm, confrontational. Combined independently with a Scenario.
 _Avoid_: Scenario, character, counterpart

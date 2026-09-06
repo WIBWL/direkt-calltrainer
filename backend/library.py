@@ -87,6 +87,7 @@ def _to_scenario(row: models.Scenario) -> Scenario:
         category=row.category,
         created_by=row.created_by,
         visibility=row.visibility,
+        follow_up=row.derived_from_session_id is not None,
     )
 
 
@@ -169,7 +170,12 @@ def get_persona(extern_id: str) -> Persona | None:
 
 
 def list_scenarios(subject: str, tenant_id: int) -> list[Scenario]:
-    """Every Scenario this caller may select, ordered by title."""
+    """Every Scenario this caller may select, oldest first.
+
+    By creation time rather than by title: the caller sees them grouped by
+    category (`backend/api/scenarios.py` sorts on top of this order), and within
+    a category the order a User can predict is the one they were made in.
+    """
     with session_scope() as db:
         rows = db.scalars(
             select(models.Scenario)
@@ -177,7 +183,7 @@ def list_scenarios(subject: str, tenant_id: int) -> list[Scenario]:
                 models.Scenario.active,
                 _visible_to(models.Scenario, subject, tenant_id),
             )
-            .order_by(models.Scenario.title)
+            .order_by(models.Scenario.created_at, models.Scenario.scenario_id)
         ).all()
         return [_to_scenario(row) for row in rows]
 
@@ -198,15 +204,27 @@ def get_scenario(extern_id: str, subject: str, tenant_id: int) -> Scenario | Non
         return _to_scenario(row) if row is not None else None
 
 
-def create_scenario(data: dict, subject: str, tenant_id: int) -> Scenario:
+def create_scenario(
+    data: dict,
+    subject: str,
+    tenant_id: int | None,
+    derived_from_session_id: int | None = None,
+) -> Scenario:
     """Author a private Scenario (ADR 0058), stamped with the caller's tenant so
-    sharing is later a `visibility` flip (ADR 0060)."""
+    sharing is later a `visibility` flip (ADR 0060).
+
+    The single write path into `scenario`, the worker's generated follow-up
+    included (ADR 0069) — which is what keeps sanitising, caps and ownership in
+    one place. That caller has no tenant claim to stamp with and passes None;
+    `set_scenario_visibility` stamps such a row when it is first shared.
+    """
     with session_scope() as db:
         row = models.Scenario(
             created_by=subject,
             tenant_id=tenant_id,
             visibility=models.VISIBILITY_PRIVATE,
             active=True,
+            derived_from_session_id=derived_from_session_id,
             **_sanitised(data, _SCENARIO_FIELDS),
         )
         db.add(row)

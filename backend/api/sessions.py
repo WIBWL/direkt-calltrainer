@@ -15,9 +15,9 @@ A Session is addressed by its `extern_id`, never by its primary key
 would confirm that the id exists, which is exactly what the unguessable id is
 there to withhold. A sequential key could offer neither guarantee.
 
-`POST /api/sessions/{extern_id}/follow-up` (F-60) reads the same Session for
-what its Feedback asked the User to work on and hands that to
-`backend/followups.py` to design the next exercise from. It stores nothing.
+The detail route also carries the follow-up Scenario the worker drafted from
+this Session's Feedback (F-60, ADR 0069) — its card, which is what the post-call
+screen offers to start or to edit.
 
 The wire matches the schema (ADR 0057): the dicts below pass the ORM's own
 English column values straight through to frontend/src/protocol.ts, with no
@@ -26,21 +26,17 @@ translation step.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import uuid
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from openai import OpenAIError
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Session as DbSession, selectinload
 
 from backend import deletion
 from backend.auth import AuthContext, require_user
 from backend.db import models as db_models
 from backend.db.session import session_scope
-from backend.followups import FollowUpError, draft_follow_up
 
 logger = logging.getLogger(__name__)
 
@@ -181,11 +177,16 @@ def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user
         return {
             "session_id": str(session.extern_id),
             "persona": session.persona.name,
+            # The id alongside the name: the follow-up offered below starts the
+            # next call against the same partner, and `session.start` takes the
+            # `extern_id` (ADR 0050), never a display name.
+            "persona_id": str(session.persona.extern_id),
             "scenario": session.scenario.title,
             "status": _feedback_status(session),
             "turns": [_turn(t) for t in sorted(session.turns, key=lambda t: t.seq_index)],
             "measurements": [_measurement(m) for m in session.measurements],
             "feedback": _feedback(session.feedback),
+            "follow_up": _follow_up(db, session.session_id),
         }
 
 
@@ -213,95 +214,28 @@ def delete_one_session(
     return Response(status_code=204)
 
 
-@router.post("/{extern_id}/follow-up")
-async def create_follow_up(
-    extern_id: uuid.UUID, caller: AuthContext = Depends(require_user)
-) -> dict:
-    """A Scenario draft built from what this Session's Feedback asked for (F-60).
+def _follow_up(db: DbSession, session_id: int) -> dict | None:
+    """The card of the Scenario drafted from this Session (ADR 0069), or None.
 
-    Stores nothing: it opens in the editor and is saved, if at all, through the
-    ordinary authoring route (ADR 0069). The improvement points are the whole
-    input, so a Session without them has nothing to build from (409).
+    Its own query rather than a relationship: `scenario` and `session` already
+    point at each other through `session.scenario_id`, and a second mapped edge
+    between them would have to disambiguate the first one everywhere.
 
-    `session_scope()` is synchronous, so the read goes to a thread — this route
-    is `async def` for the model call and must not block the event loop.
+    Filtered on `active`, so a follow-up the User has since deleted stops being
+    offered — which is also what a deleted source Session leaves behind.
     """
-    material = await asyncio.to_thread(_follow_up_material, extern_id, caller.sub)
-    # Absent and not-yours stay the same answer as in `get_session` (ADR 0050).
-    if material is None:
-        raise HTTPException(status_code=404, detail="Unknown session")
-    if not material.has_feedback:
-        raise HTTPException(
-            status_code=409,
-            detail="Das Feedback zu diesem Gespräch ist noch nicht fertig.",
-        )
-    if not material.improvements:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "Dieses Feedback nennt keine Verbesserungspunkte, aus denen sich "
-                "ein Folgeszenario bauen ließe."
-            ),
-        )
-
-    try:
-        return await draft_follow_up(
-            material.scenario_name,
-            material.scenario_teaser,
-            material.improvements,
-            material.phase_language,
-        )
-    except (OpenAIError, FollowUpError) as e:
-        # A dead gateway and an unparseable reply are the same thing from here.
-        logger.warning("Follow-up draft failed for session %s: %s", extern_id, e)
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Das Folgeszenario konnte gerade nicht erstellt werden. "
-                "Bitte später noch einmal versuchen."
-            ),
-        ) from e
-
-
-@dataclass(frozen=True)
-class _FollowUpMaterial:
-    """What the follow-up prompt is built from, read out before the database
-    handle is gone. The Scenario's card only, never its prompt fields."""
-
-    scenario_name: str
-    scenario_teaser: str
-    has_feedback: bool
-    improvements: list[str]
-    phase_language: str | None
-
-
-def _follow_up_material(extern_id: uuid.UUID, subject: str) -> _FollowUpMaterial | None:
-    """This Session's material, or None if it is not the caller's."""
-    with session_scope() as db:
-        session = (
-            db.query(db_models.Session)
-            .filter_by(extern_id=extern_id)
-            .options(
-                selectinload(db_models.Session.scenario),
-                selectinload(db_models.Session.feedback)
-                .selectinload(db_models.Feedback.points),
-            )
-            .one_or_none()
-        )
-        if session is None or session.subject_id != subject:
-            return None
-        feedback = session.feedback
-        return _FollowUpMaterial(
-            scenario_name=session.scenario.title,
-            scenario_teaser=session.scenario.short_description,
-            has_feedback=feedback is not None,
-            improvements=[
-                point.text
-                for point in (feedback.points if feedback else [])
-                if point.kind == db_models.POINT_IMPROVEMENT
-            ],
-            phase_language=feedback.phase_language if feedback else None,
-        )
+    scenario = (
+        db.query(db_models.Scenario)
+        .filter_by(derived_from_session_id=session_id, active=True)
+        .one_or_none()
+    )
+    if scenario is None:
+        return None
+    return {
+        "id": str(scenario.extern_id),
+        "name": scenario.title,
+        "short_description": scenario.short_description,
+    }
 
 
 def _feedback_status(session: db_models.Session) -> str:

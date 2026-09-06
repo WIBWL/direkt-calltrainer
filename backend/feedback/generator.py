@@ -11,6 +11,10 @@ the same call as the summary and the two lists. One call rather than a second
 one of its own, because the phases are read off the same transcript and a
 second round trip would buy nothing but latency and a second way to fail.
 
+The follow-up Scenario is the one thing that does get its own call, once the
+wrap-up is stored: it is written from the finished improvement points and the
+User is not waiting on it (ADR 0069, `backend/followups.py`).
+
 Runs in the async worker (ADR 0018/0019), not in the live path.
 """
 
@@ -27,6 +31,7 @@ from backend.clients import llm
 from backend.db import models as db_models
 from backend.db.session import session_scope
 from backend.feedback import jobs
+from backend.followups import create_follow_up
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +97,11 @@ async def _generate(session_id: int) -> None:
             _store(db, session_id, wrapup, valid_turns)
             jobs.mark(db, session_id, db_models.JOB_DONE)
         logger.info("Feedback stored for session %d (%d points)", session_id, len(wrapup.points))
+
+        # After the job is closed, not before it: the wrap-up is what the User
+        # is waiting on, and the follow-up is a second model call (ADR 0069).
+        # It never raises, so nothing below reaches the failure branch.
+        await create_follow_up(session_id)
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception("Feedback generation failed for session %d", session_id)
         # `jobs.mark` creates the row where it finds none, so a Session that

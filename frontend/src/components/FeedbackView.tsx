@@ -1,6 +1,3 @@
-import { useState } from "react";
-
-import { ApiError } from "../api";
 import type {
   FeedbackPoint,
   Measurement,
@@ -9,8 +6,19 @@ import type {
 } from "../protocol";
 import { formatOffset } from "../utils/time";
 import { useSessionFeedback } from "../hooks/useSessionFeedback";
-import { createFollowUpDraft, type ScenarioDraft } from "../scenarioLibrary";
 import Sparkline from "./Sparkline";
+
+/** What a screen can do with the follow-up Scenario (F-60): open it in the
+ * editor, or start it as the next call. Both belong to whoever owns the screen,
+ * so they are passed in — the post-call screen starts the call itself, the
+ * history hands the pairing to the training flow.
+ *
+ * `onStart` gets the Persona too: the follow-up is played against the same
+ * partner as the training it came out of, so there is nothing left to choose. */
+export interface FollowUpActions {
+  onEdit: (scenarioId: string) => void;
+  onStart: (scenarioId: string, personaId: string) => void;
+}
 
 /** How many decimals a metric reads naturally in. Counts are whole things;
  * seconds and percentages are not. */
@@ -43,12 +51,11 @@ const NOTICE: Record<string, string> = {
  */
 export default function FeedbackView({
   sessionId,
-  onFollowUpDraft,
+  followUp,
 }: {
   sessionId: string | null;
-  /** Hand the drafted follow-up (F-60) to whoever owns the editor. Omitted
-   * where there is nowhere to open it. */
-  onFollowUpDraft?: (draft: ScenarioDraft) => void;
+  /** Omitted where there is nowhere to act on the follow-up (F-60). */
+  followUp?: FollowUpActions;
 }) {
   const { detail, state } = useSessionFeedback(sessionId);
 
@@ -59,11 +66,12 @@ export default function FeedbackView({
       </div>
     );
   }
+  // The hook keeps polling past the wrap-up while the follow-up is still being
+  // written, so "loading" here is what that block waits on.
   return (
     <FeedbackReport
       detail={detail}
-      sessionId={sessionId}
-      onFollowUpDraft={onFollowUpDraft}
+      followUp={followUp && { ...followUp, pending: state === "loading" }}
     />
   );
 }
@@ -79,17 +87,18 @@ export default function FeedbackView({
  * the caller's to decide, because the honest sentence differs: on the post-call
  * screen one is still being generated, in the history none ever was.
  *
- * The follow-up offer (F-60) is opt-in for the same reason: it needs somewhere
- * to open the draft, which only a caller that owns an editor can provide.
+ * The follow-up offer (F-60) stays a prop for the same reason: both screens
+ * that show it can open the editor and start a training, but they do it
+ * differently — after a call the flow is already here, from the history it has
+ * to be handed over — and only one of them has a wrap-up still on its way to
+ * wait for.
  */
 export function FeedbackReport({
   detail,
-  sessionId,
-  onFollowUpDraft,
+  followUp,
 }: {
   detail: SessionDetail;
-  sessionId?: string | null | undefined;
-  onFollowUpDraft?: ((draft: ScenarioDraft) => void) | undefined;
+  followUp?: (FollowUpActions & { pending: boolean }) | undefined;
 }) {
   const { feedback, measurements, turns, persona, scenario } = detail;
   if (!feedback) return null;
@@ -130,8 +139,8 @@ export function FeedbackReport({
         />
       </div>
 
-      {onFollowUpDraft && sessionId && improvements.length > 0 && (
-        <FollowUp sessionId={sessionId} onDraft={onFollowUpDraft} />
+      {followUp && improvements.length > 0 && (
+        <FollowUp scenario={detail.follow_up} personaId={detail.persona_id} {...followUp} />
       )}
 
       {feedback.phase_language && (
@@ -184,55 +193,68 @@ export function MetricSection({ measurements }: { measurements: Measurement[] })
   );
 }
 
-/** "Folgeszenario erstellen" (F-60): the next exercise, built from the points
- * above. Offered only where there are improvement points — the same condition
- * the backend enforces. The draft opens in the editor and is stored only if the
- * User saves it there. */
+/** The next exercise, built from the points above (F-60). Nobody asks for it:
+ * the worker writes it with the wrap-up and stores it as an ordinary Scenario
+ * of the User's (ADR 0069), so this offers a row that already exists rather
+ * than a draft. It arrives a little after the wrap-up, hence the busy line.
+ *
+ * "Starten" goes straight into the call, against the Persona this training was
+ * played with: the exercise follows from that conversation, so re-picking a
+ * partner would be a step with only one sensible answer. The Scenario stays an
+ * ordinary row in the library, so a different partner is a matter of starting
+ * it from the setup screen instead. */
 function FollowUp({
-  sessionId,
-  onDraft,
+  scenario,
+  personaId,
+  pending,
+  onEdit,
+  onStart,
 }: {
-  sessionId: string;
-  onDraft: (draft: ScenarioDraft) => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleClick = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      onDraft(await createFollowUpDraft(sessionId));
-    } catch (e: unknown) {
-      // The backend's `detail` is written for the user, so show it as it is.
-      setError(
-        e instanceof ApiError && e.detail
-          ? e.detail
-          : "Das Folgeszenario konnte nicht erstellt werden.",
-      );
-      setBusy(false);
-    }
-  };
+  scenario: SessionDetail["follow_up"];
+  personaId: string;
+  pending: boolean;
+} & FollowUpActions) {
+  if (!scenario) {
+    if (!pending) return null;
+    return (
+      <div className="card follow-up">
+        <p className="follow-up-note">
+          Aus diesen Punkten wird gerade ein Folgeszenario gebaut – das dauert einen
+          Moment.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="card follow-up">
       <p>
-        Aus diesen Punkten lässt sich das nächste Gespräch bauen: eine neue Situation im
-        selben Umfeld, die genau das verlangt, was hier gefehlt hat.
+        Daraus ist Ihr nächstes Gespräch entstanden: eine neue Situation im selben
+        Umfeld, die genau das verlangt, was hier gefehlt hat. Es liegt unter
+        „Folgeszenario“ in Ihrer Auswahl.
       </p>
-      <button type="button" className="follow-up-button" disabled={busy} onClick={handleClick}>
-        {busy ? "Folgeszenario wird entworfen …" : "Folgeszenario erstellen"}
-      </button>
-      {busy && (
-        <p className="follow-up-note">
-          Die KI entwirft den Fall — das dauert einen Moment. Danach können Sie ihn
-          prüfen und ändern, bevor er gespeichert wird.
-        </p>
-      )}
-      {error && <p className="follow-up-error">{error}</p>}
+      <p className="follow-up-name">{scenario.name}</p>
+      <p className="follow-up-teaser">{scenario.short_description}</p>
+      <div className="follow-up-actions">
+        <button
+          type="button"
+          className="follow-up-button"
+          onClick={() => onStart(scenario.id, personaId)}
+        >
+          Starten
+        </button>
+        <button type="button" className="follow-up-draft" onClick={() => onEdit(scenario.id)}>
+          Bearbeiten
+        </button>
+      </div>
+      <p className="follow-up-note">
+        „Starten“ beginnt das Gespräch direkt – mit demselben Gesprächspartner wie in
+        diesem Training.
+      </p>
     </div>
   );
 }
+
 
 function PointList({
   eyebrow,

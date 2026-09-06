@@ -2,9 +2,10 @@
 
 `GET /api/scenarios` feeds the selection screen: every Scenario the caller may
 see, each badged `builtin` (a shipped built-in), `own` (one they authored) or
-`tenant` (shared by a colleague). The list withholds the prompt fields exactly
-as before (ADR 0043/0045) — they are the answer key to the exercise. The detail
-and write routes serve only the caller's own rows.
+`tenant` (shared by a colleague), and `follow_up` where the worker wrote it from
+one of their own Sessions (ADR 0069). The list withholds the prompt fields
+exactly as before (ADR 0043/0045) — they are the answer key to the exercise. The
+detail and write routes serve only the caller's own rows.
 
 `POST /api/scenarios/document` (F-58) is a stateless helper: it extracts an
 uploaded text-layer PDF and has the LLM condense it into a fact list for the
@@ -113,7 +114,23 @@ def _card(scenario, subject: str) -> dict:
         # True once shared with the company -- for the author's own Scenarios
         # too, which `origin` still reports as `own`.
         "shared": scenario.visibility == VISIBILITY_TENANT,
+        # Drafted from a Session's feedback (ADR 0069). A category of its own in
+        # the library, carried beside `origin` rather than as a value of it: it
+        # is the caller's own Scenario in every other respect, editable and
+        # shareable like one.
+        "follow_up": scenario.follow_up,
     }
+
+
+# The order the selection screen shows the origins in, matching its level-1
+# filter (ADR 0072). Not `scenario.category`, which is the thematic level-2
+# filter. `library.list_scenarios` returns them by creation time and Python's
+# sort is stable, so that order survives inside each group.
+_ORIGIN_ORDER = ("builtin", "own", "follow_up", "tenant")
+
+
+def _origin_group(card: dict) -> int:
+    return _ORIGIN_ORDER.index("follow_up" if card["follow_up"] else card["origin"])
 
 
 def _detail(scenario) -> dict:
@@ -140,8 +157,10 @@ def list_scenarios(
     user: AuthContext = Depends(require_user),
     tenant_id: int = Depends(current_tenant_id),
 ) -> list[dict]:
-    """Every Scenario the caller may select, each badged builtin/own/tenant."""
-    return [_card(s, user.sub) for s in library.list_scenarios(user.sub, tenant_id)]
+    """Every Scenario the caller may select, each badged builtin/own/tenant,
+    grouped by origin and by creation time within one."""
+    cards = [_card(s, user.sub) for s in library.list_scenarios(user.sub, tenant_id)]
+    return sorted(cards, key=_origin_group)
 
 
 @router.post("/document")
