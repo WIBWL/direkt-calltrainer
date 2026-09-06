@@ -1872,3 +1872,66 @@ h2 {
   line-height: 1.5;
   color: var(--color-text-muted-secondary);
 }
+
+.feedback-metrics-section {
+  margin-bottom: 32px;
+}
+
+.feedback-metrics-eyebrow {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-blue-600);
+}
+
+.feedback-metrics-title {
+  margin: 0 0 20px;
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--color-navy-900);
+}
+
+.feedback-metrics-section .metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.feedback-metrics-section .metric {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 112px;
+  padding: 18px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  background: var(--color-surface);
+}
+
+.feedback-metrics-section .metric-name {
+  font-size: 11px;
+  line-height: 1.3;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text-muted-secondary);
+}
+
+.feedback-metrics-section .metric-value {
+  margin-top: 12px;
+  font-size: 24px;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--color-navy-900);
+}
+
+.feedback-metrics-section .metric-disclaimer {
+  margin: 14px 0 0;
+  padding: 0;
+  border: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-text-muted-secondary);
+}
