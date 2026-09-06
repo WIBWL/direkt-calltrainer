@@ -93,36 +93,6 @@ def persist_session(
         return session.session_id
 
 
-def mark_feedback_failed(session_id: int, error: str) -> None:
-    """Record that this Session's wrap-up will never be generated (ADR 0032).
-
-    For the one outcome the live path can be certain of: the job was never
-    handed to the queue, so nothing downstream will ever move its row off
-    "queued". The later transitions belong to feedback/generator.py -- a worker
-    that never received the job cannot write them.
-
-    Never raises. The caller is already handling a failure and must not be
-    given a second one; a status row is worth less than the transcript that is
-    on its way to the user either way.
-    """
-    try:
-        with session_scope() as db:
-            job = (
-                db.query(db_models.AnalysisJob)
-                .filter_by(session_id=session_id, kind=db_models.JOB_KIND_FEEDBACK)
-                .order_by(db_models.AnalysisJob.job_id.desc())
-                .first()
-            )
-            if job is None:
-                logger.warning("No feedback job to fail for session %d", session_id)
-                return
-            job.status = db_models.JOB_FAILED
-            job.error_text = error
-            job.updated_at = datetime.now(UTC)
-    except Exception:  # pylint: disable=broad-except
-        logger.exception("Feedback job could not be failed for session %d", session_id)
-
-
 def _write_analysis(
     db: DbSession, session: db_models.Session, call: metrics.Conversation
 ) -> None:

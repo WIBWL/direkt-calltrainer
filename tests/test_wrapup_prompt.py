@@ -23,7 +23,8 @@ pydantic model.
 
 import pytest
 
-from backend.feedback.generator import _messages, _Wrapup
+from backend.feedback.generator import _LANGUAGE_NAMES_EN, _messages, _Wrapup
+from backend.session.language_packs import LANGUAGE_PACKS
 
 # The prompt builder and the response model are the units under test.
 # pylint: disable=protected-access,redefined-outer-name
@@ -110,3 +111,21 @@ def test_narrative_fallback_carries_no_phase_text() -> None:
     """ADR 0049's degradation path: an answer that never validates yields the
     prose alone. It has no phase analysis in it, and must not claim one."""
     assert _Wrapup(summary="Freitext ohne JSON.").phase_language == ""
+
+
+def test_every_supported_language_has_a_name_for_the_prompt() -> None:
+    """ADR 0043. The prompt is English and names the language the wrap-up is to
+    be written in, so every language a Persona can speak needs an entry here.
+
+    Asserted against LANGUAGE_PACKS, the set a Persona's `language_code` is
+    resolved through, so a pack added without a name fails here rather than
+    reaching the model as a bare code.
+    """
+    assert set(LANGUAGE_PACKS) <= set(_LANGUAGE_NAMES_EN)
+
+
+def test_the_language_name_is_what_the_model_is_told_to_write_in() -> None:
+    """The name is interpolated into the output rules, not just stored."""
+    system = _messages("dossier", _LANGUAGE_NAMES_EN["en"])[0]["content"]
+
+    assert "Every value you write is in English" in system

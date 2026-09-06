@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted, narrowed by ADR 0051: Praat remains the engine, but only for duration, pauses and loudness. The pitch and voice-quality analysis this ADR originally covered (F-35, F-38) is no longer collected.
+Accepted, narrowed by ADR 0051: Praat remains the engine, but only for duration, the phonation time its silence segmentation yields alongside the pauses, and loudness. The pitch and voice-quality analysis this ADR originally covered (F-35, F-38) is no longer collected.
 
 ## Context
 

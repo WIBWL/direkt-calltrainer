@@ -7,10 +7,14 @@ Covers:
         at the end (nothing partial is exposed mid-call)
   ADR 0033  streamed pipeline: audio is produced chunk by chunk, first chunk
         before the whole reply is finished
+  ADR 0047/0048  each Turn's acoustics are measured inline, off the critical
+        path: what the measurement puts on the Turn, and what it leaves there
+        when it fails. What the statistics do with it: tests/test_metrics.py
 """
 
 import pytest
 
+from backend.feedback.acoustics import AcousticsError, TurnAcoustics
 from backend.session.models import AudioChunk, StateChanged, TurnCompleted
 from backend.session.orchestrator import SessionOrchestrator
 from tests.conftest import audio_chunks, collect, completed, states
@@ -124,3 +128,53 @@ async def test_transcript_is_assembled_across_turns_at_the_end(orch, fake_pipeli
             "persona_text": "Alles klar, das passt fuer mich.",
         },
     ]
+
+
+async def test_a_measured_turn_records_both_its_durations(orch, fake_pipeline, monkeypatch):
+    """ADR 0047/0048. A recording that ran 1.5 s and held 0.9 s of speech puts
+    both figures on the Turn, in their own fields: Redeanteil divides by the
+    first, Sprechtempo by the second."""
+    monkeypatch.setattr(
+        "backend.session.orchestrator.analyze",
+        lambda _audio: TurnAcoustics(
+            duration_ms=1500, phonation_ms=900, pauses=(), loudness_db=(),
+        ),
+    )
+    fake_pipeline.stt.transcripts = ["Ich spreche mit einer Pause."]
+    fake_pipeline.llm.replies = ["Danke fuer die Information."]
+
+    await collect(orch.run_turn(b"audio", "turn.wav", "audio/wav"))
+
+    assert orch.turns[0].user_speech_ms == 1500
+    assert orch.turns[0].user_phonation_ms == 900
+    assert orch.turns[0].user_acoustics_complete is True
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        AcousticsError("audio too short to analyze"),
+        RuntimeError("something from the Praat C extension"),
+    ],
+    ids=["measurement_declined", "unexpected_failure"],
+)
+async def test_an_unmeasurable_turn_says_so(orch, fake_pipeline, monkeypatch, error):
+    """ADR 0048. Both failure paths -- the one `analyze` raises deliberately and
+    the catch-all for whatever Praat's C extension surfaces -- flag the Turn
+    rather than only logging. The call carries on: this leg is never
+    load-bearing."""
+    def fail_analyze(_audio):
+        raise error
+
+    monkeypatch.setattr("backend.session.orchestrator.analyze", fail_analyze)
+    fake_pipeline.stt.transcripts = ["Ich spreche trotz Messfehler."]
+    fake_pipeline.llm.replies = ["Danke fuer die Information."]
+
+    events = await collect(orch.run_turn(b"audio", "turn.wav", "audio/wav"))
+
+    assert orch.turns[0].user_acoustics_complete is False
+    assert orch.turns[0].user_speech_ms == 0
+    assert orch.turns[0].user_phonation_ms == 0
+    # An unmeasurable Turn is not a failed one.
+    assert completed(events) is not None
+    assert orch.turns[0].persona_text == "Danke fuer die Information."

@@ -8,8 +8,8 @@ back by `GET /api/sessions/{extern_id}` as `status` (ADR 0050).
 That makes it a quiet failure path. If a transition stops being written, the
 wrap-up still lands in the database and the client still polls -- it just gives
 up on its own deadline and shows the user a failure that did not happen. These
-tests pin the whole lifecycle, including the two cases where the row would
-otherwise describe a job that no longer exists.
+tests pin the whole lifecycle, including the cases where the row would
+otherwise describe a job that no longer exists, or one that finished.
 
 Postgres has to be running (`docker compose up -d db`); without it the database
 fixtures skip.
@@ -25,9 +25,9 @@ from sqlalchemy.orm import Session as DbSession
 
 from backend.clients import llm
 from backend.db.models import AnalysisJob, Feedback, Session
+from backend.feedback import jobs
 from backend.feedback.generator import generate_feedback
 from backend.feedback.queue import JOB_TIMEOUT_S
-from backend.session import persistence
 from backend.session.models import Turn
 from tests.conftest import persist
 
@@ -170,7 +170,7 @@ def test_a_job_that_was_never_queued_is_marked_failed(db_session: DbSession,
     _store()
     session_id = db_session.query(Session).one().session_id
 
-    persistence.mark_feedback_failed(session_id, "Error 111 connecting to redis:6379")
+    jobs.mark_failed(session_id, "Error 111 connecting to redis:6379")
 
     job = _job(db_session, session_id)
     assert job.status == "failed"
@@ -186,7 +186,7 @@ def test_failing_a_job_that_is_not_there_is_survivable(db_session: DbSession,
     db_session.query(AnalysisJob).delete()
     db_session.commit()
 
-    persistence.mark_feedback_failed(session_id, "boom")  # must not raise
+    jobs.mark_failed(session_id, "boom")  # must not raise
 
 
 async def test_a_session_without_a_job_reads_as_failed(
@@ -222,3 +222,57 @@ async def test_a_running_job_is_only_believed_within_its_timeout(
     body = (await api_client.get(f"/api/sessions/{extern_id}")).json()
 
     assert body["status"] == expected
+
+
+def test_a_wrapup_that_cannot_be_stored_fails_the_job(
+    db_session: DbSession, app_database: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Generation and storage are two steps and either can fail. A boundary
+    drawn around the model call alone would let a storage failure escape with
+    the row still at `running`, which is the state the client keeps polling."""
+    _store()
+    session_id = db_session.query(Session).one().session_id
+    _stub_model(monkeypatch, _REPLY)
+
+    def fail_store(_db, _session_id, _wrapup, _turn_ids):
+        raise RuntimeError("feedback_point insert failed")
+
+    monkeypatch.setattr("backend.feedback.generator._store", fail_store)
+
+    # Re-raised on purpose: RQ has to see the job fail, or it counts as done.
+    with pytest.raises(RuntimeError, match="feedback_point insert failed"):
+        generate_feedback(session_id)
+
+    job = _job(db_session, session_id)
+    assert job.status == "failed"
+    assert "feedback_point insert failed" in job.error_text
+
+
+def test_a_late_failure_does_not_overwrite_a_finished_job(
+    db_session: DbSession, app_database: str
+) -> None:
+    """`jobs.mark_failed` writes from outside the process running the job, so by
+    the time it commits the wrap-up may already be on the user's screen. Taking
+    a result away from them is worse than a row that is briefly out of date."""
+    _store()
+    session_id = db_session.query(Session).one().session_id
+    job = _job(db_session, session_id)
+    job.status = "done"
+    db_session.commit()
+
+    jobs.mark_failed(session_id, "late failure")
+
+    job = _job(db_session, session_id)
+    assert (job.status, job.error_text) == ("done", None)
+
+
+def test_a_session_that_was_never_written_leaves_no_job_behind(
+    db_session: DbSession, app_database: str
+) -> None:
+    """The worker's writer creates the row where it finds none, so a job id
+    pointing at nothing has to stop before it rather than leave a dangling
+    row nothing will ever read."""
+    with pytest.raises(LookupError):
+        generate_feedback(4_711)
+
+    assert db_session.query(AnalysisJob).filter_by(session_id=4_711).count() == 0

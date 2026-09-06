@@ -21,6 +21,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from backend.auth import AuthContext, authenticate_ws
 from backend.logging_config import session_id_scope
 from backend import library
+from backend.feedback import jobs
 from backend.personas import Persona
 from backend.scenarios import Scenario
 from backend.session import persistence
@@ -131,7 +132,9 @@ async def _record(
         return
     try:
         # Imported here, not at module scope: the live path must not need
-        # Redis to be importable, let alone reachable.
+        # Redis to be importable, let alone reachable. `jobs` stays at module
+        # scope -- it touches only the database, and the handler below needs it
+        # bound even when this import is what failed.
         from backend.feedback import queue
 
         await asyncio.to_thread(queue.enqueue_feedback, db_id)
@@ -140,7 +143,7 @@ async def _record(
         # The row persist_session just wrote says "queued" for a job nobody
         # ever received. This is the only place that knows better, so it
         # records it rather than leaving the row lying (ADR 0032).
-        await asyncio.to_thread(persistence.mark_feedback_failed, db_id, str(e))
+        await asyncio.to_thread(jobs.mark_failed, db_id, str(e))
 
 
 async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario, AuthContext] | None:

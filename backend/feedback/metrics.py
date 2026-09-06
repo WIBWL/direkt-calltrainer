@@ -42,7 +42,13 @@ class Conversation:
     """
 
     user_text: str = ""
+    # How long the user's audio ran, and how much of that was speech rather
+    # than silence. Only the first is comparable with `persona_speech_ms`.
     user_speech_ms: int = 0
+    user_phonation_ms: int = 0
+    # False when a Turn's measurement failed, leaving both figures short by an
+    # unknown amount (ADR 0048).
+    user_acoustics_complete: bool = True
     # Only ever a denominator, for the user's share of the speaking time.
     persona_speech_ms: int = 0
     # One entry per exchange: how long the user took to start replying,
@@ -96,13 +102,21 @@ def measure(call: Conversation) -> list[Measurement]:
 
 def _talk_share(call: Conversation) -> Measurement | None:
     """F-24. The user's share of the time either side actually spoke -- speaking
-    time, not wall-clock, so the model's own latency dilutes neither share."""
+    time, not wall-clock, so the model's own latency dilutes neither share.
+
+    Audio duration on both sides: the Persona's figure is the length of the
+    audio synthesized for it, so the user's has to be the length of their
+    recording. Phonation as the numerator would strip the user's silences and
+    not the Persona's, reporting that difference as a smaller share.
+    """
     spoken = call.user_speech_ms + call.persona_speech_ms
     # Words with no measured speaking time behind them mean the measurement
     # failed (ADR 0048), not that the speaker stayed silent. Reporting the
     # share anyway would put a 0% or a 100% in front of the user as though it
     # had been measured -- exactly what `measure` refuses to do elsewhere.
-    if not spoken or (call.user_text and not call.user_speech_ms):
+    if not call.user_acoustics_complete or not spoken:
+        return None
+    if call.user_text and not call.user_speech_ms:
         return None
     return Measurement(
         "talk_share",
@@ -136,14 +150,15 @@ def _pace(call: Conversation) -> Measurement | None:
     for, so the comparison would measure a setting, not the user; it is left
     out until the partner is a person.
 
-    Note what the denominator contains: the client's VAD pads each recording
-    with its pre-speech and redemption frames, so `user_speech_ms` runs a few
-    hundred milliseconds long per utterance and this rate reads slightly slow.
+    The denominator is phonation: Praat's silence segmentation (the same pass
+    that yields F-51's pauses) drops the silences inside the utterance along
+    with the pre-speech and redemption frames the client's VAD pads each
+    recording with, leaving only time the user was actually speaking in.
     """
     words = _count_words(call.user_text)
-    if not words or not call.user_speech_ms:
+    if not call.user_acoustics_complete or not words or not call.user_phonation_ms:
         return None
-    return Measurement("pace", words * _MS_PER_MINUTE / call.user_speech_ms)
+    return Measurement("pace", words * _MS_PER_MINUTE / call.user_phonation_ms)
 
 
 def _word_count(call: Conversation) -> Measurement | None:
