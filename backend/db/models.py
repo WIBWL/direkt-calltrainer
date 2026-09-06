@@ -72,6 +72,20 @@ POINT_STRENGTH = "strength"
 POINT_IMPROVEMENT = "improvement"
 POINT_KINDS = (POINT_STRENGTH, POINT_IMPROVEMENT)
 
+# Consent.purpose (ADR 0060). One purpose today: storing a finished Session and
+# everything hanging off it. Named rather than implied, so a second purpose --
+# ADR 0059's research use of de-identified measurements is the candidate -- is
+# a new value here and not a second meaning for this one.
+CONSENT_SESSION_STORAGE = "session_storage"
+CONSENT_PURPOSES = (CONSENT_SESSION_STORAGE,)
+
+# Consent.status. There is no "pending": a subject who has not decided has no
+# row at all, which is what the client asks about. Recording an undecided state
+# would mean writing a decision nobody made.
+CONSENT_GRANTED = "granted"
+CONSENT_WITHDRAWN = "withdrawn"
+CONSENT_STATUSES = (CONSENT_GRANTED, CONSENT_WITHDRAWN)
+
 # AnalysisJob vocabulary (ADR 0032). Kept here next to the schema, because the
 # CHECK constraints below are what actually enforce them. Only "feedback" is
 # ever written: the acoustic analysis runs inline in the live path since ADR
@@ -239,8 +253,11 @@ class Session(Base):
     # client when the socket opens, long before this row is written.
     extern_id: Mapped[uuid.UUID] = mapped_column(Uuid, unique=True, default=uuid.uuid4)
     # The caller's Keycloak "sub" claim (ADR 0009/0031), taken from the
-    # WebSocket handshake.
-    subject_id: Mapped[str] = mapped_column(String(64))
+    # WebSocket handshake. Indexed although it is not a foreign key -- the one
+    # such column in the schema. ADR 0052 left it unindexed while nothing
+    # queried it; the Session history reads by this column and nothing else
+    # (F-13/F-48), which is the condition ADR 0028 named for revisiting.
+    subject_id: Mapped[str] = mapped_column(String(64), index=True)
     persona_id: Mapped[int] = mapped_column(ForeignKey("persona.persona_id"), index=True)
     scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id"), index=True)
     # Deliberately duplicated from Persona.language_code rather than derived:
@@ -447,6 +464,69 @@ class FeedbackPoint(Base):
     turn: Mapped["Turn | None"] = relationship(back_populates="feedback_points")
     finding: Mapped["Finding | None"] = relationship(back_populates="feedback_points")
     metric_type: Mapped["MetricType | None"] = relationship(back_populates="feedback_points")
+
+
+class Consent(Base):
+    """One recorded consent decision (ADR 0060).
+
+    Append-only: granting, withdrawing and granting again write three rows, and
+    the current state is the newest of them. A decision is a thing that
+    happened at a moment, so overwriting the previous one would destroy the
+    only evidence that it was ever made -- which is exactly what a consent
+    record exists to keep.
+
+    Not a foreign key to anything, for the same reason `Session.subject_id` is
+    not (ADR 0031): identity lives in Keycloak and there is no local User table
+    for one to point at. Indexed, because every Session that ends asks this
+    table whether it may be stored.
+
+    `version` is the wording the subject actually agreed to. A changed notice
+    means a new version, which makes every earlier decision stale and prompts
+    again -- consent to a text nobody showed them is not consent.
+    """
+
+    __tablename__ = "consent"
+    __table_args__ = (
+        _one_of("purpose", CONSENT_PURPOSES),
+        _one_of("status", CONSENT_STATUSES),
+    )
+
+    consent_id: Mapped[int] = mapped_column(primary_key=True)
+    subject_id: Mapped[str] = mapped_column(String(64), index=True)
+    # CONSENT_SESSION_STORAGE, see the constants above.
+    purpose: Mapped[str] = mapped_column(String(40))
+    version: Mapped[str] = mapped_column(String(20))
+    # CONSENT_GRANTED or CONSENT_WITHDRAWN.
+    status: Mapped[str] = mapped_column(String(20))
+    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class RetentionPreference(Base):
+    """Whether one subject's Sessions are swept after the retention period
+    (ADR 0061).
+
+    One row per subject, and only for subjects who changed the default: the
+    absence of a row means the sweep applies, which is what makes the retention
+    period the default rather than something each account has to be opted into.
+
+    Deliberately its own table rather than a column on `session`. The choice is
+    about an account and not about a call, and putting it on the Session would
+    mean deciding, per row, what a Session written before the choice inherits.
+
+    Not a foreign key, for the same reason `Session.subject_id` is not
+    (ADR 0031): identity lives in Keycloak.
+    """
+
+    __tablename__ = "retention_preference"
+
+    preference_id: Mapped[int] = mapped_column(primary_key=True)
+    # Unique, not merely indexed: a subject has one answer to this question,
+    # and two rows would make the sweep's behaviour depend on which it read.
+    subject_id: Mapped[str] = mapped_column(String(64), unique=True)
+    # False suspends the sweep for this subject. Named for what it does rather
+    # than for the exception, so the column reads the same way the switch does.
+    auto_delete: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class AnalysisJob(Base):

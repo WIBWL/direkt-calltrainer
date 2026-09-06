@@ -20,6 +20,8 @@ We index all of them rather than only the ones on a known path. A selective rule
 
 Indexes that are *not* foreign keys remain out of scope, and ADR 0028's reasoning still governs them: `session.subject_id` in particular stays unindexed until authentication (ADR 0009) makes per-user history possible at all.
 
+That exception has since been taken up. ADR 0009 landed, `subject_id` holds the real Keycloak `sub`, and ADR 0058's history endpoint filters on that column and on nothing else — the "real query pattern rather than a guess" ADR 0028 asked to wait for. It is indexed as of migration `18f5098dfb1b` and is the one indexed column in the schema that is not a foreign key. The rule stated above is unchanged: this is a second index added for a named read path, not a licence to index on suspicion.
+
 ## Consequences
 
 Deleting a Session no longer scans its child tables, and reading one back uses an index instead of a sequential scan — both matter more as stored Sessions accumulate, which is exactly what ADR 0034 set up. The rule is uniform, so new tables inherit it without a fresh discussion, and its violation is caught by a test rather than by review.
