@@ -213,9 +213,8 @@ SCENARIOS = [
         "id": "escalation-repeated-outage",
         "name": "Wiederholter Ausfall trotz Zusage",
         "short_description": (
-            "Der dritte Ausfall in sieben Wochen, und der versprochene Fix "
-            "hat nicht gehalten. Der Kunde will diesmal mehr als eine "
-            "Entschuldigung."
+            "Der dritte Ausfall in sieben Wochen. Der Kunde will diesmal "
+            "mehr als eine Entschuldigung."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -255,8 +254,8 @@ SCENARIOS = [
         "id": "upsell-seat-expansion",
         "name": "Ausbau auf eine zweite Abteilung",
         "short_description": (
-            "Der Kunde will ein zweites Team aufschalten und braucht dafür "
-            "eine Zahl und einen Termin, bevor sein Budgetfenster zugeht."
+            "Der Kunde will ein zweites Team aufschalten und braucht Zahl "
+            "und Termin, bevor sein Budget zugeht."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -295,7 +294,7 @@ SCENARIOS = [
         "name": "Abschluss nach Erstgespräch mit Kollegin",
         "short_description": (
             "Der Kunde ruft zum Abschluss zurück und beruft sich auf Zusagen "
-            "aus einem Gespräch, das jemand anderes geführt hat."
+            "aus einem anderen Gespräch."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
