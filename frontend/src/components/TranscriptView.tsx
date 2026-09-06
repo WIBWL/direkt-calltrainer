@@ -26,8 +26,8 @@ export default function TranscriptView({
 }: TranscriptViewProps) {
   return (
     <>
-      <div className="eyebrow">Calltrainer</div>
-      <h1>Ihr Feedback</h1>
+      <div className="eyebrow">TRAINING ABGESCHLOSSEN</div>
+      <h1>Ihr Gesprächsfeedback</h1>
       {feedback}
 
       <h2>Gesprächsprotokoll</h2>
