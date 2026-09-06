@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, ValidationError
@@ -32,10 +31,6 @@ from backend.feedback import jobs
 logger = logging.getLogger(__name__)
 
 _LANGUAGE_NAMES_EN = {"de": "German", "en": "English"}
-
-# A fenced ```json block is the most common way a small model wraps structured
-# output despite being told not to; unwrap it rather than failing the parse.
-_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
 
 
 class _Point(BaseModel):
@@ -378,26 +373,16 @@ async def _ask(dossier: str, language: str) -> _Wrapup:
     for attempt in range(2):  # initial attempt + one retry
         raw = await llm.complete(messages, think=True)
         try:
-            return _Wrapup.model_validate_json(_unwrap(raw))
+            return _Wrapup.model_validate_json(llm.json_object(raw))
         except (ValidationError, ValueError) as e:
             logger.warning("Wrap-up did not validate (attempt %d): %s", attempt + 1, e)
     logger.warning("Falling back to a narrative-only wrap-up")
     return _Wrapup(summary=_unfenced_text(raw))
 
 
-def _unwrap(raw: str) -> str:
-    """The JSON object out of whatever the model wrapped it in."""
-    fenced = _FENCE_RE.search(raw)
-    candidate = fenced.group(1) if fenced else raw
-    start, end = candidate.find("{"), candidate.rfind("}")
-    if start == -1 or end <= start:
-        raise ValueError("no JSON object in the response")
-    return candidate[start:end + 1]
-
-
 def _unfenced_text(raw: str) -> str:
     """The model's prose, for the fallback: readable even though it isn't JSON."""
-    stripped = _FENCE_RE.sub("", raw).strip()
+    stripped = llm.without_fenced_blocks(raw).strip()
     return stripped or "Für dieses Gespräch konnte kein Feedback erzeugt werden."
 
 
