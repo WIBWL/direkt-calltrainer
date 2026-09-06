@@ -1,4 +1,4 @@
-# ADR 0064: The Follow-up Scenario Is Drafted From the Feedback, Into the Editor
+# ADR 0069: The Follow-up Scenario Is Drafted From the Feedback, Into the Editor
 
 ## Status
 

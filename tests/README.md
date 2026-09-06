@@ -62,7 +62,7 @@ source of that content, and which imports without a database.
 | Persona & scenario library: row mapping + seeded content | F-01, F-03, F-04, R-07..R-10, R-12, ADR 0041, ADR 0043, ADR 0045 | `test_persona_scenario_library.py` |
 | User-authored Scenarios: ownership, tenant visibility, sharing | F-34, F-59, R-58, ADR 0024, ADR 0050, ADR 0058, ADR 0059, ADR 0060 | `test_authored_content.py` |
 | PDF text extraction for an authored Scenario | F-58, ADR 0024, ADR 0058, ADR 0059 | `test_scenario_documents.py` |
-| Follow-up Scenario drafted from a Session's feedback (what the model is and is not given, and the refusals) | F-60, F-10, ADR 0043, ADR 0050, ADR 0051, ADR 0059, ADR 0064 | `test_followup_scenario.py` |
+| Follow-up Scenario drafted from a Session's feedback (what the model is and is not given, and the refusals) | F-60, F-10, ADR 0043, ADR 0050, ADR 0051, ADR 0059, ADR 0069 | `test_followup_scenario.py` |
 | Tenant resolution (org claim → e-mail domain → default) | R-58, ADR 0060 | `test_tenants.py` |
 | Sanitising authored Scenario text before it reaches the prompt | ADR 0024, ADR 0059 | `test_authored_text.py` |
 | Counterpart behaviour (LLM system prompt) | F-01, F-03, F-04, F-12, R-12, ADR 0043, ADR 0045, ADR 0033/0037/0038 | `test_system_prompt.py` |

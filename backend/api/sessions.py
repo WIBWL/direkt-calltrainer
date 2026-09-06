@@ -220,7 +220,7 @@ async def create_follow_up(
     """A Scenario draft built from what this Session's Feedback asked for (F-60).
 
     Stores nothing: it opens in the editor and is saved, if at all, through the
-    ordinary authoring route (ADR 0064). The improvement points are the whole
+    ordinary authoring route (ADR 0069). The improvement points are the whole
     input, so a Session without them has nothing to build from (409).
 
     `session_scope()` is synchronous, so the read goes to a thread — this route

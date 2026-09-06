@@ -4,7 +4,7 @@ The improvement points say what to work on; the model is asked for a Scenario
 that cannot be got through without it. Stateless like `backend/documents.py`:
 the draft goes to the editor and becomes a Scenario only when the User saves it,
 so sanitising, caps, ownership and the Tenant stamp stay where they are
-(ADR 0064).
+(ADR 0069).
 
 Withheld from the model: the measured statistics (no target range exists,
 ADR 0051) and the played Scenario's prompt fields (withheld from the client

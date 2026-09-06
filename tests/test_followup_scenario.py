@@ -3,7 +3,7 @@
 Covers:
   F-60      the next exercise, built from what the wrap-up asked for
   F-10      the improvement points are what it is built from
-  ADR 0064  stateless draft into the editor; only the played Scenario's card
+  ADR 0069  stateless draft into the editor; only the played Scenario's card
   ADR 0043  a built-in's prompt fields stay withheld
   ADR 0051  the measured statistics are not input
   ADR 0059  the drafted text is cleaned and capped like any authored text

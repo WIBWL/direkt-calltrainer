@@ -84,6 +84,7 @@ nav:
       - ADR 0066 - Consent Is What Permits a Session to Be Stored: adr/0066-consent-as-the-basis-for-storing-a-session.md
       - ADR 0067 - Stored Sessions Expire After Six Months, Unless the User Says Otherwise: adr/0067-six-month-retention-suspendable.md
       - ADR 0068 - The Consent Log Outlives the Data It Permitted: adr/0068-consent-log-outlives-the-data.md
+      - ADR 0069 - The Follow-up Scenario Is Drafted From the Feedback, Into the Editor: adr/0069-follow-up-scenario-from-feedback.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
   # site is served at the root (mkdocs serve / mkdocs build + static server).
