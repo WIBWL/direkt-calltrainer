@@ -3079,3 +3079,132 @@ h2 {
   font-size: 1.05rem;
   margin-bottom: 1.5rem;
 }
+
+/* --- Login page --- */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(
+      circle at 70% 20%,
+      rgba(255, 255, 255, 0.86),
+      transparent 34rem
+    ),
+    var(--color-background);
+}
+
+.login-header {
+  width: min(1280px, calc(100% - 80px));
+  margin: 0 auto;
+  padding-top: 48px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.login-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--color-navy-900);
+}
+
+.login-brand-mark {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 11px;
+  background: var(--color-navy-900);
+}
+
+.login-brand-mark span {
+  display: block;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--color-surface);
+}
+
+.login-brand-mark span:nth-child(1) {
+  height: 10px;
+}
+
+.login-brand-mark span:nth-child(2) {
+  height: 16px;
+}
+
+.login-brand-mark span:nth-child(3) {
+  height: 12px;
+}
+
+.login-brand-name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.login-prototype-badge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--color-blue-100);
+  color: var(--color-blue-600);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.login-main {
+  flex: 1;
+  width: min(1280px, calc(100% - 80px));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(430px, 0.82fr);
+  gap: 90px;
+  align-items: center;
+  padding: 58px 0 68px;
+}
+
+.login-hero {
+  max-width: 650px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 470px;
+  justify-self: end;
+}
+
+@media (max-width: 980px) {
+  .login-main {
+    grid-template-columns: 1fr;
+    gap: 44px;
+    align-items: start;
+  }
+
+  .login-hero {
+    max-width: none;
+  }
+
+  .login-card {
+    justify-self: start;
+    max-width: 620px;
+  }
+}
+
+@media (max-width: 620px) {
+  .login-header,
+  .login-main {
+    width: min(100% - 32px, 1280px);
+  }
+
+  .login-header {
+    padding-top: 26px;
+  }
+
+  .login-main {
+    padding-top: 40px;
+  }
+}
