@@ -3680,3 +3680,104 @@ h2 {
     transform: rotate(360deg);
   }
 }
+
+@media (max-width: 980px) {
+  .login-main {
+    padding-top: 44px;
+    padding-bottom: 56px;
+  }
+
+  .login-training-preview {
+    width: 100%;
+    max-width: 620px;
+  }
+
+  .login-card {
+    justify-self: stretch;
+  }
+}
+
+@media (max-width: 620px) {
+  .login-page {
+    min-height: 100svh;
+  }
+
+  .login-header {
+    gap: 10px;
+  }
+
+  .login-prototype-badge {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+
+  .login-main {
+    gap: 34px;
+    padding-bottom: 40px;
+  }
+
+  .login-hero-badge {
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    min-height: 30px;
+    padding: 6px 12px;
+    text-align: center;
+  }
+
+  .login-training-preview {
+    padding: 20px;
+    border-radius: 18px;
+  }
+
+  .login-training-header {
+    gap: 12px;
+  }
+
+  .login-training-meta {
+    line-height: 1.4;
+  }
+
+  .login-training-status {
+    flex-shrink: 0;
+  }
+
+  .login-training-footer {
+    gap: 18px;
+  }
+
+  .login-card {
+    max-width: none;
+  }
+}
+
+@media (max-width: 430px) {
+  .login-prototype-badge {
+    display: none;
+  }
+
+  .login-hero-title {
+    font-size: 34px;
+  }
+
+  .login-training-header {
+    flex-direction: column;
+  }
+
+  .login-training-status {
+    margin-top: 0;
+  }
+
+  .login-training-wave {
+    height: 84px;
+  }
+
+  .login-training-footer {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .login-training-footer > div:last-child {
+    text-align: left;
+  }
+}
