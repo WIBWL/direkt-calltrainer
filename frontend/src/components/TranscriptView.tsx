@@ -75,9 +75,11 @@ export default function TranscriptView({
         )}
       </section>
 
-      <button className="restart-button" type="button" onClick={onRestart}>
-        Neue Session starten
-      </button>
+      <div className="feedback-actions">
+        <button className="restart-button" type="button" onClick={onRestart}>
+          Zur Vorbereitung
+        </button>
+      </div>
     </>
   );
 }
