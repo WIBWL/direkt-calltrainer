@@ -1950,3 +1950,73 @@ h2 {
   height: 48px;
   margin-top: 16px;
 }
+
+.feedback-transcript-section {
+  margin-top: 40px;
+  margin-bottom: 32px;
+}
+
+.feedback-transcript-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+.feedback-transcript-eyebrow {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-blue-600);
+}
+
+.feedback-transcript-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--color-navy-900);
+}
+
+.feedback-transcript-count {
+  flex-shrink: 0;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--color-blue-100);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-blue-600);
+}
+
+.feedback-transcript-card {
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 16px;
+  background: var(--color-surface);
+}
+
+.feedback-transcript-card .transcript-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin: 0;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-navy-900);
+}
+
+.feedback-transcript-card .transcript-line:last-child {
+  border-bottom: 0;
+}
+
+.feedback-transcript-card .transcript-time {
+  flex: 0 0 42px;
+  padding-top: 2px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted-secondary);
+}
