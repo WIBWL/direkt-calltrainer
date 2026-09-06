@@ -46,8 +46,10 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
 
   return (
     <>
-      <div className="card">
-        <p>{feedback.summary}</p>
+      <div className="card feedback-summary-card">
+        <div className="feedback-summary-kicker">QUALITATIVE EINORDNUNG</div>
+        <h2 className="feedback-summary-title">Zusammenfassung</h2>
+        <p className="feedback-summary-text">{feedback.summary}</p>
       </div>
 
       <PointList
