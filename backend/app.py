@@ -1,24 +1,73 @@
-import base64
+"""FastAPI app: REST endpoints for setup data, WebSocket route for the live session, static frontend."""
+
+import asyncio
 import logging
 import os
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
-from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+import httpx
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from openai import OpenAI
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
-from backend.languages import DEFAULT_LANGUAGE_ID, LANGUAGES
-from backend.personas import PERSONAS
-from backend.scenarios import DEFAULT_SCENARIO_ID, SCENARIOS
+from backend.api.session_ws import router as session_ws_router
+from backend.api.sessions import router as sessions_router
+from backend.auth import check_realm, require_user
+from backend.clients import tts
+from backend.clients.config import DIREKT_URL
+from backend.clients.health import check_backends
+from backend.db.provision import provision
+from backend.db.session import session_scope
+from backend.logging_config import configure_logging
+from backend import library
 
-load_dotenv()
+configure_logging()
+logger = logging.getLogger(__name__)
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("calltrainer")
 
-app = FastAPI(title="CallTrainer API")
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
+    """Check the dependencies before the first request, so an unreachable
+    backend shows up as a boot-time log line, not a 500 far from its cause.
+    The checks only log — a dead dependency does not stop the boot.
 
+    The DiReKT gateway is only reachable from its own network; off it, every
+    pipeline call 403s like a credentials problem, so the hint names the real
+    cause."""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.get(DIREKT_URL)
+    except httpx.HTTPError as e:
+        logger.error("Could not reach DIREKT_URL (%s): %s — are you on the gateway's network (VPN)?", DIREKT_URL, e)
+    await check_backends()
+    await tts.prewarm()
+    await check_realm()  # mirrors the DiReKT check above, for the Keycloak realm
+    # Off the event loop: Alembic and the ORM are both synchronous.
+    await asyncio.to_thread(_provision_database)
+    yield
+
+
+def _provision_database() -> None:
+    """Migrate and seed on startup, so a fresh `docker compose up` is usable.
+
+    Non-fatal, like the backend check above: without it every Session fails to
+    persist and silently loses its Feedback, but the call itself still works,
+    so a database problem must not stop the app from booting.
+    """
+    try:
+        logger.info("Database provisioned, reference rows created: %s", provision())
+    except Exception:
+        logger.exception("Database provisioning failed - Sessions will not be persisted")
+
+
+app = FastAPI(title="CallTrainer API", lifespan=lifespan)
+
+# For a Vite dev server on :5173 against a host `uvicorn` — not a supported
+# workflow (the app runs via Docker, SPA served same-origin), so nothing depends
+# on this; kept only to spare a developer who tries it an opaque CORS wall.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -26,115 +75,68 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(session_ws_router)
+app.include_router(sessions_router)
+
 FRONTEND_DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
-
-LLM_URL = os.environ.get("LLM_URL")
-LLM_API_KEY = os.environ.get("LLM_API_KEY")
-LLM_MODEL = os.environ.get("LLM_MODEL")
-
-STT_URL = os.environ.get("STT_URL", LLM_URL)
-STT_API_KEY = os.environ.get("STT_API_KEY", "not-needed")
-STT_MODEL = os.environ.get("STT_MODEL")
-
-TTS_URL = os.environ.get("TTS_URL", LLM_URL)
-TTS_API_KEY = os.environ.get("TTS_API_KEY", "not-needed")
-TTS_MODEL = os.environ.get("TTS_MODEL")
-TTS_VOICE = os.environ.get("TTS_VOICE", "neutral_female")
-
-
-def _client(base_url: str, api_key: str) -> OpenAI:
-    return OpenAI(base_url=f"{base_url.rstrip('/')}/v1", api_key=api_key)
-
-
-llm_client = _client(LLM_URL, LLM_API_KEY)
-stt_client = _client(STT_URL, STT_API_KEY)
-tts_client = _client(TTS_URL, TTS_API_KEY)
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
+    """Liveness: the process is up — open, it's an infrastructure check.
+
+    Deliberately touches nothing else, so a restart loop cannot be caused by a
+    dependency being briefly unavailable.
+    """
     return {"status": "ok"}
 
 
-@app.get("/api/personas")
+@app.get("/health/ready")
+def readiness() -> dict[str, str]:
+    """Readiness: the app can actually serve. Separate from liveness because
+    every endpoint below needs the database — an instance that answers "ok"
+    while Postgres is unreachable would keep receiving traffic it can only
+    answer with 503. This is the check compose.yaml asks."""
+    try:
+        with session_scope() as db:
+            db.execute(text("SELECT 1"))
+    except SQLAlchemyError as e:
+        logger.error("Readiness check failed: %s", e)
+        raise HTTPException(status_code=503, detail="Database unavailable") from e
+    return {"status": "ready"}
+
+
+# The setup lists require a valid Keycloak token (ADR 0009). The static SPA
+# mount below stays open so the login screen can load in the first place.
+@app.get("/api/personas", dependencies=[Depends(require_user)])
 def list_personas() -> list[dict[str, str]]:
+    """List personas available for session setup.
+
+    Display fields only (ADR 0043) -- the English prompt fields stay on the
+    server. The language comes along because it is a property of the Persona and
+    not a separate choice, so the card has to say which one it speaks.
+
+    `id` on the wire is the natural key, never the primary key: the client sends
+    it straight back in session.start. Retired Personas are filtered out by the
+    library -- their rows stay, because stored Sessions reference them.
+    """
     return [
-        {"id": p.id, "name": p.name, "training_goal": p.training_goal}
-        for p in PERSONAS.values()
+        {"id": p.id, "name": p.name, "role": p.role_label, "language": p.language_name}
+        for p in library.list_personas()
     ]
 
 
-@app.get("/api/languages")
-def list_languages() -> list[dict[str, str]]:
-    return [{"id": id_, "name": name} for id_, name in LANGUAGES.items()]
+@app.get("/api/scenarios", dependencies=[Depends(require_user)])
+def list_scenarios() -> list[dict[str, str]]:
+    """List scenarios available for session setup.
 
-
-@app.post("/api/process")
-async def process(
-    file: UploadFile = File(...),
-    persona_id: str = Form(...),
-    language_id: str = Form(DEFAULT_LANGUAGE_ID),
-) -> dict[str, str]:
-    persona = PERSONAS.get(persona_id)
-    if persona is None:
-        raise HTTPException(status_code=404, detail=f"Unknown persona_id: {persona_id}")
-    language_name = LANGUAGES.get(language_id)
-    if language_name is None:
-        raise HTTPException(status_code=404, detail=f"Unknown language_id: {language_id}")
-    scenario = SCENARIOS[DEFAULT_SCENARIO_ID]
-
-    audio_bytes = await file.read()
-    logger.info(
-        "Received audio %r (%d bytes) — persona=%s, language=%s",
-        file.filename, len(audio_bytes), persona_id, language_id,
-    )
-
-    logger.info("[1/3] Transcribing via STT (%s)...", STT_MODEL)
-    try:
-        transcript = stt_client.audio.transcriptions.create(
-            model=STT_MODEL,
-            file=(file.filename, audio_bytes, file.content_type),
-        ).text
-    except Exception as e:
-        logger.error("STT request failed: %s", e)
-        raise HTTPException(status_code=502, detail=f"STT request failed: {e}") from e
-    logger.info("Transcript: %s", transcript)
-
-    logger.info("[2/3] Generating persona reply via LLM (%s)...", LLM_MODEL)
-    try:
-        reply = llm_client.chat.completions.create(
-            model=LLM_MODEL,
-            messages=[
-                {
-                    "role": "system",
-                    "content": persona.as_system_prompt(scenario, language_name),
-                },
-                {"role": "user", "content": transcript},
-            ],
-        ).choices[0].message.content
-    except Exception as e:
-        logger.error("LLM request failed: %s", e)
-        raise HTTPException(status_code=502, detail=f"LLM request failed: {e}") from e
-    logger.info("Reply: %s", reply)
-
-    logger.info("[3/3] Synthesizing speech via TTS (%s, voice=%s)...", TTS_MODEL, TTS_VOICE)
-    try:
-        speech = tts_client.audio.speech.create(
-            model=TTS_MODEL,
-            voice=TTS_VOICE,
-            input=reply,
-            response_format="wav",
-        )
-    except Exception as e:
-        logger.error("TTS request failed: %s", e)
-        raise HTTPException(status_code=502, detail=f"TTS request failed: {e}") from e
-    logger.info("Speech synthesized: %d bytes", len(speech.content))
-
-    return {
-        "transcript": transcript,
-        "reply": reply,
-        "audio_base64": base64.b64encode(speech.content).decode(),
-    }
+    Serves the short teaser, not the English call context the model reads, and
+    only active rows -- as above.
+    """
+    return [
+        {"id": s.id, "name": s.name, "short_description": s.short_description}
+        for s in library.list_scenarios()
+    ]
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIST_DIR, html=True, check_dir=False), name="frontend")
