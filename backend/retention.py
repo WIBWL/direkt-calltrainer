@@ -1,5 +1,5 @@
 """Sessions expire after six months unless the subject says otherwise
-(ADR 0061).
+(ADR 0067).
 
 Consent answers whether data may be stored; this answers how long. Without it
 a training recorded today is still there in four years, and "we keep it until

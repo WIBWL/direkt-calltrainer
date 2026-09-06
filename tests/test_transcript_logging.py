@@ -1,4 +1,4 @@
-"""Spoken content stays out of the log unless it is asked for (ADR 0060).
+"""Spoken content stays out of the log unless it is asked for (ADR 0066).
 
 The log file is outside every deletion path this application has: a transcript
 written there survives a withdrawn consent and a deleted training, and no route

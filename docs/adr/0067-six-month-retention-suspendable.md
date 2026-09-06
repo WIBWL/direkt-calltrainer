@@ -1,16 +1,16 @@
-# ADR 0061: Stored Sessions Expire After Six Months, Unless the User Says Otherwise
+# ADR 0067: Stored Sessions Expire After Six Months, Unless the User Says Otherwise
 
 ## Status
 
-Accepted. Closes the retention half of the open work ADR 0031 named; complements ADR 0060.
+Accepted. Closes the retention half of the open work ADR 0031 named; complements ADR 0066.
 
 ## Context
 
-ADR 0031 recorded two obligations as open: "a retention period and a deletion path". ADR 0060 built the deletion path, in three forms — one training, all of them, and the consent withdrawal that removes everything. None of them is a retention period. They are all things a user has to *do*.
+ADR 0031 recorded two obligations as open: "a retention period and a deletion path". ADR 0066 built the deletion path, in three forms — one training, all of them, and the consent withdrawal that removes everything. None of them is a retention period. They are all things a user has to *do*.
 
 Without a period, a training recorded today is still on the server in four years, because nothing ever removes it. "We keep it until someone asks us not to" is not a retention policy; it is the absence of one, dressed as user control. It also puts the whole burden of data minimisation on the person least placed to carry it, who would have to remember that a system holds a recording of them and go and clear it out.
 
-The counter-pressure is real: ADR 0059 wants the pilot's measurements to eventually establish what a distribution of these values looks like, and a period that quietly deletes them takes that away too.
+The counter-pressure is real: ADR 0065 wants the pilot's measurements to eventually establish what a distribution of these values looks like, and a period that quietly deletes them takes that away too.
 
 ## Decision
 
@@ -38,8 +38,8 @@ The system now forgets on its own. That is the substantive change: data minimisa
 
 The cost is that the suspension makes the period soft. Anyone can switch it off and keep everything indefinitely, so the guarantee is really "six months unless you decided otherwise", and it should be described that way rather than as a blanket retention limit. That was the explicit product decision; the alternative — a period nobody could suspend — would have deleted trainings people were actively using, and would have made the export the only way to keep them.
 
-ADR 0059's distribution data is affected: measurements go with the Session that carried them, so a cohort assembled from pilot data thins out at six months. If that data matters for establishing norms, the answer is the second consent purpose ADR 0059/0060 already anticipate — de-identified measurements retained separately, on their own basis — and not a longer period for everything.
+ADR 0065's distribution data is affected: measurements go with the Session that carried them, so a cohort assembled from pilot data thins out at six months. If that data matters for establishing norms, the answer is the second consent purpose ADR 0065/0066 already anticipate — de-identified measurements retained separately, on their own basis — and not a longer period for everything.
 
-Two things this deliberately does not do. It does not touch the consent log, which outlives the data it permitted (ADR 0062). And it does not reach the plaintext transcripts that `LOG_TRANSCRIPTS` writes when it is switched on, for the same reason nothing else does: no deletion path reaches a log file.
+Two things this deliberately does not do. It does not touch the consent log, which outlives the data it permitted (ADR 0068). And it does not reach the plaintext transcripts that `LOG_TRANSCRIPTS` writes when it is switched on, for the same reason nothing else does: no deletion path reaches a log file.
 
 The period is expected to be revisited once the pilot has an opinion about how long people actually look back.

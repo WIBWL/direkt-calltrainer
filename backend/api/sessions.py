@@ -182,7 +182,7 @@ def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user
 def delete_one_session(
     extern_id: uuid.UUID, caller: AuthContext = Depends(require_user)
 ) -> Response:
-    """Delete one of the caller's own stored trainings (ADR 0060).
+    """Delete one of the caller's own stored trainings (ADR 0066).
 
     204 on success, 404 for an id that does not exist *or* is not the caller's
     — the same answer the read route gives, for the same reason (ADR 0050): a

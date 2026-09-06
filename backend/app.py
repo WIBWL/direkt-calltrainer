@@ -44,7 +44,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     cause."""
     if LOG_TRANSCRIPTS:
         # Loud, once, at boot. The switch writes what people say aloud into a
-        # file that no deletion path reaches (ADR 0060), which is fine while
+        # file that no deletion path reaches (ADR 0066), which is fine while
         # diagnosing a model and not fine in a running pilot — so the one thing
         # it must never be is quiet.
         logger.warning(
@@ -79,7 +79,7 @@ _SWEEP_INTERVAL_S = 24 * 60 * 60
 
 
 async def _retention_loop() -> None:
-    """Delete expired Sessions, once at startup and daily after that (ADR 0061).
+    """Delete expired Sessions, once at startup and daily after that (ADR 0067).
 
     Inside the app rather than as a cron entry or a scheduled Redis job. A cron
     entry is a second place to deploy and a second thing to forget; a job queued

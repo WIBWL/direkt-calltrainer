@@ -94,7 +94,7 @@ export default function SetupView({
           voice="Durch Persona festgelegt"
         />
 
-        {/* Said before the call, not after it (ADR 0060). Someone who declined
+        {/* Said before the call, not after it (ADR 0066). Someone who declined
             storage should learn that this training will leave no record while
             they can still change their mind — finding out afterwards, with the
             transcript already gone, is finding out too late. */}

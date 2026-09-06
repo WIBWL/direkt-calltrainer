@@ -72,9 +72,9 @@ POINT_STRENGTH = "strength"
 POINT_IMPROVEMENT = "improvement"
 POINT_KINDS = (POINT_STRENGTH, POINT_IMPROVEMENT)
 
-# Consent.purpose (ADR 0060). One purpose today: storing a finished Session and
+# Consent.purpose (ADR 0066). One purpose today: storing a finished Session and
 # everything hanging off it. Named rather than implied, so a second purpose --
-# ADR 0059's research use of de-identified measurements is the candidate -- is
+# ADR 0065's research use of de-identified measurements is the candidate -- is
 # a new value here and not a second meaning for this one.
 CONSENT_SESSION_STORAGE = "session_storage"
 CONSENT_PURPOSES = (CONSENT_SESSION_STORAGE,)
@@ -467,7 +467,7 @@ class FeedbackPoint(Base):
 
 
 class Consent(Base):
-    """One recorded consent decision (ADR 0060).
+    """One recorded consent decision (ADR 0066).
 
     Append-only: granting, withdrawing and granting again write three rows, and
     the current state is the newest of them. A decision is a thing that
@@ -503,7 +503,7 @@ class Consent(Base):
 
 class RetentionPreference(Base):
     """Whether one subject's Sessions are swept after the retention period
-    (ADR 0061).
+    (ADR 0067).
 
     One row per subject, and only for subjects who changed the default: the
     absence of a row means the sweep applies, which is what makes the retention

@@ -6,7 +6,7 @@ import type { ConsentState } from "../protocol";
 export type ConsentLoadState = "loading" | "ready" | "failed";
 
 /**
- * The signed-in user's storage consent (ADR 0060).
+ * The signed-in user's storage consent (ADR 0066).
  *
  * Held once, near the root, and passed down: the dialog that asks, the notice
  * on the setup screen and the profile's revocation all describe the same fact,

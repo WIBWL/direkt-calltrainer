@@ -1,4 +1,4 @@
-"""Storage consent and what follows from withdrawing it (F-49, ADR 0060).
+"""Storage consent and what follows from withdrawing it (F-49, ADR 0066).
 
 The decisive test in this file is `test_a_session_is_not_stored_without_consent`
 — everything else describes bookkeeping, that one is the only thing standing

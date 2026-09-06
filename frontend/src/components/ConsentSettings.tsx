@@ -4,7 +4,7 @@ import { useConsentContext } from "../ConsentContext";
 
 /**
  * The storage decision on the profile page: what it currently is, and how to
- * change it (ADR 0060).
+ * change it (ADR 0066).
  *
  * Withdrawal is confirmed in a second step, and the confirmation says what it
  * will destroy — because it does destroy something. Consent is the only basis

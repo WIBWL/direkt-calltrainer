@@ -1,4 +1,4 @@
-"""Delete Sessions past the retention period, by hand (ADR 0061).
+"""Delete Sessions past the retention period, by hand (ADR 0067).
 
 The app runs this sweep itself, daily, from its lifespan. This script is for
 the times that is not enough: checking what the period would take before it

@@ -8,7 +8,7 @@ import RetentionSettings from "./RetentionSettings";
 
 /**
  * How much is stored about the caller, and a copy of it to take away
- * (ADR 0060).
+ * (ADR 0066).
  *
  * Counts rather than content: the point is to make the *extent* of what is
  * held visible at a glance, which the history below already fails to do — a

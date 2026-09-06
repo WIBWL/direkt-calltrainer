@@ -1,12 +1,12 @@
-# ADR 0062: The Consent Log Outlives the Data It Permitted
+# ADR 0068: The Consent Log Outlives the Data It Permitted
 
 ## Status
 
-Accepted. Makes explicit a behaviour ADR 0060 introduced without deciding it.
+Accepted. Makes explicit a behaviour ADR 0066 introduced without deciding it.
 
 ## Context
 
-ADR 0060 records consent decisions in an append-only `consent` table and deletes a subject's Sessions when they withdraw. It did not say what happens to the consent rows themselves, and the implementation quietly kept them: `deletion.py` removes Sessions and nothing else.
+ADR 0066 records consent decisions in an append-only `consent` table and deletes a subject's Sessions when they withdraw. It did not say what happens to the consent rows themselves, and the implementation quietly kept them: `deletion.py` removes Sessions and nothing else.
 
 So "delete everything" does not delete everything. What remains is one row per decision, each carrying the subject's Keycloak `sub`, the purpose, the wording version, the status and the moment. That is personal data, it survives the withdrawal, and nobody decided it should.
 
@@ -22,7 +22,7 @@ Withdrawal deletes the Sessions and keeps the decisions. The `consent` table is 
 
 **The log is therefore honest rather than pseudonymised further.** ADR 0031's analysis applies unchanged: this is pseudonymisation as a mitigation, not anonymisation.
 
-**It is not swept.** ADR 0061 deletes Sessions after six months and leaves this table alone. A decision from a year ago is exactly the kind of thing a retention question asks about, and expiring the evidence on the same schedule as the evidence's subject would defeat both.
+**It is not swept.** ADR 0067 deletes Sessions after six months and leaves this table alone. A decision from a year ago is exactly the kind of thing a retention question asks about, and expiring the evidence on the same schedule as the evidence's subject would defeat both.
 
 **It is not exported either**, beyond the current state. `GET /api/me/export` includes the subject's standing decision, not the full history of decisions. The history is a record kept about the processing, not a copy of what the user provided; putting every past grant and withdrawal in a downloadable file serves nobody and widens what a leaked export would contain.
 

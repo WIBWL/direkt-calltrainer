@@ -8,7 +8,7 @@ import { sessionPath } from "../routes";
 /**
  * The user's past trainings (F-48), each one a row that opens the wrap-up that
  * was generated for it back then (F-13's data, without F-13's judgement — see
- * ADR 0059: this lists what happened, it does not rate it).
+ * ADR 0065: this lists what happened, it does not rate it).
  *
  * One line per training on purpose. A history is read by scanning it for the
  * one call you are thinking of, so what earns its place in a row is what tells

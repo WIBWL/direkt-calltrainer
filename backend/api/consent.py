@@ -1,4 +1,4 @@
-"""REST routes for the storage consent (ADR 0060).
+"""REST routes for the storage consent (ADR 0066).
 
 Two routes: what the caller has decided, and a new decision. Both act on the
 caller's own `sub` and take no subject argument — there is no form of this

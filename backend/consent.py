@@ -1,4 +1,4 @@
-"""Whether a subject has agreed to their trainings being stored (ADR 0060).
+"""Whether a subject has agreed to their trainings being stored (ADR 0066).
 
 The single place that answers that question. Two callers matter and they are
 very different: the REST layer asks so the interface can prompt, and the write

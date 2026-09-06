@@ -3,7 +3,7 @@ import { useState } from "react";
 import ProcessingNotice from "./ProcessingNotice";
 
 /**
- * The storage decision, asked once and answerable either way (ADR 0060).
+ * The storage decision, asked once and answerable either way (ADR 0066).
  *
  * Blocking, because it has to be answered before the first training can be
  * stored — but *not* a wall in front of the product. Declining is a real

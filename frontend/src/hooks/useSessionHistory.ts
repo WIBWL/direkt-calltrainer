@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "../api";
 import type { SessionHistoryPage, SessionSummary } from "../protocol";
 
-/** One screen of history. The backend caps a page at 100 (ADR 0058). */
+/** One screen of history. The backend caps a page at 100 (ADR 0064). */
 const PAGE_SIZE = 20;
 
 export type HistoryState = "loading" | "ready" | "failed";
@@ -17,7 +17,7 @@ export type HistoryState = "loading" | "ready" | "failed";
  * complete on the day someone passed it.
  *
  * Ownership needs no argument here — the route filters by the caller's own
- * subject and offers no way to ask about anyone else (ADR 0058).
+ * subject and offers no way to ask about anyone else (ADR 0064).
  */
 export function useSessionHistory() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -42,7 +42,7 @@ export function useSessionHistory() {
         setTotal(page.total);
         // Replace on the first page, append after — and de-duplicate by id,
         // because a Session written between two page requests shifts every
-        // later row by one under offset pagination (ADR 0058) and would
+        // later row by one under offset pagination (ADR 0064) and would
         // otherwise show up twice.
         setSessions((previous) => {
           const merged = offset === 0 ? page.sessions : [...previous, ...page.sessions];

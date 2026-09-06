@@ -1,12 +1,12 @@
-# ADR 0059: Progress Is Shown Without Being Judged
+# ADR 0065: Progress Is Shown Without Being Judged
 
 ## Status
 
-Accepted. Extends ADR 0004 and ADR 0051 to the multi-Session view; constrains ADR 0058's data.
+Accepted. Extends ADR 0004 and ADR 0051 to the multi-Session view; constrains ADR 0064's data.
 
 ## Context
 
-ADR 0058 makes a user's Sessions readable as a series, which is what F-13 (Aufzeichnung des Fortschritts) asks for. The obvious next step is a view that plots the Kennzahlen over time — and the obvious way to draw that view is the one this project has twice decided against.
+ADR 0064 makes a user's Sessions readable as a series, which is what F-13 (Aufzeichnung des Fortschritts) asks for. The obvious next step is a view that plots the Kennzahlen over time — and the obvious way to draw that view is the one this project has twice decided against.
 
 ADR 0004 rejected reducing performance to a score, on the pilot stakeholder's explicit request. ADR 0051 went further for the per-Session statistics: no metric carries a target range, because none is validated for this population, and "an invented threshold is a score in disguise". The wrap-up prompt enforces it in writing (`generator.py`: no score, grade, rating, percentage or star, and no judging a figure against a norm).
 
@@ -20,7 +20,7 @@ Permitted, and the substance of F-13: the course of each Kennzahl across Session
 
 Not permitted without a further, explicit decision: target ranges or bands; colour that encodes good and bad; arrows, deltas or labels asserting improvement or decline; ranking against other users; and any aggregate score over Sessions. `metric_type` has no target column and gains none — the absence is the mechanism, not an oversight, exactly as in ADR 0051.
 
-Consistent with this, ADR 0058's endpoint returns raw measured values and no interpretation, and `feedback.score` stays unwritten. ADR 0004 does permit a numeric score as a supplementary addition that never replaces the qualitative feedback, so the column remains; this ADR declines to introduce one *across* Sessions, where it would be a ranking of a person over time rather than a note about one call.
+Consistent with this, ADR 0064's endpoint returns raw measured values and no interpretation, and `feedback.score` stays unwritten. ADR 0004 does permit a numeric score as a supplementary addition that never replaces the qualitative feedback, so the column remains; this ADR declines to introduce one *across* Sessions, where it would be a ranking of a person over time rather than a note about one call.
 
 The peak-end weighting stays what ADR 0004 made it: text weight in the wrap-up, never a number, and it does not extend across Sessions.
 

@@ -1,4 +1,4 @@
-# ADR 0058: A Per-User Session History, With Ownership as the Query
+# ADR 0064: A Per-User Session History, With Ownership as the Query
 
 ## Status
 
@@ -42,4 +42,4 @@ The reversal has a real cost: a user's Sessions are now enumerable by that user,
 
 Pagination is offset-based, which is the wrong tool if Sessions are ever written while a user pages through them — an insert shifts every subsequent row by one. At the volume of a pilot, where a user writes a Session every few minutes at most and reads their history between calls, this cannot bite; keyset pagination is the answer if it ever does.
 
-Nothing here decides what the progress view may *say* about the values it plots. That is ADR 0059.
+Nothing here decides what the progress view may *say* about the values it plots. That is ADR 0065.

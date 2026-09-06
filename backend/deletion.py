@@ -1,4 +1,4 @@
-"""Deleting a subject's stored trainings (ADR 0060).
+"""Deleting a subject's stored trainings (ADR 0066).
 
 The one place that removes user data, so that every entry point — the consent
 withdrawal today, a "delete this training" button later — goes through the same
@@ -15,7 +15,7 @@ construction: those foreign keys carry no `ondelete` at all.
 What this module does *not* do is claim to be a complete erasure. Two limits
 are known and named rather than papered over: backups are not reached (there is
 no surgical delete from a snapshot), and the transcript that STT logged in
-plaintext is not reached either. Both are recorded in ADR 0060.
+plaintext is not reached either. Both are recorded in ADR 0066.
 """
 from __future__ import annotations
 
@@ -59,7 +59,7 @@ def delete_session(db: DbSession, subject_id: str, extern_id: uuid.UUID) -> bool
     """Delete one of the subject's Sessions. True if there was one to delete.
 
     Ownership is part of the query, not a check on its result — the same shape
-    the history uses (ADR 0058), and for the same reason: a filter cannot be
+    the history uses (ADR 0064), and for the same reason: a filter cannot be
     forgotten on one path the way a comparison can, and there is no version of
     this call that should ever reach somebody else's row.
 

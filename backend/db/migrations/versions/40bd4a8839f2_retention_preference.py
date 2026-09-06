@@ -3,7 +3,7 @@
 Revision ID: 40bd4a8839f2
 Revises: a4d3558cbc0b
 
-One row per subject who switched the six-month sweep off (ADR 0061). Absence of
+One row per subject who switched the six-month sweep off (ADR 0067). Absence of
 a row means the sweep applies, which is what makes the retention period the
 default rather than something each account opts into.
 

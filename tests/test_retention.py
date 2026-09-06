@@ -1,4 +1,4 @@
-"""Stored Sessions expire after six months (F-49, ADR 0061).
+"""Stored Sessions expire after six months (F-49, ADR 0067).
 
 Two properties carry this file. The sweep has to delete what is over the line
 and nothing else, which is the ordinary case; and it has to leave a subject who

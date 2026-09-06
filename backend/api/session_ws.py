@@ -123,7 +123,7 @@ async def _record(
     Redis outage may cost the user the transcript they are waiting for.
     """
     # The last point at which unconsented data can be prevented from existing
-    # (ADR 0060). Checked here rather than at the handshake on purpose: the
+    # (ADR 0066). Checked here rather than at the handshake on purpose: the
     # handshake's answer would be minutes old by now, and a subject who
     # withdrew during their own call must not have it stored afterwards. The
     # call itself is unaffected — the transcript has already been sent.

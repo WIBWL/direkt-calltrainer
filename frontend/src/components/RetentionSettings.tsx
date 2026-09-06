@@ -6,7 +6,7 @@ import { formatDate } from "../utils/time";
 
 /**
  * The automatic deletion after six months, and the switch that suspends it
- * (ADR 0061).
+ * (ADR 0067).
  *
  * The period is the default and the switch is the exception, which is why the
  * text leads with the date rather than with the control: the useful thing to

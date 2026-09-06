@@ -3,7 +3,7 @@
 Revision ID: a4d3558cbc0b
 Revises: 18f5098dfb1b
 
-The table behind ADR 0060: what a subject agreed to, when, and to which
+The table behind ADR 0066: what a subject agreed to, when, and to which
 wording. Append-only, so granting, withdrawing and granting again are three
 rows and the newest one is the current state -- a decision is something that
 happened at a moment, and overwriting it would destroy the only evidence that

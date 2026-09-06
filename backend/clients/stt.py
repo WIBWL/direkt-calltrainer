@@ -26,7 +26,7 @@ async def transcribe(audio_bytes: bytes, filename: str, content_type: str | None
         language=language_id,
     )
     # What the user said is personal data, and the log file is outside every
-    # deletion path this application has (ADR 0060). The length is the part
+    # deletion path this application has (ADR 0066). The length is the part
     # that is actually useful for spotting a misfire — an empty transcript, or
     # the short hallucination the docstring above warns about — and it says
     # nothing about the person. The text itself only under LOG_TRANSCRIPTS.

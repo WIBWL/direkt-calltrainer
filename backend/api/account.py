@@ -1,4 +1,4 @@
-"""What is stored about the caller, and a copy of it (ADR 0060).
+"""What is stored about the caller, and a copy of it (ADR 0066).
 
 Two routes over the same data and they are deliberately not one. The overview
 is a handful of counts, cheap enough to load with the profile screen on every
@@ -7,7 +7,7 @@ ever wanted deliberately. Serving the second where the first was needed would
 put a full transcript dump behind an ordinary page load.
 
 Both are scoped by the caller's own `sub` in the query itself, like the history
-(ADR 0058): there is no form of either request that is about somebody else, so
+(ADR 0064): there is no form of either request that is about somebody else, so
 there is none to authorise or refuse.
 """
 
@@ -123,7 +123,7 @@ def _count(db: DbSession, model, session_ids: list[int]) -> int:
 
 
 class RetentionChoice(BaseModel):
-    """Whether the six-month sweep applies to this account (ADR 0061)."""
+    """Whether the six-month sweep applies to this account (ADR 0067)."""
 
     auto_delete: bool
 
@@ -196,7 +196,7 @@ def _session(session: db_models.Session) -> dict:
                 "name": m.metric_type.name,
                 "unit": m.metric_type.unit,
                 "value": float(m.value),
-                # Included here although the listing drops it (ADR 0058): this
+                # Included here although the listing drops it (ADR 0064): this
                 # is the subject's own copy of their data, so completeness
                 # outweighs payload size, which is the opposite trade.
                 "detail": m.detail_json,

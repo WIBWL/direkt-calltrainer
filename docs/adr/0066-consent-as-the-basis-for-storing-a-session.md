@@ -1,4 +1,4 @@
-# ADR 0060: Consent Is What Permits a Session to Be Stored
+# ADR 0066: Consent Is What Permits a Session to Be Stored
 
 ## Status
 
@@ -8,7 +8,7 @@ Accepted. Reopens the question ADR 0023 asked and ADR 0034 answered differently;
 
 ADR 0023 planned consent-gated storage and then stored nothing at all. ADR 0034 superseded it: Sessions are persisted at the end of every call, unconditionally, because the transcript (F-12), the wrap-up (F-09) and the history (F-13/F-48) are impossible without it. That left the application storing what people say aloud — their name, their company, whatever the scenario drew out of them — with nothing recorded about whether they agreed to it.
 
-ADR 0031 already named the consequence: the Sessions are personal data, the pseudonym does not change that, and "a retention period and a deletion path are open work, not discharged by how this column is designed". ADR 0058 made that more pressing rather than less, by giving users a history they can see and would reasonably expect to be able to remove.
+ADR 0031 already named the consequence: the Sessions are personal data, the pseudonym does not change that, and "a retention period and a deletion path are open work, not discharged by how this column is designed". ADR 0064 made that more pressing rather than less, by giving users a history they can see and would reasonably expect to be able to remove.
 
 ## Decision
 
@@ -26,7 +26,7 @@ A finished Session is stored only if the subject has granted consent to the curr
 
 **Withdrawal deletes.** Consent is the only basis this application has for keeping the data, so once it is withdrawn there is nothing left to justify keeping it (Art. 17(1)(b)). The decision and the deletion share one transaction, so the outcome is either "withdrawn and empty" or unchanged — never a withdrawal on record whose data is still there, which is the state that would be hardest to notice and worst to be in. The interface confirms in a second step and says what will be destroyed.
 
-**One consent, one purpose.** `purpose` is a named vocabulary with one value today (`session_storage`). ADR 0059's research use of de-identified measurements is the obvious second, and would be a new value rather than a second meaning for this one — but it is not being built now, and until it is, a withdrawal takes the measurements with everything else.
+**One consent, one purpose.** `purpose` is a named vocabulary with one value today (`session_storage`). ADR 0065's research use of de-identified measurements is the obvious second, and would be a new value rather than a second meaning for this one — but it is not being built now, and until it is, a withdrawal takes the measurements with everything else.
 
 **Seeing, taking and removing, as three routes.** `GET /api/me/data` reports counts and the period they span — the extent of what is held, which a list of transcripts does not convey. `GET /api/me/export` returns every row the subject owns as one nested JSON document, served as a download rather than a page so a tab full of transcripts is not left for the next person at the machine. `DELETE /api/sessions/{extern_id}` removes one training. All three scope by the caller's `sub` in the query itself, and the delete answers 404 for an id that is absent *or* not the caller's, exactly as the read route does (ADR 0050).
 

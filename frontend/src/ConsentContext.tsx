@@ -14,7 +14,7 @@ const ConsentContext = createContext<ConsentContextValue | null>(null);
 
 /**
  * Holds the storage decision for the whole app and asks for it when it is
- * missing (ADR 0060).
+ * missing (ADR 0066).
  *
  * One fetch, one source of truth. Three screens describe this same fact — the
  * dialog, the setup screen's notice and the profile's revocation — and letting

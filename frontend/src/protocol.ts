@@ -210,7 +210,7 @@ export interface SessionDetail {
   feedback: SessionFeedback | null;
 }
 
-// --- Session history (GET /api/sessions, ADR 0058) -------------------------
+// --- Session history (GET /api/sessions, ADR 0064) -------------------------
 // The caller's own finished Sessions, newest first. Note that `status` means
 // something different here than on SessionDetail above: this is the Session's
 // own outcome, that one is the state of its wrap-up job.
@@ -219,7 +219,7 @@ export interface SessionDetail {
 export type SessionOutcome = "completed" | "aborted";
 
 /** A Measurement as the listing carries it: no `detail`, because the loudness
- * curve would outweigh everything else on a page of Sessions (ADR 0058). */
+ * curve would outweigh everything else on a page of Sessions (ADR 0064). */
 export interface SessionSummaryMeasurement {
   key: string;
   name: string;
@@ -238,7 +238,7 @@ export interface SessionSummary {
   /**
    * Why not, where there is none: the wrap-up job's state. Carries its own
    * name rather than sharing `status`, which on this route is the Session's
-   * own outcome and nothing else (ADR 0057/0058).
+   * own outcome and nothing else (ADR 0057/0064).
    */
   feedback_status: FeedbackStatus;
   /** ISO 8601, from the client's `session.activate` (ADR 0051). */
@@ -248,7 +248,7 @@ export interface SessionSummary {
   measurements: SessionSummaryMeasurement[];
 }
 
-// --- What is stored about the caller (GET /api/me/data, ADR 0060) ----------
+// --- What is stored about the caller (GET /api/me/data, ADR 0066) ----------
 
 /** Counts and the period they span — the extent of the data, not its content. */
 export interface DataOverviewPayload {
@@ -261,7 +261,7 @@ export interface DataOverviewPayload {
   retention: RetentionState;
 }
 
-/** How long stored trainings are kept, and whether the sweep applies (ADR 0061). */
+/** How long stored trainings are kept, and whether the sweep applies (ADR 0067). */
 export interface RetentionState {
   /** False when the user has suspended the automatic deletion. */
   auto_delete: boolean;
@@ -275,7 +275,7 @@ export interface RetentionState {
   next_expiry_at: string | null;
 }
 
-// --- Storage consent (GET/POST /api/consent, ADR 0060) ---------------------
+// --- Storage consent (GET/POST /api/consent, ADR 0066) ---------------------
 
 /** What the user decided about their trainings being stored, if anything. */
 export interface ConsentState {

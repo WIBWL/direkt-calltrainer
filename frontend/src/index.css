@@ -1704,7 +1704,7 @@ h2 {
   color: var(--color-text-muted);
 }
 
-/* --- Storage consent (ADR 0060) ----------------------------------------- */
+/* --- Storage consent (ADR 0066) ----------------------------------------- */
 
 /* Replaces the app rather than floating over it: the decision has to be made,
    and dimming a usable screen behind it would suggest otherwise. */
@@ -1877,7 +1877,7 @@ h2 {
   color: var(--color-blue-600);
 }
 
-/* --- Deleting one training (ADR 0060) ----------------------------------- */
+/* --- Deleting one training (ADR 0066) ----------------------------------- */
 
 .session-delete {
   margin-top: 2.5rem;
@@ -1970,7 +1970,7 @@ h2 {
   line-height: 1.5;
 }
 
-/* --- Retention (ADR 0061) ------------------------------------------------ */
+/* --- Retention (ADR 0067) ------------------------------------------------ */
 
 .retention {
   margin-top: 1.25rem;

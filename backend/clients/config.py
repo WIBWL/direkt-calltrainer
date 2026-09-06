@@ -42,7 +42,7 @@ DEBUG = os.environ.get("DEBUG", "").lower() in ("1", "true", "yes")
 #
 # Off, the pipeline logs how long an utterance was and nothing about what was
 # in it. On, it logs the text — which is personal data, sitting in a file that
-# no deletion path reaches (ADR 0060). That is defensible while diagnosing a
+# no deletion path reaches (ADR 0066). That is defensible while diagnosing a
 # model, and indefensible in a running pilot, so it is opt-in, named for what
 # it does, and announced at boot (`app.py`'s lifespan) so it cannot be left on
 # unnoticed.

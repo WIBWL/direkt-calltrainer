@@ -294,11 +294,11 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0055 | Log File Kept for the Whole Run, Not Truncated per Session | angenommen (überarbeitet ADR 0039) | |
 | ADR 0056 | Phase-Appropriate Language Is a Paragraph, Not a Metric | angenommen (ergänzt ADR 0049/0051) | F-42, F-09 |
 | ADR 0057 | English Wire Vocabulary | angenommen (ergänzt ADR 0026) | |
-| ADR 0058 | A Per-User Session History, With Ownership as the Query | angenommen (löst die „kein Listing"-Position ab) | F-13, F-48, F-31, C-04 |
-| ADR 0059 | Progress Is Shown Without Being Judged | angenommen (erweitert ADR 0004/0051) | Q-01, F-13 |
-| ADR 0060 | Consent Is What Permits a Session to Be Stored | angenommen (schränkt ADR 0034 ein) | C-04, F-49, F-31, F-12 |
-| ADR 0061 | Stored Sessions Expire After Six Months, Unless the User Says Otherwise | angenommen (schließt ADR 0031s offene Frist) | C-04, F-49, F-12 |
-| ADR 0062 | The Consent Log Outlives the Data It Permitted | angenommen (präzisiert ADR 0060) | C-04, F-49 |
+| ADR 0064 | A Per-User Session History, With Ownership as the Query | angenommen (löst die „kein Listing"-Position ab) | F-13, F-48, F-31, C-04 |
+| ADR 0065 | Progress Is Shown Without Being Judged | angenommen (erweitert ADR 0004/0051) | Q-01, F-13 |
+| ADR 0066 | Consent Is What Permits a Session to Be Stored | angenommen (schränkt ADR 0034 ein) | C-04, F-49, F-31, F-12 |
+| ADR 0067 | Stored Sessions Expire After Six Months, Unless the User Says Otherwise | angenommen (schließt ADR 0031s offene Frist) | C-04, F-49, F-12 |
+| ADR 0068 | The Consent Log Outlives the Data It Permitted | angenommen (präzisiert ADR 0066) | C-04, F-49 |
 
 Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug; ADR 0017, 0025, 0027 bis 0030, 0039, 0055 und 0057 sind reine Wartbarkeits-, Werkzeug- oder Schemaentscheidungen ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 

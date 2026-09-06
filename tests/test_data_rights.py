@@ -1,4 +1,4 @@
-"""Seeing, taking and removing your own data (F-49, ADR 0060).
+"""Seeing, taking and removing your own data (F-49, ADR 0066).
 
 Three routes that all rest on the same rule: the caller's `sub` is part of the
 query, so there is no request here that could be about somebody else. Each one
