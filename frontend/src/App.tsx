@@ -214,7 +214,7 @@ export default function App() {
 
   if (screen === "mic-check") {
     return (
-      <AppLayout step="prepare" pageClassName="mic-check-page">
+      <AppLayout step="prepare" navigationLocked pageClassName="mic-check-page">
         <MicCheck onConfirmed={handleConfirmed} onCancel={handleCancelMicCheck} />
       </AppLayout>
     );
@@ -222,7 +222,7 @@ export default function App() {
 
   if (screen === "call") {
     return (
-      <AppLayout step="call" pageClassName="call-page">
+      <AppLayout step="call" navigationLocked pageClassName="call-page">
         <CallView
           scenarioName={selectedScenario?.name ?? "Gespräch"}
           personaName={personaName}
