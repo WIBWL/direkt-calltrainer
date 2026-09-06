@@ -30,10 +30,12 @@ load_dotenv()
 
 from backend.clients import stt, tts  # noqa: E402
 from backend.clients.config import KUGELAUDIO_CLIENT, KUGELAUDIO_MODEL  # noqa: E402
-from backend.personas import PersonaVoice  # noqa: E402
 
 SAMPLE_TEXT = {
-    "en": "Hi, this is Samantha Ferris from marketing, I'm calling about the recent increase in our subscription costs.",
+    "en": (
+        "Hi, this is Samantha Ferris from marketing, I'm calling about the "
+        "recent increase in our subscription costs."
+    ),
     "de": "Guten Tag, hier ist Thomas Brandt, ich habe eine Frage zu unserem aktuellen Vertrag.",
 }
 

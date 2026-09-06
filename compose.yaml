@@ -2,6 +2,11 @@ name: direkt-calltrainer
 services:
   app:
     image: direkt-calltrainer
+    # Nothing here comes back on its own otherwise: a Docker restart, an OOM
+    # kill or a crash leaves the container down. On the worker that is silent
+    # -- calls keep working and wrap-ups simply never appear -- which is
+    # exactly how a dead worker went unnoticed for hours.
+    restart: unless-stopped
     # Pinned: praat-parselmouth ships no Linux aarch64 wheel, so an arm64 build
     # falls back to the source tarball and fails to compile in python-slim.
     platform: linux/amd64
@@ -75,6 +80,11 @@ services:
   # to run -- a stopped worker just means wrap-ups queue until it returns.
   worker:
     image: direkt-calltrainer
+    # Nothing here comes back on its own otherwise: a Docker restart, an OOM
+    # kill or a crash leaves the container down. On the worker that is silent
+    # -- calls keep working and wrap-ups simply never appear -- which is
+    # exactly how a dead worker went unnoticed for hours.
+    restart: unless-stopped
     # Same image as app, so the same pin applies.
     platform: linux/amd64
     build:
@@ -105,6 +115,11 @@ services:
 
   redis:
     image: redis:8-alpine
+    # Nothing here comes back on its own otherwise: a Docker restart, an OOM
+    # kill or a crash leaves the container down. On the worker that is silent
+    # -- calls keep working and wrap-ups simply never appear -- which is
+    # exactly how a dead worker went unnoticed for hours.
+    restart: unless-stopped
     # No volume: the queue holds in-flight jobs only. What must survive a
     # restart is the job's outcome, and that lives in Postgres (ADR 0032).
     healthcheck:
@@ -115,6 +130,11 @@ services:
 
   db:
     image: postgres:17
+    # Nothing here comes back on its own otherwise: a Docker restart, an OOM
+    # kill or a crash leaves the container down. On the worker that is silent
+    # -- calls keep working and wrap-ups simply never appear -- which is
+    # exactly how a dead worker went unnoticed for hours.
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -146,6 +166,11 @@ services:
   # can run alongside another local Keycloak on the default port.
   keycloak:
     image: quay.io/keycloak/keycloak:26.7
+    # Nothing here comes back on its own otherwise: a Docker restart, an OOM
+    # kill or a crash leaves the container down. On the worker that is silent
+    # -- calls keep working and wrap-ups simply never appear -- which is
+    # exactly how a dead worker went unnoticed for hours.
+    restart: unless-stopped
     command: start-dev --import-realm --hostname-strict=false
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
