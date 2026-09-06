@@ -86,10 +86,11 @@ async def test_interrupt_without_a_reported_position_commits_every_dispatched_ch
     assert orch._reopen_turn is None, "a turn that already produced audio is closed, not reopened"
 
 
-async def test_interrupt_commits_only_utterances_played_through(persona, scenario, fake_pipeline, monkeypatch):
+async def test_interrupt_commits_only_what_played_through(persona, scenario, fake_pipeline, monkeypatch):
     """The client reports how many ms of the reply it actually played; only the
-    utterances whose audio finished inside that window reach the history, even
-    though the server had already streamed the whole reply ahead."""
+    audio inside that window reaches the history -- every fully-played sentence
+    plus a word-prefix of the one the user cut off -- even though the server had
+    already streamed the whole reply ahead (ADR 0035)."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
     # Each >= 80 chars so the chunker flushes all three as their own chunks.
     s1 = "Der erste Satz meiner Antwort ist inhaltlich vollstaendig und lang genug fuer seinen eigenen Chunk."
@@ -109,13 +110,15 @@ async def test_interrupt_commits_only_utterances_played_through(persona, scenari
             if dispatched == 3:  # the server has streamed all three chunks
                 break
 
-    orch.note_barge_in(1200)  # the client only played ~1.2s -> one full utterance
+    orch.note_barge_in(1200)  # 1.0s (all of s1) + 0.2s into s2
     await gen.aclose()
 
-    assert orch.turns[0].persona_text == s1
-    assert s2 not in orch.turns[0].persona_text
-    assert s3 not in orch.turns[0].persona_text
-    assert orch._messages[-1] == {"role": "assistant", "content": s1}
+    heard = orch.turns[0].persona_text
+    assert heard.startswith(s1), "the fully-played first sentence is kept whole"
+    assert s3 not in heard, "the third sentence was streamed ahead but never played"
+    assert heard != f"{s1} {s2} {s3}" and len(heard) < len(f"{s1} {s2}"), "s2 only partially"
+    assert s2.startswith(heard[len(s1):].strip()), "the s2 fragment is a word-prefix of s2"
+    assert orch._messages[-1] == {"role": "assistant", "content": heard}, "history in step"
     assert orch._reopen_turn is None
 
 
@@ -143,13 +146,12 @@ async def test_interrupt_before_a_full_utterance_was_heard_reopens_the_turn(
     assert any(isinstance(e, AudioChunk) for e in events)
 
 
-async def test_a_chunk_heard_almost_to_its_end_counts_as_heard(
+async def test_a_sentence_heard_almost_to_its_end_keeps_almost_all_of_it(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """Cutting in a moment before a sentence finishes commits that sentence and
-    closes the turn -- otherwise the whole thing is discarded, the turn
-    reopens, and the next reply re-delivers it from the top, which reads as if
-    the persona was never interrupted (ADR 0035)."""
+    """Cutting in a moment before a sentence finishes keeps almost all of its
+    words and closes the turn -- the fraction of its audio that played maps
+    onto the fraction of its words kept (ADR 0035)."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 5000)
     s1 = "Der erste Satz meiner Antwort ist inhaltlich vollstaendig und lang genug fuer seinen eigenen Chunk."
     s2 = "Den zweiten Satz hoert der Nutzer gar nicht mehr, weil er kurz vorher schon dazwischenredet."
@@ -167,17 +169,99 @@ async def test_a_chunk_heard_almost_to_its_end_counts_as_heard(
             seen += 1
             if seen == 2:
                 break
-    orch.note_barge_in(4400)  # ~88% through the 5s first sentence
+    orch.note_barge_in(4400)  # ~88% + 0.3s grace = ~94% through the 5s first sentence
     await gen.aclose()
 
-    assert orch.turns[0].persona_text == s1
-    assert orch._reopen_turn is None, "the sentence was heard, so the turn is closed"
-    assert orch._messages[-1] == {"role": "assistant", "content": s1}
+    heard = orch.turns[0].persona_text
+    assert s1.startswith(heard) and heard != s1, "almost all of s1, but not quite"
+    assert len(heard) >= 0.8 * len(s1)
+    assert s2 not in heard
+    assert orch._reopen_turn is None, "a word was heard, so the turn is closed"
+    assert orch._messages[-1] == {"role": "assistant", "content": heard}
 
     events = await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
     assert len(orch.turns) == 2, "the reaction is its own turn, not merged onto the first"
     assert orch.turns[1].user_text == "Was war der erste Satz?"
     assert any(isinstance(e, AudioChunk) for e in events)
+
+
+async def test_late_barge_in_trims_a_completed_reply_to_what_was_heard(
+    persona, scenario, fake_pipeline, monkeypatch
+):
+    """The reply finished and was committed here while the client was still
+    playing its tail; the `turn.interrupt` only reaches the server now, between
+    turns. It must still trim the stored reply -- and the Transcript -- down to
+    the part that was actually played (ADR 0035)."""
+    monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
+    s1 = "Der erste Satz meiner Antwort ist inhaltlich vollstaendig und lang genug fuer seinen eigenen Chunk."
+    s2 = "Der zweite Satz folgt unmittelbar darauf und ist ebenfalls lang genug fuer einen eigenen Chunk hier."
+    fake_pipeline.stt.transcripts = ["Bitte erklaeren Sie mir das."]
+    fake_pipeline.llm.replies = [f"{s1} {s2}"]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+    assert orch.turns[0].persona_text == f"{s1} {s2}", "the whole reply is committed first"
+
+    orch.note_late_barge_in(700)  # 0.7s + 0.3s grace = exactly the first sentence
+
+    assert orch.turns[0].persona_text == s1
+    assert orch._messages[-1] == {"role": "assistant", "content": s1}
+    assert orch._reopen_turn is None
+
+    # A second stray interrupt (played_ms now ~0) must not erase what is left.
+    orch.note_late_barge_in(0)
+    assert orch.turns[0].persona_text == s1
+
+
+async def test_late_barge_in_with_nothing_heard_reopens_the_turn(
+    persona, scenario, fake_pipeline, monkeypatch
+):
+    """If the late interrupt reports that essentially none of the reply played,
+    the committed reply is dropped and the turn reopens, so the next utterance
+    continues the same question."""
+    monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 30000)
+    s1 = "Ein einziger, inhaltlich vollstaendiger Satz der lang genug fuer seinen eigenen Chunk ist hier jetzt."
+    fake_pipeline.stt.transcripts = ["Erste Haelfte.", "Und der Rest."]
+    fake_pipeline.llm.replies = [s1, "Die echte Antwort."]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+
+    orch.note_late_barge_in(80)  # 0.4s into a 30s sentence -> not even the first word
+
+    assert orch.turns[0].persona_text == ""
+    assert not [m for m in orch._messages if m["role"] == "assistant"]
+    assert orch._reopen_turn is orch.turns[0]
+
+    await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
+    assert len(orch.turns) == 1, "the continuation reuses the same turn"
+    assert orch.turns[0].user_text == "Erste Haelfte. Und der Rest."
+
+
+async def test_a_barge_in_mid_sentence_trims_the_transcript_to_the_word(
+    persona, scenario, fake_pipeline, monkeypatch
+):
+    """Cutting in three words into a long sentence leaves roughly those three
+    words in the transcript, not the whole sentence (ADR 0035)."""
+    monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 10000)
+    sentence = (
+        "Ich wollte mich eigentlich nur ganz kurz erkundigen ob der vereinbarte "
+        "Termin am Donnerstag naechster Woche so wie besprochen noch steht."
+    )
+    fake_pipeline.stt.transcripts = ["Bitte."]
+    fake_pipeline.llm.replies = [sentence]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+    assert orch.turns[0].persona_text == sentence
+
+    orch.note_late_barge_in(2000)  # ~2.3s of a 10s sentence -> the opening words
+
+    heard = orch.turns[0].persona_text
+    assert sentence.startswith(heard), "a leading word-prefix of the sentence"
+    assert 0 < len(heard) < len(sentence) // 2, "clearly cut short, not the whole sentence"
+    assert heard == heard.strip() and sentence[len(heard)] == " ", "ends on a whole word"
+    assert orch._messages[-1]["content"] == heard, "history trimmed in step"
 
 
 async def test_new_or_reopened_turn_bookkeeping(persona, scenario):
