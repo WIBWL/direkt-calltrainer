@@ -100,15 +100,6 @@ export function FeedbackReport({ detail }: { detail: SessionDetail }) {
         />
       </div>
 
-      <div className="feedback-next-focus">
-        <div className="feedback-next-focus-number">01</div>
-
-        <div className="feedback-next-focus-content">
-          <div className="feedback-next-focus-eyebrow">NÄCHSTER TRAININGSFOKUS</div>
-          <h2 className="feedback-next-focus-title">Coming Soon</h2>
-        </div>
-      </div>
-
       {feedback.phase_language && (
         <section className="feedback-phase-card">
           <div className="feedback-phase-eyebrow">GESPRÄCHSFÜHRUNG</div>
