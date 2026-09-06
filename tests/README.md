@@ -66,6 +66,7 @@ source of that content, and which imports without a database.
 | Barge-in / eager interruption | ADR 0035 | `test_barge_in.py` |
 | Pipeline fault tolerance (retry → graceful end) | ADR 0016, ADR 0033 | `test_pipeline_failure.py` |
 | TTS backend selection & fallback | ADR 0040 | `test_tts_fallback.py` |
+| What the TTS backend is handed (German thousands separator + ordinals) | ADR 0033, ADR 0044 | `test_speech_text.py` |
 | WebSocket wire protocol & handshake (+ token in `session.start`) | F-46, F-50, ADR 0009, ADR 0033, ADR 0035 | `test_websocket_protocol.py` |
 | Centralized logging (session-tagged, kept for the whole run) | ADR 0039, ADR 0055 | `test_logging.py` |
 | Persistence schema (ORM metadata) and the invariants the database enforces (unique measurement/turn) | ADR 0025/0026/0029/0032/0051/0053, F-09, F-12, F-14 | `test_persistence_schema.py` |

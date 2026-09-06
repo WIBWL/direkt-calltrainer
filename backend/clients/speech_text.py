@@ -45,7 +45,9 @@ _MONTHS = (
 # sechste Juli"). Getting the ending wrong is a blemish; leaving the full stop
 # in is a break in the middle of a sentence, so this only has to be usually
 # right.
-_INFLECTING = {"am", "vom", "zum", "beim", "seit", "bis", "ab", "nach", "vor", "den", "dem", "im"}
+_INFLECTING = {
+    "am", "vom", "zum", "beim", "seit", "bis", "ab", "nach", "vor", "den", "dem", "im", "des",
+}
 
 # "1.400" -> "1400". Three digits after the stop and no fourth: a thousands
 # separator, never a sentence that happens to end in a digit.
@@ -55,8 +57,16 @@ _THOUSANDS_RE = re.compile(r"(?<=\d)\.(?=\d{3}(?!\d))")
 _ORDINAL_MONTH_RE = re.compile(rf"(\b\w+\s+)?(\d{{1,2}})\.(\s+(?:{_MONTHS})\b)")
 
 # "am 6." with no month behind it -- still an ordinal, still a full stop.
+#
+# `der`/`des` are here because the model puts a date in subject position often
+# enough to matter: scanned across 734 recorded persona replies, every stop this
+# module left standing mid-sentence was one of these ("Der 14. ist also der
+# Fix?"). `der` is the one article whose ending is not decidable from the word
+# alone -- nominative "der vierzehnte" against dative "in der dritten Woche" --
+# so it takes the plain form, which is the reading that actually turned up. That
+# is the blemish the module docstring allows for; a stop left in is worse.
 _ORDINAL_BARE_RE = re.compile(
-    r"\b(am|vom|zum|beim|seit|bis|ab|den|dem)(\s+)(\d{1,2})\.(?!\s*\d)",
+    r"\b(am|im|vom|zum|beim|seit|bis|ab|den|dem|der|des)(\s+)(\d{1,2})\.(?!\s*\d)",
     re.IGNORECASE,
 )
 
@@ -77,7 +87,7 @@ def _ordinal_before_month(match: re.Match[str]) -> str:
 
 def _ordinal_after_preposition(match: re.Match[str]) -> str:
     preposition, space, day = match.group(1), match.group(2), match.group(3)
-    word = _ordinal(int(day), True)
+    word = _ordinal(int(day), preposition.lower() in _INFLECTING)
     return match.group(0) if word is None else f"{preposition}{space}{word}"
 
 
