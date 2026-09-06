@@ -62,10 +62,7 @@ export default function LoginView({
               <span className="login-training-status">Training aktiv</span>
             </div>
 
-            <div
-              className="login-training-wave"
-              aria-label="Beispielhafte Sprachaktivität"
-            >
+            <div className="login-training-wave" aria-hidden="true">
               {Array.from({ length: 18 }, (_, index) => (
                 <span key={index} />
               ))}
@@ -97,9 +94,7 @@ export default function LoginView({
           </p>
 
           <div className="login-auth-note">
-            <span className="login-auth-icon" aria-hidden="true">
-              🔒
-            </span>
+            <span className="login-auth-icon" aria-hidden="true" />
 
             <span>
               Die Anmeldung erfolgt über Ihren sicheren Unternehmenszugang. Sie
