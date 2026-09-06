@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 
 import { ApiError } from "../api";
 import {
@@ -98,6 +98,35 @@ export default function ScenarioEditor({
   const [pdfElapsed, setPdfElapsed] = useState(0);
   const [pdfNote, setPdfNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingClose, setConfirmingClose] = useState(false);
+
+  // What the draft looked like when the editor opened (empty for a new
+  // Scenario, the loaded row for an edit) — so a click outside only prompts
+  // when there is really something to lose.
+  const pristine = useRef<ScenarioDraft>(EMPTY_DRAFT);
+  const isDirty = (Object.keys(draft) as (keyof ScenarioDraft)[]).some(
+    (key) => draft[key] !== pristine.current[key],
+  );
+
+  // Dismiss on Escape or a click on the backdrop outside the panel — the same
+  // "close without saving" as the Cancel button: blocked mid-save, and once a
+  // field has been touched only after confirming through the in-panel dialog
+  // (a native window.confirm would break out of the app's look).
+  const dismiss = useCallback(() => {
+    if (saving) return;
+    if (isDirty) setConfirmingClose(true);
+    else onClose();
+  }, [saving, isDirty, onClose]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (confirmingClose) setConfirmingClose(false);
+      else dismiss();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [dismiss, confirmingClose]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +150,7 @@ export default function ScenarioEditor({
         if (cancelled) return;
         const { id: _id, visibility: vis, ...rest } = detail;
         setDraft(rest);
+        pristine.current = rest;
         setVisibility(vis);
       })
       .catch((e: unknown) =>
@@ -224,128 +254,164 @@ export default function ScenarioEditor({
   };
 
   return (
-    <div className="editor-backdrop" role="dialog" aria-modal="true" aria-labelledby="editor-title">
-      <div className="editor-panel">
-        <h2 id="editor-title">{isNew ? "Neues Szenario" : "Szenario bearbeiten"}</h2>
+    <div
+      className="editor-backdrop"
+      role="presentation"
+      onMouseDown={(e) => {
+        // Only a press that both starts and ends on the backdrop itself — not a
+        // text selection dragged out of the panel — counts as "click outside".
+        if (e.target === e.currentTarget && !confirmingClose) dismiss();
+      }}
+    >
+      <div className="editor-panel" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+        <div className="editor-scroll">
+          <h2 id="editor-title">{isNew ? "Neues Szenario" : "Szenario bearbeiten"}</h2>
 
-        {loading ? (
-          <p>Wird geladen …</p>
-        ) : (
-          <>
-            <div className="editor-fields">
-              {FIELDS.map((field) => {
-                const value = draft[field.key];
-                const limit = limits[field.key];
-                return (
-                  <Fragment key={field.key}>
-                    <label className="editor-field">
-                      <span className="editor-field-label">
-                        <span>
-                          {field.label}
-                          {field.required && <span aria-hidden="true"> *</span>}
+          {loading ? (
+            <p>Wird geladen …</p>
+          ) : (
+            <>
+              <div className="editor-fields">
+                {FIELDS.map((field) => {
+                  const value = draft[field.key];
+                  const limit = limits[field.key];
+                  return (
+                    <Fragment key={field.key}>
+                      <label className="editor-field">
+                        <span className="editor-field-label">
+                          <span>
+                            {field.label}
+                            {field.required && <span aria-hidden="true"> *</span>}
+                          </span>
+                          <span
+                            className={
+                              "editor-field-count" +
+                              (value.length >= limit ? " is-full" : "")
+                            }
+                            aria-hidden="true"
+                          >
+                            {value.length} / {limit}
+                          </span>
                         </span>
-                        <span
-                          className={
-                            "editor-field-count" +
-                            (value.length >= limit ? " is-full" : "")
-                          }
-                          aria-hidden="true"
-                        >
-                          {value.length} / {limit}
-                        </span>
-                      </span>
-                      {field.multiline ? (
-                        <textarea
-                          value={value}
-                          placeholder={field.placeholder}
-                          maxLength={limit}
-                          rows={3}
-                          onChange={(e) =>
-                            setDraft((d) => ({ ...d, [field.key]: e.target.value }))
-                          }
-                        />
-                      ) : (
-                        <input
-                          type="text"
-                          value={value}
-                          placeholder={field.placeholder}
-                          maxLength={limit}
-                          onChange={(e) =>
-                            setDraft((d) => ({ ...d, [field.key]: e.target.value }))
-                          }
-                        />
-                      )}
-                    </label>
-
-                    {field.key === "case_facts" && (
-                      <div className="pdf-upload">
-                        <label className="pdf-upload-button">
-                          {pdfBusy
-                            ? `PDF wird ausgewertet … (${formatElapsed(pdfElapsed)})`
-                            : "Fakten aus PDF (KI)"}
-                          <input
-                            type="file"
-                            accept="application/pdf,.pdf"
-                            disabled={pdfBusy}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              e.target.value = ""; // allow re-selecting the same file
-                              if (file) void handlePdf(file);
-                            }}
+                        {field.multiline ? (
+                          <textarea
+                            value={value}
+                            placeholder={field.placeholder}
+                            maxLength={limit}
+                            rows={3}
+                            onChange={(e) =>
+                              setDraft((d) => ({ ...d, [field.key]: e.target.value }))
+                            }
                           />
-                        </label>
-                        <span className="editor-field-hint">
-                          Nur PDFs mit auslesbarem Text (keine Scans). Die KI zieht die
-                          relevanten Fakten heraus; das Ergebnis landet im Feld und kann
-                          dort bearbeitet werden. Bei großen Dokumenten kann das über
-                          eine Minute dauern.
-                        </span>
-                        {pdfNote && <span className="pdf-upload-note">{pdfNote}</span>}
-                      </div>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </div>
+                        ) : (
+                          <input
+                            type="text"
+                            value={value}
+                            placeholder={field.placeholder}
+                            maxLength={limit}
+                            onChange={(e) =>
+                              setDraft((d) => ({ ...d, [field.key]: e.target.value }))
+                            }
+                          />
+                        )}
+                      </label>
 
-            {tenantName !== null && (
-              <ShareToggle
-                visibility={visibility}
-                onChange={handleShareToggle}
-                label={`Mit ${tenantName} teilen`}
-                hint="Kolleginnen und Kollegen sehen dieses Szenario dann in ihrer Bibliothek."
-              />
-            )}
+                      {field.key === "case_facts" && (
+                        <div className="pdf-upload">
+                          <label className="pdf-upload-button">
+                            {pdfBusy
+                              ? `PDF wird ausgewertet … (${formatElapsed(pdfElapsed)})`
+                              : "Fakten aus PDF (KI)"}
+                            <input
+                              type="file"
+                              accept="application/pdf,.pdf"
+                              disabled={pdfBusy}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                e.target.value = ""; // allow re-selecting the same file
+                                if (file) void handlePdf(file);
+                              }}
+                            />
+                          </label>
+                          <span className="editor-field-hint">
+                            Nur PDFs mit auslesbarem Text (keine Scans). Die KI zieht die
+                            relevanten Fakten heraus; das Ergebnis landet im Feld und kann
+                            dort bearbeitet werden. Bei großen Dokumenten kann das über
+                            eine Minute dauern.
+                          </span>
+                          {pdfNote && <span className="pdf-upload-note">{pdfNote}</span>}
+                        </div>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </div>
 
-            {error && <p className="error">{error}</p>}
+              {tenantName !== null && (
+                <ShareToggle
+                  visibility={visibility}
+                  onChange={handleShareToggle}
+                  label={`Mit ${tenantName} teilen`}
+                  hint="Kolleginnen und Kollegen sehen dieses Szenario dann in ihrer Bibliothek."
+                />
+              )}
 
-            <div className="editor-actions">
-              {!isNew && (
+              {error && <p className="error">{error}</p>}
+
+              <div className="editor-actions">
+                {!isNew && (
+                  <button
+                    type="button"
+                    className="editor-delete"
+                    onClick={handleDelete}
+                    disabled={saving}
+                  >
+                    Löschen
+                  </button>
+                )}
+                <span className="editor-actions-spacer" />
+                <button type="button" onClick={onClose} disabled={saving}>
+                  Abbrechen
+                </button>
                 <button
                   type="button"
-                  className="editor-delete"
-                  onClick={handleDelete}
-                  disabled={saving}
+                  className="editor-save"
+                  onClick={handleSave}
+                  disabled={!canSave}
                 >
-                  Löschen
+                  {saving ? "Speichert …" : "Speichern"}
                 </button>
-              )}
-              <span className="editor-actions-spacer" />
-              <button type="button" onClick={onClose} disabled={saving}>
-                Abbrechen
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {confirmingClose && (
+        <div
+          className="editor-confirm"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="editor-confirm-title"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            if (e.target === e.currentTarget) setConfirmingClose(false);
+          }}
+        >
+          <div className="editor-confirm-box">
+            <h3 id="editor-confirm-title">Eingaben verwerfen?</h3>
+            <p>Deine Änderungen an diesem Szenario werden nicht gespeichert.</p>
+            <div className="editor-confirm-actions">
+              <button type="button" onClick={() => setConfirmingClose(false)}>
+                Weiter bearbeiten
               </button>
-              <button
-                type="button"
-                className="editor-save"
-                onClick={handleSave}
-                disabled={!canSave}
-              >
-                {saving ? "Speichert …" : "Speichern"}
+              <button type="button" className="editor-confirm-discard" onClick={onClose}>
+                Verwerfen
               </button>
             </div>
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
