@@ -42,6 +42,12 @@ FIELD_LIMITS = {
     "success_condition": 500,
 }
 
+# The same caps under the names the client knows: the `title` column is the card
+# field `name` (ADR 0061). Both callers (editor's limits endpoint and follow-up prompt) read this, so the
+# renaming happens once, beside the numbers.
+_WIRE_NAMES = {"title": "name"}
+WIRE_FIELD_LIMITS = {_WIRE_NAMES.get(field, field): cap for field, cap in FIELD_LIMITS.items()}
+
 # `[call end]` / `[call_end]` / `[callend]`, any case -- the exact shape the
 # orchestrator's _END_CALL_RE matches, plus the spaced variant.
 _CALL_END_RE = re.compile(r"\[\s*call[\s_]?end\s*\]", re.IGNORECASE)

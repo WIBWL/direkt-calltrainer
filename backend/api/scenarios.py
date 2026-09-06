@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 from backend import library
 from backend.api.deps import current_tenant, current_tenant_id
 from backend.auth import AuthContext, require_user
-from backend.authored_text import FIELD_LIMITS, clean
+from backend.authored_text import FIELD_LIMITS, WIRE_FIELD_LIMITS, clean
 from backend.db.models import VISIBILITY_TENANT
 from backend.documents import (
     MAX_TEXT,
@@ -155,18 +155,15 @@ async def extract_document(
     return {"text": text, "pages": pages, "summarised": summarised}
 
 
-# `FIELD_LIMITS` is keyed by column name; `title` reaches the client as the card
-# field `name` (ADR 0061), so the editor's limits endpoint reports it that way.
-_LIMIT_FIELD_NAMES = {"title": "name"}
-
-
 # Defined before "/{extern_id}" so the literal path is matched first.
 @router.get("/field-limits")
 def field_limits(_user: AuthContext = Depends(require_user)) -> dict[str, int]:
     """The maximum length the API enforces for each authorable Scenario field.
     The editor caps its inputs from here, so its limits are the same source that
-    validates them rather than a hand-kept mirror that drifts (ADR 0063)."""
-    return {_LIMIT_FIELD_NAMES.get(f, f): cap for f, cap in FIELD_LIMITS.items()}
+    validates them rather than a hand-kept mirror that drifts (ADR 0063). Keyed
+    as the client knows the fields, so the `title` column reports as the card
+    field `name` (ADR 0061); that renaming lives in `authored_text.py`."""
+    return WIRE_FIELD_LIMITS
 
 
 # Defined before "/{extern_id}" so the literal path is matched first.
