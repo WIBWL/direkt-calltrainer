@@ -13,8 +13,8 @@ The person who performs Sessions, practicing their telephone communication skill
 _Avoid_: Trainee, learner, customer
 
 **Scenario**:
-The situational context configured for a Session — e.g. the caller's reason for calling or goal. Independent of the simulated counterpart's character traits (see Persona).
-_Avoid_: Persona, situation
+The situational context configured for a Session — e.g. the caller's reason for calling or goal. Independent of the simulated counterpart's character traits (see Persona). Carries a **Category**: what kind of call it is, one of `operations`, `requirements`, `pricing` or `closing` (docs/adr/0064), four values refining F-03's three call contexts. Display and filter only, never reaches the prompt. Optional: a Scenario may have none.
+_Avoid_: Persona, situation. For the Category: type, Szenariotyp (the free-text `scenario_type` column it replaces is gone; see docs/adr/0064)
 
 **Persona**:
 The character traits of the AI-simulated conversation partner within a Session — e.g. impatient, calm, confrontational. Combined independently with a Scenario.

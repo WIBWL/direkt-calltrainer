@@ -31,14 +31,63 @@ CLOSING_NUDGE = (
 # stop a 4B model re-emitting a whole reply when the call stalls, and the
 # system prompt's standing "never repeat yourself" is too far up-context to
 # bite -- quoting the actual previous reply right before the model answers is
-# what measurably moves it.
+# what measurably moves it. The same asymmetry applies to the role: the
+# standing rule sits in the system prompt and fades, while this nudge is what
+# demands something new every turn -- and the newest material in context is
+# whatever the user has just put on the table, so the cheapest way to comply is
+# to hand that back as the persona's own contribution. Observed: the persona
+# adopts the user's proposal, endorses it, then re-presents it as its own
+# solution. Only the concrete move is named here; the standing "you are not the
+# one who solves this" belongs in the system prompt, where it is paid once.
 ANTI_REPEAT_NUDGE = (
     'Your previous reply in this call was:\n"{previous}"\n'
     "Say something genuinely different now: react to what the user just said, "
     "press a point you have not pressed yet, give ground, or ask a new "
-    "question — in new words. Do not repeat or reword that reply, and do not "
-    "greet or introduce yourself again."
+    "question about your own concern — in new words. Do not repeat or reword "
+    "that reply, and do not greet or introduce yourself again.\n"
+    "If the user has just put something on the table, respond to it — take "
+    "it, press it for the specifics it is still missing, or say why it falls "
+    "short — but never put that same offer forward yourself as though it "
+    "were your own idea."
 )
+
+# Appended to the standing nudge above, so that the criterion the call ends on
+# is the last thing in context before the model answers. It already stands in
+# the system prompt, but the same recency problem applies to it as to the
+# anti-repeat rule -- and worse: `ANTI_REPEAT_NUDGE` offers three moves, all of
+# which carry the call on (press, give ground, ask something new), so the
+# instruction sitting nearest the reply argued against closing. Played over every
+# seeded Scenario against every Persona (`scripts/play_scenarios.py`), no pairing
+# ever ended the call on the Turn its condition was met; the persona re-asked
+# what had just been answered instead.
+#
+# The wording is the measured one, not the obvious one (ADR 0073). Written as an
+# instruction -- "finish your reply with exactly this marker: [CALL_END]" -- it
+# read as an order rather than a condition, and the persona appended the marker
+# to its own opening question: 32 of 34 pairings hung up by probe 3. So the
+# marker itself is not named here (the protocol stays in the system prompt, this
+# only points at it), the open case is the branch stated first, and closing is
+# gated on being able to quote back what met the criterion.
+SETTLEMENT_CHECK = (
+    "\nOne question to settle before you send that reply. What ends this call is: "
+    "{criterion}. Has the user actually given you that, in words you could quote "
+    "back to them? Count what arrived piece by piece, and what you had to ask "
+    "twice to get. If any part of it is still open, or you are about to ask a "
+    "question of your own, then it has not been given: answer as described above "
+    "and carry the call on. Only if you could quote it back has it been given, "
+    "and then stop pressing -- accept it in your own words, thank them, and close "
+    "the call the way your instructions describe."
+)
+
+# What the check weighs the call against when the Scenario carries no success
+# condition -- a user-authored one (ADR 0024), or one predating ADR 0045. Vaguer
+# by necessity; the position in context is what does the work either way.
+GENERIC_CRITERION = "what you came for has been given"
+
+# Replies the persona has to have given -- its opening plus two answers --
+# before the settlement check is attached at all. See
+# `SessionOrchestrator._settlement_check`.
+SETTLEMENT_CHECK_AFTER_REPLIES = 3
 
 # Sent when a reply was caught opening with a greeting again and is being
 # regenerated (ADR 0038). The rejected opening is quoted so the retry has

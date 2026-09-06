@@ -116,7 +116,7 @@ def test_prompt_defines_the_call_end_marker_protocol(prompt):
     """ADR 0033/0037/0038: the persona ends the call itself by emitting
     [CALL_END], and only when the call should truly end."""
     assert "[CALL_END]" in prompt
-    assert "Never end the call while you still consider your concern" in prompt
+    assert "Never end the call while your concern is still unresolved" in prompt
     assert "unresolved" in prompt
 
 
@@ -312,7 +312,7 @@ def test_prompt_credits_a_commitment_given_piece_by_piece(prompt):
 def test_prompt_keeps_the_guard_against_ending_too_early(prompt):
     """ADR 0037's asymmetry still holds: ending mid-conversation is the more
     expensive failure, so the new check must not have replaced that rule."""
-    assert "Never end the call while you still consider your concern" in prompt
+    assert "Never end the call while your concern is still unresolved" in prompt
     assert "vague reassurance with no specifics" in prompt
 
 

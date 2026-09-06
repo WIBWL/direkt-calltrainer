@@ -16,10 +16,35 @@ export type Origin = "builtin" | "own" | "tenant";
 
 export type Visibility = "private" | "tenant";
 
+/** What kind of call a Scenario is (ADR 0072). The wire carries the English
+ * key; the German labels below are display only. */
+export type ScenarioCategory = "operations" | "requirements" | "pricing" | "closing";
+
+/** "" = no category. Only reachable for a Scenario authored before the column
+ * existed, or one whose author left the field empty; such a row is listed under
+ * "Alle" and under no category. */
+export type CategoryChoice = ScenarioCategory | "";
+
+/** Display order and labels, in one place: the filter slider and the editor's
+ * select both read this, so a further category is one entry here plus one value
+ * in the backend's SCENARIO_CATEGORIES. The labels name the occasion of the
+ * call rather than a department, because that is what a user picking a training
+ * case is choosing between. */
+export const CATEGORY_LABELS: Record<ScenarioCategory, string> = {
+  operations: "Betrieb & Störung",
+  requirements: "Beratung & Anforderung",
+  pricing: "Preis & Kondition",
+  closing: "Abschluss & Einwand",
+};
+
+export const CATEGORIES = Object.keys(CATEGORY_LABELS) as ScenarioCategory[];
+
 export interface ScenarioCard {
   id: string;
   name: string;
   short_description: string;
+  /** null = uncategorised (ADR 0072). */
+  category: ScenarioCategory | null;
   origin: Origin;
   /** True once shared with the company — also for the caller's own Scenarios,
    * which `origin` still reports as "own". */
@@ -35,14 +60,21 @@ export interface ScenarioDraft {
   case_facts: string;
   call_goal: string;
   success_condition: string;
+  /** A closed vocabulary, not free text. The backend validates it against the
+   * same list the CHECK constraint holds (ADR 0072). "" is a valid choice. */
+  category: CategoryChoice;
 }
+
+/** The draft fields that are text and therefore length-capped. `category` is a
+ * choice from a fixed list, so it has no limit to fetch. */
+export type TextField = Exclude<keyof ScenarioDraft, "category">;
 
 export interface ScenarioDetail extends ScenarioDraft {
   id: string;
   visibility: Visibility;
 }
 
-export type FieldLimits = Record<keyof ScenarioDraft, number>;
+export type FieldLimits = Record<TextField, number>;
 
 /** Max length per authorable field. The backend (`backend/authored_text.py`
  * FIELD_LIMITS) is the single source of truth and validates against it; the
@@ -71,6 +103,7 @@ export const EMPTY_DRAFT: ScenarioDraft = {
   case_facts: "",
   call_goal: "",
   success_condition: "",
+  category: "",
 };
 
 /** The caller's tenant (ADR 0060), or `{name: null}` for the default tenant.

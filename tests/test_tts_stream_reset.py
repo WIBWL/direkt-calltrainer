@@ -80,7 +80,7 @@ async def _settle():
 
 async def test_a_stream_left_before_final_drops_the_pooled_socket_and_rewarms(kugel):
     stream = tts.synthesize_stream("Ein Satz.", VOICE, "de")
-    first = await stream.__anext__()
+    first = await anext(stream)
     assert first.startswith(b"RIFF"), "one WAV piece was produced"
 
     await stream.aclose()  # the barge-in

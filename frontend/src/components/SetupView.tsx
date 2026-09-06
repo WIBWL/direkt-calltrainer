@@ -4,7 +4,11 @@ import { useConsentContext } from "../ConsentContext";
 import { ROUTES } from "../routes";
 import type { Persona } from "../protocol";
 import type { ScenarioCard } from "../scenarioLibrary";
-import LibraryPicker, { type LibraryFilter, type LibraryItem } from "./LibraryPicker";
+import LibraryPicker, {
+  type CategoryFilter,
+  type LibraryFilter,
+  type LibraryItem,
+} from "./LibraryPicker";
 import { cx } from "../utils/cx";
 import SelectionSummary from "./SelectionSummary";
 import SetupSection from "./SetupSection";
@@ -16,7 +20,13 @@ interface SetupViewProps {
   scenarioId: string | null;
   scenarioFilter: LibraryFilter;
   onScenarioFilter: (f: LibraryFilter) => void;
-  showScenarioFilter: boolean;
+  /** How many Scenarios each option of a row would show, counted against the
+   * *other* row only. Switching to an empty option is then visible in advance
+   * rather than a surprise. */
+  scenarioOriginCounts: Record<LibraryFilter, number>;
+  scenarioCategory: CategoryFilter;
+  onScenarioCategory: (c: CategoryFilter) => void;
+  scenarioCategoryCounts: Record<CategoryFilter, number>;
   tenantName: string | null;
   onNewScenario: () => void;
   onEditScenario: (id: string) => void;
@@ -42,7 +52,10 @@ export default function SetupView({
   scenarioId,
   scenarioFilter,
   onScenarioFilter,
-  showScenarioFilter,
+  scenarioOriginCounts,
+  scenarioCategory,
+  onScenarioCategory,
+  scenarioCategoryCounts,
   tenantName,
   onNewScenario,
   onEditScenario,
@@ -81,8 +94,10 @@ export default function SetupView({
           onSelect={onSelectScenario}
           filter={scenarioFilter}
           onFilter={onScenarioFilter}
-          showFilter={showScenarioFilter}
-          filterLabel="Szenarien filtern"
+          originCounts={scenarioOriginCounts}
+          category={scenarioCategory}
+          onCategory={onScenarioCategory}
+          categoryCounts={scenarioCategoryCounts}
           tenantName={tenantName}
           newLabel="+ Individuelles Szenario"
           onNew={onNewScenario}

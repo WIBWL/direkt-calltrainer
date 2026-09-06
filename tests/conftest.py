@@ -131,6 +131,7 @@ TEST_SCENARIOS = [
             "The customer (the persona) is calling the user, who works in support, "
             "about an unresolved issue with an existing contract."
         ),
+        category="operations",
     ),
     Scenario(
         id="test-scenario-price",
@@ -140,6 +141,7 @@ TEST_SCENARIOS = [
             "The customer (the persona) is calling to say they are considering "
             "cancelling, because the running costs seem too high for the benefit."
         ),
+        category="pricing",
     ),
 ]
 

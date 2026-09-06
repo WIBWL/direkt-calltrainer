@@ -51,7 +51,7 @@ source of that content, and which imports without a database.
 | Data rights: overview counts, export completeness and scoping, deleting one training | F-49, F-31, ADR 0050, ADR 0064, ADR 0066 | `test_data_rights.py` |
 | Spoken content stays out of the log unless explicitly switched on | F-49, ADR 0039, ADR 0066 | `test_transcript_logging.py` |
 | Deep links into the client-side router survive a reload, without swallowing unknown API paths | F-31, ADR 0009, ADR 0064 | `test_spa_routing.py` |
-| Setup screen: persona/scenario REST endpoints (+ auth gate, deactivated rows withheld) | F-43, F-44, F-15, F-31, F-50, F-01/03/04, ADR 0001, ADR 0009, ADR 0026, ADR 0041, ADR 0043, ADR 0045, ADR 0058 | `test_setup_api.py` |
+| Setup screen: persona/scenario REST endpoints (+ auth gate, deactivated rows withheld) | F-43, F-44, F-15, F-31, F-50, F-01/03/04, ADR 0001, ADR 0009, ADR 0026, ADR 0041, ADR 0043, ADR 0045, ADR 0058, ADR 0072 | `test_setup_api.py` |
 | Session read route: `extern_id`, ownership (404 for foreign and unknown alike), wire shape | F-09, F-12, F-42, ADR 0031, ADR 0034, ADR 0050, ADR 0057 | `test_api.py` |
 | Session history: ownership as the query, total order under pagination, what the listing withholds | F-13, F-48, F-31, F-50, ADR 0009, ADR 0031, ADR 0051, ADR 0052, ADR 0057, ADR 0064 | `test_session_history.py` |
 | Session write path: one row plus utterances, one transaction | F-12, ADR 0026, ADR 0034 | `test_save_session.py` |
@@ -59,8 +59,8 @@ source of that content, and which imports without a database.
 | Migration chain in both directions, naming convention, FK indexes | ADR 0027, ADR 0052, ADR 0053 | `test_migrations.py` |
 | Seed idempotency and deactivation | ADR 0041 | `test_seed.py` |
 | No test reaches the development database | ADR 0034 | `test_database_isolation.py` |
-| Persona & scenario library: row mapping + seeded content | F-01, F-03, F-04, R-07..R-10, R-12, ADR 0041, ADR 0043, ADR 0045 | `test_persona_scenario_library.py` |
-| User-authored Scenarios: ownership, tenant visibility, sharing | F-34, F-59, R-58, ADR 0024, ADR 0050, ADR 0058, ADR 0059, ADR 0060 | `test_authored_content.py` |
+| Persona & scenario library: row mapping + seeded content | F-01, F-03, F-04, R-07..R-10, R-12, ADR 0041, ADR 0043, ADR 0045, ADR 0064 | `test_persona_scenario_library.py` |
+| User-authored Scenarios: ownership, tenant visibility, sharing | F-34, F-59, R-58, ADR 0024, ADR 0050, ADR 0058, ADR 0059, ADR 0060, ADR 0064 | `test_authored_content.py` |
 | PDF text extraction for an authored Scenario | F-58, ADR 0024, ADR 0058, ADR 0059 | `test_scenario_documents.py` |
 | Follow-up Scenario drafted from a Session's feedback (what the model is and is not given, and the refusals) | F-60, F-10, ADR 0043, ADR 0050, ADR 0051, ADR 0059, ADR 0069 | `test_followup_scenario.py` |
 | Tenant resolution (org claim → e-mail domain → default) | R-58, ADR 0060 | `test_tenants.py` |
@@ -77,6 +77,7 @@ source of that content, and which imports without a database.
 | Pipeline fault tolerance (retry → graceful end) | ADR 0016, ADR 0033 | `test_pipeline_failure.py` |
 | TTS backend selection & fallback | ADR 0040 | `test_tts_fallback.py` |
 | A KugelAudio stream left before `final` drops the pooled socket and re-warms; the orchestrator closes an abandoned stream at once (the one-chunk audio offset after a barge-in) | ADR 0044 (amendment) | `test_tts_stream_reset.py` |
+| What the TTS backend is handed (German thousands separator + ordinals) | ADR 0033, ADR 0044 | `test_speech_text.py` |
 | WebSocket wire protocol & handshake (+ token in `session.start`) | F-46, F-50, ADR 0009, ADR 0033, ADR 0035 | `test_websocket_protocol.py` |
 | Centralized logging (session-tagged, kept for the whole run) | ADR 0039, ADR 0055 | `test_logging.py` |
 | Persistence schema (ORM metadata) and the invariants the database enforces (unique measurement/turn) | ADR 0025/0026/0029/0032/0051/0053, F-09, F-12, F-14 | `test_persistence_schema.py` |

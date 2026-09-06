@@ -349,14 +349,105 @@ h2 {
   color: var(--text-muted);
   line-height: 1.4;
   overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 /* --- Scenario library: authored vs built-in (ADR 0058) --- */
+
+/* The two filter rows (ADR 0064): level 1 origin, level 2 thematic category.
+   One rule set for both, so the second row cannot end up smaller than the
+   first. A pill track with a thumb that slides onto the active option; the
+   options stay ordinary buttons in a radiogroup, so the interaction is a click
+   or an arrow key, not a drag. */
+
+.library-filters {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.filter-slider {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0.15rem;
+  padding: 0.25rem;
+  max-width: 100%;
+  overflow-x: auto;
+  background: var(--color-surface-filter);
+  border-radius: 999px;
+}
+
+.filter-slider-thumb {
+  position: absolute;
+  top: 0.25rem;
+  left: 0;
+  bottom: 0.25rem;
+  border-radius: 999px;
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgba(3, 37, 62, 0.16);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+/* Before the first measurement there is no position to slide from; staying
+   hidden avoids a jump from the left edge on mount. */
+.filter-slider-thumb.is-unmeasured {
+  opacity: 0;
+}
+
+.filter-slider-option {
+  position: relative; /* above the thumb */
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.4rem 0.95rem;
+  font: inherit;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.filter-slider-option.active {
+  color: var(--color-navy-900);
+  font-weight: 600;
+}
+
+.filter-slider-option:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 1px;
+}
+
+.filter-slider-count {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  opacity: 0.75;
+}
+
+.filter-slider-option.active .filter-slider-count {
+  color: var(--color-blue-600);
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filter-slider-thumb {
+    transition: none;
+  }
+}
+
+.library-empty {
+  margin: 0 0 1rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
 
 .library-toolbar {
   display: flex;
@@ -364,32 +455,6 @@ h2 {
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 1rem;
-}
-
-.library-filter {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  padding: 0.2rem;
-  background: var(--color-surface-filter);
-  border-radius: 999px;
-}
-
-.library-filter-chip {
-  border: 0;
-  background: transparent;
-  border-radius: 999px;
-  padding: 0.3rem 0.8rem;
-  font: inherit;
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-
-.library-filter-chip.active {
-  background: var(--color-surface);
-  color: var(--color-navy-900);
-  box-shadow: 0 1px 2px rgba(3, 37, 62, 0.12);
 }
 
 .library-new-button {
@@ -546,7 +611,8 @@ h2 {
 }
 
 .editor-field input,
-.editor-field textarea {
+.editor-field textarea,
+.editor-field select {
   font: inherit;
   font-size: 0.9rem;
   padding: 0.5rem 0.6rem;
@@ -554,6 +620,11 @@ h2 {
   border-radius: 8px;
   background: var(--color-surface);
   resize: vertical;
+}
+
+/* Native select: no `resize`, and the platform arrow stays. */
+.editor-field select {
+  resize: none;
 }
 
 .editor-field input::placeholder,

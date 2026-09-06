@@ -97,6 +97,7 @@ async def test_scenarios_endpoint_lists_every_scenario_with_its_teaser(client):
         assert uuid.UUID(card["id"])
         assert card["short_description"] == scenario["short_description"]
         assert card["origin"] == "builtin"
+        assert card["category"] == scenario["category"]
 
 
 async def test_scenarios_endpoint_withholds_the_english_call_context(client):
@@ -116,7 +117,9 @@ async def test_scenarios_endpoint_withholds_the_case(client):
     exercise they are about to practise."""
     body = (await client.get("/api/scenarios")).json()
     for entry in body:
-        assert set(entry) == {"id", "name", "short_description", "origin", "shared"}
+        assert set(entry) == {
+            "id", "name", "short_description", "category", "origin", "shared",
+        }
         assert "case_facts" not in entry
         assert "call_goal" not in entry
         assert "success_condition" not in entry
@@ -177,3 +180,19 @@ async def test_setup_lists_require_a_token(client):
     assert (await client.get("/api/personas")).status_code == 401
     assert (await client.get("/api/scenarios")).status_code == 401
     assert (await client.get("/health")).status_code == 200
+
+
+async def test_scenario_cards_carry_a_category_from_the_closed_vocabulary(client):
+    """ADR 0072: the card carries the F-03 call context the library's category
+    filter runs on, and it is a value from the vocabulary the CHECK constraint
+    enforces, not the free text it replaces."""
+    body = (await client.get("/api/scenarios")).json()
+    for entry in body:
+        assert entry["category"] in db_models.SCENARIO_CATEGORIES
+
+
+async def test_every_category_is_selectable(client):
+    """F-03: the library covers every call context, so none of the filter's
+    options is empty on a fresh install."""
+    body = (await client.get("/api/scenarios")).json()
+    assert {entry["category"] for entry in body} == set(db_models.SCENARIO_CATEGORIES)

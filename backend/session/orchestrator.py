@@ -15,6 +15,11 @@ the user asks to hear something again, the guards ease off once -- the persona
 is nudged to say it again, shorter -- then snap back if asked twice. Retry
 policy: one retry per leg, then end the Session cleanly (ADR 0016, ADR 0033).
 """
+# pylint: disable=too-many-lines  # what is left after the seams were cut: the
+# prose lives in prompting.py (the system prompt) and nudges.py (the per-turn
+# pushes, each with the comment naming the observed failure it catches), the
+# pure helpers in heard.py and measuring.py. This is one call's control flow,
+# and carving it further would split a single flow across files to buy lines.
 
 import asyncio
 import contextlib
@@ -40,8 +45,9 @@ from backend.session.prompting import (
 )
 from backend.session.nudges import (
     ANTI_REPEAT_NUDGE, CLARIFY_AGAIN_NUDGE, CLARIFY_NUDGE, CLOSING_NUDGE, ECHO_NUDGE,
-    INTERRUPTED_MARK, INTERRUPTED_NUDGE, REGENERATE_NUDGE, REPEAT_OPENING_NUDGE,
-    RESUME_NUDGE, STATE_NOTES_FRAME, strip_interrupted_mark,
+    GENERIC_CRITERION, INTERRUPTED_MARK, INTERRUPTED_NUDGE, REGENERATE_NUDGE,
+    REPEAT_OPENING_NUDGE, RESUME_NUDGE, SETTLEMENT_CHECK, SETTLEMENT_CHECK_AFTER_REPLIES,
+    STATE_NOTES_FRAME, strip_interrupted_mark,
 )
 from backend.session.language_packs import LanguagePack, get_pack, is_phantom, signals_closing
 from backend.session.models import AudioChunk, Failed, StateChanged, Turn, TurnCompleted, TurnEvent
@@ -176,7 +182,7 @@ class _RegenerateReply(Exception):
         self.nudge = nudge
 
 
-class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes
+class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # one call's state
     """One instance per Session. Holds the LLM message history and the Turn
     list, driving one STT → dialogue → TTS pass per Turn. A barge-in can leave a
     Turn open (`_reopen_turn`) for the next utterance to continue (ADR 0035)."""
@@ -380,7 +386,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes
         finally:
             acoustics.cancel()  # no-op once awaited; releases the audio otherwise
 
-    def _messages_for_turn(self, closing: bool, interrupted: Turn | None) -> list[dict[str, str]]:
+    def _messages_for_turn(self, closing: bool, interrupted: Turn | None = None) -> list[dict[str, str]]:
         """What the model reads for this reply (ADR 0071): the system prompt,
         its notes on the call so far, the last `HISTORY_WINDOW` messages
         verbatim, and this turn's transient nudge -- never the whole history,
@@ -395,7 +401,13 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes
         a "say it again, reworded shorter" push when the user asked to hear
         something again (ADR 0038), firmer once they have asked twice;
         otherwise a standing reminder quoting the persona's own last reply so
-        it does not come back reworded (ADR 0038)."""
+        it does not come back reworded (ADR 0038), followed by the settlement
+        check that reads the call against the Scenario's success condition.
+
+        The settlement check rides on that standing nudge alone. On a closing
+        turn the call is already ending, and on a repeat-request turn the user
+        asked to hear something again, which is not a moment to weigh the
+        matter settled."""
         notes = [{"role": "system", "content": STATE_NOTES_FRAME + self._state}] if self._state else []
         view = [self._messages[0], *notes, *self._messages[1:][-HISTORY_WINDOW:]]
         if closing:
@@ -410,10 +422,33 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes
         elif self._repeat_requests_in_a_row == 1:
             nudge = CLARIFY_NUDGE
         elif self._previous_reply():
-            nudge = ANTI_REPEAT_NUDGE.format(previous=self._previous_reply())
+            nudge = (
+                ANTI_REPEAT_NUDGE.format(previous=self._previous_reply()) +
+                self._settlement_check()
+            )
         else:
             return view
         return [*view, {"role": "system", "content": nudge}]
+
+    def _settlement_check(self) -> str:
+        """The reminder that the call may end now, phrased around this
+        Scenario's success condition where it has one (ADR 0073).
+
+        Withheld over the first exchanges. Measured over the seeded library,
+        this check on the opening exchanges is where it does damage and nothing
+        else: nine of ten premature hang-ups landed on the user's very first
+        reply, where the persona has only just said what it wants and the
+        trainee cannot yet have met a condition. Asking whether the matter is
+        settled there is a question with one possible answer, and the model
+        answered it wrong. It cannot cost a real closing either: the persona
+        opens the call and states its case, so the earliest turn on which a
+        condition can honestly be met is the one this lets through.
+        """
+        replies = sum(1 for m in self._messages if m["role"] == "assistant")
+        if replies < SETTLEMENT_CHECK_AFTER_REPLIES:
+            return ""
+        criterion = self._scenario.success_condition.strip() or GENERIC_CRITERION
+        return SETTLEMENT_CHECK.format(criterion=criterion)
 
     def _schedule_state_refresh(self, turn: Turn) -> None:
         """Refresh the caller's notes from this Turn's exchange, in the

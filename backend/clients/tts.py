@@ -50,6 +50,7 @@ from backend.clients.config import (
     LOG_TRANSCRIPTS,
     TTS_MODEL,
 )
+from backend.clients.speech_text import for_speech
 from backend.personas import PersonaVoice
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,11 @@ async def synthesize_stream(text: str, voice: PersonaVoice, language_id: str) ->
     would diverge from audio the user has already heard (ADR 0033), so the
     caller ends the Turn instead.
     """
+    # Spoken form, not written: German writes "1.400" and "6. Juli" with a
+    # full stop that both the chunker and the TTS read as a sentence end.
+    # Done here so every backend and every fallback below gets it, and so
+    # the Transcript keeps the digits.
+    text = for_speech(text, language_id)
     if DEBUG or KUGELAUDIO_CLIENT is None:
         yield await _synthesize(text, voice)
         return
@@ -142,6 +148,11 @@ async def synthesize(text: str, voice: PersonaVoice, language_id: str) -> bytes:
     locale tag -- it rejects "de-DE"/"en-GB" with "Invalid request", which
     then degrades silently into the DiReKT fallback voice.
     """
+    # Spoken form, not written: German writes "1.400" and "6. Juli" with a
+    # full stop that both the chunker and the TTS read as a sentence end.
+    # Done here so every backend and every fallback below gets it, and so
+    # the Transcript keeps the digits.
+    text = for_speech(text, language_id)
     if not DEBUG:
         try:
             return await _synthesize_kugelaudio(text, voice, language_id)

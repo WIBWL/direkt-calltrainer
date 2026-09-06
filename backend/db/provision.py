@@ -195,6 +195,9 @@ def _seed_scenarios(db: DbSession) -> int:
                  "case_facts": clean(s["case_facts"]),
                  "call_goal": clean(s["call_goal"]),
                  "success_condition": clean(s["success_condition"]),
+                 # Not cleaned: a closed vocabulary, not authored prose, and
+                 # the CHECK constraint is what validates it (ADR 0072).
+                 "category": s["category"],
                  "created_by": None, "visibility": VISIBILITY_PUBLIC})[1]
         for s in SCENARIOS
     )
