@@ -2286,17 +2286,6 @@ h2 {
   line-height: 1.5;
 }
 
-/* Same treatment the statistics disclaimer gets: it qualifies what is above
-   it rather than making a claim of its own. */
-.profile-page p.profile-note {
-  margin: 1rem 0 0;
-  padding-left: 12px;
-  border-left: 3px solid var(--color-blue-300);
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: var(--color-text-muted);
-}
-
 /* A section describing something that does not exist yet. Deliberately not
    styled as a warning — nothing is wrong, it is simply not built. */
 .profile-pending {
@@ -2730,6 +2719,78 @@ h2 {
   opacity: 0.8;
 }
 
+/* --- The "i": long explanations, folded away ---------------------------- */
+/* The screens around consent have to say a lot and are read only if they are
+   short. What a decision turns on stays in the open; the background lives in
+   here. Native <details>, so it opens on find-in-page and prints expanded. */
+
+.info-details {
+  margin-top: 1rem;
+}
+
+.info-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  /* Both spellings: the marker is the default triangle, and the icon below is
+     the affordance this control actually wants to show. */
+  list-style: none;
+}
+
+.info-summary::-webkit-details-marker {
+  display: none;
+}
+
+.info-summary:hover {
+  color: var(--color-text);
+}
+
+.info-summary:focus-visible {
+  outline: 2px solid var(--color-navy-900);
+  outline-offset: 3px;
+  border-radius: var(--radius-control);
+}
+
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  /* The glyph is an "i", so it sits optically high in its circle without this. */
+  line-height: 1;
+}
+
+.info-body {
+  margin-top: 0.75rem;
+  padding-left: 12px;
+  border-left: 2px solid var(--color-border);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+.info-body > p {
+  margin: 0 0 0.75rem;
+}
+
+.info-body > p:last-child {
+  margin-bottom: 0;
+}
+
+.info-body .processing-notice {
+  margin: 0 0 0.75rem;
+}
+
 /* --- Where the data goes (F-49) ----------------------------------------- */
 
 .processing-notice {
@@ -2780,17 +2841,6 @@ h2 {
   margin: 0.2rem 0 0;
   line-height: 1.5;
   color: var(--color-text-muted);
-}
-
-/* Says something the user would otherwise find out too late, so it is the one
-   block on this page allowed to raise its voice. */
-.profile-page .card p.profile-warning {
-  margin: 0;
-  padding: 12px 14px;
-  border-radius: var(--radius-control);
-  border-left: 3px solid var(--color-danger);
-  background: #fdf4f3;
-  line-height: 1.5;
 }
 
 /* --- Retention (ADR 0067) ------------------------------------------------ */

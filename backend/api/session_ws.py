@@ -245,9 +245,15 @@ async def _run_session(
         if envelope.get("type") == "session.activate":
             on_activate()
             continue
-        # Between Turns nothing is playing, so a stray `turn.interrupt` — or any
-        # unrecognised message — is skipped, not an error (client and server
-        # versions need not match exactly).
+        # The server streams a reply's audio ahead of playback and finishes the
+        # turn on this side while the client is still speaking its tail, so a
+        # barge-in over that tail lands here, between turns. Trim the
+        # just-finished reply to what was actually heard (ADR 0035).
+        if envelope.get("type") == "turn.interrupt":
+            orchestrator.note_late_barge_in(_played_ms(envelope))
+            continue
+        # Any other unrecognised message is skipped, not an error (client and
+        # server versions need not match exactly).
         if envelope.get("type") != "turn.audio.meta":
             continue
 
@@ -304,9 +310,17 @@ async def _run_turn_interruptible(
             return "interrupted"
         return "user"
 
+    # forward_task finished first. control_task is almost always still parked in
+    # its receive, but a barge-in over the tail of a reply that just completed
+    # can land in the gap between the wait returning and this cancel -- in which
+    # case control_task resolves with the interrupt instead of raising. Honour
+    # it, or the played-through position is lost and the whole reply stays in
+    # the transcript (ADR 0035).
     control_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
-        await control_task
+        late = await control_task
+        if late is not None and late[0] == "interrupt":
+            on_barge_in(late[1])
     return forward_task.result()
 
 

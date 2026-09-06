@@ -1,9 +1,12 @@
 import { useAuth } from "react-oidc-context";
+import { Link } from "react-router-dom";
 
 import { useAccount } from "../hooks/useAccount";
+import { ROUTES } from "../routes";
 import AppLayout from "./AppLayout";
 import ConsentSettings from "./ConsentSettings";
 import DataOverview from "./DataOverview";
+import InfoDetails from "./InfoDetails";
 import ProcessingNotice from "./ProcessingNotice";
 import SessionHistory from "./SessionHistory";
 
@@ -26,6 +29,13 @@ const DIREKT_CONTACT = "wiwi-direkt@uni-wuerzburg.de";
  * answer no question a user has and only invite them to worry about an
  * identifier they cannot act on, and the access token's expiry, which describes
  * a five-minute token rather than their session (see `useAccount`).
+ *
+ * The screen leads with what the user came for — their trainings, their
+ * settings, their numbers — and folds the explanations into `InfoDetails`. Each
+ * section keeps one plain sentence and hands the rest to the "i"; the full text
+ * is the privacy statement's job, and it is linked rather than paraphrased,
+ * because two copies of the same claim are two things to keep in sync and one
+ * of them will lose.
  */
 export default function ProfileView() {
   const account = useAccount();
@@ -65,10 +75,12 @@ export default function ProfileView() {
             note={account.email && !account.emailVerified ? "nicht bestätigt" : null}
           />
         </dl>
-        <p className="profile-note">
-          Diese Angaben stammen aus Ihrem DiReKT-Konto und werden dort verwaltet, nicht im
-          Calltrainer. Sie lassen sich hier deshalb ansehen, aber nicht ändern.
-        </p>
+        <InfoDetails label="Warum lässt sich das hier nicht ändern?">
+          <p>
+            Diese Angaben stammen aus Ihrem DiReKT-Konto und werden dort verwaltet, nicht im
+            Calltrainer.
+          </p>
+        </InfoDetails>
       </section>
 
       <section className="card">
@@ -84,24 +96,32 @@ export default function ProfileView() {
       <section className="card">
         <h2>Ihre Daten</h2>
         <p>
-          Von einem Training bleiben drei Dinge: der Gesprächsverlauf als Text, die gemessenen
-          Kennzahlen und Ihre Rückmeldung. Gespeichert wird erst, wenn Sie das Gespräch zu Ende
-          führen. Brechen Sie ab, bleibt nichts zurück.
-        </p>
-        <p>
-          <strong>Ihre Tonaufnahme wird nicht gespeichert.</strong> Sie wird während des
-          Gesprächs ausgewertet und danach gelöscht.
+          Gespeichert werden Gesprächsprotokoll, Kennzahlen und Auswertung —{" "}
+          <strong>keine Tonaufnahme</strong>.
         </p>
 
         <DataOverview />
 
-        <ProcessingNotice />
+        <InfoDetails label="Was genau gespeichert wird und wo">
+          <p>
+            Gespeichert wird erst, wenn Sie das Gespräch zu Ende führen. Brechen Sie ab, bleibt
+            nichts zurück. Die Tonaufnahme wird während des Gesprächs ausgewertet und danach
+            gelöscht.
+          </p>
 
-        <p className="profile-note">
-          Ihre Trainings liegen unter einer technischen Kennung, nicht unter Ihrem Namen. Das
-          schützt Sie allerdings nur begrenzt. Wer Zugriff auf Anmeldung und Datenbank hat, kann
-          beides zusammenbringen, und im Gesprächsverlauf steht ohnehin, was Sie gesagt haben.
-        </p>
+          <ProcessingNotice />
+
+          <p>
+            Ihre Trainings liegen unter einer technischen Kennung, nicht unter Ihrem Namen. Das
+            schützt Sie allerdings nur begrenzt: wer Zugriff auf Anmeldung und Datenbank hat,
+            kann beides zusammenbringen, und im Gesprächsverlauf steht ohnehin, was Sie gesagt
+            haben.
+          </p>
+
+          <p>
+            Ausführlich in der <Link to={ROUTES.privacy}>Datenschutzerklärung</Link>.
+          </p>
+        </InfoDetails>
       </section>
 
       <section className="card">
@@ -109,31 +129,29 @@ export default function ProfileView() {
 
         <dl className="deletion-paths">
           <dt>Ein einzelnes Training</dt>
-          <dd>
-            Öffnen Sie es in der Liste oben. Ganz unten auf der Seite steht der Löschknopf.
-          </dd>
+          <dd>In der Liste oben öffnen, Löschknopf am Seitenende.</dd>
 
           <dt>Alle Ihre Trainings</dt>
-          <dd>
-            Widerrufen Sie oben die Einwilligung zur Speicherung. Damit werden alle
-            gespeicherten Trainings gelöscht, und es wird auch nichts Neues mehr gespeichert.
-          </dd>
+          <dd>Oben die Einwilligung widerrufen.</dd>
 
           <dt>Ihr ganzes DiReKT-Konto</dt>
           <dd>
-            Schreiben Sie an <a href={`mailto:${DIREKT_CONTACT}`}>{DIREKT_CONTACT}</a>. Das
-            Konto gilt für alle Anwendungen des EFRE-Projekts DiReKT, nicht nur für den
-            Calltrainer.
+            Mail an <a href={`mailto:${DIREKT_CONTACT}`}>{DIREKT_CONTACT}</a>.
           </dd>
         </dl>
 
-        <p className="profile-warning">
-          <strong>Wichtig:</strong> Die Löschung Ihres DiReKT-Kontos löscht Ihre Trainings hier
-          nicht mit. Beides ist getrennt. Wenn Sie beides loswerden wollen, widerrufen Sie
-          zuerst hier die Einwilligung und schreiben Sie danach die Mail. Andersherum kommen Sie
-          nicht mehr an Ihre Trainings heran, weil Sie sich ohne Konto nicht mehr anmelden
-          können.
-        </p>
+        <InfoDetails label="Konto und Trainings hängen nicht zusammen">
+          <p>
+            Die Löschung Ihres DiReKT-Kontos löscht Ihre Trainings hier <strong>nicht</strong>{" "}
+            mit — das Konto gilt für alle Anwendungen des EFRE-Projekts DiReKT, nicht nur für
+            den Calltrainer.
+          </p>
+          <p>
+            Wenn Sie beides loswerden wollen: erst hier die Einwilligung widerrufen, danach die
+            Mail schreiben. Andersherum kommen Sie nicht mehr an Ihre Trainings heran, weil Sie
+            sich ohne Konto nicht mehr anmelden können.
+          </p>
+        </InfoDetails>
       </section>
     </AppLayout>
   );

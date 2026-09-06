@@ -49,16 +49,15 @@ export default function ConsentSettings() {
         </span>
       </p>
 
+      {/* One line each: what is stored, and where it goes, is said once in the
+          "Ihre Daten" card below. Repeating it here would be a second copy to
+          keep in step with the privacy statement. */}
       {consent.allows_storage ? (
-        <p>
-          Ihre abgeschlossenen Trainings werden gespeichert: Gesprächsprotokoll, Kennzahlen
-          und Rückmeldung, verknüpft mit Ihrem Konto. Die Tonaufnahme nicht.
-        </p>
+        <p>Abgeschlossene Trainings werden gespeichert.</p>
       ) : (
         <p>
-          Es wird nichts gespeichert. Sie können weiterhin trainieren und sehen Ihr
-          Gesprächsprotokoll direkt nach dem Gespräch. Eine Auswertung und eine
-          Trainingshistorie gibt es dann nicht.
+          Es wird nichts gespeichert. Trainieren geht weiter — ohne Auswertung und ohne
+          Historie.
         </p>
       )}
 

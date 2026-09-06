@@ -2,7 +2,7 @@ import type { User } from "oidc-client-ts";
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { AuthProvider } from "react-oidc-context";
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate } from "react-router-dom";
 import App from "./App";
 import { AuthGate } from "./AuthGate";
 import { ConsentProvider } from "./ConsentContext";
@@ -52,6 +52,15 @@ function ReturnToRequestedPage() {
   return null;
 }
 
+/** The routes that may only be reached once the storage decision is answered. */
+function ConsentGate() {
+  return (
+    <ConsentProvider>
+      <Outlet />
+    </ConsentProvider>
+  );
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     {/* Router outermost: AuthGate's login button records the current path, so
@@ -59,23 +68,33 @@ createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <AuthProvider userManager={userManager} onSigninCallback={onSigninCallback}>
         <AuthGate>
-          {/* Inside AuthGate: the decision is read per account, so there has to
-              be one before it can be asked for. */}
-          <ConsentProvider>
-            <ReturnToRequestedPage />
-            <Routes>
+          <ReturnToRequestedPage />
+          <Routes>
+            {/* The legal pages sit outside ConsentProvider. It replaces the
+                whole app while the storage decision is unanswered, so a link to
+                the privacy statement from inside that dialog would otherwise
+                lead straight back to the dialog — the one place the link is
+                most likely to be followed from. */}
+            <Route path={ROUTES.imprint} element={<Imprint />} />
+            <Route path={ROUTES.privacy} element={<Privacy />} />
+            <Route path={ROUTES.accessibility} element={<Accessibility />} />
+            <Route path={ROUTES.notes} element={<Notes />} />
+
+            {/* Everything below needs the decision: these screens either write
+                trainings or read the ones that were written. A pathless layout
+                route rather than a nested <Routes>, so the paths stay absolute
+                (a descendant <Routes> matches against the *remaining* URL) and
+                the provider stays mounted across navigations instead of
+                refetching the decision on every route change. */}
+            <Route element={<ConsentGate />}>
               <Route path={ROUTES.training} element={<App />} />
               <Route path={ROUTES.profile} element={<ProfileView />} />
               <Route path={ROUTES.session} element={<PastSessionView />} />
-              <Route path={ROUTES.imprint} element={<Imprint />} />
-              <Route path={ROUTES.privacy} element={<Privacy />} />
-              <Route path={ROUTES.accessibility} element={<Accessibility />} />
-              <Route path={ROUTES.notes} element={<Notes />} />
               {/* An unknown path is a mistyped or stale link, not an error
                   worth a screen of its own at this size. */}
               <Route path="*" element={<Navigate to={ROUTES.training} replace />} />
-            </Routes>
-          </ConsentProvider>
+            </Route>
+          </Routes>
         </AuthGate>
       </AuthProvider>
     </BrowserRouter>

@@ -162,3 +162,33 @@ async def test_forward_turn_events_reports_failure():
 async def test_receive_json_tolerates_malformed_input():
     ws = FakeWebSocket(["not json at all"])
     assert await session_ws._receive_json(ws) is None
+
+
+class _FakeOrchestrator:
+    """Just the two hooks _run_session calls between turns."""
+
+    def __init__(self):
+        self.late_barge_ins = []
+        self.activated = 0
+
+    def start_playback(self):
+        self.activated += 1
+
+    def note_late_barge_in(self, played_ms):
+        self.late_barge_ins.append(played_ms)
+
+
+async def test_run_session_routes_a_between_turns_interrupt_to_the_orchestrator():
+    """A barge-in over a reply's tail lands between turns (the server streams
+    ahead and has already finished the turn); _run_session must hand it to the
+    orchestrator to trim, not silently drop it (ADR 0035)."""
+    ws = FakeWebSocket([
+        {"type": "turn.interrupt", "played_ms": 1500},
+        {"type": "session.end"},
+    ])
+    orch = _FakeOrchestrator()
+
+    reason = await session_ws._run_session(ws, orch, orch.start_playback)
+
+    assert reason == "user"
+    assert orch.late_barge_ins == [1500]

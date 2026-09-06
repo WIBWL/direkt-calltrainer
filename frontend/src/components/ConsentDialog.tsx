@@ -1,5 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
+import { ROUTES } from "../routes";
+import InfoDetails from "./InfoDetails";
 import ProcessingNotice from "./ProcessingNotice";
 
 /**
@@ -14,6 +17,12 @@ import ProcessingNotice from "./ProcessingNotice";
  * The two buttons are therefore given equal weight. A greyed-out "no" beside a
  * bright "yes" is a dark pattern, and it would undermine the consent it
  * collects.
+ *
+ * Short on purpose. Everything the decision itself turns on — what is kept,
+ * what is not, that it is reversible, that declining costs nothing — is above
+ * the buttons in four lines; the background sits one click away. A notice long
+ * enough to be skipped informs nobody, and an unread wall of text is the weaker
+ * consent, not the safer one.
  */
 export default function ConsentDialog({
   onDecide,
@@ -44,29 +53,35 @@ export default function ConsentDialog({
         <h1 id="consent-title">Dürfen wir Ihre Trainings speichern?</h1>
 
         <p>
-          Der Calltrainer kann Ihre abgeschlossenen Trainings speichern, damit Sie sie später
-          wieder ansehen können. Gespeichert werden dann das Gesprächsprotokoll als Text, die
-          gemessenen Kennzahlen und Ihre Rückmeldung, verknüpft mit Ihrem Konto.
+          Von abgeschlossenen Trainings speichern wir Gesprächsprotokoll, Kennzahlen und
+          Auswertung, verknüpft mit Ihrem Konto.
         </p>
 
         <p className="consent-highlight">
-          <strong>Ihre Tonaufnahme wird nicht gespeichert.</strong> Der Ton wird während des
-          Gesprächs ausgewertet und danach verworfen.
+          <strong>Ihre Tonaufnahme wird nicht gespeichert.</strong>
         </p>
-
-        <p>
-          Sie können auch ohne Zustimmung trainieren. Dann wird nach dem Gespräch nichts
-          abgelegt. Sie sehen Ihr Gesprächsprotokoll direkt im Anschluss, bekommen aber keine
-          Auswertung, und in Ihrer Trainingshistorie erscheint das Gespräch nicht.
-        </p>
-
-        <ProcessingNotice compact />
 
         <p className="consent-note">
-          Sie können das jederzeit im Profil ändern. Widerrufen Sie später, werden die bis
-          dahin gespeicherten Trainings gelöscht. Gespeicherte Trainings werden außerdem nach
-          sechs Monaten automatisch gelöscht.
+          Ohne Zustimmung trainieren Sie genauso — es wird nur nichts abgelegt. Jederzeit im
+          Profil änderbar.
         </p>
+
+        <InfoDetails label="Was das im Einzelnen bedeutet">
+          <p>
+            Ohne Zustimmung sehen Sie Ihr Gesprächsprotokoll direkt nach dem Gespräch, bekommen
+            aber keine Auswertung, und in Ihrer Trainingshistorie erscheint das Gespräch nicht.
+          </p>
+          <p>
+            Widerrufen Sie später, werden die bis dahin gespeicherten Trainings gelöscht.
+            Gespeicherte Trainings werden außerdem nach sechs Monaten automatisch gelöscht.
+          </p>
+
+          <ProcessingNotice compact />
+
+          <p>
+            Ausführlich in der <Link to={ROUTES.privacy}>Datenschutzerklärung</Link>.
+          </p>
+        </InfoDetails>
 
         {failed && (
           <p className="consent-error">
