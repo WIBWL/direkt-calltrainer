@@ -7,7 +7,7 @@ model — a dead STT model fails the Turn (ADR 0011, ADR 0016).
 
 import logging
 
-from backend.clients.config import STT_CLIENT, STT_MODEL
+from backend.clients.config import LOG_TRANSCRIPTS, STT_CLIENT, STT_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -25,5 +25,13 @@ async def transcribe(audio_bytes: bytes, filename: str, content_type: str | None
         file=(filename, audio_bytes, content_type),
         language=language_id,
     )
-    logger.info("Transcript: %s", transcription.text)
+    # What the user said is personal data, and the log file is outside every
+    # deletion path this application has (ADR 0060). The length is the part
+    # that is actually useful for spotting a misfire — an empty transcript, or
+    # the short hallucination the docstring above warns about — and it says
+    # nothing about the person. The text itself only under LOG_TRANSCRIPTS.
+    if LOG_TRANSCRIPTS:
+        logger.info("Transcript: %s", transcription.text)
+    else:
+        logger.info("Transcript received (%d characters)", len(transcription.text))
     return transcription.text

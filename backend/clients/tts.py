@@ -27,7 +27,14 @@ from kugelaudio.exceptions import KugelAudioError
 from kugelaudio.models import AudioChunk
 from openai import OpenAIError
 
-from backend.clients.config import CLIENT, DEBUG, KUGELAUDIO_CLIENT, KUGELAUDIO_MODEL, TTS_MODEL
+from backend.clients.config import (
+    CLIENT,
+    DEBUG,
+    KUGELAUDIO_CLIENT,
+    KUGELAUDIO_MODEL,
+    LOG_TRANSCRIPTS,
+    TTS_MODEL,
+)
 from backend.personas import PersonaVoice
 
 logger = logging.getLogger(__name__)
@@ -123,7 +130,16 @@ async def _synthesize(text: str, voice: PersonaVoice) -> bytes:
     last_err: OpenAIError | None = None
     for attempt in range(2):
         try:
-            logger.info("Synthesizing speech via DiReKT TTS (%s, voice=%s): %r", TTS_MODEL, voice.tts_voice, text)
+            # The persona's line rather than the user's words, so this is
+            # generated content and not personal data — but it is still one
+            # half of a recorded conversation, and a rule with an exception
+            # is harder to keep than one without. Same switch.
+            if LOG_TRANSCRIPTS:
+                logger.info("Synthesizing via DiReKT TTS (%s, voice=%s): %r",
+                            TTS_MODEL, voice.tts_voice, text)
+            else:
+                logger.info("Synthesizing via DiReKT TTS (%s, voice=%s, %d characters)",
+                            TTS_MODEL, voice.tts_voice, len(text))
             speech = await CLIENT.audio.speech.create(
                 model=TTS_MODEL,
                 voice=voice.tts_voice,
