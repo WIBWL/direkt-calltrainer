@@ -3627,3 +3627,56 @@ h2 {
 .login-error span {
   overflow-wrap: anywhere;
 }
+
+.auth-status-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--color-background);
+}
+
+.auth-status-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 22px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: 0 8px 28px rgba(3, 37, 62, 0.06);
+}
+
+.auth-status-card > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.auth-status-card strong {
+  color: var(--color-navy-900);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.auth-status-card span {
+  color: var(--color-text-muted-secondary);
+  font-size: 12px;
+}
+
+.auth-status-spinner {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-blue-600);
+  border-radius: 50%;
+  animation: auth-status-spin 0.8s linear infinite;
+}
+
+@keyframes auth-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

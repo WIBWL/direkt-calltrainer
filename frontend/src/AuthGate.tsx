@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useAuth } from "react-oidc-context";
 import { useLocation } from "react-router-dom";
+import AuthStatusView from "./components/AuthStatusView";
 
 import LoginView from "./components/LoginView";
 
@@ -18,8 +19,16 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const location = useLocation();
 
   if (auth.isLoading || auth.activeNavigator) {
-    return <p id="status">{auth.activeNavigator ? "Weiterleitung …" : "Lädt …"}</p>;
-  }
+  return (
+    <AuthStatusView
+      message={
+        auth.activeNavigator
+          ? "Sie werden zur Anmeldung weitergeleitet …"
+          : "Ihre Sitzung wird geladen …"
+      }
+    />
+  );
+}
 
   if (auth.isAuthenticated) {
     return <>{children}</>;
