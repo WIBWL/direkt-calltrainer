@@ -51,15 +51,25 @@ export default function TranscriptView({
         ) : (
           <div className="feedback-transcript-card">
             {transcript.map((entry, i) => (
-              <p className="transcript-line" key={i}>
+              <div className="transcript-line" key={i}>
                 <span className="transcript-time">
                   {formatOffset(entry.offset_ms)}
                 </span>
-                <span>
-                  <strong>{entry.speaker === "user" ? "Du" : personaName}:</strong>{" "}
-                  {entry.text}
+
+                <span className="transcript-avatar" aria-hidden="true">
+                  {entry.speaker === "user"
+                    ? "D"
+                    : personaName.trim().charAt(0).toUpperCase()}
                 </span>
-              </p>
+
+                <div className="transcript-content">
+                  <div className="transcript-speaker">
+                    {entry.speaker === "user" ? "Du" : personaName}
+                  </div>
+
+                  <p className="transcript-text">{entry.text}</p>
+                </div>
+              </div>
             ))}
           </div>
         )}
