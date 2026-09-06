@@ -2104,3 +2104,17 @@ h2 {
     padding: 16px;
   }
 }
+
+.feedback-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -8px 0 20px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-text-muted-secondary);
+}
+
+.feedback-meta-separator {
+  color: var(--color-blue-300);
+}
