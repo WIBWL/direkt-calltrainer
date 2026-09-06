@@ -24,7 +24,6 @@ export default function LoginView({
           <span className="login-brand-name">Calltrainer</span>
         </div>
 
-        <span className="login-prototype-badge">UI-Prototyp</span>
       </header>
 
       <main className="login-main">
