@@ -1,5 +1,9 @@
+import { useState } from "react";
+
+import { ApiError } from "../api";
 import type { FeedbackPoint, Measurement } from "../protocol";
 import { useSessionFeedback } from "../hooks/useSessionFeedback";
+import { createFollowUpDraft, type ScenarioDraft } from "../scenarioLibrary";
 import Sparkline from "./Sparkline";
 
 /** How many decimals a metric reads naturally in. Counts are whole things;
@@ -31,7 +35,15 @@ const NOTICE: Record<string, string> = {
  *
  * Owns the polling itself, so it is only running while this screen is mounted.
  */
-export default function FeedbackView({ sessionId }: { sessionId: string | null }) {
+export default function FeedbackView({
+  sessionId,
+  onFollowUpDraft,
+}: {
+  sessionId: string | null;
+  /** Hand the drafted follow-up (F-60) to whoever owns the editor. Omitted
+   * where there is nowhere to open it. */
+  onFollowUpDraft?: (draft: ScenarioDraft) => void;
+}) {
   const { detail, state } = useSessionFeedback(sessionId);
 
   if (!detail?.feedback) {
@@ -43,6 +55,7 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
   }
 
   const { feedback, measurements } = detail;
+  const improvements = feedback.points.filter((p) => p.kind === "improvement");
 
   return (
     <>
@@ -55,11 +68,11 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
         points={feedback.points.filter((p) => p.kind === "strength")}
         tone="success"
       />
-      <PointList
-        title="Daran können Sie arbeiten"
-        points={feedback.points.filter((p) => p.kind === "improvement")}
-        tone="danger"
-      />
+      <PointList title="Daran können Sie arbeiten" points={improvements} tone="danger" />
+
+      {onFollowUpDraft && sessionId && improvements.length > 0 && (
+        <FollowUp sessionId={sessionId} onDraft={onFollowUpDraft} />
+      )}
 
       {measurements.length > 0 && (
         <>
@@ -92,6 +105,56 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
         </>
       )}
     </>
+  );
+}
+
+/** "Folgeszenario erstellen" (F-60): the next exercise, built from the points
+ * above. Offered only where there are improvement points — the same condition
+ * the backend enforces. The draft opens in the editor and is stored only if the
+ * User saves it there. */
+function FollowUp({
+  sessionId,
+  onDraft,
+}: {
+  sessionId: string;
+  onDraft: (draft: ScenarioDraft) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleClick = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      onDraft(await createFollowUpDraft(sessionId));
+    } catch (e: unknown) {
+      // The backend's `detail` is written for the user, so show it as it is.
+      setError(
+        e instanceof ApiError && e.detail
+          ? e.detail
+          : "Das Folgeszenario konnte nicht erstellt werden.",
+      );
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card follow-up">
+      <p>
+        Aus diesen Punkten lässt sich das nächste Gespräch bauen: eine neue Situation im
+        selben Umfeld, die genau das verlangt, was hier gefehlt hat.
+      </p>
+      <button type="button" className="follow-up-button" disabled={busy} onClick={handleClick}>
+        {busy ? "Folgeszenario wird entworfen …" : "Folgeszenario erstellen"}
+      </button>
+      {busy && (
+        <p className="follow-up-note">
+          Die KI entwirft den Fall — das dauert einen Moment. Danach können Sie ihn
+          prüfen und ändern, bevor er gespeichert wird.
+        </p>
+      )}
+      {error && <p className="follow-up-error">{error}</p>}
+    </div>
   );
 }
 

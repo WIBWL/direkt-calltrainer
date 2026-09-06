@@ -559,6 +559,17 @@ h2 {
   outline-offset: 1px;
 }
 
+/* The line above a pre-filled editor: what the draft is, and that nothing is
+   stored until "Speichern" (F-60). */
+.editor-note {
+  margin: -0.6rem 0 1.2rem;
+  padding-left: 12px;
+  border-left: 3px solid var(--blue-light);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
 /* --- PDF upload in the scenario editor (F-58) --- */
 
 .pdf-upload {
@@ -1593,6 +1604,49 @@ h2 {
   border-left: 3px solid var(--blue-light);
   font-size: 0.9rem;
   color: var(--text-muted);
+}
+
+/* --- Follow-up scenario from the feedback (F-60) ------------------------ */
+
+/* Reads as the consequence of the points above it: the same card, marked by an
+   accent rather than a competing colour. */
+.card.follow-up {
+  border-left: 3px solid var(--blue);
+}
+
+.follow-up-button {
+  margin-top: 0.9rem;
+  border: none;
+  border-radius: 999px;
+  padding: 0.6rem 1.3rem;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  background: var(--navy);
+  color: #fff;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.follow-up-button:hover:not(:disabled) {
+  background: var(--navy-light);
+}
+
+.follow-up-button:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.card p.follow-up-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.card p.follow-up-error {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+  color: var(--danger);
 }
 
 /* --- Transcript (F-12) -------------------------------------------------- */

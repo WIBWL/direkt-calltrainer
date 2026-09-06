@@ -106,6 +106,14 @@ export const setScenarioVisibility = (id: string, visibility: Visibility) =>
     body: JSON.stringify({ visibility }),
   });
 
+/** A Scenario draft built from a finished Session's improvement points (F-60).
+ * Nothing is stored until the User saves it from the editor. Under /api/sessions
+ * because that is what it is built from; it lives here because it returns a
+ * ScenarioDraft. Slow (thinking mode), so callers show a busy state; 409 = no
+ * points to build from, 503 = model unreachable, both with a `detail` to show. */
+export const createFollowUpDraft = (sessionId: string) =>
+  apiFetch<ScenarioDraft>(`/api/sessions/${sessionId}/follow-up`, { method: "POST" });
+
 export interface DocumentText {
   /** The LLM's fact list, or (when `summarised` is false) the raw text. */
   text: string;

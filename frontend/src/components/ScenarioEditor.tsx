@@ -20,6 +20,10 @@ import ShareToggle from "./ShareToggle";
 interface ScenarioEditorProps {
   /** null = author a new Scenario; an id = edit that one. */
   scenarioId: string | null;
+  /** Pre-filled fields for a new Scenario — the drafted follow-up (F-60). Read
+   * once, as the form's initial state; from there it is an ordinary new
+   * Scenario. Ignored when `scenarioId` is set. */
+  initialDraft?: ScenarioDraft | null;
   /** The caller's company name, or null for the `default` tenant. Sharing is
    * offered only when it is set — "share" means "with my colleagues", which a
    * user with no company does not have (ADR 0060). */
@@ -83,13 +87,16 @@ const formatElapsed = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).pad
  * modal over the setup screen. */
 export default function ScenarioEditor({
   scenarioId,
+  initialDraft = null,
   tenantName,
   onClose,
   onSaved,
   onRefresh,
 }: ScenarioEditorProps) {
   const isNew = scenarioId === null;
-  const [draft, setDraft] = useState<ScenarioDraft>(EMPTY_DRAFT);
+  // A drafted follow-up starts the form off; a plain new Scenario starts empty.
+  const isFollowUp = isNew && initialDraft !== null;
+  const [draft, setDraft] = useState<ScenarioDraft>(initialDraft ?? EMPTY_DRAFT);
   const [limits, setLimits] = useState<FieldLimits>(FALLBACK_FIELD_LIMITS);
   const [visibility, setVisibility] = useState<Visibility>("private");
   const [loading, setLoading] = useState(!isNew);
@@ -226,7 +233,17 @@ export default function ScenarioEditor({
   return (
     <div className="editor-backdrop" role="dialog" aria-modal="true" aria-labelledby="editor-title">
       <div className="editor-panel">
-        <h2 id="editor-title">{isNew ? "Neues Szenario" : "Szenario bearbeiten"}</h2>
+        <h2 id="editor-title">
+          {isFollowUp ? "Folgeszenario" : isNew ? "Neues Szenario" : "Szenario bearbeiten"}
+        </h2>
+
+        {isFollowUp && (
+          <p className="editor-note">
+            Aus dem Feedback Ihres letzten Gesprächs entworfen: eine neue Situation, die
+            genau die Punkte verlangt, an denen Sie arbeiten wollten. Bitte prüfen und
+            anpassen — gespeichert wird erst mit „Speichern“.
+          </p>
+        )}
 
         {loading ? (
           <p>Wird geladen …</p>
