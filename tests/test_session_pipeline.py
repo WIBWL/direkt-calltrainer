@@ -194,3 +194,19 @@ async def test_empty_llm_reply_fails_after_retry(orch, fake_pipeline):
     assert failure(events).code == "llm_failed"
     assert completed(events) is None
     assert not audio_chunks(events)
+
+
+async def test_tts_zero_audio_fails_turn(orch, fake_pipeline):
+    """A TTS stream without audio must not complete the Turn successfully."""
+    fake_pipeline.stt.transcripts = ["Bitte erklären Sie mir das."]
+    fake_pipeline.llm.replies = ["Natürlich, ich erkläre es Ihnen."]
+    fake_pipeline.tts.chunks_per_call = 0
+
+    events = await collect(
+        orch.run_turn(b"a", "turn.webm", "audio/webm")
+    )
+
+    assert failure(events) is not None
+    assert failure(events).code == "tts_failed"
+    assert completed(events) is None
+    assert not audio_chunks(events)

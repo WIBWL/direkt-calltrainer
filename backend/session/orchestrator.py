@@ -896,7 +896,6 @@ class SessionOrchestrator:
             text_chunk = _strip_foreign_script(text_chunk)
 
             if text_chunk:
-                turn.persona_text += text_chunk + " "
                 async for event in self._speak(turn, text_chunk, progress):
                     yield event
                     if isinstance(event, Failed):
@@ -913,6 +912,9 @@ class SessionOrchestrator:
             async for wav in tts.synthesize_stream(text_chunk, self._voice, self._language_id):
                 if not voiced:
                     voiced = True
+                    # Only commit Persona text once TTS has actually produced audio.
+                    # Otherwise a silent TTS stream would leave an unheard reply in the Turn.
+                    turn.persona_text += text_chunk + " "
                     progress.spoken_text += text_chunk + " "
                 if not progress.spoke_yet:
                     yield StateChanged(state="speaking")
@@ -926,6 +928,12 @@ class SessionOrchestrator:
                 # the reply's playback clock, so a later barge-in can tell
                 # whether the user heard all of it (ADR 0035).
                 progress.checkpoints.append((progress.audio_ms, progress.spoken_text.strip()))
+            else:
+                logger.error("TTS synthesis returned no audio")
+                yield Failed(
+                    code="tts_failed",
+                    message="Text-to-speech returned no audio.",
+                )
         except (KugelAudioError, OpenAIError, TimeoutError, OSError) as e:
             logger.error("TTS synthesis failed: %s", e)
             yield Failed(code="tts_failed", message=str(e))
