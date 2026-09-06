@@ -2054,3 +2054,25 @@ h2 {
   line-height: 1.55;
   color: var(--color-text-muted-secondary);
 }
+
+.feedback-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 28px;
+}
+
+.feedback-actions .restart-button {
+  width: auto;
+  margin-top: 0;
+  padding: 11px 18px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-navy-900);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.feedback-actions .restart-button:hover {
+  background: var(--color-blue-100);
+}
