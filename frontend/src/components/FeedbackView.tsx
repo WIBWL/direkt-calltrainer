@@ -71,6 +71,15 @@ export default function FeedbackView({ sessionId }: { sessionId: string | null }
         />
       </div>
 
+      <div className="feedback-next-focus">
+        <div className="feedback-next-focus-number">01</div>
+
+        <div className="feedback-next-focus-content">
+          <div className="feedback-next-focus-eyebrow">NÄCHSTER TRAININGSFOKUS</div>
+          <h2 className="feedback-next-focus-title">Coming Soon</h2>
+        </div>
+      </div>
+
       {measurements.length > 0 && (
         <>
           <h2>Zahlen zum Gespräch</h2>
