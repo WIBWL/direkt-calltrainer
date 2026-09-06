@@ -21,7 +21,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from backend.auth import AuthContext, authenticate_ws
 from backend.logging_config import session_id_scope
 from backend.tenants import resolve_tenant_id
-from backend import library
+from backend import consent, library
 from backend.feedback import jobs
 from backend.personas import Persona
 from backend.scenarios import Scenario
@@ -123,6 +123,15 @@ async def _record(  # pylint: disable=too-many-arguments,too-many-positional-arg
     allowed to raise: the call is already over, and neither a database nor a
     Redis outage may cost the user the transcript they are waiting for.
     """
+    # The last point at which unconsented data can be prevented from existing
+    # (ADR 0066). Checked here rather than at the handshake on purpose: the
+    # handshake's answer would be minutes old by now, and a subject who
+    # withdrew during their own call must not have it stored afterwards. The
+    # call itself is unaffected — the transcript has already been sent.
+    if not await asyncio.to_thread(consent.allows_storage, subject_id):
+        logger.info("Session not stored: no storage consent for this subject")
+        return
+
     try:
         db_id = await asyncio.to_thread(
             persistence.persist_session,

@@ -75,7 +75,7 @@ with its own members, invitation flows, and optionally its own identity provider
   access token then carries an `organization` claim, shaped
   `"organization": { "solox": {} }` (alias → attributes).
 - The backend reads the organization from the JWT — **exactly the way it reads
-  `sub` today** ([backend/auth.py](../../backend/auth.py)). No member management
+  `sub` today** (`backend/auth.py`). No member management
   in Calltrainer, invitations included.
 
 **Pro**
@@ -195,7 +195,7 @@ first cut.
 Built-in and user-authored scenarios in **one** table:
 
 - `/api/scenarios` stays **one** query. `get_scenario(key)` in the orchestrator
-  ([backend/library.py](../../backend/library.py)) does not change. The
+  (`backend/library.py`) does not change. The
   `session.scenario_id` FK works identically whether built-in or custom — two
   tables would need a polymorphic FK.
 - Cost: every catalogue query now filters by `visibility`/`tenant_id`.
@@ -249,7 +249,7 @@ both tables — don't solve it twice separately.
 - **Prompt injection** (ADR 0024 flag): user scenario text goes into the system
   prompt. Mitigations: keep user text in clearly delimited sections, never let
   it override the call frame
-  ([orchestrator.py](../../backend/session/orchestrator.py)), a length cap, and a
+  (`backend/session/orchestrator.py`), a length cap, and a
   moderation/review step before `visibility` can be raised above `private`.
 - **Deletion / GDPR** (F-49): a user's private scenarios are deleted with the
   account; `tenant` scenarios survive (they belong to the tenant), `created_by`

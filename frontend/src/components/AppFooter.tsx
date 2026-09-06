@@ -1,3 +1,7 @@
+import { Link } from "react-router-dom";
+
+import { ROUTES } from "../routes";
+
 // The shared footer keeps legal information consistent across all training screens.
 export default function AppFooter() {
   return (
@@ -12,10 +16,12 @@ export default function AppFooter() {
         </div>
 
         <nav className="app-footer-links" aria-label="Rechtliche Informationen">
-          <a href="/impressum">Impressum</a>
-          <a href="/datenschutz">Datenschutz</a>
-          <a href="/barrierefreiheit">Barrierefreiheit</a>
-          <a href="/hinweise">Wichtige Hinweise</a>
+          {/* Router links, not <a href>: a plain href reloads the whole app,
+              which on the way out of a finished wrap-up would discard it. */}
+          <Link to={ROUTES.imprint}>Impressum</Link>
+          <Link to={ROUTES.privacy}>Datenschutz</Link>
+          <Link to={ROUTES.accessibility}>Barrierefreiheit</Link>
+          <Link to={ROUTES.notes}>Wichtige Hinweise</Link>
         </nav>
       </div>
     </footer>

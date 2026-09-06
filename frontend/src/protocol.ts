@@ -209,3 +209,94 @@ export interface SessionDetail {
   measurements: Measurement[];
   feedback: SessionFeedback | null;
 }
+
+// --- Session history (GET /api/sessions, ADR 0064) -------------------------
+// The caller's own finished Sessions, newest first. Note that `status` means
+// something different here than on SessionDetail above: this is the Session's
+// own outcome, that one is the state of its wrap-up job.
+
+/** How a stored Session ended — `session.status` in the schema (ADR 0057). */
+export type SessionOutcome = "completed" | "aborted";
+
+/** A Measurement as the listing carries it: no `detail`, because the loudness
+ * curve would outweigh everything else on a page of Sessions (ADR 0064). */
+export interface SessionSummaryMeasurement {
+  key: string;
+  name: string;
+  unit: string | null;
+  value: number;
+}
+
+/** One row of the training history. */
+export interface SessionSummary {
+  session_id: string;
+  persona: string;
+  scenario: string;
+  status: SessionOutcome;
+  /** Whether a wrap-up was stored — i.e. whether this row has one to open. */
+  has_feedback: boolean;
+  /**
+   * Why not, where there is none: the wrap-up job's state. Carries its own
+   * name rather than sharing `status`, which on this route is the Session's
+   * own outcome and nothing else (ADR 0057/0064).
+   */
+  feedback_status: FeedbackStatus;
+  /** ISO 8601, from the client's `session.activate` (ADR 0051). */
+  started_at: string;
+  /** ISO 8601. NULL where the Session has no recorded end. */
+  ended_at: string | null;
+  measurements: SessionSummaryMeasurement[];
+}
+
+// --- What is stored about the caller (GET /api/me/data, ADR 0066) ----------
+
+/** Counts and the period they span — the extent of the data, not its content. */
+export interface DataOverviewPayload {
+  sessions: number;
+  utterances: number;
+  measurements: number;
+  feedbacks: number;
+  first_session_at: string | null;
+  last_session_at: string | null;
+  retention: RetentionState;
+}
+
+/** How long stored trainings are kept, and whether the sweep applies (ADR 0067). */
+export interface RetentionState {
+  /** False when the user has suspended the automatic deletion. */
+  auto_delete: boolean;
+  /** The retention period in days. */
+  retention_days: number;
+  /**
+   * When the oldest stored training falls due. Null when nothing is stored, or
+   * when the sweep is suspended, in which case the interface must not name a
+   * date because there is not going to be one.
+   */
+  next_expiry_at: string | null;
+}
+
+// --- Storage consent (GET/POST /api/consent, ADR 0066) ---------------------
+
+/** What the user decided about their trainings being stored, if anything. */
+export interface ConsentState {
+  /** null where no decision was ever recorded — a new account. */
+  status: "granted" | "withdrawn" | null;
+  /** The wording that decision was made against. */
+  version: string | null;
+  decided_at: string | null;
+  /** The wording currently in force; a mismatch makes the decision stale. */
+  current_version: string;
+  /** Whether finished trainings are being stored right now. */
+  allows_storage: boolean;
+  /** Whether the interface has to ask. False after a withdrawal — that is a
+   *  decision, and re-asking would be a way of wearing the user down. */
+  decision_required: boolean;
+}
+
+export interface SessionHistoryPage {
+  /** All of the caller's Sessions, not just this page. */
+  total: number;
+  limit: number;
+  offset: number;
+  sessions: SessionSummary[];
+}
