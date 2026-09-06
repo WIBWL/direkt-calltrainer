@@ -3589,3 +3589,19 @@ h2 {
   font-size: 11px;
   line-height: 1.55;
 }
+
+.login-privacy-note a {
+  color: var(--color-blue-600);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-privacy-note a:hover {
+  text-decoration: underline;
+}
+
+.login-privacy-note a:focus-visible {
+  outline: 2px solid var(--color-blue-300);
+  outline-offset: 2px;
+  border-radius: 2px;
+}

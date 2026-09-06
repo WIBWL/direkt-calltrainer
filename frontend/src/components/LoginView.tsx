@@ -1,3 +1,7 @@
+import { Link } from "react-router-dom";
+
+import { ROUTES } from "../routes";
+
 interface LoginViewProps {
   errorMessage?: string | undefined;
   onLogin: () => void;
@@ -128,8 +132,8 @@ export default function LoginView({
           </div>
 
           <p className="login-privacy-note">
-            Mit der Anmeldung bestätigen Sie, dass Sie die Datenschutzhinweise
-            gelesen haben.
+            Mit der Anmeldung bestätigen Sie, dass Sie die{" "}
+            <Link to={ROUTES.privacy}>Datenschutzhinweise</Link> gelesen haben.
           </p>
         </section>
       </main>
