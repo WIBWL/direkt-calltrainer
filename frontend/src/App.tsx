@@ -316,7 +316,7 @@ export default function App() {
 
   if (screen === "transcript") {
     return (
-      <AppLayout step="feedback" pageClassName="app-page-narrow">
+      <AppLayout step="feedback">
         <TranscriptView
           transcript={transcript}
           personaName={personaName}
