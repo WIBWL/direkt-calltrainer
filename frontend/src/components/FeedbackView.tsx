@@ -170,7 +170,7 @@ function Metric({ measurement }: { measurement: Measurement }) {
   const curve = measurement.detail?.curve_db as (number | null)[] | undefined;
   const decimals = DECIMALS[measurement.key] ?? 1;
   return (
-    <div className="metric">
+    <div className={`metric${measurement.key === "loudness" ? " metric-loudness" : ""}`}>
       <span className="metric-name">{measurement.name}</span>
       <span className="metric-value">
         {measurement.value.toFixed(decimals)} {measurement.unit ?? ""}
