@@ -3413,6 +3413,33 @@ h2 {
   width: 4px;
   border-radius: 3px;
   background: var(--color-blue-600);
+  transform-origin: center;
+  animation: login-wave-pulse 1.7s ease-in-out infinite;
+}
+
+.login-training-wave span:nth-child(3n) {
+  animation-delay: -0.4s;
+}
+
+.login-training-wave span:nth-child(4n) {
+  animation-delay: -0.8s;
+}
+
+.login-training-wave span:nth-child(5n) {
+  animation-delay: -1.2s;
+}
+
+@keyframes login-wave-pulse {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+    opacity: 0.4;
+  }
+
+  50% {
+    transform: scaleY(1);
+    opacity: 0.95;
+  }
 }
 
 .login-training-wave span:nth-child(1) {
@@ -3872,5 +3899,10 @@ h2 {
 
   .auth-status-spinner {
     animation: none;
+  }
+
+  .login-training-wave span {
+    animation: none;
+    transform: none;
   }
 }
