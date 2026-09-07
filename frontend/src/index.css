@@ -415,9 +415,10 @@ h2 {
   position: relative;
   display: inline-flex;
   align-items: stretch;
-  gap: 0.15rem;
-  padding: 0.25rem;
+  width: 100%;
   max-width: 100%;
+  gap: 4px;
+  padding: 4px;
   overflow-x: auto;
   background: var(--color-surface-filter);
   border-radius: 999px;
@@ -450,9 +451,9 @@ h2 {
   border: 0;
   background: transparent;
   border-radius: 999px;
-  padding: 0.4rem 0.95rem;
+  padding: 7px 11px;
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 12.5px;
   white-space: nowrap;
   color: var(--color-text-muted);
   cursor: pointer;
@@ -470,7 +471,7 @@ h2 {
 }
 
 .filter-slider-count {
-  font-size: 0.72rem;
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
   color: var(--color-text-muted);
   opacity: 0.75;
