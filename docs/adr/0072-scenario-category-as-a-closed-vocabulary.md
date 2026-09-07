@@ -2,10 +2,8 @@
 
 ## Status
 
-Accepted. Replaces an earlier, now withdrawn decision to drop
-`scenario.scenario_type` (migration `e4a9c07b2f31`), whose ADR was removed when
-the category came back. The number 0062 stays unused; ADR numbers are not
-reassigned.
+Accepted. Introduces `category` as a closed vocabulary after
+`scenario.scenario_type` was removed by migration `e4a9c07b2f31`.
 
 ## Context
 

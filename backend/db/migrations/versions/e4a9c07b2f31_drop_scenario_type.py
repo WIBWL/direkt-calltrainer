@@ -8,10 +8,8 @@ the prompt (`backend/session/orchestrator.py` never touched it), not the
 selection card, not a filter. The library filters ran on `origin` / `shared`
 (ADR 0060) alone. So the column goes.
 
-Its ADR was withdrawn once the category came back as a closed vocabulary that a
-filter does read; ADR 0072 records both halves and the number 0062 stays
-unused. This revision itself stands: `f5b2d47a91c3` adds `category` as a new
-column rather than reviving this one.
+This revision itself stands: `f5b2d47a91c3` adds `category` as a new column
+rather than reviving this one.
 
 The downgrade re-adds it NOT NULL with a `''` server default (there is no value
 to backfill), then drops the default to match the model, which declared none.

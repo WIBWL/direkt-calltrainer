@@ -4,7 +4,7 @@
 
 **Proposed.** The feature (F-61) is not built. This records the decisions
 taken in `docs/plans/reverse-scenario.md` up front, because several of them
-are deliberate exceptions to ADRs already in force (ADR 0043, ADR 0062,
+are deliberate exceptions to ADRs already in force (ADR 0043,
 ADR 0033's "no text during the call") and those exceptions should be arguable
 before the code exists, not discovered in it. Revisit and move to Accepted
 when the feature lands; until then, nothing in this ADR describes running
@@ -30,10 +30,10 @@ more.
 ## Decision
 
 **A reverse is a Scenario row carrying a `reverse` marker**, not a convention
-in the Scenario text and not a revived `scenario_type`. ADR 0062 dropped that
-label because nothing read it; this column is read by four places — the prompt
-casting, the wrap-up's speaker labels, the setup filter and the briefing panel
-— which is exactly what the dropped label never had. The row copies the played
+in the Scenario text and not a revived `scenario_type`. The former
+`scenario_type` free-text label was not consumed; this column is read by four
+places — the prompt casting, the wrap-up's speaker labels, the setup filter and
+the briefing panel. The row copies the played
 Scenario's title, short description and four prompt fields verbatim, and adds
 `origin_session_id` (UNIQUE, so the button is idempotent — one reverse per
 Session; `ON DELETE SET NULL`, so the row outlives the Session it replays) and
