@@ -63,39 +63,37 @@ function ConsentGate() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    {/* Router outermost: AuthGate's login button records the current path, so
-        it has to be able to read the router's location. */}
     <BrowserRouter>
       <AuthProvider userManager={userManager} onSigninCallback={onSigninCallback}>
-        <AuthGate>
-          <ReturnToRequestedPage />
-          <Routes>
-            {/* The legal pages sit outside ConsentProvider. It replaces the
-                whole app while the storage decision is unanswered, so a link to
-                the privacy statement from inside that dialog would otherwise
-                lead straight back to the dialog — the one place the link is
-                most likely to be followed from. */}
-            <Route path={ROUTES.imprint} element={<Imprint />} />
-            <Route path={ROUTES.privacy} element={<Privacy />} />
-            <Route path={ROUTES.accessibility} element={<Accessibility />} />
-            <Route path={ROUTES.notes} element={<Notes />} />
+        <ReturnToRequestedPage />
 
-            {/* Everything below needs the decision: these screens either write
-                trainings or read the ones that were written. A pathless layout
-                route rather than a nested <Routes>, so the paths stay absolute
-                (a descendant <Routes> matches against the *remaining* URL) and
-                the provider stays mounted across navigations instead of
-                refetching the decision on every route change. */}
+        <Routes>
+          {/* Public legal pages */}
+          <Route path={ROUTES.imprint} element={<Imprint />} />
+          <Route path={ROUTES.privacy} element={<Privacy />} />
+          <Route path={ROUTES.accessibility} element={<Accessibility />} />
+          <Route path={ROUTES.notes} element={<Notes />} />
+
+          {/* Everything below requires authentication. */}
+          <Route
+            element={
+              <AuthGate>
+                <Outlet />
+              </AuthGate>
+            }
+          >
             <Route element={<ConsentGate />}>
               <Route path={ROUTES.training} element={<App />} />
               <Route path={ROUTES.profile} element={<ProfileView />} />
               <Route path={ROUTES.session} element={<PastSessionView />} />
-              {/* An unknown path is a mistyped or stale link, not an error
-                  worth a screen of its own at this size. */}
-              <Route path="*" element={<Navigate to={ROUTES.training} replace />} />
+
+              <Route
+                path="*"
+                element={<Navigate to={ROUTES.training} replace />}
+              />
             </Route>
-          </Routes>
-        </AuthGate>
+          </Route>
+        </Routes>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
