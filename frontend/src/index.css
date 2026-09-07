@@ -610,6 +610,14 @@ h2 {
   line-height: 1.45;
 }
 
+.setup-persona-grid .card-meta {
+  margin-top: 0.15rem;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-blue-600);
+  line-height: 1.35;
+}
+
 @media (max-width: 720px) {
   .setup-persona-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

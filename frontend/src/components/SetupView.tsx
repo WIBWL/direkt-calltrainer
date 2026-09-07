@@ -116,6 +116,7 @@ export default function SetupView({
               key={persona.id}
               title={persona.name}
               subtitle={persona.role}
+              language={persona.language}
               isSelected={persona.id === personaId}
               onSelect={() => onSelectPersona(persona.id)}
             />
@@ -169,11 +170,13 @@ export default function SetupView({
 function ChoiceCard({
   title,
   subtitle,
+  language,
   isSelected,
   onSelect,
 }: {
   title: string;
   subtitle: string;
+  language: string;
   isSelected: boolean;
   onSelect: () => void;
 }) {
@@ -190,6 +193,7 @@ function ChoiceCard({
 
       <span className="persona-name">{title}</span>
       <span className="card-subtitle">{subtitle}</span>
+      <span className="card-meta">{language}</span>
     </button>
   );
 }
