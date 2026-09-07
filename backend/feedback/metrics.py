@@ -19,7 +19,7 @@ what those numbers mean would go.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from statistics import fmean
 
@@ -31,6 +31,9 @@ _MS_PER_SECOND = 1000
 # writes for numbers don't inflate the count.
 _WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 _SENTENCE_END_RE = re.compile(r"[.!?]+")
+# The one metric the wrap-up reads as a course rather than as a figure, so
+# generator.py has to be able to pick it out of the inventory by name.
+LOUDNESS_KEY = "loudness"
 
 
 @dataclass(frozen=True)
@@ -218,10 +221,166 @@ def _loudness(call: Conversation) -> Measurement | None:
         return None
     margin = len(audible) // 20  # 5th to 95th percentile, ignoring the extremes
     return Measurement(
-        "loudness",
+        LOUDNESS_KEY,
         audible[-1 - margin] - audible[margin],
         {"curve_db": list(call.loudness_db)},
     )
+
+
+# --- The loudness course in words -----------------------------------------
+
+# The wrap-up gets the curve described, not the dB span measured: that span
+# reads like a level without being one, and ADR 0051 left it unplaceable.
+# frontend/src/components/LoudnessCourse.tsx draws the same curve with the same
+# parameters -- keep the two in step.
+_SMOOTH_POINTS = 10       # 1 s, at acoustics.py's sample interval
+_MIN_STRETCH_POINTS = 20  # 2 s -- below that it is delivery, not a change
+# How far outside the call's own spread a stretch has to sit, in multiples of
+# it: how unusual it was *for this speaker*, not the "too loud" ADR 0051 rules
+# out for want of a norm.
+_DEVIATION = 2.0
+_LOUDER = "louder"
+_QUIETER = "quieter"
+_THIRDS = ("in the first third", "in the middle third", "in the final third")
+
+
+@dataclass(frozen=True)
+class _Band:
+    """The range the speaker held for most of this call.
+
+    Their own samples are the reference -- ADR 0051 declined to invent an
+    external one -- so "louder" only ever means louder than they otherwise were.
+    """
+
+    low: float
+    high: float
+
+    def direction(self, value: float | None) -> str | None:
+        """Which way this sample leaves the band, or None if it stays inside."""
+        if value is None:
+            return None
+        if value > self.high:
+            return _LOUDER
+        if value < self.low:
+            return _QUIETER
+        return None
+
+    def distance(self, value: float, direction: str) -> float:
+        """How far outside the band this sample sits, in dB."""
+        return value - self.high if direction == _LOUDER else self.low - value
+
+
+def describe_loudness_course(curve: Sequence[float | None]) -> str:
+    """F-37's curve as one sentence for the wrap-up prompt.
+
+    Positions are thirds of the user's *own speaking time*, never a timestamp:
+    session/models.py concatenates their Turns and inserts nothing for the
+    Persona's, so this clock and the transcript's do not agree.
+    """
+    audible = sorted(value for value in curve if value is not None)
+    if len(audible) < _MIN_STRETCH_POINTS:
+        return "Loudness course: too little audible speech to describe."
+
+    stretches = _find_stretches(_smooth(curve), _band(audible))
+    if not stretches:
+        return (
+            "Loudness course: even -- the user stayed inside their own usual range for "
+            "the whole call."
+        )
+
+    described = ", ".join(
+        f"a {direction} stretch {_THIRDS[min(2, peak * 3 // len(curve))]}"
+        for direction, peak in stretches
+    )
+    return (
+        f"Loudness course: {described}. Measured against the range this user held for most "
+        "of this call, not against any norm; positions are thirds of their own speaking "
+        "time, not of the transcript above."
+    )
+
+
+def _band(audible: list[float]) -> _Band:
+    """The call's own middle ground: its median, widened by its own spread.
+
+    Median absolute deviation, not a percentile band: a stretch covering a third
+    of the call *is* the tenth percentile, so a percentile band went blind to
+    the long shifts that matter most (measured, between a fifth and a third).
+    The MAD survives anything short of half the call. A zero median deviation
+    falls back to the mean, which vanishes only for a constant curve.
+    """
+    middle = _percentile(audible, 0.5)
+    deviations = sorted(abs(value - middle) for value in audible)
+    spread = _percentile(deviations, 0.5) or fmean(deviations)
+    return _Band(middle - _DEVIATION * spread, middle + _DEVIATION * spread)
+
+
+def _percentile(sorted_values: list[float], fraction: float) -> float:
+    """Linear-interpolated percentile of an already sorted series."""
+    at = (len(sorted_values) - 1) * fraction
+    below = int(at)
+    above = min(below + 1, len(sorted_values) - 1)
+    return sorted_values[below] + (sorted_values[above] - sorted_values[below]) * (at - below)
+
+
+def _smooth(curve: Sequence[float | None]) -> list[float | None]:
+    """The curve with the jitter taken out, so a marked stretch is a change in
+    the call rather than one stressed syllable. A window more than half silent
+    yields no value -- its mean would be the edge of the silence, not a level
+    anybody spoke at.
+    """
+    half = _SMOOTH_POINTS // 2
+    smoothed: list[float | None] = []
+    for index in range(len(curve)):
+        window = [v for v in curve[max(0, index - half):index + half + 1] if v is not None]
+        smoothed.append(fmean(window) if len(window) >= half else None)
+    return smoothed
+
+
+def _find_stretches(smoothed: list[float | None], band: _Band) -> list[tuple[str, int]]:
+    """At most one stretch per direction -- the one that departed furthest over
+    its length -- as (direction, index of its peak).
+
+    A call held evenly yields none: the band comes from its own samples, so a
+    steady speaker never leaves it. A flat call must not be given a variation.
+    """
+    marked = [band.direction(value) for value in smoothed]
+    best: dict[str, tuple[float, int]] = {}
+    index = 0
+    while index < len(marked):
+        direction = marked[index]
+        if direction is None:
+            index += 1
+            continue
+        end = index
+        while end < len(marked) and marked[end] == direction:
+            end += 1
+        if end - index >= _MIN_STRETCH_POINTS:
+            _keep_furthest(best, direction, smoothed, range(index, end), band)
+        index = end
+    return [(direction, best[direction][1]) for direction in (_LOUDER, _QUIETER) if direction in best]
+
+
+def _keep_furthest(
+    best: dict[str, tuple[float, int]],
+    direction: str,
+    smoothed: list[float | None],
+    span: range,
+    band: _Band,
+) -> None:
+    """Keeps this stretch if it departs further than the one already held."""
+    deviation = 0.0
+    peak = 0.0
+    peak_index = span.start
+    for index in span:
+        value = smoothed[index]
+        if value is None:
+            continue
+        distance = band.distance(value, direction)
+        deviation += distance
+        if distance > peak:
+            peak, peak_index = distance, index
+    if direction not in best or deviation > best[direction][0]:
+        best[direction] = (deviation, peak_index)
 
 
 # --- Inventory ------------------------------------------------------------
@@ -236,7 +395,7 @@ METRICS: tuple[MetricDef, ...] = (
     MetricDef("word_count", "Gesprochene Wörter", "Wörter", "F-08", True, _word_count),
     MetricDef("reaction_time", "Reaktionszeit", "s", "F-53", True, _reaction_time),
     MetricDef("pauses", "Sprechpausen", "s", "F-51", True, _pauses),
-    MetricDef("loudness", "Lautstärke", "dB", "F-37", True, _loudness),
+    MetricDef(LOUDNESS_KEY, "Lautstärke", "dB", "F-37", True, _loudness),
     # SHOULD / COULD -- seeded so the vocabulary is complete, but inactive and
     # without a derivation.
     MetricDef("concreteness", "Sprachliche Konkretheit", None, "F-40", False),

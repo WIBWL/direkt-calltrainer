@@ -1863,10 +1863,71 @@ h2 {
   color: var(--navy);
 }
 
-.sparkline {
-  margin-top: 4px;
-  stroke: var(--blue);
+/* The loudness course (F-37). No value beside it -- the dB span behind the curve
+   reads like a level without being one (ADR 0004/0051) -- so the chart carries
+   the tile alone. */
+.loudness-course {
+  margin: 0;
+}
+
+.loudness-course-plot {
+  display: block;
+  width: 100%;
+  height: auto;
   overflow: visible;
+}
+
+/* The range the speaker held for most of the call. A pale tint, not a traffic
+   light: a colour reading as a verdict is the score ADR 0004 rules out. */
+.loudness-course-band {
+  fill: var(--color-surface-selected);
+}
+
+.loudness-course-median {
+  stroke: var(--color-border-subtle);
+  stroke-width: 1;
+  stroke-dasharray: 3 5;
+}
+
+/* One line, and the only thing in the figure with any weight. The raw curve
+   used to sit behind it; two lines competed for the same attention. */
+.loudness-course-line {
+  fill: none;
+  stroke: var(--color-blue-600);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.loudness-course-marker circle {
+  fill: var(--color-blue-600);
+}
+
+.loudness-course-marker text {
+  fill: var(--color-text-muted-secondary);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.loudness-course-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--color-text-muted-secondary);
+}
+
+/* Named, not left as a bare mm:ss range: the axis is the user's own speaking
+   time, not the call clock (backend/session/models.py). */
+.loudness-course-axis-name {
+  font-weight: 600;
+}
+
+.loudness-course-legend {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-text-muted-secondary);
 }
 
 /* The note under the statistics saying they carry no target range (ADR 0048).
@@ -2259,14 +2320,8 @@ h2 {
   min-height: 140px;
 }
 
-.feedback-metrics-section .metric-loudness .metric-value {
-  margin-top: 8px;
-}
-
-.feedback-metrics-section .metric-loudness .sparkline {
-  width: 100%;
-  height: 48px;
-  margin-top: 16px;
+.feedback-metrics-section .metric-loudness .loudness-course {
+  margin-top: 14px;
 }
 
 .feedback-transcript-section {

@@ -6,7 +6,7 @@ import type {
 } from "../protocol";
 import { formatOffset } from "../utils/time";
 import { useSessionFeedback } from "../hooks/useSessionFeedback";
-import Sparkline from "./Sparkline";
+import LoudnessCourse from "./LoudnessCourse";
 
 /** What a screen can do with the follow-up Scenario (F-60): open it in the
  * editor, or start it as the next call. Both belong to whoever owns the screen,
@@ -307,12 +307,23 @@ function PointList({
 }
 
 function Metric({ measurement }: { measurement: Measurement }) {
-  // The one metric with a course rather than a single number: loudness across
-  // the whole call, as Praat measured it at a fixed rate (ADR 0047/0051).
+  // Loudness is shown as a course, not a figure: its value is a dB span (95th
+  // percentile minus 5th) that reads like a level without being one and that no
+  // validated norm places (ADR 0004/0051). Without the curve the tile is empty.
   const curve = measurement.detail?.curve_db as (number | null)[] | undefined;
+  if (measurement.key === "loudness") {
+    if (!curve?.some((value) => value !== null)) return null;
+    return (
+      <div className="metric metric-loudness">
+        <span className="metric-name">{measurement.name} im Gesprächsverlauf</span>
+        <LoudnessCourse values={curve} />
+      </div>
+    );
+  }
+
   const decimals = DECIMALS[measurement.key] ?? 1;
   return (
-    <div className={`metric${measurement.key === "loudness" ? " metric-loudness" : ""}`}>
+    <div className="metric">
       <span className="metric-name">{measurement.name}</span>
       <span className="metric-value">
         {measurement.value.toFixed(decimals)}
@@ -320,7 +331,6 @@ function Metric({ measurement }: { measurement: Measurement }) {
           ? ` ${measurement.unit}`
           : ""}
       </span>
-      {curve && <Sparkline values={curve} label={`${measurement.name} im Gesprächsverlauf`} />}
     </div>
   );
 }

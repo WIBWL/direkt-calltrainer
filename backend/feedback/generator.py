@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session as DbSession
 from backend.clients import llm
 from backend.db import models as db_models
 from backend.db.session import session_scope
-from backend.feedback import jobs
+from backend.feedback import jobs, metrics
 from backend.followups import create_follow_up
 
 logger = logging.getLogger(__name__)
@@ -130,12 +130,18 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
     No target ranges are supplied, because none were measured (ADR 0051). The
     model is told as much, so it reports a figure it cannot place instead of
     inventing the norm we declined to invent.
+
+    Loudness is the exception: described rather than measured, see below.
     """
     lines = ["Measured statistics for this call (established fact):"]
     lines += [
         f"    {m.metric_type.name}: {float(m.value):.1f} {m.metric_type.unit or ''}".rstrip()
         for m in session.measurements
+        if m.metric_type.key != metrics.LOUDNESS_KEY
     ]
+    course = _loudness_course(session)
+    if course:
+        lines.append(f"    {course}")
 
     lines.append("Transcript, timestamped from the start of the call:")
     turn_ids: set[int] = set()
@@ -147,6 +153,23 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
         )
         turn_ids.add(turn.turn_id)
     return "\n".join(lines), turn_ids
+
+
+def _loudness_course(session: db_models.Session) -> str | None:
+    """F-37's loudness as a sentence, or None if the call has no curve.
+
+    The stored value is a dB span (95th percentile minus 5th). Handed over as a
+    number, the wrap-up quotes it as a level -- above a chart that deliberately
+    shows none. What goes in instead is what that chart says, from the same
+    curve and the same parameters, so text and picture cannot contradict.
+    """
+    for measurement in session.measurements:
+        if measurement.metric_type.key != metrics.LOUDNESS_KEY:
+            continue
+        curve = (measurement.detail_json or {}).get("curve_db")
+        if curve:
+            return metrics.describe_loudness_course(curve)
+    return None
 
 
 def _timestamp(offset_ms: int) -> str:
