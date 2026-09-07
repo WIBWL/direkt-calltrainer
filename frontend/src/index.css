@@ -810,6 +810,10 @@ h2 {
   color: var(--color-surface);
 }
 
+.setup-page {
+  width: min(940px, calc(100% - 32px));
+}
+
 /* The setup introduction explains the purpose of the first training step. */
 .setup-intro {
   margin-bottom: 24px;

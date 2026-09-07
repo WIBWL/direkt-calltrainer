@@ -129,25 +129,36 @@ export default function LibraryPicker({
 
   return (
     <>
-      <div className="library-filters">
-        <FilterSlider
-          options={originOptions}
-          value={filter}
-          onChange={onFilter}
-          label="Szenarien nach Herkunft filtern"
-        />
-        <FilterSlider
-          options={categoryOptions}
-          value={category}
-          onChange={onCategory}
-          label="Szenarien nach Kategorie filtern"
-        />
-      </div>
+      <div className="scenario-library-controls">
+        <div className="scenario-library-controls-top">
+          <span className="scenario-library-caption">Szenariobibliothek</span>
 
-      <div className="library-toolbar">
-        <button type="button" className="library-new-button" onClick={onNew}>
-          {newLabel}
-        </button>
+          <button type="button" className="library-new-button" onClick={onNew}>
+            {newLabel}
+          </button>
+        </div>
+
+        <div className="scenario-library-filter-row">
+          <span className="scenario-library-filter-label">Herkunft</span>
+
+          <FilterSlider
+            options={originOptions}
+            value={filter}
+            onChange={onFilter}
+            label="Szenarien nach Herkunft filtern"
+          />
+        </div>
+
+        <div className="scenario-library-filter-row">
+          <span className="scenario-library-filter-label">Gesprächsanlass</span>
+
+          <FilterSlider
+            options={categoryOptions}
+            value={category}
+            onChange={onCategory}
+            label="Szenarien nach Kategorie filtern"
+          />
+        </div>
       </div>
 
       {items.length === 0 && (
