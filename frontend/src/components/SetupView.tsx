@@ -110,7 +110,7 @@ export default function SetupView({
         title="Gesprächspartner auswählen"
         description="Jede Persona besitzt eine eigene Sprache, Stimme und Persönlichkeit."
       >
-        <div className="persona-grid">
+        <div className="persona-grid setup-persona-grid">
           {personas.map((persona) => (
             <ChoiceCard
               key={persona.id}

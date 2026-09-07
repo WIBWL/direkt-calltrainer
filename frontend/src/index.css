@@ -588,6 +588,40 @@ h2 {
   }
 }
 
+.setup-persona-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.setup-persona-grid .persona-card {
+  min-height: 104px;
+  justify-content: center;
+  padding: 16px 46px 16px 16px;
+  border-width: 1.5px;
+}
+
+.setup-persona-grid .persona-name {
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.setup-persona-grid .card-subtitle {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (max-width: 720px) {
+  .setup-persona-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .setup-persona-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Reserve room at the bottom for the absolutely-positioned "Bearbeiten" link
    so it never sits on top of the card badge. */
 .persona-card.editable {
@@ -962,11 +996,12 @@ h2 {
 /* Each setup section groups one decision into a separate card. */
 .setup-section {
   width: 100%;
-  margin-bottom: 14px;
-  padding: 34px;
+  margin-bottom: 16px;
+  padding: 32px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
+  box-shadow: 0 12px 34px rgba(3, 37, 62, 0.055);
 }
 
 .setup-section-content {
@@ -978,14 +1013,18 @@ h2 {
   display: flex;
   align-items: flex-start;
   gap: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 22px;
 }
 
 .setup-section-index {
   flex-shrink: 0;
-  color: #000000;
-  font-size: 17px;
-  line-height: 26px;
+  padding-top: 2px;
+  color: var(--color-blue-600);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
 }
 
 .setup-section-heading-text {
@@ -995,7 +1034,7 @@ h2 {
 .setup-section-heading-text h2 {
   margin: 0 0 4px;
   color: var(--color-navy-900);
-  font-size: 26px;
+  font-size: 25px;
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.02em;
@@ -1012,17 +1051,17 @@ h2 {
 .selection-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 7px;
   margin: 0 0 14px;
   padding: 8px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-control);
+  border-radius: 12px;
   background: var(--color-surface-filter);
 }
 
 .selection-summary-item {
   min-width: 0;
-  padding: 10px 12px;
+  padding: 11px 12px;
   border-radius: 8px;
   background: var(--color-surface);
 }
