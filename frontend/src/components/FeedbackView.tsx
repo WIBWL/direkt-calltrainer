@@ -6,6 +6,7 @@ import type {
 } from "../protocol";
 import { formatOffset } from "../utils/time";
 import { useSessionFeedback } from "../hooks/useSessionFeedback";
+import InfoDetails from "./InfoDetails";
 import LoudnessCourse from "./LoudnessCourse";
 
 /** What a screen can do with the follow-up Scenario (F-60): open it in the
@@ -143,22 +144,65 @@ export function FeedbackReport({
         <FollowUp scenario={detail.follow_up} personaId={detail.persona_id} {...followUp} />
       )}
 
-      {feedback.phase_language && (
-        <section className="feedback-phase-card">
-          <div className="feedback-phase-eyebrow">GESPRÄCHSFÜHRUNG</div>
-          <h2 className="feedback-phase-title">Phasengerechte Sprache</h2>
-
-          <p className="feedback-phase-text">{feedback.phase_language}</p>
-
-          <p className="feedback-phase-note">
-            Betrachtet wird, ob sich die Gesprächsführung passend zwischen Einstieg,
-            Anliegen und Abschluss verändert.
-          </p>
-        </section>
-      )}
+      {feedback.phase_language && <PhaseLanguage text={feedback.phase_language} />}
 
       <MetricSection measurements={measurements} />
     </>
+  );
+}
+
+/**
+ * F-42's register block: the model's reading, the pattern it is read against,
+ * and — behind the "i" — where that pattern comes from.
+ *
+ * The note is the finding itself rather than a description of it, because that
+ * is the sentence a reader can act on. What it rests on, and what it cannot
+ * tell them (ADR 0056: the phase boundaries are the model's own guess), sits in
+ * `InfoDetails` like every other background text in this app.
+ */
+function PhaseLanguage({ text }: { text: string }) {
+  return (
+    <section className="feedback-phase-card">
+      <div className="feedback-phase-eyebrow">GESPRÄCHSFÜHRUNG</div>
+      <h2 className="feedback-phase-title">Phasengerechte Sprache</h2>
+
+      <p className="feedback-phase-text">{text}</p>
+
+      <p className="feedback-phase-note">
+        Warm einsteigen, sachlich am Anliegen arbeiten, warm abschließen.
+      </p>
+
+      <InfoDetails label="Warum diese Reihenfolge">
+        {/* A list, not prose: each phase asks for a different register for a
+            different reason, and three reasons run together in a paragraph
+            read as one. */}
+        <dl className="feedback-phase-phases">
+          <dt>Einstieg</dt>
+          <dd>
+            warm und persönlich. Hier entscheidet sich, ob Ihr Gegenüber sich ernst
+            genommen fühlt.
+          </dd>
+
+          <dt>Anliegen</dt>
+          <dd>sachlich und präzise. Jetzt zählt, dass seine Zeit respektiert wird.</dd>
+
+          <dt>Abschluss</dt>
+          <dd>
+            wieder warm. Das Ende prägt, wie das ganze Gespräch in Erinnerung bleibt.
+          </dd>
+        </dl>
+
+        <p>
+          Aus der wissenschaftlichen Studie von Packard, Li und Berger (2024), belegt
+          durch echte Servicegespräche. Kein Messwert: die Phasengrenzen schätzt das
+          Sprachmodell selbst.
+        </p>
+        <p className="feedback-phase-source">
+          Packard, Li &amp; Berger (2024), Journal of Consumer Research 51 (3);
+          Kahneman et al. (1993), Psychological Science 4 (6).
+        </p>
+      </InfoDetails>
+    </section>
   );
 }
 

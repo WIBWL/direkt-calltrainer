@@ -1940,18 +1940,6 @@ h2 {
   color: var(--text-muted);
 }
 
-/* What the phase-appropriate-language block means, under the analysis of it
-   (F-42, ADR 0056). The selector carries `p` too, not just the class:
-   `.card p` is more specific than a bare class, so without the element this
-   rule loses its top margin to the margin reset every card applies. */
-.card p.phase-note {
-  margin: 0.9rem 0 0;
-  padding-left: 12px;
-  border-left: 3px solid var(--blue-light);
-  font-size: 0.9rem;
-  color: var(--text-muted);
-}
-
 /* --- Follow-up scenario from the feedback (F-60) ------------------------ */
 
 /* Reads as the consequence of the points above it: the same card, marked by an
@@ -2213,6 +2201,9 @@ h2 {
 }
 
 .feedback-phase-card {
+  /* `.card` above carries only a margin-top, so without a top margin here the
+     follow-up box and this one sit flush against each other. */
+  margin-top: 28px;
   margin-bottom: 28px;
   padding: 24px 28px;
   border: 1px solid var(--color-border-subtle);
@@ -2249,7 +2240,64 @@ h2 {
   border-top: 1px solid var(--color-border-subtle);
   font-size: 12px;
   line-height: 1.5;
+  font-weight: 600;
   color: var(--color-text-muted-secondary);
+}
+
+/* The background behind that sentence sits in the shared "i" (InfoDetails).
+   Two adjustments to the house style here: no quote bar, because the follow-up
+   card right above already carries a left accent and a second one reads as a
+   second kind of thing, and a tighter type scale to match the card's own. */
+.feedback-phase-card .info-details {
+  margin-top: 10px;
+}
+
+.feedback-phase-card .info-summary {
+  font-size: 12px;
+}
+
+.feedback-phase-card .info-body {
+  padding-left: 0;
+  border-left: 0;
+  font-size: 13px;
+}
+
+.feedback-phase-card .info-body p {
+  margin: 0 0 8px;
+}
+
+.feedback-phase-card .info-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* The three phases as term and gloss. A grid rather than the browser's default
+   indent, so the register each phase asks for starts on one column and the
+   reasons stay comparable down the list. */
+.feedback-phase-phases {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 8px;
+  margin: 0 0 10px;
+}
+
+.feedback-phase-phases dt {
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+/* The gloss continues the term's sentence, so the two are joined by the dash
+   rather than by punctuation of their own. */
+.feedback-phase-phases dt::after {
+  content: " —";
+}
+
+.feedback-phase-phases dd {
+  margin: 0;
+}
+
+.feedback-phase-source {
+  font-size: 11px;
+  opacity: 0.85;
 }
 
 .feedback-metrics-section {
