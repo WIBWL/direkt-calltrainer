@@ -662,6 +662,12 @@ h2 {
   color: #5b3a9c;
 }
 
+/* Written from a Session's feedback rather than by hand (F-60). */
+.card-badge-follow-up {
+  background: var(--color-blue-100);
+  color: var(--navy);
+}
+
 /* Own Scenario that has been shared with the company: reads as "mine" but
    signals it is out there. */
 .card-badge-shared {
@@ -785,17 +791,6 @@ h2 {
 .editor-field textarea:focus {
   outline: 2px solid var(--color-blue-300);
   outline-offset: 1px;
-}
-
-/* The line above a pre-filled editor: what the draft is, and that nothing is
-   stored until "Speichern" (F-60). */
-.editor-note {
-  margin: -0.6rem 0 1.2rem;
-  padding-left: 12px;
-  border-left: 3px solid var(--blue-light);
-  font-size: 0.88rem;
-  line-height: 1.5;
-  color: var(--text-muted);
 }
 
 /* --- PDF upload in the scenario editor (F-58) --- */
@@ -1904,8 +1899,24 @@ h2 {
   border-left: 3px solid var(--blue);
 }
 
-.follow-up-button {
+.card p.follow-up-name {
+  margin: 0.9rem 0 0.2rem;
+  font-weight: 600;
+}
+
+.card p.follow-up-teaser {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.follow-up-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   margin-top: 0.9rem;
+}
+
+.follow-up-button {
   border: none;
   border-radius: 999px;
   padding: 0.6rem 1.3rem;
@@ -1915,16 +1926,11 @@ h2 {
   cursor: pointer;
   background: var(--navy);
   color: #fff;
-  transition: background 0.2s, opacity 0.2s;
+  transition: background 0.2s;
 }
 
-.follow-up-button:hover:not(:disabled) {
+.follow-up-button:hover {
   background: var(--navy-light);
-}
-
-.follow-up-button:disabled {
-  opacity: 0.5;
-  cursor: progress;
 }
 
 .card p.follow-up-note {
@@ -1933,10 +1939,24 @@ h2 {
   color: var(--text-muted);
 }
 
-.card p.follow-up-error {
-  margin: 0.6rem 0 0;
-  font-size: 0.85rem;
-  color: var(--danger);
+/* The secondary action: outlined, so it reads as the alternative to starting
+   rather than as a second primary button. */
+.follow-up-draft {
+  border: 1px solid var(--navy);
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  color: var(--navy);
+  transition: background 0.2s, color 0.2s;
+}
+
+.follow-up-draft:hover {
+  background: var(--navy);
+  color: #fff;
 }
 
 /* --- Transcript (F-12) -------------------------------------------------- */

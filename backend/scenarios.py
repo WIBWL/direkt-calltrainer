@@ -13,6 +13,8 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+# pylint: disable=too-many-instance-attributes  # A value object: the columns
+# `library.py` maps, not behaviour. Splitting it would only move fields around.
 class Scenario:
     id: str
     name: str
@@ -37,3 +39,7 @@ class Scenario:
     # gate editing; `library.py` always sets both. The defaults are a built-in.
     created_by: str | None = None
     visibility: str = "public"
+    # Drafted from a finished Session's feedback rather than written by hand
+    # (ADR 0069). Its own category in the library, not an authorship of its own:
+    # the User owns it exactly as if they had written it.
+    follow_up: bool = False

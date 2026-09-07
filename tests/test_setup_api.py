@@ -119,6 +119,7 @@ async def test_scenarios_endpoint_withholds_the_case(client):
     for entry in body:
         assert set(entry) == {
             "id", "name", "short_description", "category", "origin", "shared",
+            "follow_up",
         }
         assert "case_facts" not in entry
         assert "call_goal" not in entry

@@ -12,9 +12,16 @@ const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 600_000;
 // A request that keeps failing outright is a broken backend, not a slow one.
 const MAX_CONSECUTIVE_ERRORS = 3;
+// How much longer to keep polling after the wrap-up has landed, for the
+// follow-up Scenario written from it (ADR 0069). One further model call, and
+// one that is allowed to produce nothing at all — so it gets a deadline of its
+// own rather than the full one above, which would leave the screen saying
+// "wird erstellt" for ten minutes about something that never started.
+const FOLLOW_UP_GRACE_MS = 180_000;
 
 /** "missing" means the Session itself was never stored, which is a different
- * failure from a wrap-up that could not be generated. */
+ * failure from a wrap-up that could not be generated. "loading" outlives the
+ * wrap-up: it also covers the follow-up Scenario drafted from it. */
 export type FeedbackState = "loading" | "ready" | "failed" | "missing";
 
 /**
@@ -27,6 +34,11 @@ export type FeedbackState = "loading" | "ready" | "failed" | "missing";
  * Goes through apiFetch: the route needs the same bearer token as the rest of
  * /api (ADR 0009).
  */
+/** Whether a follow-up is still to be expected: one is written only where the
+ * wrap-up names something to work on (ADR 0069). */
+const awaitsFollowUp = (detail: SessionDetail) =>
+  detail.feedback?.points.some((point) => point.kind === "improvement") ?? false;
+
 export function useSessionFeedback(sessionId: string | null) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [state, setState] = useState<FeedbackState>("loading");
@@ -40,7 +52,7 @@ export function useSessionFeedback(sessionId: string | null) {
     let cancelled = false;
     let timer: number | undefined;
     let errors = 0;
-    const deadline = Date.now() + POLL_TIMEOUT_MS;
+    let deadline = Date.now() + POLL_TIMEOUT_MS;
     setState("loading");
     setDetail(null);
 
@@ -50,7 +62,13 @@ export function useSessionFeedback(sessionId: string | null) {
         if (cancelled) return;
         errors = 0;
         setDetail(data);
-        if (data.feedback) return setState("ready");
+        if (data.feedback) {
+          // The follow-up is written after the wrap-up, so keep the one poller
+          // running through the gap rather than starting a second one. Nothing
+          // is waiting on it: the report is already on screen either way.
+          if (data.follow_up || !awaitsFollowUp(data)) return setState("ready");
+          deadline = Math.min(deadline, Date.now() + FOLLOW_UP_GRACE_MS);
+        }
         if (data.status === "failed") return setState("failed");
       } catch (e) {
         if (cancelled) return;

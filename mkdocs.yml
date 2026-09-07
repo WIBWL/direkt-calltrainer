@@ -83,7 +83,7 @@ nav:
       - ADR 0066 - Consent Is What Permits a Session to Be Stored: adr/0066-consent-as-the-basis-for-storing-a-session.md
       - ADR 0067 - Stored Sessions Expire After Six Months, Unless the User Says Otherwise: adr/0067-six-month-retention-suspendable.md
       - ADR 0068 - The Consent Log Outlives the Data It Permitted: adr/0068-consent-log-outlives-the-data.md
-      - ADR 0069 - The Follow-up Scenario Is Drafted From the Feedback, Into the Editor: adr/0069-follow-up-scenario-from-feedback.md
+      - ADR 0069 - The Follow-up Scenario Is Written From the Feedback and Stored: adr/0069-follow-up-scenario-from-feedback.md
       - ADR 0070 - Reverse - Replaying a Session With the Roles Swapped (proposed): adr/0070-reverse-session-with-roles-swapped.md
       - ADR 0071 - The Model Reads Its Notes and the Last Exchanges, Not the Whole History: adr/0071-call-state-notes-instead-of-raw-history.md
       - ADR 0072 - The Scenario Category as a Closed Vocabulary: adr/0072-scenario-category-as-a-closed-vocabulary.md

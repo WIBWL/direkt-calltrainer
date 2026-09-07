@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { apiFetch } from "./api";
 import AppLayout from "./components/AppLayout";
@@ -20,12 +21,8 @@ import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useSessionSocket, type CommittedSession } from "./hooks/useSessionSocket";
 import { useStreamedAudioPlayback } from "./hooks/useStreamedAudioPlayback";
 import type { Persona, TranscriptEntry } from "./protocol";
-import {
-  getTenant,
-  listScenarios,
-  type ScenarioCard,
-  type ScenarioDraft,
-} from "./scenarioLibrary";
+import { ROUTES, type TrainingStart } from "./routes";
+import { getTenant, listScenarios, type ScenarioCard } from "./scenarioLibrary";
 import { loadFinishedSession, saveFinishedSession } from "./utils/finishedSession";
 
 type Screen = "setup" | "mic-check" | "call" | "transcript";
@@ -36,13 +33,12 @@ interface PendingEnd {
   sessionId: string | null;
 }
 
-/** null = closed; { id: null } = new; { id } = editing that row. `draft`
- * pre-fills a new one — the drafted follow-up (F-60). */
-type EditorState = { id: string | null; draft?: ScenarioDraft } | null;
+/** null = closed; { id: null } = new; { id } = editing that row. */
+type EditorState = { id: string | null } | null;
 
 /** Every level 1 value, including "tenant": counting it costs nothing when the
  * caller has no company, and the picker decides whether to offer the option. */
-const ORIGIN_FILTERS: LibraryFilter[] = ["all", "standard", "own", "followup", "tenant"];
+const ORIGIN_FILTERS: LibraryFilter[] = ["all", "standard", "own", "followUp", "tenant"];
 
 /**
  * Owns the training flow: which screen is showing, what has been selected, and
@@ -255,13 +251,26 @@ export default function App() {
     return () => vad.stopListening();
   }, [isMicrophoneMuted, screen, vad.startListening, vad.stopListening]);
 
-  const handleStartSession = useCallback(() => {
-    if (personaId === null || scenarioId === null) return;
+  // The one way into a call: commit to a pairing and go to the microphone
+  // check. Taken by the setup screen's button and by the follow-up's "Starten"
+  // alike, so the second one is the same act as the first and not a shortcut
+  // past it. The stored finished Session goes here rather than in whoever
+  // called: once a new call is committed to, the previous wrap-up must not come
+  // back on the next reload.
+  const beginSession = useCallback((nextScenarioId: string, nextPersonaId: string) => {
+    saveFinishedSession(null);
+    setScenarioId(nextScenarioId);
+    setPersonaId(nextPersonaId);
     // A new object every time: that identity is what makes this a new
     // Session for useSessionSocket, even when the pairing is unchanged.
-    setCommitted({ personaId, scenarioId });
+    setCommitted({ personaId: nextPersonaId, scenarioId: nextScenarioId });
     setScreen("mic-check");
-  }, [personaId, scenarioId]);
+  }, []);
+
+  const handleStartSession = useCallback(() => {
+    if (personaId === null || scenarioId === null) return;
+    beginSession(scenarioId, personaId);
+  }, [personaId, scenarioId, beginSession]);
 
   const handleConfirmed = useCallback(() => {
     // Reveal the buffered opening line and switch to live playback.
@@ -292,6 +301,36 @@ export default function App() {
     setScreen("setup");
   }, []);
 
+  // Starts the follow-up (F-60) as the next call, against the Persona the
+  // training it came out of was played with. The call itself needs only the two
+  // ids, but the screens read the names off the library — which was fetched
+  // before this call ended and so does not hold the new row yet, hence the
+  // reload alongside.
+  const handleStartFollowUp = useCallback(
+    (followUpId: string, followUpPersonaId: string) => {
+      void reloadScenarios();
+      beginSession(followUpId, followUpPersonaId);
+    },
+    [reloadScenarios, beginSession],
+  );
+
+  // The same, started from a past training instead (F-60). That screen is a
+  // route of its own, so it hands the pairing over in the router's location
+  // state; this consumes it and clears it immediately, so neither a reload nor
+  // the Back button starts a second call. The ref guards against React's
+  // double-invoked effects, which would otherwise commit twice.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const handedOver = useRef(false);
+
+  useEffect(() => {
+    const start = (location.state as { start?: TrainingStart } | null)?.start;
+    if (!start || handedOver.current) return;
+    handedOver.current = true;
+    navigate(ROUTES.training, { replace: true, state: null });
+    handleStartFollowUp(start.scenarioId, start.personaId);
+  }, [location.state, navigate, handleStartFollowUp]);
+
   const scenarioItems = scenarios.map((s) => ({
     id: s.id,
     name: s.name,
@@ -299,6 +338,7 @@ export default function App() {
     origin: s.origin,
     shared: s.shared,
     category: s.category,
+    followUp: s.follow_up,
   }));
   // The two levels combine: level 1 picks whose Scenario it is, level 2 what
   // kind of call it is (ADR 0072).
@@ -316,16 +356,15 @@ export default function App() {
 
   const handleScenarioSaved = (savedId: string | null) => {
     setEditingScenario(null);
-    // Selects the saved row, so a follow-up is already picked for the next Session.
+    // Selects the saved row, so it is already picked for the next Session.
     void reloadScenarios(savedId);
   };
 
   // Rendered over the setup screen and the post-call screen alike: the
-  // follow-up (F-60) is offered where the feedback is.
+  // follow-up (F-60) can be edited from either.
   const scenarioEditor = editingScenario && (
     <ScenarioEditor
       scenarioId={editingScenario.id}
-      initialDraft={editingScenario.draft ?? null}
       tenantName={tenantName}
       onClose={() => setEditingScenario(null)}
       onSaved={handleScenarioSaved}
@@ -377,7 +416,10 @@ export default function App() {
           feedback={
             <FeedbackView
               sessionId={endedSessionId}
-              onFollowUpDraft={(draft) => setEditingScenario({ id: null, draft })}
+              followUp={{
+                onEdit: (id) => setEditingScenario({ id }),
+                onStart: handleStartFollowUp,
+              }}
             />
           }
         />

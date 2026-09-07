@@ -2,14 +2,11 @@ import type { Origin, ScenarioCategory } from "../scenarioLibrary";
 import { CATEGORIES, CATEGORY_LABELS } from "../scenarioLibrary";
 import FilterSlider, { type FilterOption } from "./FilterSlider";
 
-/** Level 1, the origin of a Scenario: who it comes from.
- *
- * "followup" is a slot without data behind it. A Folgegespräch continues an
- * earlier Session, which needs the cross-Session memory of F-23, and that is
- * not built. Rather than add a column nothing writes and nothing reads (the
- * mistake that got `scenario_type` removed), the option exists in the UI,
- * counts zero and says so. Once F-23 lands, `matchesFilter` gains one line. */
-export type LibraryFilter = "all" | "standard" | "own" | "followup" | "tenant";
+/** Level 1, the origin of a Scenario: who it comes from. "followUp" is the
+ * worker-written Folgeszenario (ADR 0069), which is `origin: "own"` on the wire
+ * but an option of its own here — "Individuell" means hand-authored. Not to be
+ * confused with the level-2 CategoryFilter below. */
+export type LibraryFilter = "all" | "standard" | "own" | "followUp" | "tenant";
 
 /** Level 2, the thematic category (ADR 0072). */
 export type CategoryFilter = "all" | ScenarioCategory;
@@ -26,10 +23,10 @@ const ORIGIN_LABELS: Record<Exclude<LibraryFilter, "tenant">, string> = {
   all: "Alle",
   standard: "Standard",
   own: "Individuell",
-  followup: "Folgegespräch",
+  followUp: "Folgeszenario",
 };
 
-const BASE_ORIGINS = ["all", "standard", "own", "followup"] as const;
+const BASE_ORIGINS = ["all", "standard", "own", "followUp"] as const;
 
 export interface LibraryItem {
   id: string;
@@ -40,6 +37,9 @@ export interface LibraryItem {
   shared: boolean;
   /** F-03 call context, or null for an uncategorised Scenario (ADR 0072). */
   category: ScenarioCategory | null;
+  /** Written from a Session's feedback (F-60) rather than by hand. Own, but its
+   * own origin — "Individuell" means hand-authored. */
+  followUp: boolean;
 }
 
 interface LibraryPickerProps {
@@ -67,9 +67,8 @@ interface LibraryPickerProps {
 export function matchesFilter(item: LibraryItem, filter: LibraryFilter): boolean {
   if (filter === "all") return true;
   if (filter === "standard") return item.origin === "builtin";
-  if (filter === "own") return item.origin === "own";
-  // Nothing is a Folgegespräch yet; see the note on LibraryFilter.
-  if (filter === "followup") return false;
+  if (filter === "followUp") return item.followUp;
+  if (filter === "own") return item.origin === "own" && !item.followUp;
   return item.shared;
 }
 
@@ -80,7 +79,16 @@ export function matchesCategory(item: LibraryItem, category: CategoryFilter): bo
   return category === "all" || item.category === category;
 }
 
+/** The card's origin, which is also its badge class suffix. Not the level-2
+ * category — the prop of that name is the thematic filter. */
+function badgeClass(item: LibraryItem): string {
+  if (item.followUp) return "follow-up";
+  if (item.origin === "own") return item.shared ? "shared" : "own";
+  return item.origin;
+}
+
 function badgeLabel(item: LibraryItem, tenantName: string | null): string {
+  if (item.followUp) return "Folgeszenario";
   if (item.origin === "own") return item.shared ? "Individuell · geteilt" : "Individuell";
   if (item.origin === "tenant") return tenantName ?? "Unternehmen";
   return "Standard";
@@ -88,11 +96,13 @@ function badgeLabel(item: LibraryItem, tenantName: string | null): string {
 
 /**
  * The Scenario selection grid: two filter rows, a "new" button, badged cards,
- * and an edit affordance on the caller's own rows (ADR 0058 / 0060 / 0064).
+ * and an edit affordance on the caller's own rows (ADR 0058 / 0060 / 0064 /
+ * 0069).
  *
  * The rows are independent and combine. Level 1 says where a Scenario comes
- * from, level 2 says what kind of call it is. Both are the same component, so
- * they are the same size by construction.
+ * from (Alle / Standard / Individuell / Folgeszenario / <Unternehmen>), level 2
+ * says what kind of call it is. Both are the same component, so they are the
+ * same size by construction.
  */
 export default function LibraryPicker({
   items,
@@ -163,8 +173,8 @@ export default function LibraryPicker({
 
       {items.length === 0 && (
         <p className="library-empty">
-          {filter === "followup"
-            ? "Folgegespräche gibt es noch nicht."
+          {filter === "followUp"
+            ? "Zu dieser Auswahl gibt es noch kein Folgeszenario."
             : "Zu dieser Auswahl gibt es kein Szenario."}
         </p>
       )}
@@ -187,12 +197,7 @@ export default function LibraryPicker({
               </span>
               <span className="persona-name">{item.name}</span>
               <span className="card-subtitle">{item.subtitle}</span>
-              <span
-                className={
-                  "card-badge card-badge-" +
-                  (item.origin === "own" && item.shared ? "shared" : item.origin)
-                }
-              >
+              <span className={"card-badge card-badge-" + badgeClass(item)}>
                 {badgeLabel(item, tenantName)}
               </span>
             </button>

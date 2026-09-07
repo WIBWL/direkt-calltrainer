@@ -24,6 +24,19 @@ export const ROUTES = {
 } as const;
 
 /**
+ * What the history hands the training flow when a follow-up is started from a
+ * past training (F-60), through the router's location state.
+ *
+ * The two screens are separate routes, so there is no shared component state to
+ * put a selection into — and a query parameter would survive a reload and start
+ * the call again. The training screen consumes this once and clears it.
+ */
+export interface TrainingStart {
+  scenarioId: string;
+  personaId: string;
+}
+
+/**
  * The URL of one past training.
  *
  * Encoded even though the id is a UUID the server generated: this value comes

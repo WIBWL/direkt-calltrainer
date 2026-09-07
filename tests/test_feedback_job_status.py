@@ -124,7 +124,10 @@ def test_the_job_says_running_while_the_model_is_being_asked(
 
     generate_feedback(session_id)
 
-    assert seen == [("running", 1)]
+    assert seen[0] == ("running", 1)
+    # Whatever follows is the follow-up Scenario's own call (ADR 0069), and it
+    # is asked only once the wrap-up job is closed.
+    assert set(seen[1:]) <= {("done", 1)}
 
 
 def test_a_generated_wrapup_leaves_the_job_done(

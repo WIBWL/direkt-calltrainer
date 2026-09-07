@@ -17,6 +17,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session as DbSession
 
+from backend import deletion
 from backend.db import models as db_models
 
 logger = logging.getLogger(__name__)
@@ -107,7 +108,8 @@ def sweep(db: DbSession, now: datetime | None = None) -> int:
 
     Deletes through the ORM, like `deletion.py`, so the same ownership cascades
     take the Turns, Measurements, Feedback and jobs with each Session
-    (ADR 0026/0052).
+    (ADR 0026/0052), and the follow-up Scenario drafted from one leaves the
+    library with it (ADR 0069).
     """
     boundary = cutoff(now)
     expired = (
@@ -130,6 +132,7 @@ def sweep(db: DbSession, now: datetime | None = None) -> int:
         if not auto_delete_enabled(db, subject_id):
             suspended += 1
             continue
+        deletion.retire_follow_ups(db, sessions)
         for session in sessions:
             db.delete(session)
         deleted += len(sessions)

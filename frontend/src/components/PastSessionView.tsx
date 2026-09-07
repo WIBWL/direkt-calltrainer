@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { apiFetch } from "../api";
 import { useStoredSession } from "../hooks/useStoredSession";
-import { ROUTES } from "../routes";
+import { ROUTES, type TrainingStart } from "../routes";
+import { getTenant } from "../scenarioLibrary";
 import { formatOffset } from "../utils/time";
 import AppLayout from "./AppLayout";
 import { FeedbackReport, MetricSection } from "./FeedbackView";
+import ScenarioEditor from "./ScenarioEditor";
 
 /**
  * One past training, opened from the history (F-48): the wrap-up that was
@@ -21,14 +23,36 @@ import { FeedbackReport, MetricSection } from "./FeedbackView";
  * A Session belonging to someone else answers 404 exactly like one that never
  * existed (ADR 0031/0050), so a guessed URL lands on the same screen as a stale
  * bookmark and neither learns anything from it.
+ *
+ * The follow-up Scenario written from this training (F-60) is offered here as
+ * it is after the call, minus the waiting: nothing is in flight, so a Session
+ * that has none simply shows none.
  */
 export default function PastSessionView() {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const { detail, state } = useStoredSession(sessionId ?? null);
+  const { detail, state, reload } = useStoredSession(sessionId ?? null);
   const navigate = useNavigate();
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
+  // Open only while the follow-up is being edited; the editor needs the
+  // company name to decide whether sharing is on offer at all (ADR 0060).
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [tenantName, setTenantName] = useState<string | null>(null);
+
+  useEffect(() => {
+    getTenant()
+      .then((t) => setTenantName(t.name))
+      .catch(() => setTenantName(null)); // no company, no sharing toggle
+  }, []);
+
+  // Starting the follow-up belongs to the training flow, which is another
+  // route — so hand it the pairing and go (see TrainingStart). The Persona is
+  // the one this training was played with, not a fresh choice.
+  const startFollowUp = (scenarioId: string, personaId: string) => {
+    const start: TrainingStart = { scenarioId, personaId };
+    navigate(ROUTES.training, { state: { start } });
+  };
 
   // Back to the history rather than to the now-empty page this was. Replacing
   // the entry means Back does not return to a training that no longer exists.
@@ -95,7 +119,12 @@ export default function PastSessionView() {
       <p className="page-lead">Gespräch mit {detail.persona}</p>
 
       {detail.feedback ? (
-        <FeedbackReport detail={detail} />
+        <FeedbackReport
+          detail={detail}
+          // Nothing is being generated any more, so nothing is pending: a
+          // Session with no follow-up shows no block at all.
+          followUp={{ pending: false, onEdit: setEditingId, onStart: startFollowUp }}
+        />
       ) : (
         <>
           <div className="card">
@@ -176,6 +205,21 @@ export default function PastSessionView() {
           </p>
         )}
       </section>
+
+      {/* Re-read after a save: the card above carries the title and teaser as
+          they were when this page loaded. */}
+      {editingId !== null && (
+        <ScenarioEditor
+          scenarioId={editingId}
+          tenantName={tenantName}
+          onClose={() => setEditingId(null)}
+          onSaved={() => {
+            setEditingId(null);
+            reload();
+          }}
+          onRefresh={reload}
+        />
+      )}
     </AppLayout>
   );
 }

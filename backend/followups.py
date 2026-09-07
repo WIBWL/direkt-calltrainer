@@ -1,38 +1,52 @@
-"""Draft the next exercise from a Session's Feedback: a follow-up Scenario (F-60).
+"""The next exercise, built from a Session's Feedback: a follow-up Scenario (F-60).
 
 The improvement points say what to work on; the model is asked for a Scenario
-that cannot be got through without it. Stateless like `backend/documents.py`:
-the draft goes to the editor and becomes a Scenario only when the User saves it,
-so sanitising, caps, ownership and the Tenant stamp stay where they are
-(ADR 0069).
+that cannot be got through without it. `create_follow_up` runs in the Feedback
+worker, right after the wrap-up it is built from is stored (ADR 0069), and
+writes through `backend/library.py` like any authored Scenario, so sanitising,
+caps and ownership stay where they are.
 
 Withheld from the model: the measured statistics (no target range exists,
 ADR 0051) and the played Scenario's prompt fields (withheld from the client
 anyway, ADR 0043) -- only its card goes in. The four case fields become the
 caller's briefing, so the prompt keeps the exercise's purpose out of them.
 
-The values are German: the draft's destination is the editor, as with F-58.
+The values are German: it lands in the User's own library, as F-58's text does.
 """
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 
+from openai import OpenAIError
 from pydantic import BaseModel, ValidationError
+from sqlalchemy.orm import selectinload
 
+from backend import library
 from backend.authored_text import WIRE_FIELD_LIMITS, clean
 from backend.clients import llm
+from backend.db import models as db_models
+from backend.db.session import session_scope
 
 logger = logging.getLogger(__name__)
 
 
 class FollowUpError(RuntimeError):
-    """The model answered, but never with a draft that parsed."""
+    """The model answered, but never with a scenario worth storing."""
+
+
+# The fields `ScenarioInput` requires of a User (the three case fields may be
+# empty, ADR 0045). A draft missing one of them is not a Scenario, and storing
+# it would put a row in the library that POST /api/scenarios would have refused.
+_REQUIRED = ("name", "short_description", "description")
 
 
 class _Draft(BaseModel):
     """The six authorable fields (`backend/api/scenarios.py`'s ScenarioInput).
 
-    All defaulted: a missing key costs that field, not the whole draft.
+    All defaulted: a missing optional key costs that field, not the whole
+    draft. The three in `_REQUIRED` are checked after cleaning, because a field
+    that survives validation and then cleans to nothing is just as unusable.
     """
 
     name: str = ""
@@ -46,8 +60,30 @@ class _Draft(BaseModel):
         """Cleaned and capped to what the authoring API enforces (ADR 0059/0063),
         so the editor shows exactly the text that would be stored."""
         return {
-            field: clean(getattr(self, field))[:cap] for field, cap in WIRE_FIELD_LIMITS.items()
+            field: _fit(clean(getattr(self, field)), cap)
+            for field, cap in WIRE_FIELD_LIMITS.items()
         }
+
+
+def _fit(value: str, cap: int) -> str:
+    """One field, held to its cap without ending mid-word.
+
+    The prompt states every limit, and the card's twice over, and a small
+    model (ADR 0011) still writes past the 100 characters `short_description`
+    gets -- so the cap has to hold on this side as well. Cutting back to the
+    last space leaves a readable line instead of a severed word, and the
+    ellipsis says the sentence was cut rather than written that way. Only
+    ever a safety net: a draft that needs it has already lost its ending.
+    """
+    if len(value) <= cap:
+        return value
+    head = value[: cap - 1].rstrip()
+    space = head.rfind(" ")
+    # Back off to a word boundary only while that leaves most of the field --
+    # one very long word must not cut the line down to nothing.
+    if space > cap // 2:
+        head = head[:space]
+    return head.rstrip(" ,;:-–—") + "…"
 
 
 # --- Prompt ---------------------------------------------------------------
@@ -127,10 +163,13 @@ def _messages(material: str) -> list[dict[str, str]]:
         "# Rules for the card\n"
         "C1. name: a short, plain title for the situation. No colon-prefix, no "
         '"Folgegespräch", no numbering.\n'
-        "C2. short_description: one sentence for the trainee, on what this call "
-        "is and what it will demand of them. This is the one place where the "
-        "purpose of the exercise may be said out loud -- the caller never reads "
-        "it.\n"
+        "C2. short_description: one short sentence for the trainee, on what "
+        "this call will demand of them. At most 100 characters -- roughly "
+        "twelve German words -- because it is a teaser on a selection card, "
+        "not a summary; count them before you answer. Anything longer is cut "
+        "off mid-sentence. The situation itself belongs in description, which "
+        "has five times the room. This is the one place where the purpose of "
+        "the exercise may be said out loud -- the caller never reads it.\n"
         "\n"
         "# Never\n"
         "N1. No markdown, no headings, no bullet characters, no line breaks "
@@ -185,11 +224,12 @@ async def draft_follow_up(
     improvements: list[str],
     phase_language: str | None = None,
 ) -> dict[str, str]:
-    """One draft, cleaned and capped, ready for the editor.
+    """One draft, cleaned and capped, ready to store.
 
     Thinking mode, as off the live path (ADR 0011). Propagates OpenAIError;
-    raises FollowUpError when nothing parsed -- unlike the wrap-up there is no
-    partial result worth keeping, because an empty editor is not a draft.
+    raises FollowUpError when nothing usable came back -- unlike the wrap-up
+    there is no partial result worth keeping, because a Scenario with no
+    situation in it is not an exercise.
     """
     messages = _messages(_material(scenario_name, scenario_teaser, improvements, phase_language))
     for attempt in range(2):  # initial attempt + one retry
@@ -201,7 +241,103 @@ async def draft_follow_up(
             think=True,
         )
         try:
-            return _Draft.model_validate_json(llm.json_object(raw)).sanitised()
+            draft = _Draft.model_validate_json(llm.json_object(raw)).sanitised()
+            if all(draft[field] for field in _REQUIRED):
+                return draft
+            raise ValueError(f"empty {[f for f in _REQUIRED if not draft[f]]}")
         except (ValidationError, ValueError) as e:
             logger.warning("Follow-up draft did not validate (attempt %d): %s", attempt + 1, e)
     raise FollowUpError("the model produced no usable scenario draft")
+
+
+# --- The stored follow-up -------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _SessionMaterial:
+    """What the prompt is built from, read out before the database handle is
+    gone. The played Scenario's card only, never its prompt fields."""
+
+    subject_id: str
+    scenario_name: str
+    scenario_teaser: str
+    improvements: list[str]
+    phase_language: str | None
+
+
+def _session_material(session_id: int) -> _SessionMaterial | None:
+    """This Session's material, or None if there is nothing to build from.
+
+    No ownership check and no consent check: the caller is the worker, running
+    a job for a Session that is already stored — which, per ADR 0066, it could
+    not be without consent.
+    """
+    with session_scope() as db:
+        session = (
+            db.query(db_models.Session)
+            .filter_by(session_id=session_id)
+            .options(
+                selectinload(db_models.Session.scenario),
+                selectinload(db_models.Session.feedback)
+                .selectinload(db_models.Feedback.points),
+            )
+            .one_or_none()
+        )
+        feedback = session.feedback if session else None
+        if feedback is None:
+            return None
+        improvements = [
+            point.text
+            for point in feedback.points
+            if point.kind == db_models.POINT_IMPROVEMENT
+        ]
+        if not improvements:
+            return None
+        return _SessionMaterial(
+            subject_id=session.subject_id,
+            scenario_name=session.scenario.title,
+            scenario_teaser=session.scenario.short_description,
+            improvements=improvements,
+            phase_language=feedback.phase_language,
+        )
+
+
+async def create_follow_up(session_id: int) -> None:
+    """Store this Session's follow-up Scenario, if its Feedback asks for one.
+
+    Never raises. It runs after the wrap-up has been stored and the job closed
+    (`backend/feedback/generator.py`), and the wrap-up is the thing the User is
+    waiting for: a model that will not produce a scenario must not turn a
+    finished wrap-up into a failed job. A Session with no improvement points
+    gets none, silently, for the same reason.
+
+    Exactly one per Session, and it is the UNIQUE on `derived_from_session_id`
+    that says so rather than a check here — `scripts/requeue_feedback.py` can
+    run this job again, and a second draft would arrive as a duplicate row
+    nobody asked for.
+    """
+    try:
+        material = _session_material(session_id)
+        if material is None:
+            return
+        draft = await draft_follow_up(
+            material.scenario_name,
+            material.scenario_teaser,
+            material.improvements,
+            material.phase_language,
+        )
+        # The draft is keyed as the client knows the fields (ADR 0061); the
+        # library writes columns, where the card's `name` is `title`.
+        draft["title"] = draft.pop("name")
+        # No tenant: the worker has no request and so no `tenant` claim to
+        # resolve one from (ADR 0060).
+        scenario = library.create_scenario(
+            draft, material.subject_id, None, derived_from_session_id=session_id
+        )
+        logger.info("Follow-up scenario %s stored for session %d", scenario.id, session_id)
+    except (OpenAIError, FollowUpError) as e:
+        # Expected: the gateway has no fallback, and a small model does not
+        # always write a scenario. The User keeps their wrap-up either way.
+        logger.warning("No follow-up scenario for session %d: %s", session_id, e)
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.exception("Follow-up scenario failed for session %d", session_id)
