@@ -6,6 +6,8 @@ Covers:
         factual -> warm again across Opening, Core Business and Closing, and
         the block that says whether it did
   ADR 0049  the model interprets, it never produces a figure
+  F-37  loudness reaches the model described rather than measured, so the
+        text cannot quote a figure the chart deliberately does not show
   ADR 0004 / ADR 0051  no score, and no figure judged against a norm
 
 Asserts the text handed to the model and the shape of the answer it is asked
@@ -22,10 +24,14 @@ pydantic model, and the two tests that reach `_ask`/`_strip_reasoning` stub or
 bypass the model call.
 """
 
+from types import SimpleNamespace
+
 import pytest
 
 from backend.clients.llm import _strip_reasoning
-from backend.feedback.generator import _ask, _LANGUAGE_NAMES_EN, _messages, _Wrapup
+from backend.feedback.generator import (
+    _ask, _dossier, _LANGUAGE_NAMES_EN, _messages, _Wrapup,
+)
 from backend.session.language_packs import LANGUAGE_PACKS
 
 # The prompt builder and the response model are the units under test.
@@ -171,3 +177,59 @@ def test_an_unfinished_reasoning_trace_yields_no_answer() -> None:
     """
     assert _strip_reasoning("<think>Let me consider {\"summary\": ...") == ""
     assert _strip_reasoning("<think>done</think>\n{\"summary\": \"Kurz.\"}") == '{"summary": "Kurz."}'
+
+
+# --- F-37: what the dossier says about loudness ----------------------------
+
+
+def _measurement(key: str, name: str, unit: str | None, value: float, detail=None):
+    """One Measurement as `_dossier` reads it -- no database needed."""
+    return SimpleNamespace(
+        value=value,
+        detail_json=detail,
+        metric_type=SimpleNamespace(key=key, name=name, unit=unit),
+    )
+
+
+def _session_with(*measurements) -> SimpleNamespace:
+    return SimpleNamespace(measurements=list(measurements), turns=[])
+
+
+def test_the_dossier_describes_loudness_instead_of_quoting_its_span() -> None:
+    """The stored value is a dB span (95th percentile minus 5th). Handed over
+    as a number, the wrap-up quotes it as a level -- above a chart that shows
+    none (ADR 0004/0051)."""
+    curve = [65.0 + (index % 5) - 2 for index in range(600)]
+    for index in range(450, 510):
+        curve[index] += 10.0
+
+    dossier, _ = _dossier(_session_with(
+        _measurement("loudness", "Lautstärke", "dB", 12.3, {"curve_db": curve}),
+    ))
+
+    assert "Lautstärke: 12.3 dB" not in dossier
+    assert "Loudness course:" in dossier
+    assert "louder stretch" in dossier
+
+
+def test_the_other_statistics_still_reach_the_model_as_figures() -> None:
+    """Only loudness is described: every other Kennzahl has a unit the model
+    can state plainly, and ADR 0049 wants it explaining those."""
+    dossier, _ = _dossier(_session_with(
+        _measurement("pace", "Sprechtempo", "WPM", 132.0),
+        _measurement("questions", "Fragen", "Anzahl", 4.0),
+    ))
+
+    assert "Sprechtempo: 132.0 WPM" in dossier
+    assert "Fragen: 4.0 Anzahl" in dossier
+
+
+def test_a_loudness_measurement_without_a_curve_adds_no_line() -> None:
+    """A row whose detail was dropped leaves the block a statistic short rather
+    than asserting a course nobody measured."""
+    dossier, _ = _dossier(_session_with(
+        _measurement("loudness", "Lautstärke", "dB", 12.3, None),
+    ))
+
+    assert "Loudness course" not in dossier
+    assert "Lautstärke" not in dossier

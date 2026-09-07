@@ -4,6 +4,8 @@ Covers:
   F-24  Redeanteil, and the unit it is a share *of*
   F-36  Sprechtempo, and the unit it is a rate *over*
   F-53  Reaktionszeit: only from Turns whose start was actually measured
+  F-37  the loudness curve, and the words the wrap-up gets instead of its
+        dB span
   ADR 0047/0048  a Turn's acoustics are measured inline and never load-bearing,
                  so a failed measurement stays visible downstream
   ADR 0051  no figure the user could take for measured when it was not
@@ -14,7 +16,7 @@ numbers `analyze()` would have produced.
 """
 
 from backend.feedback.acoustics import Pause
-from backend.feedback.metrics import measure
+from backend.feedback.metrics import describe_loudness_course, measure
 from backend.session.models import Turn, conversation
 
 # A recording that ran 4 s and held 2 s of speech: the two figures these tests
@@ -141,3 +143,80 @@ def test_pauses_come_from_the_same_segmentation_as_phonation() -> None:
     values = _by_key(turns)
 
     assert values["pauses"] == 1.0
+
+
+# --- F-37: the loudness course, described rather than scored ---------------
+
+# Steady without being constant: real Praat output jitters a few dB per frame,
+# and a spread of exactly zero is what would make the band degenerate.
+def _steady(points: int, level: float = 65.0) -> list[float | None]:
+    return [level + (index % 5) - 2 for index in range(points)]
+
+
+def _with_stretch(shift: float, length: int, at: int) -> list[float | None]:
+    """A steady 60 s call with one shifted stretch spliced into it."""
+    curve = _steady(600)
+    for index in range(at, at + length):
+        value = curve[index]
+        assert value is not None
+        curve[index] = value + shift
+    return curve
+
+
+def test_an_even_call_is_described_as_even() -> None:
+    """The band comes from the call's own samples, so a speaker who held one
+    level never leaves it. A flat call must not be given a variation."""
+    assert "even" in describe_loudness_course(_steady(600))
+
+
+def test_a_sustained_shift_is_named_with_where_it_happened() -> None:
+    """What F-37 is for -- and the most that can be said without the norms
+    ADR 0051 declined to invent."""
+    described = describe_loudness_course(_with_stretch(shift=10.0, length=60, at=450))
+
+    assert "louder stretch" in described
+    assert "in the final third" in described
+
+
+def test_a_brief_change_is_not_a_stretch() -> None:
+    """One second outside the band is a stressed word. Marking it would bury
+    the sustained shifts."""
+    assert "even" in describe_loudness_course(_with_stretch(shift=10.0, length=10, at=450))
+
+
+def test_a_shift_covering_a_third_of_the_call_is_still_found() -> None:
+    """The regression the band exists to avoid: a stretch that long *is* the
+    tenth percentile. The median absolute deviation survives it."""
+    described = describe_loudness_course(_with_stretch(shift=-9.0, length=200, at=380))
+
+    assert "quieter stretch" in described
+
+
+def test_both_directions_are_reported_when_both_happened() -> None:
+    """A call that rose and later fell is two observations, which is why the
+    stretches are kept per direction."""
+    curve = _with_stretch(shift=10.0, length=60, at=60)
+    for index in range(430, 490):
+        value = curve[index]
+        assert value is not None
+        curve[index] = value - 9.0
+
+    described = describe_loudness_course(curve)
+
+    assert "louder stretch" in described
+    assert "quieter stretch" in described
+
+
+def test_the_description_carries_no_figure_and_no_timestamp() -> None:
+    """ADR 0051: a dB reading in the prompt comes back out as one in the
+    wrap-up, over a chart that shows none. A timestamp would be read against the
+    transcript's clock, which this curve is not on."""
+    described = describe_loudness_course(_with_stretch(shift=10.0, length=60, at=450))
+
+    assert not any(character.isdigit() for character in described)
+    assert "dB" not in described
+
+
+def test_a_call_with_almost_no_audible_speech_says_so() -> None:
+    """Saying "even" about two samples reports a steadiness never measured."""
+    assert "too little" in describe_loudness_course([None] * 40 + [65.0, 66.0])
