@@ -3159,9 +3159,14 @@ h2 {
   flex-direction: column;
   background:
     radial-gradient(
-      circle at 70% 20%,
-      rgba(255, 255, 255, 0.86),
-      transparent 34rem
+      circle at 12% 14%,
+      rgba(50, 95, 127, 0.12),
+      transparent 31%
+    ),
+    radial-gradient(
+      circle at 80% 90%,
+      rgba(50, 95, 127, 0.08),
+      transparent 28%
     ),
     var(--color-background);
 }
