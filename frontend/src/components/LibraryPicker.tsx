@@ -169,7 +169,7 @@ export default function LibraryPicker({
         </p>
       )}
 
-      <div className="persona-grid">
+      <div className="persona-grid scenario-grid">
         {items.map((item) => (
           <div key={item.id} className="card-wrap">
             <button
