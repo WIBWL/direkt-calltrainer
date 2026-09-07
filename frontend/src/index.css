@@ -352,6 +352,50 @@ h2 {
 }
 
 /* --- Scenario library: authored vs built-in (ADR 0058) --- */
+.scenario-library-controls {
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid #d9e8f1;
+  border-radius: 16px;
+  background: linear-gradient(
+    180deg,
+    #f3f9fc 0%,
+    #edf6fb 100%
+  );
+}
+
+.scenario-library-controls-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.scenario-library-caption {
+  color: var(--color-navy-700);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.scenario-library-filter-row {
+  display: grid;
+  grid-template-columns: 106px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.scenario-library-filter-row + .scenario-library-filter-row {
+  margin-top: 8px;
+}
+
+.scenario-library-filter-label {
+  color: var(--color-text-muted-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
 
 /* The two filter rows (ADR 0064): level 1 origin, level 2 thematic category.
    One rule set for both, so the second row cannot end up smaller than the
