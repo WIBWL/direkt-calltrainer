@@ -1,3 +1,4 @@
+import { useAuth } from "react-oidc-context";
 import { Link } from "react-router-dom";
 
 import { ROUTES } from "../routes";
@@ -37,6 +38,7 @@ export default function AppHeader({
   navigationLocked = false,
   accountActive = false,
 }: AppHeaderProps) {
+  const auth = useAuth();
   const account = useAccount();
   const activeStepIndex = trainingSteps.findIndex((step) => step.id === activeStep);
 
@@ -95,26 +97,27 @@ export default function AppHeader({
           <span className="app-header-spacer" />
         )}
 
-        {navigationLocked ? (
-          // Not merely disabled: during a call the chip has nothing to offer,
-          // and a greyed-out control invites the click it is refusing.
-          <span className="account-chip is-locked" title="Während des Gesprächs nicht verfügbar">
-            <span className="account-avatar" aria-hidden="true">
-              {account.initials}
+        {auth.isAuthenticated &&
+          (navigationLocked ? (
+            // Not merely disabled: during a call the chip has nothing to offer,
+            // and a greyed-out control invites the click it is refusing.
+            <span className="account-chip is-locked" title="Während des Gesprächs nicht verfügbar">
+              <span className="account-avatar" aria-hidden="true">
+                {account.initials}
+              </span>
             </span>
-          </span>
-        ) : (
-          <Link
-            to={ROUTES.profile}
-            className={cx("account-chip", accountActive && "is-active")}
-            aria-current={accountActive ? "page" : undefined}
-          >
-            <span className="account-avatar" aria-hidden="true">
-              {account.initials}
-            </span>
-            <span className="account-chip-name">{account.displayName}</span>
-          </Link>
-        )}
+          ) : (
+            <Link
+              to={ROUTES.profile}
+              className={cx("account-chip", accountActive && "is-active")}
+              aria-current={accountActive ? "page" : undefined}
+            >
+              <span className="account-avatar" aria-hidden="true">
+                {account.initials}
+              </span>
+              <span className="account-chip-name">{account.displayName}</span>
+            </Link>
+          ))}
       </div>
     </header>
   );
