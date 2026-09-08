@@ -33,6 +33,7 @@ from kugelaudio.exceptions import KugelAudioError
 from openai import OpenAIError
 
 from backend.clients import llm, stt, tts
+from backend.clients.config import GEMINI
 from backend.feedback.acoustics import analyze
 from backend.personas import Persona
 from backend.scenarios import Scenario
@@ -57,9 +58,21 @@ logger = logging.getLogger(__name__)
 
 _END_CALL_RE = re.compile(r"\[\s*call[_\s]?end\s*\]", re.IGNORECASE)
 
-# How many history messages the model reads verbatim (ADR 0071): the last
-# three exchanges. Everything before them reaches the model only as its notes.
+# How many history messages the model reads verbatim while the notes are kept
+# (ADR 0071): the last three exchanges. Everything before them reaches the model
+# only as its notes.
 HISTORY_WINDOW = 6
+
+# Whether the caller's notes are kept at all (ADR 0075 narrows ADR 0071).
+#
+# Not a preference and not a vendor check in disguise: the notes are a
+# compression built for a model that could not read its own transcript, and the
+# two backends here differ in exactly that. Where the model can be handed the
+# conversation, handing it a five-line summary instead is a loss twice over --
+# the summary is rewritten from the previous summary rather than from the
+# history, so a distortion has no source left to be corrected against, and it
+# costs one background request per exchange to throw the detail away.
+CALL_STATE_NOTES = not GEMINI
 
 
 def _signals_closing(user_text: str, pack: LanguagePack) -> bool:
@@ -387,12 +400,17 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             acoustics.cancel()  # no-op once awaited; releases the audio otherwise
 
     def _messages_for_turn(self, closing: bool, interrupted: Turn | None = None) -> list[dict[str, str]]:
-        """What the model reads for this reply (ADR 0071): the system prompt,
-        its notes on the call so far, the last `HISTORY_WINDOW` messages
-        verbatim, and this turn's transient nudge -- never the whole history,
-        which a 4B model misreads past a handful of exchanges (it attributed
-        its own case to the user). `self._messages` stays the full record for
-        the guards, the barge-in trims and the Transcript.
+        """What the model reads for this reply: the system prompt, the call so
+        far, and this turn's transient nudge.
+
+        How much of "the call so far" depends on the backend. With the notes
+        kept (ADR 0071) it is the summary plus the last `HISTORY_WINDOW`
+        messages verbatim, because a 4B model misreads the raw history past a
+        handful of exchanges -- it attributed its own case to the user and
+        asked about it for eight Turns. Without them (ADR 0075) it is the
+        history itself, which is both cheaper and less lossy on a model that
+        can read it. `self._messages` stays the full record either way, for the
+        guards, the barge-in trims and the Transcript.
 
         The nudge, never stored: the closing push when the user has said
         goodbye (ADR 0037); the "you were cut off here" push when the user
@@ -408,8 +426,13 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         turn the call is already ending, and on a repeat-request turn the user
         asked to hear something again, which is not a moment to weigh the
         matter settled."""
-        notes = [{"role": "system", "content": STATE_NOTES_FRAME + self._state}] if self._state else []
-        view = [self._messages[0], *notes, *self._messages[1:][-HISTORY_WINDOW:]]
+        if CALL_STATE_NOTES:
+            notes = [{"role": "system", "content": STATE_NOTES_FRAME + self._state}] if self._state else []
+            view = [self._messages[0], *notes, *self._messages[1:][-HISTORY_WINDOW:]]
+        else:
+            # The whole call, unbounded on purpose: a Session is one phone call,
+            # so the record cannot outgrow a context measured in six figures.
+            view = list(self._messages)
         if closing:
             nudge = CLOSING_NUDGE
         elif interrupted is not None and view[-1]["role"] == "user":
@@ -454,7 +477,13 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         """Refresh the caller's notes from this Turn's exchange, in the
         background (ADR 0071). Called when a reply is committed and again when
         a barge-in trims it -- the notes must only ever record what the user
-        heard -- so a refresh still running for the same exchange is replaced."""
+        heard -- so a refresh still running for the same exchange is replaced.
+
+        A no-op where the notes are not kept (ADR 0075): nothing reads
+        `self._state` there, and this is the request that would be spent
+        filling it."""
+        if not CALL_STATE_NOTES:
+            return
         if not turn.user_text or not turn.persona_text:
             return
         if self._state_task is not None and not self._state_task.done():

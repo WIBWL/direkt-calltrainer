@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted
+Accepted (narrowed by ADR 0075 — this describes the gateway backend; where the
+dialogue model reads its own history, the notes and the window are not used)
 
 ## Context
 
