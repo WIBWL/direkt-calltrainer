@@ -63,6 +63,21 @@ export function useMicrophoneVAD(
         negativeSpeechThreshold: 0.35,
         // Raised from vad-web's 400ms default to filter out quiet/brief "hmm"s.
         minSpeechMs: 500,
+        // How long the silence after a sentence has to last before the turn is
+        // sent. vad-web's default is 1400 ms, and it was never chosen here --
+        // it is simply what the library does. It is also the single largest
+        // piece of the delay between the user finishing and hearing a reply:
+        // the whole server pipeline (STT + reply + first audio) was measured at
+        // about a second, so the browser was waiting longer than everything
+        // else together.
+        //
+        // 700 ms is short enough to stop the pause feeling like a hang and long
+        // enough to sit out the breath in the middle of a sentence, which is
+        // what this guards: cut it too fine and a user who pauses to think has
+        // their turn sent half-finished, and the persona answers a fragment.
+        // If that starts happening, this is the number to raise -- not a prompt
+        // to fix.
+        redemptionMs: 700,
         onSpeechStart: () => console.debug("[VAD] speech start (unconfirmed)"),
         // Fires once sustained past minSpeechMs -- use this for barge-in, not onSpeechStart above.
         onSpeechRealStart: () => {
