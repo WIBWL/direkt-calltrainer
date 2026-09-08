@@ -654,21 +654,37 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
 
         # force_end_call backstops [CALL_END]: a small model won't always
         # include the marker even when told to (confirmed in testing).
-        ends_call = progress.ends_call or force_end_call or repeated_reply or restates
+        #
+        # said_goodbye is the mirror of ADR 0037's veto, and it catches an
+        # obedient model rather than a careless one. The prompt forbids the
+        # marker in a reply that also says the matter is not settled -- so a
+        # reply that voices a reservation *and* signs off ("...sonst muessen
+        # wir eskalieren. Ich danke Ihnen. Auf Wiederhoeren.") withholds the
+        # marker exactly as instructed, and the call then hung on a persona
+        # that had audibly hung up. The same `farewell_re` that already
+        # overrules `_still_pressing` decides here, so both directions read the
+        # goodbye the same way.
+        said_goodbye = spoke and not progress.ends_call and bool(
+            self._pack.farewell_re.search(turn.persona_text)
+        )
+        ends_call = progress.ends_call or force_end_call or repeated_reply or restates or said_goodbye
         if ends_call:
             self.ended = True
             logger.info(
                 "Turn %d ends the call (model marker=%s, closing-intent check=%s, "
-                "repeated reply=%s, restated reply=%s)",
+                "repeated reply=%s, restated reply=%s, said goodbye=%s)",
                 turn.seq,
                 progress.ends_call,
                 force_end_call,
                 repeated_reply,
                 restates,
+                said_goodbye,
             )
             # Only the closing-intent path actually asked the model for a
             # goodbye (CLOSING_NUDGE); a repeat or an unprompted ending
-            # didn't, so it can't be trusted to have included one.
+            # didn't, so it can't be trusted to have included one. said_goodbye
+            # is deliberately absent from this list -- it *is* the goodbye, and
+            # appending the fallback line would say it twice.
             if repeated_reply or restates or (progress.ends_call and not force_end_call):
                 async for event in self._speak_fallback_closing(turn, progress):
                     yield event

@@ -102,6 +102,39 @@ async def test_a_goodbye_followed_by_a_trailing_question_still_ends_the_call(per
     assert completed(events).ends_call is True
 
 
+async def test_a_goodbye_without_the_marker_still_ends_the_call(persona, scenario, fake_pipeline):
+    """The mirror of the veto above (ADR 0037's amendment). The prompt forbids
+    the marker in a reply that also says the matter is not settled, so a model
+    that voices a reservation and then signs off is obeying it -- and the call
+    used to hang on a persona the user had heard hang up."""
+    fake_pipeline.stt.transcripts = ["Bis 16:30 Uhr läuft der Export wieder."]
+    fake_pipeline.llm.replies = [
+        "Eine Bestätigung allein reicht nicht, wenn die Daten dann nicht fließen. "
+        "Sollte es weiter haken, müssen wir eskalieren. Ich danke Ihnen. Auf Wiederhören."
+    ]
+
+    orch = SessionOrchestrator(persona, scenario)
+    events = await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+
+    assert completed(events).ends_call is True
+    spoken = " ".join(text for text, _voice, _language in fake_pipeline.tts.calls)
+    assert spoken.count("Wiederhören") == 1, "its own goodbye, not the fallback line on top of it"
+
+
+async def test_a_reply_that_only_presses_does_not_end_the_call(persona, scenario, fake_pipeline):
+    """The guard rests on a farewell, not on a polite closing shape: a reply
+    that thanks and keeps pressing is not a goodbye."""
+    fake_pipeline.stt.transcripts = ["Ich schaue mir das Ticket an."]
+    fake_pipeline.llm.replies = [
+        "Ich danke Ihnen für die Rückmeldung. Wann genau kann ich mit einer Lösung rechnen?"
+    ]
+
+    orch = SessionOrchestrator(persona, scenario)
+    events = await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+
+    assert completed(events).ends_call is False
+
+
 async def test_a_nudged_marker_is_taken_at_its_word(persona, scenario, fake_pipeline):
     """After the user said goodbye the closing nudge asked for the marker; a
     persona that ends on a grumble then still ends (ADR 0037)."""
