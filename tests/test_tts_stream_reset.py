@@ -66,7 +66,7 @@ class _Client:
 def kugel(monkeypatch):
     """A fake pooled KugelAudio client behind `synthesize_stream`."""
     streaming = _StreamingTTS([_Chunk(b"\x00\x01" * 100), _Chunk(b"\x02\x03" * 100), {"final": True}])
-    monkeypatch.setattr(tts, "DEBUG", False)
+    monkeypatch.setattr(tts, "SKIP_KUGELAUDIO", False)
     monkeypatch.setattr(tts, "AudioChunk", _Chunk)
     monkeypatch.setattr(tts, "KUGELAUDIO_CLIENT", _Client(streaming))
     return streaming

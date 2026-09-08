@@ -2,7 +2,7 @@
 
 Runs the same check the app runs at startup
 (`backend.clients.health.check_backends`), on its own, so you can tell whether
-a model is down without booting the app. Respects the DEBUG toggle in .env
+a model is down without booting the app. Respects the SKIP_KUGELAUDIO toggle in .env
 (forces TTS to the DiReKT fallback instead of KugelAudio).
 
 Usage:

@@ -5,7 +5,7 @@ Required variables have no default and throw before the app can listen: a wrong
 or missing value should fail now, not surface later as a 403 that looks like bad
 credentials. STT and the LLM have one backend each, no fallback (ADR 0011); TTS
 defaults to KugelAudio with the DiReKT model as fallback (ADR 0040), or the
-DiReKT model always under DEBUG.
+DiReKT model always under SKIP_KUGELAUDIO.
 """
 
 import os
@@ -34,10 +34,10 @@ CLIENT = AsyncOpenAI(base_url=f"{DIREKT_URL}/v1", api_key=_required_env("DIREKT_
 
 # Optional, default off. When truthy, TTS skips KugelAudio and uses the DiReKT
 # model on every call — lets the app run without KugelAudio credentials.
-DEBUG = os.environ.get("DEBUG", "").lower() in ("1", "true", "yes")
+SKIP_KUGELAUDIO = os.environ.get("SKIP_KUGELAUDIO", "").lower() in ("1", "true", "yes")
 
 # Optional, default off, and deliberately its own switch rather than a second
-# meaning for DEBUG: it decides whether what people say aloud is written into
+# meaning for SKIP_KUGELAUDIO: it decides whether what people say aloud is written into
 # the log file.
 #
 # Off, the pipeline logs how long an utterance was and nothing about what was
@@ -57,10 +57,10 @@ LLM_CLIENT = CLIENT
 LLM_MODEL = _required_env("LLM_MODEL")
 
 # TTS config: KugelAudio is the default; TTS_MODEL (the DiReKT model) is only the
-# fallback, or always under DEBUG.
+# fallback, or always under SKIP_KUGELAUDIO.
 TTS_MODEL = _required_env("TTS_MODEL")
-if DEBUG:
-    # No KugelAudio client under DEBUG, so its credentials aren't required.
+if SKIP_KUGELAUDIO:
+    # No KugelAudio client under SKIP_KUGELAUDIO, so its credentials aren't required.
     KUGELAUDIO_CLIENT = None
     KUGELAUDIO_MODEL = None
 else:

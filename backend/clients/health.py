@@ -2,7 +2,7 @@
 
 Fires one minimal real request at each backend (STT, LLM, TTS) so a dead model
 surfaces at boot, not mid-call. Uses the exact prod code paths, including TTS's
-KugelAudio-then-DiReKT fallback (see `DEBUG` in `backend.clients.config`).
+KugelAudio-then-DiReKT fallback (see `SKIP_KUGELAUDIO` in `backend.clients.config`).
 """
 
 import asyncio
@@ -15,7 +15,7 @@ from kugelaudio.exceptions import KugelAudioError
 from openai import OpenAIError
 
 from backend.clients import llm, stt, tts
-from backend.clients.config import DEBUG, KUGELAUDIO_MODEL, LLM_MODEL, STT_MODEL, TTS_MODEL
+from backend.clients.config import SKIP_KUGELAUDIO, KUGELAUDIO_MODEL, LLM_MODEL, STT_MODEL, TTS_MODEL
 from backend.personas import PersonaVoice
 
 logger = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ async def _check_tts() -> None:
 _CHECKS: dict[str, tuple] = {
     "STT": (_check_stt, STT_MODEL),
     "LLM": (_check_llm, LLM_MODEL),
-    "TTS": (_check_tts, TTS_MODEL if DEBUG else KUGELAUDIO_MODEL),
+    "TTS": (_check_tts, TTS_MODEL if SKIP_KUGELAUDIO else KUGELAUDIO_MODEL),
 }
 
 

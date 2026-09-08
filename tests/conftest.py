@@ -19,7 +19,7 @@ The backend reads a handful of environment variables at import time
 module is imported. Values are dummies: no test in this suite makes a real
 network call — every pipeline backend (STT / LLM / TTS) is faked.
 
-`DEBUG=true` keeps TTS config fully offline (no KugelAudio client is
+`SKIP_KUGELAUDIO=true` keeps TTS config fully offline (no KugelAudio client is
 constructed); the KugelAudio-default / DiReKT-fallback dispatch is still
 covered in `test_tts_fallback.py` by patching the tts module directly.
 """
@@ -38,7 +38,7 @@ os.environ.setdefault("LLM_MODEL", "test-llm-model")
 os.environ.setdefault("TTS_MODEL", "test-tts-model")
 os.environ.setdefault("KUGELAUDIO_MODEL", "test-kugelaudio-model")
 os.environ.setdefault("KUGELAUDIO_API_KEY", "test-kugelaudio-key")
-os.environ.setdefault("DEBUG", "true")
+os.environ.setdefault("SKIP_KUGELAUDIO", "true")
 os.environ.setdefault("OIDC_ISSUER", "http://keycloak.test.invalid/realms/direkt")
 
 # Deliberately unusable credentials, and the reason they are set here at all:
