@@ -382,6 +382,7 @@ export default function App() {
           onDevicesRefresh={refreshMicDevices}
           onConfirmed={handleConfirmed}
           onCancel={handleCancelMicCheck}
+          briefing={selectedScenario?.briefing}
         />
       </AppLayout>
     );

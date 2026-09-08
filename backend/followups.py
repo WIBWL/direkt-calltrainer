@@ -9,7 +9,9 @@ caps and ownership stay where they are.
 Withheld from the model: the measured statistics (no target range exists,
 ADR 0051) and the played Scenario's prompt fields (withheld from the client
 anyway, ADR 0043) -- only its card goes in. The four case fields become the
-caller's briefing, so the prompt keeps the exercise's purpose out of them.
+caller's briefing, so the prompt keeps the exercise's purpose out of them; the
+trainee's own briefing (ADR 0054) is the one further field where it may be said,
+beside `short_description`, because the caller reads neither.
 
 The values are German: it lands in the User's own library, as F-58's text does.
 """
@@ -42,7 +44,7 @@ _REQUIRED = ("name", "short_description", "description")
 
 
 class _Draft(BaseModel):
-    """The six authorable fields (`backend/api/scenarios.py`'s ScenarioInput).
+    """The seven authorable fields (`backend/api/scenarios.py`'s ScenarioInput).
 
     All defaulted: a missing optional key costs that field, not the whole
     draft. The three in `_REQUIRED` are checked after cleaning, because a field
@@ -51,6 +53,7 @@ class _Draft(BaseModel):
 
     name: str = ""
     short_description: str = ""
+    briefing: str = ""
     description: str = ""
     case_facts: str = ""
     call_goal: str = ""
@@ -133,8 +136,9 @@ def _messages(material: str) -> list[dict[str, str]]:
         "The tool plays the caller and the trainee answers the phone. Four of "
         "the fields you write -- description, case_facts, call_goal, "
         "success_condition -- are handed to the model that plays that caller, "
-        "as its briefing. The other two -- name, short_description -- are the "
-        "card the trainee reads before they start.\n"
+        "as its briefing. The other three -- name, short_description, briefing "
+        "-- are read by the trainee before they start and never by the "
+        "caller.\n"
         "\n"
         "# Rules for the caller's briefing\n"
         "S1. Write it entirely from the caller's side, addressed to the caller "
@@ -160,7 +164,7 @@ def _messages(material: str) -> list[dict[str, str]]:
         "trainee did not do, stated as the caller's own requirement, and set it "
         "so that a vague or evasive answer does not clear it.\n"
         "\n"
-        "# Rules for the card\n"
+        "# Rules for what the trainee reads\n"
         "C1. name: a short, plain title for the situation. No colon-prefix, no "
         '"Folgegespräch", no numbering.\n'
         "C2. short_description: one short sentence for the trainee, on what "
@@ -168,8 +172,17 @@ def _messages(material: str) -> list[dict[str, str]]:
         "twelve German words -- because it is a teaser on a selection card, "
         "not a summary; count them before you answer. Anything longer is cut "
         "off mid-sentence. The situation itself belongs in description, which "
-        "has five times the room. This is the one place where the purpose of "
-        "the exercise may be said out loud -- the caller never reads it.\n"
+        "has five times the room. This and briefing are the two places where "
+        "the purpose of the exercise may be said out loud -- the caller reads "
+        "neither.\n"
+        "C3. briefing: the trainee's own side of the case, in three short "
+        'sentences addressed to them as "Sie". Say exactly three things and '
+        "stop: the role they answer the phone in, the room they have (what "
+        "they may offer, promise or escalate), and what counts as a good "
+        "outcome. Never what to say or in which order -- told that, they read "
+        "a script instead of holding a conversation. It has to agree with "
+        "success_condition: never offer them something the caller's bar would "
+        "not accept, or the call cannot be won.\n"
         "\n"
         "# Never\n"
         "N1. No markdown, no headings, no bullet characters, no line breaks "
@@ -181,10 +194,10 @@ def _messages(material: str) -> list[dict[str, str]]:
         "\n"
         "# Output\n"
         "Answer with a single JSON object and nothing else.\n"
-        "O1. Exactly these six keys, spelled exactly like this, all six always "
-        "present: name, short_description, description, case_facts, call_goal, "
-        "success_condition. The keys are identifiers: never translate them, "
-        "never add one.\n"
+        "O1. Exactly these seven keys, spelled exactly like this, all seven "
+        "always present: name, short_description, briefing, description, "
+        "case_facts, call_goal, success_condition. The keys are identifiers: "
+        "never translate them, never add one.\n"
         "O2. Every value is written in German. The keys stay as they are.\n"
         "O3. Maximum lengths, in characters -- a value over its limit is cut "
         f"off, so stay under it: {caps}.\n"
@@ -193,6 +206,8 @@ def _messages(material: str) -> list[dict[str, str]]:
         '{"name": "short title of the situation", '
         '"short_description": "one sentence to the trainee about what this call '
         'will demand of them", '
+        '"briefing": "three sentences to the trainee: the role they answer '
+        'in, the room they have, and what a good outcome is", '
         '"description": "the situation, told to the caller: who they are '
         'calling and why", '
         '"case_facts": "the concrete facts of the case, as short plain lines", '
@@ -201,12 +216,14 @@ def _messages(material: str) -> list[dict[str, str]]:
         'considers it settled"}\n'
         "\n"
         "# Before you answer, check silently\n"
-        "The four briefing fields say nothing about feedback, training or what "
+        "The four caller fields say nothing about feedback, training or what "
         "is being practised; nothing in them addresses the trainee; the case is "
-        "one you invented rather than the one named in the subject area; and "
-        "success_condition is a bar a vague answer would fail.\n"
+        "one you invented rather than the one named in the subject area; "
+        "success_condition is a bar a vague answer would fail; and the room "
+        "briefing gives the trainee is room the caller would actually "
+        "accept.\n"
         "\n"
-        "The six keys stay in English. Every value is written in German. Your "
+        "The seven keys stay in English. Every value is written in German. Your "
         "entire answer is the JSON object, starting with { and ending with }."
     )
     return [

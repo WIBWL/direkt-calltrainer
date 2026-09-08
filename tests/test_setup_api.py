@@ -98,6 +98,9 @@ async def test_scenarios_endpoint_lists_every_scenario_with_its_teaser(client):
         assert card["short_description"] == scenario["short_description"]
         assert card["origin"] == "builtin"
         assert card["category"] == scenario["category"]
+        # ADR 0054: the trainee's own briefing rides on the card, because the
+        # setup screen and the microphone check both read it from this list.
+        assert card["briefing"] == scenario["briefing"]
 
 
 async def test_scenarios_endpoint_withholds_the_english_call_context(client):
@@ -118,8 +121,8 @@ async def test_scenarios_endpoint_withholds_the_case(client):
     body = (await client.get("/api/scenarios")).json()
     for entry in body:
         assert set(entry) == {
-            "id", "name", "short_description", "category", "origin", "shared",
-            "follow_up",
+            "id", "name", "short_description", "briefing", "category", "origin",
+            "shared", "follow_up",
         }
         assert "case_facts" not in entry
         assert "call_goal" not in entry

@@ -43,6 +43,10 @@ export interface ScenarioCard {
   id: string;
   name: string;
   short_description: string;
+  /** The trainee's own briefing (ADR 0054): the role they answer in, the room
+   * they have, what a good outcome is. Shown before the call, never sent to the
+   * model. "" for a Scenario whose author left it empty. */
+  briefing: string;
   /** null = uncategorised (ADR 0072). */
   category: ScenarioCategory | null;
   origin: Origin;
@@ -55,11 +59,13 @@ export interface ScenarioCard {
   follow_up: boolean;
 }
 
-/** The fields a User may author. `name` / `short_description` are the card;
- * the rest is prompt input and may be left empty (ADR 0045). */
+/** The fields a User may author. `name` / `short_description` are the card and
+ * `briefing` the trainee's own text (ADR 0054); the rest is prompt input and may
+ * be left empty (ADR 0045). */
 export interface ScenarioDraft {
   name: string;
   short_description: string;
+  briefing: string;
   description: string;
   case_facts: string;
   call_goal: string;
@@ -89,6 +95,7 @@ export type FieldLimits = Record<TextField, number>;
 export const FALLBACK_FIELD_LIMITS: FieldLimits = {
   name: 50,
   short_description: 100,
+  briefing: 600,
   description: 500,
   case_facts: 3000,
   call_goal: 500,
@@ -103,6 +110,7 @@ export const getFieldLimits = () =>
 export const EMPTY_DRAFT: ScenarioDraft = {
   name: "",
   short_description: "",
+  briefing: "",
   description: "",
   case_facts: "",
   call_goal: "",

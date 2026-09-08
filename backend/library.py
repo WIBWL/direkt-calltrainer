@@ -37,9 +37,10 @@ from backend.scenarios import Scenario
 
 # Fields an authoring caller may set on a Scenario. `description` and the three
 # case fields are prompt input (ADR 0045); `title` / `short_description` are the
-# card. Everything else on the row (ids, ownership, `active`) is set here.
+# card and `briefing` the trainee's own text (ADR 0054). Everything else on the
+# row (ids, ownership, `active`) is set here.
 _SCENARIO_FIELDS = (
-    "title", "short_description",
+    "title", "short_description", "briefing",
     "description", "case_facts", "call_goal", "success_condition",
     "category",
 )
@@ -80,6 +81,7 @@ def _to_scenario(row: models.Scenario) -> Scenario:
         id=str(row.extern_id),
         name=row.title,
         short_description=row.short_description,
+        briefing=row.briefing,
         description=row.description,
         case_facts=row.case_facts,
         call_goal=row.call_goal,

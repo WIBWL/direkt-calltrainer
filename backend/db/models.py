@@ -315,6 +315,14 @@ class Scenario(_AuthoredContent, Base):
     case_facts: Mapped[str] = mapped_column(Text)
     call_goal: Mapped[str] = mapped_column(Text)
     success_condition: Mapped[str] = mapped_column(Text)
+    # Display field, in the UI language, addressed to the *trainee* and never
+    # to the model (ADR 0054): the role they answer in, the room they have, and
+    # what counts as a good outcome. It is the counterpart of the four fields
+    # above -- one case from two sides -- and the reason it must stay out of the
+    # prompt is the defect ADR 0045 removed: handing the trainee's objective to
+    # the caller had the caller pursuing it. Empty is allowed; a Scenario
+    # without one briefs nobody, which is where every row stood before ADR 0054.
+    briefing: Mapped[str] = mapped_column(Text, default="")
     # Display/filter field, never read by the prompt (ADR 0072): one of
     # SCENARIO_CATEGORIES, or NULL for a Scenario that was never categorised.
     # The CHECK above is NULL-tolerant, which is what allows that.

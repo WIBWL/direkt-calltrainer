@@ -58,11 +58,16 @@ _CATEGORY_PATTERN = "^(" + "|".join(SCENARIO_CATEGORIES) + "|)$"
 
 class ScenarioInput(BaseModel):
     """The fields an authoring caller sets. `name` / `short_description` are the
-    card; `description` and the three case fields are prompt input (ADR 0045)
-    and may be left empty — an empty case means "improvise"."""
+    card and `briefing` the trainee's own text (ADR 0054); `description` and the
+    three case fields are prompt input (ADR 0045) and may be left empty — an
+    empty case means "improvise"."""
 
     name: str = _limited("title", required=True)
     short_description: str = _limited("short_description", required=True)
+    # Display, addressed to the trainee, never to the model (ADR 0054).
+    # Optional: a Scenario without one briefs nobody, which is what every row
+    # authored before this field existed does.
+    briefing: str = _limited("briefing", required=False)
     # The situation is what the model gets as context -- an authored Scenario
     # without it is not a scenario, so it is required (the built-in seed rows
     # all carry one; ADR 0045 only allows the *case* fields to be blank).
@@ -107,6 +112,13 @@ def _card(scenario, subject: str) -> dict:
         "id": scenario.id,
         "name": scenario.name,
         "short_description": scenario.short_description,
+        # On the card rather than only on the detail route: the briefing is
+        # shown before the call from the list the selection screen already
+        # holds (ADR 0054), and a built-in's detail route is closed to the
+        # client anyway (ADR 0043) — it serves the owner's editor, not a
+        # reader. Unlike the case fields there is nothing to withhold here:
+        # this text is written to be read by whoever plays it.
+        "briefing": scenario.briefing,
         # Null for an uncategorised Scenario; the category filter then only
         # shows it under "Alle" (ADR 0072).
         "category": scenario.category,
@@ -140,6 +152,7 @@ def _detail(scenario) -> dict:
         "id": scenario.id,
         "name": scenario.name,
         "short_description": scenario.short_description,
+        "briefing": scenario.briefing,
         "description": scenario.description,
         "case_facts": scenario.case_facts,
         "call_goal": scenario.call_goal,

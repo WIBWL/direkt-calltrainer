@@ -3213,7 +3213,7 @@ h2 {
 }
 
 .info-summary:hover {
-  color: var(--color-text);
+  color: var(--color-navy-900);
 }
 
 .info-summary:focus-visible {
@@ -4185,4 +4185,45 @@ h2 {
     animation: none;
     transform: none;
   }
+}
+
+/* --- The trainee's briefing (ADR 0054) ---------------------------------- */
+/* Shown on the setup screen under the selection summary and again on the
+   microphone check. Deliberately quiet -- a tinted panel, not a callout: it is
+   read once, before the call, and it competes with the start button on both
+   screens. The left rule is what separates it from the storage note above it
+   on the setup screen, which uses the same tinted background. */
+
+.scenario-briefing {
+  margin: 0 0 1.25rem;
+  padding: 14px 16px;
+  border-left: 3px solid var(--color-blue-600);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-filter);
+}
+
+.scenario-briefing-title {
+  margin: 0 0 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-blue-600);
+}
+
+.scenario-briefing-body {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  /* Not muted: on the microphone check this is the only thing on the screen
+     worth reading, and the mic test below it is already the loud element. */
+  color: var(--color-navy-900);
+}
+
+/* On the microphone check it sits between the intro and the test section, so it
+   carries the gap the intro would otherwise leave. */
+.mic-check-briefing {
+  max-width: 800px;
+  margin-top: -20px;
+  margin-bottom: 32px;
 }

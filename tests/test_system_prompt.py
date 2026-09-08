@@ -233,6 +233,20 @@ def test_prompt_carries_the_success_condition(persona):
     assert "settled when" in prompt
 
 
+def test_prompt_never_carries_the_trainees_briefing(persona):
+    """ADR 0054: the briefing is the *trainee's* objective, and handing an
+    objective meant for the other side to the caller is exactly the defect
+    ADR 0045 removed — the caller was told to keep itself as a customer. The
+    separation is enforced by which field the prompt builder reads, so this is
+    the assertion that holds it."""
+    marker = "Sie sitzen im Vertrieb und duerfen bis zehn Prozent nachlassen."
+    prompt = build_system_prompt(persona, _case_scenario(briefing=marker), GERMAN)
+
+    assert marker not in prompt
+    # Not just the text: no wording of the field leaks in either.
+    assert "briefing" not in prompt.lower()
+
+
 def test_prompt_binds_the_model_to_the_case_facts(persona):
     """ADR 0045: with facts present, improvisation is bounded — fill the gaps,
     never overwrite what the case already states."""

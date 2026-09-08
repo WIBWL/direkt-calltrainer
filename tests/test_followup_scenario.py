@@ -47,11 +47,17 @@ _IMPROVEMENTS = [
 ]
 _PHASE = "Der Ton bleibt über alle drei Phasen gleich sachlich."
 
-# What the stubbed model answers with: the six keys of the authoring wire
-# (ADR 0061, so `name` and not `title`).
+# What the stubbed model answers with: the seven keys of the authoring wire
+# (ADR 0061, so `name` and not `title`), the trainee's briefing (ADR 0054)
+# among them.
 _DRAFT = {
     "name": "Rückruf zur offenen Reklamation",
     "short_description": "Der Anrufer lässt sich diesmal nicht ohne festes Datum abwimmeln.",
+    "briefing": (
+        "Sie sitzen im Support und nehmen den Rückruf entgegen. Sie dürfen ein "
+        "Datum zusagen und intern eskalieren. Gut gelaufen ist das Gespräch, "
+        "wenn ein Tag genannt ist."
+    ),
     "description": "Sie rufen bei Ihrem Dienstleister an, weil eine Gutschrift ausbleibt.",
     "case_facts": "Gutschrift über 640 Euro, zugesagt am 3. März, bis heute nicht gebucht.",
     "call_goal": "Ein Datum, an dem das Geld auf dem Konto ist.",
@@ -121,7 +127,7 @@ async def test_the_draft_is_asked_in_thinking_mode(monkeypatch: pytest.MonkeyPat
     assert calls[0][1] is True
 
 
-async def test_the_six_fields_come_back_as_the_library_expects_them(
+async def test_the_seven_fields_come_back_as_the_library_expects_them(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _stub_model(monkeypatch, _REPLY)
@@ -129,6 +135,23 @@ async def test_the_six_fields_come_back_as_the_library_expects_them(
     draft = await draft_follow_up(_CARD_NAME, _CARD_TEASER, _IMPROVEMENTS)
 
     assert draft == _DRAFT
+
+
+async def test_the_prompt_asks_for_the_trainees_briefing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR 0054: a generated Scenario briefs the trainee too, or every
+    follow-up lands in the library with the one field the setup screen and the
+    microphone check read left empty."""
+    calls = _stub_model(monkeypatch, _REPLY)
+
+    await draft_follow_up(_CARD_NAME, _CARD_TEASER, _IMPROVEMENTS)
+
+    system = calls[0][0][0]["content"]
+    assert "briefing" in system
+    # Read by the trainee, never handed to the caller -- the separation the
+    # whole field rests on.
+    assert "never by the caller" in system
 
 
 async def test_a_fenced_reply_is_unwrapped(monkeypatch: pytest.MonkeyPatch) -> None:

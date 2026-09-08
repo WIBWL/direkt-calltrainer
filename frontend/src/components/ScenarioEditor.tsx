@@ -54,6 +54,12 @@ const FIELDS: {
     required: true,
   },
   {
+    key: "briefing",
+    label: "Briefing für die trainierende Person (optional)",
+    placeholder: "Ihre Rolle, Ihr Spielraum, was ein gutes Ergebnis ist.",
+    multiline: true,
+  },
+  {
     key: "description",
     label: "Situation",
     placeholder: "Worum geht es im Anruf? Kurz, aber konkret.",

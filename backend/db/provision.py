@@ -191,6 +191,7 @@ def _seed_scenarios(db: DbSession) -> int:
         _upsert(db, Scenario, {"key": s["id"]},
                 {"title": clean(s["name"]),
                  "short_description": clean(s["short_description"]),
+                 "briefing": clean(s["briefing"]),
                  "description": clean(s["description"]),
                  "case_facts": clean(s["case_facts"]),
                  "call_goal": clean(s["call_goal"]),

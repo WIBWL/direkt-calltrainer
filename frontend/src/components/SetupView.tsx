@@ -10,6 +10,7 @@ import LibraryPicker, {
   type LibraryItem,
 } from "./LibraryPicker";
 import { cx } from "../utils/cx";
+import ScenarioBriefing from "./ScenarioBriefing";
 import SelectionSummary from "./SelectionSummary";
 import SetupSection from "./SetupSection";
 
@@ -131,6 +132,11 @@ export default function SetupView({
           language={selectedPersona?.language ?? NOT_SELECTED}
           voice="Durch Persona festgelegt"
         />
+
+        {/* The trainee's side of the case (ADR 0054). Here as well as on the
+            microphone check: which Scenario to pick is itself a decision, and
+            the card's one line says only what the caller wants. */}
+        <ScenarioBriefing briefing={selectedScenario?.briefing} />
 
         {/* Said before the call, not after it (ADR 0066). Someone who declined
             storage should learn that this training will leave no record while

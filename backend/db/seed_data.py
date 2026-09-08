@@ -142,6 +142,17 @@ PERSONAS = [
 #     is not part of the Persona's prompt; it used to be, and the caller was
 #     being told to keep itself as a customer.
 #
+# "briefing" (ADR 0054) is the third audience: display text addressed to the
+# *trainee*, never to the model. The four fields above brief the caller; this
+# one briefs whoever picks up the phone, and it says three things and stops --
+# the role they answer in, the room they have (what may be offered, promised or
+# escalated), and what counts as a good outcome. What to say is not its
+# business: told that, the trainee reads a script and the exercise stops being
+# a conversation (R-43). It has to agree with "success_condition", because the
+# two describe one case from two sides -- a briefing that offers what the
+# caller's bar does not recognise makes the call unwinnable in a way neither
+# field reveals on its own.
+#
 # "category" (ADR 0072) is display and filter only, never prompt input: one of
 # `models.SCENARIO_CATEGORIES`. The four refine F-03's three call contexts --
 # operations (short support cases), requirements (consultative project talks),
@@ -168,6 +179,14 @@ SCENARIOS = [
         "short_description": (
             "Der Kunde ruft mit einer offenen Frage zu einem bestehenden "
             "Vertrag an und will sie geklärt haben."
+        ),
+        "briefing": (
+            "Sie arbeiten im Support und nehmen den Anruf zu einem laufenden "
+            "Vertrag entgegen. Sie dürfen den Vorgang einsehen, einen "
+            "verbindlichen Termin zusagen und intern eskalieren. Gut gelaufen ist "
+            "das Gespräch, wenn Ihr Gegenüber weiß, woran es liegt und bis wann es "
+            "wieder läuft — oder ehrlich hört, dass es nicht geht, und was "
+            "stattdessen gilt."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -199,6 +218,13 @@ SCENARIOS = [
         "short_description": (
             "Der Kunde erwägt zu kündigen, weil ihm die laufenden Kosten zu "
             "hoch sind."
+        ),
+        "briefing": (
+            "Sie betreuen diesen Kunden im Vertrieb. Sie dürfen über Preis, "
+            "Laufzeit und Leistungsumfang verhandeln und den Zuschnitt ändern. Gut "
+            "gelaufen ist das Gespräch, wenn Ihr Gegenüber eine belastbare Aussage "
+            "mitnimmt: eine Zahl mit Datum, eine begründete Absage, oder eine "
+            "Rücksprache, an die ein Termin gebunden ist."
         ),
         "description": (
             "The customer (the persona) is calling to say they are considering "
@@ -237,6 +263,13 @@ SCENARIOS = [
         "short_description": (
             "Der dritte Ausfall in sieben Wochen. Der Kunde will diesmal "
             "mehr als eine Entschuldigung."
+        ),
+        "briefing": (
+            "Sie sitzen im Support, und Ihr Gegenüber ist beim dritten Ausfall "
+            "angekommen. Sie dürfen den Stand offen benennen, einen nächsten "
+            "Schritt mit Datum zusagen und Gutschriften prüfen lassen. Gut gelaufen "
+            "ist das Gespräch, wenn Ihr Gegenüber etwas anderes mitnimmt als die "
+            "Zusage, die beim letzten Mal nicht gehalten hat."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -280,6 +313,13 @@ SCENARIOS = [
             "Der Kunde will ein zweites Team aufschalten und braucht Zahl "
             "und Termin, bevor sein Budget zugeht."
         ),
+        "briefing": (
+            "Sie arbeiten im Vertrieb, und Ihr Gegenüber will erweitern. Sie kennen "
+            "die Preisliste samt Mengenstaffeln, dürfen Termine verbindlich "
+            "vergeben und den Ausbau selbst freigeben. Gut gelaufen ist das "
+            "Gespräch, wenn am Ende eine Zahl und ein Termin stehen — beides, nicht "
+            "eines von beiden."
+        ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
             "sales, about extending an existing licence to a second "
@@ -319,6 +359,14 @@ SCENARIOS = [
         "short_description": (
             "Der Kunde ruft zum Abschluss zurück und beruft sich auf Zusagen "
             "aus einem anderen Gespräch."
+        ),
+        "briefing": (
+            "Sie arbeiten im Vertrieb und übernehmen ein Gespräch, das eine "
+            "Kollegin vorbereitet hat; Notizen daraus haben Sie keine. Sie dürfen "
+            "nachfragen, Rücksprache halten und einen Termin für die Klärung "
+            "setzen. Gut gelaufen ist das Gespräch, wenn klar ist, was gilt und wie "
+            "es weitergeht, ohne dass Sie etwas bestätigt haben, das Sie nicht "
+            "kennen."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -360,6 +408,12 @@ SCENARIOS = [
             "Ein eingespielter Ablauf steht seit drei Tagen. Der Stichtag "
             "rückt näher."
         ),
+        "briefing": (
+            "Sie arbeiten im Support. Sie dürfen die Ursache benennen, einen Termin "
+            "zusagen und einen Weg an der Störung vorbei anbieten. Gut gelaufen ist "
+            "das Gespräch, wenn Ihr Gegenüber weiß, ob der Stichtag hält — und wenn "
+            "nicht, was stattdessen gilt."
+        ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
             "support, because a recurring document-driven process has stopped "
@@ -395,6 +449,13 @@ SCENARIOS = [
         "short_description": (
             "Eine verpflichtende Umstellung mit fester Frist, erklärt ohne "
             "Fachbegriffe."
+        ),
+        "briefing": (
+            "Sie arbeiten in der Beratung und sprechen mit jemandem ohne "
+            "technischen Hintergrund. Sie dürfen Aufwand und Kosten grob "
+            "einschätzen und einen nächsten Schritt vereinbaren. Gut gelaufen ist "
+            "das Gespräch, wenn Ihr Gegenüber am Ende mit eigenen Worten sagen "
+            "kann, was zu tun ist — ein Verweis auf die Unterlagen zählt nicht."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -432,6 +493,12 @@ SCENARIOS = [
             "Der Kunde will etwas automatisieren, kann aber weder Auslöser "
             "noch Zielzustand benennen."
         ),
+        "briefing": (
+            "Sie arbeiten in der Beratung. Sie dürfen offen lassen, ob das machbar "
+            "ist, und dürfen fragen, statt zu antworten. Gut gelaufen ist das "
+            "Gespräch, wenn Ihr Gegenüber weiß, was als Nächstes passiert, wer es "
+            "tut und wann — eine Machbarkeit im Allgemeinen ist kein Ergebnis."
+        ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
             "consulting or development, wanting a recurring manual process "
@@ -464,6 +531,13 @@ SCENARIOS = [
         "short_description": (
             "Eine gewünschte Anpassung ist vom Vertrag nicht gedeckt und wäre "
             "zu berechnen."
+        ),
+        "briefing": (
+            "Sie betreuen den Kunden fachlich und kennen den Vertragsumfang. Sie "
+            "dürfen die Anpassung als Kulanz vergeben, sie berechnen oder sie "
+            "ablehnen — die Entscheidung liegt bei Ihnen. Gut gelaufen ist das "
+            "Gespräch, wenn Ihr Gegenüber die Begründung nachvollziehen und selbst "
+            "wiedergeben kann, wie sie auch ausfällt."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -499,6 +573,13 @@ SCENARIOS = [
             "Seit dem Morgen steht eine zentrale Komponente, und seit drei "
             "Stunden meldet sich niemand."
         ),
+        "briefing": (
+            "Sie sitzen im Support und nehmen einen Anruf an, auf den seit Stunden "
+            "jemand wartet. Sie dürfen zugeben, was Sie nicht wissen, und dürfen "
+            "einen Rückruf mit fester Uhrzeit zusagen. Gut gelaufen ist das "
+            "Gespräch, wenn Ihr Gegenüber weiß, wer sich kümmert und wann er wieder "
+            "hört — auch dann, wenn Sie kein Ende nennen können."
+        ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
             "support or account management, because a central system component "
@@ -533,6 +614,13 @@ SCENARIOS = [
         "short_description": (
             "Vier besprochene Punkte, einer davon anders verstanden. Fällt es "
             "beim Zusammenfassen auf?"
+        ),
+        "briefing": (
+            "Sie führen das Gespräch zum Abschluss einer Klärung. Vier Punkte "
+            "wurden vorher besprochen; Ihre Aufgabe ist, sie noch einmal laut "
+            "zusammenzufassen, bevor etwas schriftlich wird. Gut gelaufen ist das "
+            "Gespräch, wenn Ihre Zusammenfassung konkret genug ist, dass Ihr "
+            "Gegenüber widersprechen kann, wo er etwas anders verstanden hat."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -574,6 +662,13 @@ SCENARIOS = [
             "Ein Ablauf, den zwei Personen unterschiedlich ausführen, während "
             "Anrufer hält beides für dasselbe."
         ),
+        "briefing": (
+            "Sie nehmen einen Prozess auf, um ihn später zu modellieren. Sie dürfen "
+            "so lange nachfragen, wie Sie brauchen, und dürfen das Gehörte "
+            "zurückspiegeln. Gut gelaufen ist das Gespräch, wenn Sie die Schritte "
+            "wiedergeben können und Unterschiede in der Ausführung benannt sind, "
+            "statt unter einer gemeinsamen Beschreibung zu verschwinden."
+        ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
             "consulting or requirements analysis, for a first conversation "
@@ -608,6 +703,13 @@ SCENARIOS = [
         "short_description": (
             "Drei Vorbehalte gegen den vorgeschlagenen Ansatz, und eine "
             "Entscheidung in sechs Wochen."
+        ),
+        "briefing": (
+            "Sie beraten zum vorgeschlagenen Ansatz und sitzen selbst nicht in der "
+            "Entscheidung. Sie dürfen Risiken einräumen, Alternativen nennen und "
+            "Belege nachreichen. Gut gelaufen ist das Gespräch, wenn jeder Vorbehalt "
+            "entweder eine konkrete Antwort hat oder offen als Risiko benannt ist — "
+            "eine pauschale Beruhigung zählt für keinen."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -646,6 +748,13 @@ SCENARIOS = [
             "Der Einkauf fordert einen Nachlass und verweist auf ein "
             "Vergleichsangebot."
         ),
+        "briefing": (
+            "Sie arbeiten im Vertrieb und verantworten das Angebot, das auf dem "
+            "Tisch liegt. Sie dürfen über Preis, Laufzeit und Leistungsumfang "
+            "verhandeln und einen Nachlass selbst vergeben. Gut gelaufen ist das "
+            "Gespräch, wenn am Ende eine Zahl mit Gültigkeitsdatum steht oder eine "
+            "begründete Absage — eine Prüfung im Haus ist keines von beidem."
+        ),
         "description": (
             "The customer's procurement side (the persona) is calling the "
             "user, who works in sales or management, to ask for a discount, "
@@ -679,6 +788,14 @@ SCENARIOS = [
         "short_description": (
             "Der Fachbereich ist überzeugt, die IT sieht Steuerbarkeit und "
             "Betrieb gefährdet."
+        ),
+        "briefing": (
+            "Sie arbeiten in der Beratung und sprechen mit der IT-Seite des Kunden, "
+            "nicht mit dem Fachbereich, der Sie geholt hat. Sie dürfen "
+            "Zuständigkeiten vorschlagen, interne Regeln akzeptieren und den "
+            "Fachbereich ausbremsen. Gut gelaufen ist das Gespräch, wenn "
+            "Entscheidungsweg, Freigabe und Betrieb benannt sind — die Zusage, die "
+            "IT künftig einzubinden, ist keines davon."
         ),
         "description": (
             "The customer's IT side (the persona) is calling the user, who "
@@ -716,6 +833,13 @@ SCENARIOS = [
             "Drei Fragen zu Datenhaltung und Nachweisen, auf eine gibt es "
             "keine belastbare Antwort."
         ),
+        "briefing": (
+            "Sie arbeiten in der Beratung; Ihr Gegenüber schreibt mit und gibt Ihre "
+            "Aussagen an Dritte weiter. Sie dürfen sagen, dass Sie etwas nicht "
+            "belastbar beantworten können, und dürfen eine Antwort nachliefern. Gut "
+            "gelaufen ist das Gespräch, wenn jede Frage entweder beantwortet oder "
+            "ausdrücklich offen ist, mit der Zusage, wer sie bis wann klärt."
+        ),
         "description": (
             "The customer (the persona) works in a heavily regulated area and "
             "is calling the user, who works in consulting, with questions "
@@ -751,6 +875,13 @@ SCENARIOS = [
         "short_description": (
             "Der Kunde will einen zugesagten Termin bestätigt haben. Halten "
             "lässt er sich nicht."
+        ),
+        "briefing": (
+            "Sie führen das Projekt und wissen, was Ihr Gegenüber noch nicht weiß: "
+            "der zugesagte Termin ist nicht zu halten. Sie dürfen einen neuen "
+            "Termin nennen, Teilergebnisse anbieten und Prioritäten verschieben. "
+            "Gut gelaufen ist das Gespräch, wenn die Korrektur früh genug ankommt "
+            "und klar ist, was aus dem Anschlusstermin wird, der daran hängt."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "

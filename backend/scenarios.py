@@ -30,6 +30,11 @@ class Scenario:
     case_facts: str = ""
     call_goal: str = ""
     success_condition: str = ""
+    # Display: the trainee's own briefing, in the UI language (ADR 0054) --
+    # role, room for manoeuvre, what a good outcome is. Never handed to the
+    # model: the objective is the trainee's, and giving it to the caller is the
+    # defect ADR 0045 removed. Empty means a Scenario that briefs nobody.
+    briefing: str = ""
     # Display/filter only, never part of the prompt (ADR 0072): one of
     # `backend.db.models.SCENARIO_CATEGORIES`, or None for a Scenario that
     # carries no category. F-03's three call contexts, made selectable.

@@ -16,6 +16,10 @@ _Avoid_: Trainee, learner, customer
 The situational context configured for a Session — e.g. the caller's reason for calling or goal. Independent of the simulated counterpart's character traits (see Persona). Carries a **Category**: what kind of call it is, one of `operations`, `requirements`, `pricing` or `closing` (docs/adr/0064), four values refining F-03's three call contexts. Display and filter only, never reaches the prompt. Optional: a Scenario may have none.
 _Avoid_: Persona, situation. For the Category: type, Szenariotyp (the free-text `scenario_type` column it replaces is gone; see docs/adr/0064)
 
+**Briefing**:
+The Scenario's text addressed to the User rather than to the Persona (docs/adr/0054): the role they answer the phone in, the room they have (what may be offered, promised or escalated), and what counts as a good outcome. The counterpart of the four prompt fields, which brief the simulated caller — one case described from two sides, and they have to agree, or the call cannot be won. Never reaches the prompt: an objective handed to the caller is one the caller pursues, which is the defect docs/adr/0045 removed. Shown before the Session starts, on the setup screen and again on the microphone check. Optional: a Scenario may have none, and then briefs nobody.
+_Avoid_: Instructions, task, script (it never says what to say), Kurzbeschreibung (that is the card's teaser, and it speaks about the caller)
+
 **Follow-up Scenario** (_Folgeszenario_):
 The Scenario written automatically from a finished Session's Feedback, one per Session that has improvement points (docs/adr/0069). A Scenario in every other respect — the User owns it, edits it, shares it and plays it against any Persona — so it is a category, not a kind: it is set apart only by the Session it came from, and it leaves the library when that Session is deleted. Not a repeat of the call it came from: a new case in the same subject area, built so that what the Feedback asked for is the way through it.
 _Avoid_: Follow-up call, next session, exercise

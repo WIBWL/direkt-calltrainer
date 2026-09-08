@@ -39,6 +39,10 @@ CAROL_APPOLLO = auth.AuthContext(sub="carol", roles=[], token="t", tenant="appol
 _NEW = {
     "name": "Preisverhandlung mit Großkunde",
     "short_description": "Der Kunde will 20 % Rabatt und droht mit Wechsel.",
+    "briefing": (
+        "Sie verantworten das Angebot. Sie dürfen bis zehn Prozent nachlassen. "
+        "Gut gelaufen ist das Gespräch, wenn eine Zahl mit Datum steht."
+    ),
     "description": "The customer is calling to demand a discount.",
     "case_facts": "Contract runs to March, 40 seats, last raised 8 percent.",
     "call_goal": "Get 20 percent off or a real reason why not.",
@@ -136,7 +140,7 @@ async def test_field_limits_endpoint_reports_the_api_caps(client, as_user):
     limits = (await client.get("/api/scenarios/field-limits")).json()
 
     assert set(limits) == {
-        "name", "short_description", "description",
+        "name", "short_description", "briefing", "description",
         "case_facts", "call_goal", "success_condition",
     }
     assert limits["name"] == FIELD_LIMITS["title"]
