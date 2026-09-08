@@ -1,8 +1,14 @@
-"""Startup health checks for the three pipeline backends.
+"""Startup health checks for the pipeline backends.
 
 Fires one minimal real request at each backend (STT, LLM, TTS) so a dead model
 surfaces at boot, not mid-call. Uses the exact prod code paths, including TTS's
 KugelAudio-then-DiReKT fallback (see `SKIP_KUGELAUDIO` in `backend.clients.config`).
+
+A fourth check appears when the wrap-up runs on a model of its own (ADR 0074).
+It has to: that model is reached only from the RQ worker, so a name that 404s
+breaks nothing a caller would notice -- the calls keep working and the wrap-ups
+simply never arrive, which is exactly how a dead worker once went unnoticed for
+hours.
 """
 
 import asyncio
@@ -15,7 +21,9 @@ from kugelaudio.exceptions import KugelAudioError
 from openai import OpenAIError
 
 from backend.clients import llm, stt, tts
-from backend.clients.config import SKIP_KUGELAUDIO, KUGELAUDIO_MODEL, LLM_MODEL, STT_MODEL, TTS_MODEL
+from backend.clients.config import (
+    SKIP_KUGELAUDIO, KUGELAUDIO_MODEL, LLM_FEEDBACK_MODEL, LLM_MODEL, STT_MODEL, TTS_MODEL,
+)
 from backend.personas import PersonaVoice
 
 logger = logging.getLogger(__name__)
@@ -49,6 +57,13 @@ async def _check_llm() -> None:
             break  # one delta is enough to prove the model responds
 
 
+async def _check_feedback_llm() -> None:
+    # `think=True` because that is how all three of its callers use it, and the
+    # thinking level is the parameter most likely to be wrong for a given model
+    # -- an unsupported one is a 400 that names nothing (ADR 0074).
+    await llm.complete([{"role": "user", "content": "ping"}], think=True)
+
+
 async def _check_tts() -> None:
     await tts.synthesize("Hallo.", _CHECK_VOICE, _CHECK_LANGUAGE)
 
@@ -58,6 +73,10 @@ _CHECKS: dict[str, tuple] = {
     "LLM": (_check_llm, LLM_MODEL),
     "TTS": (_check_tts, TTS_MODEL if SKIP_KUGELAUDIO else KUGELAUDIO_MODEL),
 }
+if LLM_FEEDBACK_MODEL != LLM_MODEL:
+    # Only when they actually differ: on the gateway they are one name, and a
+    # second identical request would spend a boot request to learn nothing.
+    _CHECKS["LLM (wrap-up)"] = (_check_feedback_llm, LLM_FEEDBACK_MODEL)
 
 
 async def _run_check(name: str, check_fn, model: str) -> bool:
@@ -71,8 +90,8 @@ async def _run_check(name: str, check_fn, model: str) -> bool:
 
 
 async def check_backends() -> bool:
-    """Check all three pipeline backends concurrently, one log line each;
-    returns True only if all passed.
+    """Check every configured pipeline backend concurrently, one log line
+    each; returns True only if all passed.
 
     Never raises — it runs from `lifespan`, which logs a dead dependency rather
     than failing the boot. The return value is for `scripts/check_backends.py`,

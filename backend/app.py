@@ -25,7 +25,7 @@ from backend.api.sessions import router as sessions_router
 from backend.api.tenant import router as tenant_router
 from backend.auth import check_realm
 from backend.clients import tts
-from backend.clients.config import DIREKT_URL, LOG_TRANSCRIPTS
+from backend.clients.config import DIREKT_URL, GEMINI, LLM_FEEDBACK_MODEL, LLM_MODEL, LOG_TRANSCRIPTS
 from backend.clients.health import check_backends
 from backend.db.provision import provision
 from backend.db.session import session_scope
@@ -55,6 +55,13 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
             "That log is personal data and is not covered by any deletion path. "
             "Turn it off for anything but local debugging."
         )
+    if GEMINI:
+        # Said once at boot because the alternative is a silent one: STT and TTS
+        # stay on the gateway, the startup check names a model but not where it
+        # ran, and a stray GEMINI=yes in someone's `.env` would look like the
+        # gateway having a good day (ADR 0011, ADR 0074).
+        logger.info("Dialogue generation is on Gemini: %s live, %s for feedback",
+                    LLM_MODEL, LLM_FEEDBACK_MODEL)
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             await client.get(DIREKT_URL)

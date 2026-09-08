@@ -1,4 +1,5 @@
-"""Check the three pipeline backends (STT, LLM, TTS) from the host.
+"""Check the pipeline backends (STT, LLM, TTS, and the wrap-up model when it
+is a separate one) from the host.
 
 Runs the same check the app runs at startup
 (`backend.clients.health.check_backends`), on its own, so you can tell whether
@@ -8,7 +9,7 @@ a model is down without booting the app. Respects the SKIP_KUGELAUDIO toggle in 
 Usage:
     python scripts/check_backends.py
 
-Exit code is 0 only if all three backends respond.
+Exit code is 0 only if every configured backend responds.
 """
 
 import asyncio

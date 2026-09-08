@@ -6,6 +6,7 @@ model — a dead STT model fails the Turn (ADR 0011, ADR 0016).
 """
 
 import logging
+import time
 
 from backend.clients.config import LOG_TRANSCRIPTS, STT_CLIENT, STT_MODEL
 
@@ -20,6 +21,7 @@ async def transcribe(audio_bytes: bytes, filename: str, content_type: str | None
     phrase ("Vielen Dank.") on near-silence, which a VAD misfire can let through.
     """
     logger.info("Transcribing via STT (%s, language=%s)...", STT_MODEL, language_id)
+    started = time.monotonic()
     transcription = await STT_CLIENT.audio.transcriptions.create(
         model=STT_MODEL,
         file=(filename, audio_bytes, content_type),
@@ -33,5 +35,11 @@ async def transcribe(audio_bytes: bytes, filename: str, content_type: str | None
     if LOG_TRANSCRIPTS:
         logger.info("Transcript: %s", transcription.text)
     else:
-        logger.info("Transcript received (%d characters)", len(transcription.text))
+        # The duration alongside the length: STT is one blocking call per Turn
+        # (Whisper needs the whole utterance), so it is a fixed floor under
+        # every reply and worth seeing next to the LLM's own timing.
+        logger.info(
+            "Transcript received (%d characters) in %.2f s",
+            len(transcription.text), time.monotonic() - started,
+        )
     return transcription.text

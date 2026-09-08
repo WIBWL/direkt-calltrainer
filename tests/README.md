@@ -72,7 +72,8 @@ source of that content, and which imports without a database.
 | Repetition guard, re-introduction regeneration + guaranteed sign-off | ADR 0038, ADR 0043 | `test_repetition_guard.py` |
 | `[CALL_END]` marker + foreign-script scrub | ADR 0033 | `test_call_end_marker.py` |
 | Barge-in / eager interruption (incl. the note-barge-in ordering contract, a late interrupt over a committed reply's tail, the `[unterbrochen]` transcript marker, and the cut-off dash + one-Turn nudge that keep the model in the conversation afterwards) | ADR 0035 | `test_barge_in.py`, `test_barge_in_ordering.py` |
-| The caller's notes and the history window: the model reads notes + the last three exchanges, the guards and the Transcript keep the full record; background refresh, refresh-on-trim, failure keeps stale notes | ADR 0071 | `test_call_state.py` |
+| The startup backend checks: the wrap-up model is checked at boot when it is a separate model, and not when it is the same one; the check asks the way its callers do | ADR 0016, ADR 0074 | `test_startup_checks.py` |
+| The caller's notes and the history window: the model reads notes + the last three exchanges, the guards and the Transcript keep the full record; background refresh, refresh-on-trim, failure keeps stale notes. And the other shape: with the notes off the model is handed the whole conversation and no summarisation request is made | ADR 0071, ADR 0075 | `test_call_state.py` |
 | Whisper phantom transcripts ("*Titelm*", "Vielen Dank.") are no Turn | ADR 0071 | `test_stt_phantom.py` |
 | Pipeline fault tolerance (retry → graceful end) | ADR 0016, ADR 0033 | `test_pipeline_failure.py` |
 | TTS backend selection & fallback | ADR 0040 | `test_tts_fallback.py` |
