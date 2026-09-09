@@ -177,6 +177,15 @@ export interface SessionTurn {
   /** NULL where the utterance has no measured end. */
   duration_ms: number | null;
   transcript: string;
+  /** True on a Persona line the user cut into (ADR 0035). */
+  interrupted: boolean;
+  /**
+   * What the Persona had been about to say, cut off by the interruption. Null
+   * for every other line, and also for interrupted lines recorded before this
+   * was kept: the words were discarded at the time. Never part of the
+   * transcript, always rendered as what was *not* said.
+   */
+  unheard_text: string | null;
 }
 
 export interface FeedbackPoint {
@@ -199,6 +208,27 @@ export interface SessionFeedback {
   points: FeedbackPoint[];
 }
 
+/**
+ * One noted moment inside a call, the counterpart to a Measurement: a
+ * Measurement is what the whole call amounted to, a Finding is one thing that
+ * happened at one point. F-51's hard interruptions are the first kind written.
+ */
+export interface Finding {
+  /** Machine-readable kind, e.g. "hard_interruption". The wording is
+   *  `description`; this decides where the entry belongs. */
+  category: string;
+  /** Milliseconds into the call, so the entry can be placed on the transcript. */
+  offset_ms: number | null;
+  description: string;
+  /** The Kennzahl this moment belongs to, or null if it stands alone. */
+  metric_key: string | null;
+}
+
+/** The provisional three-step reading of a figure, computed server-side from
+ *  thresholds that are declared heuristics. Shown as an orientation, never as
+ *  a verdict, and never as colour alone. */
+export type TrafficLight = "green" | "yellow" | "red";
+
 export interface SessionDetail {
   session_id: string;
   persona: string;
@@ -210,6 +240,16 @@ export interface SessionDetail {
   turns: SessionTurn[];
   /** Statistics for the whole call, not per utterance (ADR 0051). */
   measurements: Measurement[];
+  /** Individual noted moments, ordered by when they happened. */
+  findings: Finding[];
+  /** The long explanation behind a Kennzahl's "i", by metric key. Served
+   *  rather than bundled, so the text and the thresholds it explains are
+   *  edited in one place (ADR 0063's arrangement for the field limits). */
+  metric_notes: Record<string, string>;
+  /** The steps a traffic light comes from, by metric key, written out. Shown
+   *  beside the light: a boundary the user cannot see is a judgement they
+   *  cannot argue with. */
+  metric_scales: Record<string, { light: TrafficLight; range: string }[]>;
   feedback: SessionFeedback | null;
   /**
    * The Scenario the worker drafted from this Session's feedback (F-60,

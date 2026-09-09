@@ -13,6 +13,10 @@ export const ROUTES = {
   profile: "/profil",
   /** One past training, by the id the listing hands out (ADR 0050). */
   session: "/trainings/:sessionId",
+  /** One Kennzahl of one training, in detail (F-51's interruptions today). A
+   *  page of its own rather than a panel: the transcript excerpts are long,
+   *  and a reader should be able to link to them and use Back. */
+  sessionMetric: "/trainings/:sessionId/kennzahl/:metricKey",
 
   // The legal pages the footer links. Their paths are the ones the footer
   // already used, so old links and bookmarks keep working.
@@ -45,4 +49,10 @@ export interface TrainingStart {
  */
 export function sessionPath(sessionId: string): string {
   return `/trainings/${encodeURIComponent(sessionId)}`;
+}
+
+/** One Kennzahl of one training. Both segments encoded, for the reason
+ *  `sessionPath` gives. */
+export function sessionMetricPath(sessionId: string, metricKey: string): string {
+  return `/trainings/${encodeURIComponent(sessionId)}/kennzahl/${encodeURIComponent(metricKey)}`;
 }

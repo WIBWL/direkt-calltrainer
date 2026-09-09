@@ -1,9 +1,14 @@
 import type {
   FeedbackPoint,
+  Finding,
   Measurement,
   SessionDetail,
   SessionTurn,
+  TrafficLight,
 } from "../protocol";
+import { Link } from "react-router-dom";
+
+import { sessionMetricPath } from "../routes";
 import { formatOffset } from "../utils/time";
 import { useSessionFeedback } from "../hooks/useSessionFeedback";
 import InfoDetails from "./InfoDetails";
@@ -146,7 +151,12 @@ export function FeedbackReport({
 
       {feedback.phase_language && <PhaseLanguage text={feedback.phase_language} />}
 
-      <MetricSection measurements={measurements} />
+      <MetricSection
+        measurements={measurements}
+        findings={detail.findings}
+        notes={detail.metric_notes}
+        sessionId={detail.session_id}
+      />
     </>
   );
 }
@@ -215,8 +225,28 @@ function PhaseLanguage({ text }: { text: string }) {
  * that would be needed to say whether a figure is good, and the note under the
  * grid says so rather than leaving the user to assume a direction.
  */
-export function MetricSection({ measurements }: { measurements: Measurement[] }) {
+export function MetricSection({
+  measurements,
+  findings = [],
+  notes = {},
+  sessionId = null,
+}: {
+  measurements: Measurement[];
+  /** Individual moments noted during the call, e.g. F-51's interruptions.
+   *  Used here only to decide which tiles have a page worth opening. */
+  findings?: Finding[];
+  /** The long explanation behind a Kennzahl's "i", by metric key. */
+  notes?: Record<string, string>;
+  /** The Session these figures belong to, for the per-Kennzahl page. Null on a
+   *  call that was never stored, where there is nothing to link to. */
+  sessionId?: string | null;
+}) {
   if (measurements.length === 0) return null;
+
+  const detailed = new Set([
+    ...findings.map((f) => f.metric_key).filter((key): key is string => key !== null),
+    ...Object.keys(notes),
+  ]);
 
   return (
     <section className="feedback-metrics-section">
@@ -225,7 +255,12 @@ export function MetricSection({ measurements }: { measurements: Measurement[] })
 
       <div className="metric-grid">
         {measurements.map((measurement) => (
-          <Metric key={measurement.key} measurement={measurement} />
+          <Metric
+            key={measurement.key}
+            measurement={measurement}
+            sessionId={sessionId}
+            detailed={detailed.has(measurement.key)}
+          />
         ))}
       </div>
 
@@ -350,7 +385,17 @@ function PointList({
   );
 }
 
-function Metric({ measurement }: { measurement: Measurement }) {
+function Metric({
+  measurement,
+  sessionId,
+  detailed,
+}: {
+  measurement: Measurement;
+  /** Null on a call that was never stored, where there is no page to open. */
+  sessionId: string | null;
+  /** Whether this Kennzahl has a page worth opening. */
+  detailed: boolean;
+}) {
   // Loudness is shown as a course, not a figure: its value is a dB span (95th
   // percentile minus 5th) that reads like a level without being one and that no
   // validated norm places (ADR 0004/0051). Without the curve the tile is empty.
@@ -366,15 +411,79 @@ function Metric({ measurement }: { measurement: Measurement }) {
   }
 
   const decimals = DECIMALS[measurement.key] ?? 1;
-  return (
-    <div className="metric">
+  const light = measurement.detail?.light as TrafficLight | undefined;
+  const context = interruptionContext(measurement);
+
+  // The traffic light colours the figure and nothing else. It is the only
+  // colour in this application that says something about a value, the two
+  // thresholds behind it are working values that nothing has validated (see
+  // `interruptions.py`), and a whole tile in that colour would shout an
+  // orientation. The step is written out underneath, so colour is never the
+  // only channel, and the scale it comes from is on the page behind the tile.
+  const body = (
+    <>
       <span className="metric-name">{measurement.name}</span>
-      <span className="metric-value">
+      <span className={`metric-value${light ? ` metric-value-${light}` : ""}`}>
         {measurement.value.toFixed(decimals)}
-        {measurement.unit && measurement.unit !== "Anzahl"
-          ? ` ${measurement.unit}`
-          : ""}
+        {measurement.unit && measurement.unit !== "Anzahl" ? ` ${measurement.unit}` : ""}
       </span>
-    </div>
+
+      {context && <span className="metric-context">{context}</span>}
+
+      {light && (
+        <span className="metric-light-label">
+          {LIGHT_LABEL[light]} <span className="metric-light-caveat">(Einschätzung)</span>
+        </span>
+      )}
+    </>
   );
+
+  if (!detailed || !sessionId) {
+    return <div className="metric">{body}</div>;
+  }
+
+  return (
+    <Link className="metric metric-open" to={sessionMetricPath(sessionId, measurement.key)}>
+      {body}
+      <span className="metric-open-hint">Einzelne Stellen ansehen</span>
+    </Link>
+  );
+}
+
+/** The three steps in words, so the colour is never the only carrier. Shared
+ *  with the Kennzahl's own page, which shows the whole scale. */
+export const LIGHT_LABEL: Record<TrafficLight, string> = {
+  green: "im üblichen Rahmen",
+  yellow: "erhöht",
+  red: "deutlich erhöht",
+};
+
+/**
+ * The count set against the call it happened in.
+ *
+ * Context beside the figure, never inside it: dividing by the call length or by
+ * the number of Persona replies was tried and put a single interruption on the
+ * top step of a short call. The traffic light stays on the count; this line is
+ * what lets a reader weigh that count for themselves.
+ *
+ * The backchannels are named here too, and named as not counting. Listening is
+ * the other half of this goal, and a figure that only ever counted the failures
+ * would describe an attentive call and an absent one identically.
+ */
+function interruptionContext(measurement: Measurement): string | null {
+  if (measurement.key !== "interruptions") return null;
+  const detail = measurement.detail ?? {};
+  const callMs = (detail.call_ms as number | undefined) ?? 0;
+  const turns = detail.persona_turns as number | undefined;
+  const backchannels = (detail.backchannel_count as number | undefined) ?? 0;
+
+  const parts: string[] = [];
+  if (callMs > 0) parts.push(`in ${Math.max(1, Math.round(callMs / 60000))} Gesprächsminuten`);
+  if (turns) parts.push(`bei ${turns} Redebeiträgen des Gegenübers`);
+  if (backchannels > 0) {
+    parts.push(
+      `${backchannels} bestätigende${backchannels === 1 ? "s Hörsignal" : " Hörsignale"} zählen nicht mit`,
+    );
+  }
+  return parts.length > 0 ? parts.join(", ") : null;
 }

@@ -137,7 +137,12 @@ export default function PastSessionView() {
               Session (ADR 0047/0048), so they survive a wrap-up that never
               got written. Withholding them would hide data that is right
               there. */}
-          <MetricSection measurements={detail.measurements} />
+          <MetricSection
+            measurements={detail.measurements}
+            findings={detail.findings}
+            notes={detail.metric_notes}
+            sessionId={detail.session_id}
+          />
         </>
       )}
 

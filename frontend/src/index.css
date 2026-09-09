@@ -3186,6 +3186,311 @@ h2 {
   opacity: 0.8;
 }
 
+/* --- The provisional traffic light (F-51) -------------------------------- */
+/* The only colour in this application that says something about a value, and
+   an exception to the rule the rest of it follows: ADR 0004, ADR 0051 and
+   ADR 0065 all refuse to place a figure against a threshold, on the grounds
+   that no threshold here was measured rather than guessed. This one is being
+   trialled, its boundaries are declared heuristics in `interruptions.py`, and
+   it appears on a single Kennzahl of a single call.
+
+   It colours the figure and nothing else. A whole tile in red would shout an
+   orientation that two invented numbers cannot support, and it would drown out
+   the eight neighbouring Kennzahlen that carry no judgement at all.
+
+   Colour is never the only channel: the step is written out underneath, the
+   word "Einschätzung" follows it, the scale sits on the Kennzahl's own page,
+   and the three tints differ in lightness so they survive greyscale. */
+
+.metric-value-green {
+  color: var(--color-success);
+}
+
+.metric-value-yellow {
+  color: #b57a12;
+}
+
+.metric-value-red {
+  color: var(--color-danger);
+}
+
+.metric-light-label {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.metric-light-caveat {
+  font-style: italic;
+  opacity: 0.85;
+}
+
+/* The count set against the call it happened in. Grey and small: it qualifies
+   the figure, it is not a second figure. */
+.metric-context {
+  margin-top: 2px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+/* A Kennzahl with a page behind it. The tile keeps its shape and gains only a
+   hover and the line that says there is more. */
+.metric-open {
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-control);
+  transition: background 0.15s;
+}
+
+.metric-open:hover {
+  background: var(--color-surface-selected);
+}
+
+.metric-open:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 4px;
+}
+
+.metric-open-hint {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--color-blue-600);
+}
+
+/* --- One Kennzahl's own page --------------------------------------------- */
+
+.metric-page-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-page-figure .metric-light-label {
+  margin-top: 0;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+/* The scale the colour comes from. A boundary the user cannot see is a
+   judgement they cannot argue with. */
+.metric-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 0.75rem;
+}
+
+.metric-step {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 8px;
+  border-left: 3px solid var(--color-border);
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.metric-step dt,
+.metric-step dd {
+  margin: 0;
+}
+
+.metric-step dd {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.metric-step-green {
+  border-left-color: var(--color-success);
+}
+
+.metric-step-yellow {
+  border-left-color: #b57a12;
+}
+
+.metric-step-red {
+  border-left-color: var(--color-danger);
+}
+
+.metric-note {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+/* --- The pitch contour (F-35) --------------------------------------------- */
+/* Drawn the way phonetics draws F0: semitones on the vertical axis relative to
+   the speaker's own median, gaps left as gaps, one hue throughout. The reasons
+   are in PitchContour.tsx; what matters here is that nothing in this block may
+   encode a judgement. */
+
+.pitch-contour {
+  margin: 0;
+}
+
+.pitch-contour-plot {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* The speaker's own usual range, not a target band. */
+.pitch-contour-band {
+  fill: var(--color-blue-100);
+}
+
+.pitch-contour-grid {
+  stroke: var(--color-border-subtle);
+  stroke-width: 1;
+}
+
+/* The zero line is the speaker's median, so it is the one line worth seeing. */
+.pitch-contour-median {
+  stroke: var(--color-blue-300);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.pitch-contour-line {
+  fill: none;
+  stroke: var(--color-blue-600);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.pitch-contour-tick,
+.pitch-contour-axis-label {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  fill: var(--color-text-muted);
+}
+
+.pitch-contour-tick {
+  text-anchor: end;
+}
+
+.pitch-contour-axis-end {
+  text-anchor: end;
+}
+
+.pitch-contour-legend {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+/* --- The factors read off that contour ----------------------------------- */
+
+.factor-list {
+  margin: 0;
+}
+
+.factor + .factor {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.factor dt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.factor-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.factor-value {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+  color: var(--color-blue-600);
+}
+
+.factor dd {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+/* --- One interruption, in its own words ---------------------------------- */
+
+.interruptions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.interruption {
+  padding: 8px 10px;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-selected);
+}
+
+.interruption-time {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.interruption-line {
+  margin: 0 0 4px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.interruption-speaker {
+  font-weight: 600;
+}
+
+.interruption-user {
+  margin-bottom: 0;
+}
+
+/* Where the user came in. A visible break rather than a word, so the sentence
+   reads as one that was stopped. */
+.interruption-cut {
+  display: inline-block;
+  width: 2px;
+  height: 0.95em;
+  margin: 0 4px;
+  vertical-align: text-bottom;
+  background: var(--color-danger);
+}
+
+/* What was never said. Struck through and faint, because the one thing this
+   must not do is read like part of the transcript. */
+.interruption-unheard {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.interruption-unheard.is-missing {
+  text-decoration: none;
+  font-style: italic;
+  opacity: 0.8;
+}
+
 /* --- The "i": long explanations, folded away ---------------------------- */
 /* The screens around consent have to say a lot and are read only if they are
    short. What a decision turns on stays in the open; the background lives in
