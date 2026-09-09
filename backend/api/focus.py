@@ -1,4 +1,4 @@
-"""REST routes for the training focus (F-61, ADR 0074).
+"""REST routes for the training focus (F-62, ADR 0076).
 
 Two routes over one thing: what the caller could focus on and what they
 currently do, and a replacement for the second. Both act on the caller's own
@@ -31,7 +31,7 @@ router = APIRouter(prefix="/api/focus", dependencies=[Depends(require_user)])
 class FocusChoice(BaseModel):
     """The goals to focus on. An empty list is a real answer — "no focus",
     everything weighted alike — and not the absence of one; what distinguishes
-    the two is that this request was made at all (ADR 0074)."""
+    the two is that this request was made at all (ADR 0076)."""
 
     goals: list[str] = Field(default_factory=list)
 
@@ -75,7 +75,7 @@ def _state(
         "groups": focus_service.groups(),
         # `evidence` is not on the wire. It says how far a goal can be measured
         # today, which is planning information for the analysis work rather than
-        # something a user should have to weigh up while picking (ADR 0074).
+        # something a user should have to weigh up while picking (ADR 0076).
         "goals": [
             {
                 "key": goal.key,

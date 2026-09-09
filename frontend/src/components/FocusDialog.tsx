@@ -4,7 +4,7 @@ import type { FocusState } from "../protocol";
 import FocusGoalPicker, { toggleGoal } from "./FocusGoalPicker";
 
 /**
- * The training focus, asked once at the first start (F-61, ADR 0074).
+ * The training focus, asked once at the first start (F-62, ADR 0076).
  *
  * Two things have to be true of this screen or it does harm. Picking nothing
  * must be a real option, offered as plainly as picking something, which is why

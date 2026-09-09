@@ -347,7 +347,7 @@ function MetricBody({ series, sessionCount }: { series: MetricSeries; sessionCou
  * Not an empty box and not a nag. The three Kennzahlen that moved most across
  * the period are the ones where there is something to look at, so they earn the
  * space; the invitation to pick goals sits beside them as an offer. Choosing
- * goals is voluntary (F-61) and a screen that withholds content until you do
+ * goals is voluntary (F-62) and a screen that withholds content until you do
  * would make it less so.
  */
 function OverviewSection({ series }: { series: MetricSeries[] }) {

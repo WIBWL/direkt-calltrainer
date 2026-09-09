@@ -3,7 +3,7 @@
 Revision ID: c8a1f60d34be
 Revises: dc5b4557e6b1
 
-The three tables behind F-61 / ADR 0074: the shipped catalogue of training
+The three tables behind F-62 / ADR 0076: the shipped catalogue of training
 focuses, the fact that one subject has answered the question, and the at most
 five goals they picked.
 
@@ -29,6 +29,9 @@ Purely additive: three new tables, no column touched on an existing one, so this
 runs on a populated database without rewriting a row. Constraint and index names
 are passed through op.f() so they match the convention on Base.metadata
 (ADR 0053).
+
+Re-pointed from `dc5b4557e6b1`, which left two heads when this branch took
+origin/dev in. The columns are additive, so the order is free.
 """
 from typing import Sequence, Union
 
@@ -38,7 +41,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "c8a1f60d34be"
-down_revision: Union[str, None] = "dc5b4557e6b1"
+down_revision: Union[str, None] = "b6d24f7a91e5"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -2,13 +2,14 @@
 
 ## Status
 
-**Proposed.** The feature (F-61) is not built. This records the decisions
-taken in `docs/plans/reverse-scenario.md` up front, because several of them
-are deliberate exceptions to ADRs already in force (ADR 0043,
-ADR 0033's "no text during the call") and those exceptions should be arguable
-before the code exists, not discovered in it. Revisit and move to Accepted
-when the feature lands; until then, nothing in this ADR describes running
-code.
+**Accepted**, and built (F-61). It was written as *proposed* before any code
+existed, because several of the decisions below are deliberate exceptions to
+ADRs already in force (ADR 0043, ADR 0033's "no text during the call") and
+those exceptions should be arguable in the open rather than discovered in a
+diff. Three things changed on the way in, all recorded in Consequences: the
+call-state notes (ADR 0071), the settlement check (ADR 0073) and the per-turn
+anti-repeat nudge (ADR 0038) turned out to need the swap as well, since all
+three are written from the caller's side.
 
 ## Context
 
@@ -66,8 +67,11 @@ are untouched.
 `llm.complete(think=True)` at creation turns the four prompt fields (plus the
 improvement points and `phase_language` where a wrap-up exists) into German
 text addressed to the User — situation, facts, goal, settled — and three to
-five imperative watch-points. It translates and re-addresses; it invents
-nothing. It lives in `reverse_brief` on the row, and the live call never sees
+five **goals**: the concrete things this call has to raise, ask or come away
+with, each one tickable once it has happened. (They began as "watch-points",
+advice on what to pay attention to; that produced remarks about tone, which
+are not something a caller can work through. The prompt now rules manner out
+by name.) It translates and re-addresses; it invents nothing. It lives in `reverse_brief` on the row, and the live call never sees
 it: a briefing the Persona could read would be a briefing the Persona could
 act on.
 
@@ -75,7 +79,19 @@ act on.
 ADR 0033's "no text during the live call, only a state animation". The rule
 exists so the trainee listens instead of reading a transcript; this text is
 the User's own briefing, fixed before the call starts, and never the Persona's
-lines. It appears on the mic-check screen and beside the state animation.
+lines. It appears beside the state animation, the two splitting the screen
+evenly, and at its full length: no scrollbox of its own, because a briefing
+half-hidden behind an inner scrollbar is a briefing the User will not find the
+fact in.
+
+**Starting a reverse takes two presses and a screen in between.** *Rollen
+tauschen* writes the Scenario; *Gespräch starten* begins the call; between them
+is a screen carrying the briefing alone. The first press costs a model call and
+the better part of a minute, so it cannot also be the press that starts a
+conversation — and a reverse is a case the User has to argue, which is not
+something to be dropped into. That screen stands where the microphone check
+stands for an ordinary call, pre-warm (ADR 0042) and all, rather than after it:
+the microphone was in use for the training this reverse came out of.
 
 **A reverse is stored and analysed like any Session** — consent (ADR 0066),
 retention (ADR 0067), history and wrap-up all apply unchanged. The wrap-up
@@ -106,3 +122,37 @@ case the User is about to argue. It is generated once and stored rather than
 per call, which makes it inspectable and fixable; it is not regenerated when
 the origin Scenario changes, and after the origin Session is deleted the row
 keeps a briefing whose conversation no longer exists.
+
+Three further places turned out to be written from the caller's side and had
+to swap with the rest, none of them foreseen above, and all three for one
+reason: they sit *nearer the reply* than the system prompt does, so a casting
+they contradict is the casting that loses. The **call-state notes** (ADR 0071)
+are most of what the model still sees of a call, so a frame naming the wrong
+side as the caller undoes the system prompt one exchange at a time; they now
+name the side that answered, and label the exchange `Agent` like the wrap-up's
+dossier. The **settlement check** (ADR 0073) asked whether the user had given
+the persona what it came for, which reversed turns into the persona pressing
+the caller for the thing the caller rang about; it now asks whether the persona
+has given the caller that. The **per-turn anti-repeat nudge** (ADR 0038) ends
+in three lines forbidding the persona to put the user's proposal forward as its
+own solution — written against a real failure mode of the caller casting, and
+in the reverse casting a prohibition on the one thing the company side is there
+to do; its reversed form keeps the demand for something new every turn and
+drops that clause. All three are variants beside the original, not replacements,
+and the ordinary text of each is pinned by a test — which is the shape this
+whole change took: a handful of builders with a reversed form, everything that
+has to hold in both castings written once.
+
+The deletion asymmetry is stated where the Consequences above demanded it: the
+profile screen's withdrawal confirmation names the reverse Scenarios it takes,
+and its list of deletion paths says that removing a single training leaves them
+standing. Creating a reverse is offered from a past training as well as from
+the screen that follows the call — the row is written on request rather than by
+the worker, so there is nothing about it that has to happen within a minute of
+hanging up, and confining it there would have made a stored Scenario reachable
+only in the window before it existed.
+
+The retry-and-parse loop the follow-up (ADR 0069) and this briefing share moved
+into `llm.complete_json`, beside the fence-unwrapping that was already there
+for the same reason. The wrap-up deliberately does not use it: it needs the raw
+text for its narrative fallback, which that helper does not hand back.

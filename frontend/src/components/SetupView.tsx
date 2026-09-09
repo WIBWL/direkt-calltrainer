@@ -30,6 +30,8 @@ interface SetupViewProps {
   tenantName: string | null;
   onNewScenario: () => void;
   onEditScenario: (id: string) => void;
+  /** Retire a reverse (ADR 0070); the only affordance it has. */
+  onRemoveScenario: (id: string) => void;
   personas: Persona[];
   personaId: string | null;
   selectedScenario: ScenarioCard | null;
@@ -59,6 +61,7 @@ export default function SetupView({
   tenantName,
   onNewScenario,
   onEditScenario,
+  onRemoveScenario,
   personas,
   personaId,
   selectedScenario,
@@ -102,6 +105,7 @@ export default function SetupView({
           newLabel="+ Individuelles Szenario"
           onNew={onNewScenario}
           onEdit={onEditScenario}
+          onRemove={onRemoveScenario}
         />
       </SetupSection>
 
@@ -129,7 +133,6 @@ export default function SetupView({
           scenario={selectedScenario?.name ?? NOT_SELECTED}
           persona={selectedPersona?.name ?? NOT_SELECTED}
           language={selectedPersona?.language ?? NOT_SELECTED}
-          voice="Durch Persona festgelegt"
         />
 
         {/* Said before the call, not after it (ADR 0066). Someone who declined

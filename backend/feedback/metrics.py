@@ -23,9 +23,11 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from statistics import fmean
 
+from backend.db.models import ASPECT_HOW, ASPECT_WHAT
 from backend.feedback import intonation
 from backend.feedback.acoustics import Pause
 from backend.feedback.interruptions import Segment, classify
+from backend.session.language_packs import LANGUAGE_PACKS, LanguagePack
 
 _MS_PER_MINUTE = 60_000
 _MS_PER_SECOND = 1000
@@ -33,6 +35,8 @@ _MS_PER_SECOND = 1000
 # writes for numbers don't inflate the count.
 _WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 _SENTENCE_END_RE = re.compile(r"[.!?]+")
+# The same, minus the question mark: a segment a question mark already ended.
+_SENTENCE_SPLIT_RE = re.compile(r"[.!]+")
 # The one metric the wrap-up reads as a course rather than as a figure, so
 # generator.py has to be able to pick it out of the inventory by name.
 LOUDNESS_KEY = "loudness"
@@ -66,6 +70,9 @@ class Conversation:  # pylint: disable=too-many-instance-attributes  # a record 
     """
 
     user_text: str = ""
+    # For the metrics that read words rather than milliseconds. None means
+    # they report what they can without a vocabulary.
+    language_id: str | None = None
     # How long the user's audio ran, and how much of that was speech rather
     # than silence. Only the first is comparable with `persona_speech_ms`.
     user_speech_ms: int = 0
@@ -120,6 +127,9 @@ class MetricDef:
     key: str
     name: str
     unit: str | None
+    # ASPECT_HOW or ASPECT_WHAT: which half of the Kennzahlen grid this one
+    # sits in. A display grouping -- it never reaches the wrap-up prompt.
+    aspect: str
     feature_id: str
     active: bool
     derive: Deriver | None = None
@@ -171,12 +181,32 @@ def _questions(call: Conversation) -> Measurement | None:
     Counted from the transcript's own punctuation: STT punctuates German
     reliably enough, and a keyword list would miss the inversions
     ("Koennen Sie mir sagen...") that carry most German questions.
+
+    The detail splits them into open and closed. Both halves are read off the
+    same question marks, so they always add up to the count.
     """
     words = _count_words(call.user_text)
     if not words:
         return None
     questions = call.user_text.count("?")
-    return Measurement("questions", float(questions), {"per_100_words": questions * 100 / words})
+    detail: dict = {"per_100_words": questions * 100 / words}
+    pack = _pack(call)
+    if pack and questions:
+        opened = _open_questions(call.user_text, pack)
+        detail |= {"open": opened, "closed": questions - opened}
+    return Measurement("questions", float(questions), detail)
+
+
+def _open_questions(text: str, pack: LanguagePack) -> int:
+    """How many of the question marks in `text` end an open question.
+
+    Only the last clause of a segment is the question; what precedes the
+    nearest full stop belongs to the sentence before it.
+    """
+    return sum(
+        1 for segment in text.split("?")[:-1]
+        if pack.open_question_re.match(_SENTENCE_SPLIT_RE.split(segment)[-1].strip())
+    )
 
 
 def _pace(call: Conversation) -> Measurement | None:
@@ -225,6 +255,23 @@ def _reaction_time(call: Conversation) -> Measurement | None:
         "reaction_time",
         fmean(call.reactions_ms) / _MS_PER_SECOND,
         {"longest_s": max(call.reactions_ms) / _MS_PER_SECOND, "count": len(call.reactions_ms)},
+    )
+
+
+def _phonation_share(call: Conversation) -> Measurement | None:
+    """F-51. How much of the user's own recording was speech rather than
+    silence -- the companion to `_pauses`, which knows only an average length.
+
+    Systematically short of 100%: the client's VAD pads every recording, and
+    that padding sits in the denominator. A reading against this user's own
+    calls, not an absolute.
+    """
+    if not call.user_acoustics_complete or not call.user_speech_ms:
+        return None
+    return Measurement(
+        "phonation_share",
+        call.user_phonation_ms * 100 / call.user_speech_ms,
+        {"speech_ms": call.user_speech_ms, "phonation_ms": call.user_phonation_ms},
     )
 
 
@@ -513,34 +560,46 @@ METRICS: tuple[MetricDef, ...] = (
     # Active -- F-53's Kennzahlen, plus F-37's loudness curve. No metric
     # carries a target range: there is no validated norm for this population,
     # and a made-up threshold is a score in disguise (ADR 0004/0051).
-    MetricDef("talk_share", "Redeanteil", "%", "F-24", True, _talk_share),
-    MetricDef("questions", "Fragen an den Gesprächspartner", "Anzahl", "F-41", True, _questions),
-    MetricDef("pace", "Sprechtempo", "Wörter/min", "F-36", True, _pace),
-    MetricDef("word_count", "Gesprochene Wörter", "Wörter", "F-08", True, _word_count),
-    MetricDef("reaction_time", "Reaktionszeit", "s", "F-53", True, _reaction_time),
-    MetricDef("pauses", "Sprechpausen", "s", "F-51", True, _pauses),
-    MetricDef(LOUDNESS_KEY, "Lautstärke", "dB", "F-37", True, _loudness),
+    #
+    # `aspect` splits them into the two halves the screen shows one at a time.
+    # Redeanteil is `what` despite coming from durations: it describes the
+    # shape of the exchange, not the delivery.
+    MetricDef("talk_share", "Redeanteil", "%", ASPECT_WHAT, "F-24", True, _talk_share),
+    MetricDef("questions", "Fragen an den Gesprächspartner", "Anzahl", ASPECT_WHAT, "F-41",
+              True, _questions),
+    MetricDef("pace", "Sprechtempo", "Wörter/min", ASPECT_HOW, "F-36", True, _pace),
+    MetricDef("word_count", "Gesprochene Wörter", "Wörter", ASPECT_WHAT, "F-08", True,
+              _word_count),
+    MetricDef("reaction_time", "Reaktionszeit", "s", ASPECT_HOW, "F-53", True, _reaction_time),
+    MetricDef("pauses", "Sprechpausen", "s", ASPECT_HOW, "F-51", True, _pauses),
+    MetricDef("phonation_share", "Redefluss", "%", ASPECT_HOW, "F-51", True, _phonation_share),
+    MetricDef(LOUDNESS_KEY, "Lautstärke", "dB", ASPECT_HOW, "F-37", True, _loudness),
     # F-35, a MUST that had no measurement until the pitch curve existed. The
     # unit is semitones so the figure describes delivery rather than the voice
     # it was spoken with -- see `_intonation`.
-    MetricDef("intonation", "Sprachmelodie", "Halbtöne", "F-35", True, _intonation),
-    # F-51's third element beside pauses: how often the user cut in (ADR 0035),
-    # as a count. A rate per Persona turn was built alongside it and dropped
-    # again -- at the length these calls run it turned every single
-    # interruption into the top step, which said more about the denominator
-    # than about the call.
-    MetricDef("interruptions", "Unterbrechungen", "Anzahl", "F-51", True, _interruptions),
+    MetricDef("intonation", "Sprachmelodie", "Halbtöne", ASPECT_HOW, "F-35", True, _intonation),
+    # F-51's third element beside pauses (ADR 0035). A count, not a rate: per
+    # Persona turn it put every single interruption on the top step.
+    MetricDef("interruptions", "Unterbrechungen", "Anzahl", ASPECT_HOW, "F-51", True,
+              _interruptions),
     # SHOULD / COULD -- seeded so the vocabulary is complete, but inactive and
     # without a derivation.
-    MetricDef("concreteness", "Sprachliche Konkretheit", None, "F-40", False),
+    MetricDef("concreteness", "Sprachliche Konkretheit", None, ASPECT_WHAT, "F-40", False),
     # F-42 ships, but as prose and not as a figure: what it describes is a
     # change of register across the call's three phases, which no single value
     # carries and which would need a norm nobody measured to score. It is the
     # `phase_language` paragraph of the wrap-up (backend/feedback/generator.py).
     # The row stays inactive and seeded so the vocabulary keeps its entry.
-    MetricDef("phase_appropriate_language", "Phasengerechte Sprache", None, "F-42", False),
-    MetricDef("congruence", "Kongruenz von Inhalt und Stimme", None, "F-39", False),
+    MetricDef("phase_appropriate_language", "Phasengerechte Sprache", None, ASPECT_HOW,
+              "F-42", False),
+    MetricDef("congruence", "Kongruenz von Inhalt und Stimme", None, ASPECT_HOW, "F-39", False),
 )
+
+
+def _pack(call: Conversation) -> LanguagePack | None:
+    """The call's language pack, or None. `.get`, not `get_pack`: a missing
+    pack costs one detail, raising would cost every statistic."""
+    return LANGUAGE_PACKS.get(call.language_id or "")
 
 
 def _count_words(text: str) -> int:

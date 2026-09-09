@@ -1,8 +1,8 @@
-# ADR 0074: Focus Goals as a Stored Selection
+# ADR 0076: Focus Goals as a Stored Selection
 
 ## Status
 
-Accepted. Introduces F-61 (`docs/features.md`) and migration `c8a1f60d34be`.
+Accepted. Introduces F-62 (`docs/features.md`) and migration `c8a1f60d34be`.
 Scoped deliberately: this decides what a focus *is* and where it lives. What
 reads one — the wrap-up and the progress dashboard — is a later step and is not
 part of this change.

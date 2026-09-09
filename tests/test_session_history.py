@@ -175,6 +175,9 @@ async def test_a_row_carries_what_the_history_list_shows(
     assert set(row) == {
         "session_id", "persona", "scenario", "status", "has_feedback",
         "feedback_status", "started_at", "ended_at", "measurements",
+        # Which side the User was on (ADR 0070) -- two rows on the same
+        # Scenario are otherwise indistinguishable.
+        "reverse",
     }
     assert row["persona"] == "Thomas Brandt"
     assert row["scenario"] == "Kündigungsabsicht"

@@ -123,7 +123,7 @@ async def test_the_switch_really_does_switch(
 
 
 def test_the_switch_is_off_unless_it_is_set(monkeypatch) -> None:
-    """Read from the environment the same way DEBUG is, and off for anything
+    """Read from the environment the same way the other flags are, and off for anything
     that is not an explicit yes — including the empty value .env ships.
 
     The reload is restored in a `finally`, not left to monkeypatch: undoing the

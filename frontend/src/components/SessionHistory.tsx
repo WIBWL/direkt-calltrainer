@@ -7,12 +7,6 @@ import type { SessionSummary } from "../protocol";
 import { formatClock, formatDateTime } from "../utils/time";
 import { sessionPath } from "../routes";
 
-/** How many rows the list shows before the user asks for the rest. Four is
- *  what a returning user actually looks for — the last handful of calls — and
- *  it keeps the sections below (data, deletion) on the same screen instead of
- *  pushing them past a history that grows without bound. */
-const COLLAPSED_ROWS = 4;
-
 /**
  * The user's past trainings (F-48), each one a row that opens the wrap-up that
  * was generated for it back then (F-13's data, without F-13's judgement — see
@@ -22,10 +16,8 @@ const COLLAPSED_ROWS = 4;
  * one call you are thinking of, so what earns its place in a row is what tells
  * two calls apart: when it was, which scenario, and with whom.
  *
- * Only the newest few are shown; the rest are one click away. Nothing is
- * withheld by that — the older rows are already loaded, the button says how
- * many there are, and expanding is what the page remembers for as long as it
- * is open.
+ * Only the newest few are shown, the rest one press at a time
+ * (`useSessionHistory`), so the sections below stay on the same screen.
  *
  * Deleting is offered on the row itself rather than only inside the training:
  * clearing out a handful of old calls should not mean opening and leaving each
@@ -33,9 +25,8 @@ const COLLAPSED_ROWS = 4;
  * final and reaches the wrap-up and the figures with it.
  */
 export default function SessionHistory() {
-  const { sessions, total, state, hasMore, loadingMore, loadMore, removeSession } =
+  const { sessions, total, state, hasMore, loadingMore, showMore, removeSession } =
     useSessionHistory();
-  const [expanded, setExpanded] = useState(false);
 
   if (state === "loading") {
     return <p className="muted">Trainings werden geladen …</p>;
@@ -54,37 +45,21 @@ export default function SessionHistory() {
     );
   }
 
-  const visible = expanded ? sessions : sessions.slice(0, COLLAPSED_ROWS);
-  const hidden = total - visible.length;
-
   return (
     <>
       <ol className="session-list">
-        {visible.map((session) => (
+        {sessions.map((session) => (
           <li key={session.session_id}>
             <SessionRow session={session} onDeleted={() => removeSession(session.session_id)} />
           </li>
         ))}
       </ol>
 
-      {sessions.length > COLLAPSED_ROWS && (
+      {hasMore && (
         <button
           type="button"
           className="session-more"
-          aria-expanded={expanded}
-          onClick={() => setExpanded((open) => !open)}
-        >
-          {expanded ? "Weniger anzeigen" : `Ältere Trainings anzeigen (${hidden})`}
-        </button>
-      )}
-
-      {/* Only once the list is open — under a collapsed list this would offer
-          to fetch rows that are not being shown. */}
-      {expanded && hasMore && (
-        <button
-          type="button"
-          className="session-more"
-          onClick={loadMore}
+          onClick={showMore}
           disabled={loadingMore}
         >
           {loadingMore ? "Wird geladen …" : `Weitere laden (${sessions.length} von ${total})`}
@@ -131,6 +106,12 @@ function SessionRow({
           <span className="session-row-title">{session.scenario}</span>
           <span className="session-row-persona">
             {session.persona}
+            {session.reverse && (
+              // Which side of the phone the User was on (ADR 0070). Two rows on
+              // the same Scenario are otherwise indistinguishable, and they were
+              // opposite exercises.
+              <span className="chip chip-neutral">Rollentausch</span>
+            )}
             {session.status === "aborted" && (
               // Worth saying, because it explains a short call or a missing
               // wrap-up — but stated, not warned about.

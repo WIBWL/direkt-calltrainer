@@ -19,7 +19,7 @@ import LegalPage from "../LegalPage";
  * it: the login through Keycloak, the speech leaving the browser for the DiReKT
  * gateway and KugelAudio, the consent-gated storage, the six-month retention,
  * the account settings that are stored alongside the trainings without being
- * part of them (the focus goals of ADR 0074 and the retention switch), and the
+ * part of them (the focus goals of ADR 0076 and the retention switch), and the
  * rights that are exercisable in the app itself.
  *
  * The two gaps the first draft carried are filled: the hoster is Hetzner in

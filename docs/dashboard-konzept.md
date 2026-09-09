@@ -76,7 +76,7 @@ konkret folgt, nicht nur, dass es sie gibt.
 |---|---|
 | Hattie & Timperley (2007), *The Power of Feedback*: wirksames Feedback beantwortet „Feed Up“ (wohin), „Feed Back“ (wie läuft es), „Feed Forward“ (was als Nächstes) | Die drei Bereiche des Bildschirms sind genau diese drei Fragen, in dieser Reihenfolge: Fokusziele oben, Verläufe in der Mitte, Übungsvorschlag unten. |
 | Zimmerman (2002), zyklisches Modell selbstregulierten Lernens (Planung, Ausführung, Selbstreflexion) | Das Dashboard bedient die Reflexionsphase und muss in die Planungsphase zurückführen. Ein Dashboard ohne Weg zurück ins Training endet in der Betrachtung. |
-| Locke & Latham (2002), Zielsetzungstheorie: spezifische Ziele wirken, aber nur mit Rückmeldung zum Zielfortschritt | Die Fokusziele (F-61) sind der spezifische Teil. Das Dashboard ist die Rückmeldung dazu. Ohne diesen Bereich blieben die Fokusziele folgenlos. |
+| Locke & Latham (2002), Zielsetzungstheorie: spezifische Ziele wirken, aber nur mit Rückmeldung zum Zielfortschritt | Die Fokusziele (F-62) sind der spezifische Teil. Das Dashboard ist die Rückmeldung dazu. Ohne diesen Bereich blieben die Fokusziele folgenlos. |
 | Ericsson et al. (1993), deliberate practice: gezielte Wiederholung an der Schwachstelle, mit unmittelbarer Rückmeldung | Der Bereich „Üben“ verknüpft einen wiederkehrenden Verbesserungspunkt mit genau einem passenden Szenario und einer passenden Persona, nicht mit einer allgemeinen Empfehlung. |
 | Jivet et al. (2018), *License to Evaluate*: Lern-Dashboards stützen sich überwiegend auf sozialen Vergleich und selten auf eine Lerntheorie | Bezugsnorm ist ausschließlich die eigene Vergangenheit (individuelle Bezugsnorm), nie eine Gruppe. Das deckt sich mit Abschnitt 2. |
 | Verbert et al. (2013), Prozessmodell für Lernanalytik: Wahrnehmen, Reflektieren, Deuten, Handeln | Jeder Block endet mit einer Handlungsmöglichkeit (Detail öffnen, Ziel ändern, Training starten). Ein Block, aus dem nichts folgt, gehört nicht auf den Bildschirm. |
@@ -182,7 +182,7 @@ abgebrochen), also Aktivität und Vielfalt.
 
 ### 4.2 Abdeckung der Fokusziele
 
-Der Katalog aus F-61 hat 15 Ziele. Was davon heute mit Daten hinterlegt werden
+Der Katalog aus F-62 hat 15 Ziele. Was davon heute mit Daten hinterlegt werden
 kann:
 
 | Fokusziel | Heute belegbar durch | Lücke |
@@ -303,7 +303,7 @@ Jede Kachel zeigt:
 also die, bei denen sich überhaupt etwas bewegt, jeweils mit Sparkline, und
 daneben eine Einladung, Fokusziele zu wählen, die ins Profil führt. Damit ist
 der Bereich nie leer, und die Einladung ist ein Angebot statt einer Mahnung. Das
-Setzen von Zielen bleibt freiwillig (F-61).
+Setzen von Zielen bleibt freiwillig (F-62).
 
 ### C. Kennzahlen über die Zeit
 

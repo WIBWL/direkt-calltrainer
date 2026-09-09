@@ -114,6 +114,10 @@ services:
           path: ./requirements.txt
 
   redis:
+    # Not streamed by `docker compose up` -- `docker compose logs redis`
+    # still has every line. It says nothing a running system needs; the queue
+    # is observed through the worker, which stays attached.
+    attach: false
     image: redis:8-alpine
     # `warning` silences the module-load and "ready to accept connections"
     # notices at boot; nothing here needs Redis's own info logs.
@@ -133,6 +137,21 @@ services:
 
   db:
     image: postgres:17
+    # Not streamed by `docker compose up`; `docker compose logs db` still has
+    # every line. Its output is startup/shutdown chatter plus, during a test
+    # run, one checkpoint per throwaway database (tests/conftest.py creates and
+    # drops one per persistence test, and CREATE/DROP DATABASE each force one)
+    # -- a few hundred lines describing 30 ms of work apiece, burying the two
+    # services worth watching.
+    #
+    # `attach: false` rather than a Postgres log level, because there is no log
+    # level that drops this and keeps errors: `log_min_messages` ranks LOG above
+    # ERROR, so raising it past the startup chatter silences real errors too
+    # (verified -- a division by zero stopped being logged).
+    attach: false
+    # Checkpoint logging off on top of that, so a test run does not fill the
+    # captured log either. Turn it back on before diagnosing real I/O.
+    command: postgres -c log_checkpoints=off
     # Nothing here comes back on its own otherwise: a Docker restart, an OOM
     # kill or a crash leaves the container down. On the worker that is silent
     # -- calls keep working and wrap-ups simply never appear -- which is
@@ -168,6 +187,11 @@ services:
   # reach it as `keycloak:8080` for the JWKS. Host port 18081, not 18080, so it
   # can run alongside another local Keycloak on the default port.
   keycloak:
+    # Not streamed by `docker compose up` -- `docker compose logs keycloak`
+    # still has every line. It prints dozens of lines of Quarkus banner and
+    # realm import at every start and nothing afterwards, so in the foreground
+    # it is pure startup noise around the two services worth watching.
+    attach: false
     image: quay.io/keycloak/keycloak:26.7
     # Nothing here comes back on its own otherwise: a Docker restart, an OOM
     # kill or a crash leaves the container down. On the worker that is silent
@@ -188,7 +212,17 @@ services:
       # the admin console below is reachable with admin/admin. Nothing is lost,
       # KC_HOSTNAME pins the issuer to localhost anyway, so a login from
       # another machine could not work regardless.
+      #
+      # Both loopback addresses, and that is not redundant: Windows resolves
+      # `localhost` to ::1 first, so an IPv4-only binding makes every browser
+      # request to Keycloak open a connection that goes nowhere and fall back
+      # to 127.0.0.1 once the attempt times out -- a flat ~200 ms on each, paid
+      # five times over while the login page loads. The app's port carries no
+      # interface prefix and therefore listens on both anyway; here the prefix
+      # is what keeps it off the network, so the second address has to be
+      # spelled out.
       - 127.0.0.1:18081:8080
+      - "[::1]:18081:8080"
     volumes:
       - keycloak-data:/opt/keycloak/data
       - ./keycloak:/opt/keycloak/data/import:ro

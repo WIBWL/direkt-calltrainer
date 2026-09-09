@@ -287,3 +287,29 @@ def test_a_session_that_was_never_written_leaves_no_job_behind(
         generate_feedback(4_711)
 
     assert db_session.query(AnalysisJob).filter_by(session_id=4_711).count() == 0
+
+
+def test_a_call_with_nothing_in_it_is_summarised_without_the_model(
+    db_session: DbSession, app_database: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A training broken off before a word was said.
+
+    O5 asks the model for this one sentence, and a 4B model (ADR 0011) answers
+    it in the English the rule is written in -- "nothing to review", on a German
+    screen. There is nothing to interpret in an empty call, so nothing is asked:
+    the sentence is written here, in the Session's own language.
+    """
+    asked: list = []
+    _stub_model(monkeypatch, lambda messages: asked.append(messages) or _REPLY)
+    persist(turns=[])
+    session_id = db_session.query(Session).one().session_id
+
+    generate_feedback(session_id)
+
+    db_session.expire_all()
+    feedback = db_session.query(Feedback).one()
+    assert not asked, "an empty call costs no model call"
+    assert feedback.summary.startswith("In diesem Training wurde nicht gesprochen")
+    assert feedback.points == []
+    assert feedback.phase_language is None
+    assert _job(db_session, session_id).status == "done"

@@ -1,5 +1,5 @@
 /**
- * Which measured Kennzahlen stand behind a focus goal (F-61, F-13).
+ * Which measured Kennzahlen stand behind a focus goal (F-62, F-13).
  *
  * The dashboard has to show something per picked goal, and the honest answer
  * differs per goal: nine of the fifteen have measurements today, two are

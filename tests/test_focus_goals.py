@@ -1,4 +1,4 @@
-"""The training focus a User picks, and the catalogue behind it (F-61, ADR 0074).
+"""The training focus a User picks, and the catalogue behind it (F-62, ADR 0076).
 
 Three properties carry this file.
 
@@ -64,7 +64,7 @@ def test_every_goal_declares_a_group_and_an_evidence_kind(db_session: DbSession)
     """Both are closed vocabularies with a CHECK behind them. The group decides
     the heading a card sits under; `evidence` records how far a goal can be
     derived from a recording today and stays internal, which is why the payload
-    test below asserts it is *not* on the wire (ADR 0074)."""
+    test below asserts it is *not* on the wire (ADR 0076)."""
     for row in db_session.query(FocusGoal).all():
         assert row.group_key in FOCUS_GROUPS, row.key
         assert row.evidence in FOCUS_EVIDENCE, row.key
@@ -96,7 +96,7 @@ async def test_the_catalogue_is_served_with_the_selection(
     assert {g["key"] for g in body["groups"]} == set(FOCUS_GROUPS)
     # Every goal carries the text the card shows and nothing more. `evidence` is
     # planning information for the analysis work and stays off the wire, so a
-    # user is never asked to weigh up how far a goal is measurable (ADR 0074).
+    # user is never asked to weigh up how far a goal is measurable (ADR 0076).
     first = body["goals"][0]
     assert set(first) == {"key", "title", "caption", "info", "group"}
 

@@ -15,7 +15,7 @@ Two shapes:
   audio latency does not matter.
 
 Both fall back to the DiReKT Voxtral model (ADR 0040) when KugelAudio fails
-before producing audio, or always under ``DEBUG``.
+before producing audio, or always under ``SKIP_KUGELAUDIO``.
 
 **A stream left before its ``final`` frame poisons the pooled socket** (ADR
 0044 amendment). ``stream_async`` sends the request on the shared connection
@@ -44,7 +44,7 @@ from openai import OpenAIError
 
 from backend.clients.config import (
     CLIENT,
-    DEBUG,
+    SKIP_KUGELAUDIO,
     KUGELAUDIO_CLIENT,
     KUGELAUDIO_MODEL,
     LOG_TRANSCRIPTS,
@@ -62,8 +62,8 @@ async def prewarm() -> None:
     Called once from the app's lifespan. `stream_async` (which
     `synthesize_stream` uses) reuses this connection, so the first synthesis
     of the process skips the ~300-600 ms TCP+TLS+WebSocket handshake. No-op
-    under DEBUG."""
-    if DEBUG or KUGELAUDIO_CLIENT is None:
+    under SKIP_KUGELAUDIO."""
+    if SKIP_KUGELAUDIO or KUGELAUDIO_CLIENT is None:
         return
     try:
         await KUGELAUDIO_CLIENT.tts.connect_async(KUGELAUDIO_MODEL)
@@ -85,7 +85,7 @@ async def synthesize_stream(text: str, voice: PersonaVoice, language_id: str) ->
     # Done here so every backend and every fallback below gets it, and so
     # the Transcript keeps the digits.
     text = for_speech(text, language_id)
-    if DEBUG or KUGELAUDIO_CLIENT is None:
+    if SKIP_KUGELAUDIO or KUGELAUDIO_CLIENT is None:
         yield await _synthesize(text, voice)
         return
 
@@ -142,7 +142,7 @@ async def _reset_pooled_connection() -> None:
 
 async def synthesize(text: str, voice: PersonaVoice, language_id: str) -> bytes:
     """One-shot: the whole chunk as a single WAV. KugelAudio by default,
-    DiReKT on failure or under DEBUG.
+    DiReKT on failure or under SKIP_KUGELAUDIO.
 
     KugelAudio wants the bare language code ("de", "en") here, not a full
     locale tag -- it rejects "de-DE"/"en-GB" with "Invalid request", which
@@ -153,7 +153,7 @@ async def synthesize(text: str, voice: PersonaVoice, language_id: str) -> bytes:
     # Done here so every backend and every fallback below gets it, and so
     # the Transcript keeps the digits.
     text = for_speech(text, language_id)
-    if not DEBUG:
+    if not SKIP_KUGELAUDIO:
         try:
             return await _synthesize_kugelaudio(text, voice, language_id)
         except (KugelAudioError, TimeoutError, OSError) as e:

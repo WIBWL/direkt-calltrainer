@@ -59,7 +59,7 @@ function ReturnToRequestedPage() {
 /**
  * The routes that may only be reached once the two first-run questions are
  * answered: whether trainings may be stored (ADR 0066) and what the user wants
- * to focus on (ADR 0074).
+ * to focus on (ADR 0076).
  *
  * Nested, so they are asked one after the other rather than on top of each
  * other, and in this order: consent is the one with a legal basis behind it,

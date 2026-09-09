@@ -33,8 +33,9 @@ export const ROUTES = {
 } as const;
 
 /**
- * What the history hands the training flow when a follow-up is started from a
- * past training (F-60), through the router's location state.
+ * What the history hands the training flow when a follow-up (F-60) or a
+ * reverse (F-61) is started from a past training, through the router's location
+ * state.
  *
  * The two screens are separate routes, so there is no shared component state to
  * put a selection into — and a query parameter would survive a reload and start
@@ -43,6 +44,11 @@ export const ROUTES = {
 export interface TrainingStart {
   scenarioId: string;
   personaId: string;
+  /** Whether the Scenario is a reverse (ADR 0070), which decides whether the
+   * briefing panel is shown. Carried rather than looked up: the row was just
+   * written and is not in the training screen's library copy yet. Absent means
+   * an ordinary Scenario. */
+  reverse?: boolean;
 }
 
 /**

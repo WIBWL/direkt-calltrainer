@@ -1,5 +1,5 @@
 """The training focus a User has picked, and the catalogue it comes from
-(F-61, ADR 0074).
+(F-62, ADR 0076).
 
 The single place the `focus_goal`, `focus_selection` and `focus_selection_goal`
 tables are read and written — `backend/library.py`'s role for the Scenario

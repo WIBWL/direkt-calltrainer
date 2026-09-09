@@ -7,7 +7,7 @@ import InfoDetails from "./InfoDetails";
  * Exported because both screens that show the picker need it, and because the
  * guard belongs next to the `disabled` rule in the picker below rather than
  * being restated in each of them: the two must agree on what the limit does,
- * and the backend refuses a sixth goal outright (ADR 0074).
+ * and the backend refuses a sixth goal outright (ADR 0076).
  */
 export function toggleGoal(selected: string[], key: string, max: number): string[] {
   if (selected.includes(key)) return selected.filter((k) => k !== key);
@@ -15,8 +15,8 @@ export function toggleGoal(selected: string[], key: string, max: number): string
 }
 
 /**
- * The catalogue as a set of tickable cards, grouped by heading (F-61,
- * ADR 0074).
+ * The catalogue as a set of tickable cards, grouped by heading (F-62,
+ * ADR 0076).
  *
  * One component for both places it appears — the first-run dialog and the
  * profile section. They differ in what surrounds them and in nothing else, and

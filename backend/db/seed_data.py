@@ -3,7 +3,7 @@
 
 ADR 0041 made the database the source of truth for the first two, so this
 content is seed state and not a runtime source: `backend/library.py` reads the
-tables, never this module. The focus-goal catalogue (ADR 0074) follows the same
+tables, never this module. The focus-goal catalogue (ADR 0076) follows the same
 rule and is read through `backend/focus.py`. `backend/db/provision.py` writes
 all of it on startup and `scripts/seed_reference_data.py` on demand, both
 idempotently.
@@ -782,7 +782,7 @@ SCENARIOS = [
 ]
 
 # --- Focus goals ----------------------------------------------------------
-# The catalogue a User picks their training focus from (F-61, ADR 0074). All
+# The catalogue a User picks their training focus from (F-62, ADR 0076). All
 # text here is German and user-facing: it is content, like a Scenario's title,
 # and the interface shows it unchanged. Only "id" is English, because it is the
 # key on the wire (ADR 0057/0061).
@@ -797,7 +797,7 @@ SCENARIOS = [
 # them carry an implementation detail while picking.
 #
 # The texts say what a goal is about, never what the system will do with it:
-# nothing reads a selection yet (ADR 0074's scope), and a promise here would be
+# nothing reads a selection yet (ADR 0076's scope), and a promise here would be
 # one this release does not keep.
 #
 # "position" is the display order across the whole catalogue; "group" only

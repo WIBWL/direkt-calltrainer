@@ -1,12 +1,15 @@
-import type { Origin, ScenarioCategory } from "../scenarioLibrary";
+import { useEffect, useState } from "react";
+
+import type { Origin, OriginSessionRef, ScenarioCategory } from "../scenarioLibrary";
 import { CATEGORIES, CATEGORY_LABELS } from "../scenarioLibrary";
 import FilterSlider, { type FilterOption } from "./FilterSlider";
 
 /** Level 1, the origin of a Scenario: who it comes from. "followUp" is the
- * worker-written Folgeszenario (ADR 0069), which is `origin: "own"` on the wire
- * but an option of its own here — "Individuell" means hand-authored. Not to be
- * confused with the level-2 CategoryFilter below. */
-export type LibraryFilter = "all" | "standard" | "own" | "followUp" | "tenant";
+ * Folgeszenario drafted from a training (ADR 0069) and "reverse" the Rollentausch of one
+ * finished Session (ADR 0070). Both are `origin: "own"` on the wire and options
+ * of their own here — "Individuell" means hand-authored, and nothing else. Not
+ * to be confused with the level-2 CategoryFilter below. */
+export type LibraryFilter = "all" | "standard" | "own" | "followUp" | "reverse" | "tenant";
 
 /** Level 2, the thematic category (ADR 0072). */
 export type CategoryFilter = "all" | ScenarioCategory;
@@ -24,9 +27,17 @@ const ORIGIN_LABELS: Record<Exclude<LibraryFilter, "tenant">, string> = {
   standard: "Standard",
   own: "Individuell",
   followUp: "Folgeszenario",
+  reverse: "Rollentausch",
 };
 
-const BASE_ORIGINS = ["all", "standard", "own", "followUp"] as const;
+const BASE_ORIGINS = ["all", "standard", "own", "followUp", "reverse"] as const;
+
+/** How many Scenario cards the grid shows before the "show all" tile takes over
+ * the sixth place. Five and not six, so that tile is always on the first two
+ * rows of a three-column grid rather than starting a third one by itself: the
+ * seeded library alone is seventeen rows deep, and a selection screen that
+ * opens on all of them is a scroll before it is a choice. */
+const COLLAPSED_CARDS = 5;
 
 export interface LibraryItem {
   id: string;
@@ -40,6 +51,21 @@ export interface LibraryItem {
   /** Written from a Session's feedback (F-60) rather than by hand. Own, but its
    * own origin — "Individuell" means hand-authored. */
   followUp: boolean;
+  /** A reverse of one finished Session (ADR 0070). */
+  reverse: boolean;
+  /** The conversation it replays; null once that Session has been deleted. */
+  originSession: OriginSessionRef | null;
+}
+
+/** "Gespräch vom 3. September mit Anna Beck" — which conversation a reverse
+ * replays, so two reverses of the same Scenario are told apart. */
+function reverseSubtitle(item: LibraryItem): string {
+  if (!item.originSession) return "Ursprungsgespräch gelöscht";
+  const when = new Date(item.originSession.started_at).toLocaleDateString("de-DE", {
+    day: "numeric",
+    month: "long",
+  });
+  return `Gespräch vom ${when} mit ${item.originSession.persona}`;
 }
 
 interface LibraryPickerProps {
@@ -60,15 +86,27 @@ interface LibraryPickerProps {
   newLabel: string;
   onNew: () => void;
   onEdit: (id: string) => void;
+  /** Retire a reverse (ADR 0070), which is the only affordance it has in
+   * place of editing. */
+  onRemove: (id: string) => void;
 }
 
 /** Whether an item passes the active origin filter. "tenant" = anything shared
- * with the company, the author's own shared Scenarios included. */
+ * with the company, the author's own shared Scenarios included.
+ *
+ * A reverse is `origin: "own"` on the wire but is deliberately *not* under
+ * "Individuell": that option means what the User wrote, and a reverse is a
+ * copy of a call they had. Every Scenario therefore still sits under exactly
+ * one origin option, which is what keeps the counts adding up. */
 export function matchesFilter(item: LibraryItem, filter: LibraryFilter): boolean {
   if (filter === "all") return true;
   if (filter === "standard") return item.origin === "builtin";
   if (filter === "followUp") return item.followUp;
-  if (filter === "own") return item.origin === "own" && !item.followUp;
+  if (filter === "reverse") return item.reverse;
+  // "Individuell" is what is left of `own` once the two kinds the system wrote
+  // itself are taken out, so every Scenario sits under exactly one option and
+  // the counts add up.
+  if (filter === "own") return item.origin === "own" && !item.followUp && !item.reverse;
   return item.shared;
 }
 
@@ -80,14 +118,19 @@ export function matchesCategory(item: LibraryItem, category: CategoryFilter): bo
 }
 
 /** The card's origin, which is also its badge class suffix. Not the level-2
- * category — the prop of that name is the thematic filter. */
+ * category — the prop of that name is the thematic filter.
+ *
+ * The two kinds the system wrote itself come first: both are `origin: "own"`,
+ * and that is the distinction the badge is making. */
 function badgeClass(item: LibraryItem): string {
+  if (item.reverse) return "reverse";
   if (item.followUp) return "follow-up";
   if (item.origin === "own") return item.shared ? "shared" : "own";
   return item.origin;
 }
 
 function badgeLabel(item: LibraryItem, tenantName: string | null): string {
+  if (item.reverse) return "Rollentausch";
   if (item.followUp) return "Folgeszenario";
   if (item.origin === "own") return item.shared ? "Individuell · geteilt" : "Individuell";
   if (item.origin === "tenant") return tenantName ?? "Unternehmen";
@@ -118,7 +161,22 @@ export default function LibraryPicker({
   newLabel,
   onNew,
   onEdit,
+  onRemove,
 }: LibraryPickerProps) {
+  // Which card is asking to be confirmed, if any. One id rather than a set:
+  // asking about a second row answers the first with "no", which is the safe
+  // way round and saves a stray confirmation sitting armed on a card the User
+  // has moved on from.
+  const [confirmingRemoval, setConfirmingRemoval] = useState<string | null>(null);
+  // The grid opens on one row and a half of cards; the rest is behind the tile
+  // at the end of it. Collapsed again whenever the filters change, because what
+  // "the first five" are has changed with them.
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => setExpanded(false), [filter, category]);
+
+  const hidden = items.length - COLLAPSED_CARDS;
+  const shown = expanded ? items : items.slice(0, COLLAPSED_CARDS);
+
   const originOptions: FilterOption<LibraryFilter>[] = [
     ...BASE_ORIGINS.map((f) => ({
       value: f as LibraryFilter,
@@ -175,12 +233,14 @@ export default function LibraryPicker({
         <p className="library-empty">
           {filter === "followUp"
             ? "Zu dieser Auswahl gibt es noch kein Folgeszenario."
-            : "Zu dieser Auswahl gibt es kein Szenario."}
+            : filter === "reverse"
+              ? "Noch kein Rollentausch. Sie erstellen einen nach einem Gespräch, unter der Auswertung."
+              : "Zu dieser Auswahl gibt es kein Szenario."}
         </p>
       )}
 
       <div className="persona-grid scenario-grid">
-        {items.map((item) => (
+        {shown.map((item) => (
           <div key={item.id} className="card-wrap">
             <button
               className={
@@ -196,18 +256,84 @@ export default function LibraryPicker({
                 {item.id === selectedId ? "✓" : ""}
               </span>
               <span className="persona-name">{item.name}</span>
-              <span className="card-subtitle">{item.subtitle}</span>
+              <span className="card-subtitle">
+                {item.reverse ? reverseSubtitle(item) : item.subtitle}
+              </span>
               <span className={"card-badge card-badge-" + badgeClass(item)}>
                 {badgeLabel(item, tenantName)}
               </span>
             </button>
-            {item.origin === "own" && (
-              <button type="button" className="card-edit" onClick={() => onEdit(item.id)}>
-                Bearbeiten
-              </button>
+            {/* A reverse is not editable (ADR 0070) — it copies a case that
+                was played — so the affordance on it is removal instead, and
+                that asks first: it sits where every other card carries
+                "Bearbeiten", one slip away from a row the User cannot get
+                back. Recreating it means going to the training it came from
+                and spending a model call, if that training is even still
+                stored. */}
+            {item.reverse ? (
+              confirmingRemoval === item.id ? (
+                <span className="card-remove-confirm">
+                  <button
+                    type="button"
+                    className="card-edit card-edit-danger"
+                    onClick={() => {
+                      setConfirmingRemoval(null);
+                      onRemove(item.id);
+                    }}
+                  >
+                    Ja, entfernen
+                  </button>
+                  <button
+                    type="button"
+                    className="card-edit"
+                    onClick={() => setConfirmingRemoval(null)}
+                  >
+                    Abbrechen
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="card-edit"
+                  onClick={() => setConfirmingRemoval(item.id)}
+                >
+                  Entfernen
+                </button>
+              )
+            ) : (
+              item.origin === "own" && (
+                <button type="button" className="card-edit" onClick={() => onEdit(item.id)}>
+                  Bearbeiten
+                </button>
+              )
             )}
           </div>
         ))}
+
+        {/* The tile in the sixth place, and a tile rather than a link under the
+            grid: it is the last thing in the same row of choices, so it is
+            found by the eye already reading them. Absent when everything is on
+            screen — there is nothing behind it to open. */}
+        {hidden > 0 && (
+          <div className="card-wrap">
+            <button
+              type="button"
+              className="persona-card library-more-card"
+              onClick={() => setExpanded(!expanded)}
+            >
+              <span className="persona-name">
+                {expanded ? "Weniger anzeigen" : "Alle anzeigen"}
+              </span>
+              <span className="card-subtitle">
+                {expanded
+                  ? `Zurück auf ${COLLAPSED_CARDS}`
+                  : hidden === 1
+                    ? "1 weiteres Szenario"
+                    : `${hidden} weitere Szenarien`}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
     </>
   );

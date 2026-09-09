@@ -5,7 +5,7 @@ import FocusGoalPicker, { toggleGoal } from "./FocusGoalPicker";
 
 /**
  * The training focus on the profile page: what is currently picked, and how to
- * change it (F-61, ADR 0074).
+ * change it (F-62, ADR 0076).
  *
  * Read-only until the user asks to edit. The section is passed on the way to
  * something else most of the time, and fifteen open checkboxes would make a

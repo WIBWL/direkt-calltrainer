@@ -85,11 +85,13 @@ nav:
       - ADR 0067 - Stored Sessions Expire After Six Months, Unless the User Says Otherwise: adr/0067-six-month-retention-suspendable.md
       - ADR 0068 - The Consent Log Outlives the Data It Permitted: adr/0068-consent-log-outlives-the-data.md
       - ADR 0069 - The Follow-up Scenario Is Written From the Feedback and Stored: adr/0069-follow-up-scenario-from-feedback.md
-      - ADR 0070 - Reverse - Replaying a Session With the Roles Swapped (proposed): adr/0070-reverse-session-with-roles-swapped.md
+      - ADR 0070 - Reverse - Replaying a Session With the Roles Swapped: adr/0070-reverse-session-with-roles-swapped.md
       - ADR 0071 - The Model Reads Its Notes and the Last Exchanges, Not the Whole History: adr/0071-call-state-notes-instead-of-raw-history.md
       - ADR 0072 - The Scenario Category as a Closed Vocabulary: adr/0072-scenario-category-as-a-closed-vocabulary.md
       - ADR 0073 - The Settlement Check Rides on the Per-Turn Nudge: adr/0073-the-settlement-check-on-the-per-turn-nudge.md
-      - ADR 0074 - Focus Goals as a Stored Selection: adr/0074-focus-goals-as-a-stored-selection.md
+      - ADR 0074 - Dialogue Generation May Run on Gemini, Under One Switch and on Two Models: adr/0074-gemini-for-dialogue-two-models.md
+      - ADR 0075 - The Caller's Notes Are Kept Only Where the Model Cannot Read Its Own History: adr/0075-notes-only-where-the-model-cannot-read-its-history.md
+      - ADR 0076 - Focus Goals as a Stored Selection: adr/0076-focus-goals-as-a-stored-selection.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
   # site is served at the root (mkdocs serve / mkdocs build + static server).

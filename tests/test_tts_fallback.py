@@ -3,7 +3,7 @@
 Covers ADR 0040:
   * normal path -> KugelAudio
   * KugelAudio error -> transparently falls back to the DiReKT TTS model
-  * DEBUG=True -> always the DiReKT model, KugelAudio is never called
+  * SKIP_KUGELAUDIO=True -> always the DiReKT model, KugelAudio is never called
 And the PCM16 -> WAV wrapping KugelAudio output needs.
 """
 
@@ -43,14 +43,14 @@ def spy_backends(monkeypatch):
 
 
 async def test_default_path_uses_kugelaudio(spy_backends, monkeypatch):
-    monkeypatch.setattr(tts, "DEBUG", False)
+    monkeypatch.setattr(tts, "SKIP_KUGELAUDIO", False)
     out = await tts.synthesize("Hallo.", VOICE, "de")
     assert out == b"KUGEL-WAV"
     assert spy_backends == {"kugelaudio": 1, "direkt": 0}
 
 
 async def test_falls_back_to_direkt_when_kugelaudio_fails(spy_backends, monkeypatch):
-    monkeypatch.setattr(tts, "DEBUG", False)
+    monkeypatch.setattr(tts, "SKIP_KUGELAUDIO", False)
 
     async def boom(_text, _voice, _language_id):
         spy_backends["kugelaudio"] += 1
@@ -64,7 +64,7 @@ async def test_falls_back_to_direkt_when_kugelaudio_fails(spy_backends, monkeypa
 
 
 async def test_debug_mode_always_uses_direkt_and_never_calls_kugelaudio(spy_backends, monkeypatch):
-    monkeypatch.setattr(tts, "DEBUG", True)
+    monkeypatch.setattr(tts, "SKIP_KUGELAUDIO", True)
     out = await tts.synthesize("Hallo.", VOICE, "de")
     assert out == b"DIREKT-WAV"
     assert spy_backends == {"kugelaudio": 0, "direkt": 1}
@@ -82,7 +82,7 @@ def test_pcm16_to_wav_produces_a_valid_mono_16bit_wav():
 
 async def test_empty_kugelaudio_stream_falls_back_to_direkt(monkeypatch):
     """A cleanly finished KugelAudio stream without audio must use the fallback."""
-    monkeypatch.setattr(tts, "DEBUG", False)
+    monkeypatch.setattr(tts, "SKIP_KUGELAUDIO", False)
 
     class EmptyStreamingTTS:
         async def stream_async(self, **_kwargs):

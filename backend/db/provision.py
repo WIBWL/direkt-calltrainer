@@ -17,7 +17,7 @@ Content sources:
     MetricType       -> backend/feedback/metrics.py (METRICS), which also
                         derives the measurement rows, so the seeded inventory
                         and the analysis cannot drift apart.
-    FocusGoal        -> backend/db/seed_data.py (FOCUS_GOALS, ADR 0074), read
+    FocusGoal        -> backend/db/seed_data.py (FOCUS_GOALS, ADR 0076), read
                         at runtime through backend/focus.py
 """
 
@@ -98,7 +98,7 @@ def seed(db: DbSession) -> dict[str, int]:
     # `active`, which is what actually removes it from the selection.
     _deactivate_missing(db, Persona, {p["id"] for p in PERSONAS})
     _deactivate_missing(db, Scenario, {s["id"] for s in SCENARIOS})
-    # The same rule for the focus catalogue (ADR 0074): `focus_selection_goal`
+    # The same rule for the focus catalogue (ADR 0076): `focus_selection_goal`
     # references it, so a retired goal stays readable for the selections that
     # already name it, and /api/focus filters on `active`.
     _deactivate_missing(db, FocusGoal, {g["id"] for g in FOCUS_GOALS})
@@ -226,7 +226,7 @@ def _seed_scenarios(db: DbSession) -> int:
 
 
 def _seed_focus_goals(db: DbSession) -> int:
-    """The focus-goal catalogue (F-61, ADR 0074).
+    """The focus-goal catalogue (F-62, ADR 0076).
 
     Not cleaned: unlike a Persona or a Scenario, none of this text ever reaches
     a prompt, so the sanitiser of ADR 0059 has nothing to protect here.
@@ -243,7 +243,7 @@ def _seed_focus_goals(db: DbSession) -> int:
 def _seed_metric_types(db: DbSession) -> int:
     return sum(
         _upsert(db, MetricType, {"key": m.key},
-                {"name": m.name, "unit": m.unit,
+                {"name": m.name, "unit": m.unit, "aspect": m.aspect,
                  "feature_id": m.feature_id, "active": m.active})[1]
         for m in METRICS
     )

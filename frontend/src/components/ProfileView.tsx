@@ -155,11 +155,14 @@ export default function ProfileView() {
           <dt>Ein einzelnes Training</dt>
           <dd>
             In der Liste oben auf das Papierkorb-Symbol in der Zeile, oder im geöffneten
-            Training am Seitenende.
+            Training am Seitenende. Ein daraus erstellter Rollentausch bleibt dabei
+            erhalten — Sie entfernen ihn in der Szenarienauswahl.
           </dd>
 
           <dt>Alle Ihre Trainings</dt>
-          <dd>Oben die Einwilligung widerrufen.</dd>
+          <dd>
+            Oben die Einwilligung widerrufen. Damit gehen auch alle Rollentausch-Szenarien.
+          </dd>
 
           <dt>Ihr ganzes DiReKT-Konto</dt>
           <dd>

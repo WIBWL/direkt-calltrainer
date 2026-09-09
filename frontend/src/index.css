@@ -683,6 +683,14 @@ h2 {
   color: var(--navy);
 }
 
+/* A reverse (ADR 0070). Amber rather than a shade of the "own" green: it is
+   the caller's row on paper, but what the badge is saying is that the roles
+   are the other way round, which is not a degree of ownership. */
+.card-badge-reverse {
+  background: #fdf0dd;
+  color: #8a5200;
+}
+
 /* Own Scenario that has been shared with the company: reads as "mine" but
    signals it is out there. */
 .card-badge-shared {
@@ -703,6 +711,51 @@ h2 {
   color: var(--color-blue-600);
   text-decoration: underline;
   cursor: pointer;
+}
+
+/* The tile that opens the rest of the library. A card in the grid rather than a
+   link under it, so it is read as the last of the choices -- but dashed and
+   unfilled, because it is not one of them: nothing is selected by pressing it.
+   No check circle and no badge, hence the plain padding. */
+.library-more-card {
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1rem;
+  border-style: dashed;
+  background: transparent;
+  color: var(--color-blue-600);
+}
+
+.library-more-card .persona-name {
+  color: inherit;
+}
+
+.library-more-card:hover {
+  border-style: solid;
+  background: #fff;
+}
+
+/* The removal confirmation takes the place of the "Entfernen" link rather than
+   opening anything: the card must not change size while the question is being
+   asked, or the grid reflows under the pointer that is about to answer it. */
+.card-remove-confirm {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.1rem 0.7rem;
+  align-items: baseline;
+}
+
+.card-remove-confirm .card-edit {
+  position: static;
+  padding-left: 0;
+}
+
+.card-edit-danger {
+  color: var(--color-danger);
 }
 
 /* --- Scenario editor modal --- */
@@ -1199,9 +1252,42 @@ h2 {
   max-width: 800px;
 }
 
+/* Except while a reverse briefing runs beside it (ADR 0070), where the page
+   carries two columns instead of one. `width` as well as `max-width`, because
+   .app-page sets the width itself. */
+.call-page-wide {
+  width: min(1240px, calc(100% - 32px));
+  max-width: 1240px;
+}
+
+.call-layout {
+  display: grid;
+  gap: 24px;
+}
+
+/* Side by side only where both columns are genuinely readable; below that the
+   briefing goes back under the call, which is the one case where reading it
+   means scrolling. An even split rather than a main column with a sidebar:
+   during a reverse the briefing is not an aside, it is the half of the call
+   the User is playing from. */
+@media (min-width: 1080px) {
+  .call-layout-with-brief {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
 .call-intro {
   max-width: 800px;
   margin-bottom: 40px;
+}
+
+/* Only the two panels below take the wider page. The heading keeps the width
+   and the position it has on every other call -- what changes during a reverse
+   is what is under it, not what the screen is about. */
+.call-page-wide .call-intro {
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .call-panel {
@@ -1959,8 +2045,63 @@ h2 {
 
 /* Reads as the consequence of the points above it: the same card, marked by an
    accent rather than a competing colour. */
-.card.follow-up {
+/* The two things a finished training offers next: the Folgeszenario (F-60) and
+   the Rollentausch (F-61). One card shape with a heading each, so that they
+   read as two named offers rather than as two paragraphs someone appended
+   under the feedback. The accent colour is the only difference. */
+
+/* Side by side and evenly, because they are alternatives — stacked, the second
+   reads as what follows the first. `auto-fit` rather than two fixed columns so
+   that whichever half is on offer alone takes the row: a lone card in a 50 %
+   column would look like the other one failed to load. */
+.next-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  align-items: stretch;
+  /* The spacing the cards used to bring themselves, now that they do not. */
+  margin-top: 1.5rem;
+}
+
+.card.next-step {
   border-left: 3px solid var(--blue);
+  /* A column so the button can be pushed to the bottom: side by side, two
+     leads of different lengths would otherwise leave the buttons at different
+     heights, which reads as one card being unfinished. */
+  display: flex;
+  flex-direction: column;
+  /* The grid's own gap does the spacing between them. */
+  margin-top: 0;
+}
+
+/* The lead is what gives way, so what follows it lines up across the two. */
+.card p.next-step-lead {
+  flex: 1;
+}
+
+/* The card is a flex column now, and a bare button in one stretches the full
+   width unless it is told not to. The pill keeps its own size. */
+.card.next-step > .follow-up-button {
+  align-self: flex-start;
+}
+
+.next-step-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  color: var(--text-muted);
+}
+
+.card h2.next-step-title {
+  margin: 0.3rem 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.card p.next-step-lead {
+  margin: 0 0 1rem;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
 }
 
 .card p.follow-up-name {
@@ -2021,6 +2162,244 @@ h2 {
 .follow-up-draft:hover {
   background: var(--navy);
   color: #fff;
+}
+
+/* --- Reverse: the roles swapped (F-61, ADR 0070) ------------------------ */
+
+/* The offer under the feedback. Same card as the follow-up, other accent, so
+   the two read as two options rather than as one thing said twice. */
+.card.reverse-offer {
+  border-left-color: #c98a2b;
+}
+
+.card.reverse-offer .next-step-eyebrow {
+  color: #8a5200;
+}
+
+.card.reverse-offer .follow-up-button {
+  background: #c98a2b;
+}
+
+.card.reverse-offer .follow-up-button:hover {
+  background: #b0761f;
+}
+
+/* The reverse's pre-call screen: the briefing and the button, nothing else.
+   Held to the panel's own width so the actions line up under it rather than
+   running the width of the widened page. */
+.brief-page {
+  max-width: 720px;
+}
+
+.brief-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+/* The briefing the User holds during a reverse call. Deliberately the loudest
+   thing on the call screen after the animation: it is the only place the case
+   exists for them, and a panel they have to hunt for mid-call is no panel. */
+.reverse-brief {
+  margin: 0 auto 1.5rem;
+  max-width: 720px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-left: 3px solid #c98a2b;
+  border-radius: var(--radius-card);
+  background: #fffaf2;
+  padding: 1.25rem 1.4rem;
+}
+
+.reverse-brief-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  color: #8a5200;
+}
+
+.reverse-brief-title {
+  margin: 0.35rem 0 0;
+  font-size: 1.15rem;
+}
+
+.reverse-brief-lead {
+  margin: 0.3rem 0 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.reverse-brief-fields {
+  margin: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.reverse-brief-field dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8a5200;
+}
+
+.reverse-brief-field dd {
+  margin: 0.2rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.reverse-brief-watch {
+  margin-top: 1.2rem;
+  border-top: 1px solid #f0e2cc;
+  padding-top: 1rem;
+}
+
+.reverse-brief-watch-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.reverse-brief-watch-title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+/* How much of the list has been worked through. Deliberately a count and not a
+   percentage or a grade: it is the User's own tally mid-call, and ADR 0004
+   leaves no room for a score even a self-assessed one (ADR 0065). */
+.reverse-brief-watch-count {
+  flex: none;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: #8a5200;
+}
+
+.reverse-brief-progress {
+  height: 4px;
+  margin-bottom: 0.8rem;
+  border-radius: 999px;
+  background: #f0e2cc;
+  overflow: hidden;
+}
+
+.reverse-brief-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #c98a2b;
+  transition: width 160ms ease-out;
+}
+
+.reverse-brief-watch-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+
+/* A row rather than a line of text with a box next to it: the whole row is the
+   hit area, which is what makes ticking one off mid-sentence possible. */
+.reverse-brief-watch-list label {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  cursor: pointer;
+  transition: background 120ms ease-out, border-color 120ms ease-out;
+}
+
+.reverse-brief-watch-list label:hover {
+  background: #fff6e9;
+}
+
+/* The native box is kept for the keyboard and for screen readers, and hidden
+   visually behind the drawn one -- `display: none` would take it out of the
+   tab order along with everything that makes it a checkbox. */
+.reverse-brief-watch-list input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.reverse-brief-watch-box {
+  flex: none;
+  margin-top: 0.1rem;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid #d9c19b;
+  border-radius: 5px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease-out, border-color 120ms ease-out;
+}
+
+.reverse-brief-watch-list input:focus-visible + .reverse-brief-watch-box {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.reverse-brief-watch-list label.is-ticked {
+  background: #fdf3e4;
+  border-color: #f0e2cc;
+}
+
+.reverse-brief-watch-list label.is-ticked .reverse-brief-watch-box {
+  background: #c98a2b;
+  border-color: #c98a2b;
+}
+
+/* The tick itself, drawn rather than a glyph so it cannot pick up a font. */
+.reverse-brief-watch-list label.is-ticked .reverse-brief-watch-box::after {
+  content: "";
+  width: 5px;
+  height: 9px;
+  margin-top: -2px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* Ticked off: dimmed rather than struck through, because the goal stays true
+   for the rest of the call — it has been met once, not finished with. */
+.reverse-brief-watch-list label.is-ticked .reverse-brief-watch-text {
+  opacity: 0.55;
+}
+
+.reverse-brief-watch-note {
+  margin: 0.7rem 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Beside the call rather than under it (ADR 0070), and at its full length: no
+   scroll box of its own. A panel with an inner scrollbar hides part of the
+   briefing behind a gesture, and the one thing that must never happen mid-call
+   is the User not finding a fact they were told they have. The column simply
+   grows; the page scrolls if it has to, which on a briefing this size it
+   rarely does. Below the two-column breakpoint this goes back to being a block
+   under the call. */
+.reverse-brief-call {
+  margin: 0 auto;
+  background: #fff;
+}
+
+@media (min-width: 1080px) {
+  .reverse-brief-call {
+    max-width: none;
+  }
 }
 
 /* --- Transcript (F-12) -------------------------------------------------- */
@@ -2335,6 +2714,32 @@ h2 {
   color: var(--color-navy-900);
 }
 
+/* Sized between the label and the value, so it belongs to the number above. */
+.feedback-metrics-section .metric-subline {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--color-text-muted);
+}
+
+/* The Kennzahlen slider: the same track as the scenario filters. Only two
+   options here, so they split it instead of sitting left-aligned. */
+.feedback-metrics-filter {
+  margin-bottom: 18px;
+}
+
+.feedback-metrics-filter .filter-slider-option {
+  flex: 1;
+  justify-content: center;
+}
+
+.feedback-metrics-lead {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
 .feedback-metrics-section .metric-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2443,6 +2848,15 @@ h2 {
   font-size: 13px;
   line-height: 1.55;
   color: var(--color-navy-900);
+}
+
+/* The empty state stands in for a line, so it takes a line's inset. Without
+   it the sentence starts at the card's own border, out of column with every
+   line the card otherwise holds. */
+.feedback-transcript-card .transcript-empty {
+  margin: 0;
+  padding: 18px 20px;
+  color: var(--color-text-muted-secondary);
 }
 
 .feedback-transcript-card .transcript-line:last-child {
@@ -2650,6 +3064,10 @@ h2 {
 
   .feedback-transcript-card .transcript-line {
     gap: 10px;
+    padding: 16px;
+  }
+
+  .feedback-transcript-card .transcript-empty {
     padding: 16px;
   }
 }

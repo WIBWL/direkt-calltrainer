@@ -161,10 +161,16 @@ export type ServerMessage =
 
 export type FeedbackStatus = "queued" | "running" | "done" | "failed";
 
+/** backend/db/models.py METRIC_ASPECTS. */
+export type MetricAspect = "how" | "what";
+
 export interface Measurement {
   key: string;
   name: string;
   unit: string | null;
+  /** Which half of the Kennzahlen this one sits in. NULL only for a metric
+   * the inventory has retired. */
+  aspect: MetricAspect | null;
   value: number;
   /** ADR 0029's free-form payload: curves, sub-measures, pause positions. */
   detail: Record<string, unknown> | null;
@@ -256,6 +262,10 @@ export interface SessionDetail {
    * against the same partner — `persona` above is only its display name. */
   persona_id: string;
   scenario: string;
+  /** Whether this training was a reverse — the User rang and the Persona
+   * answered (ADR 0070). Display only; the casting itself lives on the
+   * Scenario row. */
+  reverse: boolean;
   status: FeedbackStatus;
   turns: SessionTurn[];
   /** Statistics for the whole call, not per utterance (ADR 0051). */
@@ -272,10 +282,10 @@ export interface SessionDetail {
   metric_scales: Record<string, MetricStep[]>;
   feedback: SessionFeedback | null;
   /**
-   * The Scenario the worker drafted from this Session's feedback (F-60,
-   * ADR 0069), or null — because there were no improvement points to build one
-   * from, because it is still being written, or because the User has since
-   * deleted it. The card only; the editor loads the rest by id.
+   * The Scenario drafted from this Session's feedback (F-60, ADR 0069) — the
+   * next call in the same matter — or null: nobody has asked for one, the
+   * wrap-up named no improvement points to build one from, or the User has
+   * since deleted it. The card only; the editor loads the rest by id.
    */
   follow_up: { id: string; name: string; short_description: string } | null;
 }
@@ -310,6 +320,10 @@ export interface SessionSummary {
   session_id: string;
   persona: string;
   scenario: string;
+  /** Whether this training was a reverse — the User rang and the Persona
+   * answered (ADR 0070). Display only; the casting itself lives on the
+   * Scenario row. */
+  reverse: boolean;
   status: SessionOutcome;
   /** Whether a wrap-up was stored — i.e. whether this row has one to open. */
   has_feedback: boolean;
@@ -371,7 +385,7 @@ export interface ConsentState {
   decision_required: boolean;
 }
 
-// --- Training focus (GET/PUT /api/focus, F-61, ADR 0074) -------------------
+// --- Training focus (GET/PUT /api/focus, F-62, ADR 0076) -------------------
 
 /** Which heading a goal sits under. Display grouping only. */
 export type FocusGroupKey = "paraverbal" | "phases" | "impact" | "habit";
@@ -381,7 +395,7 @@ export type FocusGroupKey = "paraverbal" | "phases" | "impact" | "habit";
  *
  *  `focus_goal.evidence` is deliberately absent here. It records how far a goal
  *  can be measured today, which is planning information for the analysis work
- *  and not something the user is asked to weigh up while picking (ADR 0074). */
+ *  and not something the user is asked to weigh up while picking (ADR 0076). */
 export interface FocusGoal {
   key: string;
   title: string;

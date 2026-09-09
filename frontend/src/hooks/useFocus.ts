@@ -7,7 +7,7 @@ export type FocusLoadState = "loading" | "ready" | "failed";
 
 /**
  * The signed-in user's training focus and the catalogue it comes from
- * (F-61, ADR 0074).
+ * (F-62, ADR 0076).
  *
  * Held once, near the root, and passed down: the first-run dialog and the
  * profile section show the same catalogue and the same ticks, and fetching it

@@ -48,7 +48,7 @@ source of that content, and which imports without a database.
 | Keycloak bearer-token verification | F-31, F-50, ADR 0009 | `test_auth.py` |
 | Storage consent: the gate on the write path, version staleness, withdrawal deletes | F-49, F-31, ADR 0031, ADR 0034, ADR 0066 | `test_consent.py` |
 | Six-month retention: the boundary, the per-account suspension, idempotence | F-49, ADR 0031, ADR 0066, ADR 0067 | `test_retention.py` |
-| Focus goals: the five-goal limit at the backend, "no focus" as a decision, the catalogue, and that deleting trainings leaves the selection alone | F-61, ADR 0031, ADR 0041, ADR 0066, ADR 0074 | `test_focus_goals.py` |
+| Focus goals: the five-goal limit at the backend, "no focus" as a decision, the catalogue, and that deleting trainings leaves the selection alone | F-62, ADR 0031, ADR 0041, ADR 0066, ADR 0076 | `test_focus_goals.py` |
 | Data rights: overview counts, export completeness and scoping, deleting one training | F-49, F-31, ADR 0050, ADR 0064, ADR 0066 | `test_data_rights.py` |
 | Spoken content stays out of the log unless explicitly switched on | F-49, ADR 0039, ADR 0066 | `test_transcript_logging.py` |
 | Deep links into the client-side router survive a reload, without swallowing unknown API paths | F-31, ADR 0009, ADR 0064 | `test_spa_routing.py` |
@@ -63,17 +63,21 @@ source of that content, and which imports without a database.
 | Persona & scenario library: row mapping + seeded content | F-01, F-03, F-04, R-07..R-10, R-12, ADR 0041, ADR 0043, ADR 0045, ADR 0064 | `test_persona_scenario_library.py` |
 | User-authored Scenarios: ownership, tenant visibility, sharing | F-34, F-59, R-58, ADR 0024, ADR 0050, ADR 0058, ADR 0059, ADR 0060, ADR 0064 | `test_authored_content.py` |
 | PDF text extraction for an authored Scenario | F-58, ADR 0024, ADR 0058, ADR 0059 | `test_scenario_documents.py` |
-| Follow-up Scenario written from a Session's feedback (what the model is and is not given, that it is stored once as the User's own private Scenario, and that it leaves the library when its Session does) | F-60, F-10, ADR 0011, ADR 0043, ADR 0051, ADR 0058, ADR 0059, ADR 0066, ADR 0067, ADR 0069 | `test_followup_scenario.py` |
+| Follow-up Scenario drafted on request from a Session's feedback (the played case and the wrap-up carried forward, what the model is still not given, the route's refusals and idempotency, that it is stored once as the User's own private Scenario, and that it leaves the library when its Session does) | F-60, F-10, ADR 0011, ADR 0031, ADR 0043, ADR 0050, ADR 0051, ADR 0058, ADR 0059, ADR 0066, ADR 0067, ADR 0069, ADR 0070 | `test_followup_scenario.py` |
+| Reverse of a finished Session (the row it writes, the briefing, idempotency, the refusals, and what a deletion and the retention sweep take) | F-61, ADR 0043, ADR 0050, ADR 0051, ADR 0059, ADR 0066, ADR 0067, ADR 0070 | `test_reverse.py` |
 | Tenant resolution (org claim → e-mail domain → default) | R-58, ADR 0060 | `test_tenants.py` |
 | Sanitising authored Scenario text before it reaches the prompt | ADR 0024, ADR 0059 | `test_authored_text.py` |
 | Counterpart behaviour (LLM system prompt) | F-01, F-03, F-04, F-12, R-12, ADR 0043, ADR 0045, ADR 0033/0037/0038 | `test_system_prompt.py` |
+| The swapped casting a reverse runs under (prompt, opening, call-state notes, settlement check, per-turn anti-repeat nudge) | F-61, ADR 0038, ADR 0043, ADR 0045, ADR 0070, ADR 0071, ADR 0073 | `test_reverse_prompt.py` |
 | Live session loop & state model (+ what a Turn's acoustics record) | F-46, F-01, F-12, F-52, R-52, ADR 0033, ADR 0047, ADR 0048 | `test_session_pipeline.py` |
 | Streaming TTS chunking | ADR 0033 | `test_chunking.py` |
 | Closing-intent detection (both language packs) | ADR 0037, ADR 0043, F-01 | `test_closing_intent.py` |
+| A goodbye without the marker ends the call, and its own farewell is not doubled by the fallback line; a reply that only presses does not end it | ADR 0037 (amendment) | `test_call_end_marker.py` |
 | Repetition guard, re-introduction regeneration + guaranteed sign-off | ADR 0038, ADR 0043 | `test_repetition_guard.py` |
 | `[CALL_END]` marker + foreign-script scrub | ADR 0033 | `test_call_end_marker.py` |
 | Barge-in / eager interruption (incl. the note-barge-in ordering contract, a late interrupt over a committed reply's tail, the `[unterbrochen]` transcript marker, and the cut-off dash + one-Turn nudge that keep the model in the conversation afterwards) | ADR 0035 | `test_barge_in.py`, `test_barge_in_ordering.py` |
-| The caller's notes and the history window: the model reads notes + the last three exchanges, the guards and the Transcript keep the full record; background refresh, refresh-on-trim, failure keeps stale notes | ADR 0071 | `test_call_state.py` |
+| The startup backend checks: the wrap-up model is checked at boot when it is a separate model, and not when it is the same one; the check asks the way its callers do | ADR 0016, ADR 0074 | `test_startup_checks.py` |
+| The caller's notes and the history window: the model reads notes + the last three exchanges, the guards and the Transcript keep the full record; background refresh, refresh-on-trim, failure keeps stale notes. And the other shape: with the notes off the model is handed the whole conversation and no summarisation request is made | ADR 0071, ADR 0075 | `test_call_state.py` |
 | Whisper phantom transcripts ("*Titelm*", "Vielen Dank.") are no Turn | ADR 0071 | `test_stt_phantom.py` |
 | Pipeline fault tolerance (retry → graceful end) | ADR 0016, ADR 0033 | `test_pipeline_failure.py` |
 | TTS backend selection & fallback | ADR 0040 | `test_tts_fallback.py` |

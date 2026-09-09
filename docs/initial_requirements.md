@@ -104,7 +104,7 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 | :--- | :----------------------------------------------------------------------------------------------------------------------------------------------- | :------------- | :-- | :--------- |
 | R-28 | Nutzer wollen Gespräche genauer reflektieren können, als es aus der bloßen Erinnerung möglich ist.                                               | SO 4.7         | F   | F-12       |
 | R-29 | Das Training soll kontinuierlich über längere Zeiträume nutzbar sein, weil blinde Flecken sich erst mit der Zeit einschleifen.                   | SO 4.7, AP 3.7 | F   | F-13, F-48 |
-| R-30 | Nutzer wollen die Entwicklung des eigenen Gesprächsverhaltens über mehrere Gespräche hinweg nachvollziehen.                                      | SO 4.7         | F   | F-13, F-61 |
+| R-30 | Nutzer wollen die Entwicklung des eigenen Gesprächsverhaltens über mehrere Gespräche hinweg nachvollziehen.                                      | SO 4.7         | F   | F-13, F-62 |
 | R-31 | Nutzer wollen das gemeinsame Verständnis nach einem Gespräch absichern, wie es bisher über eine zusammenfassende E-Mail an den Kunden geschieht. | SO 2.3, 3.3    | F   | F-09, F-54    |
 | R-52 | Das Transkript soll unmittelbar nach dem Gespräch vollständig und in Textform vorliegen. Ein während des Gesprächs nur teilweise fertiges Transkript gilt als verwirrend.                         | SO-S 3, AP-S 3 | F   | F-12          |
 

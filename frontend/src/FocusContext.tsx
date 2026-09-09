@@ -13,8 +13,8 @@ interface FocusContextValue {
 const FocusContext = createContext<FocusContextValue | null>(null);
 
 /**
- * Holds the training focus for the whole app and asks for it once (F-61,
- * ADR 0074).
+ * Holds the training focus for the whole app and asks for it once (F-62,
+ * ADR 0076).
  *
  * One fetch, one source of truth — the same arrangement `ConsentProvider` has,
  * and for the same reason: the first-run dialog and the profile section describe

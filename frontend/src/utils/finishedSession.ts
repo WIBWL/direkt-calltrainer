@@ -17,6 +17,10 @@ export interface FinishedSession {
   /** Carried along because a reload restores this screen without a Persona
    * selection to look the name up in. */
   personaName: string;
+  /** The Persona that was played, so a reverse started from this screen
+   * (ADR 0070) keeps the same voice on the other end of the line. Null after a
+   * reload of a Session stored before this field existed. */
+  personaId?: string | null;
 }
 
 export function loadFinishedSession(): FinishedSession | null {

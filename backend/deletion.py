@@ -14,6 +14,11 @@ construction: those foreign keys carry no `ondelete` at all. The one Scenario
 that belongs to a Session — the follow-up drafted from its feedback (ADR 0069)
 — is deactivated rather than deleted, for the reason `retire_follow_ups` gives.
 
+One exception, and only on the withdrawal path: a reverse Scenario (ADR 0070)
+is content about the subject's own call rather than reference data, so
+`delete_subject_sessions` removes those rows too. Deleting a *single* training
+does not — see `_delete_reverses` for why the two differ.
+
 What this module does *not* do is claim to be a complete erasure. Two limits
 are known and named rather than papered over: backups are not reached (there is
 no surgical delete from a snapshot), and the transcript that STT logged in
@@ -78,8 +83,38 @@ def delete_subject_sessions(db: DbSession, subject_id: str) -> int:
     # goes on to write in the same transaction (the withdrawal does) cannot
     # observe rows this call has logically already removed.
     db.flush()
+    _delete_reverses(db, subject_id)
     logger.info("Deleted %d stored session(s) for the subject", len(sessions))
     return len(sessions)
+
+
+def _delete_reverses(db: DbSession, subject_id: str) -> None:
+    """Remove the subject's reverse Scenarios (ADR 0070).
+
+    The one place where a withdrawal reaches beyond the `session` table, and
+    deliberately: a reverse carries a briefing written from that person's own
+    wrap-up, so leaving the row would leave a reading of feedback whose
+    conversation has just been deleted. An ordinary authored Scenario is not
+    touched — it is the User's own work about a case, not a record of a call
+    they had.
+
+    After the Sessions, never before: a reverse Session points at its Scenario
+    through `session.scenario_id`, which carries no `ondelete` at all
+    (ADR 0052), so this delete would be refused while such a row still stood.
+
+    Hard-deleted rather than deactivated, unlike every other Scenario retirement
+    (ADR 0058): deactivation keeps the text, and the text is what has to go.
+    """
+    reverses = (
+        db.query(db_models.Scenario)
+        .filter_by(created_by=subject_id, reverse=True)
+        .all()
+    )
+    for scenario in reverses:
+        db.delete(scenario)
+    db.flush()
+    if reverses:
+        logger.info("Deleted %d reverse scenario(s) for the subject", len(reverses))
 
 
 def delete_session(db: DbSession, subject_id: str, extern_id: uuid.UUID) -> bool:

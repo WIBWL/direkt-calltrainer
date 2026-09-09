@@ -78,10 +78,17 @@ export default function ConsentSettings() {
       {consent.allows_storage ? (
         confirming ? (
           <div className="consent-confirm">
+            {/* Der Rollentausch wird hier eigens genannt (ADR 0070): er ist
+                ein Szenario und kein Training, verschwindet beim Widerruf aber
+                mit — seine Unterlagen sind aus der eigenen Auswertung
+                geschrieben. Beim Löschen eines einzelnen Trainings bleibt er
+                dagegen stehen, und genau diese Asymmetrie wäre ohne diesen
+                Satz nicht erkennbar. */}
             <p>
               <strong>Widerrufen und alle gespeicherten Trainings löschen?</strong> Ihre bisherigen
-              Gesprächsprotokolle, Kennzahlen und Rückmeldungen werden dabei entfernt. Das lässt
-              sich nicht rückgängig machen.
+              Gesprächsprotokolle, Kennzahlen und Rückmeldungen werden dabei entfernt, ebenso Ihre
+              Rollentausch-Szenarien samt der Unterlagen darin. Das lässt sich nicht rückgängig
+              machen.
             </p>
             <div className="consent-confirm-actions">
               <button
