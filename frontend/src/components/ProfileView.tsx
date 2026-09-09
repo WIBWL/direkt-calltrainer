@@ -43,7 +43,7 @@ export default function ProfileView() {
   const auth = useAuth();
 
   return (
-    <AppLayout accountActive pageClassName="app-page-narrow profile-page">
+    <AppLayout accountActive pageClassName="profile-page">
       <h1>Profil</h1>
 
       <section className="profile-identity">

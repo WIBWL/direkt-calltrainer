@@ -22,10 +22,21 @@ export function toggleGoal(selected: string[], key: string, max: number): string
  * profile section. They differ in what surrounds them and in nothing else, and
  * two copies of a fifteen-card list would drift on the first catalogue change.
  *
+ * The card is the app's own selection idiom (`.choice-check`, as on a Persona
+ * or Scenario card) over a real checkbox: this is a pick-up-to-five, so the
+ * input stays and only its rendering changes. The circle carries the pick's
+ * position rather than a tick, which is what ties a card to a slot in the
+ * dialog's tally.
+ *
  * The limit is enforced by disabling what cannot be picked rather than by
  * refusing the click afterwards: a checkbox that turns out not to have worked
  * is worse than one that says why it is unavailable. Already-ticked cards stay
- * enabled at the limit, so the way out is always to untick something.
+ * enabled at the limit, so the way out is always to untick something. Locked
+ * cards go quiet rather than faint — ten faded cards in a grid read as broken.
+ *
+ * The cards sit in a responsive grid — two columns in the dialog, one in the
+ * narrower profile card — because a title of 15 to 31 characters does not need
+ * a full row, and fifteen full rows is what made the first screen long.
  */
 export default function FocusGoalPicker({
   goals,
@@ -43,25 +54,51 @@ export default function FocusGoalPicker({
   disabled?: boolean;
 }) {
   const full = selected.length >= max;
+  // A group whose goals were all retired is dropped here rather than returning
+  // null below, so the numbering never skips a step.
+  const shown = groups
+    .map((group) => ({ group, inGroup: goals.filter((goal) => goal.group === group.key) }))
+    .filter(({ inGroup }) => inGroup.length > 0);
 
   return (
     <div className="focus-groups">
-      {groups.map((group) => {
-        const inGroup = goals.filter((goal) => goal.group === group.key);
-        // A group whose goals were all retired renders nothing rather than an
-        // empty heading.
-        if (inGroup.length === 0) return null;
-
+      {shown.map(({ group, inGroup }, index) => {
         return (
-          <section className="focus-group" key={group.key}>
-            <h3 className="focus-group-title">{group.name}</h3>
+          // role/aria-labelledby, because a <section> with a heading does not
+          // tie the checkboxes inside it to that heading for a screen reader.
+          <section
+            className="focus-group"
+            key={group.key}
+            role="group"
+            aria-labelledby={`focus-group-${group.key}`}
+          >
+            <h3 className="focus-group-title" id={`focus-group-${group.key}`}>
+              {/* Numbered rather than colour-coded: in this palette a colour
+                  says something about a value, and a group means nothing. */}
+              <span className="focus-group-number" aria-hidden="true">{index + 1}</span>
+              {group.name}
+              {/* Where this group's picks sit, without scanning for ticks. */}
+              {inGroup.some((goal) => selected.includes(goal.key)) && (
+                <span className="focus-group-count">
+                  · {inGroup.filter((goal) => selected.includes(goal.key)).length} gewählt
+                </span>
+              )}
+            </h3>
 
             <ul className="focus-goal-list">
               {inGroup.map((goal) => {
-                const checked = selected.includes(goal.key);
+                const position = selected.indexOf(goal.key);
+                const checked = position !== -1;
+                const locked = full && !checked;
                 return (
                   <li key={goal.key}>
-                    <div className={`focus-goal${checked ? " focus-goal-selected" : ""}`}>
+                    <div
+                      className={
+                        "focus-goal" +
+                        (checked ? " focus-goal-selected" : "") +
+                        (locked ? " focus-goal-locked" : "")
+                      }
+                    >
                       {/* The label carries the checkbox, so the whole title and
                           caption are the hit area. The "i" below stays outside
                           it — an interactive element nested in a label would
@@ -69,17 +106,23 @@ export default function FocusGoalPicker({
                       <label className="focus-goal-main">
                         <input
                           type="checkbox"
+                          className="focus-goal-input"
                           checked={checked}
-                          disabled={disabled || (full && !checked)}
+                          disabled={disabled || locked}
                           onChange={() => onToggle(goal.key)}
                         />
+                        <span className="choice-check focus-goal-check" aria-hidden="true">
+                          {checked ? position + 1 : ""}
+                        </span>
                         <span className="focus-goal-text">
                           <span className="focus-goal-title">{goal.title}</span>
                           <span className="focus-goal-caption">{goal.caption}</span>
                         </span>
                       </label>
 
-                      <InfoDetails label="Was dieses Ziel bedeutet">
+                      {/* Icon only: the same label fifteen times is noise, and
+                          naming the goal makes it a better one when read out. */}
+                      <InfoDetails label={`Was „${goal.title}“ bedeutet`} iconOnly>
                         <p>{goal.info}</p>
                       </InfoDetails>
                     </div>

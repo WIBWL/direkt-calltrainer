@@ -12,21 +12,26 @@ import type { ReactNode } from "react";
  * screen-reader-operable without any work, it opens on in-page find, and it
  * prints expanded. The summary carries the whole accessible name, so the icon
  * itself is decorative.
+ *
+ * `iconOnly` keeps that name and hides it from the eye, for the places where
+ * the same label would otherwise be repeated on every card in a grid.
  */
 export default function InfoDetails({
   label = "Mehr dazu",
+  iconOnly = false,
   children,
 }: {
   label?: string;
+  iconOnly?: boolean;
   children: ReactNode;
 }) {
   return (
-    <details className="info-details">
+    <details className={"info-details" + (iconOnly ? " info-details-icon" : "")}>
       <summary className="info-summary">
         <span className="info-icon" aria-hidden="true">
           i
         </span>
-        {label}
+        {iconOnly ? <span className="visually-hidden">{label}</span> : label}
       </summary>
 
       <div className="info-body">{children}</div>

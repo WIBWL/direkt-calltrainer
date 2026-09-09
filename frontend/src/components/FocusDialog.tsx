@@ -16,7 +16,9 @@ import FocusGoalPicker, { toggleGoal } from "./FocusGoalPicker";
  *
  * Fifteen cards is a lot for a first screen, which is why the captions carry
  * the meaning and the paragraphs sit behind an "i". Whoever wants to decide in
- * ten seconds can; whoever wants the detail has it.
+ * ten seconds can; whoever wants the detail has it. They sit two to a row for
+ * the same reason, and the action bar stays put while the list scrolls: how
+ * many are left and how to go on must not be a scroll away.
  *
  * Answerable later either way: the profile section changes the selection, and
  * the dialog says so, so nobody has to get this right on the first day.
@@ -64,10 +66,6 @@ export default function FocusDialog({
           schaltet nichts ab.
         </p>
 
-        <p className="consent-note">
-          Sie können Ihre Auswahl jederzeit im Profil ändern.
-        </p>
-
         <FocusGoalPicker
           goals={focus.goals}
           groups={focus.groups}
@@ -77,35 +75,55 @@ export default function FocusDialog({
           onToggle={(key) => setSelected((s) => toggleGoal(s, key, focus.max_goals))}
         />
 
-        <p className="focus-count" aria-live="polite">
-          {selected.length} von {focus.max_goals} Zielen ausgewählt.
-          {selected.length >= focus.max_goals &&
-            " Wenn Sie tauschen möchten, wählen Sie zuerst ein Ziel ab."}
-        </p>
+        {/* Sticky, so the tally and both answers stay in view over a list
+            that is taller than the viewport. */}
+        <div className="focus-actions-bar">
+          <div className="focus-tally">
+            <span className="focus-slots" aria-hidden="true">
+              {Array.from({ length: focus.max_goals }, (_, slot) => (
+                <span
+                  key={slot}
+                  className={
+                    "focus-slot" + (slot < selected.length ? " focus-slot-filled" : "")
+                  }
+                />
+              ))}
+            </span>
+            <span className="focus-count" aria-live="polite">
+              {selected.length} von {focus.max_goals} Zielen ausgewählt.
+              {selected.length >= focus.max_goals &&
+                " Wenn Sie tauschen möchten, wählen Sie zuerst ein Ziel ab."}
+            </span>
+          </div>
 
-        {failed && (
-          <p className="consent-error">
-            Ihre Auswahl konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.
+          {failed && (
+            <p className="consent-error">
+              Ihre Auswahl konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.
+            </p>
+          )}
+
+          <div className="consent-actions">
+            <button
+              type="button"
+              className="consent-button consent-button-primary"
+              onClick={() => void submit(selected)}
+              disabled={saving || selected.length === 0}
+            >
+              {saving ? "Wird gespeichert …" : "Fokus übernehmen"}
+            </button>
+            <button
+              type="button"
+              className="consent-button consent-button-secondary"
+              onClick={() => void submit([])}
+              disabled={saving}
+            >
+              Ohne Fokus fortfahren
+            </button>
+          </div>
+
+          <p className="focus-bar-note">
+            Sie können Ihre Auswahl jederzeit im Profil ändern.
           </p>
-        )}
-
-        <div className="consent-actions">
-          <button
-            type="button"
-            className="consent-button consent-button-primary"
-            onClick={() => void submit(selected)}
-            disabled={saving || selected.length === 0}
-          >
-            {saving ? "Wird gespeichert …" : "Fokus übernehmen"}
-          </button>
-          <button
-            type="button"
-            className="consent-button consent-button-secondary"
-            onClick={() => void submit([])}
-            disabled={saving}
-          >
-            Ohne Fokus fortfahren
-          </button>
         </div>
       </div>
     </div>

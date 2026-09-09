@@ -4654,21 +4654,29 @@ h2 {
    of those. */
 
 /* Wider than the consent dialog, which carries four sentences — this one
-   carries fifteen cards. The backdrop already scrolls, so a tall list on a
-   short viewport stays reachable. */
+   carries fifteen cards, two to a row. The backdrop already scrolls, so a tall
+   list on a short viewport stays reachable. */
 .focus-dialog {
-  width: min(720px, 100%);
+  width: min(920px, 100%);
 }
 
 .focus-groups {
   margin-top: 1.25rem;
 }
 
+/* A rule between the groups, since the cards no longer form one column whose
+   breaks the headings alone could mark. */
 .focus-group + .focus-group {
   margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .focus-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   margin: 0 0 0.6rem;
   font-family: var(--font-display);
   font-size: 0.8rem;
@@ -4678,21 +4686,58 @@ h2 {
   color: var(--color-text-muted);
 }
 
+/* `auto-fit` rather than a fixed two: the dialog gets two columns, the
+   narrower profile card falls back to one without a second rule. */
 .focus-goal-list {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 10px;
+}
+
+/* Cards in one row end level, whatever their caption runs to. */
+.focus-goal-list > li {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+}
+
+.focus-group-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--color-surface-filter);
+  color: var(--color-blue-600);
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+.focus-group-count {
+  font-weight: 600;
+  color: var(--color-blue-600);
 }
 
 .focus-goal {
+  position: relative; /* for the check circle */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   padding: 12px 14px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   transition: border-color 0.15s, background 0.15s;
+}
+
+/* The card looks like a Persona card, so it has to answer the pointer like
+   one. Neither a picked nor a locked card: both already say what they are, and
+   a hover would take it back. */
+.focus-goal:not(.focus-goal-selected):not(.focus-goal-locked):hover {
+  border-color: var(--color-blue-300);
 }
 
 /* Selected is marked by the border and the fill as well as by the tick: the
@@ -4702,36 +4747,58 @@ h2 {
   background: var(--color-surface-selected);
 }
 
+/* Room on the right for the check circle, which is positioned on the card. */
 .focus-goal-main {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  display: block;
+  padding-right: 30px;
   cursor: pointer;
 }
 
-.focus-goal-main input[type="checkbox"] {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  margin: 2px 0 0;
-  accent-color: var(--color-blue-600);
-  cursor: pointer;
+/* The real control, kept for the keyboard and the screen reader and drawn as
+   the circle below. */
+.focus-goal-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
 }
 
-/* At the limit the unpicked cards go quiet rather than disappearing: what is
-   unavailable has to stay visible, or the list looks shorter than it is. */
-.focus-goal-main input[type="checkbox"]:disabled {
-  cursor: default;
+/* Geometry comes from .choice-check, so this and a Persona card cannot drift.
+   It holds the pick's number, hence the smaller type. */
+.focus-goal-check {
+  top: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
 }
 
-.focus-goal-main:has(input:disabled) {
-  cursor: default;
-  opacity: 0.55;
+.focus-goal-selected .focus-goal-check {
+  border-color: var(--color-blue-600);
+  background: var(--color-blue-600);
+  color: var(--color-surface);
 }
 
-.focus-goal-main input[type="checkbox"]:focus-visible {
+.focus-goal-input:focus-visible + .focus-goal-check {
   outline: 2px solid var(--color-blue-600);
   outline-offset: 2px;
+}
+
+/* At the limit the unpicked cards go quiet, not faint: ten faded cards in a
+   grid read as a broken screen rather than a full one. */
+.focus-goal-locked .focus-goal-main {
+  cursor: default;
+}
+
+.focus-goal-locked .focus-goal-check {
+  border-style: dashed;
+  border-color: var(--color-border);
+}
+
+.focus-goal-locked .focus-goal-title,
+.focus-goal-locked .focus-goal-caption {
+  color: var(--color-text-muted);
 }
 
 .focus-goal-text {
@@ -4755,8 +4822,9 @@ h2 {
 
 /* Smaller than a standalone "i", because it sits inside a card rather than
    under a section heading. Indented to the text, not to the checkbox. */
+/* No checkbox column to indent past any more. */
 .focus-goal .info-details {
-  margin: 0.5rem 0 0 30px;
+  margin: 0.5rem 0 0;
 }
 
 .focus-goal .info-summary {
@@ -4773,6 +4841,64 @@ h2 {
 .focus-count {
   margin: 1rem 0 0;
   font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+/* Bleeds to the dialog's padding edges (32px) so the bar spans it fully, and
+   sticks to the bottom of the backdrop's scroll while the list runs past. */
+.focus-actions-bar {
+  position: sticky;
+  bottom: 0;
+  margin: 1.5rem -32px -32px;
+  padding: 14px 32px 20px;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+}
+
+.focus-tally {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+/* The limit as five slots that fill up: seen rather than read. */
+.focus-slots {
+  display: inline-flex;
+  flex: none;
+  gap: 5px;
+  transform: translateY(-1px);
+}
+
+.focus-slot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  border: 1px solid var(--color-blue-300);
+}
+
+.focus-slot-filled {
+  background: var(--color-blue-600);
+  border-color: var(--color-blue-600);
+}
+
+.focus-actions-bar .focus-count {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.focus-actions-bar .consent-actions {
+  margin-top: 0;
+  /* Two pill buttons at `flex: 1` squeeze past legibility on a narrow window. */
+  flex-wrap: wrap;
+}
+
+/* Moved down from the head: the reassurance that this is changeable belongs
+   where the decision is made. */
+.focus-bar-note {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
   color: var(--color-text-muted);
 }
 
@@ -4796,8 +4922,23 @@ h2 {
    short. What a decision turns on stays in the open; the background lives in
    here. Native <details>, so it opens on find-in-page and prints expanded. */
 
+/* Present to a screen reader, absent to the eye. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .info-details {
   margin-top: 1rem;
+}
+
+/* Icon only: no label to leave room for. */
+.info-details-icon .info-summary {
+  gap: 0;
 }
 
 .info-summary {
