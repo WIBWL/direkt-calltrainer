@@ -304,6 +304,31 @@ def test_seeded_personas_carry_objections():
         assert all(text.strip() for text in objections)
 
 
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_seeded_persona_carries_german_display_text(entry):
+    """F-44: the info panel behind a card shows the Persona in the UI
+    language. `role_label` and `training_goal` were German already; these
+    two are the display twins added beside the English prompt fields."""
+    assert entry["traits_label"].strip(), f"{entry['id']}: no traits_label"
+    # Not a language check -- "German" is not mechanically decidable, and the
+    # suite only tests the other direction (the English fields carry no German).
+    # What is checkable is that the display field was actually written rather
+    # than copied off its prompt twin, which is the mistake worth catching.
+    assert entry["traits_label"] != entry["traits"], f"{entry['id']}: traits_label is the prompt text"
+
+
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_every_objection_has_exactly_one_german_label(entry):
+    """The two lists are parallel: `objections[i]` is the English move the
+    prompt gets and `objection_labels[i]` the same move for a person to
+    read. `provision._seed_objections` zips them strictly, so a mismatch
+    here would be a provisioning failure at startup rather than a wrong
+    label -- which is why the lengths are pinned in the seed."""
+    labels = entry["objection_labels"]
+    assert len(labels) == len(entry["objections"]), entry["id"]
+    assert all(label.strip() for label in labels), entry["id"]
+
+
 def test_seeded_persona_behaviour_carries_no_situation():
     """ADR 0045: `behavior` is manner only. Both Personas used to open it with
     the same sentence about having a reason for the call — a statement about

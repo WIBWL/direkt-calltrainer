@@ -246,7 +246,15 @@ class Persona(_AuthoredContent, Base):
     role_label: Mapped[str] = mapped_column(String(120))
     role: Mapped[str] = mapped_column(String(120))
     traits: Mapped[str] = mapped_column(String(120))
+    # Display counterpart of `traits`, in the UI language, for the info panel on
+    # the selection card. Nullable because it is display-only: a Persona without
+    # one is still fully playable, the panel just omits the line. Same split as
+    # role_label/role above.
+    traits_label: Mapped[str | None] = mapped_column(Text)
     behavior: Mapped[str] = mapped_column(Text)
+    # German already, and the only prompt-adjacent column that is: it describes
+    # what the User is meant to practise, not what the Persona does, and the
+    # model never reads it.
     training_goal: Mapped[str] = mapped_column(Text)
     difficulty: Mapped[str] = mapped_column(String(40))
     language_code: Mapped[str] = mapped_column(ForeignKey("language.code"), index=True)
@@ -279,6 +287,11 @@ class PersonaObjection(Base):
     )
     position: Mapped[int] = mapped_column(Integer)
     text: Mapped[str] = mapped_column(Text)
+    # Display counterpart of `text`, in the UI language. `text` is an English
+    # move the model reads (ADR 0043/0045) and must stay that way; this is the
+    # same objection written for a person to read. Nullable, like
+    # `persona.traits_label`.
+    text_label: Mapped[str | None] = mapped_column(Text)
 
     persona: Mapped["Persona"] = relationship(back_populates="objections")
 

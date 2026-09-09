@@ -33,6 +33,9 @@ interface SetupViewProps {
   onEditScenario: (id: string) => void;
   personas: Persona[];
   personaId: string | null;
+  /** Open the read-only info panel for this Persona. Held in App.tsx
+   * beside the Scenario editor's state, since this component keeps none. */
+  onShowPersonaInfo: (id: string) => void;
   selectedScenario: ScenarioCard | null;
   selectedPersona: Persona | null;
   loadError: string | null;
@@ -62,6 +65,7 @@ export default function SetupView({
   onEditScenario,
   personas,
   personaId,
+  onShowPersonaInfo,
   selectedScenario,
   selectedPersona,
   loadError,
@@ -120,6 +124,8 @@ export default function SetupView({
               language={persona.language}
               isSelected={persona.id === personaId}
               onSelect={() => onSelectPersona(persona.id)}
+              onInfo={() => onShowPersonaInfo(persona.id)}
+              infoLabel={`Mehr über ${persona.name}`}
             />
           ))}
         </div>
@@ -172,34 +178,55 @@ export default function SetupView({
 
 /** One selectable card. The Persona step is a plain grid (Personas are
  * curated, not User-authored); the Scenario step uses LibraryPicker instead,
- * which adds filtering and authoring. */
+ * which adds filtering and authoring.
+ *
+ * The info affordance sits *outside* the card button rather than inside it —
+ * a button cannot be nested in a button — using the same `card-wrap` shell
+ * LibraryPicker puts its "Bearbeiten" link in. Reading about a Persona and
+ * choosing one are separate acts: the "i" does not select the card. */
 function ChoiceCard({
   title,
   subtitle,
   language,
   isSelected,
   onSelect,
+  onInfo,
+  infoLabel,
 }: {
   title: string;
   subtitle: string;
   language: string;
   isSelected: boolean;
   onSelect: () => void;
+  onInfo: () => void;
+  infoLabel: string;
 }) {
   return (
-    <button
-      type="button"
-      className={cx("persona-card", isSelected && "selected")}
-      aria-pressed={isSelected}
-      onClick={onSelect}
-    >
-      <span className="choice-check" aria-hidden="true">
-        {isSelected ? "✓" : ""}
-      </span>
+    <div className="card-wrap">
+      <button
+        type="button"
+        className={cx("persona-card", isSelected && "selected")}
+        aria-pressed={isSelected}
+        onClick={onSelect}
+      >
+        <span className="choice-check" aria-hidden="true">
+          {isSelected ? "✓" : ""}
+        </span>
 
-      <span className="persona-name">{title}</span>
-      <span className="card-subtitle">{subtitle}</span>
-      <span className="card-meta">{language}</span>
-    </button>
+        <span className="persona-name">{title}</span>
+        <span className="card-subtitle">{subtitle}</span>
+        <span className="card-meta">{language}</span>
+      </button>
+
+      <button
+        type="button"
+        className="card-info"
+        onClick={onInfo}
+        aria-label={infoLabel}
+        title={infoLabel}
+      >
+        <span aria-hidden="true">i</span>
+      </button>
+    </div>
   );
 }

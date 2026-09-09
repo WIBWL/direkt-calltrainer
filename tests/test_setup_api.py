@@ -91,6 +91,54 @@ async def test_personas_endpoint_serves_the_label_not_the_prompt_role(client):
         assert "traits" not in entry and "behavior" not in entry
 
 
+async def test_persona_detail_serves_the_german_display_text(client):
+    """F-44 / ADR 0043: the info panel behind a card is fed by
+    `GET /api/personas/{id}`, and every text on it is the UI-language
+    display field -- never the English prompt field beside it."""
+    cards = (await client.get("/api/personas")).json()
+    card = next(c for c in cards if c["name"] == "Marcel Kropp")
+
+    resp = await client.get(f"/api/personas/{card['id']}")
+    assert resp.status_code == 200
+    detail = resp.json()
+
+    seeded = next(p for p in SEEDED_PERSONAS if p["name"] == "Marcel Kropp")
+    assert detail["role"] == seeded["role_label"]
+    assert detail["traits"] == seeded["traits_label"]
+    assert detail["training_goal"] == seeded["training_goal"]
+    assert detail["objections"] == seeded["objection_labels"]
+    assert set(detail) == {
+        "id", "name", "role", "language", "traits", "training_goal", "objections",
+    }
+
+
+async def test_persona_detail_withholds_the_english_prompt_fields(client):
+    """ADR 0043, the same rule the card route follows: `role`, `traits`,
+    `behavior` and an objection's English `text` brief the model and stay on
+    the server. The panel would be the obvious place to leak them, because
+    it shows a field of each name."""
+    cards = (await client.get("/api/personas")).json()
+    served = []
+    for card in cards:
+        detail = (await client.get(f"/api/personas/{card['id']}")).json()
+        served.append(detail["traits"])
+        served.extend(detail["objections"])
+        assert "behavior" not in detail
+
+    for persona in SEEDED_PERSONAS:
+        assert persona["traits"] not in served
+        assert persona["behavior"] not in served
+        for objection in persona["objections"]:
+            assert objection not in served
+
+
+async def test_persona_detail_404s_for_an_unknown_id(client):
+    """An id that is not a Persona's answers 404, exactly as an inactive
+    one does -- an inactive Persona is not on offer either."""
+    resp = await client.get(f"/api/personas/{uuid.uuid4()}")
+    assert resp.status_code == 404
+
+
 async def test_scenarios_endpoint_lists_every_scenario_with_its_teaser(client):
     """F-43/F-03: each scenario is offered with a human-readable teaser."""
     resp = await client.get("/api/scenarios")

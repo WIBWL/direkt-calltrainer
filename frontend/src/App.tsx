@@ -13,6 +13,7 @@ import {
   type LibraryFilter,
 } from "./components/LibraryPicker";
 import MicCheck from "./components/MicCheck";
+import PersonaInfo from "./components/PersonaInfo";
 import ScenarioEditor from "./components/ScenarioEditor";
 import SetupView from "./components/SetupView";
 import TranscriptView from "./components/TranscriptView";
@@ -55,6 +56,9 @@ export default function App() {
   // The F-03 call context filter (ADR 0072), independent of the origin chips.
   const [scenarioCategory, setScenarioCategory] = useState<CategoryFilter>("all");
   const [editingScenario, setEditingScenario] = useState<EditorState>(null);
+  // The Persona whose read-only info panel is open, or null. Held here for
+  // the same reason the editor's state is: SetupView is presentational.
+  const [infoPersonaId, setInfoPersonaId] = useState<string | null>(null);
   // The caller's company (ADR 0060); null = default tenant, no company chip.
   const [tenantName, setTenantName] = useState<string | null>(null);
   // Tracks intentional muting separately from entering or leaving the call screen.
@@ -360,6 +364,11 @@ export default function App() {
     void reloadScenarios(savedId);
   };
 
+  // The card the info panel was opened from. Looked up rather than stored so
+  // a reload of the Persona list cannot leave a stale name in the heading;
+  // if the Persona is gone the panel closes with the list.
+  const infoPersona = personas.find((p) => p.id === infoPersonaId) ?? null;
+
   // Rendered over the setup screen and the post-call screen alike: the
   // follow-up (F-60) can be edited from either.
   const scenarioEditor = editingScenario && (
@@ -445,6 +454,7 @@ export default function App() {
         onEditScenario={(id) => setEditingScenario({ id })}
         personas={personas}
         personaId={personaId}
+        onShowPersonaInfo={setInfoPersonaId}
         selectedScenario={selectedScenario}
         selectedPersona={selectedPersona}
         loadError={loadError}
@@ -454,6 +464,14 @@ export default function App() {
       />
 
       {scenarioEditor}
+
+      {infoPersona && (
+        <PersonaInfo
+          personaId={infoPersona.id}
+          personaName={infoPersona.name}
+          onClose={() => setInfoPersonaId(null)}
+        />
+      )}
     </AppLayout>
   );
 }

@@ -58,6 +58,10 @@ PERSONAS = [
             "matter-of-fact, time-conscious, impatient with overly technical "
             "detail, an experienced negotiator"
         ),
+        "traits_label": (
+            "Sachlich, auf die Zeit bedacht, ungeduldig bei zu viel technischem "
+            "Detail, verhandlungserfahren."
+        ),
         # Manner only (ADR 0045): how hard this Persona pushes and how long it
         # tolerates a vague answer. What the call is about lives on the
         # Scenario.
@@ -96,6 +100,12 @@ PERSONAS = [
             "asks what exactly is being paid for, item by item",
             "threatens to take the decision to the next budget round instead",
         ],
+        "objection_labels": [
+            "Hält dagegen, der Betrag liege über dem, was dafür eingeplant war",
+            "Sagt, das sei schon einmal zugesagt worden und nichts sei passiert",
+            "Fragt Posten für Posten, wofür genau bezahlt wird",
+            "Droht damit, die Entscheidung in die nächste Budgetrunde zu schieben",
+        ],
     },
     {
         "id": "theresia-jansen-marketing",
@@ -105,6 +115,10 @@ PERSONAS = [
         "traits": (
             "very polite, courteous, calm and composed, never pushy, easy and "
             "pleasant to talk to"
+        ),
+        "traits_label": (
+            "Sehr höflich, zuvorkommend, ruhig und gefasst, nie drängend, "
+            "angenehm im Gespräch."
         ),
         # Manner only (ADR 0045). Same persistence as the other Persona, worn
         # differently: she never raises her voice and never interrupts, and
@@ -134,6 +148,12 @@ PERSONAS = [
             "says she understands, but that this does not answer what she asked",
             "asks whether she should call back once someone can give her a firm answer",
         ],
+        "objection_labels": [
+            "Entschuldigt sich und kommt dann auf die offene Frage zurück",
+            "Sagt, sie verstehe das, es beantworte aber nicht ihre Frage",
+            "Fragt, ob sie später noch einmal anrufen soll, wenn jemand "
+            "verbindlich antworten kann",
+        ],
     },
     # --- From the persona catalogue ---------------------------------------
     # The four below come from the persona catalogue (docs/scenario-catalogue.md,
@@ -158,6 +178,10 @@ PERSONAS = [
         "traits": (
             "thorough, sceptical of summaries, precise with words, unhurried, "
             "sure of his own subject"
+        ),
+        "traits_label": (
+            "Gründlich, misstrauisch gegenüber Zusammenfassungen, wortgenau, "
+            "unaufgeregt, sicher im eigenen Fach."
         ),
         # Manner only (ADR 0045). The deliberate opposite pole to Andreas
         # Kastner: the same persistence, but this one wants the long version and
@@ -192,6 +216,13 @@ PERSONAS = [
             "points out this has to pass an internal review before anything is agreed",
             "asks which part of that is measured and which part is an estimate",
         ],
+        "objection_labels": [
+            "Fragt, was im Fehlerfall passiert und wer es dann trägt",
+            "Sagt, die Zusammenfassung reiche nicht, und fragt nach dem "
+            "Mechanismus dahinter",
+            "Weist darauf hin, dass das erst durch eine interne Prüfung muss",
+            "Fragt, welcher Teil davon gemessen und welcher geschätzt ist",
+        ],
     },
     {
         "id": "kerstin-kaser-clerk",
@@ -204,6 +235,10 @@ PERSONAS = [
         "traits": (
             "reserved, brief, not unfriendly, gives away nothing unasked, "
             "comfortable with silence"
+        ),
+        "traits_label": (
+            "Zurückhaltend, knapp, nicht unfreundlich, sagt ungefragt nichts, "
+            "hält Stille aus."
         ),
         # Manner only (ADR 0045). The counterpart to both existing Personas,
         # which talk and ask: here the call dies unless the user asks. R-50
@@ -235,6 +270,13 @@ PERSONAS = [
             "acknowledges in a single word and waits for the next question",
             "says someone else would have to answer that, without naming who",
         ],
+        "objection_labels": [
+            "Beantwortet eine weite Frage mit einem blanken Ja oder Nein und "
+            "hört auf",
+            "Sagt, das wisse sie nicht, und belässt es dabei",
+            "Bestätigt mit einem einzigen Wort und wartet auf die nächste Frage",
+            "Sagt, das müsse jemand anderes beantworten, ohne zu sagen wer",
+        ],
     },
     {
         "id": "marcel-kropp-cost-critical",
@@ -247,6 +289,10 @@ PERSONAS = [
         "traits": (
             "friendly while nothing costs extra, blunt about money, no "
             "negotiator, quick to refuse"
+        ),
+        "traits_label": (
+            "Freundlich, solange nichts extra kostet, beim Geld unverblümt, "
+            "kein Verhandler, schnell bei der Absage."
         ),
         # Manner only (ADR 0045). R-07 is the one customer type the interviews
         # described in so many words. He refuses rather than bargains, which is
@@ -268,7 +314,7 @@ PERSONAS = [
         "training_goal": (
             "Umgang mit harter Preisablehnung: Der Nutzer muss den Wert einer "
             "Leistung erklären und die Abgrenzung zum Bestehenden klären, "
-            "statt über den Betrag zu verhandeln -- die Persona verhandelt "
+            "statt über den Betrag zu verhandeln. Die Persona verhandelt "
             "nicht."
         ),
         "difficulty": "medium",
@@ -282,6 +328,13 @@ PERSONAS = [
             "says the same thing used to be included and asks what changed",
             "says he will do without it rather than pay on top",
         ],
+        "objection_labels": [
+            "Lehnt rundheraus ab, sobald ein Aufpreis genannt wird",
+            "Fragt, was seine bestehende Zahlung abdeckt und was nicht",
+            "Sagt, dasselbe sei früher enthalten gewesen, und fragt, was sich "
+            "geändert hat",
+            "Sagt, dann verzichte er lieber darauf, als noch etwas draufzuzahlen",
+        ],
     },
     {
         "id": "fabian-jantzer-non-technical",
@@ -294,6 +347,10 @@ PERSONAS = [
         "traits": (
             "willing, unembarrassed about not knowing, quickly lost in jargon, "
             "thinks in pictures"
+        ),
+        "traits_label": (
+            "Willig, ohne Scham über Nichtwissen, bei Fachjargon schnell "
+            "abgehängt, denkt in Bildern."
         ),
         # Manner only (ADR 0045). R-16 asks for explaining without jargon; this
         # is the counterpart that makes it trainable, and the reason F-40 has
@@ -326,6 +383,13 @@ PERSONAS = [
             "says that explanation used other terms he does not know either",
             "asks for a comparison to something outside the subject",
             "says he will have to bring in a colleague if it stays this technical",
+        ],
+        "objection_labels": [
+            "Hält an und nennt das Wort, bei dem er ausgestiegen ist",
+            "Sagt, in dieser Erklärung kämen wieder Begriffe vor, die er auch "
+            "nicht kennt",
+            "Bittet um einen Vergleich mit etwas außerhalb des Fachgebiets",
+            "Sagt, er müsse eine Kollegin dazuholen, wenn es so technisch bleibt",
         ],
     },
 ]

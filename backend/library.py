@@ -52,6 +52,7 @@ _NULLABLE_SCENARIO_FIELDS = frozenset({"category"})
 
 
 def _to_persona(row: models.Persona) -> Persona:
+    ordered = sorted(row.objections, key=lambda e: e.position)
     return Persona(
         id=str(row.extern_id),
         name=row.name,
@@ -62,6 +63,8 @@ def _to_persona(row: models.Persona) -> Persona:
             kugelaudio_voice_id=row.kugelaudio_voice_id,
         ),
         role_label=row.role_label,
+        traits_label=row.traits_label,
+        training_goal=row.training_goal,
         role=row.role,
         traits=row.traits,
         behavior=row.behavior,
@@ -69,9 +72,10 @@ def _to_persona(row: models.Persona) -> Persona:
         # only orders what the database returns, so the mapping would depend on
         # how the row was obtained. `position` (ADR 0026) is the authored
         # order, and it is the order the prompt gets.
-        objections=tuple(
-            objection.text
-            for objection in sorted(row.objections, key=lambda e: e.position)
+        objections=tuple(objection.text for objection in ordered),
+        # Same source, same order: the label of objection i is at index i.
+        objection_labels=tuple(
+            objection.text_label or "" for objection in ordered
         ),
     )
 

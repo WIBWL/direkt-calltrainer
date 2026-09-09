@@ -34,6 +34,21 @@ export interface Persona {
   language: string;
 }
 
+/**
+ * What the info panel behind a Persona card shows (`GET /api/personas/{id}`).
+ *
+ * Every text here is German display content, never the English prompt fields
+ * the model reads (ADR 0043): `traits` is the `traits_label` column and
+ * `objections` the objections' `text_label`, not their `text`. `traits` is
+ * nullable because the column is — a Persona seeded without one still plays,
+ * the panel just leaves the line out.
+ */
+export interface PersonaDetail extends Persona {
+  traits: string | null;
+  training_goal: string;
+  objections: string[];
+}
+
 export interface Scenario {
   id: string;
   name: string;
