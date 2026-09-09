@@ -3490,6 +3490,24 @@ h2 {
   stroke-linecap: round;
 }
 
+/* The connection across a stimmlose Stelle. Same hue, so the eye follows one
+   curve, but thin and faint: nothing was measured here, and the line must not
+   claim otherwise. */
+.pitch-contour-bridge {
+  fill: none;
+  stroke: var(--color-blue-600);
+  stroke-width: 0.9;
+  opacity: 0.35;
+}
+
+/* Where one of the user's turns ends and the next begins. Light grey and
+   dashed: a seam in the recording, not a value. */
+.pitch-contour-break {
+  stroke: var(--color-border);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
 .pitch-contour-tick,
 .pitch-contour-axis-label {
   font-family: var(--font-sans);

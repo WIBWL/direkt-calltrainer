@@ -262,6 +262,38 @@ def test_a_handful_of_voiced_frames_is_not_a_range() -> None:
     assert "intonation" not in _by_key(turns)
 
 
+def test_the_curve_carries_the_seams_between_the_users_turns() -> None:
+    """The drawn curve is the user's speaking time with the Persona's turns
+    taken out, so the point where one of their utterances ends and the next
+    begins is not recoverable from the curve itself. Without it a seam would be
+    read as a movement of the voice.
+
+    No step is stored beside it: which step of the scale the figure lands on is
+    derived when the Session is read (`api/sessions.py::_served_detail`), so a
+    recalibration reaches trainings whose audio is long gone.
+    """
+    turns = _measured_call()
+    turns[1].pitch_hz = [120.0] * 60
+    turns.append(
+        Turn(
+            seq=3,
+            user_text="Und noch etwas",
+            user_offset_ms=8_000,
+            user_end_ms=8_000 + _AUDIO_MS,
+            user_speech_ms=_AUDIO_MS,
+            user_phonation_ms=_PHONATION_MS,
+            pitch_hz=[150.0] * 60,
+        )
+    )
+
+    detail = next(m.detail for m in measure(conversation(turns)) if m.key == "intonation")
+
+    # 60 frames at 10 ms thinned to the 100 ms display grid is 6 points.
+    assert detail["turn_breaks"] == [6]
+    assert len(detail["curve_hz"]) == 12
+    assert "liveliness" not in detail
+
+
 # --- F-37: the loudness course, described rather than scored ---------------
 
 # Steady without being constant: real Praat output jitters a few dB per frame,

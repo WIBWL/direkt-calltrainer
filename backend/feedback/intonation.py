@@ -313,6 +313,37 @@ def thin(contour: tuple[float | None, ...], step_ms: int) -> list[float | None]:
     return out
 
 
+def utterance_breaks(
+    per_utterance: tuple[tuple[float | None, ...], ...], step_ms: int
+) -> list[int]:
+    """Where one of the speaker's utterances ends and the next begins, as
+    indices into the thinned curve.
+
+    The curve holds the user's frames only, one utterance after the other, with
+    the Persona's turns not represented at all -- that is what makes the
+    horizontal axis speaking time rather than call time. Without these marks a
+    reader would take a seam between two utterances for a movement of the voice.
+    Each index is therefore *both* an end and the next start, and the interface
+    draws it as one line rather than as a gap.
+
+    Empty utterances (no voicing measured at all) contribute nothing to the
+    curve and so cannot be marked on it; two very short utterances landing in
+    the same window collapse to one mark rather than being drawn twice.
+    """
+    per_point = max(1, step_ms // STEP_MS)
+    total = sum(len(utterance) for utterance in per_utterance)
+    points = -(-total // per_point)  # the length `thin` will produce
+
+    marks: list[int] = []
+    frames = 0
+    for utterance in per_utterance[:-1]:
+        frames += len(utterance)
+        index = frames // per_point
+        if 0 < index < points and index not in marks:
+            marks.append(index)
+    return marks
+
+
 # --- The reading, which is the one part of this module that judges -----------
 
 

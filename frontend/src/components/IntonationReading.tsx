@@ -52,6 +52,9 @@ export default function IntonationReading({ measurement }: { measurement: Measur
   const endings = detail.endings as Endings | undefined;
   const first = detail.range_first_st as number | undefined;
   const last = detail.range_last_st as number | undefined;
+  // Absent for a Session measured before the seams were kept; the plot then
+  // simply draws one continuous stretch of speaking time.
+  const breaks = detail.turn_breaks as number[] | undefined;
   const step = detail.liveliness as string | undefined;
 
   // A Session measured before the factors existed carries the range and
@@ -77,6 +80,7 @@ export default function IntonationReading({ measurement }: { measurement: Measur
           stepMs={stepMs}
           bandLowSt={-measurement.value / 2}
           bandHighSt={measurement.value / 2}
+          breaks={breaks}
         />
       </div>
 

@@ -84,7 +84,7 @@ source of that content, and which imports without a database.
 | Persistence schema (ORM metadata) and the invariants the database enforces (unique measurement/turn) | ADR 0025/0026/0029/0032/0051/0053, F-09, F-12, F-14 | `test_persistence_schema.py` |
 | Session statistics: what each metric divides by, and what suppresses it | F-08, F-24, F-35, F-36, F-41, F-51, F-53, ADR 0047, ADR 0048, ADR 0051 | `test_metrics.py` |
 | Praat measurement against synthetic waveforms: the pitch curve's grid, its unit, and what is refused rather than guessed | F-35, F-37, F-51, ADR 0047, ADR 0048 | `test_acoustics.py` |
-| Pitch contour factors: range vs movement, terminal contours per utterance, development across the call, what is refused | F-35, ADR 0051 | `test_intonation.py` |
+| Pitch contour factors: range vs movement, terminal contours per utterance, development across the call, what is refused, the five-step reading and the seams between the user's turns | F-35, ADR 0004, ADR 0051 | `test_intonation.py` |
 | Overlapping speech: the rule order that keeps a backchannel from counting, terminal overlap, hard vs soft, and the provisional traffic light | F-51, ADR 0035, ADR 0036, ADR 0051 | `test_interruptions.py` |
 | Async wrap-up job status (queued → running → done/failed), and every path that can strand it | F-09, F-10, ADR 0019, ADR 0032, ADR 0034, ADR 0050 | `test_feedback_job_status.py` |
 | Wrap-up prompt & phase block (F-42), and the thinking-mode call it is asked with | F-09, F-42, F-43, ADR 0004, ADR 0011, ADR 0043, ADR 0049, ADR 0051, ADR 0056 | `test_wrapup_prompt.py` |

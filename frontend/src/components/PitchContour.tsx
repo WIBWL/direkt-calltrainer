@@ -1,7 +1,7 @@
 /**
  * The F0 contour of a call, drawn the way phonetics draws it (F-35).
  *
- * Four conventions, each of which is a decision and not a style:
+ * Five conventions, each of which is a decision and not a style:
  *
  * **Semitones on the vertical axis, relative to the speaker's own median.**
  * Hertz is a linear scale and pitch perception is not: 20 Hz is a large step
@@ -10,10 +10,19 @@
  * speaker's median is the standard normalisation and makes the picture about
  * the delivery rather than about the voice.
  *
- * **Gaps stay gaps.** Unvoiced frames are consonants, breaths and pauses, and
- * roughly half of speech carries no pitch at all. Interpolating across them
- * would draw movement that never happened, which is the single most common way
- * an F0 plot lies. The line breaks instead.
+ * **The horizontal axis is speaking time, not call time.** The curve holds the
+ * user's frames only; what the Persona said is not in the data at all, so no
+ * stretch of this plot stands for someone else talking. Where one utterance
+ * ends and the next begins there is a dashed mark instead of a gap — the seam
+ * is a fact worth seeing, an empty stretch would only be dead space.
+ *
+ * **Unvoiced stretches are bridged, but drawn as bridges.** Roughly half of
+ * speech carries no pitch: consonants, breaths, the pauses inside a sentence.
+ * Leaving them as holes broke the line into confetti and made a contour
+ * unreadable at a glance; interpolating them silently would draw movement that
+ * was never measured, which is the commonest way an F0 plot lies. So the line
+ * runs through, and the bridged pieces are thin and faint: continuous to
+ * follow, visibly not the same claim as the measured stretches.
  *
  * **The band is the speaker's own 5th to 95th percentile**, not a target. It is
  * there so the eye can see which excursions were unusual *for this speaker*,
@@ -43,6 +52,7 @@ export default function PitchContour({
   stepMs,
   bandLowSt,
   bandHighSt,
+  breaks = [],
 }: {
   /** One point per `stepMs`, null where the frame carried no voicing. */
   curveHz: (number | null)[];
@@ -52,6 +62,9 @@ export default function PitchContour({
   /** The 5th and 95th percentile, in semitones from the median. */
   bandLowSt?: number | undefined;
   bandHighSt?: number | undefined;
+  /** Indices into `curveHz` where one utterance ends and the next begins.
+   *  Empty for a Session measured before these were kept. */
+  breaks?: number[] | undefined;
 }) {
   const points = curveHz.map((hz) => (hz ? 12 * Math.log2(hz / medianHz) : null));
   const voiced = points.filter((st): st is number => st !== null);
@@ -66,18 +79,8 @@ export default function PitchContour({
   const x = (index: number) => PAD_LEFT + (index / (points.length - 1)) * plotWidth;
   const y = (st: number) => PAD_TOP + plotHeight / 2 - (st / reach) * (plotHeight / 2);
 
-  // One polyline per voiced run. The breaks are the point: see the docstring.
-  const runs: string[] = [];
-  let current: string[] = [];
-  points.forEach((st, index) => {
-    if (st === null) {
-      if (current.length > 1) runs.push(current.join(" "));
-      current = [];
-      return;
-    }
-    current.push(`${x(index).toFixed(1)},${y(st).toFixed(1)}`);
-  });
-  if (current.length > 1) runs.push(current.join(" "));
+  const marks = breaks.filter((index) => index > 0 && index < points.length);
+  const { lines, bridges } = trace(points, marks);
 
   const gridlines: number[] = [];
   for (let st = -Math.floor(reach / GRID_STEP_ST) * GRID_STEP_ST; st <= reach; st += GRID_STEP_ST) {
@@ -85,6 +88,8 @@ export default function PitchContour({
   }
 
   const seconds = (points.length * stepMs) / 1000;
+  const path = (run: [number, number][]) =>
+    run.map(([index, st]) => `${x(index).toFixed(1)},${y(st).toFixed(1)}`).join(" ");
 
   return (
     <figure className="pitch-contour">
@@ -96,7 +101,10 @@ export default function PitchContour({
           `Tonhöhenverlauf über ${Math.round(seconds)} Sekunden Sprechzeit, ` +
           `bezogen auf Ihre mittlere Stimmlage von ${Math.round(medianHz)} Hertz. ` +
           `Die Werte reichen von ${Math.min(...voiced).toFixed(1)} bis ` +
-          `${Math.max(...voiced).toFixed(1)} Halbtönen um diese Mitte.`
+          `${Math.max(...voiced).toFixed(1)} Halbtönen um diese Mitte` +
+          (marks.length > 0
+            ? `, aufgeteilt auf ${marks.length + 1} Redebeiträge von Ihnen.`
+            : ".")
         }
       >
         {bandLowSt !== undefined && bandHighSt !== undefined && (
@@ -124,8 +132,25 @@ export default function PitchContour({
           </g>
         ))}
 
-        {runs.map((run, index) => (
-          <polyline className="pitch-contour-line" key={index} points={run} />
+        {/* Behind the curve: a seam is context for the line, not a thing to
+            read on its own. */}
+        {marks.map((index) => (
+          <line
+            className="pitch-contour-break"
+            key={index}
+            x1={x(index)}
+            y1={PAD_TOP}
+            x2={x(index)}
+            y2={PAD_TOP + plotHeight}
+          />
+        ))}
+
+        {bridges.map((run, index) => (
+          <polyline className="pitch-contour-bridge" key={index} points={path(run)} />
+        ))}
+
+        {lines.map((run, index) => (
+          <polyline className="pitch-contour-line" key={index} points={path(run)} />
         ))}
 
         <text className="pitch-contour-axis-label" x={2} y={PAD_TOP + 8}>
@@ -141,9 +166,66 @@ export default function PitchContour({
 
       <figcaption className="pitch-contour-legend">
         Halbtöne um Ihre mittlere Stimmlage ({Math.round(medianHz)} Hz, die Nulllinie). Das
-        Band ist der Bereich, in dem Sie meistens sprechen. Lücken sind stimmlose Stellen,
-        also Konsonanten, Atem und Pausen; dort wird bewusst nicht durchgezeichnet.
+        Band ist der Bereich, in dem Sie meistens sprechen. Waagerecht läuft nur Ihre eigene
+        Sprechzeit; die dünnen Verbindungen überbrücken stimmlose Stellen wie Konsonanten und
+        Atem, dort wurde nichts gemessen.
+        {marks.length > 0 && (
+          <>
+            {" "}
+            Die gestrichelten Linien markieren, wo einer Ihrer Redebeiträge endet und der nächste
+            beginnt. Dazwischen sprach Ihr Gegenüber; diese Zeit ist nicht dargestellt.
+          </>
+        )}
       </figcaption>
     </figure>
   );
+}
+
+/**
+ * The curve as two sets of runs: what was measured, and what merely connects
+ * two measured stretches.
+ *
+ * Both are needed because the line has to be continuous to be readable and
+ * honest to be true. A bridge is emitted for every unvoiced stretch inside one
+ * utterance, and never across an utterance seam: the voice did not travel from
+ * the end of one turn to the start of the next, the Persona spoke in between.
+ */
+function trace(
+  points: (number | null)[],
+  marks: number[],
+): { lines: [number, number][][]; bridges: [number, number][][] } {
+  const seams = new Set(marks);
+  const lines: [number, number][][] = [];
+  const bridges: [number, number][][] = [];
+
+  let run: [number, number][] = [];
+  let previous: [number, number] | null = null;
+
+  const closeRun = () => {
+    // A run of one point draws nothing in SVG, and it is not lost: it stays the
+    // endpoint of the bridges on either side of it.
+    if (run.length > 1) lines.push(run);
+    run = [];
+  };
+
+  points.forEach((st, index) => {
+    if (seams.has(index)) {
+      closeRun();
+      previous = null; // the voice did not travel across a seam, so no bridge
+    }
+    if (st === null) {
+      closeRun();
+      return;
+    }
+
+    const point: [number, number] = [index, st];
+    if (run.length === 0 && previous !== null) {
+      bridges.push([previous, point]);
+    }
+    run.push(point);
+    previous = point;
+  });
+  closeRun();
+
+  return { lines, bridges };
 }

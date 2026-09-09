@@ -28,6 +28,7 @@ from backend.feedback.intonation import (
     profile,
     semitones,
     thin,
+    utterance_breaks,
 )
 
 
@@ -321,3 +322,32 @@ def test_serving_leaves_a_detail_that_was_never_measured_alone() -> None:
     all. There is nothing to read a step off, and inventing one would put a
     word on a training that was never measured."""
     assert _served_detail(RANGE_KEY, 9.0, None) is None
+
+
+# --- Where one utterance ends and the next begins ---------------------------
+
+
+def test_utterance_seams_land_on_the_thinned_curve() -> None:
+    """The curve is speaking time: the Persona's turns are not in it, so a seam
+    is the only thing that says two stretches were not one breath."""
+    utterances = (_steady(120, 250), _steady(130, 250), _steady(140, 100))
+
+    marks = utterance_breaks(utterances, 100)
+
+    # 250 frames at 10 ms thinned to 100 ms is 25 points, then 25 more.
+    assert marks == [25, 50]
+
+
+def test_a_call_of_one_utterance_has_no_seams() -> None:
+    """Nothing to mark, and a mark at the end of the last utterance would be a
+    line at the right edge with nothing behind it."""
+    assert not utterance_breaks((_steady(120, 300),), 100)
+
+
+def test_two_seams_inside_one_window_are_marked_once() -> None:
+    """A very short utterance puts two seams in the same 100 ms window. One
+    line, not two on top of each other: the second would be invisible and would
+    still be in the count the caption states."""
+    barely_spoke = (_steady(120, 105), _steady(130, 4), _steady(140, 300))
+
+    assert utterance_breaks(barely_spoke, 100) == [10]

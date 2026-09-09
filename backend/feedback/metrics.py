@@ -282,6 +282,14 @@ def _intonation(call: Conversation) -> Measurement | None:
             # them (intonation.thin).
             "curve_hz": intonation.thin(call.pitch_hz, LOUDNESS_INTERVAL_MS),
             "curve_step_ms": LOUDNESS_INTERVAL_MS,
+            # Where one of the user's utterances ends and the next begins, as
+            # indices into that curve. The curve is speaking time, not call
+            # time: the Persona's turns are not in it at all, so without these
+            # a seam between two utterances would read as a movement of the
+            # voice.
+            "turn_breaks": intonation.utterance_breaks(
+                call.pitch_per_turn, LOUDNESS_INTERVAL_MS
+            ),
             "median_hz": shape.median_hz,
             "movement_st_per_s": shape.movement_st_per_s,
             "endings": {
