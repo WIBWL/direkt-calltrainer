@@ -153,7 +153,10 @@ export default function ProfileView() {
 
         <dl className="deletion-paths">
           <dt>Ein einzelnes Training</dt>
-          <dd>In der Liste oben öffnen, Löschknopf am Seitenende.</dd>
+          <dd>
+            In der Liste oben auf das Papierkorb-Symbol in der Zeile, oder im geöffneten
+            Training am Seitenende.
+          </dd>
 
           <dt>Alle Ihre Trainings</dt>
           <dd>Oben die Einwilligung widerrufen.</dd>

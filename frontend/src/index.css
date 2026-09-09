@@ -2818,10 +2818,21 @@ h2 {
   border-top: 1px solid var(--color-border-subtle);
 }
 
+/* The row proper and the delete button beside it. The button cannot live
+   inside the link (invalid markup, and a click would navigate too), so the two
+   sit side by side and the link takes what is left. */
+.session-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .session-row {
   display: flex;
   align-items: center;
   gap: 18px;
+  flex: 1;
+  min-width: 0;
   padding: 13px 18px;
   text-decoration: none;
   color: inherit;
@@ -2929,6 +2940,84 @@ h2 {
 
 .session-row:hover .session-row-chevron {
   border-color: var(--color-blue-600);
+}
+
+/* Quiet until the row is pointed at or the button itself focused: a delete
+   sitting in full colour on every line would be the loudest thing on a screen
+   whose purpose is reading. It stays reachable by keyboard regardless — only
+   the colour is held back, never the button. */
+.session-row-delete {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-right: 10px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  padding: 0;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: color 0.15s, background 0.15s, opacity 0.15s;
+}
+
+.session-item:hover .session-row-delete,
+.session-row-delete:focus-visible {
+  opacity: 1;
+}
+
+.session-row-delete:hover:not(:disabled) {
+  background: var(--color-surface-selected);
+  color: var(--color-danger);
+  opacity: 1;
+}
+
+.session-row-delete:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: -2px;
+}
+
+/* Open confirmation: the bin stays in reach (clicking it again closes) and
+   shows which row the question below belongs to. */
+.session-row-delete[aria-expanded="true"] {
+  color: var(--color-danger);
+  opacity: 1;
+}
+
+/* Spans the full row underneath it, so the question and its answer are not
+   squeezed into the space the bin occupied. */
+.session-row-confirm {
+  flex: 0 0 100%;
+  padding: 0 18px 14px;
+}
+
+.session-row-confirm p {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.session-row-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.session-row-confirm .consent-button {
+  flex: 0 0 auto;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+}
+
+.session-row-confirm .cancel-button {
+  display: inline-block;
+  width: auto;
+  margin-top: 0;
+  padding: 0.5rem 0;
+  font-size: 0.9rem;
 }
 
 .session-more {

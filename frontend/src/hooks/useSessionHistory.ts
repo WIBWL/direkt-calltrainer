@@ -66,6 +66,14 @@ export function useSessionHistory() {
 
   const loadMore = useCallback(() => setRequestedPages((n) => n + 1), []);
 
+  // Drops a Session the server has already deleted. Local rather than a
+  // refetch: re-requesting the same offsets after a row disappeared would pull
+  // rows across page boundaries and skip one.
+  const removeSession = useCallback((sessionId: string) => {
+    setSessions((previous) => previous.filter((s) => s.session_id !== sessionId));
+    setTotal((previous) => Math.max(0, previous - 1));
+  }, []);
+
   return {
     sessions,
     total,
@@ -74,5 +82,6 @@ export function useSessionHistory() {
     /** True while the list is shorter than what the server says exists. */
     hasMore: sessions.length < total,
     loadMore,
+    removeSession,
   };
 }
