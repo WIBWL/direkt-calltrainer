@@ -584,6 +584,8 @@ def _measurement(measurement: db_models.Measurement) -> dict:
         "key": measurement.metric_type.key,
         "name": measurement.metric_type.name,
         "unit": measurement.metric_type.unit,
+        # Which half of the Kennzahlen grid this one sits in; display only.
+        "aspect": measurement.metric_type.aspect,
         "value": float(measurement.value),
         "detail": measurement.detail_json,
     }

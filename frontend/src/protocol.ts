@@ -161,10 +161,16 @@ export type ServerMessage =
 
 export type FeedbackStatus = "queued" | "running" | "done" | "failed";
 
+/** backend/db/models.py METRIC_ASPECTS. */
+export type MetricAspect = "how" | "what";
+
 export interface Measurement {
   key: string;
   name: string;
   unit: string | null;
+  /** Which half of the Kennzahlen this one sits in. NULL only for a metric
+   * the inventory has retired. */
+  aspect: MetricAspect | null;
   value: number;
   /** ADR 0029's free-form payload: curves, sub-measures, pause positions. */
   detail: Record<string, unknown> | null;
