@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session as DbSession
 # entities visibly distinct from the identically named in-memory ones.
 from backend.db import models as db_models
 from backend.db.session import session_scope
-from backend.feedback import metrics
+from backend.feedback import interruptions, metrics
 from backend.personas import Persona
 from backend.scenarios import Scenario
 from backend.session.models import Turn, conversation, utterances
@@ -74,6 +74,8 @@ def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-a
                 start_offset_ms=spoken.offset_ms,
                 duration_ms=spoken.duration_ms,
                 transcript=spoken.text,
+                interrupted=spoken.interrupted,
+                unheard_text=spoken.unheard or None,
             )
             for index, spoken in enumerate(utterances(turns))
         ]
@@ -96,15 +98,18 @@ def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-a
 def _write_analysis(
     db: DbSession, session: db_models.Session, call: metrics.Conversation
 ) -> None:
-    """Attach the Session's Measurement rows.
-
-    No `Finding` rows are written: marking a value as remarkable takes a norm to
-    compare it against, and none of these metrics has one that was measured
-    rather than guessed (ADR 0051). The table waits for pilot data.
+    """Attach the Session's Measurement and Finding rows.
 
     A metric the seed does not know is dropped rather than written against a
     guessed reference row -- provision.py seeds the inventory from the same
     METRICS tuple, so that can only happen against a database behind the code.
+
+    Findings are written for one thing only, and the distinction is what makes
+    it allowable: a hard interruption is an *event that occurred at a moment*,
+    not a value judged against a threshold. ADR 0051 keeps the table empty for
+    the second kind, because marking a figure as remarkable takes a norm nobody
+    measured. Nothing of that sort is written here -- an overlap either happened
+    or it did not, and the row says when.
     """
     metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType).all()}
     session.measurements = [
@@ -115,6 +120,18 @@ def _write_analysis(
         )
         for m in metrics.measure(call)
         if m.key in metric_ids
+    ]
+    session.findings = [
+        db_models.Finding(
+            metric_type_id=metric_ids.get(interruptions.COUNT_KEY),
+            category=interruptions.FINDING_CATEGORY,
+            offset_ms=event.offset_ms,
+            description=(
+                f"Sie haben zu sprechen begonnen, während Ihr Gegenüber noch "
+                f"{round(event.remaining_ms / 1000, 1)} Sekunden zu sagen hatte."
+            ),
+        )
+        for event in interruptions.classify(call.timeline).hard
     ]
 
 

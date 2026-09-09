@@ -147,6 +147,89 @@ def test_pauses_come_from_the_same_segmentation_as_phonation() -> None:
     assert values["pauses"] == 1.0
 
 
+# --- F-51: cutting in on the Persona (ADR 0035) ----------------------------
+
+
+def _call_with_a_barge_in() -> list[Turn]:
+    """A call where the user genuinely cut in: their utterance starts while the
+    Persona's line still had seconds of audio outstanding, and that line was
+    trimmed back to the heard part.
+
+    Both halves are needed. A trimmed reply on its own says nothing about
+    timing, and an overlap on its own may have cost the Persona nothing.
+    """
+    return [
+        Turn(seq=1, persona_text="Guten Tag, ich rufe an wegen der offenen Rechnung ...",
+             persona_offset_ms=0, persona_end_ms=10_000, persona_interrupted=True),
+        Turn(
+            seq=2,
+            user_text="Moment bitte",
+            user_offset_ms=3_000,
+            user_end_ms=3_000 + _AUDIO_MS,
+            user_speech_ms=_AUDIO_MS,
+            user_phonation_ms=_PHONATION_MS,
+            persona_text="Gut.",
+            persona_offset_ms=12_000,
+            persona_end_ms=13_000,
+        ),
+    ]
+
+
+def test_an_interruption_needs_both_the_overlap_and_the_lost_words() -> None:
+    """The event is "the Persona had more to say and did not get to say it".
+    Read off the timeline plus the trim flag, never off the transcript's
+    "[unterbrochen]" marker, which is a rendering decision."""
+    values = _by_key(_call_with_a_barge_in())
+
+    assert values["interruptions"] == 1.0
+
+
+def test_a_trimmed_reply_the_user_did_not_overlap_is_not_an_interruption() -> None:
+    """Same flag, no overlapping start: whatever cut that reply short, it was
+    not somebody talking over it."""
+    turns = _measured_call()
+    turns[1].persona_interrupted = True
+
+    assert _by_key(turns)["interruptions"] == 0.0
+
+
+def test_a_call_nobody_interrupted_reports_zero_rather_than_nothing() -> None:
+    """Zero is a measurement here, unlike elsewhere in this module. The user
+    let every reply finish, which is a fact about the call; a missing row would
+    read as "not measured" and hide it."""
+    values = _by_key(_measured_call())
+
+    assert values["interruptions"] == 0.0
+
+
+def test_the_count_carries_its_context_without_dividing_by_it() -> None:
+    """A count, with the number of Persona replies beside it rather than under
+    it. A rate was built and dropped: at the length these calls run, dividing
+    turned a single interruption into the top step of the scale, which said
+    more about the denominator than about the call.
+
+    The offsets travel too, so the interface can point at them in the
+    transcript without recomputing anything.
+    """
+    detail = next(
+        m.detail for m in measure(conversation(_call_with_a_barge_in()))
+        if m.key == "interruptions"
+    )
+
+    assert detail["persona_turns"] == 2
+    assert detail["soft_count"] == 0
+    assert detail["hard_offsets_ms"] == [3_000]
+    assert "interruption_rate" not in {m.key for m in measure(conversation(_measured_call()))}
+
+
+def test_a_call_with_no_persona_reply_yields_no_interruption_figure() -> None:
+    """Nothing was there to cut into, so there is nothing to report. Zero would
+    claim the user restrained themselves."""
+    turns = [Turn(seq=1, user_text="Hallo?", user_speech_ms=500, user_phonation_ms=400)]
+
+    assert "interruptions" not in _by_key(turns)
+
+
 # --- F-35: the pitch range, in an interval rather than in Hertz ------------
 
 

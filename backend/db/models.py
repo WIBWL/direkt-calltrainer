@@ -473,6 +473,23 @@ class Turn(Base):
     # could not be analysed, or a Persona line whose synthesis failed.
     duration_ms: Mapped[int | None] = mapped_column(Integer)
     transcript: Mapped[str] = mapped_column(Text)
+    # True on a Persona utterance that was cut back to the part the user
+    # actually heard (ADR 0035). The transcript already carries a visible
+    # "... [unterbrochen]" for the reader, but that is a display decision;
+    # anything computing on it -- the interruption classification of F-51 --
+    # needs a field, not a string match on a marker somebody may reword.
+    # Always False on a user utterance: the Persona never talks over the user.
+    interrupted: Mapped[bool] = mapped_column(Boolean, default=False)
+    # What had been synthesized but not yet played when the user cut in (F-51),
+    # so the wrap-up can show what the Persona had been about to say. NULL
+    # everywhere else, including on an interrupted line recorded before this
+    # column existed.
+    #
+    # Deliberately kept out of `transcript`: that column is what was actually
+    # said in the call, and ADR 0035 keeps it and the model's history to the
+    # heard words exactly. This is the counterfactual beside it, never part of
+    # it.
+    unheard_text: Mapped[str | None] = mapped_column(Text)
 
     session: Mapped["Session"] = relationship(back_populates="turns")
     feedback_points: Mapped[list["FeedbackPoint"]] = relationship(back_populates="turn")

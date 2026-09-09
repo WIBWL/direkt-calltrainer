@@ -37,6 +37,7 @@ from backend import deletion
 from backend.auth import AuthContext, require_user
 from backend.db import models as db_models
 from backend.db.session import session_scope
+from backend.feedback import interruptions
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +168,7 @@ def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user
                 selectinload(db_models.Session.jobs),
                 selectinload(db_models.Session.persona),
                 selectinload(db_models.Session.scenario),
+                selectinload(db_models.Session.findings),
             )
             .one_or_none()
         )
@@ -185,6 +187,24 @@ def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user
             "status": _feedback_status(session),
             "turns": [_turn(t) for t in sorted(session.turns, key=lambda t: t.seq_index)],
             "measurements": [_measurement(m) for m in session.measurements],
+            # Individual moments that were noted, ordered as they happened. The
+            # counterpart to a Measurement: a Measurement is what the whole call
+            # amounted to, a Finding is one thing that occurred at one point
+            # (F-51 writes the first of them). Sorted here so the client does
+            # not have to know that they belong on the transcript's timeline.
+            "findings": [
+                _finding(f) for f in sorted(session.findings, key=lambda f: f.offset_ms or 0)
+            ],
+            # The long explanation behind a Kennzahl's "i", by metric key.
+            # Read from the Python constant at request time rather than stored
+            # with the Session or copied into the frontend: it explains the
+            # thresholds it sits next to, and the two have to be edited
+            # together (the arrangement ADR 0063 chose for the field limits).
+            "metric_notes": {interruptions.COUNT_KEY: interruptions.EXPLANATION},
+            # The scale the traffic light comes from, written out. A boundary
+            # the user cannot see is a judgement they cannot argue with, and
+            # these boundaries are working values (see `interruptions.py`).
+            "metric_scales": {interruptions.COUNT_KEY: interruptions.light_steps()},
             "feedback": _feedback(session.feedback),
             "follow_up": _follow_up(db, session.session_id),
         }
@@ -283,6 +303,25 @@ def _turn(turn: db_models.Turn) -> dict:
         "start_offset_ms": turn.start_offset_ms,
         "duration_ms": turn.duration_ms,
         "transcript": turn.transcript,
+        # Both only ever set on a Persona line the user cut into (F-51). The
+        # unheard part is what the Persona had been about to say; it is not part
+        # of the transcript and must never be rendered as though it were.
+        "interrupted": turn.interrupted,
+        "unheard_text": turn.unheard_text,
+    }
+
+
+def _finding(finding: db_models.Finding) -> dict:
+    """One noted moment. `category` is the machine-readable kind (the interface
+    decides how to word it), `offset_ms` places it on the transcript's timeline,
+    `description` is the sentence already written for the user."""
+    return {
+        "category": finding.category,
+        "offset_ms": finding.offset_ms,
+        "description": finding.description,
+        # Which figure this moment belongs to, so the interface can show it
+        # beside the right Kennzahl. NULL for a Finding that stands alone.
+        "metric_key": finding.metric_type.key if finding.metric_type else None,
     }
 
 

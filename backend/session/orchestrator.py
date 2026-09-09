@@ -160,6 +160,24 @@ def _strip_foreign_script(text_chunk: str) -> str:
     return _FOREIGN_SCRIPT_RE.sub("", text_chunk).strip()
 
 
+def _unheard(spoken_text: str, heard: str) -> str:
+    """The part of a cut-off reply the user never got to hear (F-51).
+
+    Kept only so the wrap-up can show what the Persona had been about to say
+    when it was interrupted. It is deliberately *not* put back into the model's
+    history or into the Transcript: ADR 0035 keeps those to the heard words
+    exactly, and a model that read its own unspoken sentence would carry on as
+    though it had been said.
+
+    Note what this is and is not. Generation is cancelled along with playback,
+    so this holds what had already been synthesized and not yet played, not the
+    whole sentence the model would eventually have produced. The interface has
+    to word it that way.
+    """
+    remainder = spoken_text[len(heard):] if spoken_text.startswith(heard) else ""
+    return remainder.strip()
+
+
 def _note_suppressed(progress: _ReplyProgress, text: str, nudge: str) -> None:
     """A chunk the filters emptied: counted, the first kept with its nudge."""
     progress.suppressed += 1
@@ -785,6 +803,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         if len(heard) >= len(turn.persona_text):
             return  # heard all of it, or a stale re-entry -- nothing to trim
         logger.info("Turn %d reply trimmed to the heard part: %r", turn.seq, heard)
+        turn.persona_unheard = _unheard(progress.spoken_text, heard)
         turn.persona_text = heard
         turn.persona_interrupted = True
         # The dash tells the model this line was cut off (see nudges.py); the
@@ -812,6 +831,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             return
         heard = heard_text(progress.checkpoints, progress.spoken_text, played_ms)
         if heard:
+            turn.persona_unheard = _unheard(progress.spoken_text, heard)
             turn.persona_text = heard
             turn.persona_interrupted = True
             self._messages.append({"role": "assistant", "content": f"{heard}{INTERRUPTED_MARK}"})

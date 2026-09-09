@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from backend.feedback.acoustics import Pause
+from backend.feedback.interruptions import Segment
 from backend.feedback.metrics import Conversation
 
 
@@ -33,6 +34,11 @@ class Turn:  # pylint: disable=too-many-instance-attributes
     # and the metrics never see it -- `utterances()` is the only reader, adding
     # the visible "[unterbrochen]" marker to the transcript line.
     persona_interrupted: bool = False
+    # What had been synthesized but not yet played when the user cut in (F-51).
+    # Kept out of `persona_text` and out of the model's history on purpose
+    # (ADR 0035 keeps both to the heard words); it exists so the wrap-up can
+    # show what the Persona had been about to say.
+    persona_unheard: str = ""
 
     # The two utterances placed on the Session's timeline, in milliseconds from
     # its start; None until that utterance has happened. The Persona's window is
@@ -72,6 +78,13 @@ class Utterance:
     text: str
     offset_ms: int
     duration_ms: int | None
+    # True on a Persona line cut back to the heard part (ADR 0035). Carried as
+    # a field beside the visible marker in `text`, so that anything computing
+    # on it does not have to match a string (F-51).
+    interrupted: bool = False
+    # The words that were cut off, for the wrap-up's drill-down. Empty
+    # everywhere else.
+    unheard: str = ""
 
 
 def utterances(turns: Sequence[Turn]) -> list[Utterance]:
@@ -100,6 +113,8 @@ def utterances(turns: Sequence[Turn]) -> list[Utterance]:
             spoken.append(Utterance(
                 "persona", text, turn.persona_offset_ms or 0,
                 _span(turn.persona_offset_ms, turn.persona_end_ms),
+                interrupted=turn.persona_interrupted,
+                unheard=turn.persona_unheard,
             ))
     return spoken
 
@@ -116,7 +131,7 @@ def conversation(turns: Sequence[Turn]) -> Conversation:
     pauses: list[Pause] = []
     loudness: list[float | None] = []
     pitch: list[float | None] = []
-    user_ms = user_phonation = persona_ms = 0
+    user_ms = user_phonation = persona_ms = persona_turns = 0
     persona_stopped: int | None = None
 
     for turn in turns:
@@ -133,6 +148,8 @@ def conversation(turns: Sequence[Turn]) -> Conversation:
         pitch.extend(turn.pitch_hz)
         persona_ms += _span(turn.persona_offset_ms, turn.persona_end_ms) or 0
         persona_stopped = turn.persona_end_ms or persona_stopped
+        if turn.persona_text:
+            persona_turns += 1
 
     return Conversation(
         user_text=" ".join(turn.user_text for turn in turns if turn.user_text),
@@ -150,6 +167,27 @@ def conversation(turns: Sequence[Turn]) -> Conversation:
         # Grouped by utterance as well, which the terminal contours read:
         # where one sentence ended is not recoverable from the flat curve.
         pitch_per_turn=tuple(tuple(turn.pitch_hz) for turn in turns if turn.pitch_hz),
+        persona_turns=persona_turns,
+        timeline=timeline(turns),
+    )
+
+
+def timeline(turns: Sequence[Turn]) -> tuple[Segment, ...]:
+    """The call as bare segments, for the overlap classification (F-51).
+
+    The same flattening `utterances()` does, minus the text and with unmeasured
+    sides dropped: a segment with no duration cannot be tested for overlap, and
+    guessing one would invent the very thing being measured.
+    """
+    return tuple(
+        Segment(
+            speaker=spoken.speaker,
+            offset_ms=spoken.offset_ms,
+            duration_ms=spoken.duration_ms,
+            interrupted=spoken.interrupted,
+        )
+        for spoken in utterances(turns)
+        if spoken.duration_ms
     )
 
 

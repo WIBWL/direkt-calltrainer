@@ -25,6 +25,7 @@ from statistics import fmean
 
 from backend.feedback import intonation
 from backend.feedback.acoustics import Pause
+from backend.feedback.interruptions import Segment, classify
 
 _MS_PER_MINUTE = 60_000
 _MS_PER_SECOND = 1000
@@ -73,6 +74,13 @@ class Conversation:  # pylint: disable=too-many-instance-attributes  # a record 
     # "how did this sentence end" has no answer on a contour with the sentence
     # boundaries taken out.
     pitch_per_turn: tuple[tuple[float | None, ...], ...] = ()
+    # How many Persona replies there were, which is what the interruption rate
+    # divides by.
+    persona_turns: int = 0
+    # The bare segments the overlap classification of F-51 runs on. Empty for a
+    # call whose sides were never measured, in which case no overlap can be
+    # established either way.
+    timeline: tuple[Segment, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -287,6 +295,26 @@ def _intonation(call: Conversation) -> Measurement | None:
     )
 
 
+def _interruptions(call: Conversation) -> Measurement | None:
+    """F-51. How often the user cut the Persona off with something still to say.
+
+    The count behind the rate below, and the two are derived from one pass so
+    they can never disagree. What counts as an interruption is decided in
+    `interruptions.py`; in particular a short listening signal and a start made
+    as the line was ending anyway are not one.
+
+    Nothing here says that interrupting is wrong. Cutting in on a caller who is
+    repeating themselves is often the right move, and this trainer supports
+    barge-in deliberately. The number says how often it happened.
+    """
+    if call.persona_turns == 0:
+        return None
+    report = classify(call.timeline)
+    # The detail is built by the report itself, so the live path and the
+    # backfill script cannot drift apart on what travels with the figure.
+    return Measurement("interruptions", float(len(report.hard)), report.detail())
+
+
 # --- The loudness course in words -----------------------------------------
 
 # The wrap-up gets the curve described, not the dB span measured: that span
@@ -460,6 +488,12 @@ METRICS: tuple[MetricDef, ...] = (
     # unit is semitones so the figure describes delivery rather than the voice
     # it was spoken with -- see `_intonation`.
     MetricDef("intonation", "Sprachmelodie", "Halbtöne", "F-35", True, _intonation),
+    # F-51's third element beside pauses: how often the user cut in (ADR 0035),
+    # as a count. A rate per Persona turn was built alongside it and dropped
+    # again -- at the length these calls run it turned every single
+    # interruption into the top step, which said more about the denominator
+    # than about the call.
+    MetricDef("interruptions", "Unterbrechungen", "Anzahl", "F-51", True, _interruptions),
     # SHOULD / COULD -- seeded so the vocabulary is complete, but inactive and
     # without a derivation.
     MetricDef("concreteness", "Sprachliche Konkretheit", None, "F-40", False),

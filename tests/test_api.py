@@ -159,8 +159,13 @@ async def test_stored_session_is_returned_in_the_transcript_shape(
     assert body["session_id"] == str(extern_id)
     assert body["persona"] == "Thomas Brandt"
     assert body["scenario"] == "Kündigungsabsicht"
+    # The exact key set, so anything added here is a decision rather than
+    # drift. `interrupted` and `unheard_text` were added for F-51's
+    # interruption drill-down: the second is what the Persona had been about to
+    # say, kept beside the transcript and never inside it (ADR 0035).
     assert set(body["turns"][0]) == {
         "turn_id", "speaker", "start_offset_ms", "duration_ms", "transcript",
+        "interrupted", "unheard_text",
     }
 
 
