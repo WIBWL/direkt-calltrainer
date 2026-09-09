@@ -4747,11 +4747,24 @@ h2 {
   background: var(--color-surface-selected);
 }
 
-/* Room on the right for the check circle, which is positioned on the card. */
-.focus-goal-main {
-  display: block;
-  padding-right: 30px;
-  cursor: pointer;
+/* Title and "i" on one line, the icon hugging the title rather than stretching
+   to the right edge, where it would sit against the check circle. Opened, the
+   panel takes a line of its own so the text runs the card's full width. */
+.focus-goal-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-right: 30px; /* the check circle */
+}
+
+.focus-goal-head .info-details {
+  margin: 0;
+}
+
+.focus-goal-head .info-details[open] {
+  flex-basis: 100%;
+  margin-top: 0.25rem;
 }
 
 /* The real control, kept for the keyboard and the screen reader and drawn as
@@ -4762,6 +4775,13 @@ h2 {
   height: 1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
+}
+
+/* Both halves of the text are labels for the same box, so either one ticks it. */
+.focus-goal-title,
+.focus-goal-caption {
+  display: block;
+  cursor: pointer;
 }
 
 /* Geometry comes from .choice-check, so this and a Persona card cannot drift.
@@ -4780,14 +4800,17 @@ h2 {
   color: var(--color-surface);
 }
 
-.focus-goal-input:focus-visible + .focus-goal-check {
+/* :has, because the circle now sits inside the title label rather than beside
+   the input. */
+.focus-goal:has(.focus-goal-input:focus-visible) .focus-goal-check {
   outline: 2px solid var(--color-blue-600);
   outline-offset: 2px;
 }
 
 /* At the limit the unpicked cards go quiet, not faint: ten faded cards in a
    grid read as a broken screen rather than a full one. */
-.focus-goal-locked .focus-goal-main {
+.focus-goal-locked .focus-goal-title,
+.focus-goal-locked .focus-goal-caption {
   cursor: default;
 }
 
@@ -4801,13 +4824,6 @@ h2 {
   color: var(--color-text-muted);
 }
 
-.focus-goal-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
 .focus-goal-title {
   font-weight: 600;
   font-size: 0.95rem;
@@ -4815,6 +4831,7 @@ h2 {
 }
 
 .focus-goal-caption {
+  margin-top: 2px;
   font-size: 0.9rem;
   line-height: 1.45;
   color: var(--color-text-muted);
@@ -4822,11 +4839,6 @@ h2 {
 
 /* Smaller than a standalone "i", because it sits inside a card rather than
    under a section heading. Indented to the text, not to the checkbox. */
-/* No checkbox column to indent past any more. */
-.focus-goal .info-details {
-  margin: 0.5rem 0 0;
-}
-
 .focus-goal .info-summary {
   font-size: 0.8rem;
   font-weight: 500;

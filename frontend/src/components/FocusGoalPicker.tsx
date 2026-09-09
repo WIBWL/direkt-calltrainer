@@ -99,32 +99,46 @@ export default function FocusGoalPicker({
                         (locked ? " focus-goal-locked" : "")
                       }
                     >
-                      {/* The label carries the checkbox, so the whole title and
-                          caption are the hit area. The "i" below stays outside
-                          it — an interactive element nested in a label would
-                          toggle the box when it is opened. */}
-                      <label className="focus-goal-main">
-                        <input
-                          type="checkbox"
-                          className="focus-goal-input"
-                          checked={checked}
-                          disabled={disabled || locked}
-                          onChange={() => onToggle(goal.key)}
-                        />
-                        <span className="choice-check focus-goal-check" aria-hidden="true">
-                          {checked ? position + 1 : ""}
-                        </span>
-                        <span className="focus-goal-text">
-                          <span className="focus-goal-title">{goal.title}</span>
-                          <span className="focus-goal-caption">{goal.caption}</span>
-                        </span>
-                      </label>
+                      {/* `for`, not a wrapping label: that lets the "i" sit
+                          beside the title as a sibling. Inside a label it would
+                          toggle the box whenever it was opened. Two labels on
+                          one input are valid, so title and caption both stay
+                          part of the hit area. */}
+                      <input
+                        type="checkbox"
+                        id={`focus-goal-${goal.key}`}
+                        className="focus-goal-input"
+                        checked={checked}
+                        disabled={disabled || locked}
+                        onChange={() => onToggle(goal.key)}
+                      />
 
-                      {/* Icon only: the same label fifteen times is noise, and
-                          naming the goal makes it a better one when read out. */}
-                      <InfoDetails label={`Was „${goal.title}“ bedeutet`} iconOnly>
-                        <p>{goal.info}</p>
-                      </InfoDetails>
+                      <div className="focus-goal-head">
+                        <label
+                          className="focus-goal-title"
+                          htmlFor={`focus-goal-${goal.key}`}
+                        >
+                          {/* In the label so that clicking it ticks the box;
+                              hidden, so its number stays out of the name. */}
+                          <span className="choice-check focus-goal-check" aria-hidden="true">
+                            {checked ? position + 1 : ""}
+                          </span>
+                          {goal.title}
+                        </label>
+
+                        {/* Icon only: the same label fifteen times is noise, and
+                            naming the goal makes it a better one when read out. */}
+                        <InfoDetails label={`Was „${goal.title}“ bedeutet`} iconOnly>
+                          <p>{goal.info}</p>
+                        </InfoDetails>
+                      </div>
+
+                      <label
+                        className="focus-goal-caption"
+                        htmlFor={`focus-goal-${goal.key}`}
+                      >
+                        {goal.caption}
+                      </label>
                     </div>
                   </li>
                 );
