@@ -16,6 +16,7 @@ from backend.feedback.intonation import (
     BALANCED_MAX_ST,
     LIVELY_MAX_ST,
     MAX_STEP_ST,
+    MIN_VOICED_MS_FOR_READING,
     MONOTONE_MAX_ST,
     RANGE_KEY,
     STEP_MS,
@@ -23,6 +24,7 @@ from backend.feedback.intonation import (
     VERY_MONOTONE_MAX_ST,
     Ending,
     Liveliness,
+    effective_step_ms,
     liveliness,
     liveliness_steps,
     profile,
@@ -351,3 +353,56 @@ def test_two_seams_inside_one_window_are_marked_once() -> None:
     barely_spoke = (_steady(120, 105), _steady(130, 4), _steady(140, 300))
 
     assert utterance_breaks(barely_spoke, 100) == [10]
+
+
+def test_the_stated_grid_is_the_one_thinning_produced() -> None:
+    """Thinning works in whole 10 ms frames, so a request for 25 ms yields
+    20 ms. Everything that reads the curve -- the drawing's time axis, the seam
+    indices -- has to use what came out, or the picture claims a duration the
+    curve does not have."""
+    assert effective_step_ms(50) == 50
+    assert effective_step_ms(25) == 20
+    assert len(thin(_steady(120, 100), 25)) == pytest.approx(50, abs=1)
+
+
+def test_the_band_is_measured_at_both_ends_and_not_assumed_symmetric() -> None:
+    """The drawing puts a band behind the contour. Taken as the range halved
+    either side of the median, that band is a guess about the shape of the
+    distribution; a voice that reaches further up than down would be drawn with
+    its band in the wrong place."""
+    # Twice as much room above the median as below it.
+    lopsided = _steady(120, 200) + _sweep(120, 170, 100) + _sweep(120, 109, 100)
+
+    shape = profile(lopsided, ())
+
+    assert shape.band_low_st is not None and shape.band_high_st is not None
+    assert shape.band_high_st > abs(shape.band_low_st)
+    # ... and the two ends still add up to the figure the Kennzahl reports.
+    assert shape.band_high_st - shape.band_low_st == pytest.approx(shape.range_st, abs=0.05)
+
+
+def test_movement_is_not_counted_across_the_seam_between_two_utterances() -> None:
+    """The call's contour is the user's utterances laid end to end with the
+    Persona's turns taken out. The last frame of one and the first frame of the
+    next are neighbours in that array and a minute apart in the call; a step
+    between them is movement the voice never made."""
+    # A step just under MAX_STEP_ST, so it is not thrown out as an octave error
+    # first and the seam rule is what this actually tests.
+    low = _steady(110, 200)
+    high = _steady(155, 200)
+    assert semitones(155, 110) < MAX_STEP_ST
+
+    seamless = profile(low + high, (low, high))
+    as_one_stretch = profile(low + high, ())
+
+    assert seamless.movement_st_per_s == 0.0
+    assert as_one_stretch.movement_st_per_s is not None
+    assert as_one_stretch.movement_st_per_s > 0
+
+
+def test_a_step_is_read_only_from_enough_voiced_speech() -> None:
+    """Five steps on two seconds of humming would be a verdict on nothing. The
+    figure is still reported -- a spread is a spread -- but it carries no word."""
+    assert liveliness(9.0, MIN_VOICED_MS_FOR_READING) is Liveliness.BALANCED
+    assert liveliness(9.0, MIN_VOICED_MS_FOR_READING - 1) is None
+    assert liveliness(9.0, None) is Liveliness.BALANCED  # not recorded: no reason to withhold

@@ -40,6 +40,22 @@ LOUDNESS_KEY = "loudness"
 # sampling so the two can be read side by side.
 LOUDNESS_INTERVAL_MS = 100
 
+# The pitch curve is stored at half of that, and does not share the grid.
+#
+# Measured, on a synthetic contour with speech's own syllable rate: at 100 ms
+# the drawing turns into a sawtooth, because roughly 4 to 5 syllables a second
+# sampled ten times a second is barely above the point where the movement folds
+# back on itself. The picture stops being a contour and becomes noise, which is
+# the same aliasing that ADR 0051's audit found in the *statistics* and fixed
+# there by measuring at 10 ms -- only the drawing was left behind.
+#
+# 50 ms is a whole number of analysis frames (so `thin` produces exactly this
+# grid, see `effective_step_ms`), samples the syllable rate about ten times
+# over, and doubles the stored curve: about 2.5 KB for twenty seconds of
+# speaking time, 25 KB for a long call, all of it in `detail_json`, which the
+# listing route does not serve.
+PITCH_INTERVAL_MS = 50
+
 
 @dataclass(frozen=True)
 class Conversation:  # pylint: disable=too-many-instance-attributes  # a record of measured facts, one field per fact
@@ -280,18 +296,30 @@ def _intonation(call: Conversation) -> Measurement | None:
             # statistics above are computed on every 10 ms frame, but three
             # minutes of those is eighteen thousand points and no chart resolves
             # them (intonation.thin).
-            "curve_hz": intonation.thin(call.pitch_hz, LOUDNESS_INTERVAL_MS),
-            "curve_step_ms": LOUDNESS_INTERVAL_MS,
+            "curve_hz": intonation.thin(call.pitch_hz, PITCH_INTERVAL_MS),
+            # The grid that thinning actually produced, which is what the
+            # drawing's time axis and the seam indices below are in. Never the
+            # requested figure -- see `intonation.effective_step_ms`.
+            "curve_step_ms": intonation.effective_step_ms(PITCH_INTERVAL_MS),
             # Where one of the user's utterances ends and the next begins, as
             # indices into that curve. The curve is speaking time, not call
             # time: the Persona's turns are not in it at all, so without these
             # a seam between two utterances would read as a movement of the
             # voice.
             "turn_breaks": intonation.utterance_breaks(
-                call.pitch_per_turn, LOUDNESS_INTERVAL_MS
+                call.pitch_per_turn, PITCH_INTERVAL_MS
             ),
             "median_hz": shape.median_hz,
+            # The two ends of the range in semitones from that median, which is
+            # what the contour draws its band from. Measured rather than assumed
+            # symmetric: a voice does not reach as far down as it does up.
+            "band_low_st": shape.band_low_st,
+            "band_high_st": shape.band_high_st,
             "movement_st_per_s": shape.movement_st_per_s,
+            # How much voiced speech all of this rests on -- the floor under the
+            # five-step reading, and worth showing beside a figure from a short
+            # call.
+            "voiced_ms": shape.voiced_ms,
             "endings": {
                 "falling": shape.endings.falling,
                 "rising": shape.endings.rising,

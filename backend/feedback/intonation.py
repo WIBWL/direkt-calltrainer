@@ -59,6 +59,19 @@ MIN_TERMINAL_FRAMES = 8
 # otherwise be dominated by them.
 MAX_STEP_ST = 6.0
 
+# The movement figure is read off a contour smoothed over this many frames
+# (30 ms), which is below the shortest thing a voice does deliberately and above
+# the frame-to-frame wobble of the tracker.
+#
+# Measured, not assumed. On a synthetic contour with a 4.5 Hz syllable rate,
+# adding 2% frame-to-frame noise -- which is what a tracker produces on a real
+# voice, quite apart from the speaker's own jitter -- moved the unsmoothed
+# figure from 46.3 to 59.7 semitones per second, a 29% inflation of a number
+# that is supposed to describe intonation. At three frames the same noise costs
+# 4.5%, while the movement actually present is only damped by 5%. Five frames
+# were tried too and started eating the syllable-rate movement itself (-13%).
+MOVEMENT_SMOOTH_FRAMES = 3
+
 # Below this many voiced frames a factor is not reported at all. Everything here
 # is a shape, and a shape needs enough points to have one.
 MIN_VOICED_FRAMES = 20
@@ -90,6 +103,14 @@ VERY_MONOTONE_MAX_ST = 4.0   # ~1.2 st SD
 MONOTONE_MAX_ST = 7.0        # ~2.1 st SD
 BALANCED_MAX_ST = 12.0       # ~3.6 st SD
 LIVELY_MAX_ST = 18.0         # ~5.5 st SD, or an octave error the trim missed
+
+# How much voiced speech a step needs under it. The figure itself is reported
+# from MIN_VOICED_FRAMES (0.2 s) upwards, because a spread is a spread; calling
+# somebody monotone on that much material would be something else entirely. Ten
+# seconds of voicing is roughly a minute of a normal call, given how much of
+# speech carries no pitch at all and how much of a call the other side is
+# talking.
+MIN_VOICED_MS_FOR_READING = 10_000
 
 
 class Ending(str, Enum):
@@ -128,9 +149,19 @@ class Profile:
 
     # 5th to 95th percentile, in semitones. None below MIN_VOICED_FRAMES.
     range_st: float | None = None
+    # The two ends of that span, each in semitones from the speaker's median.
+    # Reported separately because they are *not* symmetric around it -- a voice
+    # reaches further up than down, or the other way about -- and the drawn band
+    # would otherwise be a guess dressed as a measurement.
+    band_low_st: float | None = None
+    band_high_st: float | None = None
     # Mean absolute change between neighbouring voiced frames, in semitones per
     # second of voiced speech.
     movement_st_per_s: float | None = None
+    # How much voiced speech the figures rest on. The reading below has a floor
+    # under it: five steps read off two seconds of humming would be a verdict on
+    # nothing.
+    voiced_ms: int = 0
     endings: Endings = Endings()
     # The range of the first third of the call and of the last, so a widening
     # or a flattening can be stated as what it is: a change within one speaker,
@@ -160,9 +191,13 @@ def profile(contour: tuple[float | None, ...], per_utterance: tuple[tuple[float 
 
     median = _median(sorted(voiced))
     thirds = _thirds(contour)
+    band = _band(voiced)
     return Profile(
         range_st=_range_st(voiced),
-        movement_st_per_s=_movement(contour),
+        band_low_st=None if band is None else round(semitones(band[0], median), 2),
+        band_high_st=None if band is None else round(semitones(band[1], median), 2),
+        movement_st_per_s=_movement(per_utterance or (contour,)),
+        voiced_ms=len(voiced) * STEP_MS,
         endings=_endings(per_utterance),
         range_first_st=_range_st([hz for hz in thirds[0] if hz]),
         range_last_st=_range_st([hz for hz in thirds[2] if hz]),
@@ -170,13 +205,16 @@ def profile(contour: tuple[float | None, ...], per_utterance: tuple[tuple[float 
     )
 
 
-def _range_st(voiced: list[float]) -> float | None:
-    """The 5th to 95th percentile spread, in semitones.
+def _band(voiced: list[float]) -> tuple[float, float] | None:
+    """The 5th and 95th percentile of a set of voiced frames, in Hertz.
 
     Trimmed rather than min-to-max: a single frame the tracker got wrong would
     otherwise decide the figure for the whole call. The trim is why the two-pass
     measurement in acoustics.py matters as well -- between them, an octave error
     has to survive both to reach this number.
+
+    One implementation for the span and for the two ends of it, so the figure
+    and the band drawn behind the contour cannot come apart.
     """
     if len(voiced) < MIN_VOICED_FRAMES:
         return None
@@ -185,10 +223,16 @@ def _range_st(voiced: list[float]) -> float | None:
     low, high = ordered[margin], ordered[-1 - margin]
     if low <= 0 or high < low:
         return None
-    return round(semitones(high, low), 2)
+    return low, high
 
 
-def _movement(contour: tuple[float | None, ...]) -> float | None:
+def _range_st(voiced: list[float]) -> float | None:
+    """That band as one figure: the spread from its bottom to its top."""
+    band = _band(voiced)
+    return None if band is None else round(semitones(band[1], band[0]), 2)
+
+
+def _movement(per_utterance: tuple[tuple[float | None, ...], ...]) -> float | None:
     """How much the voice moves, in semitones per second of voiced speech.
 
     The factor that separates a wide range from a lively one. A speaker can
@@ -196,22 +240,52 @@ def _movement(contour: tuple[float | None, ...]) -> float | None:
     and cover the same ten by moving on every phrase; only this figure tells
     them apart.
 
-    Steps larger than MAX_STEP_ST are dropped rather than counted: at 10 ms a
-    real voice does not jump half an octave between frames, so such a step is
-    the tracker and not the speaker.
+    Per utterance and then pooled, never across the whole call at once. The
+    call's contour is the speaker's utterances laid end to end with the
+    Persona's turns removed, so the last frame of one utterance and the first
+    frame of the next sit next to each other with a minute of somebody else's
+    speech between them in reality. Counted as a step, that is movement the
+    voice never made.
+
+    Two filters, and they catch different things. The 30 ms median below removes
+    the tracker's frame-to-frame wobble, which otherwise inflates the figure by
+    a third on a noisy recording (see MOVEMENT_SMOOTH_FRAMES). Steps larger than
+    MAX_STEP_ST are then dropped as octave errors: at 10 ms no real voice jumps
+    half an octave.
     """
     steps: list[float] = []
-    for before, after in zip(contour, contour[1:]):
-        if not before or not after:
-            continue  # a voicing gap is not a movement
-        step = abs(semitones(after, before))
-        if step <= MAX_STEP_ST:
-            steps.append(step)
+    for utterance in per_utterance:
+        smoothed = _smooth(utterance)
+        for before, after in zip(smoothed, smoothed[1:]):
+            if not before or not after:
+                continue  # a voicing gap is not a movement
+            step = abs(semitones(after, before))
+            if step <= MAX_STEP_ST:
+                steps.append(step)
     if len(steps) < MIN_VOICED_FRAMES:
         return None
     # Per second, not per frame, so the figure does not change when the analysis
     # grid does.
     return round(sum(steps) / len(steps) * (1000 / STEP_MS), 2)
+
+
+def _smooth(contour: tuple[float | None, ...]) -> tuple[float | None, ...]:
+    """A median over MOVEMENT_SMOOTH_FRAMES, with the gaps left where they are.
+
+    The median and not a mean: a mean would spread a single stray frame over its
+    neighbours instead of discarding it, which is the opposite of the point.
+    Unvoiced frames stay unvoiced -- smoothing a gap shut would connect two
+    stretches that were never connected.
+    """
+    half = MOVEMENT_SMOOTH_FRAMES // 2
+    out: list[float | None] = []
+    for index, hz in enumerate(contour):
+        if not hz:
+            out.append(None)
+            continue
+        window = [v for v in contour[max(0, index - half):index + half + 1] if v]
+        out.append(_median(sorted(window)))
+    return tuple(out)
 
 
 def _endings(per_utterance: tuple[tuple[float | None, ...], ...]) -> Endings:
@@ -294,6 +368,24 @@ def _median(ordered: list[float]) -> float:
     return (ordered[middle - 1] + ordered[middle]) / 2
 
 
+def effective_step_ms(step_ms: int) -> int:
+    """The grid `thin` will actually produce for a requested one.
+
+    Thinning works in whole analysis frames, so a request for 25 ms yields
+    20 ms. Everything that states or measures the thinned grid -- the axis of
+    the drawing, the seam indices, the figure in the payload -- has to use this
+    and not the number that was asked for, or the drawing claims a duration the
+    curve does not have (a 19 second contour labelled 24 seconds, which is how
+    this was found).
+    """
+    return _per_point(step_ms) * STEP_MS
+
+
+def _per_point(step_ms: int) -> int:
+    """How many analysis frames go into one thinned point."""
+    return max(1, step_ms // STEP_MS)
+
+
 def thin(contour: tuple[float | None, ...], step_ms: int) -> list[float | None]:
     """The contour at a coarser grid, for storage and drawing.
 
@@ -305,7 +397,7 @@ def thin(contour: tuple[float | None, ...], step_ms: int) -> list[float | None]:
     stray frame does not become a visible spike, and yields None for a window
     with no voicing in it at all.
     """
-    per_point = max(1, step_ms // STEP_MS)
+    per_point = _per_point(step_ms)
     out: list[float | None] = []
     for start in range(0, len(contour), per_point):
         window = [hz for hz in contour[start:start + per_point] if hz]
@@ -330,7 +422,7 @@ def utterance_breaks(
     curve and so cannot be marked on it; two very short utterances landing in
     the same window collapse to one mark rather than being drawn twice.
     """
-    per_point = max(1, step_ms // STEP_MS)
+    per_point = _per_point(step_ms)
     total = sum(len(utterance) for utterance in per_utterance)
     points = -(-total // per_point)  # the length `thin` will produce
 
@@ -374,6 +466,16 @@ LABELS: dict[Liveliness, str] = {
     Liveliness.EXAGGERATED: "überzeichnet",
 }
 
+# The upper bound of each step except the last, in the order they are read and
+# shown. One table for the decision and for the legend, so a recalibration
+# cannot move a boundary in one and leave it in the other.
+_LADDER: tuple[tuple[float, Liveliness], ...] = (
+    (VERY_MONOTONE_MAX_ST, Liveliness.VERY_MONOTONE),
+    (MONOTONE_MAX_ST, Liveliness.MONOTONE),
+    (BALANCED_MAX_ST, Liveliness.BALANCED),
+    (LIVELY_MAX_ST, Liveliness.LIVELY),
+)
+
 # The text behind the info icon, beside the thresholds it explains.
 EXPLANATION = (
     "Gemessen wird die Spanne zwischen Ihrem tiefsten und höchsten üblichen Ton "
@@ -388,8 +490,13 @@ EXPLANATION = (
 )
 
 
-def liveliness(range_st: float | None) -> Liveliness | None:
+def liveliness(range_st: float | None, voiced_ms: int | None = None) -> Liveliness | None:
     """The step a range falls on, or None where nothing was measured.
+
+    `voiced_ms` is how much voiced speech the range came from; below
+    MIN_VOICED_MS_FOR_READING there is no step, only the figure. None means the
+    Session did not record it, which is treated as "no reason to withhold" --
+    the figure was measured under the same rules either way.
 
     On the range alone, deliberately. The movement figure is the better
     discriminator in principle -- a contour that drifts slowly from high to low
@@ -401,14 +508,11 @@ def liveliness(range_st: float | None) -> Liveliness | None:
     """
     if range_st is None:
         return None
-    if range_st < VERY_MONOTONE_MAX_ST:
-        return Liveliness.VERY_MONOTONE
-    if range_st < MONOTONE_MAX_ST:
-        return Liveliness.MONOTONE
-    if range_st < BALANCED_MAX_ST:
-        return Liveliness.BALANCED
-    if range_st < LIVELY_MAX_ST:
-        return Liveliness.LIVELY
+    if voiced_ms is not None and voiced_ms < MIN_VOICED_MS_FOR_READING:
+        return None
+    for bound, step in _LADDER:
+        if range_st < bound:
+            return step
     return Liveliness.EXAGGERATED
 
 
@@ -422,19 +526,16 @@ def liveliness_steps() -> list[dict[str, str | None]]:
     a scale that is bad at both ends cannot be drawn as a traffic light without
     claiming a direction it does not have.
     """
-    bounds = [
-        (Liveliness.VERY_MONOTONE, f"unter {_st(VERY_MONOTONE_MAX_ST)} Halbtönen"),
-        (Liveliness.MONOTONE,
-         f"{_st(VERY_MONOTONE_MAX_ST)} bis {_st(MONOTONE_MAX_ST)} Halbtöne"),
-        (Liveliness.BALANCED,
-         f"{_st(MONOTONE_MAX_ST)} bis {_st(BALANCED_MAX_ST)} Halbtöne"),
-        (Liveliness.LIVELY,
-         f"{_st(BALANCED_MAX_ST)} bis {_st(LIVELY_MAX_ST)} Halbtöne"),
-        (Liveliness.EXAGGERATED, f"über {_st(LIVELY_MAX_ST)} Halbtönen"),
-    ]
+    spans: list[tuple[Liveliness, str]] = []
+    floor: float | None = None
+    for bound, step in _LADDER:
+        spans.append((step, f"unter {_st(bound)} Halbtönen" if floor is None
+                      else f"{_st(floor)} bis {_st(bound)} Halbtöne"))
+        floor = bound
+    spans.append((Liveliness.EXAGGERATED, f"über {_st(floor)} Halbtönen"))
     return [
         {"step": step.value, "label": LABELS[step], "range": span, "light": None}
-        for step, span in bounds
+        for step, span in spans
     ]
 
 

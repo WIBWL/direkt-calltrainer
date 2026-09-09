@@ -368,9 +368,9 @@ def _served_detail(key: str, value: float, detail: dict | None) -> dict | None:
     if detail is None:
         return None
     if key == intonation.RANGE_KEY:
-        step = intonation.liveliness(value)
+        step = intonation.liveliness(value, detail.get("voiced_ms"))
         if step is None:
-            return detail
+            return detail  # measured, but on too little speech to be read
         return {**detail, "liveliness": step.value, "liveliness_label": intonation.LABELS[step]}
     if key == interruptions.COUNT_KEY:
         try:

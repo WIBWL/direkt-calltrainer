@@ -288,9 +288,10 @@ def test_the_curve_carries_the_seams_between_the_users_turns() -> None:
 
     detail = next(m.detail for m in measure(conversation(turns)) if m.key == "intonation")
 
-    # 60 frames at 10 ms thinned to the 100 ms display grid is 6 points.
-    assert detail["turn_breaks"] == [6]
-    assert len(detail["curve_hz"]) == 12
+    # 60 frames at 10 ms thinned to the 50 ms display grid is 12 points each.
+    assert detail["curve_step_ms"] == 50
+    assert detail["turn_breaks"] == [12]
+    assert len(detail["curve_hz"]) == 24
     assert "liveliness" not in detail
 
 
