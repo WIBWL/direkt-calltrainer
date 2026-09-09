@@ -105,6 +105,10 @@ class LanguagePack:
     # Turn (docs/research/model-parameters.md; ADR 0071). Whole-message
     # patterns only: "Nein, danke, das passt" is a real answer.
     stt_phantom_re: re.Pattern[str]
+    # A question word at the start makes an open question, anything else a
+    # closed one. Anchored, and deliberately shallow: a question word buried
+    # further in counts as closed rather than being guessed at.
+    open_question_re: re.Pattern[str]
     fallback_closing_line: str
 
 
@@ -238,6 +242,14 @@ _GERMAN = LanguagePack(
         r"copyright [\w\s,.-]+)\W*$",
         re.IGNORECASE,
     ),
+    # Longest alternatives first, so "womit" is not shadowed by "wo"; leading
+    # fillers are skipped ("Und was brauchen Sie?").
+    open_question_re=re.compile(
+        r"^(?:(?:und|aber|also|okay|gut|ja|nun|jetzt)[\s,]+){0,2}"
+        r"(wieso|weshalb|warum|wofür|womit|worauf|worum|wohin|woher|welche[rnsm]?|"
+        r"wessen|wer|wen|wem|was|wann|wo|wie)\b",
+        re.IGNORECASE,
+    ),
     fallback_closing_line="Vielen Dank für Ihre Zeit. Auf Wiederhören.",
 )
 
@@ -321,6 +333,11 @@ _ENGLISH = LanguagePack(
     stt_phantom_re=re.compile(
         r"^\W*(thank you( for watching)?|thanks for watching|amen|subtitles? by [\w\s,.-]+|"
         r"copyright [\w\s,.-]+)\W*$",
+        re.IGNORECASE,
+    ),
+    open_question_re=re.compile(
+        r"^(?:(?:and|but|so|okay|well|now)[\s,]+){0,2}"
+        r"(whose|whom|who|what|when|where|why|which|how)\b",
         re.IGNORECASE,
     ),
     fallback_closing_line="Thank you for your time. Goodbye.",

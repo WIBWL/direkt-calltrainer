@@ -25,6 +25,7 @@ from statistics import fmean
 
 from backend.db.models import ASPECT_HOW, ASPECT_WHAT
 from backend.feedback.acoustics import Pause
+from backend.session.language_packs import LANGUAGE_PACKS, LanguagePack
 
 _MS_PER_MINUTE = 60_000
 _MS_PER_SECOND = 1000
@@ -32,6 +33,8 @@ _MS_PER_SECOND = 1000
 # writes for numbers don't inflate the count.
 _WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 _SENTENCE_END_RE = re.compile(r"[.!?]+")
+# The same, minus the question mark: a segment a question mark already ended.
+_SENTENCE_SPLIT_RE = re.compile(r"[.!]+")
 # The one metric the wrap-up reads as a course rather than as a figure, so
 # generator.py has to be able to pick it out of the inventory by name.
 LOUDNESS_KEY = "loudness"
@@ -46,6 +49,9 @@ class Conversation:
     """
 
     user_text: str = ""
+    # For the metrics that read words rather than milliseconds. None means
+    # they report what they can without a vocabulary.
+    language_id: str | None = None
     # How long the user's audio ran, and how much of that was speech rather
     # than silence. Only the first is comparable with `persona_speech_ms`.
     user_speech_ms: int = 0
@@ -139,12 +145,32 @@ def _questions(call: Conversation) -> Measurement | None:
     Counted from the transcript's own punctuation: STT punctuates German
     reliably enough, and a keyword list would miss the inversions
     ("Koennen Sie mir sagen...") that carry most German questions.
+
+    The detail splits them into open and closed. Both halves are read off the
+    same question marks, so they always add up to the count.
     """
     words = _count_words(call.user_text)
     if not words:
         return None
     questions = call.user_text.count("?")
-    return Measurement("questions", float(questions), {"per_100_words": questions * 100 / words})
+    detail: dict = {"per_100_words": questions * 100 / words}
+    pack = _pack(call)
+    if pack and questions:
+        opened = _open_questions(call.user_text, pack)
+        detail |= {"open": opened, "closed": questions - opened}
+    return Measurement("questions", float(questions), detail)
+
+
+def _open_questions(text: str, pack: LanguagePack) -> int:
+    """How many of the question marks in `text` end an open question.
+
+    Only the last clause of a segment is the question; what precedes the
+    nearest full stop belongs to the sentence before it.
+    """
+    return sum(
+        1 for segment in text.split("?")[:-1]
+        if pack.open_question_re.match(_SENTENCE_SPLIT_RE.split(segment)[-1].strip())
+    )
 
 
 def _pace(call: Conversation) -> Measurement | None:
@@ -193,6 +219,23 @@ def _reaction_time(call: Conversation) -> Measurement | None:
         "reaction_time",
         fmean(call.reactions_ms) / _MS_PER_SECOND,
         {"longest_s": max(call.reactions_ms) / _MS_PER_SECOND, "count": len(call.reactions_ms)},
+    )
+
+
+def _phonation_share(call: Conversation) -> Measurement | None:
+    """F-51. How much of the user's own recording was speech rather than
+    silence -- the companion to `_pauses`, which knows only an average length.
+
+    Systematically short of 100%: the client's VAD pads every recording, and
+    that padding sits in the denominator. A reading against this user's own
+    calls, not an absolute.
+    """
+    if not call.user_acoustics_complete or not call.user_speech_ms:
+        return None
+    return Measurement(
+        "phonation_share",
+        call.user_phonation_ms * 100 / call.user_speech_ms,
+        {"speech_ms": call.user_speech_ms, "phonation_ms": call.user_phonation_ms},
     )
 
 
@@ -405,6 +448,7 @@ METRICS: tuple[MetricDef, ...] = (
               _word_count),
     MetricDef("reaction_time", "Reaktionszeit", "s", ASPECT_HOW, "F-53", True, _reaction_time),
     MetricDef("pauses", "Sprechpausen", "s", ASPECT_HOW, "F-51", True, _pauses),
+    MetricDef("phonation_share", "Redefluss", "%", ASPECT_HOW, "F-51", True, _phonation_share),
     MetricDef(LOUDNESS_KEY, "Lautstärke", "dB", ASPECT_HOW, "F-37", True, _loudness),
     # SHOULD / COULD -- seeded so the vocabulary is complete, but inactive and
     # without a derivation.
@@ -418,6 +462,12 @@ METRICS: tuple[MetricDef, ...] = (
               "F-42", False),
     MetricDef("congruence", "Kongruenz von Inhalt und Stimme", None, ASPECT_HOW, "F-39", False),
 )
+
+
+def _pack(call: Conversation) -> LanguagePack | None:
+    """The call's language pack, or None. `.get`, not `get_pack`: a missing
+    pack costs one detail, raising would cost every statistic."""
+    return LANGUAGE_PACKS.get(call.language_id or "")
 
 
 def _count_words(text: str) -> int:
