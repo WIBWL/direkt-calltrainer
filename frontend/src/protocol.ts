@@ -275,6 +275,14 @@ export interface SessionSummaryMeasurement {
   name: string;
   unit: string | null;
   value: number;
+  /**
+   * Whether the metric is still part of the backend's current inventory.
+   * False for one measured under a key that has since been renamed: the row
+   * keeps pointing at the retired metric type, which carries the same display
+   * name as its replacement. The progress view drops those, or one renamed
+   * metric appears as two identical charts.
+   */
+  active: boolean;
 }
 
 /** One row of the training history. */

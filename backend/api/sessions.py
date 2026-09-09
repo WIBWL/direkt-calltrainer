@@ -146,6 +146,15 @@ def _session_summary(session: db_models.Session) -> dict:
                 "name": m.metric_type.name,
                 "unit": m.metric_type.unit,
                 "value": float(m.value),
+                # Whether this metric is still part of the current inventory
+                # (`backend/feedback/metrics.py`). A Session measured before a
+                # metric was renamed keeps pointing at the retired row, and
+                # nothing else on the wire would let a caller tell the two
+                # apart: both carry the same display name. The progress view
+                # (F-13) needs to, or one renamed metric becomes two identical
+                # cards. The detail route deliberately does not filter -- a past
+                # Session shows what was measured then.
+                "active": m.metric_type.active,
             }
             for m in session.measurements
         ],

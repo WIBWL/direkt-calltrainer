@@ -13,6 +13,8 @@ import Notes from "./components/legal/Notes";
 import Privacy from "./components/legal/Privacy";
 import PastSessionView from "./components/PastSessionView";
 import ProfileView from "./components/ProfileView";
+import ProgressMetricView from "./components/ProgressMetricView";
+import ProgressView from "./components/ProgressView";
 import SessionMetricView from "./components/SessionMetricView";
 import { consumeReturnTo, rememberReturnTo, userManager } from "./auth";
 import { ROUTES } from "./routes";
@@ -98,6 +100,8 @@ createRoot(document.getElementById("root")!).render(
             <Route element={<ConsentGate />}>
               <Route path={ROUTES.training} element={<App />} />
               <Route path={ROUTES.profile} element={<ProfileView />} />
+              <Route path={ROUTES.progress} element={<ProgressView />} />
+              <Route path={ROUTES.progressMetric} element={<ProgressMetricView />} />
               <Route path={ROUTES.session} element={<PastSessionView />} />
               <Route path={ROUTES.sessionMetric} element={<SessionMetricView />} />
 

@@ -11,6 +11,11 @@ interface AppLayoutProps {
   navigationLocked?: boolean;
   /** Marks the header's account chip as the current page. */
   accountActive?: boolean;
+  /** Marks the header's progress link as the current page. */
+  progressActive?: boolean;
+  /** Widens the header to the same measure as a wide page, so brand and account
+   *  chip line up with the content instead of sitting inside it. */
+  wide?: boolean;
   /** Per-screen modifier on the page element; the shared `app-page` is added here. */
   pageClassName?: string;
   children: ReactNode;
@@ -22,6 +27,8 @@ export default function AppLayout({
   step,
   navigationLocked,
   accountActive,
+  progressActive,
+  wide,
   pageClassName,
   children,
 }: AppLayoutProps) {
@@ -31,6 +38,8 @@ export default function AppLayout({
         activeStep={step}
         navigationLocked={navigationLocked}
         accountActive={accountActive}
+        progressActive={progressActive}
+        wide={wide}
       />
 
       <main className={cx("app-page", pageClassName)}>{children}</main>

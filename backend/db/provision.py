@@ -102,6 +102,13 @@ def seed(db: DbSession) -> dict[str, int]:
     # references it, so a retired goal stays readable for the selections that
     # already name it, and /api/focus filters on `active`.
     _deactivate_missing(db, FocusGoal, {g["id"] for g in FOCUS_GOALS})
+    # And for the metric inventory. ADR 0057 states this already happens ("the
+    # old key is deactivated and the new one inserted"), but the call was never
+    # made, so every German key from before that rename stayed active beside its
+    # English replacement -- two rows with the same display name, and a Session
+    # measured before the rename pointing at the older one. Measurements
+    # reference these rows, hence deactivation and not a delete.
+    _deactivate_missing(db, MetricType, {m.key for m in METRICS})
     # Languages are deliberately absent: a closed code list, never retired, and
     # a Session keeps pointing at the code it ran in.
     return created

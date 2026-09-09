@@ -24,6 +24,10 @@ interface AppHeaderProps {
   navigationLocked?: boolean | undefined;
   /** Marks the account chip as the current page. */
   accountActive?: boolean | undefined;
+  /** Marks the progress link as the current page (F-13). */
+  progressActive?: boolean | undefined;
+  /** Widens the header bar to a wide page's measure, so the two align. */
+  wide?: boolean | undefined;
 }
 
 // Keeping the step configuration here avoids duplicating the markup.
@@ -37,6 +41,8 @@ export default function AppHeader({
   activeStep,
   navigationLocked = false,
   accountActive = false,
+  progressActive = false,
+  wide = false,
 }: AppHeaderProps) {
   const auth = useAuth();
   const account = useAccount();
@@ -56,7 +62,7 @@ export default function AppHeader({
 
   return (
     <header className="app-header">
-      <div className="app-header-inner">
+      <div className={cx("app-header-inner", wide && "is-wide")}>
         {navigationLocked ? (
           brand
         ) : (
@@ -95,6 +101,18 @@ export default function AppHeader({
           // Holds the brand left and the account right when there are no steps
           // between them.
           <span className="app-header-spacer" />
+        )}
+
+        {/* Suppressed during a call for the same reason the account chip is:
+            leaving the page tears the WebSocket down (ADR 0034). */}
+        {auth.isAuthenticated && !navigationLocked && (
+          <Link
+            to={ROUTES.progress}
+            className={cx("header-link", progressActive && "is-active")}
+            aria-current={progressActive ? "page" : undefined}
+          >
+            Fortschritt
+          </Link>
         )}
 
         {auth.isAuthenticated &&

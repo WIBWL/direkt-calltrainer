@@ -98,14 +98,22 @@ export default function ProfileView() {
       </section>
 
       <section className="profile-section">
-        <h2>Ihre Trainings</h2>
+        <div className="progress-section-head">
+          <h2>Ihre Trainings</h2>
+          {/* The history lists single calls; the dashboard is the same data
+              read across calls. Whoever is looking at one often wants the
+              other. */}
+          <Link to={ROUTES.progress} className="progress-section-link">
+            Fortschritt ansehen
+          </Link>
+        </div>
         <SessionHistory />
       </section>
 
       <section className="card">
         <h2>Ihre Daten</h2>
         <p>
-          Gespeichert werden Gesprächsprotokoll, Kennzahlen und Auswertung —{" "}
+          Gespeichert werden Gesprächsprotokoll, Kennzahlen und Auswertung, aber{" "}
           <strong>keine Tonaufnahme</strong>.
         </p>
 

@@ -75,12 +75,27 @@ body {
   max-width: 640px;
 }
 
+/* A dashboard is a comparison, and a comparison needs room: the small
+   multiples only earn their name when several fit on one row. Four fifths of
+   the window rather than all of it, so the page keeps a margin and does not
+   read as an unframed sheet of data. The header takes the same measure on
+   these screens (`.app-header-inner.is-wide`) so brand and account chip line
+   up with the content instead of sitting inside it. */
+.app-page-wide {
+  width: 80%;
+  max-width: none;
+}
+
 /* The shared header remains consistent across every training screen. */
 .app-header {
   width: 100%;
   height: 76px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.app-header-inner.is-wide {
+  width: 80%;
 }
 
 .app-header-inner {
@@ -3498,6 +3513,533 @@ h2 {
   text-decoration: none;
   font-style: italic;
   opacity: 0.8;
+}
+
+/* --- Progress dashboard (F-13, docs/dashboard-konzept.md) ---------------- */
+/* One rule governs everything below: nothing here may encode a judgement.
+   No red, no green, no arrows. A value is drawn in the same blue whether it
+   is high or low, because nobody has established which of the two is better
+   for these Kennzahlen (ADR 0051, ADR 0065). */
+
+.progress-page h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.progress-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 1.25rem;
+}
+
+.progress-activity {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.progress-activity-span {
+  color: var(--color-text-muted);
+}
+
+.progress-note {
+  margin-top: -0.5rem;
+  font-size: 0.85rem;
+}
+
+/* Period switch. Buttons rather than a select: three options that are always
+   worth seeing, and switching is the most frequent act on this screen. */
+.progress-periods {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  padding: 3px;
+}
+
+.progress-period {
+  border: none;
+  border-radius: 999px;
+  background: none;
+  padding: 0.35rem 0.9rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.progress-period.is-active {
+  background: var(--color-navy-900);
+  color: var(--color-surface);
+}
+
+.progress-period:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 2px;
+}
+
+.progress-section {
+  margin-top: 2rem;
+}
+
+.progress-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 0.75rem;
+}
+
+.progress-section-link {
+  font-size: 0.85rem;
+  color: var(--color-blue-600);
+}
+
+/* Focus tiles and the metric grid are the same shape on purpose: small
+   multiples compare only when they are identically sized (Tufte). */
+.focus-tiles,
+.progress-metric-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.focus-tile,
+.progress-metric-cell {
+  display: block;
+  height: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+.progress-metric-cell {
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.progress-metric-cell:hover {
+  border-color: var(--color-blue-300);
+  background: var(--color-surface-selected);
+}
+
+.progress-metric-cell:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: -2px;
+}
+
+.focus-tile-title,
+.progress-metric-cell-name {
+  display: block;
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* The number beside the curve, so the tile says something without the chart
+   having to be read. */
+.progress-metric-figure {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.progress-metric-figure-label {
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.focus-tile-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.progress-detail-link {
+  display: inline-block;
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--color-blue-600);
+}
+
+.progress-invite {
+  margin-top: 12px;
+}
+
+.progress-invite .consent-button {
+  flex: 0 0 auto;
+  margin-top: 0.5rem;
+}
+
+/* Two panels side by side on a wide screen, stacked below it. The activity
+   chart gets the larger share: it is the one thing that says something from the
+   first training onwards. */
+.progress-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .progress-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.progress-columns .card {
+  margin: 0;
+  height: 100%;
+}
+
+.progress-columns h2 {
+  margin-bottom: 1rem;
+}
+
+/* --- Activity over time -------------------------------------------------- */
+/* Counting what somebody did needs no norm, which is why this is the one chart
+   here that carries no caveat (ADR 0065). */
+
+.activity-chart {
+  margin: 0;
+}
+
+.activity-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 132px;
+}
+
+.activity-bar-slot {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  height: 100%;
+  gap: 4px;
+}
+
+.activity-bar-count {
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  line-height: 1;
+  min-height: 0.7rem;
+}
+
+.activity-bar-stack {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 34px;
+  height: 100%;
+}
+
+.activity-bar {
+  display: block;
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  background: var(--color-blue-600);
+}
+
+/* An abandoned call is a fact, not a fault: the same hue, lighter. Red would
+   turn a note in the history into a mark against the user. */
+.activity-bar-aborted {
+  background: var(--color-blue-300);
+  border-radius: 0;
+}
+
+.activity-bar-stack > .activity-bar:first-child {
+  border-radius: 3px 3px 0 0;
+}
+
+.activity-axis {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.activity-axis span {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.activity-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.activity-key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--color-blue-600);
+}
+
+.activity-key-aborted {
+  margin-left: 10px;
+  background: var(--color-blue-300);
+}
+
+/* --- What was trained with what ------------------------------------------ */
+
+.variety-wrap {
+  overflow-x: auto;
+}
+
+.variety-grid {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.variety-grid th {
+  font-weight: 600;
+  text-align: left;
+  padding: 4px 10px 8px 0;
+  color: var(--color-text-muted);
+  vertical-align: bottom;
+}
+
+.variety-grid thead th {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.variety-grid tbody th {
+  font-weight: 500;
+  color: var(--color-navy-900);
+  padding-right: 14px;
+  /* Long Scenario titles must not push the grid off the card. */
+  max-width: 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variety-grid td {
+  padding: 3px 4px;
+}
+
+.variety-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 28px;
+  border-radius: var(--radius-control);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.variety-cell.is-played {
+  background: var(--color-blue-600);
+  color: var(--color-surface);
+}
+
+.variety-empty {
+  width: 100%;
+  height: 100%;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+/* Available to a screen reader, invisible on screen: an empty cell has to say
+   what it means, and a dash would be read out as punctuation. */
+.variety-empty-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- The chart ----------------------------------------------------------- */
+
+.sparkline {
+  display: block;
+  width: 100%;
+  height: 56px;
+  overflow: visible;
+}
+
+/* The band is the user's own usual range, not a target. Faint on purpose: it
+   is context for the line, and a strong fill would read as a zone to stay in. */
+.sparkline-band {
+  fill: var(--color-blue-100);
+}
+
+.sparkline-line {
+  fill: none;
+  stroke: var(--color-blue-600);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.sparkline-dot {
+  fill: var(--color-blue-600);
+}
+
+/* --- Metric detail ------------------------------------------------------- */
+
+.progress-page .card .sparkline {
+  height: 160px;
+  margin-bottom: 0.75rem;
+}
+
+.progress-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.progress-table th {
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.progress-table td {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.progress-table tr:last-child td {
+  border-bottom: none;
+}
+
+.progress-table-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* --- The two blocks that are still a preview ----------------------------- */
+/* Visibly an example, or it would read as the user's own data. The dashed
+   border and the muted content are the second signal beside the "Beispiel"
+   chip and the sentence. */
+
+.progress-preview {
+  border-style: dashed;
+}
+
+.progress-preview-note {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.progress-preview-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  opacity: 0.55;
+}
+
+.progress-preview-heading {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.progress-preview-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.9rem;
+}
+
+.progress-preview-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.progress-preview-count {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.progress-preview-practice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+  opacity: 0.55;
+}
+
+.progress-preview-reason {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* The header's plain text link, beside the account chip. */
+.header-link {
+  font-size: 0.9rem;
+  color: var(--color-navy-900);
+  text-decoration: none;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-control);
+}
+
+.header-link:hover {
+  background: var(--color-surface-selected);
+}
+
+.header-link.is-active {
+  font-weight: 600;
+  color: var(--color-blue-600);
+}
+
+@media (max-width: 560px) {
+  .header-link {
+    display: none;
+  }
 }
 
 /* --- Training focus (F-61, ADR 0074) ------------------------------------ */

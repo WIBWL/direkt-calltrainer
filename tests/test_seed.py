@@ -128,3 +128,37 @@ def test_seed_deactivates_personas_it_no_longer_contains(migrated_database: str)
         engine.dispose()
 
     assert still_there is False, "Retired Persona should be deactivated, not left active"
+
+
+def test_seed_deactivates_metric_types_it_no_longer_contains(migrated_database: str) -> None:
+    """The same rule for the metric inventory, which ADR 0057 already claims it
+    follows: when a metric key was renamed, the old row is deactivated.
+
+    It was not, for a long time. Every German key from before that rename stayed
+    active beside its English replacement, and both carry the same display name
+    ("Redeanteil" for `redeanteil` and for `talk_share`), so anything reading the
+    inventory saw each renamed metric twice. Measurements reference these rows,
+    which is why this is a flag and not a delete.
+    """
+    _run_seed(migrated_database)
+
+    engine = create_engine(migrated_database)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO metric_type (key, name, unit, active)"
+                    " VALUES ('redeanteil', 'Redeanteil', '%', true)"
+                )
+            )
+
+        _run_seed(migrated_database)
+
+        with engine.connect() as conn:
+            still_there = conn.execute(
+                text("SELECT active FROM metric_type WHERE key = 'redeanteil'")
+            ).scalar_one()
+    finally:
+        engine.dispose()
+
+    assert still_there is False, "Renamed metric type should be deactivated"

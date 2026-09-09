@@ -11,6 +11,11 @@ export const ROUTES = {
   training: "/",
   /** Account, privacy notice, deletion path and the history (F-31, F-49, F-48). */
   profile: "/profil",
+  /** The progress dashboard (F-13, docs/dashboard-konzept.md). */
+  progress: "/fortschritt",
+  /** One Kennzahl over time, the dashboard's second level. A route rather than
+   *  a panel, so the view can be linked and Back is the browser's. */
+  progressMetric: "/fortschritt/:metricKey",
   /** One past training, by the id the listing hands out (ADR 0050). */
   session: "/trainings/:sessionId",
   /** One Kennzahl of one training, in detail (F-51's interruptions today). A
@@ -49,6 +54,12 @@ export interface TrainingStart {
  */
 export function sessionPath(sessionId: string): string {
   return `/trainings/${encodeURIComponent(sessionId)}`;
+}
+
+/** The detail view of one Kennzahl. Encoded for the same reason as above,
+ *  although a metric key is a slug the backend defines. */
+export function progressMetricPath(metricKey: string): string {
+  return `/fortschritt/${encodeURIComponent(metricKey)}`;
 }
 
 /** One Kennzahl of one training. Both segments encoded, for the reason

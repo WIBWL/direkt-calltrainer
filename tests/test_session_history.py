@@ -218,13 +218,21 @@ async def test_the_loudness_curve_stays_out_of_the_listing(
 ) -> None:
     """`detail_json` is the per-Session course of a metric. Multiplied by a
     page of Sessions it dwarfs everything else in the payload, and no view
-    across Sessions plots it — the detail route is where it belongs."""
+    across Sessions plots it — the detail route is where it belongs.
+
+    The exact key set is asserted rather than just the absence of `detail`, so
+    that anything added here is a decision and not a drift. `active` was added
+    deliberately for the progress view (F-13): a Session measured before a
+    metric was renamed points at the retired metric type, which carries the same
+    display name as its replacement, and nothing else on the wire distinguishes
+    them.
+    """
     persist(turns=MEASURED_TURNS)
 
     body = (await api_client.get("/api/sessions")).json()
 
     measurement = body["sessions"][0]["measurements"][0]
-    assert set(measurement) == {"key", "name", "unit", "value"}
+    assert set(measurement) == {"key", "name", "unit", "value", "active"}
     assert "detail" not in measurement
 
 
