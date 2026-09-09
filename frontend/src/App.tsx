@@ -56,6 +56,40 @@ const ORIGIN_FILTERS: LibraryFilter[] = [
   "all", "standard", "own", "followUp", "reverse", "tenant",
 ];
 
+/** What the selection screen opens on (ADR 0072): the seeded library, and the
+ * call context most trainings start from. "Alle" on both rows was the honest
+ * default while there was little to filter, and is now a wall of every Scenario
+ * the User has ever owned or been shared — a starting point has to be a
+ * shortlist, and both rows are one press from anything else. */
+const DEFAULT_ORIGIN: LibraryFilter = "standard";
+const DEFAULT_CATEGORY: CategoryFilter = "operations";
+
+/** The card as the picker takes it. Its own function because the first
+ * selection is made against the same filters the picker applies, before there
+ * is a rendered list to read one off. */
+const toLibraryItem = (s: ScenarioCard) => ({
+  id: s.id,
+  name: s.name,
+  subtitle: s.short_description,
+  origin: s.origin,
+  shared: s.shared,
+  category: s.category,
+  followUp: s.follow_up,
+  reverse: s.reverse,
+  originSession: s.origin_session,
+});
+
+/** The Scenario to start on: the first the default filters actually show, so
+ * the summary at the bottom of the screen does not name a card that is not on
+ * it. Falls back to the first of all, for a library those filters leave empty. */
+function firstSelectable(scenarios: ScenarioCard[]): string | null {
+  const items = scenarios.map(toLibraryItem);
+  const visible = items.find(
+    (item) => matchesFilter(item, DEFAULT_ORIGIN) && matchesCategory(item, DEFAULT_CATEGORY),
+  );
+  return (visible ?? items[0])?.id ?? null;
+}
+
 /**
  * Owns the training flow: which screen is showing, what has been selected, and
  * the live Session behind it. Everything visible is delegated to a screen
@@ -67,9 +101,9 @@ export default function App() {
   const [personaId, setPersonaId] = useState<string | null>(null);
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [scenarioFilter, setScenarioFilter] = useState<LibraryFilter>("all");
+  const [scenarioFilter, setScenarioFilter] = useState<LibraryFilter>(DEFAULT_ORIGIN);
   // The F-03 call context filter (ADR 0072), independent of the origin chips.
-  const [scenarioCategory, setScenarioCategory] = useState<CategoryFilter>("all");
+  const [scenarioCategory, setScenarioCategory] = useState<CategoryFilter>(DEFAULT_CATEGORY);
   const [editingScenario, setEditingScenario] = useState<EditorState>(null);
   // The caller's company (ADR 0060); null = default tenant, no company chip.
   const [tenantName, setTenantName] = useState<string | null>(null);
@@ -145,7 +179,7 @@ export default function App() {
     listScenarios()
       .then((data) => {
         setScenarios(data);
-        if (!restored && data[0]) setScenarioId(data[0].id);
+        if (!restored) setScenarioId(firstSelectable(data));
       })
       .catch((e) =>
         setLoadError(`Szenarien konnten nicht geladen werden: ${e.message}`),
@@ -457,17 +491,7 @@ export default function App() {
     handleStartFollowUp(start.scenarioId, start.personaId, start.reverse ?? false);
   }, [location.state, navigate, handleStartFollowUp]);
 
-  const scenarioItems = scenarios.map((s) => ({
-    id: s.id,
-    name: s.name,
-    subtitle: s.short_description,
-    origin: s.origin,
-    shared: s.shared,
-    category: s.category,
-    followUp: s.follow_up,
-    reverse: s.reverse,
-    originSession: s.origin_session,
-  }));
+  const scenarioItems = scenarios.map(toLibraryItem);
   // The two levels combine: level 1 picks whose Scenario it is, level 2 what
   // kind of call it is (ADR 0072).
   const byOrigin = scenarioItems.filter((s) => matchesFilter(s, scenarioFilter));

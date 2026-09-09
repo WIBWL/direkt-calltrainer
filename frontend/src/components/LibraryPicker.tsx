@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { Origin, OriginSessionRef, ScenarioCategory } from "../scenarioLibrary";
 import { CATEGORIES, CATEGORY_LABELS } from "../scenarioLibrary";
@@ -31,6 +31,13 @@ const ORIGIN_LABELS: Record<Exclude<LibraryFilter, "tenant">, string> = {
 };
 
 const BASE_ORIGINS = ["all", "standard", "own", "followUp", "reverse"] as const;
+
+/** How many Scenario cards the grid shows before the "show all" tile takes over
+ * the sixth place. Five and not six, so that tile is always on the first two
+ * rows of a three-column grid rather than starting a third one by itself: the
+ * seeded library alone is seventeen rows deep, and a selection screen that
+ * opens on all of them is a scroll before it is a choice. */
+const COLLAPSED_CARDS = 5;
 
 export interface LibraryItem {
   id: string;
@@ -161,6 +168,14 @@ export default function LibraryPicker({
   // way round and saves a stray confirmation sitting armed on a card the User
   // has moved on from.
   const [confirmingRemoval, setConfirmingRemoval] = useState<string | null>(null);
+  // The grid opens on one row and a half of cards; the rest is behind the tile
+  // at the end of it. Collapsed again whenever the filters change, because what
+  // "the first five" are has changed with them.
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => setExpanded(false), [filter, category]);
+
+  const hidden = items.length - COLLAPSED_CARDS;
+  const shown = expanded ? items : items.slice(0, COLLAPSED_CARDS);
 
   const originOptions: FilterOption<LibraryFilter>[] = [
     ...BASE_ORIGINS.map((f) => ({
@@ -225,7 +240,7 @@ export default function LibraryPicker({
       )}
 
       <div className="persona-grid scenario-grid">
-        {items.map((item) => (
+        {shown.map((item) => (
           <div key={item.id} className="card-wrap">
             <button
               className={
@@ -294,6 +309,31 @@ export default function LibraryPicker({
             )}
           </div>
         ))}
+
+        {/* The tile in the sixth place, and a tile rather than a link under the
+            grid: it is the last thing in the same row of choices, so it is
+            found by the eye already reading them. Absent when everything is on
+            screen — there is nothing behind it to open. */}
+        {hidden > 0 && (
+          <div className="card-wrap">
+            <button
+              type="button"
+              className="persona-card library-more-card"
+              onClick={() => setExpanded(!expanded)}
+            >
+              <span className="persona-name">
+                {expanded ? "Weniger anzeigen" : "Alle anzeigen"}
+              </span>
+              <span className="card-subtitle">
+                {expanded
+                  ? `Zurück auf ${COLLAPSED_CARDS}`
+                  : hidden === 1
+                    ? "1 weiteres Szenario"
+                    : `${hidden} weitere Szenarien`}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
     </>
   );

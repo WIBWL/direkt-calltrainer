@@ -698,6 +698,28 @@ h2 {
   cursor: pointer;
 }
 
+/* The tile that opens the rest of the library. A card in the grid rather than a
+   link under it, so it is read as the last of the choices -- but dashed and
+   unfilled, because it is not one of them: nothing is selected by pressing it.
+   No check circle and no badge, hence the plain padding. */
+.library-more-card {
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1rem;
+  border-style: dashed;
+  background: transparent;
+  color: var(--color-blue-600);
+}
+
+.library-more-card .persona-name {
+  color: inherit;
+}
+
+.library-more-card:hover {
+  border-style: solid;
+  background: #fff;
+}
+
 /* The removal confirmation takes the place of the "Entfernen" link rather than
    opening anything: the card must not change size while the question is being
    asked, or the grid reflows under the pointer that is about to answer it. */

@@ -15,7 +15,7 @@ import { sessionPath } from "../routes";
  * two calls apart: when it was, which scenario, and with whom.
  */
 export default function SessionHistory() {
-  const { sessions, total, state, hasMore, loadingMore, loadMore } = useSessionHistory();
+  const { sessions, total, state, hasMore, loadingMore, showMore } = useSessionHistory();
 
   if (state === "loading") {
     return <p className="muted">Trainings werden geladen …</p>;
@@ -48,7 +48,7 @@ export default function SessionHistory() {
         <button
           type="button"
           className="session-more"
-          onClick={loadMore}
+          onClick={showMore}
           disabled={loadingMore}
         >
           {loadingMore ? "Wird geladen …" : `Weitere anzeigen (${sessions.length} von ${total})`}
