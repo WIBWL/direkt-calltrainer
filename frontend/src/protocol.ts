@@ -343,6 +343,48 @@ export interface ConsentState {
   decision_required: boolean;
 }
 
+// --- Training focus (GET/PUT /api/focus, F-61, ADR 0074) -------------------
+
+/** Which heading a goal sits under. Display grouping only. */
+export type FocusGroupKey = "paraverbal" | "phases" | "impact" | "habit";
+
+/** One entry of the shipped catalogue. All text is German and comes from the
+ *  database, exactly as a Scenario's title does: the client never composes it.
+ *
+ *  `focus_goal.evidence` is deliberately absent here. It records how far a goal
+ *  can be measured today, which is planning information for the analysis work
+ *  and not something the user is asked to weigh up while picking (ADR 0074). */
+export interface FocusGoal {
+  key: string;
+  title: string;
+  caption: string;
+  /** The paragraph behind the "i". */
+  info: string;
+  group: FocusGroupKey;
+}
+
+export interface FocusGroup {
+  key: FocusGroupKey;
+  name: string;
+}
+
+/** The catalogue plus what the caller has picked out of it. */
+export interface FocusState {
+  /** How many goals may be focused on at once. Read from here rather than
+   *  hardcoded, so the interface enforces the number the backend does. */
+  max_goals: number;
+  /** Whether the question has been answered at all. An empty `selected` with
+   *  `decided: true` is "no focus" — a real answer, not a missing one. */
+  decided: boolean;
+  decided_at: string | null;
+  /** Whether the first-run dialog still has to ask. */
+  decision_required: boolean;
+  /** The picked keys, in catalogue order. */
+  selected: string[];
+  groups: FocusGroup[];
+  goals: FocusGoal[];
+}
+
 export interface SessionHistoryPage {
   /** All of the caller's Sessions, not just this page. */
   total: number;

@@ -18,6 +18,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from backend.api.account import router as account_router
 from backend.api.consent import router as consent_router
+from backend.api.focus import router as focus_router
 from backend.api.personas import router as personas_router
 from backend.api.scenarios import router as scenarios_router
 from backend.api.session_ws import router as session_ws_router
@@ -140,6 +141,7 @@ app.include_router(tenant_router)
 app.include_router(session_ws_router)
 app.include_router(sessions_router)
 app.include_router(consent_router)
+app.include_router(focus_router)
 app.include_router(account_router)
 
 FRONTEND_DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")

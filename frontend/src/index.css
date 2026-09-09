@@ -2992,7 +2992,13 @@ h2 {
   inset: 0;
   z-index: 50;
   display: flex;
-  align-items: center;
+  /* NOT align-items: center. On a scroll container, a centered flex item that
+     is taller than the viewport overflows equally in both directions, and the
+     part above the top edge cannot be scrolled to: scrolling never goes above
+     the origin, so the head of a long dialog is simply lost. The dialog below
+     centers itself with `margin: auto` instead, which resolves to zero once
+     there is no free space left. */
+  align-items: flex-start;
   justify-content: center;
   padding: 24px;
   background: var(--color-background);
@@ -3001,6 +3007,9 @@ h2 {
 
 .consent-dialog {
   width: min(560px, 100%);
+  /* Centers vertically while it fits and starts at the top once it does not
+     (see the backdrop above). */
+  margin: auto;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
@@ -3489,6 +3498,149 @@ h2 {
   text-decoration: none;
   font-style: italic;
   opacity: 0.8;
+}
+
+/* --- Training focus (F-61, ADR 0074) ------------------------------------ */
+/* The same picker in two frames: the first-run dialog and the profile card.
+   Everything below styles the picker; only .focus-dialog belongs to the first
+   of those. */
+
+/* Wider than the consent dialog, which carries four sentences — this one
+   carries fifteen cards. The backdrop already scrolls, so a tall list on a
+   short viewport stays reachable. */
+.focus-dialog {
+  width: min(720px, 100%);
+}
+
+.focus-groups {
+  margin-top: 1.25rem;
+}
+
+.focus-group + .focus-group {
+  margin-top: 1.5rem;
+}
+
+.focus-group-title {
+  margin: 0 0 0.6rem;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.focus-goal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.focus-goal {
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+/* Selected is marked by the border and the fill as well as by the tick: the
+   checkbox alone is a 13px cue on a list of fifteen. */
+.focus-goal-selected {
+  border-color: var(--color-blue-600);
+  background: var(--color-surface-selected);
+}
+
+.focus-goal-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.focus-goal-main input[type="checkbox"] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--color-blue-600);
+  cursor: pointer;
+}
+
+/* At the limit the unpicked cards go quiet rather than disappearing: what is
+   unavailable has to stay visible, or the list looks shorter than it is. */
+.focus-goal-main input[type="checkbox"]:disabled {
+  cursor: default;
+}
+
+.focus-goal-main:has(input:disabled) {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.focus-goal-main input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 2px;
+}
+
+.focus-goal-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.focus-goal-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.focus-goal-caption {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+/* Smaller than a standalone "i", because it sits inside a card rather than
+   under a section heading. Indented to the text, not to the checkbox. */
+.focus-goal .info-details {
+  margin: 0.5rem 0 0 30px;
+}
+
+.focus-goal .info-summary {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.focus-goal .info-body {
+  font-size: 0.85rem;
+}
+
+/* aria-live: the count is how a screen-reader user learns the limit was
+   reached, since the change itself is a set of checkboxes going disabled. */
+.focus-count {
+  margin: 1rem 0 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+/* The read-only summary on the profile card. */
+.focus-summary {
+  margin: 0.5rem 0 0.9rem;
+  padding-left: 1.2rem;
+}
+
+.focus-summary li {
+  margin-bottom: 0.25rem;
+  line-height: 1.5;
+}
+
+.profile-page .card .focus-count {
+  margin-bottom: 1rem;
 }
 
 /* --- The "i": long explanations, folded away ---------------------------- */

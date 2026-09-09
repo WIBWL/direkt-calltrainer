@@ -60,6 +60,7 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 | F-12 | Aufzeichnung des Gesprächs | Aufzeichnung und Transkription zur nachträglichen Reflexion. Das Transkript liegt unmittelbar nach dem Gespräch vollständig in Textform vor und wird während des Gesprächs nicht angezeigt. | Funktionale Vollständigkeit | MUST | R-28, R-52 |
 | F-13 | Aufzeichnung des Fortschritts | Nutzerbezogene Verlaufsdaten über längere Zeiträume, nachvollziehbar dargestellt. | Funktionale Vollständigkeit | SHOULD | R-27, R-29, R-30 |
 | F-48 | Trainingshistorie | Übersicht vergangener Trainings, filterbar nach Szenario-Typ und Zeitraum. | Funktionale Vollständigkeit | COULD | R-29 |
+| F-61 | Persönliche Fokusziele | Der Nutzer wählt aus einem Katalog bis zu fünf Trainingsziele, die in Training und Auswertung besonders hervorgehoben werden; die übrigen Ziele bleiben unberührt. Die Auswahl wird beim ersten Start erfragt, ist mit „ohne Fokus“ beantwortbar und im Profil jederzeit änderbar. | Funktionale Vollständigkeit | SHOULD | R-30, Systementwurf |
 
 ## Bedienoberfläche
 

@@ -6,6 +6,7 @@ import { ROUTES } from "../routes";
 import AppLayout from "./AppLayout";
 import ConsentSettings from "./ConsentSettings";
 import DataOverview from "./DataOverview";
+import FocusSettings from "./FocusSettings";
 import InfoDetails from "./InfoDetails";
 import ProcessingNotice from "./ProcessingNotice";
 import SessionHistory from "./SessionHistory";
@@ -88,6 +89,14 @@ export default function ProfileView() {
         <ConsentSettings />
       </section>
 
+      {/* Above the history, below the storage decision: it is a setting about
+          future trainings, which is what the card above it is too, and it says
+          nothing about the trainings already listed further down. */}
+      <section className="card">
+        <h2>Ihre Fokusziele</h2>
+        <FocusSettings />
+      </section>
+
       <section className="profile-section">
         <h2>Ihre Trainings</h2>
         <SessionHistory />
@@ -110,6 +119,13 @@ export default function ProfileView() {
           </p>
 
           <ProcessingNotice />
+
+          <p>
+            Neben den Trainings selbst werden Ihre Einstellungen gespeichert, also Ihre
+            Fokusziele und die Angabe, ob die automatische Löschung ausgesetzt ist. Sie
+            enthalten keine Gesprächsinhalte und bleiben erhalten, wenn Trainings gelöscht
+            werden.
+          </p>
 
           <p>
             Ihre Trainings liegen unter einer technischen Kennung, nicht unter Ihrem Namen. Das

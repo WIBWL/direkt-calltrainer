@@ -22,7 +22,7 @@ logic against a throwaway RSA key and a stubbed JWKS.
 
 The database tests (`test_migrations.py`, `test_seed.py`, `test_save_session.py`,
 `test_cascade_delete.py`, `test_feedback_job_status.py`, `test_api.py`,
-`test_session_history.py`,
+`test_session_history.py`, `test_focus_goals.py`,
 `test_setup_api.py`, and the second half of `test_persistence_schema.py`) each
 create a throwaway database on the server named in `.env`, migrate it and drop
 it afterwards. Postgres has to be running for them (`docker compose up -d db`);
@@ -48,6 +48,7 @@ source of that content, and which imports without a database.
 | Keycloak bearer-token verification | F-31, F-50, ADR 0009 | `test_auth.py` |
 | Storage consent: the gate on the write path, version staleness, withdrawal deletes | F-49, F-31, ADR 0031, ADR 0034, ADR 0066 | `test_consent.py` |
 | Six-month retention: the boundary, the per-account suspension, idempotence | F-49, ADR 0031, ADR 0066, ADR 0067 | `test_retention.py` |
+| Focus goals: the five-goal limit at the backend, "no focus" as a decision, the catalogue, and that deleting trainings leaves the selection alone | F-61, ADR 0031, ADR 0041, ADR 0066, ADR 0074 | `test_focus_goals.py` |
 | Data rights: overview counts, export completeness and scoping, deleting one training | F-49, F-31, ADR 0050, ADR 0064, ADR 0066 | `test_data_rights.py` |
 | Spoken content stays out of the log unless explicitly switched on | F-49, ADR 0039, ADR 0066 | `test_transcript_logging.py` |
 | Deep links into the client-side router survive a reload, without swallowing unknown API paths | F-31, ADR 0009, ADR 0064 | `test_spa_routing.py` |

@@ -6,6 +6,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate } from "rea
 import App from "./App";
 import { AuthGate } from "./AuthGate";
 import { ConsentProvider } from "./ConsentContext";
+import { FocusProvider } from "./FocusContext";
 import Accessibility from "./components/legal/Accessibility";
 import Imprint from "./components/legal/Imprint";
 import Notes from "./components/legal/Notes";
@@ -53,11 +54,22 @@ function ReturnToRequestedPage() {
   return null;
 }
 
-/** The routes that may only be reached once the storage decision is answered. */
+/**
+ * The routes that may only be reached once the two first-run questions are
+ * answered: whether trainings may be stored (ADR 0066) and what the user wants
+ * to focus on (ADR 0074).
+ *
+ * Nested, so they are asked one after the other rather than on top of each
+ * other, and in this order: consent is the one with a legal basis behind it,
+ * and the focus question is asked of a user who has already decided what
+ * happens to their data.
+ */
 function ConsentGate() {
   return (
     <ConsentProvider>
-      <Outlet />
+      <FocusProvider>
+        <Outlet />
+      </FocusProvider>
     </ConsentProvider>
   );
 }

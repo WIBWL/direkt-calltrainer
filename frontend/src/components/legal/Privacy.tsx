@@ -17,8 +17,10 @@ import LegalPage from "../LegalPage";
  *
  * What was added, because it does happen and the original could not know about
  * it: the login through Keycloak, the speech leaving the browser for the DiReKT
- * gateway and KugelAudio, the consent-gated storage, the six-month retention
- * and the rights that are exercisable in the app itself.
+ * gateway and KugelAudio, the consent-gated storage, the six-month retention,
+ * the account settings that are stored alongside the trainings without being
+ * part of them (the focus goals of ADR 0074 and the retention switch), and the
+ * rights that are exercisable in the app itself.
  *
  * The two gaps the first draft carried are filled: the hoster is Hetzner in
  * Gunzenhausen, and KugelAudio's seat, DPA and sub-processors come from the
@@ -390,6 +392,26 @@ export default function Privacy() {
           Rechtsgrundlage ist Ihre Einwilligung nach Art. 6 Abs. 1 lit. a DSGVO.
         </p>
 
+        <h3>Ihre Einstellungen</h3>
+        <p>
+          Unabhängig von den Trainings speichern wir zu Ihrem Konto Ihre Einstellungen in der
+          Anwendung. Das sind Ihre Fokusziele, also die Trainingsziele, die Sie beim ersten
+          Start oder später im Profil ausgewählt haben, und die Angabe, ob Sie die automatische
+          Löschung nach sechs Monaten ausgesetzt haben. Gespeichert wird dabei die Auswahl
+          selbst, verknüpft mit der technischen Kennung Ihres Kontos. Gesprächsinhalte enthalten
+          diese Angaben nicht.
+        </p>
+        <p>
+          Sie können Ihre Fokusziele jederzeit im Profil ändern. Ein Widerruf der Einwilligung
+          löscht Ihre Trainings, setzt diese Einstellungen aber nicht zurück, weil sie nichts
+          über einzelne Gespräche aussagen. Wenn Sie auch sie gelöscht haben möchten, genügt
+          eine Nachricht an die oben genannte Adresse.
+        </p>
+        <p>
+          Rechtsgrundlage ist Art. 6 Abs. 1 lit. e DSGVO i. V. m. Art. 4 BayDSG, wie bei der
+          Anmeldung: Die Einstellungen dienen der Bereitstellung des Trainings selbst.
+        </p>
+
         <h3>Nachweis Ihrer Einwilligung</h3>
         <p>
           Um nachweisen zu können, dass eine Speicherung gedeckt war, protokollieren wir Ihre
@@ -406,6 +428,7 @@ export default function Privacy() {
           <li>sehen, wie viele Trainings, Gesprächsbeiträge und Kennzahlen gespeichert sind,</li>
           <li>alle gespeicherten Daten als JSON-Datei herunterladen,</li>
           <li>ein einzelnes Training löschen,</li>
+          <li>Ihre Fokusziele ändern,</li>
           <li>
             die Einwilligung widerrufen, wodurch alle gespeicherten Trainings gelöscht werden,
           </li>

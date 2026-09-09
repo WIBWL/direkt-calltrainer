@@ -136,6 +136,27 @@ SCENARIO_CATEGORIES = (
     CATEGORY_OPERATIONS, CATEGORY_REQUIREMENTS, CATEGORY_PRICING, CATEGORY_CLOSING,
 )
 
+# FocusGoal.group_key (ADR 0074): which part of the catalogue a goal belongs to.
+# Display grouping only -- it decides which heading a card sits under and
+# nothing else. The German headings live with the seed content, not here.
+FOCUS_GROUP_PARAVERBAL = "paraverbal"   # the measurable core of the voice
+FOCUS_GROUP_PHASES = "phases"           # along the course of the call
+FOCUS_GROUP_IMPACT = "impact"           # what the call did to the other side
+FOCUS_GROUP_HABIT = "habit"             # how the training itself is run
+FOCUS_GROUPS = (
+    FOCUS_GROUP_PARAVERBAL, FOCUS_GROUP_PHASES, FOCUS_GROUP_IMPACT, FOCUS_GROUP_HABIT,
+)
+
+# FocusGoal.evidence (ADR 0074): how far a statement about this goal can be
+# derived from a recording today. Internal: it is planning information for the
+# analysis work and never leaves the backend, because the aim is that every goal
+# becomes measurable and a user picking one should not have to weigh up how far
+# each already is.
+EVIDENCE_MEASURED = "measured"        # derived from the audio or the transcript
+EVIDENCE_MIXED = "mixed"              # a measurable part plus an interpreted one
+EVIDENCE_INTERPRETIVE = "interpretive"  # an appraisal, not a measurement
+FOCUS_EVIDENCE = (EVIDENCE_MEASURED, EVIDENCE_MIXED, EVIDENCE_INTERPRETIVE)
+
 
 def _one_of(column: str, values: tuple[str, ...]) -> CheckConstraint:
     """A CHECK restricting `column` to `values`.
@@ -686,6 +707,106 @@ class RetentionPreference(Base):
     # than for the exception, so the column reads the same way the switch does.
     auto_delete: Mapped[bool] = mapped_column(Boolean, default=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class FocusGoal(Base):
+    """One selectable training focus (F-61, ADR 0074).
+
+    A reference table like `metric_type`: the catalogue is shipped, seeded from
+    backend/db/seed_data.py and never written by a User. What a User owns is a
+    *selection* over it, which is the two tables below.
+
+    The German display text lives in these rows, exactly as a Scenario's title
+    does — it is content, not a label the interface could derive. What stays
+    English is the `key` the wire and the code use (ADR 0057/0061).
+
+    Retired goals are deactivated, never deleted: `focus_selection_goal`
+    references them, and a selection made last month has to stay readable.
+    """
+
+    __tablename__ = "focus_goal"
+    __table_args__ = (
+        _one_of("group_key", FOCUS_GROUPS),
+        _one_of("evidence", FOCUS_EVIDENCE),
+    )
+
+    focus_goal_id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(40), unique=True)  # e.g. speaking_pace
+    title: Mapped[str] = mapped_column(String(120))
+    # The one line under the title on the card.
+    caption: Mapped[str] = mapped_column(String(240))
+    # The paragraph behind the "i". Longer than a card can carry and the place
+    # where the goal says what it actually looks at.
+    info: Mapped[str] = mapped_column(Text)
+    # `group_key`, not `group`: GROUP is a reserved word in SQL and a column of
+    # that name would need quoting in every hand-written statement.
+    group_key: Mapped[str] = mapped_column(String(20))
+    # EVIDENCE_MEASURED / _MIXED / _INTERPRETIVE, see the constants above.
+    # Internal, deliberately: api/focus.py does not serve it.
+    evidence: Mapped[str] = mapped_column(String(20))
+    # Display order inside the group. Not the primary key: the catalogue is
+    # reordered by editing the seed, which must not renumber anybody's rows.
+    position: Mapped[int] = mapped_column(Integer)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    selections: Mapped[list["FocusSelectionGoal"]] = relationship(
+        back_populates="focus_goal"
+    )
+
+
+class FocusSelection(Base):
+    """That one subject has answered the focus question, and when (ADR 0074).
+
+    Its own row rather than a flag derived from the goals below, because
+    "picked no focus" and "was never asked" are different states and the
+    interface has to tell them apart: the first must never re-open the dialog,
+    the second always must. A subject who continues without a focus has a row
+    here and none in `focus_selection_goal`.
+
+    Not a foreign key, for the same reason `Session.subject_id` is not
+    (ADR 0031): identity lives in Keycloak and there is no local User table.
+    """
+
+    __tablename__ = "focus_selection"
+
+    selection_id: Mapped[int] = mapped_column(primary_key=True)
+    # Unique, not merely indexed: a subject has one current focus, and two rows
+    # would make the answer depend on which one was read first.
+    subject_id: Mapped[str] = mapped_column(String(64), unique=True)
+    # When the question was first answered. Kept apart from `updated_at` so a
+    # later change does not erase the fact that the initial choice was made.
+    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    goals: Mapped[list["FocusSelectionGoal"]] = relationship(
+        back_populates="selection", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class FocusSelectionGoal(Base):
+    """One goal a subject is currently focusing on (ADR 0074).
+
+    An ownership edge on the selection side (CASCADE) and a reference edge on
+    the catalogue side (no ondelete), which is the same split the rest of the
+    schema uses: replacing a selection removes its rows, while a FocusGoal with
+    selections behind it must not be deletable at all.
+    """
+
+    __tablename__ = "focus_selection_goal"
+    # The same row twice would let a subject spend two of their five slots on
+    # one goal, and the count is the whole of the limit (ADR 0074).
+    __table_args__ = (UniqueConstraint("selection_id", "focus_goal_id"),)
+
+    selection_goal_id: Mapped[int] = mapped_column(primary_key=True)
+    selection_id: Mapped[int] = mapped_column(
+        ForeignKey("focus_selection.selection_id", ondelete="CASCADE"), index=True
+    )
+    focus_goal_id: Mapped[int] = mapped_column(
+        ForeignKey("focus_goal.focus_goal_id"), index=True
+    )
+
+    selection: Mapped["FocusSelection"] = relationship(back_populates="goals")
+    focus_goal: Mapped["FocusGoal"] = relationship(back_populates="selections")
 
 
 class AnalysisJob(Base):

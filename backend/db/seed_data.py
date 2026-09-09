@@ -1,9 +1,12 @@
-"""Initial content for the `persona` and `scenario` reference tables.
+# pylint: disable=too-many-lines  # a data module: splitting it by line count would scatter the seed
+"""Initial content for the `persona`, `scenario` and `focus_goal` reference tables.
 
-ADR 0041 made the database the source of truth for both, so this content is
-seed state and not a runtime source: `backend/library.py` reads the tables,
-never this module. `backend/db/provision.py` writes it on startup and
-`scripts/seed_reference_data.py` on demand, both idempotently.
+ADR 0041 made the database the source of truth for the first two, so this
+content is seed state and not a runtime source: `backend/library.py` reads the
+tables, never this module. The focus-goal catalogue (ADR 0074) follows the same
+rule and is read through `backend/focus.py`. `backend/db/provision.py` writes
+all of it on startup and `scripts/seed_reference_data.py` on demand, both
+idempotently.
 
 Field names here are English and match both the value types in
 `backend/personas.py` / `backend/scenarios.py` and the columns of the library
@@ -774,6 +777,281 @@ SCENARIOS = [
             "the date is confirmed, or a new one is named together with what "
             "happens to the appointment that hangs off it. A new date on its "
             "own leaves the third party unanswered."
+        ),
+    },
+]
+
+# --- Focus goals ----------------------------------------------------------
+# The catalogue a User picks their training focus from (F-61, ADR 0074). All
+# text here is German and user-facing: it is content, like a Scenario's title,
+# and the interface shows it unchanged. Only "id" is English, because it is the
+# key on the wire (ADR 0057/0061).
+#
+# "evidence" records how far a goal can be derived from a recording today:
+#   measured     -- derived from the audio or the transcript
+#   mixed        -- a measurable part plus an interpreted one
+#   interpretive -- an appraisal, not a measurement
+# It is planning information for the analysis work and is deliberately *not*
+# served to the client or shown on a card. The aim is that every goal becomes
+# measurable; asking a user to weigh up how far each one already is would make
+# them carry an implementation detail while picking.
+#
+# The texts say what a goal is about, never what the system will do with it:
+# nothing reads a selection yet (ADR 0074's scope), and a promise here would be
+# one this release does not keep.
+#
+# "position" is the display order across the whole catalogue; "group" only
+# decides which heading a card sits under.
+FOCUS_GROUP_NAMES = {
+    "paraverbal": "Stimme und Sprechweise",
+    "phases": "Gesprächsverlauf",
+    "impact": "Wirkung auf den Gesprächspartner",
+    "habit": "Ihr Training",
+}
+
+FOCUS_GOALS = [
+    # --- A. Paraverbal: the measurable core of the voice.
+    {
+        "id": "pace",
+        "group": "paraverbal",
+        "evidence": "measured",
+        "position": 1,
+        "title": "Ausgewogenes Sprechtempo",
+        "caption": (
+            "Weder gehetzt noch schleppend, sondern in einem Tempo, dem Ihr "
+            "Gegenüber mühelos folgt."
+        ),
+        "info": (
+            "Wer zu schnell spricht, wirkt nervös und überfordert sein "
+            "Gegenüber. Wer zu langsam spricht, wirkt unsicher oder "
+            "desinteressiert. Gefragt ist ein gleichmäßiges Tempo mit "
+            "bewussten Pausen an den Sinngrenzen. Ausgewertet wird auch, an "
+            "welchen Stellen Sie deutlich schneller oder langsamer werden."
+        ),
+    },
+    {
+        "id": "intonation",
+        "group": "paraverbal",
+        "evidence": "measured",
+        "position": 2,
+        "title": "Lebendige Sprachmelodie",
+        "caption": "Betonung und Tonhöhe variieren, statt monoton zu klingen.",
+        "info": (
+            "Eine abwechslungsreiche Betonung hält die Aufmerksamkeit und "
+            "transportiert das, was am Telefon sonst verloren geht. Monotonie "
+            "lässt selbst gute Inhalte flach wirken. Im Blick sind die "
+            "Bandbreite Ihrer Tonhöhe und die Frage, ob wichtige Aussagen "
+            "hörbar hervortreten."
+        ),
+    },
+    {
+        "id": "loudness",
+        "group": "paraverbal",
+        "evidence": "measured",
+        "position": 3,
+        "title": "Souveräne Lautstärke",
+        "caption": (
+            "Gut hörbar und gleichmäßig, ohne zu verhallen oder zu "
+            "übersteuern."
+        ),
+        "info": (
+            "Eine stabile Lautstärke signalisiert Präsenz und Sicherheit. "
+            "Fällt die Stimme am Satzende ab oder schwankt sie stark, wirkt "
+            "das unsicher. Ausgewertet wird Ihr Pegel über das ganze Gespräch "
+            "und damit auch die Stellen, an denen Sie deutlich leiser oder "
+            "lauter werden."
+        ),
+    },
+    {
+        "id": "articulation",
+        "group": "paraverbal",
+        "evidence": "mixed",
+        "position": 4,
+        "title": "Deutliche Artikulation",
+        "caption": (
+            "Klar verständlich sprechen, ohne zu nuscheln oder Endungen zu "
+            "verschlucken."
+        ),
+        "info": (
+            "Am Telefon fehlt das Mundbild, deshalb trägt die Aussprache "
+            "allein die Verständlichkeit. Undeutliche oder verschluckte "
+            "Wörter zwingen Ihr Gegenüber zum Nachfragen und stören den "
+            "Gesprächsfluss. Im Blick ist, wie klar Sie über das ganze "
+            "Gespräch hinweg sprechen."
+        ),
+    },
+    {
+        "id": "conciseness",
+        "group": "paraverbal",
+        "evidence": "measured",
+        "position": 5,
+        "title": "Prägnante Sprache",
+        "caption": (
+            "Auf den Punkt kommen und Füllwörter, Wiederholungen und "
+            "Abschweifungen reduzieren."
+        ),
+        "info": (
+            "Füllwörter wie „ähm“, „quasi“ oder „sozusagen“ verwässern die "
+            "Botschaft und lassen Unsicherheit durchscheinen. Gefragt ist eine "
+            "klare Sprache, die dieselbe Aussage mit weniger Worten trägt. "
+            "Ausgewertet werden Häufungen von Füllwörtern und inhaltliche "
+            "Wiederholungen."
+        ),
+    },
+    # --- B. Along the course of the call.
+    {
+        "id": "opening",
+        "group": "phases",
+        "evidence": "mixed",
+        "position": 6,
+        "title": "Souveräner Gesprächseinstieg",
+        "caption": (
+            "Begrüßung, Vorstellung und Anlass des Gesprächs klar und "
+            "freundlich setzen."
+        ),
+        "info": (
+            "Die ersten Sekunden entscheiden über den ersten Eindruck und über "
+            "die Stimmung im weiteren Gespräch. Gefragt ist ein Einstieg, der "
+            "Name, Anliegen und Rahmen vermittelt, ohne zu hetzen. Dabei zählt "
+            "beides: Wie ruhig und zugewandt Sie klingen und ob inhaltlich "
+            "nichts fehlt."
+        ),
+    },
+    {
+        "id": "needs_analysis",
+        "group": "phases",
+        "evidence": "mixed",
+        "position": 7,
+        "title": "Aktive Bedarfsermittlung",
+        "caption": "Durch gezielte Fragen herausfinden, was Ihr Kunde wirklich braucht.",
+        "info": (
+            "Gute Gespräche leben von Fragen, nicht von Monologen. Gefragt "
+            "ist, offene Fragen zu stellen, nachzuhaken und Ihrem Gegenüber "
+            "Raum zu geben. Ausgewertet werden Ihr Frageanteil, Ihr Redeanteil "
+            "und ob Sie an das anknüpfen, was der Kunde gesagt hat."
+        ),
+    },
+    {
+        "id": "objection_handling",
+        "group": "phases",
+        "evidence": "mixed",
+        "position": 8,
+        "title": "Sichere Einwandbehandlung",
+        "caption": "Auf Bedenken und Einwände ruhig und überzeugend eingehen.",
+        "info": (
+            "Einwände sind der Prüfstein jedes Gesprächs. Gefragt ist, sie "
+            "nicht abzuwehren, sondern aufzunehmen, zu verstehen und sachlich "
+            "aufzulösen, und dabei auch unter Druck souverän zu klingen. Jede "
+            "Persona bringt ihre eigenen typischen Einwände mit."
+        ),
+    },
+    {
+        "id": "closing",
+        "group": "phases",
+        "evidence": "interpretive",
+        "position": 9,
+        "title": "Klarer Gesprächsabschluss",
+        "caption": (
+            "Ergebnisse zusammenfassen und mit einer klaren nächsten Aktion "
+            "schließen."
+        ),
+        "info": (
+            "Ein guter Abschluss sichert Verbindlichkeit. Er fasst kurz "
+            "zusammen, hält eine klare Vereinbarung fest und verabschiedet "
+            "freundlich. Offene oder abrupte Enden hinterlassen Unsicherheit. "
+            "Im Blick ist, ob und wie Sie das Gespräch zu Ende führen."
+        ),
+    },
+    # --- C. What the call did to the other side.
+    {
+        "id": "active_listening",
+        "group": "impact",
+        "evidence": "mixed",
+        "position": 10,
+        "title": "Aktives Zuhören",
+        "caption": "Ausreden lassen, aufgreifen und bestätigen, statt zu unterbrechen.",
+        "info": (
+            "Zuhören zeigt sich in Timing und Reaktion. Lassen Sie Ihr "
+            "Gegenüber ausreden, knüpfen Sie an seine Worte an und geben Sie "
+            "kurze Bestätigungen. Häufiges Unterbrechen oder ein abrupter "
+            "Themenwechsel signalisieren das Gegenteil. Ausgewertet werden "
+            "Unterbrechungen, Redeanteil und der inhaltliche Bezug Ihrer "
+            "Antworten."
+        ),
+    },
+    {
+        "id": "empathy",
+        "group": "impact",
+        "evidence": "interpretive",
+        "position": 11,
+        "title": "Empathie und Kundenorientierung",
+        "caption": "Die Situation und die Stimmung Ihres Gegenübers erkennen und aufgreifen.",
+        "info": (
+            "Kundenorientierung heißt, das Anliegen und die Stimmung des "
+            "Gegenübers wahrzunehmen und darauf einzugehen, sprachlich wie im "
+            "Ton. Gefragt ist ein zugewandter Gesprächsstil, der auch dann "
+            "trägt, wenn es inhaltlich schwierig wird."
+        ),
+    },
+    {
+        "id": "composure",
+        "group": "impact",
+        "evidence": "mixed",
+        "position": 12,
+        "title": "Souveränität unter Druck",
+        "caption": "Auch bei Gegenwind ruhig, klar und stabil in der Stimme bleiben.",
+        "info": (
+            "Kritische Kunden, Zeitdruck und Einwände dürfen Sie nicht aus dem "
+            "Konzept bringen. Gefragt ist stimmliche Stabilität, also "
+            "gleichmäßiges Tempo, ruhige Lautstärke und wenige Füllwörter, "
+            "gerade in den fordernden Momenten. Ausgewertet wird, wie sich "
+            "Ihre Werte in diesen Passagen vom Rest des Gesprächs "
+            "unterscheiden."
+        ),
+    },
+    {
+        "id": "talk_share",
+        "group": "impact",
+        "evidence": "measured",
+        "position": 13,
+        "title": "Ausgewogener Redeanteil",
+        "caption": "Das richtige Verhältnis zwischen selbst sprechen und sprechen lassen.",
+        "info": (
+            "Wer zu viel redet, verliert den Kunden. Wer zu wenig führt, "
+            "verliert das Gespräch. Gefragt ist eine Balance, die Ihrem "
+            "Gegenüber Raum gibt, ohne die Steuerung abzugeben. Ausgewertet "
+            "wird Ihr prozentualer Redeanteil am Gespräch."
+        ),
+    },
+    # --- D. The training habit, not the performance. Worded so that a goal
+    # about how often you practise cannot be read as a judgement of how well
+    # you did.
+    {
+        "id": "training_regularity",
+        "group": "habit",
+        "evidence": "measured",
+        "position": 14,
+        "title": "Regelmäßiges Training",
+        "caption": "Dranbleiben und kontinuierlich üben statt in seltenen Schüben.",
+        "info": (
+            "Kommunikative Fähigkeiten wachsen durch Wiederholung. Dieses Ziel "
+            "betrifft nicht Ihre Leistung im Gespräch, sondern wie gleichmäßig "
+            "Sie trainieren."
+        ),
+    },
+    {
+        "id": "training_variety",
+        "group": "habit",
+        "evidence": "measured",
+        "position": 15,
+        "title": "Trainingsvielfalt",
+        "caption": "Verschiedene Szenarien und Gesprächspartner bewusst durchspielen.",
+        "info": (
+            "Wer immer dieselbe Situation übt, wird nur in dieser Situation "
+            "sicher. Dieses Ziel betrifft die Breite Ihres Trainings, also "
+            "welche Kombinationen aus Szenario und Persona Sie schon gespielt "
+            "haben und wo noch Lücken sind. Über die Qualität eines Gesprächs "
+            "sagt es nichts."
         ),
     },
 ]

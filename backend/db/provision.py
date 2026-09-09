@@ -17,6 +17,8 @@ Content sources:
     MetricType       -> backend/feedback/metrics.py (METRICS), which also
                         derives the measurement rows, so the seeded inventory
                         and the analysis cannot drift apart.
+    FocusGoal        -> backend/db/seed_data.py (FOCUS_GOALS, ADR 0074), read
+                        at runtime through backend/focus.py
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from backend.authored_text import clean
 from backend.db.models import (
+    FocusGoal,
     Language,
     MetricType,
     Persona,
@@ -38,7 +41,13 @@ from backend.db.models import (
     Tenant,
     VISIBILITY_PUBLIC,
 )
-from backend.db.seed_data import LANGUAGE_NAMES, PERSONAS, SCENARIOS, TENANTS
+from backend.db.seed_data import (
+    FOCUS_GOALS,
+    LANGUAGE_NAMES,
+    PERSONAS,
+    SCENARIOS,
+    TENANTS,
+)
 from backend.db.session import advisory_lock, session_scope
 from backend.feedback.metrics import METRICS
 
@@ -81,6 +90,7 @@ def seed(db: DbSession) -> dict[str, int]:
         "Persona": _seed_personas(db),
         "Scenario": _seed_scenarios(db),
         "MetricType": _seed_metric_types(db),
+        "FocusGoal": _seed_focus_goals(db),
     }
     # Deactivate, never delete: `session` references these rows by foreign key,
     # so a Persona dropped from the seed has to stay readable for the Sessions
@@ -88,6 +98,10 @@ def seed(db: DbSession) -> dict[str, int]:
     # `active`, which is what actually removes it from the selection.
     _deactivate_missing(db, Persona, {p["id"] for p in PERSONAS})
     _deactivate_missing(db, Scenario, {s["id"] for s in SCENARIOS})
+    # The same rule for the focus catalogue (ADR 0074): `focus_selection_goal`
+    # references it, so a retired goal stays readable for the selections that
+    # already name it, and /api/focus filters on `active`.
+    _deactivate_missing(db, FocusGoal, {g["id"] for g in FOCUS_GOALS})
     # Languages are deliberately absent: a closed code list, never retired, and
     # a Session keeps pointing at the code it ran in.
     return created
@@ -115,7 +129,8 @@ def inventory(db: DbSession) -> dict[str, int]:
     """Row counts of the reference tables, for the CLI's summary line."""
     return {
         model.__name__: db.query(model).count()
-        for model in (Language, Tenant, Persona, PersonaObjection, Scenario, MetricType)
+        for model in (Language, Tenant, Persona, PersonaObjection, Scenario,
+                      MetricType, FocusGoal)
     }
 
 
@@ -200,6 +215,21 @@ def _seed_scenarios(db: DbSession) -> int:
                  "category": s["category"],
                  "created_by": None, "visibility": VISIBILITY_PUBLIC})[1]
         for s in SCENARIOS
+    )
+
+
+def _seed_focus_goals(db: DbSession) -> int:
+    """The focus-goal catalogue (F-61, ADR 0074).
+
+    Not cleaned: unlike a Persona or a Scenario, none of this text ever reaches
+    a prompt, so the sanitiser of ADR 0059 has nothing to protect here.
+    """
+    return sum(
+        _upsert(db, FocusGoal, {"key": g["id"]},
+                {"title": g["title"], "caption": g["caption"], "info": g["info"],
+                 "group_key": g["group"], "evidence": g["evidence"],
+                 "position": g["position"], "active": True})[1]
+        for g in FOCUS_GOALS
     )
 
 
