@@ -40,7 +40,9 @@ export interface FollowUpActions {
 
 /** How many decimals a metric reads naturally in. Counts are whole things;
  * seconds and percentages are not. */
-const DECIMALS: Record<string, number> = { questions: 0, word_count: 0, pace: 0, talk_share: 0 };
+const DECIMALS: Record<string, number> = {
+  questions: 0, word_count: 0, pace: 0, talk_share: 0, phonation_share: 0,
+};
 
 /** The two halves (backend/db/models.py METRIC_ASPECTS), in slider order. */
 const ASPECTS: MetricAspect[] = ["how", "what"];
@@ -618,6 +620,7 @@ function Metric({ measurement }: { measurement: Measurement }) {
   }
 
   const decimals = DECIMALS[measurement.key] ?? 1;
+  const detail = subline(measurement);
   return (
     <div className="metric">
       <span className="metric-name">{measurement.name}</span>
@@ -627,6 +630,18 @@ function Metric({ measurement }: { measurement: Measurement }) {
           ? ` ${measurement.unit}`
           : ""}
       </span>
+      {detail && <span className="metric-subline">{detail}</span>}
     </div>
   );
+}
+
+/** A second line under a metric's value, where its `detail` refines the same
+ * figure rather than standing beside it. Absent for a call whose language has
+ * no question words on file. */
+function subline(measurement: Measurement): string | null {
+  if (measurement.key !== "questions") return null;
+  const open = measurement.detail?.["open"];
+  const closed = measurement.detail?.["closed"];
+  if (typeof open !== "number" || typeof closed !== "number") return null;
+  return `davon ${open} offen, ${closed} geschlossen`;
 }
