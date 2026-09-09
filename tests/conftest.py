@@ -19,7 +19,7 @@ The backend reads a handful of environment variables at import time
 module is imported. Values are dummies: no test in this suite makes a real
 network call — every pipeline backend (STT / LLM / TTS) is faked.
 
-`DEBUG=true` keeps TTS config fully offline (no KugelAudio client is
+`SKIP_KUGELAUDIO=true` keeps TTS config fully offline (no KugelAudio client is
 constructed); the KugelAudio-default / DiReKT-fallback dispatch is still
 covered in `test_tts_fallback.py` by patching the tts module directly.
 """
@@ -38,8 +38,18 @@ os.environ.setdefault("LLM_MODEL", "test-llm-model")
 os.environ.setdefault("TTS_MODEL", "test-tts-model")
 os.environ.setdefault("KUGELAUDIO_MODEL", "test-kugelaudio-model")
 os.environ.setdefault("KUGELAUDIO_API_KEY", "test-kugelaudio-key")
-os.environ.setdefault("DEBUG", "true")
+os.environ.setdefault("SKIP_KUGELAUDIO", "true")
 os.environ.setdefault("OIDC_ISSUER", "http://keycloak.test.invalid/realms/direkt")
+
+# Assigned rather than setdefault, for the reason spelled out for POSTGRES_*
+# below: this one decides *behaviour*, not just an endpoint. With GEMINI on, the
+# request shape changes (ADR 0074) and the caller's notes are not kept at all
+# (ADR 0075) -- so a developer whose own .env has it set, or a run inside the
+# app container where compose puts .env into the environment before pytest
+# starts, would silently exercise the other half of the code and fail the tests
+# that assert the documented default. The Gemini shape is covered on purpose
+# instead, by patching the constant where it is read.
+os.environ["GEMINI"] = ""
 
 # Deliberately unusable credentials, and the reason they are set here at all:
 # backend/clients/config.py calls load_dotenv() when the backend is first
