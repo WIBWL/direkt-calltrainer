@@ -23,6 +23,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from statistics import fmean
 
+from backend.db.models import ASPECT_HOW, ASPECT_WHAT
 from backend.feedback.acoustics import Pause
 
 _MS_PER_MINUTE = 60_000
@@ -84,6 +85,9 @@ class MetricDef:
     key: str
     name: str
     unit: str | None
+    # ASPECT_HOW or ASPECT_WHAT: which half of the Kennzahlen grid this one
+    # sits in. A display grouping -- it never reaches the wrap-up prompt.
+    aspect: str
     feature_id: str
     active: bool
     derive: Deriver | None = None
@@ -389,23 +393,30 @@ METRICS: tuple[MetricDef, ...] = (
     # Active -- F-53's Kennzahlen, plus F-37's loudness curve. No metric
     # carries a target range: there is no validated norm for this population,
     # and a made-up threshold is a score in disguise (ADR 0004/0051).
-    MetricDef("talk_share", "Redeanteil", "%", "F-24", True, _talk_share),
-    MetricDef("questions", "Fragen an den Gesprächspartner", "Anzahl", "F-41", True, _questions),
-    MetricDef("pace", "Sprechtempo", "Wörter/min", "F-36", True, _pace),
-    MetricDef("word_count", "Gesprochene Wörter", "Wörter", "F-08", True, _word_count),
-    MetricDef("reaction_time", "Reaktionszeit", "s", "F-53", True, _reaction_time),
-    MetricDef("pauses", "Sprechpausen", "s", "F-51", True, _pauses),
-    MetricDef(LOUDNESS_KEY, "Lautstärke", "dB", "F-37", True, _loudness),
+    #
+    # `aspect` splits them into the two halves the screen shows one at a time.
+    # Redeanteil is `what` despite coming from durations: it describes the
+    # shape of the exchange, not the delivery.
+    MetricDef("talk_share", "Redeanteil", "%", ASPECT_WHAT, "F-24", True, _talk_share),
+    MetricDef("questions", "Fragen an den Gesprächspartner", "Anzahl", ASPECT_WHAT, "F-41",
+              True, _questions),
+    MetricDef("pace", "Sprechtempo", "Wörter/min", ASPECT_HOW, "F-36", True, _pace),
+    MetricDef("word_count", "Gesprochene Wörter", "Wörter", ASPECT_WHAT, "F-08", True,
+              _word_count),
+    MetricDef("reaction_time", "Reaktionszeit", "s", ASPECT_HOW, "F-53", True, _reaction_time),
+    MetricDef("pauses", "Sprechpausen", "s", ASPECT_HOW, "F-51", True, _pauses),
+    MetricDef(LOUDNESS_KEY, "Lautstärke", "dB", ASPECT_HOW, "F-37", True, _loudness),
     # SHOULD / COULD -- seeded so the vocabulary is complete, but inactive and
     # without a derivation.
-    MetricDef("concreteness", "Sprachliche Konkretheit", None, "F-40", False),
+    MetricDef("concreteness", "Sprachliche Konkretheit", None, ASPECT_WHAT, "F-40", False),
     # F-42 ships, but as prose and not as a figure: what it describes is a
     # change of register across the call's three phases, which no single value
     # carries and which would need a norm nobody measured to score. It is the
     # `phase_language` paragraph of the wrap-up (backend/feedback/generator.py).
     # The row stays inactive and seeded so the vocabulary keeps its entry.
-    MetricDef("phase_appropriate_language", "Phasengerechte Sprache", None, "F-42", False),
-    MetricDef("congruence", "Kongruenz von Inhalt und Stimme", None, "F-39", False),
+    MetricDef("phase_appropriate_language", "Phasengerechte Sprache", None, ASPECT_HOW,
+              "F-42", False),
+    MetricDef("congruence", "Kongruenz von Inhalt und Stimme", None, ASPECT_HOW, "F-39", False),
 )
 
 

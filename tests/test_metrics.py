@@ -9,14 +9,16 @@ Covers:
   ADR 0047/0048  a Turn's acoustics are measured inline and never load-bearing,
                  so a failed measurement stays visible downstream
   ADR 0051  no figure the user could take for measured when it was not
+  F-53      every metric belongs to one half of the Kennzahlen slider
 
 `conversation()` and `measure()` are pure functions over in-memory Turns: no
 database, no audio and no Praat -- the acoustic facts are handed in as the
 numbers `analyze()` would have produced.
 """
 
+from backend.db.models import METRIC_ASPECTS
 from backend.feedback.acoustics import Pause
-from backend.feedback.metrics import describe_loudness_course, measure
+from backend.feedback.metrics import METRICS, describe_loudness_course, measure
 from backend.session.models import Turn, conversation
 
 # A recording that ran 4 s and held 2 s of speech: the two figures these tests
@@ -45,6 +47,18 @@ def _measured_call() -> list[Turn]:
 
 def _by_key(turns: list[Turn]) -> dict[str, float]:
     return {m.key: m.value for m in measure(conversation(turns))}
+
+
+def test_every_metric_belongs_to_one_half_of_the_grid() -> None:
+    """provision.py seeds `metric_type.aspect` from this inventory: a value
+    outside the vocabulary fails to seed, a missing one is filed under "what"
+    by the screen's fallback rather than showing up as a fault."""
+    assert all(metric.aspect in METRIC_ASPECTS for metric in METRICS)
+
+
+def test_both_halves_of_the_grid_are_measured() -> None:
+    """The slider hides itself when one half is empty (FeedbackView.tsx)."""
+    assert {metric.aspect for metric in METRICS if metric.active} == set(METRIC_ASPECTS)
 
 
 def test_talk_share_compares_audio_duration_on_both_sides() -> None:

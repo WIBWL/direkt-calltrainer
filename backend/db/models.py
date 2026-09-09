@@ -137,6 +137,14 @@ SCENARIO_CATEGORIES = (
 )
 
 
+# MetricType.aspect: which half of the Kennzahlen a metric belongs to -- `how`
+# is the paraverbal side, `what` the verbal one. Display only, like
+# `scenario.category`; backend/feedback/metrics.py assigns one per metric.
+ASPECT_HOW = "how"
+ASPECT_WHAT = "what"
+METRIC_ASPECTS = (ASPECT_HOW, ASPECT_WHAT)
+
+
 def _one_of(column: str, values: tuple[str, ...]) -> CheckConstraint:
     """A CHECK restricting `column` to `values`.
 
@@ -422,10 +430,14 @@ class MetricType(Base):
     """
 
     __tablename__ = "metric_type"
+    __table_args__ = (_one_of("aspect", METRIC_ASPECTS),)
     metric_type_id: Mapped[int] = mapped_column(primary_key=True)
     key: Mapped[str] = mapped_column(String(60), unique=True)  # e.g. speaking_rate
     name: Mapped[str] = mapped_column(String(120))
     unit: Mapped[str | None] = mapped_column(String(40))
+    # One of METRIC_ASPECTS. Nullable only for a key the inventory has
+    # retired; the CHECK above passes for NULL.
+    aspect: Mapped[str | None] = mapped_column(String(10))
     feature_id: Mapped[str | None] = mapped_column(String(10))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
