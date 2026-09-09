@@ -154,7 +154,11 @@ def _seed_personas(db: DbSession) -> int:
              "role": clean(p["role"]), "traits": clean(p["traits"]),
              "behavior": clean(p["behavior"]),
              "training_goal": clean(p["training_goal"]), "difficulty": p["difficulty"],
-             "active": True, "language_code": p["language_id"],
+             # Defaults to True: a Persona is only seeded inactive while
+             # something it needs to run is still missing -- today a KugelAudio
+             # voice id. Written to the table either way, so filling the id in
+             # and dropping the flag is the whole change.
+             "active": p.get("active", True), "language_code": p["language_id"],
              "tts_voice": p["tts_voice"],
              "kugelaudio_voice_id": p["kugelaudio_voice_id"],
              # A shipped built-in belongs to nobody and everybody (ADR 0058).

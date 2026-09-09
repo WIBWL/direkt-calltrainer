@@ -39,6 +39,12 @@ from backend.db.session import session_scope
 
 # pylint: disable=missing-function-docstring,redefined-outer-name
 
+# The Personas actually on offer. A seed entry may carry `active: False` while
+# something it needs to run is still missing (a KugelAudio voice, today), and
+# `library.list_personas` filters those out -- so the endpoint serves a subset
+# of the seed, and these tests compare against that subset.
+OFFERED_PERSONAS = [p for p in SEEDED_PERSONAS if p.get("active", True)]
+
 
 @pytest.fixture
 async def client(seeded_database):  # pylint: disable=unused-argument
@@ -59,11 +65,11 @@ async def test_personas_endpoint_lists_every_persona_with_card_fields(client):
     resp = await client.get("/api/personas")
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body) == len(SEEDED_PERSONAS)
+    assert len(body) == len(OFFERED_PERSONAS)
     # Keyed by name: `id` on the wire is the extern_id UUID now (ADR 0058), not
     # the seed slug, and the endpoint orders by name while the seed does not.
     by_name = {entry["name"]: entry for entry in body}
-    for persona in SEEDED_PERSONAS:
+    for persona in OFFERED_PERSONAS:
         card = by_name[persona["name"]]
         assert uuid.UUID(card["id"])  # a valid opaque id, not the slug
         assert card["role"] == persona["role_label"]
@@ -77,7 +83,7 @@ async def test_personas_endpoint_serves_the_label_not_the_prompt_role(client):
     fields stay on the server."""
     body = (await client.get("/api/personas")).json()
     served = {e["role"] for e in body}
-    assert served == {p["role_label"] for p in SEEDED_PERSONAS}
+    assert served == {p["role_label"] for p in OFFERED_PERSONAS}
     for persona in SEEDED_PERSONAS:
         assert persona["role"] not in served
         assert persona["traits"] not in served

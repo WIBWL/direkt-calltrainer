@@ -191,11 +191,29 @@ def test_every_seeded_persona_speaks_a_language_that_has_a_pack(entry):
 
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
-def test_every_seeded_persona_has_its_own_voice(entry):
+def test_every_offered_persona_has_its_own_voice(entry):
     """ADR 0040/0041: voice is a per-Persona property, and both backends need
-    an identity — KugelAudio by default, the DiReKT model as fallback."""
+    an identity — KugelAudio by default, the DiReKT model as fallback.
+
+    A Persona still waiting for a KugelAudio voice is seeded `active: False`
+    and is the one case where the id may be missing; the test below is what
+    keeps that from turning into a Persona on offer that cannot speak."""
     assert entry["tts_voice"]
-    assert isinstance(entry["kugelaudio_voice_id"], int)
+    if entry.get("active", True):
+        assert isinstance(entry["kugelaudio_voice_id"], int)
+
+
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_a_seeded_persona_without_a_voice_is_not_offered(entry):
+    """The converse, and the one that matters: `library.list_personas` filters
+    on `active`, so an unfinished Persona is invisible — but only as long as
+    nobody flips the flag before choosing the voice. Without the id the default
+    TTS backend has nothing to synthesise with and every Turn falls through to
+    the fallback model."""
+    if entry["kugelaudio_voice_id"] is None:
+        assert not entry.get("active", True), (
+            f"{entry['id']}: on offer without a KugelAudio voice"
+        )
 
 
 def test_seeded_scenarios_carry_no_language_of_their_own():
