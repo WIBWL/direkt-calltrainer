@@ -2809,6 +2809,15 @@ h2 {
   color: var(--color-navy-900);
 }
 
+/* The empty state stands in for a line, so it takes a line's inset. Without
+   it the sentence starts at the card's own border, out of column with every
+   line the card otherwise holds. */
+.feedback-transcript-card .transcript-empty {
+  margin: 0;
+  padding: 18px 20px;
+  color: var(--color-text-muted-secondary);
+}
+
 .feedback-transcript-card .transcript-line:last-child {
   border-bottom: 0;
 }
@@ -3014,6 +3023,10 @@ h2 {
 
   .feedback-transcript-card .transcript-line {
     gap: 10px;
+    padding: 16px;
+  }
+
+  .feedback-transcript-card .transcript-empty {
     padding: 16px;
   }
 }

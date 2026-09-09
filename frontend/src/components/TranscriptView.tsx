@@ -46,7 +46,7 @@ export default function TranscriptView({
 
         {transcript.length === 0 ? (
           <div className="feedback-transcript-card">
-            <p>Es wurden keine Turns aufgezeichnet.</p>
+            <p className="transcript-empty">Es wurden keine Beiträge aufgezeichnet.</p>
           </div>
         ) : (
           <div className="feedback-transcript-card">
