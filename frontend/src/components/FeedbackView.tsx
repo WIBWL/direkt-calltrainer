@@ -292,7 +292,7 @@ export function MetricSection({ measurements }: { measurements: Measurement[] })
   );
 }
 
-/** The next exercise, built from the points above (F-60).
+/** The next call in the same matter, built from the points above (F-60).
  *
  * Asked for, not written unbidden (ADR 0069's amendment): the User presses the
  * button, exactly as they do for the reverse below. Until then this is an
@@ -351,8 +351,8 @@ function FollowUp({
         <div className="next-step-eyebrow">WEITER ÜBEN</div>
         <h2 className="next-step-title">Folgeszenario</h2>
         <p className="next-step-lead">
-          Daraus lässt sich Ihr nächstes Gespräch bauen: eine neue Situation im selben
-          Umfeld, die genau das verlangt, was hier gefehlt hat.
+          Daraus lässt sich Ihr nächstes Gespräch bauen: derselbe Fall, einige Zeit
+          später – diesmal so, dass genau das nötig ist, was hier gefehlt hat.
         </p>
         <button type="button" className="follow-up-button" disabled={busy} onClick={handleClick}>
           {busy ? "Folgeszenario wird gebaut …" : "Folgeszenario erstellen"}
@@ -372,9 +372,9 @@ function FollowUp({
       <div className="next-step-eyebrow">WEITER ÜBEN</div>
       <h2 className="next-step-title">Folgeszenario</h2>
       <p className="next-step-lead">
-        Daraus ist Ihr nächstes Gespräch entstanden: eine neue Situation im selben
-        Umfeld, die genau das verlangt, was hier gefehlt hat. Es liegt unter
-        „Folgeszenario“ in Ihrer Auswahl.
+        Daraus ist Ihr nächstes Gespräch entstanden: derselbe Fall, einige Zeit
+        später – diesmal so, dass genau das nötig ist, was hier gefehlt hat. Es liegt
+        unter „Folgeszenario“ in Ihrer Auswahl.
       </p>
       <p className="follow-up-name">{card.name}</p>
       <p className="follow-up-teaser">{card.short_description}</p>

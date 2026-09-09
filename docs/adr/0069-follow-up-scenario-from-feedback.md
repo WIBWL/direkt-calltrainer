@@ -2,10 +2,12 @@
 
 ## Status
 
-Accepted, **amended 2026-09-09** — see the amendment at the end. One clause of
-the Decision below no longer holds: the follow-up is no longer written without
-being asked for. Everything else stands, and the Decision is left as written
-because the reasoning it records is what the amendment argues with.
+Accepted, **amended twice on 2026-09-09** — see the two amendments at the end.
+Two clauses of the Decision below no longer hold: the follow-up is no longer
+written without being asked for, and it no longer invents a new situation in
+the same subject area but carries the played case forward. Everything else
+stands, and the Decision is left as written because the reasoning it records
+is what the amendments argue with.
 
 Builds on ADR 0058 (User-authored Scenarios) and ADR 0049 (the wrap-up it is
 written from); bounded by ADR 0051 (no target ranges) and ADR 0043 (a built-in's
@@ -280,3 +282,53 @@ stamped like it is for anything they author (ADR 0060), and sharing is a plain
 screen's busy line is gone — `useSessionFeedback` no longer polls past the
 wrap-up for something arriving behind it, because nothing does; the button
 carries its own busy state, as the reverse's does.
+
+## Amendment 2 (2026-09-09): the follow-up carries the played case forward
+
+The Decision above answered "how much of the played Scenario carries over" with
+*the card and nothing else*, and Consequences closed by naming the thing that
+answer ruled out: **"the same case, harder"** — not built, because it would need
+the played Scenario's four prompt fields, which ADR 0043 withholds for a
+built-in, and "a rule that holds for one half of the library and not the other
+would be no rule at all."
+
+That objection has since been answered, and not here. ADR 0070 needed the same
+four fields to build the reverse, took the exception, and stated the ground it
+rests on: the case is one **the User has just heard played out**. The rule that
+looked like it would have to split the library does not, because the exception
+is not about who authored a Scenario — it is about whether this User has played
+it. A built-in's answer key is withheld from the client; it is not withheld
+from the person who spent ten minutes on the receiving end of it.
+
+With that settled, the original choice is worth re-reading. "A new situation in
+the same subject area" was picked for **transfer**: a second run at a case the
+User now knows the answer to is not an exercise. True — but a follow-up call in
+the same matter is not a second run. The case moves on: what was agreed last
+time, what has happened since, what is still open. What the User knows is the
+history, which is exactly what a caller ringing back would expect them to know.
+And practising a weakness in an unfamiliar case asks two things at once, of
+which only one was the point.
+
+**What changes.** The material handed to the model gains the played Scenario's
+`description`, `case_facts`, `call_goal` and `success_condition`, and the
+wrap-up's `summary` — where that call actually ended up, which no other field
+carries. The prompt's S5 flips from *invent a new case* to *carry this one
+forward*: the same matter, a later call, its anchors kept and moved on. C1 lets
+the title read as the later call in a matter already begun, and S2 now lets the
+caller refer to their own earlier call — as their own call, never as an
+exercise.
+
+**What does not change.** The measured statistics still stay out (ADR 0051).
+S6 is untouched: `success_condition` still sits at exactly the thing the
+feedback says was missing, stated as the caller's own bar — which is what keeps
+this an exercise rather than a re-run, because the last call's behaviour does
+not clear it. The four briefing fields still say nothing about feedback,
+training or what is being practised. Storage, the provenance column and its
+UNIQUE, the badge, the filter chip, the German values and the whole lifecycle
+are all as the Decision and Amendment 1 leave them.
+
+**The cost.** Transfer is genuinely given up: nothing now asks the User to carry
+a skill into an unfamiliar case. If the pilot shows people getting good at one
+case and no further, that is the symptom, and the fix is a second kind of
+follow-up rather than a change to this one — the material is the only
+difference between them.

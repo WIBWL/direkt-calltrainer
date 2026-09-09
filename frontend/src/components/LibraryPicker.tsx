@@ -5,7 +5,7 @@ import { CATEGORIES, CATEGORY_LABELS } from "../scenarioLibrary";
 import FilterSlider, { type FilterOption } from "./FilterSlider";
 
 /** Level 1, the origin of a Scenario: who it comes from. "followUp" is the
- * worker-written Folgeszenario (ADR 0069) and "reverse" the Rollentausch of one
+ * Folgeszenario drafted from a training (ADR 0069) and "reverse" the Rollentausch of one
  * finished Session (ADR 0070). Both are `origin: "own"` on the wire and options
  * of their own here — "Individuell" means hand-authored, and nothing else. Not
  * to be confused with the level-2 CategoryFilter below. */

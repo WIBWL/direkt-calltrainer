@@ -216,10 +216,10 @@ export interface SessionDetail {
   measurements: Measurement[];
   feedback: SessionFeedback | null;
   /**
-   * The Scenario the worker drafted from this Session's feedback (F-60,
-   * ADR 0069), or null — because there were no improvement points to build one
-   * from, because it is still being written, or because the User has since
-   * deleted it. The card only; the editor loads the rest by id.
+   * The Scenario drafted from this Session's feedback (F-60, ADR 0069) — the
+   * next call in the same matter — or null: nobody has asked for one, the
+   * wrap-up named no improvement points to build one from, or the User has
+   * since deleted it. The card only; the editor loads the rest by id.
    */
   follow_up: { id: string; name: string; short_description: string } | null;
 }

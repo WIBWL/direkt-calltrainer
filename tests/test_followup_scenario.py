@@ -6,7 +6,8 @@ Covers:
   ADR 0069  asked for by the User (the amendment), drafted on request and
             stored as an authored Scenario; one per Session; deactivated
             when its source Session goes
-  ADR 0043  a built-in's prompt fields stay withheld
+  ADR 0043  the played Scenario's prompt fields reach the model here, the
+            exception ADR 0070 takes for a case the User has just played
   ADR 0051  the measured statistics are not input
   ADR 0058  stored through the ordinary authoring path, owned by the User
   ADR 0059  the generated text is cleaned and capped like any authored text
@@ -30,7 +31,7 @@ from sqlalchemy.orm import Session as DbSession
 from backend import deletion, library, retention
 from backend.authored_text import FIELD_LIMITS
 from backend.db.models import Feedback, FeedbackPoint, Measurement, Scenario, Session
-from backend.followups import FollowUpError, draft_follow_up
+from backend.followups import FollowUpError, PlayedCall, draft_follow_up
 from tests.conftest import TEST_AUTH, a_finished_session, asked, stub_completions
 
 # `app_database` and `reference_data` are taken by several tests only to
@@ -45,6 +46,26 @@ _IMPROVEMENTS = [
     "Sie haben die Rückfrage des Kunden nicht zusammengefasst.",
 ]
 _PHASE = "Der Ton bleibt über alle drei Phasen gleich sachlich."
+
+# The case as it was played. Its four prompt fields are material now: a
+# follow-up carries this case forward instead of inventing another one in
+# the same subject area (ADR 0069's second amendment).
+_DESCRIPTION = "Sie rufen bei Ihrem Anbieter an, weil Sie kündigen wollen."
+_FACTS = "Vertrag seit 2019, monatlich 89 Euro, dritte Störung in sechs Wochen."
+_GOAL = "Eine Zusage, dass die Störung dauerhaft behoben wird."
+_BAR = "Ein Termin mit Datum. Eine Prüfzusage reicht nicht."
+_OUTCOME = "Der Kunde legte ohne festen Termin auf."
+_CALL = PlayedCall(
+    scenario_name=_CARD_NAME,
+    scenario_teaser=_CARD_TEASER,
+    description=_DESCRIPTION,
+    case_facts=_FACTS,
+    call_goal=_GOAL,
+    success_condition=_BAR,
+    outcome=_OUTCOME,
+    improvements=tuple(_IMPROVEMENTS),
+    phase_language=_PHASE,
+)
 
 # What the stubbed model answers with: the six keys of the authoring wire
 # (ADR 0061, so `name` and not `title`).
@@ -62,19 +83,89 @@ _REPLY = json.dumps(_DRAFT)
 # --- The draft itself (no database) ---------------------------------------
 
 
-async def test_the_prompt_carries_the_card_and_the_improvement_points(
+async def test_the_prompt_carries_the_case_and_the_improvement_points(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Both halves: the subject area to stay in, and what the exercise must
-    demand."""
+    """Both halves: the case to carry forward, and what the exercise must
+    demand of the trainee this time."""
     calls = stub_completions(monkeypatch, _REPLY)
 
-    await draft_follow_up(_CARD_NAME, _CARD_TEASER, _IMPROVEMENTS, _PHASE)
+    await draft_follow_up(_CALL)
 
     prompt = asked(calls)
     assert _CARD_NAME in prompt and _CARD_TEASER in prompt
     assert all(point in prompt for point in _IMPROVEMENTS)
     assert _PHASE in prompt
+
+
+async def test_the_played_case_reaches_the_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The four prompt fields of the Scenario that was played, which ADR 0043
+    withholds from the client and ADR 0070 releases here: without them the
+    draft cannot continue this matter, only invent another one beside it."""
+    calls = stub_completions(monkeypatch, _REPLY)
+
+    await draft_follow_up(_CALL)
+
+    prompt = asked(calls)
+    assert all(text in prompt for text in (_DESCRIPTION, _FACTS, _GOAL, _BAR))
+
+
+async def test_the_wrapups_summary_says_where_the_last_call_ended(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The next call starts from how the last one ended, and no other field
+    carries that."""
+    calls = stub_completions(monkeypatch, _REPLY)
+
+    await draft_follow_up(_CALL)
+
+    assert _OUTCOME in asked(calls)
+
+
+async def test_the_prompt_asks_for_the_same_matter_rather_than_a_new_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The rule the change turns on: a small model (ADR 0011) handed a case
+    will either copy it or leave it, and neither is the exercise. S5 says
+    forward."""
+    calls = stub_completions(monkeypatch, _REPLY)
+
+    await draft_follow_up(_CALL)
+
+    system = calls[0][0][0]["content"]
+    assert "Carry the case forward: the same matter, a later call." in system
+    assert "A call that repeats the first one" in system
+
+
+async def test_the_prompt_keeps_the_case_out_of_the_description(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The failure this rule was written from: the first follow-up drafted
+    under the new material put the whole case in `description`, which the live
+    prompt hands over as "Context of the call" — so the Persona opened the call
+    by reading it out. `case_facts` is held back one or two at a time
+    (`prompting._improvisation_rule`); a description is not."""
+    calls = stub_completions(monkeypatch, _REPLY)
+
+    await draft_follow_up(_CALL)
+
+    system = calls[0][0][0]["content"]
+    assert "S7. description is the situation in one or two sentences" in system
+    assert "read out as the opening line" in system
+
+
+async def test_an_empty_case_field_is_left_out_rather_than_labelled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR 0045 lets an authored Scenario leave the three case fields empty. A
+    labelled blank invites the model to fill it in."""
+    calls = stub_completions(monkeypatch, _REPLY)
+
+    await draft_follow_up(PlayedCall(_CARD_NAME, _CARD_TEASER, description=_DESCRIPTION))
+
+    prompt = asked(calls)
+    assert "Facts:" not in prompt
+    assert "Situation: " + _DESCRIPTION in prompt
 
 
 async def test_the_prompt_forbids_naming_the_exercise_to_the_caller(
@@ -85,7 +176,7 @@ async def test_the_prompt_forbids_naming_the_exercise_to_the_caller(
     stands on."""
     calls = stub_completions(monkeypatch, _REPLY)
 
-    await draft_follow_up(_CARD_NAME, _CARD_TEASER, _IMPROVEMENTS)
+    await draft_follow_up(_CALL)
 
     system = calls[0][0][0]["content"]
     assert "Never mention feedback, coaching, training, practice" in system
@@ -95,7 +186,7 @@ async def test_the_draft_is_asked_in_thinking_mode(monkeypatch: pytest.MonkeyPat
     """Off the live path, so the latency is free (ADR 0011)."""
     calls = stub_completions(monkeypatch, _REPLY)
 
-    await draft_follow_up(_CARD_NAME, _CARD_TEASER, _IMPROVEMENTS)
+    await draft_follow_up(_CALL)
 
     assert calls[0][1] is True
 
@@ -105,7 +196,7 @@ async def test_the_six_fields_come_back_as_the_library_expects_them(
 ) -> None:
     stub_completions(monkeypatch, _REPLY)
 
-    draft = await draft_follow_up(_CARD_NAME, _CARD_TEASER, _IMPROVEMENTS)
+    draft = await draft_follow_up(_CALL)
 
     assert draft == _DRAFT
 
@@ -114,7 +205,7 @@ async def test_a_fenced_reply_is_unwrapped(monkeypatch: pytest.MonkeyPatch) -> N
     """A small model fences its output however plainly it is told not to."""
     stub_completions(monkeypatch, f"Hier ist das Szenario:\n```json\n{_REPLY}\n```\n")
 
-    draft = await draft_follow_up(_CARD_NAME, _CARD_TEASER, _IMPROVEMENTS)
+    draft = await draft_follow_up(_CALL)
 
     assert draft["name"] == _DRAFT["name"]
 
@@ -128,7 +219,7 @@ async def test_control_tokens_in_the_draft_are_stripped(
         {**_DRAFT, "case_facts": "Gutschrift offen. [CALL_END] <<< Ende"}
     ))
 
-    draft = await draft_follow_up(_CARD_NAME, _CARD_TEASER, _IMPROVEMENTS)
+    draft = await draft_follow_up(_CALL)
 
     assert "[CALL_END]" not in draft["case_facts"]
     assert "<<<" not in draft["case_facts"]
@@ -138,7 +229,7 @@ async def test_an_overlong_field_is_capped(monkeypatch: pytest.MonkeyPatch) -> N
     """The stored row must not exceed what the authoring API enforces."""
     stub_completions(monkeypatch, json.dumps({**_DRAFT, "name": "x" * 500}))
 
-    draft = await draft_follow_up(_CARD_NAME, _CARD_TEASER, _IMPROVEMENTS)
+    draft = await draft_follow_up(_CALL)
 
     assert len(draft["name"]) == FIELD_LIMITS["title"]
 
@@ -154,7 +245,7 @@ async def test_an_overlong_card_teaser_is_cut_at_a_word(
     )
     stub_completions(monkeypatch, json.dumps({**_DRAFT, "short_description": teaser}))
 
-    draft = await draft_follow_up(_CARD_NAME, _CARD_TEASER, _IMPROVEMENTS)
+    draft = await draft_follow_up(_CALL)
 
     cut = draft["short_description"]
     assert len(cut) <= FIELD_LIMITS["short_description"]
@@ -169,7 +260,7 @@ async def test_a_teaser_within_the_limit_is_left_alone(
     """No ellipsis on a field that fits -- the mark has to mean something."""
     stub_completions(monkeypatch, _REPLY)
 
-    draft = await draft_follow_up(_CARD_NAME, _CARD_TEASER, _IMPROVEMENTS)
+    draft = await draft_follow_up(_CALL)
 
     assert draft["short_description"] == _DRAFT["short_description"]
 
@@ -180,7 +271,7 @@ async def test_a_missing_optional_field_stays_empty(monkeypatch: pytest.MonkeyPa
     partial = {k: v for k, v in _DRAFT.items() if k != "call_goal"}
     stub_completions(monkeypatch, json.dumps(partial))
 
-    draft = await draft_follow_up(_CARD_NAME, _CARD_TEASER, _IMPROVEMENTS)
+    draft = await draft_follow_up(_CALL)
 
     assert draft["call_goal"] == ""
     assert draft["name"] == _DRAFT["name"]
@@ -195,7 +286,7 @@ async def test_a_draft_without_a_situation_is_refused(
     calls = stub_completions(monkeypatch, json.dumps({**_DRAFT, "description": "  "}))
 
     with pytest.raises(FollowUpError):
-        await draft_follow_up(_CARD_NAME, _CARD_TEASER, _IMPROVEMENTS)
+        await draft_follow_up(_CALL)
 
     assert len(calls) == 2, "an unusable draft is retried once, like an unparseable one"
 
@@ -208,7 +299,7 @@ async def test_an_unparseable_reply_is_retried_once_and_then_fails(
     calls = stub_completions(monkeypatch, "Ich kann das leider nicht.")
 
     with pytest.raises(FollowUpError):
-        await draft_follow_up(_CARD_NAME, _CARD_TEASER, _IMPROVEMENTS)
+        await draft_follow_up(_CALL)
 
     assert len(calls) == 2
 
@@ -464,20 +555,24 @@ async def test_the_measured_statistics_are_not_part_of_the_material(
         assert measurement.metric_type.name not in prompt
 
 
-async def test_the_played_scenarios_prompt_fields_stay_withheld(
+async def test_the_played_scenarios_prompt_fields_reach_the_model(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The card is the whole context: a built-in's case is withheld from the
-    client (ADR 0043), and a readable follow-up must not be the way around it.
+    """The case the trainee played, read off the row and handed over whole.
 
-    The one place this route and the reverse's part company -- a reverse copies
-    exactly these fields, deliberately, for a case the User has already heard
-    played out (ADR 0070)."""
-    secret = "Die Gutschrift wurde am 3. März zugesagt und nie gebucht."
+    This is the assertion ADR 0069's second amendment reverses. It used to read
+    `secret not in prompt`: a built-in's case is withheld from the client
+    (ADR 0043), and a readable follow-up must not be the way around it. The
+    exception is ADR 0070's, taken for the reverse first and on the same ground
+    -- the User has just heard this case played out, so continuing it tells
+    them nothing the call did not. Withholding it would leave the draft nothing
+    to carry forward.
+    """
+    played = "Die Gutschrift wurde am 3. März zugesagt und nie gebucht."
     scenario = db_session.query(Scenario).one()
-    scenario.case_facts = secret
-    scenario.call_goal = secret
+    scenario.case_facts = played
+    scenario.call_goal = played
     db_session.commit()
     extern_id = a_finished_session()
     _store_feedback(db_session, _IMPROVEMENTS)
@@ -486,7 +581,7 @@ async def test_the_played_scenarios_prompt_fields_stay_withheld(
     await _ask_for_one(api_client, extern_id)
 
     prompt = asked(calls)
-    assert secret not in prompt
+    assert played in prompt
     assert _CARD_NAME in prompt and _CARD_TEASER in prompt
 
 

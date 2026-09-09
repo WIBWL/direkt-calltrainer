@@ -49,7 +49,7 @@ from backend.api.deps import current_tenant_id
 from backend.auth import AuthContext, require_user
 from backend.db import models as db_models
 from backend.db.session import session_scope
-from backend.followups import FollowUpError, draft_follow_up
+from backend.followups import FollowUpError, PlayedCall, draft_follow_up
 from backend.reversals import ReverseError, draft_brief
 
 logger = logging.getLogger(__name__)
@@ -387,10 +387,11 @@ async def create_follow_up(
     chose is a library people stop reading.
 
     409 rather than 404 when the wrap-up names nothing to work on: the Session
-    is the caller's and does exist, and the improvement points are the entire
-    input — a follow-up without them would be an invented exercise about
-    nothing. The client hides the button in that case, so this is the second
-    line of defence, not the message anyone should normally see.
+    is the caller's and does exist, and the improvement points are what makes
+    the next call an exercise — without them it would only carry the case
+    forward, with nothing to practise. The client hides the button in that
+    case, so this is the second line of defence, not the message anyone
+    should normally see.
 
     `session_scope()` is synchronous, so every read and write goes to a thread
     — this route is `async def` for the model call and must not block the loop.
@@ -399,7 +400,7 @@ async def create_follow_up(
     # Absent and not-yours stay the same answer as in `get_session` (ADR 0050).
     if material is None:
         raise HTTPException(status_code=404, detail="Unknown session")
-    if not material.improvements:
+    if not material.call.improvements:
         raise HTTPException(
             status_code=409,
             detail=(
@@ -413,12 +414,7 @@ async def create_follow_up(
         return _follow_up_response(existing)
 
     try:
-        draft = await draft_follow_up(
-            material.scenario_name,
-            material.scenario_teaser,
-            material.improvements,
-            material.phase_language,
-        )
+        draft = await draft_follow_up(material.call)
     except (OpenAIError, FollowUpError) as e:
         # A dead gateway and an unusable draft are the same thing from here.
         logger.warning("Follow-up draft failed for session %s: %s", extern_id, e)
@@ -457,17 +453,14 @@ def _follow_up_response(scenario) -> dict:
 @dataclass(frozen=True)
 class _FollowUpMaterial:
     """What a follow-up is drafted from, read out before the database handle is
-    gone. The played Scenario's *card* and nothing more: its four prompt fields
-    stay withheld (ADR 0043), and the measured statistics stay out because no
-    target range exists to correct a figure against (ADR 0051). This is the one
-    place that difference from `_ReverseMaterial` is visible, and it is the
-    whole difference between inventing a new case and copying one."""
+    gone. The played Scenario's prompt fields are in here, exactly as they are
+    for the reverse above: a follow-up carries that case forward, and ADR 0070
+    already takes this exception to ADR 0043 for a case the User has just heard
+    played out. The measured statistics stay out -- no target range exists to
+    correct a figure against (ADR 0051)."""
 
     session_pk: int
-    scenario_name: str
-    scenario_teaser: str
-    improvements: list[str]
-    phase_language: str | None
+    call: PlayedCall
 
 
 def _follow_up_material(extern_id: uuid.UUID, subject: str) -> _FollowUpMaterial | None:
@@ -490,17 +483,27 @@ def _follow_up_material(extern_id: uuid.UUID, subject: str) -> _FollowUpMaterial
         )
         if session is None or session.subject_id != subject:
             return None
+        scenario = session.scenario
         feedback = session.feedback
         return _FollowUpMaterial(
             session_pk=session.session_id,
-            scenario_name=session.scenario.title,
-            scenario_teaser=session.scenario.short_description,
-            improvements=[
-                point.text
-                for point in (feedback.points if feedback else [])
-                if point.kind == db_models.POINT_IMPROVEMENT
-            ],
-            phase_language=feedback.phase_language if feedback else None,
+            call=PlayedCall(
+                scenario_name=scenario.title,
+                scenario_teaser=scenario.short_description,
+                description=scenario.description,
+                case_facts=scenario.case_facts,
+                call_goal=scenario.call_goal,
+                success_condition=scenario.success_condition,
+                # Where the call ended up, in the wrap-up's own words. The next
+                # call starts from that, and no other field says it.
+                outcome=feedback.summary if feedback else "",
+                improvements=tuple(
+                    point.text
+                    for point in (feedback.points if feedback else [])
+                    if point.kind == db_models.POINT_IMPROVEMENT
+                ),
+                phase_language=feedback.phase_language if feedback else None,
+            ),
         )
 
 

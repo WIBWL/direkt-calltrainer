@@ -23,7 +23,7 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 | F-23 | Mehrteilige Projektgespräche | Trainingsfälle erstrecken sich über mehrere Sitzungen, wobei sich der Gegenpart an vorangegangene Termine erinnert. | Funktionale Vollständigkeit | COULD | R-11 |
 | F-34 | Usergesteuertes Szenario | Der Nutzer beschreibt die zu trainierende Gesprächssituation per Freitext. | Funktionale Vollständigkeit | COULD | Systementwurf |
 | F-58 | Szenario aus hochgeladenem Dokument | Aus einem hochgeladenen Dokument erzeugt das System ein sitzungsbezogenes Szenario, um Gespräche mit stärkerem Unternehmensbezug zu üben. | Funktionale Vollständigkeit | SHOULD | R-42 |
-| F-60 | Folgeszenario aus dem Feedback | Aus den Verbesserungspunkten eines abgeschlossenen Gesprächs entwirft das System ein neues Szenario, das genau die dort benannten Punkte verlangt. Der Entwurf wird im Editor geprüft und erst mit dem Speichern zum eigenen Szenario. | Funktionale Vollständigkeit | SHOULD | R-22, Systementwurf |
+| F-60 | Folgeszenario aus dem Feedback | Aus den Verbesserungspunkten eines abgeschlossenen Gesprächs entwirft das System auf Knopfdruck das nächste Gespräch in derselben Sache – derselbe Fall, zeitlich später –, das genau die dort benannten Punkte verlangt. Es wird als eigenes Szenario gespeichert und lässt sich im Editor ändern. | Funktionale Vollständigkeit | SHOULD | R-22, Systementwurf |
 | F-59 | Mandantenbezogene Szenario-Bibliothek | Selbst erstellte Szenarien werden über die Sitzung hinaus mandantenbezogen gespeichert, sodass Kollegen ohne erneute Erfassung damit trainieren. | Funktionale Vollständigkeit | COULD | R-58 |
 
 ## Sprach- und Kommunikationsanalyse
