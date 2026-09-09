@@ -82,18 +82,22 @@ source of that content, and which imports without a database.
 | WebSocket wire protocol & handshake (+ token in `session.start`) | F-46, F-50, ADR 0009, ADR 0033, ADR 0035 | `test_websocket_protocol.py` |
 | Centralized logging (session-tagged, kept for the whole run) | ADR 0039, ADR 0055 | `test_logging.py` |
 | Persistence schema (ORM metadata) and the invariants the database enforces (unique measurement/turn) | ADR 0025/0026/0029/0032/0051/0053, F-09, F-12, F-14 | `test_persistence_schema.py` |
-| Session statistics: what each metric divides by, and what suppresses it | F-08, F-24, F-36, F-41, F-51, F-53, ADR 0047, ADR 0048, ADR 0051 | `test_metrics.py` |
+| Session statistics: what each metric divides by, and what suppresses it | F-08, F-24, F-35, F-36, F-41, F-51, F-53, ADR 0047, ADR 0048, ADR 0051 | `test_metrics.py` |
+| Praat measurement against synthetic waveforms: the pitch curve's grid, its unit, and what is refused rather than guessed | F-35, F-37, F-51, ADR 0047, ADR 0048 | `test_acoustics.py` |
+| Pitch contour factors: range vs movement, terminal contours per utterance, development across the call, what is refused | F-35, ADR 0051 | `test_intonation.py` |
+| Overlapping speech: the rule order that keeps a backchannel from counting, terminal overlap, hard vs soft, and the provisional traffic light | F-51, ADR 0035, ADR 0036, ADR 0051 | `test_interruptions.py` |
 | Async wrap-up job status (queued → running → done/failed), and every path that can strand it | F-09, F-10, ADR 0019, ADR 0032, ADR 0034, ADR 0050 | `test_feedback_job_status.py` |
 | Wrap-up prompt & phase block (F-42), and the thinking-mode call it is asked with | F-09, F-42, F-43, ADR 0004, ADR 0011, ADR 0043, ADR 0049, ADR 0051, ADR 0056 | `test_wrapup_prompt.py` |
 | Documented gaps (current-state guards) | F-13/48, F-53, F-56, ADR 0006/0009 | `test_documented_gaps.py` |
 
 ## Not covered here
 
-* **Paraverbal measurement and the post-call wrap-up** (F-10, F-37, F-51,
-  F-53) — implemented in `backend/feedback/` (ADR 0047–0051). Only the
-  wrap-up prompt is covered (`test_wrapup_prompt.py`, its job status in
-  `test_feedback_job_status.py`, and the wire round trip in `test_api.py`);
-  feature tests for `metrics.py` and `acoustics.py` are still owed. The cross-session dashboard (F-53) is still unbuilt.
+* **The post-call wrap-up** (F-10) — implemented in `backend/feedback/`
+  (ADR 0047–0051). Only the prompt is covered (`test_wrapup_prompt.py`, its job
+  status in `test_feedback_job_status.py`, and the wire round trip in
+  `test_api.py`); the generated text itself is not asserted, since it is model
+  output. `metrics.py` is covered by `test_metrics.py` and `acoustics.py` by
+  `test_acoustics.py` since the pitch curve was added.
 * **Frontend** (React hooks, in-browser Silero VAD / ADR 0036, streamed audio
   playback) — no JS test runner is configured. VAD confirmed-speech filtering
   is a browser-only concern.

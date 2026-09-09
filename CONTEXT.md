@@ -20,6 +20,10 @@ _Avoid_: Persona, situation. For the Category: type, Szenariotyp (the free-text 
 The Scenario written automatically from a finished Session's Feedback, one per Session that has improvement points (docs/adr/0069). A Scenario in every other respect — the User owns it, edits it, shares it and plays it against any Persona — so it is a category, not a kind: it is set apart only by the Session it came from, and it leaves the library when that Session is deleted. Not a repeat of the call it came from: a new case in the same subject area, built so that what the Feedback asked for is the way through it.
 _Avoid_: Follow-up call, next session, exercise
 
+**Focus Goal** (_Fokusziel_):
+One entry of a shipped catalogue of things a User can choose to work on, e.g. speaking pace, handling objections, empathy (docs/adr/0074). A User focuses on at most five at a time, or on none, and the selection belongs to the User rather than to a Session: it says what should be emphasised, never what happened. Each one carries an internal `evidence` value (`measured` / `mixed` / `interpretive`) recording how far it can be derived from a recording today. That is planning information for the analysis work; it is never shown, and the goal is that all of them become `measured`.
+_Avoid_: Learning goal, objective, KPI, target (there is no target value — see docs/adr/0004, docs/adr/0051). Not the Scenario's `call_goal`, which is what the simulated caller wants out of one call.
+
 **Persona**:
 The character traits of the AI-simulated conversation partner within a Session — e.g. impatient, calm, confrontational. Combined independently with a Scenario.
 _Avoid_: Scenario, character, counterpart
