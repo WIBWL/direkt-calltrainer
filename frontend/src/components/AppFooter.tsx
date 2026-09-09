@@ -11,7 +11,7 @@ export default function AppFooter() {
           <span className="app-footer-copyright">© 2026 Train to Call</span>
 
           <span className="app-footer-disclaimer">
-            KI-gestützter Trainingsprototyp – Ergebnisse dienen ausschließlich zu Übungszwecken.
+            KI-gestützter Trainingsprototyp. Ergebnisse dienen ausschließlich zu Übungszwecken.
           </span>
         </div>
 

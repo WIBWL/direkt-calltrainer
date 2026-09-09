@@ -33,7 +33,7 @@ const DECIMALS: Record<string, number> = { questions: 0, word_count: 0, pace: 0,
 /** Everything that is not a finished wrap-up is a one-line notice. There is
  * no entry for "ready": the hook reports it only once feedback is present. */
 const NOTICE: Record<string, string> = {
-  loading: "Das Feedback wird erstellt – einen Moment bitte.",
+  loading: "Das Feedback wird erstellt. Einen Moment bitte.",
   missing: "Für dieses Gespräch wurde kein Feedback gespeichert.",
   failed:
     "Das Feedback konnte nicht erstellt werden. Das Gesprächsprotokoll unten ist davon nicht betroffen.",
@@ -204,7 +204,7 @@ function PhaseLanguage({ text }: { text: string }) {
 
         <p>
           Aus der wissenschaftlichen Studie von Packard, Li und Berger (2024), belegt
-          durch echte Servicegespräche. Kein Messwert: die Phasengrenzen schätzt das
+          durch echte Servicegespräche. Kein Messwert: Die Phasengrenzen schätzt das
           Sprachmodell selbst.
         </p>
         <p className="feedback-phase-source">
@@ -265,7 +265,7 @@ export function MetricSection({
       </div>
 
       <p className="metric-disclaimer">
-        Reine Messwerte, ohne Zielbereich: für diese Nutzergruppe gibt es keinen
+        Reine Messwerte, ohne Zielbereich: Für diese Nutzergruppe gibt es keinen
         belegten Normwert, an dem sie zu messen wären.
       </p>
     </section>
@@ -298,7 +298,7 @@ function FollowUp({
     return (
       <div className="card follow-up">
         <p className="follow-up-note">
-          Aus diesen Punkten wird gerade ein Folgeszenario gebaut – das dauert einen
+          Aus diesen Punkten wird gerade ein Folgeszenario gebaut. Das dauert einen
           Moment.
         </p>
       </div>
@@ -327,7 +327,7 @@ function FollowUp({
         </button>
       </div>
       <p className="follow-up-note">
-        „Starten“ beginnt das Gespräch direkt – mit demselben Gesprächspartner wie in
+        „Starten“ beginnt das Gespräch sofort, mit demselben Gesprächspartner wie in
         diesem Training.
       </p>
     </div>

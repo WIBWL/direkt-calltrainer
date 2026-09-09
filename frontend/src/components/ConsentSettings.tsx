@@ -56,7 +56,7 @@ export default function ConsentSettings() {
         <p>Abgeschlossene Trainings werden gespeichert.</p>
       ) : (
         <p>
-          Es wird nichts gespeichert. Trainieren geht weiter — ohne Auswertung und ohne
+          Es wird nichts gespeichert. Trainieren geht weiter, nur ohne Auswertung und ohne
           Historie.
         </p>
       )}

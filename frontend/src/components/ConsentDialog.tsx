@@ -62,7 +62,7 @@ export default function ConsentDialog({
         </p>
 
         <p className="consent-note">
-          Ohne Zustimmung trainieren Sie genauso — es wird nur nichts abgelegt. Jederzeit im
+          Ohne Zustimmung trainieren Sie genauso, es wird nur nichts abgelegt. Jederzeit im
           Profil änderbar.
         </p>
 

@@ -137,7 +137,7 @@ export default function ProfileView() {
 
           <p>
             Ihre Trainings liegen unter einer technischen Kennung, nicht unter Ihrem Namen. Das
-            schützt Sie allerdings nur begrenzt: wer Zugriff auf Anmeldung und Datenbank hat,
+            schützt Sie allerdings nur begrenzt: Wer Zugriff auf Anmeldung und Datenbank hat,
             kann beides zusammenbringen, und im Gesprächsverlauf steht ohnehin, was Sie gesagt
             haben.
           </p>
@@ -170,12 +170,12 @@ export default function ProfileView() {
         <InfoDetails label="Konto und Trainings hängen nicht zusammen">
           <p>
             Die Löschung Ihres DiReKT-Kontos löscht Ihre Trainings hier <strong>nicht</strong>{" "}
-            mit — das Konto gilt für alle Anwendungen des EFRE-Projekts DiReKT, nicht nur für
+            mit. Das Konto gilt für alle Anwendungen des EFRE-Projekts DiReKT, nicht nur für
             den Calltrainer.
           </p>
           <p>
-            Wenn Sie beides loswerden wollen: erst hier die Einwilligung widerrufen, danach die
-            Mail schreiben. Andersherum kommen Sie nicht mehr an Ihre Trainings heran, weil Sie
+            Wenn Sie beides loswerden wollen, widerrufen Sie erst hier die Einwilligung und
+            schreiben danach die Mail. Andersherum kommen Sie nicht mehr an Ihre Trainings heran, weil Sie
             sich ohne Konto nicht mehr anmelden können.
           </p>
         </InfoDetails>

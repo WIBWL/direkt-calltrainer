@@ -231,7 +231,7 @@ export default function ScenarioEditor({
         setDraft((d) => ({ ...d, case_facts: doc.text }));
         setPdfNote(
           doc.summarised
-            ? `${doc.pages} Seiten gelesen und zusammengefasst — bitte prüfen.`
+            ? `${doc.pages} Seiten gelesen und zusammengefasst. Bitte prüfen Sie den Text.`
             : `${doc.pages} Seiten gelesen. Zusammenfassung nicht möglich, Rohtext übernommen.`,
         );
       }
