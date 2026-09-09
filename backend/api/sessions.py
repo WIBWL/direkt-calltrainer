@@ -37,7 +37,7 @@ from backend import deletion
 from backend.auth import AuthContext, require_user
 from backend.db import models as db_models
 from backend.db.session import session_scope
-from backend.feedback import interruptions
+from backend.feedback import interruptions, intonation
 
 logger = logging.getLogger(__name__)
 
@@ -209,11 +209,17 @@ def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user
             # with the Session or copied into the frontend: it explains the
             # thresholds it sits next to, and the two have to be edited
             # together (the arrangement ADR 0063 chose for the field limits).
-            "metric_notes": {interruptions.COUNT_KEY: interruptions.EXPLANATION},
-            # The scale the traffic light comes from, written out. A boundary
-            # the user cannot see is a judgement they cannot argue with, and
-            # these boundaries are working values (see `interruptions.py`).
-            "metric_scales": {interruptions.COUNT_KEY: interruptions.light_steps()},
+            "metric_notes": {
+                interruptions.COUNT_KEY: interruptions.EXPLANATION,
+                intonation.RANGE_KEY: intonation.EXPLANATION,
+            },
+            # The scales those readings come from, written out. A boundary the
+            # user cannot see is a judgement they cannot argue with, and both
+            # sets of boundaries are working values (see the two modules).
+            "metric_scales": {
+                interruptions.COUNT_KEY: interruptions.light_steps(),
+                intonation.RANGE_KEY: intonation.liveliness_steps(),
+            },
             "feedback": _feedback(session.feedback),
             "follow_up": _follow_up(db, session.session_id),
         }
@@ -335,13 +341,44 @@ def _finding(finding: db_models.Finding) -> dict:
 
 
 def _measurement(measurement: db_models.Measurement) -> dict:
+    key = measurement.metric_type.key
+    value = float(measurement.value)
     return {
-        "key": measurement.metric_type.key,
+        "key": key,
         "name": measurement.metric_type.name,
         "unit": measurement.metric_type.unit,
-        "value": float(measurement.value),
-        "detail": measurement.detail_json,
+        "value": value,
+        "detail": _served_detail(key, value, measurement.detail_json),
     }
+
+
+def _served_detail(key: str, value: float, detail: dict | None) -> dict | None:
+    """The stored facts, plus the reading derived from them at request time.
+
+    The split is the point. What the analysis measured is written once and kept
+    (ADR 0051); which step of a scale that lands on is a judgement resting on
+    thresholds nothing has validated yet, so it is computed here, on every read,
+    from the stored figure. A recalibration then reaches every Session that was
+    ever measured -- including the ones whose audio is long gone (ADR 0048) --
+    instead of leaving old trainings labelled by a scale that no longer exists.
+
+    F-51's traffic light predates this and is still stored in its detail; only
+    its wording is added here, so the German lives beside the thresholds.
+    """
+    if detail is None:
+        return None
+    if key == intonation.RANGE_KEY:
+        step = intonation.liveliness(value)
+        if step is None:
+            return detail
+        return {**detail, "liveliness": step.value, "liveliness_label": intonation.LABELS[step]}
+    if key == interruptions.COUNT_KEY:
+        try:
+            light = interruptions.TrafficLight(detail.get("light"))
+        except ValueError:
+            return detail  # measured before the light existed, or a value since retired
+        return {**detail, "light_label": interruptions.LABELS[light]}
+    return detail
 
 
 def _feedback(feedback: db_models.Feedback | None) -> dict | None:

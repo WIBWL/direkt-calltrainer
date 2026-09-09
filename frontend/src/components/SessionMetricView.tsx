@@ -3,9 +3,9 @@ import { Link, useParams } from "react-router-dom";
 import { useStoredSession } from "../hooks/useStoredSession";
 import type { Finding, SessionTurn, TrafficLight } from "../protocol";
 import { ROUTES, sessionPath } from "../routes";
+import { cx } from "../utils/cx";
 import { formatOffset } from "../utils/time";
 import AppLayout from "./AppLayout";
-import { LIGHT_LABEL } from "./FeedbackView";
 import IntonationReading from "./IntonationReading";
 
 /**
@@ -62,6 +62,12 @@ export default function SessionMetricView() {
   const steps = detail.metric_scales[metricKey ?? ""] ?? [];
   const note = detail.metric_notes[metricKey ?? ""];
   const light = measurement.detail?.light as TrafficLight | undefined;
+  // Which step of the scale this call landed on, and how it is said. Both come
+  // from the backend beside the thresholds they belong to, so a recalibration
+  // cannot leave a stale word behind here (`api/sessions.py::_served_detail`).
+  const current = (measurement.detail?.liveliness ?? light) as string | undefined;
+  const reading = (measurement.detail?.light_label ??
+    measurement.detail?.liveliness_label) as string | undefined;
 
   return (
     <AppLayout pageClassName="app-page-narrow">
@@ -76,18 +82,29 @@ export default function SessionMetricView() {
           <span className={light ? `metric-value-${light}` : undefined}>
             {formatFigure(measurement.value, measurement.unit)}
           </span>
-          {light && (
+          {reading && (
             <span className="metric-light-label">
-              {LIGHT_LABEL[light]} <span className="metric-light-caveat">(Einschätzung)</span>
+              {reading} <span className="metric-light-caveat">(Einschätzung)</span>
             </span>
           )}
         </p>
 
+        {/* The whole scale, with this call's step marked. Marked rather than
+            shown alone: on a five-step scale the reader has to see not only
+            where the boundaries are but which side of them they came down on. */}
         {steps.length > 0 && (
           <dl className="metric-steps">
             {steps.map((step) => (
-              <div className={`metric-step metric-step-${step.light}`} key={step.light}>
-                <dt>{LIGHT_LABEL[step.light]}</dt>
+              <div
+                className={cx(
+                  "metric-step",
+                  step.light && `metric-step-${step.light}`,
+                  step.step === current && "is-current",
+                )}
+                key={step.step}
+                aria-current={step.step === current ? "true" : undefined}
+              >
+                <dt>{step.label}</dt>
                 <dd>{step.range}</dd>
               </div>
             ))}

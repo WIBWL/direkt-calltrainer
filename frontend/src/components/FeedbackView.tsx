@@ -413,6 +413,11 @@ function Metric({
   const decimals = DECIMALS[measurement.key] ?? 1;
   const light = measurement.detail?.light as TrafficLight | undefined;
   const context = interruptionContext(measurement);
+  // The step this call landed on, in words. Two Kennzahlen carry one: F-51's
+  // traffic light and F-35's five-step reading of the pitch range. Both come
+  // from the backend, beside the thresholds they were read off.
+  const reading = (measurement.detail?.light_label ??
+    measurement.detail?.liveliness_label) as string | undefined;
 
   // The traffic light colours the figure and nothing else. It is the only
   // colour in this application that says something about a value, the two
@@ -420,6 +425,10 @@ function Metric({
   // `interruptions.py`), and a whole tile in that colour would shout an
   // orientation. The step is written out underneath, so colour is never the
   // only channel, and the scale it comes from is on the page behind the tile.
+  //
+  // F-35's five steps deliberately get the word without the colour: that scale
+  // is uncomfortable at both ends, so there is no direction for a colour to
+  // point in (`intonation.liveliness_steps`).
   const body = (
     <>
       <span className="metric-name">{measurement.name}</span>
@@ -430,9 +439,9 @@ function Metric({
 
       {context && <span className="metric-context">{context}</span>}
 
-      {light && (
+      {reading && (
         <span className="metric-light-label">
-          {LIGHT_LABEL[light]} <span className="metric-light-caveat">(Einschätzung)</span>
+          {reading} <span className="metric-light-caveat">(Einschätzung)</span>
         </span>
       )}
     </>
@@ -445,17 +454,17 @@ function Metric({
   return (
     <Link className="metric metric-open" to={sessionMetricPath(sessionId, measurement.key)}>
       {body}
-      <span className="metric-open-hint">Einzelne Stellen ansehen</span>
+      <span className="metric-open-hint">{OPEN_HINT[measurement.key] ?? "Ansehen"}</span>
     </Link>
   );
 }
 
-/** The three steps in words, so the colour is never the only carrier. Shared
- *  with the Kennzahl's own page, which shows the whole scale. */
-export const LIGHT_LABEL: Record<TrafficLight, string> = {
-  green: "im üblichen Rahmen",
-  yellow: "erhöht",
-  red: "deutlich erhöht",
+/** What the tile promises behind it, per Kennzahl. The interruptions page shows
+ *  transcript excerpts, the intonation page a contour: "Einzelne Stellen" would
+ *  be wrong for the second. */
+const OPEN_HINT: Record<string, string> = {
+  interruptions: "Einzelne Stellen ansehen",
+  intonation: "Verlauf ansehen",
 };
 
 /**

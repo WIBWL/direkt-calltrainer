@@ -229,6 +229,26 @@ export interface Finding {
  *  a verdict, and never as colour alone. */
 export type TrafficLight = "green" | "yellow" | "red";
 
+/**
+ * One step of the scale a reading was taken off — F-51's traffic light and
+ * F-35's five-step Sprachmelodie reading are both described this way.
+ *
+ * `label` and `range` come from the backend rather than being written here on
+ * purpose: they belong beside the thresholds they describe, or a recalibration
+ * silently leaves the wrong words on the screen. `light` is null for a scale
+ * that has no direction — F-35's is uncomfortable at both ends, so no colour
+ * can point along it.
+ */
+export interface MetricStep {
+  /** Machine-readable step name, matched against the measurement's own
+   *  reading (`detail.liveliness` / `detail.light`) to mark the current one. */
+  step: string;
+  label: string;
+  /** Where this step applies, written out, e.g. "7 bis 12 Halbtöne". */
+  range: string;
+  light: TrafficLight | null;
+}
+
 export interface SessionDetail {
   session_id: string;
   persona: string;
@@ -246,10 +266,10 @@ export interface SessionDetail {
    *  rather than bundled, so the text and the thresholds it explains are
    *  edited in one place (ADR 0063's arrangement for the field limits). */
   metric_notes: Record<string, string>;
-  /** The steps a traffic light comes from, by metric key, written out. Shown
-   *  beside the light: a boundary the user cannot see is a judgement they
-   *  cannot argue with. */
-  metric_scales: Record<string, { light: TrafficLight; range: string }[]>;
+  /** The steps a reading comes from, by metric key, written out. Shown beside
+   *  it: a boundary the user cannot see is a judgement they cannot argue
+   *  with. */
+  metric_scales: Record<string, MetricStep[]>;
   feedback: SessionFeedback | null;
   /**
    * The Scenario the worker drafted from this Session's feedback (F-60,

@@ -63,6 +63,34 @@ MAX_STEP_ST = 6.0
 # is a shape, and a shape needs enough points to have one.
 MIN_VOICED_FRAMES = 20
 
+# The metric this module feeds, named here so the API, the tests and the
+# interface agree on the string rather than each spelling it out.
+RANGE_KEY = "intonation"
+
+# --- The five-step reading -------------------------------------------------
+# Where the Umfang is read as monotone, balanced or overdone, in semitones.
+#
+# Worth stating plainly, because the rest of this module is careful not to:
+# THIS IS A JUDGEMENT, and ADR 0004/0051 rule judgements out for the Kennzahlen
+# on the grounds that no threshold is validated for this population. It exists
+# because it was asked for, it is confined to the single-call view, and it is
+# removable by deleting this block, `liveliness`, `liveliness_steps` and the
+# two places that call them.
+#
+# The numbers are not pulled out of the air, but they are not measured on this
+# population either. They come from the F0 standard deviations usually reported
+# for speech -- around 1 semitone for speech heard as monotone, 2 to 3 for
+# ordinary conversation, 4 and above for animated delivery -- converted to the
+# 5th-to-95th-percentile span this metric actually reports, which for a roughly
+# normal distribution is about 3.3 standard deviations. That conversion is the
+# whole derivation, and it is why the interface says "Einschätzung" and shows
+# the scale: a reader who disagrees can see the boundary they are disagreeing
+# with.
+VERY_MONOTONE_MAX_ST = 4.0   # ~1.2 st SD
+MONOTONE_MAX_ST = 7.0        # ~2.1 st SD
+BALANCED_MAX_ST = 12.0       # ~3.6 st SD
+LIVELY_MAX_ST = 18.0         # ~5.5 st SD, or an octave error the trim missed
+
 
 class Ending(str, Enum):
     """How one utterance ended."""
@@ -283,3 +311,102 @@ def thin(contour: tuple[float | None, ...], step_ms: int) -> list[float | None]:
         window = [hz for hz in contour[start:start + per_point] if hz]
         out.append(round(_median(sorted(window)), 1) if window else None)
     return out
+
+
+# --- The reading, which is the one part of this module that judges -----------
+
+
+class Liveliness(str, Enum):
+    """How the Umfang is read on the five-step scale.
+
+    Everything above this line describes; this describes and then decides, on
+    two of the invented thresholds ADR 0051 declined to invent. It is presented
+    as an Einschätzung with its scale visible, never as a measurement, and it
+    is deliberately absent from the progress view (ADR 0065).
+    """
+
+    VERY_MONOTONE = "very_monotone"
+    MONOTONE = "monotone"
+    BALANCED = "balanced"
+    LIVELY = "lively"
+    # "Overdrawn" rather than "too much": the step above lively is either a very
+    # expressive speaker or a tracking error, and both are worth a second look
+    # rather than a correction.
+    EXAGGERATED = "exaggerated"
+
+
+LABELS: dict[Liveliness, str] = {
+    Liveliness.VERY_MONOTONE: "stark monoton",
+    Liveliness.MONOTONE: "monoton",
+    Liveliness.BALANCED: "ausgewogen",
+    Liveliness.LIVELY: "lebendig",
+    Liveliness.EXAGGERATED: "überzeichnet",
+}
+
+# The text behind the info icon, beside the thresholds it explains.
+EXPLANATION = (
+    "Gemessen wird die Spanne zwischen Ihrem tiefsten und höchsten üblichen Ton "
+    "(5. bis 95. Perzentil) in Halbtönen, bezogen auf Ihre eigene mittlere "
+    "Stimmlage. In Halbtönen und nicht in Hertz, damit eine tiefe und eine hohe "
+    "Stimme bei gleicher Lebendigkeit dieselbe Zahl ergeben. Die fünf Stufen "
+    "sind aus den in der Literatur üblichen Streuungswerten gesprochener "
+    "Sprache abgeleitet und für diese Nutzergruppe nicht validiert: eine "
+    "Orientierung, kein Urteil. Wie viel Melodie angemessen ist, hängt außerdem "
+    "vom Anlass ab — eine Reklamation klingt zu Recht anders als ein "
+    "Verkaufsgespräch."
+)
+
+
+def liveliness(range_st: float | None) -> Liveliness | None:
+    """The step a range falls on, or None where nothing was measured.
+
+    On the range alone, deliberately. The movement figure is the better
+    discriminator in principle -- a contour that drifts slowly from high to low
+    covers ground without sounding lively -- but the range is the one of the two
+    for which published figures exist to anchor a boundary. Reading the movement
+    would mean inventing a second threshold with nothing behind it and hiding it
+    inside a verdict, so it stays what it is: a factor reported beside the step,
+    with the wording that tells the two apart.
+    """
+    if range_st is None:
+        return None
+    if range_st < VERY_MONOTONE_MAX_ST:
+        return Liveliness.VERY_MONOTONE
+    if range_st < MONOTONE_MAX_ST:
+        return Liveliness.MONOTONE
+    if range_st < BALANCED_MAX_ST:
+        return Liveliness.BALANCED
+    if range_st < LIVELY_MAX_ST:
+        return Liveliness.LIVELY
+    return Liveliness.EXAGGERATED
+
+
+def liveliness_steps() -> list[dict[str, str | None]]:
+    """The whole scale, written out, so the interface can show what the step
+    was read off.
+
+    Built from the constants rather than written twice: a recalibration has to
+    reach the legend, or the user is shown a boundary that no longer decides
+    anything. `light` is null throughout -- these steps carry no colour, because
+    a scale that is bad at both ends cannot be drawn as a traffic light without
+    claiming a direction it does not have.
+    """
+    bounds = [
+        (Liveliness.VERY_MONOTONE, f"unter {_st(VERY_MONOTONE_MAX_ST)} Halbtönen"),
+        (Liveliness.MONOTONE,
+         f"{_st(VERY_MONOTONE_MAX_ST)} bis {_st(MONOTONE_MAX_ST)} Halbtöne"),
+        (Liveliness.BALANCED,
+         f"{_st(MONOTONE_MAX_ST)} bis {_st(BALANCED_MAX_ST)} Halbtöne"),
+        (Liveliness.LIVELY,
+         f"{_st(BALANCED_MAX_ST)} bis {_st(LIVELY_MAX_ST)} Halbtöne"),
+        (Liveliness.EXAGGERATED, f"über {_st(LIVELY_MAX_ST)} Halbtönen"),
+    ]
+    return [
+        {"step": step.value, "label": LABELS[step], "range": span, "light": None}
+        for step, span in bounds
+    ]
+
+
+def _st(value: float) -> str:
+    """A threshold as the interface states it: no decimal point on a whole one."""
+    return f"{value:g}"

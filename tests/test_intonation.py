@@ -11,11 +11,20 @@ the second one flat, which is backwards for a listener.
 """
 import pytest
 
+from backend.api.sessions import _served_detail
 from backend.feedback.intonation import (
+    BALANCED_MAX_ST,
+    LIVELY_MAX_ST,
     MAX_STEP_ST,
+    MONOTONE_MAX_ST,
+    RANGE_KEY,
     STEP_MS,
     TERMINAL_FLAT_ST,
+    VERY_MONOTONE_MAX_ST,
     Ending,
+    Liveliness,
+    liveliness,
+    liveliness_steps,
     profile,
     semitones,
     thin,
@@ -233,3 +242,82 @@ def test_an_ending_is_read_from_voiced_frames_only() -> None:
 def test_ending_values_are_the_documented_vocabulary() -> None:
     """The frontend words these; a fourth value would render as nothing."""
     assert {e.value for e in Ending} == {"falling", "rising", "level"}
+
+
+# --- The five-step reading of the range -------------------------------------
+# The one part of this module that judges. These tests pin the boundaries, not
+# because the numbers are established -- they are not -- but so that changing
+# one is a deliberate act with a test to update.
+
+
+def test_each_step_of_the_scale_is_reachable() -> None:
+    """A scale with an unreachable step is a scale with fewer steps. Each
+    boundary is taken from just below and just above."""
+    assert liveliness(0.5) is Liveliness.VERY_MONOTONE
+    assert liveliness(VERY_MONOTONE_MAX_ST - 0.1) is Liveliness.VERY_MONOTONE
+    assert liveliness(VERY_MONOTONE_MAX_ST) is Liveliness.MONOTONE
+    assert liveliness(MONOTONE_MAX_ST - 0.1) is Liveliness.MONOTONE
+    assert liveliness(MONOTONE_MAX_ST) is Liveliness.BALANCED
+    assert liveliness(BALANCED_MAX_ST - 0.1) is Liveliness.BALANCED
+    assert liveliness(BALANCED_MAX_ST) is Liveliness.LIVELY
+    assert liveliness(LIVELY_MAX_ST - 0.1) is Liveliness.LIVELY
+    assert liveliness(LIVELY_MAX_ST) is Liveliness.EXAGGERATED
+
+
+def test_an_unmeasured_range_gets_no_step() -> None:
+    """Whispering, or a call too short to have a shape. "stark monoton" would
+    be a verdict on a measurement that was never taken."""
+    assert liveliness(None) is None
+
+
+def test_a_monotone_contour_reads_as_monotone_and_a_lively_one_as_lively() -> None:
+    """End to end over the measurement, not over the thresholds: a voice that
+    barely moves and one that works in every phrase must not land on the same
+    step, which is the whole point of the feature."""
+    flat = profile(_steady(120, 400), ())
+    lively = profile(_zigzag(120, 13.0, 40, 400), ())
+
+    assert flat.range_st is not None and lively.range_st is not None
+    assert liveliness(flat.range_st) is Liveliness.VERY_MONOTONE
+    assert liveliness(lively.range_st) is Liveliness.LIVELY
+
+
+def test_the_scale_is_built_from_the_thresholds_and_carries_no_colour() -> None:
+    """The legend and the logic come from the same constants, so a
+    recalibration reaches both. No colour: the scale is uncomfortable at both
+    ends, so there is no direction for one to point in."""
+    steps = liveliness_steps()
+
+    assert [s["step"] for s in steps] == [step.value for step in Liveliness]
+    assert [s["label"] for s in steps] == [
+        "stark monoton", "monoton", "ausgewogen", "lebendig", "überzeichnet",
+    ]
+    assert steps[0]["range"] == "unter 4 Halbtönen"
+    assert steps[2]["range"] == "7 bis 12 Halbtöne"
+    assert steps[4]["range"] == "über 18 Halbtönen"
+    assert all(s["light"] is None for s in steps)
+
+
+def test_the_step_is_derived_when_the_session_is_read() -> None:
+    """Not stored with the Measurement, on purpose.
+
+    The figure is a measurement and is written once; the step is a judgement on
+    thresholds nothing has validated, so it is computed on every read from the
+    stored figure. That is what lets a recalibration reach trainings recorded
+    months ago, whose audio is long gone (ADR 0048) and which therefore could
+    never be measured again.
+    """
+    served = _served_detail(RANGE_KEY, 9.0, {"median_hz": 120.0})
+
+    assert served == {
+        "median_hz": 120.0,
+        "liveliness": "balanced",
+        "liveliness_label": "ausgewogen",
+    }
+
+
+def test_serving_leaves_a_detail_that_was_never_measured_alone() -> None:
+    """A Session stored before the pitch curve existed carries no detail at
+    all. There is nothing to read a step off, and inventing one would put a
+    word on a training that was never measured."""
+    assert _served_detail(RANGE_KEY, 9.0, None) is None

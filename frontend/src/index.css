@@ -3432,6 +3432,16 @@ h2 {
   border-left-color: var(--color-danger);
 }
 
+/* The step this call landed on. Weight and a filled ground, never a colour:
+   on the five-step Sprachmelodie scale (F-35) both ends are uncomfortable, so
+   there is no direction a colour could point in. */
+.metric-step.is-current {
+  border-left-color: var(--color-blue-600);
+  background: var(--color-surface-selected);
+  color: var(--color-navy-900);
+  font-weight: 600;
+}
+
 .metric-note {
   margin: 0;
   font-size: 0.85rem;

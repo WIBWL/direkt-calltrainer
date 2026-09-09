@@ -113,7 +113,14 @@ class TrafficLight(str, Enum):
     RED = "red"
 
 
-def light_steps() -> list[dict[str, str]]:
+LABELS: dict[TrafficLight, str] = {
+    TrafficLight.GREEN: "im üblichen Rahmen",
+    TrafficLight.YELLOW: "erhöht",
+    TrafficLight.RED: "deutlich erhöht",
+}
+
+
+def light_steps() -> list[dict[str, str | None]]:
     """The three steps, written out, so the interface can show the scale the
     colour comes from.
 
@@ -121,13 +128,25 @@ def light_steps() -> list[dict[str, str]]:
     is the worst form for a threshold that nothing has validated to take. Built
     from the constants rather than written twice, so a recalibration reaches the
     legend as well as the logic.
+
+    The shape is shared with `intonation.liveliness_steps`: `step` is the
+    machine-readable name, `label` how it is said, `range` where it applies and
+    `light` a colour where the scale has a direction, null where it has none.
     """
     return [
-        {"light": TrafficLight.GREEN.value, "range": _step_label(0, GREEN_MAX_COUNT)},
-        {"light": TrafficLight.YELLOW.value,
-         "range": _step_label(GREEN_MAX_COUNT + 1, YELLOW_MAX_COUNT)},
-        {"light": TrafficLight.RED.value, "range": f"ab {YELLOW_MAX_COUNT + 1}"},
+        _step(TrafficLight.GREEN, _step_label(0, GREEN_MAX_COUNT)),
+        _step(TrafficLight.YELLOW, _step_label(GREEN_MAX_COUNT + 1, YELLOW_MAX_COUNT)),
+        _step(TrafficLight.RED, f"ab {YELLOW_MAX_COUNT + 1}"),
     ]
+
+
+def _step(light: TrafficLight, span: str) -> dict[str, str | None]:
+    return {
+        "step": light.value,
+        "label": LABELS[light],
+        "range": span,
+        "light": light.value,
+    }
 
 
 def _step_label(low: int, high: int) -> str:

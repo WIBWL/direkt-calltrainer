@@ -11,10 +11,16 @@ import PitchContour from "./PitchContour";
  *
  * Where the reading is allowed to interpret, and where it is not:
  *
- * The range and the movement are reported as figures with no adjective. There
- * is no validated norm for either in this population, so calling a number
- * "gut" or even "eng" would be inventing the threshold ADR 0051 declined to
- * invent, and the reader would rightly take it as measured.
+ * The range carries the five-step reading (stark monoton … überzeichnet), and
+ * that step is a judgement on thresholds nothing has validated for this
+ * population — the exception ADR 0051 does not cover, kept to this screen and
+ * always shown with the scale it came from and the word "Einschätzung" beside
+ * it. `backend/feedback/intonation.py` holds the boundaries and says where the
+ * numbers come from.
+ *
+ * The movement is reported as a figure with no adjective, for the reason the
+ * range no longer is: there is no published figure to anchor a boundary for it,
+ * so a step would be invented twice over.
  *
  * The endings are different, and they are where the substance of this reading
  * sits. Whether a sentence ends falling or rising has a natural zero, needs no
@@ -46,6 +52,7 @@ export default function IntonationReading({ measurement }: { measurement: Measur
   const endings = detail.endings as Endings | undefined;
   const first = detail.range_first_st as number | undefined;
   const last = detail.range_last_st as number | undefined;
+  const step = detail.liveliness as string | undefined;
 
   // A Session measured before the factors existed carries the range and
   // nothing else. Its recording is long gone (ADR 0048), so the rest cannot be
@@ -83,7 +90,8 @@ export default function IntonationReading({ measurement }: { measurement: Measur
               `Zwischen Ihrem tiefsten und höchsten üblichen Ton liegt das ` +
               `${Math.pow(2, measurement.value / 12).toFixed(2)}-fache der Frequenz. ` +
               `Das ist eine Spanne, keine Lage: Ihre mittlere Stimmlage liegt bei ` +
-              `${Math.round(median)} Hz und geht in diese Zahl nicht ein.`
+              `${Math.round(median)} Hz und geht in diese Zahl nicht ein. ` +
+              rangeReading(step)
             }
           />
 
@@ -139,6 +147,48 @@ function Factor({
       <dd>{explanation}</dd>
     </div>
   );
+}
+
+/**
+ * What the five-step reading means, in one sentence each.
+ *
+ * The step itself is decided in the backend and shown above with its scale;
+ * this only says what it sounds like, and says it without an instruction. Two
+ * of the five carry a caveat rather than advice: a very narrow span can be a
+ * deliberate register, and a very wide one is as often a tracking error as a
+ * performance.
+ */
+function rangeReading(step: string | undefined): string {
+  switch (step) {
+    case "very_monotone":
+      return (
+        "Auf der Skala oben ist das stark monoton: Ihre Stimme blieb fast auf einer Höhe. " +
+        "Auf ein Gegenüber wirkt das schnell teilnahmslos, und Betonungen kommen kaum an. " +
+        "Am Telefon fällt es stärker auf als im Raum, weil Mimik und Haltung wegfallen."
+      );
+    case "monotone":
+      return (
+        "Auf der Skala oben ist das monoton: die Melodie bewegt sich, aber wenig. Wenn Sie " +
+        "beim Hören merken, dass eine wichtige Stelle nicht heraussticht, ist das hier die Zahl dazu."
+      );
+    case "balanced":
+      return (
+        "Auf der Skala oben ist das ausgewogen: eine Spanne, wie sie in ruhigen Gesprächen " +
+        "üblich ist."
+      );
+    case "lively":
+      return (
+        "Auf der Skala oben ist das lebendig: Ihre Stimme trägt hörbar mit, was Sie sagen."
+      );
+    case "exaggerated":
+      return (
+        "Auf der Skala oben liegt das über „lebendig“. Das kann sehr ausdrucksstarkes Sprechen " +
+        "sein — oder ein Messfehler: springt die Tonhöhenerkennung an einer Stelle eine Oktave, " +
+        "wird die Spanne zu groß. Ein Blick auf den Verlauf zeigt, was von beidem zutrifft."
+      );
+    default:
+      return "";
+  }
 }
 
 function endingsValue({ falling, rising, level }: Endings): string {
