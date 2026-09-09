@@ -23,6 +23,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from statistics import fmean
 
+from backend.feedback import intonation
 from backend.feedback.acoustics import Pause
 
 _MS_PER_MINUTE = 60_000
@@ -34,10 +35,13 @@ _SENTENCE_END_RE = re.compile(r"[.!?]+")
 # The one metric the wrap-up reads as a course rather than as a figure, so
 # generator.py has to be able to pick it out of the inventory by name.
 LOUDNESS_KEY = "loudness"
+# The grid the stored curves are drawn at, matching acoustics.py's loudness
+# sampling so the two can be read side by side.
+LOUDNESS_INTERVAL_MS = 100
 
 
 @dataclass(frozen=True)
-class Conversation:
+class Conversation:  # pylint: disable=too-many-instance-attributes  # a record of measured facts, one field per fact
     """One finished call, reduced to the facts the statistics are derived from.
 
     Assembled by backend/session/models.py, which owns the Turn timeline and
@@ -61,6 +65,14 @@ class Conversation:
     pauses: tuple[Pause, ...] = ()
     # The user's loudness across the whole call, at acoustics.py's fixed rate.
     loudness_db: tuple[float | None, ...] = ()
+    # The user's fundamental frequency at acoustics.py's 10 ms grid, None where
+    # the frame was unvoiced (F-35). Finer than the loudness curve on purpose:
+    # a 100 ms grid aliases the movement that intonation lives in.
+    pitch_hz: tuple[float | None, ...] = ()
+    # The same frames grouped by utterance, which the terminal contours need:
+    # "how did this sentence end" has no answer on a contour with the sentence
+    # boundaries taken out.
+    pitch_per_turn: tuple[tuple[float | None, ...], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -224,6 +236,54 @@ def _loudness(call: Conversation) -> Measurement | None:
         LOUDNESS_KEY,
         audible[-1 - margin] - audible[margin],
         {"curve_db": list(call.loudness_db)},
+    )
+
+
+def _intonation(call: Conversation) -> Measurement | None:
+    """F-35. The shape of the user's pitch across the call.
+
+    Four factors rather than one figure, because one figure could not tell a
+    lively speaker from one who said a single sentence brightly, nor a speaker
+    who closes their sentences from one who ends every one of them on a rise.
+    `backend/feedback/intonation.py` derives them and says why each was chosen.
+
+    The value stays the range in semitones, so the Kennzahl keeps one number the
+    way every other one does; the factors ride in the detail.
+
+    Semitones and not Hertz, and this is the point of the unit. A range of 40 Hz
+    is a lot for a low voice and little for a high one, so a figure in Hertz
+    would report the speaker's build as though it were their delivery. A
+    semitone is a ratio, so the same expressive range yields the same number for
+    any voice -- which is also how phonetics states pitch variability.
+
+    No norm is attached, and none is implied. F-35 speaks of making monotony
+    visible, but where a lively range ends and a monotone one begins is exactly
+    the threshold ADR 0051 declined to invent. The figures are reported; what
+    they mean is for the user and for the wrap-up's prose.
+    """
+    shape = intonation.profile(call.pitch_hz, call.pitch_per_turn)
+    if shape.range_st is None:
+        return None
+    return Measurement(
+        "intonation",
+        shape.range_st,
+        {
+            # The curve at the display grid, not at the analysis grid: the
+            # statistics above are computed on every 10 ms frame, but three
+            # minutes of those is eighteen thousand points and no chart resolves
+            # them (intonation.thin).
+            "curve_hz": intonation.thin(call.pitch_hz, LOUDNESS_INTERVAL_MS),
+            "curve_step_ms": LOUDNESS_INTERVAL_MS,
+            "median_hz": shape.median_hz,
+            "movement_st_per_s": shape.movement_st_per_s,
+            "endings": {
+                "falling": shape.endings.falling,
+                "rising": shape.endings.rising,
+                "level": shape.endings.level,
+            },
+            "range_first_st": shape.range_first_st,
+            "range_last_st": shape.range_last_st,
+        },
     )
 
 
@@ -396,6 +456,10 @@ METRICS: tuple[MetricDef, ...] = (
     MetricDef("reaction_time", "Reaktionszeit", "s", "F-53", True, _reaction_time),
     MetricDef("pauses", "Sprechpausen", "s", "F-51", True, _pauses),
     MetricDef(LOUDNESS_KEY, "Lautstärke", "dB", "F-37", True, _loudness),
+    # F-35, a MUST that had no measurement until the pitch curve existed. The
+    # unit is semitones so the figure describes delivery rather than the voice
+    # it was spoken with -- see `_intonation`.
+    MetricDef("intonation", "Sprachmelodie", "Halbtöne", "F-35", True, _intonation),
     # SHOULD / COULD -- seeded so the vocabulary is complete, but inactive and
     # without a derivation.
     MetricDef("concreteness", "Sprachliche Konkretheit", None, "F-40", False),

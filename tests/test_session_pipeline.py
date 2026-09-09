@@ -136,8 +136,11 @@ async def test_a_measured_turn_records_both_its_durations(orch, fake_pipeline, m
     first, Sprechtempo by the second."""
     monkeypatch.setattr(
         "backend.session.orchestrator.analyze",
+        # Every field named, including the empty curves: TurnAcoustics carries
+        # no defaults, so a new measurement cannot be added without every
+        # construction of it being revisited.
         lambda _audio: TurnAcoustics(
-            duration_ms=1500, phonation_ms=900, pauses=(), loudness_db=(),
+            duration_ms=1500, phonation_ms=900, pauses=(), loudness_db=(), pitch_hz=(),
         ),
     )
     fake_pipeline.stt.transcripts = ["Ich spreche mit einer Pause."]

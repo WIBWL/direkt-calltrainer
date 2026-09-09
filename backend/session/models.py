@@ -59,6 +59,9 @@ class Turn:  # pylint: disable=too-many-instance-attributes
     user_acoustics_complete: bool = True
     pauses: list[Pause] = field(default_factory=list)
     loudness_db: list[float | None] = field(default_factory=list)
+    # The pitch curve on the same grid as the loudness one (F-35), so the two
+    # concatenate identically across Turns.
+    pitch_hz: list[float | None] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -112,6 +115,7 @@ def conversation(turns: Sequence[Turn]) -> Conversation:
     reactions: list[int] = []
     pauses: list[Pause] = []
     loudness: list[float | None] = []
+    pitch: list[float | None] = []
     user_ms = user_phonation = persona_ms = 0
     persona_stopped: int | None = None
 
@@ -126,6 +130,7 @@ def conversation(turns: Sequence[Turn]) -> Conversation:
         user_phonation += turn.user_phonation_ms
         pauses.extend(turn.pauses)
         loudness.extend(turn.loudness_db)
+        pitch.extend(turn.pitch_hz)
         persona_ms += _span(turn.persona_offset_ms, turn.persona_end_ms) or 0
         persona_stopped = turn.persona_end_ms or persona_stopped
 
@@ -141,6 +146,10 @@ def conversation(turns: Sequence[Turn]) -> Conversation:
         reactions_ms=tuple(reactions),
         pauses=tuple(pauses),
         loudness_db=tuple(loudness),
+        pitch_hz=tuple(pitch),
+        # Grouped by utterance as well, which the terminal contours read:
+        # where one sentence ended is not recoverable from the flat curve.
+        pitch_per_turn=tuple(tuple(turn.pitch_hz) for turn in turns if turn.pitch_hz),
     )
 
 

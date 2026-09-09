@@ -50,3 +50,6 @@ async def attach_measurements(
     turn.user_phonation_ms += measured.phonation_ms
     turn.pauses.extend(Pause(started_ms + p.offset_ms, p.duration_ms) for p in measured.pauses)
     turn.loudness_db.extend(measured.loudness_db)
+    # Same grid, same concatenation: the pitch curve carries no offsets of its
+    # own, so it needs no rebasing (F-35).
+    turn.pitch_hz.extend(measured.pitch_hz)

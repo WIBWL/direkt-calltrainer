@@ -15,6 +15,8 @@ database, no audio and no Praat -- the acoustic facts are handed in as the
 numbers `analyze()` would have produced.
 """
 
+import pytest
+
 from backend.feedback.acoustics import Pause
 from backend.feedback.metrics import describe_loudness_course, measure
 from backend.session.models import Turn, conversation
@@ -143,6 +145,38 @@ def test_pauses_come_from_the_same_segmentation_as_phonation() -> None:
     values = _by_key(turns)
 
     assert values["pauses"] == 1.0
+
+
+# --- F-35: the pitch range, in an interval rather than in Hertz ------------
+
+
+def test_intonation_is_reported_in_semitones() -> None:
+    """A fifth is seven semitones. In Hertz the same figure would describe the
+    voice rather than what was done with it."""
+    turns = _measured_call()
+    turns[1].pitch_hz = [120.0] * 30 + [180.0] * 30
+
+    values = _by_key(turns)
+
+    assert values["intonation"] == pytest.approx(7.02, abs=0.6)
+
+
+def test_an_unvoiced_call_has_no_pitch_figure() -> None:
+    """Whispering, or a Turn Praat found no voicing in. A span over nothing
+    would be a number with no measurement behind it."""
+    turns = _measured_call()
+    turns[1].pitch_hz = [None] * 60
+
+    assert "intonation" not in _by_key(turns)
+
+
+def test_a_handful_of_voiced_frames_is_not_a_range() -> None:
+    """Below the floor the percentiles are picking single frames, and one
+    octave error would then decide the value for the whole call."""
+    turns = _measured_call()
+    turns[1].pitch_hz = [120.0, 240.0, 130.0]
+
+    assert "intonation" not in _by_key(turns)
 
 
 # --- F-37: the loudness course, described rather than scored ---------------
