@@ -212,7 +212,17 @@ services:
       # the admin console below is reachable with admin/admin. Nothing is lost,
       # KC_HOSTNAME pins the issuer to localhost anyway, so a login from
       # another machine could not work regardless.
+      #
+      # Both loopback addresses, and that is not redundant: Windows resolves
+      # `localhost` to ::1 first, so an IPv4-only binding makes every browser
+      # request to Keycloak open a connection that goes nowhere and fall back
+      # to 127.0.0.1 once the attempt times out -- a flat ~200 ms on each, paid
+      # five times over while the login page loads. The app's port carries no
+      # interface prefix and therefore listens on both anyway; here the prefix
+      # is what keeps it off the network, so the second address has to be
+      # spelled out.
       - 127.0.0.1:18081:8080
+      - "[::1]:18081:8080"
     volumes:
       - keycloak-data:/opt/keycloak/data
       - ./keycloak:/opt/keycloak/data/import:ro
