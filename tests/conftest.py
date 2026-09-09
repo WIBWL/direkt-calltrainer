@@ -630,7 +630,8 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
         visibility=db_models.VISIBILITY_PUBLIC,
     )
     metric_type = db_models.MetricType(
-        key=METRIC_KEY, name="Sprechtempo", unit="Wörter/min", feature_id="F-36", active=True
+        key=METRIC_KEY, name="Sprechtempo", unit="Wörter/min", aspect=db_models.ASPECT_HOW,
+        feature_id="F-36", active=True,
     )
     db_session.add_all([language, default_tenant, persona, scenario, metric_type])
     db_session.commit()
