@@ -38,6 +38,30 @@ logger = logging.getLogger(__name__)
 
 _LANGUAGE_NAMES_EN = {"de": "German", "en": "English"}
 
+# The two wrap-ups written here rather than by the model, keyed by the same
+# English language name the prompt is built with. O2 asks the model to answer
+# in the Session's language and a 4B model (ADR 0011) still hands back the
+# English of the rule it is following -- which is exactly what a User saw when
+# a call they broke off immediately came back summarised as "nothing to
+# review". Neither path reaches the model, so neither can be got wrong.
+#
+# German for a language we do not know: the pilot runs in German, and a
+# sentence in the wrong language beats a KeyError on the one screen that is
+# meant to say why there is nothing to read.
+_NOTHING_SAID = {
+    "German": "In diesem Training wurde nicht gesprochen. Es gibt daher nichts auszuwerten.",
+    "English": "Nothing was said in this training, so there is nothing to review.",
+}
+_NO_WRAPUP = {
+    "German": "Für dieses Gespräch konnte kein Feedback erzeugt werden.",
+    "English": "No feedback could be written for this call.",
+}
+
+
+def _in_language(texts: dict[str, str], language: str) -> str:
+    """One of the tables above, in `language` or in German."""
+    return texts.get(language, texts["German"])
+
 
 class _Point(BaseModel):
     text: str
@@ -95,7 +119,14 @@ async def _generate(session_id: int) -> None:
             # call below runs with no database handle open (ADR 0070).
             reverse = session.scenario.reverse
 
-        wrapup = await _ask(dossier, language, reverse)
+        # A call with nothing in it is answered here: O5 asks the model for
+        # this sentence, but it is the one case where there is nothing to
+        # write and no reason to spend a model call finding that out.
+        wrapup = (
+            _Wrapup(summary=_in_language(_NOTHING_SAID, language))
+            if not valid_turns
+            else await _ask(dossier, language, reverse)
+        )
 
         with session_scope() as db:
             _store(db, session_id, wrapup, valid_turns)
@@ -510,13 +541,13 @@ async def _ask(dossier: str, language: str, reverse: bool = False) -> _Wrapup:
         except (ValidationError, ValueError) as e:
             logger.warning("Wrap-up did not validate (attempt %d): %s", attempt + 1, e)
     logger.warning("Falling back to a narrative-only wrap-up")
-    return _Wrapup(summary=_unfenced_text(raw))
+    return _Wrapup(summary=_unfenced_text(raw, language))
 
 
-def _unfenced_text(raw: str) -> str:
+def _unfenced_text(raw: str, language: str) -> str:
     """The model's prose, for the fallback: readable even though it isn't JSON."""
     stripped = llm.without_fenced_blocks(raw).strip()
-    return stripped or "Für dieses Gespräch konnte kein Feedback erzeugt werden."
+    return stripped or _in_language(_NO_WRAPUP, language)
 
 
 # --- Storage --------------------------------------------------------------

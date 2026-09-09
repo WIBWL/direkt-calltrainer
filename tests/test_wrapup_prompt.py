@@ -31,7 +31,8 @@ import pytest
 
 from backend.clients.llm import _strip_reasoning
 from backend.feedback.generator import (
-    _ask, _dossier, _LANGUAGE_NAMES_EN, _messages, _without_turn_markers, _Wrapup,
+    _ask, _dossier, _in_language, _LANGUAGE_NAMES_EN, _messages, _NO_WRAPUP,
+    _NOTHING_SAID, _without_turn_markers, _Wrapup,
 )
 from backend.session.language_packs import LANGUAGE_PACKS
 
@@ -279,3 +280,23 @@ def test_a_sentence_that_merely_reads_like_a_marker_is_left_alone() -> None:
     assert _without_turn_markers("Bei 02:14 sagten Sie: „Moment.“") == (
         "Bei 02:14 sagten Sie: „Moment.“"
     )
+
+
+# --- The sentences the model does not write --------------------------------
+
+
+def test_the_sentences_written_here_follow_the_sessions_language() -> None:
+    """An empty call and a model that answered with nothing usable are the two
+    wrap-ups this module writes itself, and both used to be German whatever the
+    Session was -- or, for the empty call, whatever English the model echoed
+    back out of O5."""
+    assert _in_language(_NOTHING_SAID, "German").startswith("In diesem Training")
+    assert "nothing to review" in _in_language(_NOTHING_SAID, "English")
+    assert _in_language(_NO_WRAPUP, "German").startswith("Für dieses Gespräch")
+    assert _in_language(_NO_WRAPUP, "English").startswith("No feedback")
+
+
+def test_a_language_without_a_sentence_gets_the_german_one() -> None:
+    """A KeyError here would fail the job on the one screen whose whole purpose
+    is to say why there is nothing to read. German is what the pilot runs in."""
+    assert _in_language(_NOTHING_SAID, "Finnish") == _in_language(_NOTHING_SAID, "German")
