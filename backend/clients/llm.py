@@ -11,12 +11,19 @@ import logging
 import re
 import time
 from collections.abc import AsyncIterator
+from typing import TypeVar
+
+from pydantic import BaseModel, ValidationError
 
 from backend.clients.config import (
     GEMINI, LLM_CLIENT, LLM_FEEDBACK_MODEL, LLM_MODEL, LLM_REASONING_EFFORT,
 )
 
 logger = logging.getLogger(__name__)
+
+# What `complete_json` parses into: any pydantic model the caller names, handed
+# back as that type rather than as a dict, so the caller keeps its own fields.
+_Model = TypeVar("_Model", bound=BaseModel)
 
 # In thinking mode the reasoning trace is delivered out-of-band as
 # `reasoning_content` when the gateway runs a reasoning parser, and inline as a
@@ -186,10 +193,10 @@ def _strip_reasoning(text: str) -> str:
 
 # --- Reading a structured reply -------------------------------------------
 #
-# Two callers ask for JSON off the live path, the wrap-up (ADR 0049) and the
-# follow-up draft (F-60), and a small model (ADR 0011) fences its output
-# however plainly it is told not to. So the unwrapping lives here, once, next
-# to the call that produced the text.
+# Three callers ask for JSON off the live path -- the wrap-up (ADR 0049), the
+# follow-up draft (F-60) and the reverse briefing (F-61, ADR 0070) -- and a
+# small model (ADR 0011) fences its output however plainly it is told not to.
+# So the unwrapping lives here, once, next to the call that produced the text.
 
 _FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
 
@@ -210,3 +217,31 @@ def without_fenced_blocks(raw: str) -> str:
     """`raw` with every fenced block removed, content and all — the prose, for a
     caller that has given up on parsing the reply."""
     return _FENCE_RE.sub("", raw)
+
+
+async def complete_json(
+    messages: list[dict[str, str]], model: type[_Model], what: str
+) -> _Model | None:
+    """One structured answer off the live path, retried once. None if neither
+    attempt produced something that parsed.
+
+    Thinking mode and no token cap: the fields are bounded by the caller's own
+    limits, and running out inside the reasoning trace yields no answer at all
+    (see `_strip_reasoning`). Only safe where nothing is waiting — the reverse
+    briefing (F-61) asks for it here, never the live reply.
+
+    Returns None rather than raising, because what an unusable answer means is
+    the caller's to decide: the briefing has nothing worth storing and turns it
+    into a 503, and the wrap-up would rather keep the prose than nothing. The
+    wrap-up does not use this helper for exactly that reason — it needs the raw
+    text for its fallback, which this deliberately does not hand back. The
+    follow-up draft (F-60) keeps its own loop too: it re-asks on a draft whose
+    required fields came back empty, which is a judgement this cannot make.
+    """
+    for attempt in range(2):  # initial attempt + one retry
+        raw = await complete(messages, max_tokens=None, think=True)
+        try:
+            return model.model_validate_json(json_object(raw))
+        except (ValidationError, ValueError) as e:
+            logger.warning("%s did not validate (attempt %d): %s", what, attempt + 1, e)
+    return None

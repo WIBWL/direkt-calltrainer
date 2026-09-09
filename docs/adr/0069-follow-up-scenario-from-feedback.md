@@ -2,11 +2,17 @@
 
 ## Status
 
-Accepted. Builds on ADR 0058 (User-authored Scenarios) and ADR 0049 (the wrap-up
-it is written from); bounded by ADR 0051 (no target ranges) and ADR 0043 (a
-built-in's prompt fields stay withheld). Its lifecycle follows ADR 0026 (a
-Session's Scenario is not deletable), ADR 0066 (deletion) and ADR 0067
-(retention).
+Accepted, **amended 2026-09-09** — see the amendment at the end. One clause of
+the Decision below no longer holds: the follow-up is no longer written without
+being asked for. Everything else stands, and the Decision is left as written
+because the reasoning it records is what the amendment argues with.
+
+Builds on ADR 0058 (User-authored Scenarios) and ADR 0049 (the wrap-up it is
+written from); bounded by ADR 0051 (no target ranges) and ADR 0043 (a built-in's
+prompt fields stay withheld). Its lifecycle follows ADR 0026 (a Session's
+Scenario is not deletable), ADR 0066 (deletion) and ADR 0067 (retention). Since
+the amendment it is the sibling of ADR 0070 (the reverse), which was written on
+this one's pattern and then turned out to have the better half of it.
 
 ## Context
 
@@ -203,3 +209,74 @@ One thing is still deliberately not built:
   Scenario the User authored themselves — they already own that text — but a
   rule that holds for one half of the library and not the other would be no rule
   at all.
+
+
+## Amendment (2026-09-09): the follow-up is asked for, like the reverse
+
+The decision above turns on one comparison, and it was made against the wrong
+opponent. "Whether the User has to ask for it" weighed *writing it unbidden*
+against *a button that drafted into the editor and stored nothing* — and against
+that, unbidden wins on both counts it names: a draft that dies with the screen,
+and a decision asked before there is anything to look at.
+
+But those two objections are not to the button. They are to *not storing*. The
+reverse (ADR 0070) was designed on this ADR's pattern a fortnight later and kept
+the button while dropping the draft-only part: it is asked for, and what it
+writes is a row. Set side by side, the reverse's shape answers both of this
+ADR's objections and the automatic one does not answer the reverse's:
+
+* **The exercise no longer dies with the screen** — because it is stored, which
+  is this ADR's own decision and nothing to do with who triggers it.
+* **The User is no longer asked before there is anything to look at.** The
+  button sits *under the finished wrap-up*, beneath the very improvement points
+  it would be built from. They have read what it would be aimed at.
+* **A failure is now visible.** "Silent on failure" was the price of running
+  where nobody was waiting: an unreachable model meant a follow-up that simply
+  never appeared, indistinguishable from a wrap-up that named nothing to work
+  on. Asked for, the same failure is a 503 with a sentence in it, and the User
+  can press the button again.
+
+Against that stands what this ADR bought and now gives up: a User who never
+notices the offer gets no exercise. That is the trade, and it is worth making,
+because the thing being lost — an exercise nobody chose — is also what
+Consequences above worried about under "the User is no longer the reviewer
+before storage" and "a follow-up per Session accumulates". Twenty trainings no
+longer mean twenty rows in the library; they mean twenty *offers*, and as many
+rows as were wanted.
+
+**What changes.** `POST /api/sessions/{extern_id}/follow-up` comes back, on the
+sessions router beside `POST …/reverse` and deliberately identical to it: 404
+for an unknown or foreign Session, 409 where the wrap-up names nothing to build
+from, 503 for a model that would not answer, and idempotency through the same
+UNIQUE column, so a second press returns the row the first one wrote without a
+second model call — and reactivates it if the User had since removed it.
+`backend/feedback/generator.py` no longer calls `create_follow_up`, so the
+wrap-up job has one model call and one way to fail; `backend/followups.py` is
+left as the drafting module, the sibling of `backend/reversals.py`, and knows
+nothing about a worker any more.
+
+**What does not change**: the material the model is given, the prompt, the
+required-field floor, the storage path through `library.create_scenario`, the
+provenance column and its UNIQUE, the badge, the filter chip, and the whole
+lifecycle — deletion, withdrawal, retention.
+
+One thing changed for both routes at once while this was done: **a call begun
+from a finished training skips the microphone check.** That screen exists to
+catch a microphone that is not working before a conversation is spent on it
+(F-46) — a question already answered by the call the User has just had, on the
+same device, in the same page session. Skipped, it is a click between the
+button and the conversation and nothing else. The commit still happens exactly
+as ADR 0042 describes, and the confirmation the check would have carried is
+done by an effect one render later; `useSessionSocket.sendActivate` now holds
+that message back until the handshake has gone out instead of dropping it,
+which also closes a latent hole on the ordinary path — a User who confirmed the
+check before the socket opened lost their `session.activate` and waited for an
+opening line the server was still holding.
+
+Two smaller things follow from the move. `tenant_id` is **no longer NULL**: the
+draft is written in a request now, so the caller's company is resolved and
+stamped like it is for anything they author (ADR 0060), and sharing is a plain
+`visibility` flip rather than a flip plus a late stamp. And the post-call
+screen's busy line is gone — `useSessionFeedback` no longer polls past the
+wrap-up for something arriving behind it, because nothing does; the button
+carries its own busy state, as the reverse's does.

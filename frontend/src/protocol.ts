@@ -206,6 +206,10 @@ export interface SessionDetail {
    * against the same partner — `persona` above is only its display name. */
   persona_id: string;
   scenario: string;
+  /** Whether this training was a reverse — the User rang and the Persona
+   * answered (ADR 0070). Display only; the casting itself lives on the
+   * Scenario row. */
+  reverse: boolean;
   status: FeedbackStatus;
   turns: SessionTurn[];
   /** Statistics for the whole call, not per utterance (ADR 0051). */
@@ -242,6 +246,10 @@ export interface SessionSummary {
   session_id: string;
   persona: string;
   scenario: string;
+  /** Whether this training was a reverse — the User rang and the Persona
+   * answered (ADR 0070). Display only; the casting itself lives on the
+   * Scenario row. */
+  reverse: boolean;
   status: SessionOutcome;
   /** Whether a wrap-up was stored — i.e. whether this row has one to open. */
   has_feedback: boolean;

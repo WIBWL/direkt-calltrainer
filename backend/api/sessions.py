@@ -15,9 +15,17 @@ A Session is addressed by its `extern_id`, never by its primary key
 would confirm that the id exists, which is exactly what the unguessable id is
 there to withhold. A sequential key could offer neither guarantee.
 
-The detail route also carries the follow-up Scenario the worker drafted from
-this Session's Feedback (F-60, ADR 0069) — its card, which is what the post-call
-screen offers to start or to edit.
+Two routes here build a Scenario out of a finished Session, and both are asked
+for rather than volunteered. `POST /{extern_id}/follow-up` (F-60, ADR 0069)
+drafts the *next* exercise from the wrap-up's improvement points;
+`POST /{extern_id}/reverse` (F-61, ADR 0070) copies the case that was played
+into a Scenario that replays it with the roles swapped. They share their shape
+on purpose — 404 for an unknown or foreign Session, 409 for one there is
+nothing to build from, 503 for a model that would not answer, and idempotency
+through a UNIQUE column, so pressing the button twice costs no second model
+call. Both are here rather than under `/api/scenarios` because a Session is
+what they are built from; the detail route carries the card of whichever
+already exists.
 
 The wire matches the schema (ADR 0057): the dicts below pass the ORM's own
 English column values straight through to frontend/src/protocol.ts, with no
@@ -26,17 +34,23 @@ translation step.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from openai import OpenAIError
 from sqlalchemy.orm import Session as DbSession, selectinload
 
-from backend import deletion
+from backend import deletion, library
+from backend.api.deps import current_tenant_id
 from backend.auth import AuthContext, require_user
 from backend.db import models as db_models
 from backend.db.session import session_scope
+from backend.followups import FollowUpError, draft_follow_up
+from backend.reversals import ReverseError, draft_brief
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +145,9 @@ def _session_summary(session: db_models.Session) -> dict:
         "session_id": str(session.extern_id),
         "persona": session.persona.name,
         "scenario": session.scenario.title,
+        # Whether this training was a reverse (ADR 0070), so the history can
+        # say so on the row. The Scenario is already loaded for its title.
+        "reverse": session.scenario.reverse,
         "status": session.status,
         "has_feedback": session.feedback is not None,
         "feedback_status": _feedback_status(session),
@@ -182,6 +199,7 @@ def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user
             # `extern_id` (ADR 0050), never a display name.
             "persona_id": str(session.persona.extern_id),
             "scenario": session.scenario.title,
+            "reverse": session.scenario.reverse,
             "status": _feedback_status(session),
             "turns": [_turn(t) for t in sorted(session.turns, key=lambda t: t.seq_index)],
             "measurements": [_measurement(m) for m in session.measurements],
@@ -212,6 +230,278 @@ def delete_one_session(
     # Returned explicitly rather than annotated `-> None`: FastAPI derives a
     # response model from the annotation, and a 204 may not carry a body.
     return Response(status_code=204)
+
+
+@router.post("/{extern_id}/reverse")
+async def create_reverse(
+    extern_id: uuid.UUID,
+    caller: AuthContext = Depends(require_user),
+    tenant_id: int = Depends(current_tenant_id),
+) -> dict:
+    """The reverse of this Session: the same call with the roles swapped (F-61).
+
+    Like the follow-up (ADR 0069) it writes a Scenario the User owns, so both
+    end up in the same library; unlike it, this one is asked for rather than
+    written by the worker, because a reverse is a thing you decide to do about
+    a call you have just had.
+
+    Idempotent, and cheaply so: the existing reverse is looked up before any
+    model call, so pressing the button twice costs nothing and yields the same
+    row. A reverse of a reverse is refused: the roles are already swapped, and
+    swapping them again is the original call with a copied briefing.
+
+    No consent guard, and none is needed (ADR 0066): without consent no Session
+    is written, and without a stored Session there is nothing here to read — the
+    first lookup answers 404. A withdrawal mid-flight removes the Session, so
+    the write below then finds nothing and answers the same way.
+
+    `session_scope()` is synchronous, so every read and write goes to a thread
+    — this route is `async def` for the model call and must not block the loop.
+    """
+    material = await asyncio.to_thread(_reverse_material, extern_id, caller.sub)
+    # Absent and not-yours stay the same answer as in `get_session` (ADR 0050).
+    if material is None:
+        raise HTTPException(status_code=404, detail="Unknown session")
+    if material.already_reverse:
+        raise HTTPException(
+            status_code=409,
+            detail="Dieses Gespräch ist selbst schon ein Rollentausch.",
+        )
+    if not material.has_turns:
+        raise HTTPException(
+            status_code=409,
+            detail="Zu diesem Gespräch wurde nichts gesprochen, was sich tauschen ließe.",
+        )
+
+    existing = await asyncio.to_thread(library.restore_reverse, material.session_pk)
+    if existing is not None:
+        return _reverse_response(existing)
+
+    try:
+        brief = await draft_brief(
+            material.description,
+            material.case_facts,
+            material.call_goal,
+            material.success_condition,
+            material.improvements,
+        )
+    except (OpenAIError, ReverseError) as e:
+        # A dead gateway and an unparseable reply are the same thing from here.
+        logger.warning("Reverse briefing failed for session %s: %s", extern_id, e)
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Der Rollentausch konnte gerade nicht vorbereitet werden. "
+                "Bitte später noch einmal versuchen."
+            ),
+        ) from e
+
+    scenario = await asyncio.to_thread(
+        library.create_reverse, material.session_pk, caller.sub, tenant_id, brief
+    )
+    if scenario is None:
+        # The Session went away between the two reads — a deletion in another
+        # tab. Nothing was written; the same 404 the first read would have given.
+        raise HTTPException(status_code=404, detail="Unknown session")
+    return _reverse_response(scenario)
+
+
+def _reverse_response(scenario) -> dict:
+    """What the client needs to start the reverse straight away: the id to
+    commit a Session with, and the briefing to show while it runs."""
+    return {
+        "id": scenario.id,
+        "name": scenario.name,
+        "short_description": scenario.short_description,
+        "reverse_brief": scenario.reverse_brief,
+    }
+
+
+@dataclass(frozen=True)
+class _ReverseMaterial:
+    """What a reverse is built from, read out before the database handle is
+    gone. The played Scenario's prompt fields are in here on purpose: the
+    briefing is a translation of exactly those, which is the exception ADR 0070
+    takes to ADR 0043 and the reason it is only ever taken for a case the User
+    has already heard played out."""
+
+    session_pk: int
+    already_reverse: bool
+    has_turns: bool
+    description: str
+    case_facts: str
+    call_goal: str
+    success_condition: str
+    improvements: list[str]
+
+
+def _reverse_material(extern_id: uuid.UUID, subject: str) -> _ReverseMaterial | None:
+    """This Session's material, or None if it is not the caller's."""
+    with session_scope() as db:
+        session = (
+            db.query(db_models.Session)
+            .filter_by(extern_id=extern_id)
+            .options(
+                selectinload(db_models.Session.scenario),
+                selectinload(db_models.Session.turns),
+                selectinload(db_models.Session.feedback)
+                .selectinload(db_models.Feedback.points),
+            )
+            .one_or_none()
+        )
+        if session is None or session.subject_id != subject:
+            return None
+        scenario = session.scenario
+        feedback = session.feedback
+        return _ReverseMaterial(
+            session_pk=session.session_id,
+            already_reverse=scenario.reverse,
+            has_turns=bool(session.turns),
+            description=scenario.description,
+            case_facts=scenario.case_facts,
+            call_goal=scenario.call_goal,
+            success_condition=scenario.success_condition,
+            # Absent when the wrap-up has not landed, which is allowed here:
+            # the briefing is built from the case, and the coaching points only
+            # decide which goal the checklist names first.
+            improvements=[
+                point.text
+                for point in (feedback.points if feedback else [])
+                if point.kind == db_models.POINT_IMPROVEMENT
+            ],
+        )
+
+
+@router.post("/{extern_id}/follow-up")
+async def create_follow_up(
+    extern_id: uuid.UUID,
+    caller: AuthContext = Depends(require_user),
+    tenant_id: int = Depends(current_tenant_id),
+) -> dict:
+    """The next exercise, drafted from this Session's wrap-up (F-60).
+
+    The sibling of the reverse below it, deliberately down to the shape: same
+    refusals, same idempotency, same 503. It was once written by the Feedback
+    worker without anyone asking — ADR 0069's amendment says why that changed,
+    and the short of it is that a library filling itself with exercises nobody
+    chose is a library people stop reading.
+
+    409 rather than 404 when the wrap-up names nothing to work on: the Session
+    is the caller's and does exist, and the improvement points are the entire
+    input — a follow-up without them would be an invented exercise about
+    nothing. The client hides the button in that case, so this is the second
+    line of defence, not the message anyone should normally see.
+
+    `session_scope()` is synchronous, so every read and write goes to a thread
+    — this route is `async def` for the model call and must not block the loop.
+    """
+    material = await asyncio.to_thread(_follow_up_material, extern_id, caller.sub)
+    # Absent and not-yours stay the same answer as in `get_session` (ADR 0050).
+    if material is None:
+        raise HTTPException(status_code=404, detail="Unknown session")
+    if not material.improvements:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Diese Auswertung nennt keine Punkte zum Weiterentwickeln, "
+                "aus denen sich eine Übung bauen ließe."
+            ),
+        )
+
+    existing = await asyncio.to_thread(library.restore_follow_up, material.session_pk)
+    if existing is not None:
+        return _follow_up_response(existing)
+
+    try:
+        draft = await draft_follow_up(
+            material.scenario_name,
+            material.scenario_teaser,
+            material.improvements,
+            material.phase_language,
+        )
+    except (OpenAIError, FollowUpError) as e:
+        # A dead gateway and an unusable draft are the same thing from here.
+        logger.warning("Follow-up draft failed for session %s: %s", extern_id, e)
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Das Folgeszenario konnte gerade nicht erstellt werden. "
+                "Bitte später noch einmal versuchen."
+            ),
+        ) from e
+
+    # The draft is keyed as the client knows the fields (ADR 0061); the library
+    # writes columns, where the card's `name` is `title`.
+    draft["title"] = draft.pop("name")
+    scenario = await asyncio.to_thread(
+        library.create_follow_up, draft, caller.sub, tenant_id, material.session_pk
+    )
+    if scenario is None:
+        # The Session went away between the two reads — a deletion in another
+        # tab. The same 404 the first read would have given.
+        raise HTTPException(status_code=404, detail="Unknown session")
+    return _follow_up_response(scenario)
+
+
+def _follow_up_response(scenario) -> dict:
+    """The card, in the shape `_follow_up` below already hands the client on the
+    detail route — so the screen renders what it came back with and what a
+    later reload brings identically."""
+    return {
+        "id": scenario.id,
+        "name": scenario.name,
+        "short_description": scenario.short_description,
+    }
+
+
+@dataclass(frozen=True)
+class _FollowUpMaterial:
+    """What a follow-up is drafted from, read out before the database handle is
+    gone. The played Scenario's *card* and nothing more: its four prompt fields
+    stay withheld (ADR 0043), and the measured statistics stay out because no
+    target range exists to correct a figure against (ADR 0051). This is the one
+    place that difference from `_ReverseMaterial` is visible, and it is the
+    whole difference between inventing a new case and copying one."""
+
+    session_pk: int
+    scenario_name: str
+    scenario_teaser: str
+    improvements: list[str]
+    phase_language: str | None
+
+
+def _follow_up_material(extern_id: uuid.UUID, subject: str) -> _FollowUpMaterial | None:
+    """This Session's material, or None if it is not the caller's.
+
+    A Session whose wrap-up never landed comes back with no improvements, which
+    the route refuses the same way it refuses a wrap-up that named none: from
+    here the two are one case, because the input is missing either way.
+    """
+    with session_scope() as db:
+        session = (
+            db.query(db_models.Session)
+            .filter_by(extern_id=extern_id)
+            .options(
+                selectinload(db_models.Session.scenario),
+                selectinload(db_models.Session.feedback)
+                .selectinload(db_models.Feedback.points),
+            )
+            .one_or_none()
+        )
+        if session is None or session.subject_id != subject:
+            return None
+        feedback = session.feedback
+        return _FollowUpMaterial(
+            session_pk=session.session_id,
+            scenario_name=session.scenario.title,
+            scenario_teaser=session.scenario.short_description,
+            improvements=[
+                point.text
+                for point in (feedback.points if feedback else [])
+                if point.kind == db_models.POINT_IMPROVEMENT
+            ],
+            phase_language=feedback.phase_language if feedback else None,
+        )
 
 
 def _follow_up(db: DbSession, session_id: int) -> dict | None:

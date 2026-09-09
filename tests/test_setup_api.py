@@ -120,6 +120,9 @@ async def test_scenarios_endpoint_withholds_the_case(client):
         assert set(entry) == {
             "id", "name", "short_description", "category", "origin", "shared",
             "follow_up",
+            # ADR 0070. Neither is prompt input: one is a casting marker,
+            # the other names a Session the caller already owns.
+            "reverse", "origin_session",
         }
         assert "case_facts" not in entry
         assert "call_goal" not in entry

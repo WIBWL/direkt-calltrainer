@@ -699,3 +699,70 @@ async def api_client(app_database: str) -> AsyncIterator[httpx.AsyncClient]:  # 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         yield client
+
+
+def stub_completions(monkeypatch, reply) -> list[tuple[list[dict[str, str]], bool]]:
+    """Replace `llm.complete` and record what it was asked.
+
+    `reply` is the text to answer with, or a callable invoked with the messages
+    (to raise, or to answer differently per attempt). The returned list holds
+    one `(messages, think)` pair per call, so a test can assert both what the
+    model was told and that it was asked off the live path (ADR 0011).
+
+    Lives here rather than in the one test file that uses it (F-61's): the
+    follow-up's tests grew their own variant while this branch was away, and a
+    stub of the pipeline's own client belongs beside the other pipeline fakes
+    either way.
+    """
+    calls: list[tuple[list[dict[str, str]], bool]] = []
+
+    # pylint: disable=unused-argument  # the signature has to mirror
+    # `llm.complete`, whose callers pass max_tokens; what it is set to is
+    # not what these tests are about.
+    async def complete(messages: list[dict[str, str]], *,
+                       max_tokens: int | None = None, think: bool = False) -> str:
+        calls.append((messages, think))
+        return reply(messages) if callable(reply) else reply
+
+    monkeypatch.setattr(llm, "complete", complete)
+    return calls
+
+
+def asked(calls, index: int = 0) -> str:
+    """Everything the model was told on one call, system prompt and material
+    together -- what a prompt assertion is made against."""
+    return "\n".join(message["content"] for message in calls[index][0])
+
+
+# One finished exchange with both speech durations filled in. Sprechtempo, the
+# one metric the reference fixture seeds, is a rate over phonation -- without
+# them nothing is measured and a Session carries no statistics at all. What a
+# test needs when it wants a Session that looks real and does not care what was
+# said in it (F-61).
+DRAFTED_FROM_TURNS = [
+    Turn(seq=1, persona_text="Brandt hier.", persona_offset_ms=0, persona_end_ms=1500),
+    Turn(seq=2, user_text="Guten Tag, was kann ich für Sie tun?",
+         user_offset_ms=1800, user_end_ms=3400,
+         user_speech_ms=1600, user_phonation_ms=1300,
+         persona_text="Der Preis ist zu hoch.",
+         persona_offset_ms=3700, persona_end_ms=5000),
+]
+
+
+def a_finished_session(
+    turns=None, subject: str | None = None, started_at: datetime | None = None
+) -> uuid.UUID:
+    """One Session written through the real write path, defaulting to
+    `DRAFTED_FROM_TURNS`.
+
+    `subject` names someone other than the test caller, which is how the
+    ownership refusals are set up; `started_at` moves it in time, which is how
+    the retention tests put one past the period. Both are omitted rather than
+    passed as None, so `persist` keeps its own defaults.
+    """
+    kwargs: dict = {}
+    if subject is not None:
+        kwargs["subject"] = subject
+    if started_at is not None:
+        kwargs["started_at"] = started_at
+    return persist(turns=DRAFTED_FROM_TURNS if turns is None else turns, **kwargs)

@@ -70,6 +70,12 @@ function SessionRow({ session }: { session: SessionSummary }) {
         <span className="session-row-title">{session.scenario}</span>
         <span className="session-row-persona">
           {session.persona}
+          {session.reverse && (
+            // Which side of the phone the User was on (ADR 0070). Two rows on
+            // the same Scenario are otherwise indistinguishable, and they were
+            // opposite exercises.
+            <span className="chip chip-neutral">Rollentausch</span>
+          )}
           {session.status === "aborted" && (
             // Worth saying, because it explains a short call or a missing
             // wrap-up — but stated, not warned about.

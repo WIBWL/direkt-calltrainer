@@ -27,13 +27,14 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import and_, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
 from backend.authored_text import clean
 from backend.db import models
 from backend.db.session import session_scope
 from backend.personas import Persona, PersonaVoice
-from backend.scenarios import Scenario
+from backend.scenarios import OriginSession, Scenario
 
 # Fields an authoring caller may set on a Scenario. `description` and the three
 # case fields are prompt input (ADR 0045); `title` / `short_description` are the
@@ -88,7 +89,28 @@ def _to_scenario(row: models.Scenario) -> Scenario:
         created_by=row.created_by,
         visibility=row.visibility,
         follow_up=row.derived_from_session_id is not None,
+        reverse=row.reverse,
+        origin_session=_to_origin_session(row.origin_session),
+        reverse_brief=row.reverse_brief,
     )
+
+
+def _to_origin_session(row: models.Session | None) -> OriginSession | None:
+    """The Session a reverse replays (ADR 0070), or None once it is gone --
+    the foreign key is `SET NULL`, so this is a normal state and not an error."""
+    if row is None:
+        return None
+    return OriginSession(
+        id=str(row.extern_id), persona=row.persona.name, started_at=row.started_at
+    )
+
+
+# The origin Session and its Persona, loaded with the Scenario rather than left
+# to a lazy load: every listing renders the card of every reverse, and one
+# query per row would be the N+1 the selection screen notices first.
+_WITH_ORIGIN = joinedload(models.Scenario.origin_session).joinedload(
+    models.Session.persona
+)
 
 
 def _visible_to(model, subject: str, tenant_id: int):
@@ -179,6 +201,7 @@ def list_scenarios(subject: str, tenant_id: int) -> list[Scenario]:
     with session_scope() as db:
         rows = db.scalars(
             select(models.Scenario)
+            .options(_WITH_ORIGIN)
             .where(
                 models.Scenario.active,
                 _visible_to(models.Scenario, subject, tenant_id),
@@ -195,7 +218,9 @@ def get_scenario(extern_id: str, subject: str, tenant_id: int) -> Scenario | Non
         return None
     with session_scope() as db:
         row = db.scalars(
-            select(models.Scenario).where(
+            select(models.Scenario)
+            .options(_WITH_ORIGIN)
+            .where(
                 models.Scenario.extern_id == ref,
                 models.Scenario.active,
                 _visible_to(models.Scenario, subject, tenant_id),
@@ -213,10 +238,11 @@ def create_scenario(
     """Author a private Scenario (ADR 0058), stamped with the caller's tenant so
     sharing is later a `visibility` flip (ADR 0060).
 
-    The single write path into `scenario`, the worker's generated follow-up
-    included (ADR 0069) — which is what keeps sanitising, caps and ownership in
-    one place. That caller has no tenant claim to stamp with and passes None;
-    `set_scenario_visibility` stamps such a row when it is first shared.
+    The single write path into `scenario`, the drafted follow-up included
+    (ADR 0069, through `create_follow_up` below) — which is what keeps
+    sanitising, caps and ownership in one place. A caller with no tenant claim
+    to stamp with passes None; `set_scenario_visibility` stamps such a row when
+    it is first shared.
     """
     with session_scope() as db:
         row = models.Scenario(
@@ -234,7 +260,13 @@ def create_scenario(
 
 
 def update_scenario(extern_id: str, data: dict, subject: str) -> Scenario | None:
-    """Edit a Scenario the caller authored. None if it is not theirs."""
+    """Edit a Scenario the caller authored. None if it is not theirs.
+
+    A reverse is not among them (ADR 0070): it is a copy of a case that was
+    played, and editing it would leave a row claiming to replay a conversation
+    it no longer matches. Excluded in the WHERE clause rather than checked
+    afterwards, so it answers exactly like a row that is not the caller's.
+    """
     ref = _as_extern_id(extern_id)
     if ref is None:
         return None
@@ -243,6 +275,7 @@ def update_scenario(extern_id: str, data: dict, subject: str) -> Scenario | None
             select(models.Scenario).where(
                 models.Scenario.extern_id == ref,
                 models.Scenario.created_by == subject,
+                models.Scenario.reverse.is_(False),
             )
         ).one_or_none()
         if row is None:
@@ -265,6 +298,11 @@ def set_scenario_visibility(
     """Share the caller's Scenario with their tenant, or make it private again
     (ADR 0060). Only `private` <-> `tenant`. None if the row is not theirs.
 
+    A reverse is excluded for a second reason on top of the one in
+    `update_scenario`: its briefing is derived from the author's own wrap-up
+    (ADR 0070), so sharing the row would hand colleagues a reading of that
+    person's feedback.
+
     A row that somehow has no `tenant_id` (created before tenant stamping) is
     stamped with the caller's tenant here, so sharing still works."""
     ref = _shareable_ref(extern_id, visibility)
@@ -275,6 +313,7 @@ def set_scenario_visibility(
             select(models.Scenario).where(
                 models.Scenario.extern_id == ref,
                 models.Scenario.created_by == subject,
+                models.Scenario.reverse.is_(False),
             )
         ).one_or_none()
         if row is None:
@@ -283,6 +322,133 @@ def set_scenario_visibility(
             row.tenant_id = tenant_id
         row.visibility = visibility
         db.flush()
+        return _to_scenario(row)
+
+
+# --- Written from a Session (ADR 0069, ADR 0070) ---------------------------
+#
+# Two kinds of Scenario are not authored but built out of a finished Session:
+# the follow-up drafted from its Feedback and the reverse that replays it. Both
+# are asked for by the User, both are stored, and both are at most one per
+# Session -- a UNIQUE column each says so. They live here for the reason
+# everything else does: this is the only module that writes the table.
+
+
+def _restore(where) -> Scenario | None:
+    """The row this Session already produced, made selectable again if the User
+    had removed it. None if there is none.
+
+    Shared by the two lookups below because the reason is shared: the create
+    routes ask for the existing row *before* they call a model, so pressing the
+    button twice costs nothing and yields the same Scenario. Reactivating
+    rather than returning the retired row is what keeps that answer usable -- a
+    deactivated Scenario is absent from the library, so handing back its id
+    would name something the selection screen cannot show.
+    """
+    with session_scope() as db:
+        row = db.scalars(
+            select(models.Scenario).options(_WITH_ORIGIN).where(where)
+        ).one_or_none()
+        if row is None:
+            return None
+        row.active = True
+        db.flush()
+        return _to_scenario(row)
+
+
+def restore_reverse(origin_session_id: int) -> Scenario | None:
+    """The reverse already made from this Session (ADR 0070), or None."""
+    return _restore(models.Scenario.origin_session_id == origin_session_id)
+
+
+def restore_follow_up(session_id: int) -> Scenario | None:
+    """The follow-up already drafted from this Session (ADR 0069), or None."""
+    return _restore(models.Scenario.derived_from_session_id == session_id)
+
+
+def create_follow_up(
+    draft: dict, subject: str, tenant_id: int | None, session_id: int
+) -> Scenario | None:
+    """Store one drafted follow-up as the caller's own Scenario (ADR 0069).
+
+    `create_scenario` with the provenance filled in, plus the same answer to
+    the same race the reverse has below: `derived_from_session_id` is UNIQUE,
+    so two overlapping requests for one Session end with one row, and the
+    loser reads it rather than raising. Nothing else differs -- a follow-up is
+    an authored Scenario in every respect the rest of this module knows about,
+    which is why it goes through the ordinary write path.
+
+    None only where the row the loser went looking for has itself gone in the
+    meantime, which the route answers exactly as it answers a Session that is
+    no longer there.
+    """
+    try:
+        return create_scenario(draft, subject, tenant_id, derived_from_session_id=session_id)
+    except IntegrityError:
+        return restore_follow_up(session_id)
+
+
+def create_reverse(
+    origin_session_id: int, subject: str, tenant_id: int, brief: dict
+) -> Scenario | None:
+    """Write the reverse of one Session (ADR 0070). None if that Session is gone.
+
+    The case is copied from the Scenario that was actually played, here rather
+    than in the caller: this module already owns what a Scenario row is made
+    of, and a copy assembled outside it would be a second place to update when
+    a field is added.
+
+    Lands private and owned by the caller, like an authored Scenario -- but
+    unlike one it can never be shared or edited (see the two guards above). The
+    text is not run through `clean()` on the way in: the case is a copy of a
+    row that was cleaned when it was written, and the briefing is sanitised by
+    `backend/reversals.py` as it comes out of the model.
+
+    The route looks for an existing reverse before it gets here, so the UNIQUE
+    constraint is only reached when two requests for the same Session overlap
+    -- a second tab, or a double click that outran the button's disabled state.
+    That is answered with the row that won rather than with a 500: both callers
+    asked for the same thing and there is exactly one of it. The briefing the
+    loser generated is dropped, which costs a model call and nothing else.
+    """
+    try:
+        return _insert_reverse(origin_session_id, subject, tenant_id, brief)
+    except IntegrityError:
+        return restore_reverse(origin_session_id)
+
+
+def _insert_reverse(
+    origin_session_id: int, subject: str, tenant_id: int, brief: dict
+) -> Scenario | None:
+    """The write itself, in a transaction of its own so the caller above can let
+    it fail and read instead -- `session_scope` has rolled it back by then."""
+    with session_scope() as db:
+        origin = db.get(models.Session, origin_session_id)
+        if origin is None:
+            return None
+        played = origin.scenario
+        row = models.Scenario(
+            created_by=subject,
+            tenant_id=tenant_id,
+            visibility=models.VISIBILITY_PRIVATE,
+            active=True,
+            reverse=True,
+            origin_session_id=origin_session_id,
+            reverse_brief=brief,
+            title=played.title,
+            short_description=played.short_description,
+            description=played.description,
+            case_facts=played.case_facts,
+            call_goal=played.call_goal,
+            success_condition=played.success_condition,
+            # Carried over so a reverse sits under the same category filter as
+            # the call it replays -- it is the same kind of call, seen from the
+            # other side (ADR 0072).
+            category=played.category,
+        )
+        db.add(row)
+        db.flush()
+        db.refresh(row)
         return _to_scenario(row)
 
 

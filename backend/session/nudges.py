@@ -51,6 +51,26 @@ ANTI_REPEAT_NUDGE = (
     "were your own idea."
 )
 
+# The same nudge for a reverse (ADR 0070), and the paragraph above is why it
+# needs one: its last three lines exist to stop the persona adopting the user's
+# proposal and re-presenting it as its own solution. Reversed, that is not a
+# failure mode but the job -- the persona is the company side, the one that
+# *does* put things on the table -- so the rule left as it stands has the
+# nudge nearest the reply contradicting the casting the system prompt set. What
+# survives is the demand for something new every turn, which is the part that
+# is about repetition rather than about who solves the call.
+ANTI_REPEAT_NUDGE_REVERSE = (
+    'Your previous reply in this call was:\n"{previous}"\n'
+    "Say something genuinely different now: react to what the caller just "
+    "said, answer the part of it you have not answered yet, put forward what "
+    "you can actually do, or ask for the one detail you still need — in new "
+    "words. Do not repeat or reword that reply, and do not greet or introduce "
+    "yourself again.\n"
+    "If the caller has just told you something, use it: place it against what "
+    "your records say, and either act on it or say plainly why you cannot. Do "
+    "not hand their own request back to them as a question."
+)
+
 # Appended to the standing nudge above, so that the criterion the call ends on
 # is the last thing in context before the model answers. It already stands in
 # the system prompt, but the same recency problem applies to it as to the
@@ -79,10 +99,28 @@ SETTLEMENT_CHECK = (
     "the call the way your instructions describe."
 )
 
+# The same check for a reverse (ADR 0070), where the criterion is the caller's
+# and the persona is the one who has to meet it. The direction is the whole
+# difference: asked the question above while playing the support side, the
+# model read "has the user given you that" as its own demand and started
+# pressing the caller for the thing the caller had rung about.
+SETTLEMENT_CHECK_REVERSE = (
+    "\nOne question to settle before you send that reply. What ends this call is: "
+    "{criterion}. Have you actually given the caller that, in words they could "
+    "quote back to you? Count what you offered piece by piece over several "
+    "replies. If any part of it is still open, or you are about to ask a "
+    "question of your own, then it has not been given: answer as described "
+    "above and carry the call on. If you cannot give it at all, say so plainly "
+    "-- that is an answer too, and the call can close on it. Only once it has "
+    "actually been given do you stop: confirm briefly what will happen and "
+    "close the call the way your instructions describe."
+)
+
 # What the check weighs the call against when the Scenario carries no success
 # condition -- a user-authored one (ADR 0024), or one predating ADR 0045. Vaguer
 # by necessity; the position in context is what does the work either way.
 GENERIC_CRITERION = "what you came for has been given"
+GENERIC_CRITERION_REVERSE = "the caller has what they rang about"
 
 # Replies the persona has to have given -- its opening plus two answers --
 # before the settlement check is attached at all. See

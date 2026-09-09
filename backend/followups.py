@@ -1,10 +1,17 @@
 """The next exercise, built from a Session's Feedback: a follow-up Scenario (F-60).
 
 The improvement points say what to work on; the model is asked for a Scenario
-that cannot be got through without it. `create_follow_up` runs in the Feedback
-worker, right after the wrap-up it is built from is stored (ADR 0069), and
-writes through `backend/library.py` like any authored Scenario, so sanitising,
-caps and ownership stay where they are.
+that cannot be got through without it. The draft is written here and stored by
+`backend/library.py` like any authored Scenario, so sanitising, caps and
+ownership stay where they are.
+
+**Asked for, not written unbidden** (ADR 0069's amendment). It began as a second
+model call in the Feedback worker, arriving a little after the wrap-up whether
+anyone wanted it or not; the User now presses a button for it, exactly as they
+do for the reverse (F-61). What that buys is stated in the ADR; what it means
+here is that this module no longer knows anything about a worker. It drafts,
+`POST /api/sessions/{id}/follow-up` reads the material and stores the result,
+and a failure is a status code rather than a silent log line.
 
 Withheld from the model: the measured statistics (no target range exists,
 ADR 0051) and the played Scenario's prompt fields (withheld from the client
@@ -16,17 +23,11 @@ The values are German: it lands in the User's own library, as F-58's text does.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 
-from openai import OpenAIError
 from pydantic import BaseModel, ValidationError
-from sqlalchemy.orm import selectinload
 
-from backend import library
 from backend.authored_text import WIRE_FIELD_LIMITS, clean
 from backend.clients import llm
-from backend.db import models as db_models
-from backend.db.session import session_scope
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +230,13 @@ async def draft_follow_up(
     Thinking mode, as off the live path (ADR 0011). Propagates OpenAIError;
     raises FollowUpError when nothing usable came back -- unlike the wrap-up
     there is no partial result worth keeping, because a Scenario with no
-    situation in it is not an exercise.
+    situation in it is not an exercise. Both reach the caller as a 503, which
+    is the whole difference the amendment made: the same failure used to be a
+    log line nobody read.
+
+    Its own retry loop rather than `llm.complete_json` (F-61 uses that one):
+    this re-asks on a draft whose required fields came back *empty*, which is a
+    judgement about the content and not about whether it parsed.
     """
     messages = _messages(_material(scenario_name, scenario_teaser, improvements, phase_language))
     for attempt in range(2):  # initial attempt + one retry
@@ -248,96 +255,3 @@ async def draft_follow_up(
         except (ValidationError, ValueError) as e:
             logger.warning("Follow-up draft did not validate (attempt %d): %s", attempt + 1, e)
     raise FollowUpError("the model produced no usable scenario draft")
-
-
-# --- The stored follow-up -------------------------------------------------
-
-
-@dataclass(frozen=True)
-class _SessionMaterial:
-    """What the prompt is built from, read out before the database handle is
-    gone. The played Scenario's card only, never its prompt fields."""
-
-    subject_id: str
-    scenario_name: str
-    scenario_teaser: str
-    improvements: list[str]
-    phase_language: str | None
-
-
-def _session_material(session_id: int) -> _SessionMaterial | None:
-    """This Session's material, or None if there is nothing to build from.
-
-    No ownership check and no consent check: the caller is the worker, running
-    a job for a Session that is already stored — which, per ADR 0066, it could
-    not be without consent.
-    """
-    with session_scope() as db:
-        session = (
-            db.query(db_models.Session)
-            .filter_by(session_id=session_id)
-            .options(
-                selectinload(db_models.Session.scenario),
-                selectinload(db_models.Session.feedback)
-                .selectinload(db_models.Feedback.points),
-            )
-            .one_or_none()
-        )
-        feedback = session.feedback if session else None
-        if feedback is None:
-            return None
-        improvements = [
-            point.text
-            for point in feedback.points
-            if point.kind == db_models.POINT_IMPROVEMENT
-        ]
-        if not improvements:
-            return None
-        return _SessionMaterial(
-            subject_id=session.subject_id,
-            scenario_name=session.scenario.title,
-            scenario_teaser=session.scenario.short_description,
-            improvements=improvements,
-            phase_language=feedback.phase_language,
-        )
-
-
-async def create_follow_up(session_id: int) -> None:
-    """Store this Session's follow-up Scenario, if its Feedback asks for one.
-
-    Never raises. It runs after the wrap-up has been stored and the job closed
-    (`backend/feedback/generator.py`), and the wrap-up is the thing the User is
-    waiting for: a model that will not produce a scenario must not turn a
-    finished wrap-up into a failed job. A Session with no improvement points
-    gets none, silently, for the same reason.
-
-    Exactly one per Session, and it is the UNIQUE on `derived_from_session_id`
-    that says so rather than a check here — `scripts/requeue_feedback.py` can
-    run this job again, and a second draft would arrive as a duplicate row
-    nobody asked for.
-    """
-    try:
-        material = _session_material(session_id)
-        if material is None:
-            return
-        draft = await draft_follow_up(
-            material.scenario_name,
-            material.scenario_teaser,
-            material.improvements,
-            material.phase_language,
-        )
-        # The draft is keyed as the client knows the fields (ADR 0061); the
-        # library writes columns, where the card's `name` is `title`.
-        draft["title"] = draft.pop("name")
-        # No tenant: the worker has no request and so no `tenant` claim to
-        # resolve one from (ADR 0060).
-        scenario = library.create_scenario(
-            draft, material.subject_id, None, derived_from_session_id=session_id
-        )
-        logger.info("Follow-up scenario %s stored for session %d", scenario.id, session_id)
-    except (OpenAIError, FollowUpError) as e:
-        # Expected: the gateway has no fallback, and a small model does not
-        # always write a scenario. The User keeps their wrap-up either way.
-        logger.warning("No follow-up scenario for session %d: %s", session_id, e)
-    except Exception:  # pylint: disable=broad-exception-caught
-        logger.exception("Follow-up scenario failed for session %d", session_id)

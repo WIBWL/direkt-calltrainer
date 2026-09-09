@@ -192,7 +192,14 @@ def _measurement(key: str, name: str, unit: str | None, value: float, detail=Non
 
 
 def _session_with(*measurements) -> SimpleNamespace:
-    return SimpleNamespace(measurements=list(measurements), turns=[])
+    # The Scenario is stood in for as well: `_dossier` reads its `reverse` flag
+    # to decide what to call the simulated side (ADR 0070), and a real Session
+    # always has one -- `session.scenario_id` is NOT NULL.
+    return SimpleNamespace(
+        measurements=list(measurements),
+        turns=[],
+        scenario=SimpleNamespace(reverse=False),
+    )
 
 
 def test_the_dossier_describes_loudness_instead_of_quoting_its_span() -> None:

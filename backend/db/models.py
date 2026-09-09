@@ -157,6 +157,20 @@ def _tenant_visibility_needs_a_tenant() -> CheckConstraint:
     )
 
 
+def _brief_only_on_a_reverse() -> CheckConstraint:
+    """The briefing belongs to a reverse and to nothing else (ADR 0070).
+
+    Deliberately not the stronger `reverse => origin_session_id IS NOT NULL`:
+    the origin Session is `ON DELETE SET NULL`, so a reverse whose original
+    conversation has been deleted is a legitimate row that such a constraint
+    would forbid the database from producing.
+    """
+    return CheckConstraint(
+        "reverse OR reverse_brief IS NULL",
+        name="brief_only_on_a_reverse",
+    )
+
+
 class _AuthoredContent:
     """The columns shared by the `scenario` table and, for schema symmetry, the
     `persona` table. A mixin so the set is defined once and cannot drift between
@@ -292,6 +306,7 @@ class Scenario(_AuthoredContent, Base):
         _one_of("visibility", VISIBILITIES),
         _one_of("category", SCENARIO_CATEGORIES),
         _tenant_visibility_needs_a_tenant(),
+        _brief_only_on_a_reverse(),
         # The visibility filter's hot path -- `/api/scenarios` and every
         # `get_scenario` in the Session pipeline (ADR 0060).
         Index("ix_scenario_tenant_id_visibility", "tenant_id", "visibility"),
@@ -336,10 +351,54 @@ class Scenario(_AuthoredContent, Base):
         index=True,
     )
 
-    # `foreign_keys` because there are now two edges between these tables --
-    # this one, and the provenance column above.
+    # --- Reverse (ADR 0070) -------------------------------------------------
+    # A reverse replays one finished Session with the roles swapped: the User
+    # calls and the Persona answers. A column rather than a convention in the
+    # Scenario text because four readers branch on it -- the prompt casting
+    # (`session/prompting.py`), the wrap-up's speaker labels, the library
+    # filter and the briefing panel. That is exactly what the free-text
+    # `scenario_type` label ADR 0062 removed never had.
+    #
+    # Distinct from `derived_from_session_id` above, which is the follow-up's
+    # provenance (ADR 0069): that one says a Scenario was *written from* a
+    # Session, this one says it *replays* one, and only this one changes how
+    # the call is cast. A row is at most one of the two.
+    reverse: Mapped[bool] = mapped_column(Boolean, default=False)
+    # The Session this replays. UNIQUE, so the button is idempotent: one
+    # reverse per Session, and a second press finds the row rather than making
+    # a second one. `SET NULL` and not `CASCADE` -- the exception ADR 0052
+    # names for a back-reference, and the direction matters here: a *reverse
+    # Session* points at this row through `session.scenario_id`, so the row has
+    # to outlive the conversation it came from. What it keeps is the case and a
+    # briefing, never the original transcript.
+    #
+    # No `index=True` beside the unique constraint (ADR 0052): the unique index
+    # is already an index on this column, and a second one would be dead weight
+    # on every write.
+    origin_session_id: Mapped[int | None] = mapped_column(
+        # use_alter for the same reason as the provenance edge above: three
+        # foreign keys now run between these two tables, and without it
+        # SQLAlchemy cannot order them.
+        ForeignKey("session.session_id", ondelete="SET NULL", use_alter=True),
+        unique=True,
+    )
+    # What the User reads *during* a reverse call: the Persona's own briefing,
+    # turned into German prose addressed to them, plus the checklist of goals
+    # (`backend/reversals.py`). NULL on every other row, which the CHECK above
+    # enforces. Never part of any prompt -- a briefing the Persona could read
+    # would be a briefing the Persona could act on.
+    reverse_brief: Mapped[dict | None] = mapped_column(JSONB)
+
+    # `foreign_keys` because there are now three edges between these tables --
+    # this one, the provenance column above, and the reverse's origin below.
     sessions: Mapped[list["Session"]] = relationship(
         back_populates="scenario", foreign_keys="Session.scenario_id"
+    )
+    # No back-reference from Session on purpose -- without one the ORM issues a
+    # plain DELETE and lets the database's SET NULL do the work, which is what
+    # keeps deleting a Session from loading every reverse ever made of it.
+    origin_session: Mapped["Session | None"] = relationship(
+        foreign_keys=[origin_session_id]
     )
 
 
@@ -412,6 +471,8 @@ class Session(Base):
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     persona: Mapped["Persona"] = relationship(back_populates="sessions")
+    # `foreign_keys` because two Scenario columns point back the other way --
+    # the follow-up's provenance (ADR 0069) and the reverse's origin (ADR 0070).
     scenario: Mapped["Scenario"] = relationship(
         back_populates="sessions", foreign_keys=[scenario_id]
     )

@@ -60,6 +60,7 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 | F-12 | Aufzeichnung des Gesprächs | Aufzeichnung und Transkription zur nachträglichen Reflexion. Das Transkript liegt unmittelbar nach dem Gespräch vollständig in Textform vor und wird während des Gesprächs nicht angezeigt. | Funktionale Vollständigkeit | MUST | R-28, R-52 |
 | F-13 | Aufzeichnung des Fortschritts | Nutzerbezogene Verlaufsdaten über längere Zeiträume, nachvollziehbar dargestellt. | Funktionale Vollständigkeit | SHOULD | R-27, R-29, R-30 |
 | F-48 | Trainingshistorie | Übersicht vergangener Trainings, filterbar nach Szenario-Typ und Zeitraum. | Funktionale Vollständigkeit | COULD | R-29 |
+| F-61 | Rollentausch eines Gesprächs | Ein abgeschlossenes Gespräch lässt sich mit vertauschten Rollen wiederholen: der Nutzer ruft an, die KI nimmt ab und übernimmt die Seite des Nutzers. Während des Gesprächs sieht der Nutzer die Unterlagen, die zuvor die KI hatte, samt einer kurzen Liste, worauf zu achten ist. | Funktionale Vollständigkeit | COULD | R-25, R-28, R-01 |
 
 ## Bedienoberfläche
 
@@ -101,5 +102,5 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 |---|---|
 | MUST | 17 |
 | SHOULD | 11 |
-| COULD | 14 |
-| **Gesamt** | **42** |
+| COULD | 15 |
+| **Gesamt** | **43** |

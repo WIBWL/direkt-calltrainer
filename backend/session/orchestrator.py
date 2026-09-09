@@ -45,9 +45,11 @@ from backend.session.prompting import (
     STATE_MAX_TOKENS, build_state_prompt, build_system_prompt, opening_instruction,
 )
 from backend.session.nudges import (
-    ANTI_REPEAT_NUDGE, CLARIFY_AGAIN_NUDGE, CLARIFY_NUDGE, CLOSING_NUDGE, ECHO_NUDGE,
-    GENERIC_CRITERION, INTERRUPTED_MARK, INTERRUPTED_NUDGE, REGENERATE_NUDGE,
-    REPEAT_OPENING_NUDGE, RESUME_NUDGE, SETTLEMENT_CHECK, SETTLEMENT_CHECK_AFTER_REPLIES,
+    ANTI_REPEAT_NUDGE, ANTI_REPEAT_NUDGE_REVERSE, CLARIFY_AGAIN_NUDGE, CLARIFY_NUDGE,
+    CLOSING_NUDGE, ECHO_NUDGE,
+    GENERIC_CRITERION, GENERIC_CRITERION_REVERSE, INTERRUPTED_MARK, INTERRUPTED_NUDGE,
+    REGENERATE_NUDGE, REPEAT_OPENING_NUDGE, RESUME_NUDGE, SETTLEMENT_CHECK,
+    SETTLEMENT_CHECK_AFTER_REPLIES, SETTLEMENT_CHECK_REVERSE,
     STATE_NOTES_FRAME, strip_interrupted_mark,
 )
 from backend.session.language_packs import LanguagePack, get_pack, is_phantom, signals_closing
@@ -308,14 +310,22 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         return turn, reopening
 
     async def run_opening_turn(self) -> AsyncIterator[TurnEvent]:
-        """Have the Persona speak first: a freshly generated, varied call opener."""
+        """Have the Persona speak first: a freshly generated, varied call opener.
+
+        In a reverse (ADR 0070) it speaks first here too -- it is the one
+        picking up the phone -- and the instruction, not this Turn, is what
+        makes it say only that.
+        """
         turn, _ = self._new_or_reopened_turn()
         progress = _ReplyProgress()
         try:
             yield StateChanged(state="thinking")
             kickoff_messages = [
                 *self._messages,
-                {"role": "user", "content": opening_instruction(self._pack)},
+                {
+                    "role": "user",
+                    "content": opening_instruction(self._pack, self._scenario.reverse),
+                },
             ]
             async with contextlib.aclosing(self._generate_reply(turn, kickoff_messages, progress)) as replies:
                 async for event in replies:
@@ -445,8 +455,13 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         elif self._repeat_requests_in_a_row == 1:
             nudge = CLARIFY_NUDGE
         elif self._previous_reply():
+            # Reversed, the anti-repeat rule turns around with the casting
+            # (ADR 0070): the persona is the side that puts things on the
+            # table, so the clause forbidding that would undo the system
+            # prompt from the nearest position in context.
+            frame = ANTI_REPEAT_NUDGE_REVERSE if self._scenario.reverse else ANTI_REPEAT_NUDGE
             nudge = (
-                ANTI_REPEAT_NUDGE.format(previous=self._previous_reply()) +
+                frame.format(previous=self._previous_reply()) +
                 self._settlement_check()
             )
         else:
@@ -470,6 +485,12 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         replies = sum(1 for m in self._messages if m["role"] == "assistant")
         if replies < SETTLEMENT_CHECK_AFTER_REPLIES:
             return ""
+        # A reverse asks the same question from the other end of the line
+        # (ADR 0070): the criterion is the caller's either way, but there it is
+        # the persona's to meet rather than to be satisfied by.
+        if self._scenario.reverse:
+            criterion = self._scenario.success_condition.strip() or GENERIC_CRITERION_REVERSE
+            return SETTLEMENT_CHECK_REVERSE.format(criterion=criterion)
         criterion = self._scenario.success_condition.strip() or GENERIC_CRITERION
         return SETTLEMENT_CHECK.format(criterion=criterion)
 

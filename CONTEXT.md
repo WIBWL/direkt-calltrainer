@@ -17,8 +17,12 @@ The situational context configured for a Session — e.g. the caller's reason fo
 _Avoid_: Persona, situation. For the Category: type, Szenariotyp (the free-text `scenario_type` column it replaces is gone; see docs/adr/0064)
 
 **Follow-up Scenario** (_Folgeszenario_):
-The Scenario written automatically from a finished Session's Feedback, one per Session that has improvement points (docs/adr/0069). A Scenario in every other respect — the User owns it, edits it, shares it and plays it against any Persona — so it is a category, not a kind: it is set apart only by the Session it came from, and it leaves the library when that Session is deleted. Not a repeat of the call it came from: a new case in the same subject area, built so that what the Feedback asked for is the way through it.
+The Scenario the User has drafted from a finished Session's Feedback, at most one per Session and only where the Feedback names improvement points (docs/adr/0069). Asked for, like a Reverse: it was written unbidden by the Feedback worker until that ADR's amendment. A Scenario in every other respect — the User owns it, edits it, shares it and plays it against any Persona — so it is a category, not a kind: it is set apart only by the Session it came from, and it leaves the library when that Session is deleted. Not a repeat of the call it came from: a new case in the same subject area, built so that what the Feedback asked for is the way through it.
 _Avoid_: Follow-up call, next session, exercise
+
+**Reverse** (_Rollentausch_):
+A Session that replays one finished Session with the roles swapped: the User is the caller, and the Persona answers the phone and takes the side the User held. Stored as a Scenario of its own and asked for in the same way as a Follow-up Scenario — but where that one is *written from* a Session, this one *replays* it: it carries that Session's case verbatim plus a **Reverse Brief**, the German briefing the User reads while the call runs (docs/adr/0070). A row is at most one of the two. Not a mode: it is a marker on a row, so a reverse can be selected again like any other Scenario, and unlike a Follow-up Scenario it is neither edited nor shared.
+_Avoid_: Rollentausch (in code and on the wire — it stays "reverse"; the UI label is German), replay, re-run, mirror, role-play
 
 **Persona**:
 The character traits of the AI-simulated conversation partner within a Session — e.g. impatient, calm, confrontational. Combined independently with a Scenario.
