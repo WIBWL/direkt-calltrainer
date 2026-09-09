@@ -166,7 +166,6 @@ export default function PastSessionView() {
             measurements={detail.measurements}
             findings={detail.findings}
             notes={detail.metric_notes}
-            scales={detail.metric_scales}
             sessionId={detail.session_id}
           />
         </>

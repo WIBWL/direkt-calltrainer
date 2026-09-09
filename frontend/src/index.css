@@ -3973,43 +3973,9 @@ h2 {
   color: var(--color-text-muted);
 }
 
-/* --- The Sprachmelodie block in the wrap-up (F-35) ------------------------ */
-/* The one Kennzahl that gets a block instead of a tile, because what it
-   measures is a shape. Same eyebrow and title as the Kennzahlen section above
-   it, so it reads as a continuation of that section and not as a second
-   verdict. */
-.feedback-intonation {
-  margin-top: 2rem;
-}
-
-.intonation-figure {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 10px;
-  margin: 0 0 0.75rem;
-}
-
-.intonation-figure-value {
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--color-navy-900);
-  font-variant-numeric: tabular-nums;
-}
-
-/* The figure line's own reading sits on the same baseline as the number, so the
-   word and the value read as one statement. */
-.intonation-figure .metric-light-label {
-  margin-top: 0;
-}
-
-.intonation-more {
-  display: inline-block;
-  margin-top: 1rem;
-  font-size: 0.85rem;
-  color: var(--color-blue-600);
-}
+/* --- Sprachmelodie (F-35) ------------------------------------------------- */
+/* The contour and the four factors live on the Kennzahl's own page
+   (`SessionMetricView`); the wrap-up carries the tile like every other. */
 
 .factor-heading {
   margin: 1.5rem 0 0.5rem;
