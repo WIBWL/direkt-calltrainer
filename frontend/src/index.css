@@ -2699,6 +2699,24 @@ h2 {
   color: var(--color-navy-900);
 }
 
+/* The Kennzahlen slider: the same track as the scenario filters. Only two
+   options here, so they split it instead of sitting left-aligned. */
+.feedback-metrics-filter {
+  margin-bottom: 18px;
+}
+
+.feedback-metrics-filter .filter-slider-option {
+  flex: 1;
+  justify-content: center;
+}
+
+.feedback-metrics-lead {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
 .feedback-metrics-section .metric-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

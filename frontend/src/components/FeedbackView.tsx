@@ -4,6 +4,7 @@ import { ApiError } from "../api";
 import type {
   FeedbackPoint,
   Measurement,
+  MetricAspect,
   SessionDetail,
   SessionTurn,
 } from "../protocol";
@@ -15,6 +16,7 @@ import {
   type FollowUpCard,
   type ReverseScenario,
 } from "../scenarioLibrary";
+import FilterSlider, { type FilterOption } from "./FilterSlider";
 import InfoDetails from "./InfoDetails";
 import LoudnessCourse from "./LoudnessCourse";
 
@@ -39,6 +41,22 @@ export interface FollowUpActions {
 /** How many decimals a metric reads naturally in. Counts are whole things;
  * seconds and percentages are not. */
 const DECIMALS: Record<string, number> = { questions: 0, word_count: 0, pace: 0, talk_share: 0 };
+
+/** The two halves (backend/db/models.py METRIC_ASPECTS), in slider order. */
+const ASPECTS: MetricAspect[] = ["how", "what"];
+
+const ASPECT_LABELS: Record<MetricAspect, string> = {
+  how: "Wie Sie gesprochen haben",
+  what: "Was Sie gesagt haben",
+};
+
+/** One line under the slider saying what the half in view is a reading of. */
+const ASPECT_LEADS: Record<MetricAspect, string> = {
+  how: "Ihre Sprechweise: Tempo, Pausen, Lautstärke und wie schnell Sie geantwortet haben.",
+  what:
+    "Der Zuschnitt des Gesprächs: wie viel Raum Sie eingenommen und wie viel Sie " +
+    "gefragt haben.",
+};
 
 /** Everything that is not a finished wrap-up is a one-line notice. There is
  * no entry for "ready": the hook reports it only once feedback is present. */
@@ -271,15 +289,42 @@ function PhaseLanguage({ text }: { text: string }) {
  * grid says so rather than leaving the user to assume a direction.
  */
 export function MetricSection({ measurements }: { measurements: Measurement[] }) {
-  if (measurements.length === 0) return null;
+  // Opens on the paraverbal half: the one reading the transcript cannot give.
+  const [aspect, setAspect] = useState<MetricAspect>("how");
+
+  const derived = sentenceLength(measurements);
+  const all = derived ? [...measurements, derived] : measurements;
+
+  const options: FilterOption<MetricAspect>[] = ASPECTS.map((value) => ({
+    value,
+    label: ASPECT_LABELS[value],
+    count: all.filter((m) => half(m) === value).length,
+  }));
+  // Nothing to switch between when one half is empty: show what there is.
+  const split = options.every((option) => option.count > 0);
+  const shown = split ? all.filter((m) => half(m) === aspect) : all;
+
+  if (all.length === 0) return null;
 
   return (
     <section className="feedback-metrics-section">
       <div className="feedback-metrics-eyebrow">ERGÄNZENDE AUSWERTUNG</div>
       <h2 className="feedback-metrics-title">Kennzahlen zum Gespräch</h2>
 
+      {split && (
+        <div className="feedback-metrics-filter">
+          <FilterSlider
+            options={options}
+            value={aspect}
+            onChange={setAspect}
+            label="Kennzahlen nach Art filtern"
+          />
+          <p className="feedback-metrics-lead">{ASPECT_LEADS[aspect]}</p>
+        </div>
+      )}
+
       <div className="metric-grid">
-        {measurements.map((measurement) => (
+        {shown.map((measurement) => (
           <Metric key={measurement.key} measurement={measurement} />
         ))}
       </div>
@@ -290,6 +335,29 @@ export function MetricSection({ measurements }: { measurements: Measurement[] })
       </p>
     </section>
   );
+}
+
+/** `how` is the closed side; everything else falls to `what`, so an
+ * unclassified metric still gets a tile. */
+function half(measurement: Measurement): MetricAspect {
+  return measurement.aspect === "how" ? "how" : "what";
+}
+
+/** F-08's second half, already in `word_count`'s own `detail`: its own tile,
+ * because the two answer different questions, but not its own metric_type row
+ * — that would store one number twice. */
+function sentenceLength(measurements: Measurement[]): Measurement | null {
+  const words = measurements.find((m) => m.key === "word_count");
+  const value = words?.detail?.["words_per_sentence"];
+  if (typeof value !== "number") return null;
+  return {
+    key: "words_per_sentence",
+    name: "Wörter pro Satz",
+    unit: null,
+    aspect: "what",
+    value,
+    detail: null,
+  };
 }
 
 /** The next call in the same matter, built from the points above (F-60).
