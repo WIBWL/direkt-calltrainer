@@ -6,6 +6,7 @@ Covers:
         factual -> warm again across Opening, Core Business and Closing, and
         the block that says whether it did
   ADR 0049  the model interprets, it never produces a figure
+  F-10  a point names a moment by its timestamp, never by its turn id
   F-37  loudness reaches the model described rather than measured, so the
         text cannot quote a figure the chart deliberately does not show
   ADR 0004 / ADR 0051  no score, and no figure judged against a norm
@@ -30,7 +31,7 @@ import pytest
 
 from backend.clients.llm import _strip_reasoning
 from backend.feedback.generator import (
-    _ask, _dossier, _LANGUAGE_NAMES_EN, _messages, _Wrapup,
+    _ask, _dossier, _LANGUAGE_NAMES_EN, _messages, _without_turn_markers, _Wrapup,
 )
 from backend.session.language_packs import LANGUAGE_PACKS
 
@@ -240,3 +241,41 @@ def test_a_loudness_measurement_without_a_curve_adds_no_line() -> None:
 
     assert "Loudness course" not in dossier
     assert "Lautstärke" not in dossier
+
+
+# --- F-10: the turn id stays out of the prose ------------------------------
+
+
+def test_the_prompt_forbids_the_turn_id_in_a_text_value(system_prompt: str) -> None:
+    """The id belongs in the turn_id field (O3), not in the sentence the
+    trainee reads, where P1 asks for the timestamp."""
+    assert "N5." in system_prompt
+    assert "Never write a turn id inside a text value" in system_prompt
+
+
+@pytest.mark.parametrize("written, expected", [
+    ('Bei [turn_id=12] 02:14 sagten Sie: „Ich schaue mal.“',
+     'Bei 02:14 sagten Sie: „Ich schaue mal.“'),
+    ('turn_id=12 Sie blieben sachlich.', 'Sie blieben sachlich.'),
+    ('Sie sagten (turn_id 7), dass Sie sich melden.',
+     'Sie sagten, dass Sie sich melden.'),
+    ('[Turn 12] Ihr Einstieg war warm.', 'Ihr Einstieg war warm.'),
+    ('Sie liessen ihn ausreden [turn-id: 4]; das half.',
+     'Sie liessen ihn ausreden; das half.'),
+])
+def test_a_copied_turn_marker_never_reaches_the_stored_text(
+    written: str, expected: str,
+) -> None:
+    """N5 is a rule, and a 4B model (ADR 0011) loses rules -- so the marker
+    comes back out at the write boundary, gap and all."""
+    assert _without_turn_markers(written) == expected
+
+
+def test_a_sentence_that_merely_reads_like_a_marker_is_left_alone() -> None:
+    """Marker shapes only: cutting "in Turn 12" out of a sentence leaves it
+    ungrammatical, which is worse than the marker."""
+    prose = "In Turn 12 haben Sie zugehört."
+    assert _without_turn_markers(prose) == prose
+    assert _without_turn_markers("Bei 02:14 sagten Sie: „Moment.“") == (
+        "Bei 02:14 sagten Sie: „Moment.“"
+    )

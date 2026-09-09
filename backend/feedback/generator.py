@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, ValidationError
@@ -420,6 +421,11 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
         "N3. No markdown, no headings, no bullet characters, no line breaks "
         "inside the JSON strings.\n"
         "N4. No text of any kind before or after the JSON object.\n"
+        "N5. Never write a turn id inside a text value, and never the "
+        "word 'turn' with a number after it. The material prefixes "
+        "every line with its id so that you can fill in the turn_id field "
+        "(O3); in the text a moment is named by its timestamp and nothing "
+        "else.\n"
         "\n"
         "# Output\n"
         "Answer with a single JSON object and nothing else -- no prose, no "
@@ -516,12 +522,41 @@ def _unfenced_text(raw: str) -> str:
 # --- Storage --------------------------------------------------------------
 
 
+# `_dossier` prefixes every line with `[turn_id=12]` so a point can cite it
+# in the turn_id field (O3); a 4B model (ADR 0011) copies it into the prose
+# too, where P1 asked for the timestamp. N5 forbids it, this takes it back
+# out. Marker shapes only -- cutting "in Turn 12" out of a sentence would
+# leave it ungrammatical, so that form stays N5's job.
+_TURN_MARKER_RE = re.compile(
+    r"""
+    \s*                                                    # its leading space
+    (?:
+        [\[(] \s* turn [ _-]? (?:id)? \s* [:=#]? \s* \d+ \s* [\])]  # [turn_id=12]
+      | \b turn [ _-]? id \s* [:=#]? \s* \d+                   # turn_id=12
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def _without_turn_markers(text: str) -> str:
+    """One text value with the transcript's id markers taken back out."""
+    cleaned = _TURN_MARKER_RE.sub("", text)
+    # It takes its own space with it: close the gap it leaves behind.
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r" +([,.;:!?])", r"\1", cleaned)
+    return cleaned.strip()
+
+
 def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) -> None:
     """Replace this Session's Feedback with the generated one.
 
     A point citing a Turn that is not this Session's is stored without the
     citation rather than dropped: the observation may still be sound, but a
     reference the user could follow to the wrong place must not survive.
+
+    Every text value passes `_without_turn_markers` on the way in: written
+    once, read on two screens, so the cleanup belongs here.
     """
     # Through the ORM, not a bulk delete. The database would carry the points
     # along by itself (feedback_point.feedback_id is ON DELETE CASCADE), but
@@ -533,11 +568,11 @@ def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) 
         db.flush()
     feedback = db_models.Feedback(
         session_id=session_id,
-        summary=wrapup.summary,
+        summary=_without_turn_markers(wrapup.summary),
         # NULL rather than "" where the model gave us nothing: the frontend
         # leaves the block out entirely then, which is honest about a call
         # nobody analysed for its phases. An empty paragraph would not be.
-        phase_language=wrapup.phase_language.strip() or None,
+        phase_language=_without_turn_markers(wrapup.phase_language) or None,
         score=None,  # ADR 0004: qualitative only, no score in the MVP
         created_at=datetime.now(UTC),
     )
@@ -545,7 +580,7 @@ def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) 
         db_models.FeedbackPoint(
             position=index,
             kind=kind,
-            text=point.text,
+            text=_without_turn_markers(point.text),
             turn_id=point.turn_id if point.turn_id in turn_ids else None,
         )
         for index, (kind, point) in enumerate(wrapup.points)
