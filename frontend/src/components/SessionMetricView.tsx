@@ -3,10 +3,10 @@ import { Link, useParams } from "react-router-dom";
 import { useStoredSession } from "../hooks/useStoredSession";
 import type { Finding, SessionTurn, TrafficLight } from "../protocol";
 import { ROUTES, sessionPath } from "../routes";
-import { cx } from "../utils/cx";
 import { formatOffset } from "../utils/time";
 import AppLayout from "./AppLayout";
 import IntonationReading from "./IntonationReading";
+import MetricScale from "./MetricScale";
 
 /**
  * One Kennzahl of one training, in full (F-51's interruptions today).
@@ -89,32 +89,16 @@ export default function SessionMetricView() {
           )}
         </p>
 
-        {/* The whole scale, with this call's step marked. Marked rather than
-            shown alone: on a five-step scale the reader has to see not only
-            where the boundaries are but which side of them they came down on. */}
-        {steps.length > 0 && (
-          <dl className="metric-steps">
-            {steps.map((step) => (
-              <div
-                className={cx(
-                  "metric-step",
-                  step.light && `metric-step-${step.light}`,
-                  step.step === current && "is-current",
-                )}
-                key={step.step}
-                aria-current={step.step === current ? "true" : undefined}
-              >
-                <dt>{step.label}</dt>
-                <dd>{step.range}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
+        <MetricScale steps={steps} current={current} />
 
         {note && <p className="metric-note">{note}</p>}
       </div>
 
-      {metricKey === "intonation" && <IntonationReading measurement={measurement} />}
+      {metricKey === "intonation" && (
+        <div className="card">
+          <IntonationReading measurement={measurement} />
+        </div>
+      )}
 
       {findings.length > 0 && (
         <>

@@ -3457,17 +3457,32 @@ h2 {
 
 .pitch-contour {
   margin: 0;
+  /* An SVG scales as a whole, its labels with it, so on a phone the 9 px ticks
+     would land near 4 px. Below the width the drawing was laid out for it
+     scrolls sideways instead of shrinking into illegibility. */
+  overflow-x: auto;
 }
 
 .pitch-contour-plot {
   display: block;
   width: 100%;
+  min-width: 520px;
   height: auto;
 }
 
 /* The speaker's own usual range, not a target band. */
 .pitch-contour-band {
   fill: var(--color-blue-100);
+  opacity: 0.55;
+}
+
+/* Its two edges, which are measured values (5th and 95th percentile) and not
+   the rounded ones the gridlines show. */
+.pitch-contour-band-edge {
+  stroke: var(--color-blue-300);
+  stroke-width: 0.8;
+  stroke-dasharray: 2 2;
+  opacity: 0.8;
 }
 
 .pitch-contour-grid {
@@ -3491,13 +3506,15 @@ h2 {
 }
 
 /* The connection across a stimmlose Stelle. Same hue, so the eye follows one
-   curve, but thin and faint: nothing was measured here, and the line must not
+   curve, but dotted and faint: nothing was measured here, and the line must not
    claim otherwise. */
 .pitch-contour-bridge {
   fill: none;
   stroke: var(--color-blue-600);
-  stroke-width: 0.9;
-  opacity: 0.35;
+  stroke-width: 1;
+  stroke-dasharray: 1 2;
+  stroke-linecap: round;
+  opacity: 0.3;
 }
 
 /* Where one of the user's turns ends and the next begins. Light grey and
@@ -3506,6 +3523,14 @@ h2 {
   stroke: var(--color-border);
   stroke-width: 1;
   stroke-dasharray: 3 3;
+}
+
+/* The turn numbers above those seams. Quieter than the axis: they orient, they
+   are not read. */
+.pitch-contour-turn {
+  font-family: var(--font-sans);
+  font-size: 8px;
+  fill: var(--color-blue-300);
 }
 
 .pitch-contour-tick,
@@ -3528,6 +3553,52 @@ h2 {
   font-size: 0.78rem;
   line-height: 1.5;
   color: var(--color-text-muted);
+}
+
+/* --- The Sprachmelodie block in the wrap-up (F-35) ------------------------ */
+/* The one Kennzahl that gets a block instead of a tile, because what it
+   measures is a shape. Same eyebrow and title as the Kennzahlen section above
+   it, so it reads as a continuation of that section and not as a second
+   verdict. */
+.feedback-intonation {
+  margin-top: 2rem;
+}
+
+.intonation-figure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 0.75rem;
+}
+
+.intonation-figure-value {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The figure line's own reading sits on the same baseline as the number, so the
+   word and the value read as one statement. */
+.intonation-figure .metric-light-label {
+  margin-top: 0;
+}
+
+.intonation-more {
+  display: inline-block;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--color-blue-600);
+}
+
+.factor-heading {
+  margin: 1.5rem 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
 }
 
 /* --- The factors read off that contour ----------------------------------- */

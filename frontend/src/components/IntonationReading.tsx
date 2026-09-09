@@ -56,79 +56,83 @@ export default function IntonationReading({ measurement }: { measurement: Measur
   // simply draws one continuous stretch of speaking time.
   const breaks = detail.turn_breaks as number[] | undefined;
   const step = detail.liveliness as string | undefined;
+  const bandLow = detail.band_low_st as number | undefined;
+  const bandHigh = detail.band_high_st as number | undefined;
 
   // A Session measured before the factors existed carries the range and
   // nothing else. Its recording is long gone (ADR 0048), so the rest cannot be
   // reconstructed; the block says so rather than showing empty rows.
   if (!curve || !median) {
     return (
-      <div className="card">
-        <p className="muted">
-          Für dieses Training liegt nur der Umfang vor. Der Tonhöhenverlauf wurde damals noch
-          nicht mitgeschrieben, und die Aufnahme ist gelöscht, wie bei jedem Gespräch.
-        </p>
-      </div>
+      <p className="muted">
+        Für dieses Training liegt nur der Umfang vor. Der Tonhöhenverlauf wurde damals noch nicht
+        mitgeschrieben, und die Aufnahme ist gelöscht, wie bei jedem Gespräch.
+      </p>
     );
   }
 
   return (
     <>
-      <div className="card">
-        <PitchContour
-          curveHz={curve}
-          medianHz={median}
-          stepMs={stepMs}
-          bandLowSt={-measurement.value / 2}
-          bandHighSt={measurement.value / 2}
-          breaks={breaks}
-        />
-      </div>
+      <PitchContour
+        curveHz={curve}
+        medianHz={median}
+        stepMs={stepMs}
+        // The measured ends of the range where they exist. The fallback assumes
+        // the band sits symmetrically around the median, which is what this
+        // drawing did before the two ends were measured -- near enough on most
+        // voices, wrong on any voice that reaches further one way than the
+        // other, and kept only so a Session stored in between still draws.
+        bandLowSt={bandLow ?? -measurement.value / 2}
+        bandHighSt={bandHigh ?? measurement.value / 2}
+        breaks={breaks}
+      />
 
-      <h2>Vier Größen aus diesem Verlauf</h2>
-      <div className="card">
-        <dl className="factor-list">
+      <h3 className="factor-heading">Vier Größen aus diesem Verlauf</h3>
+      <dl className="factor-list">
+        <Factor
+          name="Umfang"
+          value={`${measurement.value.toFixed(1)} Halbtöne`}
+          explanation={
+            `Zwischen Ihrem tiefsten und höchsten üblichen Ton liegt das ` +
+            `${Math.pow(2, measurement.value / 12).toFixed(2)}-fache der Frequenz. ` +
+            `Das ist eine Spanne, keine Lage: Ihre mittlere Stimmlage liegt bei ` +
+            `${Math.round(median)} Hz und geht in diese Zahl nicht ein. ` +
+            rangeReading(step)
+          }
+        />
+
+        {movement !== undefined && (
           <Factor
-            name="Umfang"
-            value={`${measurement.value.toFixed(1)} Halbtöne`}
+            name="Bewegung"
+            value={`${movement.toFixed(1)} Halbtöne pro Sekunde`}
             explanation={
-              `Zwischen Ihrem tiefsten und höchsten üblichen Ton liegt das ` +
-              `${Math.pow(2, measurement.value / 12).toFixed(2)}-fache der Frequenz. ` +
-              `Das ist eine Spanne, keine Lage: Ihre mittlere Stimmlage liegt bei ` +
-              `${Math.round(median)} Hz und geht in diese Zahl nicht ein. ` +
-              rangeReading(step)
+              "Zählt man alle Auf- und Abbewegungen zusammen, legt Ihre Stimme pro Sekunde " +
+              `Sprechzeit rund ${movement.toFixed(0)} Halbtöne zurück. Es ist also eine ` +
+              "Wegstrecke, keine Spanne. Zusammen mit dem Umfang trennt das zwei sehr " +
+              "verschiedene Sprechweisen: Man kann eine weite Spanne erreichen, indem man " +
+              "langsam von hoch nach tief driftet, und dieselbe Spanne, indem man in jedem " +
+              "Satz arbeitet. Zu dieser Zahl gibt es bewusst keine Einordnung, denn anders als " +
+              "beim Umfang gibt es keinen belegten Vergleichswert, an dem sie zu messen wäre."
             }
           />
+        )}
 
-          {movement !== undefined && (
-            <Factor
-              name="Bewegung"
-              value={`${movement.toFixed(1)} Halbtöne pro Sekunde`}
-              explanation={
-                "Wie viel sich Ihre Stimme bewegt, während Sie sprechen. Zusammen mit dem " +
-                "Umfang trennt das zwei sehr verschiedene Sprechweisen: Man kann eine weite " +
-                "Spanne erreichen, indem man langsam von hoch nach tief driftet, und dieselbe " +
-                "Spanne, indem man in jedem Satz arbeitet."
-              }
-            />
-          )}
+        {endings && endings.falling + endings.rising + endings.level > 0 && (
+          <Factor
+            name="Satzenden"
+            value={endingsValue(endings)}
+            explanation={endingsReading(endings)}
+          />
+        )}
 
-          {endings && endings.falling + endings.rising + endings.level > 0 && (
-            <Factor
-              name="Satzenden"
-              value={endingsValue(endings)}
-              explanation={endingsReading(endings)}
-            />
-          )}
-
-          {first !== undefined && last !== undefined && (
-            <Factor
-              name="Verlauf über das Gespräch"
-              value={`${first.toFixed(1)} → ${last.toFixed(1)} Halbtöne`}
-              explanation={developmentReading(first, last)}
-            />
-          )}
-        </dl>
-      </div>
+        {first !== undefined && last !== undefined && (
+          <Factor
+            name="Verlauf über das Gespräch"
+            value={`${first.toFixed(1)} → ${last.toFixed(1)} Halbtöne`}
+            explanation={developmentReading(first, last)}
+          />
+        )}
+      </dl>
     </>
   );
 }
@@ -173,7 +177,8 @@ function rangeReading(step: string | undefined): string {
     case "monotone":
       return (
         "Auf der Skala oben ist das monoton: die Melodie bewegt sich, aber wenig. Wenn Sie " +
-        "beim Hören merken, dass eine wichtige Stelle nicht heraussticht, ist das hier die Zahl dazu."
+        "beim Hören merken, dass eine wichtige Stelle nicht heraussticht, ist das hier die " +
+        "Zahl dazu."
       );
     case "balanced":
       return (
@@ -186,9 +191,10 @@ function rangeReading(step: string | undefined): string {
       );
     case "exaggerated":
       return (
-        "Auf der Skala oben liegt das über „lebendig“. Das kann sehr ausdrucksstarkes Sprechen " +
-        "sein — oder ein Messfehler: springt die Tonhöhenerkennung an einer Stelle eine Oktave, " +
-        "wird die Spanne zu groß. Ein Blick auf den Verlauf zeigt, was von beidem zutrifft."
+        "Auf der Skala oben liegt das über „lebendig“. Das kann sehr ausdrucksstarkes " +
+        "Sprechen sein. Es kann auch ein Messfehler sein: Springt die Tonhöhenerkennung an " +
+        "einer Stelle eine Oktave, wird die Spanne zu groß. Ein Blick auf den Verlauf zeigt, " +
+        "was von beidem zutrifft."
       );
     default:
       return "";

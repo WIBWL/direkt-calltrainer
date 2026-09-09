@@ -2,6 +2,7 @@ import type {
   FeedbackPoint,
   Finding,
   Measurement,
+  MetricStep,
   SessionDetail,
   SessionTurn,
   TrafficLight,
@@ -12,6 +13,7 @@ import { sessionMetricPath } from "../routes";
 import { formatOffset } from "../utils/time";
 import { useSessionFeedback } from "../hooks/useSessionFeedback";
 import InfoDetails from "./InfoDetails";
+import IntonationSection from "./IntonationSection";
 import LoudnessCourse from "./LoudnessCourse";
 
 /** What a screen can do with the follow-up Scenario (F-60): open it in the
@@ -155,6 +157,7 @@ export function FeedbackReport({
         measurements={measurements}
         findings={detail.findings}
         notes={detail.metric_notes}
+        scales={detail.metric_scales}
         sessionId={detail.session_id}
       />
     </>
@@ -229,6 +232,7 @@ export function MetricSection({
   measurements,
   findings = [],
   notes = {},
+  scales = {},
   sessionId = null,
 }: {
   measurements: Measurement[];
@@ -237,6 +241,8 @@ export function MetricSection({
   findings?: Finding[];
   /** The long explanation behind a Kennzahl's "i", by metric key. */
   notes?: Record<string, string>;
+  /** The steps a reading was taken off, by metric key. */
+  scales?: Record<string, MetricStep[]>;
   /** The Session these figures belong to, for the per-Kennzahl page. Null on a
    *  call that was never stored, where there is nothing to link to. */
   sessionId?: string | null;
@@ -247,30 +253,59 @@ export function MetricSection({
     ...findings.map((f) => f.metric_key).filter((key): key is string => key !== null),
     ...Object.keys(notes),
   ]);
+  const intonation = measurements.find((m) => m.key === INTONATION_KEY);
+  // Its tile stops offering a page once the block below shows the same thing:
+  // a link that leads to what the reader can already see is a link that lied
+  // about where the content was. The block itself still offers the page, and a
+  // Session with no contour keeps the tile's link, because there the page has
+  // something to say that the tile cannot.
+  if (intonation?.detail?.curve_hz) detailed.delete(INTONATION_KEY);
 
   return (
-    <section className="feedback-metrics-section">
-      <div className="feedback-metrics-eyebrow">ERGÄNZENDE AUSWERTUNG</div>
-      <h2 className="feedback-metrics-title">Kennzahlen zum Gespräch</h2>
+    <>
+      <section className="feedback-metrics-section">
+        <div className="feedback-metrics-eyebrow">ERGÄNZENDE AUSWERTUNG</div>
+        <h2 className="feedback-metrics-title">Kennzahlen zum Gespräch</h2>
 
-      <div className="metric-grid">
-        {measurements.map((measurement) => (
-          <Metric
-            key={measurement.key}
-            measurement={measurement}
-            sessionId={sessionId}
-            detailed={detailed.has(measurement.key)}
-          />
-        ))}
-      </div>
+        <div className="metric-grid">
+          {measurements.map((measurement) => (
+            <Metric
+              key={measurement.key}
+              measurement={measurement}
+              sessionId={sessionId}
+              detailed={detailed.has(measurement.key)}
+            />
+          ))}
+        </div>
 
-      <p className="metric-disclaimer">
-        Reine Messwerte, ohne Zielbereich: Für diese Nutzergruppe gibt es keinen
-        belegten Normwert, an dem sie zu messen wären.
-      </p>
-    </section>
+        {/* The second sentence exists because the first one is contradicted a
+            few pixels above it: two Kennzahlen now carry a word beside their
+            figure. Rather than quietly dropping the claim, the exception is
+            named and bounded — it is what the reader is looking at. */}
+        <p className="metric-disclaimer">
+          Reine Messwerte, ohne Zielbereich: Für diese Nutzergruppe gibt es keinen
+          belegten Normwert, an dem sie zu messen wären. Wo „Einschätzung“ steht, haben wir
+          die Schwellen selbst gesetzt; welche das sind, steht jeweils dabei.
+        </p>
+      </section>
+
+      {/* One Kennzahl gets a block of its own, below the grid: F-35 measures a
+          shape, and a shape cannot be put in a tile (`IntonationSection`). */}
+      {intonation && (
+        <IntonationSection
+          measurement={intonation}
+          steps={scales[INTONATION_KEY]}
+          note={notes[INTONATION_KEY]}
+          sessionId={sessionId}
+        />
+      )}
+    </>
   );
 }
+
+/** The Kennzahl whose reading is a drawing rather than a number. Matches
+ *  `intonation.RANGE_KEY` on the backend. */
+const INTONATION_KEY = "intonation";
 
 /** The next exercise, built from the points above (F-60). Nobody asks for it:
  * the worker writes it with the wrap-up and stores it as an ordinary Scenario
@@ -460,11 +495,12 @@ function Metric({
 }
 
 /** What the tile promises behind it, per Kennzahl. The interruptions page shows
- *  transcript excerpts, the intonation page a contour: "Einzelne Stellen" would
- *  be wrong for the second. */
+ *  transcript excerpts, the intonation page the contour and what it says —
+ *  "Einzelne Stellen" would be wrong for the second, and the second only offers
+ *  a page at all when the block below could not be drawn. */
 const OPEN_HINT: Record<string, string> = {
   interruptions: "Einzelne Stellen ansehen",
-  intonation: "Verlauf ansehen",
+  intonation: "Diese Kennzahl ansehen",
 };
 
 /**
