@@ -1106,7 +1106,7 @@ h2 {
 /* The summary groups all confirmed choices into one compact panel. */
 .selection-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
   margin: 0 0 14px;
   padding: 8px;
