@@ -4685,6 +4685,22 @@ h2 {
   color: var(--color-text-muted);
 }
 
+/* The opening's three parts as its headline (F-63). No colour: which part was
+   said is a fact, and colour here says something about a value. */
+.feedback-metrics-section .metric-parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.feedback-metrics-section .metric-part.is-said {
+  color: var(--color-navy-900);
+}
+
 /* Why a suggested card is suggested (F-62). */
 .card-reason {
   font-size: 0.78rem;

@@ -47,7 +47,7 @@ export interface FollowUpActions {
  * seconds and percentages are not. */
 const DECIMALS: Record<string, number> = {
   questions: 0, word_count: 0, pace: 0, talk_share: 0, phonation_share: 0, fillers: 0,
-  repetitions: 0, hesitations: 0,
+  repetitions: 0, hesitations: 0, opening: 0,
 };
 
 /** The two halves (backend/db/models.py METRIC_ASPECTS), in slider order. */
@@ -708,9 +708,13 @@ function Metric({
   const body = (
     <>
       <span className="metric-name">{measurement.name}</span>
-      <span className={`metric-value${light ? ` metric-value-${light}` : ""}`}>
-        {melody && reading ? reading : figure}
-      </span>
+      {measurement.key === "opening" ? (
+        <OpeningParts detail={measurement.detail ?? {}} />
+      ) : (
+        <span className={`metric-value${light ? ` metric-value-${light}` : ""}`}>
+          {melody && reading ? reading : figure}
+        </span>
+      )}
 
       {melody ? (
         <span className="metric-subline">
@@ -781,6 +785,44 @@ function interruptionContext(measurement: Measurement): string | null {
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
+/** The parts of an opening, in the order they are usually said (F-63). The
+ *  third depends on who rang, and a stored call carries whichever was checked;
+ *  the ones stored before the split carry "concern". */
+const OPENING_PARTS: [string, string][] = [
+  ["greeting", "Begrüßung"],
+  ["name", "Name"],
+  ["offer", "Hilfsangebot"],
+  ["concern", "Anliegen"],
+];
+
+/** The opening's headline: the three parts, each marked, in place of a count
+ *  that reads like a grade. "nicht erkannt" for the screen reader, never
+ *  "fehlt": a bare name slips past the patterns. */
+function OpeningParts({ detail }: { detail: Record<string, unknown> }) {
+  return (
+    <span className="metric-parts">
+      {OPENING_PARTS.filter(([key]) => key in detail).map(([key, label]) => {
+        const said = detail[key] === true;
+        return (
+          <span key={key} className={"metric-part" + (said ? " is-said" : "")}>
+            <span aria-hidden="true">{said ? "✓" : "–"}</span> {label}
+            <span className="visually-hidden">{said ? " erkannt" : " nicht erkannt"}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+/** "33 % langsamer als sonst" — the opening's tempo against the rest of the
+ *  User's own call; the parts themselves are the headline. */
+function openingSubline(measurement: Measurement): string | null {
+  const ratio = measurement.detail?.["pace_ratio"];
+  if (typeof ratio !== "number") return null;
+  const percent = Math.round((ratio - 1) * 100);
+  return `Einstieg ${Math.abs(percent)} % ${percent >= 0 ? "schneller" : "langsamer"} als sonst`;
+}
+
 /** A second line under a metric's value, where its `detail` refines the same
  * figure rather than standing beside it. Absent for a call whose language has
  * no word list on file. */
@@ -799,6 +841,7 @@ function subline(measurement: Measurement): string | null {
     const words = first.split(" ");
     return `z. B. „${words.slice(0, 6).join(" ")}${words.length > 6 ? " …" : ""}“`;
   }
+  if (measurement.key === "opening") return openingSubline(measurement);
   // Said on the tile itself, not only on a page: this one is a detection.
   if (measurement.key === "hesitations") return "geschätzt aus der Tonhöhe";
   if (measurement.key !== "questions") return null;

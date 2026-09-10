@@ -45,6 +45,7 @@ export const FOCUS_BACKING: Record<string, FocusBacking> = {
     metrics: ["fillers", "hesitations", "repetitions", "word_count"],
   },
   intonation: { kind: "metric", metrics: ["intonation"] },
+  opening: { kind: "metric", metrics: ["opening"] },
   training_regularity: { kind: "activity", metrics: [] },
   training_variety: { kind: "activity", metrics: [] },
   // No measurement yet. Named individually rather than defaulted, so adding a
@@ -52,7 +53,6 @@ export const FOCUS_BACKING: Record<string, FocusBacking> = {
   // the "no measurement" bucket.
   articulation: { kind: "text", metrics: [], note: NO_MEASUREMENT },
   composure: { kind: "text", metrics: [], note: NO_MEASUREMENT },
-  opening: { kind: "text", metrics: [], note: NO_MEASUREMENT },
   objection_handling: { kind: "text", metrics: [], note: NO_MEASUREMENT },
   closing: { kind: "text", metrics: [], note: NO_MEASUREMENT },
   empathy: { kind: "text", metrics: [], note: NO_MEASUREMENT },
