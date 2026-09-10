@@ -2,6 +2,7 @@ import type React from "react";
 
 import type { TranscriptEntry } from "../protocol";
 import { formatOffset } from "../utils/time";
+import { useAccount } from "../hooks/useAccount";
 
 interface TranscriptViewProps {
   transcript: TranscriptEntry[];
@@ -24,6 +25,8 @@ export default function TranscriptView({
   onRestart,
   feedback,
 }: TranscriptViewProps) {
+  const account = useAccount();
+
   return (
     <>
       <div className="feedback-intro">
@@ -46,7 +49,9 @@ export default function TranscriptView({
 
         {transcript.length === 0 ? (
           <div className="feedback-transcript-card">
-            <p className="transcript-empty">Es wurden keine Beiträge aufgezeichnet.</p>
+            <p className="transcript-empty">
+              Es wurden keine Beiträge aufgezeichnet.
+            </p>
           </div>
         ) : (
           <div className="feedback-transcript-card">
@@ -58,8 +63,14 @@ export default function TranscriptView({
 
                 <span className="transcript-avatar" aria-hidden="true">
                   {entry.speaker === "user"
-                    ? "D"
-                    : personaName.trim().charAt(0).toUpperCase()}
+                    ? account.initials
+                    : personaName
+                      .trim()
+                      .split(/\s+/)
+                      .filter(Boolean)
+                      .map((part) => part.charAt(0).toUpperCase())
+                      .slice(0, 2)
+                      .join("")}
                 </span>
 
                 <div className="transcript-content">
