@@ -59,7 +59,9 @@ interface LibraryPickerProps {
   tenantName: string | null;
   newLabel: string;
   onNew: () => void;
-  onEdit: (id: string) => void;
+  /** Open the read-only info panel. Editing is reached from inside it
+   * (ADR 0076), so the card carries no separate edit affordance. */
+  onInfo: (id: string) => void;
 }
 
 /** Whether an item passes the active origin filter. "tenant" = anything shared
@@ -117,7 +119,7 @@ export default function LibraryPicker({
   tenantName,
   newLabel,
   onNew,
-  onEdit,
+  onInfo,
 }: LibraryPickerProps) {
   const originOptions: FilterOption<LibraryFilter>[] = [
     ...BASE_ORIGINS.map((f) => ({
@@ -183,11 +185,7 @@ export default function LibraryPicker({
         {items.map((item) => (
           <div key={item.id} className="card-wrap">
             <button
-              className={
-                "persona-card" +
-                (item.id === selectedId ? " selected" : "") +
-                (item.origin === "own" ? " editable" : "")
-              }
+              className={"persona-card" + (item.id === selectedId ? " selected" : "")}
               onClick={() => onSelect(item.id)}
               type="button"
               aria-pressed={item.id === selectedId}
@@ -201,11 +199,18 @@ export default function LibraryPicker({
                 {badgeLabel(item, tenantName)}
               </span>
             </button>
-            {item.origin === "own" && (
-              <button type="button" className="card-edit" onClick={() => onEdit(item.id)}>
-                Bearbeiten
-              </button>
-            )}
+            {/* Every Scenario is readable (ADR 0076), so the "i" is on every
+                card — unlike the old "Bearbeiten", which was on the caller's
+                own rows only and now lives inside the panel. */}
+            <button
+              type="button"
+              className="card-info"
+              onClick={() => onInfo(item.id)}
+              aria-label={`Mehr über ${item.name}`}
+              title={`Mehr über ${item.name}`}
+            >
+              <span aria-hidden="true">i</span>
+            </button>
           </div>
         ))}
       </div>

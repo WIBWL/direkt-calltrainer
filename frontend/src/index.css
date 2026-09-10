@@ -630,12 +630,6 @@ h2 {
   }
 }
 
-/* Reserve room at the bottom for the absolutely-positioned "Bearbeiten" link
-   so it never sits on top of the card badge. */
-.persona-card.editable {
-  padding-bottom: 2.75rem;
-}
-
 .card-badge {
   align-self: flex-start;
   margin-top: 0.15rem;
@@ -676,11 +670,13 @@ h2 {
   box-shadow: inset 0 0 0 1px #5b3a9c33;
 }
 
-/* The "i" on a Persona card. Bottom-right, on the same 12px right edge and at
-   the same 24px size as the check bubble above it, so the two sit in one
-   column down the card's right gutter -- the gutter the card's padding already
-   keeps clear of text. Round and quiet: it must read as an aside to the
-   choice, not as a second way of making it. */
+/* The "i" on a selection card, Personas and Scenarios alike. Bottom-right, on
+   the same 12px right edge and at the same 24px size as the check bubble above
+   it, so the two sit in one column down the card's right gutter -- the gutter
+   both grids' padding already keeps clear of text. Round and quiet: it must
+   read as an aside to the choice, not as a second way of making it. It replaced
+   the Scenario card's "Bearbeiten" link, which moved into the panel (ADR 0076),
+   so a card carries one secondary affordance rather than two. */
 .card-info {
   position: absolute;
   right: 12px;
@@ -690,25 +686,24 @@ h2 {
   width: 24px;
   height: 24px;
   padding: 0;
-  border: 1px solid var(--color-blue-300);
+  border: 1px solid var(--color-navy-900);
   border-radius: 50%;
   background: transparent;
   font: inherit;
   font-size: 0.8rem;
   font-weight: 700;
   line-height: 1;
-  color: var(--color-blue-600);
+  color: var(--color-navy-900);
   cursor: pointer;
   transition: background-color 0.2s, border-color 0.2s;
 }
 
 .card-info:hover {
-  border-color: var(--color-blue-600);
   background: var(--color-blue-100);
 }
 
 .card-info:focus-visible {
-  outline: 2px solid var(--color-blue-600);
+  outline: 2px solid var(--color-navy-900);
   outline-offset: 2px;
 }
 
@@ -753,20 +748,6 @@ h2 {
   flex-direction: column;
   gap: 0.35rem;
   line-height: 1.5;
-}
-
-.card-edit {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  border: 0;
-  background: transparent;
-  padding: 0.1rem 0.3rem;
-  font: inherit;
-  font-size: 0.75rem;
-  color: var(--color-blue-600);
-  text-decoration: underline;
-  cursor: pointer;
 }
 
 /* --- Scenario editor modal --- */
@@ -977,6 +958,22 @@ h2 {
 .editor-delete {
   border-color: var(--color-danger) !important;
   color: var(--color-danger);
+}
+
+/* "Bearbeiten" in the read-only info panel (ADR 0076). Filled in the same dark
+   blue as the "Weiter zum Mikrofontest" button, and hovering to the same
+   lighter blue: it is the one action that leads somewhere from a panel that
+   otherwise only closes. Shape comes from `.editor-actions button` so it lines
+   up with "Schließen" beside it; only the colour is its own. */
+.editor-edit {
+  border-color: var(--navy) !important;
+  background: var(--navy) !important;
+  color: var(--color-surface);
+  font-weight: 600;
+}
+
+.editor-edit:hover {
+  background: var(--navy-light) !important;
 }
 
 /* In-panel replacement for window.confirm when a click outside would discard

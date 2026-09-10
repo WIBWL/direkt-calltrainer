@@ -79,9 +79,44 @@ export interface ScenarioDraft {
  * choice from a fixed list, so it has no limit to fetch. */
 export type TextField = Exclude<keyof ScenarioDraft, "category">;
 
-export interface ScenarioDetail extends ScenarioDraft {
+/**
+ * One Scenario as `GET /api/scenarios/{id}` returns it (ADR 0076): the read
+ * view the info panel shows, and — where `editable` is true — the row the
+ * editor loads. Not a `ScenarioDraft`: two fields are nullable here.
+ */
+export interface ScenarioDetail {
   id: string;
-  visibility: Visibility;
+  name: string;
+  short_description: string;
+  briefing: string;
+  description: string;
+  case_facts: string;
+  /** null = withheld because this is a built-in, whose caller's intent is
+   * the answer key (ADR 0076). "" = its author left the field empty. */
+  call_goal: string | null;
+  success_condition: string | null;
+  category: CategoryChoice;
+  /** "public" for a built-in. The editor never sees that value: it opens
+   * only where `editable` is true, and those rows are private or tenant. */
+  visibility: Visibility | "public";
+  /** The caller authored this row, so they may edit it. Decided by the
+   * server from the verified token, never inferred from `origin` here. */
+  editable: boolean;
+}
+
+/** The editor works on strings; a withheld or absent field is an empty one
+ * to it. Only ever called on an `editable` row, where nothing is withheld. */
+export function toDraft(detail: ScenarioDetail): ScenarioDraft {
+  return {
+    name: detail.name,
+    short_description: detail.short_description,
+    briefing: detail.briefing,
+    description: detail.description,
+    case_facts: detail.case_facts,
+    call_goal: detail.call_goal ?? "",
+    success_condition: detail.success_condition ?? "",
+    category: detail.category,
+  };
 }
 
 export type FieldLimits = Record<TextField, number>;

@@ -15,6 +15,7 @@ import {
   updateScenario,
   type CategoryChoice,
   type FieldLimits,
+  toDraft,
   type ScenarioDraft,
   type TextField,
   type Visibility,
@@ -158,10 +159,11 @@ export default function ScenarioEditor({
     getScenario(scenarioId)
       .then((detail) => {
         if (cancelled) return;
-        const { id: _id, visibility: vis, ...rest } = detail;
-        setDraft(rest);
-        pristine.current = rest;
-        setVisibility(vis);
+        const draft = toDraft(detail);
+        setDraft(draft);
+        pristine.current = draft;
+        // Never "public" here: the editor only opens on an editable row.
+        setVisibility(detail.visibility === "public" ? "private" : detail.visibility);
       })
       .catch((e: unknown) =>
         setError(e instanceof ApiError && e.status === 404

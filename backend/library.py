@@ -88,6 +88,8 @@ def _to_scenario(row: models.Scenario) -> Scenario:
         briefing=row.briefing,
         description=row.description,
         case_facts=row.case_facts,
+        description_label=row.description_label,
+        case_facts_label=row.case_facts_label,
         call_goal=row.call_goal,
         success_condition=row.success_condition,
         category=row.category,

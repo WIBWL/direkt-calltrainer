@@ -92,7 +92,10 @@ async def test_another_user_never_sees_my_private_scenario(client, as_user):
     as_user(BOB)
     listed = (await client.get("/api/scenarios")).json()
     assert new_id not in {s["id"] for s in listed}
-    # ... and cannot reach it directly either, not even to read.
+    # ... and cannot reach it directly either, not even to read. ADR 0076
+    # opened the detail route to everything the caller may *select*; a
+    # stranger's private row is not that, and the 404 is the same answer an
+    # unknown id gets (ADR 0031/0050).
     assert (await client.get(f"/api/scenarios/{new_id}")).status_code == 404
 
 
@@ -119,11 +122,49 @@ async def test_deleting_a_scenario_drops_it_from_the_list(client, as_user):
     assert new_id not in {s["id"] for s in listed}
 
 
-async def test_a_built_in_has_no_editable_detail_view(client, as_user):
+async def test_a_built_in_is_readable_but_not_editable(client, as_user):
+    """ADR 0076: the info panel reads any Scenario the caller may select.
+    A built-in is not theirs to write, and `editable` is what says so --
+    the route no longer answers 404 to make the point."""
     as_user(ALICE)
-    # The list gives built-in ids; none of them is the caller's to open.
     built_in_id = (await client.get("/api/scenarios")).json()[0]["id"]
-    assert (await client.get(f"/api/scenarios/{built_in_id}")).status_code == 404
+
+    resp = await client.get(f"/api/scenarios/{built_in_id}")
+    assert resp.status_code == 200
+    assert resp.json()["editable"] is False
+
+    # Readable, not writable: the write routes are unchanged.
+    assert (await client.patch(f"/api/scenarios/{built_in_id}",
+                               json=_NEW)).status_code == 404
+    assert (await client.delete(f"/api/scenarios/{built_in_id}")).status_code == 404
+
+
+async def test_a_built_in_withholds_the_callers_intent(client, as_user):
+    """ADR 0076: `description` and `case_facts` are the situation and come
+    up in the call anyway; `call_goal` and `success_condition` are what the
+    caller wants and when the exercise is over. Reading those in advance
+    would hand the trainee the answer, so a built-in serves them as None --
+    None rather than "", so "withheld" stays distinguishable from "empty"."""
+    as_user(ALICE)
+    built_in_id = (await client.get("/api/scenarios")).json()[0]["id"]
+    detail = (await client.get(f"/api/scenarios/{built_in_id}")).json()
+
+    assert detail["call_goal"] is None
+    assert detail["success_condition"] is None
+    # The situation is served, and the seed gives every built-in one.
+    assert detail["description"]
+
+
+async def test_my_own_scenario_withholds_nothing(client, as_user):
+    """The counterpart: the author wrote the whole thing, so the read view
+    is the editor's view and `editable` is true."""
+    as_user(ALICE)
+    new_id = (await client.post("/api/scenarios", json=_NEW)).json()["id"]
+
+    detail = (await client.get(f"/api/scenarios/{new_id}")).json()
+    assert detail["editable"] is True
+    assert detail["call_goal"] == _NEW["call_goal"]
+    assert detail["success_condition"] == _NEW["success_condition"]
 
 
 async def test_an_oversize_field_is_rejected(client, as_user):
@@ -196,12 +237,19 @@ async def test_sharing_makes_it_visible_to_a_colleague_not_to_other_companies(
     assert mine["shared"] is True
 
     # The colleague now sees it, badged as a company Scenario, and can start a
-    # call with it -- but cannot edit it.
+    # call with it. Since ADR 0076 they can read it in full as well -- sharing
+    # a case with the company while making it illegible to the company is not
+    # a policy anyone chose -- but they still cannot edit it.
     as_user(BOB_SOLOX)
     card = {s["id"]: s for s in (await client.get("/api/scenarios")).json()}[new_id]
     assert card["origin"] == "tenant"
     assert card["shared"] is True
-    assert (await client.get(f"/api/scenarios/{new_id}")).status_code == 404  # not editable
+
+    detail = (await client.get(f"/api/scenarios/{new_id}")).json()
+    assert detail["editable"] is False
+    # Nothing is withheld from a colleague: only a built-in withholds.
+    assert detail["call_goal"] == _NEW["call_goal"]
+    assert detail["success_condition"] == _NEW["success_condition"]
     assert (await client.patch(f"/api/scenarios/{new_id}", json=_NEW)).status_code == 404
 
     # Someone in another company still does not see it.

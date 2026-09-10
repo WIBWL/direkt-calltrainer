@@ -30,6 +30,11 @@ class Scenario:
     case_facts: str = ""
     call_goal: str = ""
     success_condition: str = ""
+    # Display: the same situation and case facts in the UI language, for the
+    # read view behind a card (ADR 0076). None on an authored Scenario, which
+    # is already written in its author's language.
+    description_label: str | None = None
+    case_facts_label: str | None = None
     # Display: the trainee's own briefing, in the UI language (ADR 0054) --
     # role, room for manoeuvre, what a good outcome is. Never handed to the
     # model: the objective is the trainee's, and giving it to the caller is the

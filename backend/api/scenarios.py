@@ -3,9 +3,13 @@
 `GET /api/scenarios` feeds the selection screen: every Scenario the caller may
 see, each badged `builtin` (a shipped built-in), `own` (one they authored) or
 `tenant` (shared by a colleague), and `follow_up` where the worker wrote it from
-one of their own Sessions (ADR 0069). The list withholds the prompt fields
-exactly as before (ADR 0043/0045) — they are the answer key to the exercise. The
-detail and write routes serve only the caller's own rows.
+one of their own Sessions (ADR 0069). The list carries card fields only.
+
+`GET /api/scenarios/{id}` is the read view behind that list (ADR 0076): any
+Scenario the caller may select, with `editable` saying whether they may also
+open the editor on it. A built-in withholds `call_goal` and `success_condition`
+— the caller's intent and the mark by which the call is done are the answer key
+to the exercise (ADR 0043/0045). The *write* routes remain owner-scoped.
 
 `POST /api/scenarios/document` (F-58) is a stateless helper: it extracts an
 uploaded text-layer PDF and has the LLM condense it into a fact list for the
@@ -114,10 +118,9 @@ def _card(scenario, subject: str) -> dict:
         "short_description": scenario.short_description,
         # On the card rather than only on the detail route: the briefing is
         # shown before the call from the list the selection screen already
-        # holds (ADR 0054), and a built-in's detail route is closed to the
-        # client anyway (ADR 0043) — it serves the owner's editor, not a
-        # reader. Unlike the case fields there is nothing to withhold here:
-        # this text is written to be read by whoever plays it.
+        # holds (ADR 0054), without a second request. Nothing is withheld
+        # here in any case — this text is written to be read by whoever
+        # plays the Scenario.
         "briefing": scenario.briefing,
         # Null for an uncategorised Scenario; the category filter then only
         # shows it under "Alle" (ADR 0072).
@@ -145,23 +148,48 @@ def _origin_group(card: dict) -> int:
     return _ORIGIN_ORDER.index("follow_up" if card["follow_up"] else card["origin"])
 
 
-def _detail(scenario) -> dict:
-    """The full row, for the editor. Only ever returned for the caller's own
-    Scenario, so the case fields are theirs to see."""
+def _detail(scenario, subject: str) -> dict:
+    """One Scenario as the client reads it (ADR 0076).
+
+    Two audiences, one payload: the editor, which opens only on a row the
+    caller owns, and the read-only info panel, which opens on any row they
+    may select. `editable` is what separates them, and it is decided here
+    from the verified `sub` rather than taken from the client.
+
+    A built-in withholds `call_goal` and `success_condition` — None, not
+    "", so the client can tell "withheld" from "the author left it empty".
+    Those two are the caller's *intent* and the mark by which the call is
+    done; reading them in advance would hand the trainee the answer to the
+    exercise. `description` and `case_facts` are the situation, which comes
+    up in the call anyway, so they are served. A Scenario the caller or a
+    colleague authored withholds nothing: they wrote it, or work with the
+    person who did.
+    """
+    # No author at all = a shipped built-in. A colleague's shared row has an
+    # author, just not this caller, and is served in full.
+    built_in = scenario.created_by is None
     return {
         "id": scenario.id,
         "name": scenario.name,
         "short_description": scenario.short_description,
         "briefing": scenario.briefing,
-        "description": scenario.description,
-        "case_facts": scenario.case_facts,
-        "call_goal": scenario.call_goal,
-        "success_condition": scenario.success_condition,
+        # The display twin where there is one, the field itself otherwise
+        # (ADR 0076). A built-in's prompt text is English (ADR 0043) and the
+        # seed carries a German twin for it; an authored Scenario has no twin
+        # because its author already wrote it in their own language. Same wire
+        # name either way: the client shows one text and never both.
+        "description": scenario.description_label or scenario.description,
+        "case_facts": scenario.case_facts_label or scenario.case_facts,
+        "call_goal": None if built_in else scenario.call_goal,
+        "success_condition": None if built_in else scenario.success_condition,
         # "" rather than null, so the editor's select has a value to sit on.
         "category": scenario.category or "",
-        # Always `private` or `tenant` here -- `_detail` only runs for the
-        # caller's own rows, never a `public` built-in.
+        # `public` for a built-in now that this route serves one. The editor
+        # never sees that value: it opens only where `editable` is true.
         "visibility": scenario.visibility,
+        # Authorship, not visibility: a colleague's shared Scenario is
+        # readable but not editable (ADR 0058 -- only the author may write).
+        "editable": scenario.created_by == subject,
     }
 
 
@@ -221,13 +249,17 @@ def get_scenario(
     user: AuthContext = Depends(require_user),
     tenant_id: int = Depends(current_tenant_id),
 ) -> dict:
-    """Full detail for one of the caller's own Scenarios (to populate the
-    editor). A built-in, or another User's, is a 404 — it is not editable and
-    its case must not leak."""
+    """One Scenario the caller may select, for the info panel and — where
+    `editable` says so — for the editor (ADR 0076).
+
+    Scoped by `library.get_scenario`, which serves built-ins, rows shared
+    with the caller's company, and their own. Another User's private row is
+    invisible there and stays a 404, indistinguishable from an unknown id
+    (ADR 0031/0050)."""
     scenario = library.get_scenario(extern_id, user.sub, tenant_id)
-    if scenario is None or scenario.created_by != user.sub:
+    if scenario is None:
         raise HTTPException(status_code=404, detail="Unknown scenario")
-    return _detail(scenario)
+    return _detail(scenario, user.sub)
 
 
 @router.post("", status_code=201)
@@ -238,7 +270,7 @@ def create_scenario(
 ) -> dict:
     """Author a Scenario. It lands private, owned by the caller (ADR 0058)."""
     scenario = library.create_scenario(body.to_library(), user.sub, tenant_id)
-    return _detail(scenario)
+    return _detail(scenario, user.sub)
 
 
 @router.patch("/{extern_id}")
@@ -251,7 +283,7 @@ def update_scenario(
     scenario = library.update_scenario(extern_id, body.to_library(), user.sub)
     if scenario is None:
         raise HTTPException(status_code=404, detail="Unknown scenario")
-    return _detail(scenario)
+    return _detail(scenario, user.sub)
 
 
 @router.put("/{extern_id}/visibility")
@@ -277,7 +309,7 @@ def set_visibility(
     )
     if scenario is None:
         raise HTTPException(status_code=404, detail="Unknown scenario")
-    return _detail(scenario)
+    return _detail(scenario, user.sub)
 
 
 @router.delete("/{extern_id}", status_code=204)

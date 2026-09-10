@@ -329,6 +329,31 @@ def test_every_objection_has_exactly_one_german_label(entry):
     assert all(label.strip() for label in labels), entry["id"]
 
 
+@pytest.mark.parametrize("entry", SEED.SCENARIOS, ids=lambda e: e["id"])
+def test_seeded_scenario_carries_german_display_text(entry):
+    """ADR 0076: the read view behind a card shows the situation and the facts
+    of the case. Those two columns are English prompt text (ADR 0043), so a
+    built-in needs a display twin for each -- without one the panel would show
+    a German user an English case."""
+    for field in ("description_label", "case_facts_label"):
+        assert entry[field].strip(), f"{entry['id']}: no {field}"
+        assert entry[field] != entry[field.removesuffix("_label")], (
+            f"{entry['id']}: {field} is the prompt text"
+        )
+
+
+@pytest.mark.parametrize("entry", SEED.SCENARIOS, ids=lambda e: e["id"])
+def test_seeded_scenario_display_text_carries_no_dash(entry):
+    """House style for anything the UI shows: no em or en dash. They were used
+    as a catch-all joiner in the seeded briefings, which reads as an aside in
+    text meant to state a rule."""
+    for field in ("name", "short_description", "briefing",
+                  "description_label", "case_facts_label"):
+        assert not _DISPLAY_DASH.search(entry[field] or ""), (
+            f"{entry['id']}.{field}: dash in display text"
+        )
+
+
 def test_seeded_persona_behaviour_carries_no_situation():
     """ADR 0045: `behavior` is manner only. Both Personas used to open it with
     the same sentence about having a reason for the call — a statement about
@@ -377,6 +402,9 @@ def test_scenario_row_maps_its_category():
 # cannot also be English ("die", "man", "war", "will", "in", "so" are German
 # words too and are deliberately absent).
 _UMLAUTS = re.compile(r"[äöüÄÖÜß]")
+# An em or en dash with space around it: the joiner this seed used to reach
+# for. A hyphen inside a compound ("IT-Seite") is not one and must pass.
+_DISPLAY_DASH = re.compile(r"\s[—–]\s")
 _GERMAN_ONLY = re.compile(
     r"\b(ohne|nicht|und|oder|sind|wird|eine|einen|dass|sich|auch|aber|sehr|"
     r"kein|keine|wenn|weil|damit|schon|noch|nur|zwischen|werden|haben)\b",

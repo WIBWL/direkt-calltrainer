@@ -326,6 +326,14 @@ class Scenario(_AuthoredContent, Base):
     # asked for before, which is what ADR 0024's user-authored ones will be.
     description: Mapped[str] = mapped_column(Text)
     case_facts: Mapped[str] = mapped_column(Text)
+    # Display twins of the two above, in the UI language, for the read view
+    # behind a card (ADR 0076). The prompt fields stay English so a Persona's
+    # language decides the call's (ADR 0043); these are the same content
+    # written for a person. Only the seed writes them: an authored Scenario
+    # is already in its author's language, so both are NULL there and the
+    # API falls back to the prompt field itself.
+    description_label: Mapped[str | None] = mapped_column(Text)
+    case_facts_label: Mapped[str | None] = mapped_column(Text)
     call_goal: Mapped[str] = mapped_column(Text)
     success_condition: Mapped[str] = mapped_column(Text)
     # Display field, in the UI language, addressed to the *trainee* and never

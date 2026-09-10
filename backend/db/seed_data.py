@@ -452,8 +452,8 @@ SCENARIOS = [
             "Sie arbeiten im Support und nehmen den Anruf zu einem laufenden "
             "Vertrag entgegen. Sie dürfen den Vorgang einsehen, einen "
             "verbindlichen Termin zusagen und intern eskalieren. Gut gelaufen ist "
-            "das Gespräch, wenn Ihr Gegenüber weiß, woran es liegt und bis wann es "
-            "wieder läuft — oder ehrlich hört, dass es nicht geht, und was "
+            "das Gespräch, wenn Ihr Gegenüber weiß, woran es liegt und bis wann "
+            "es wieder läuft, oder ehrlich hört, dass es nicht geht, und was "
             "stattdessen gilt."
         ),
         "description": (
@@ -467,6 +467,18 @@ SCENARIOS = [
             "happened since. The workaround in use is exporting one record at "
             "a time, roughly 40 a week. The contract runs to the end of the "
             "year and includes next-business-day support."
+        ),
+        "description_label": (
+            "Der Kunde ruft im Support an, weil ein Anliegen zu einem bestehenden "
+            "Vertrag ungelöst ist."
+        ),
+        "case_facts_label": (
+            "Vor elf Tagen wurde ein Support-Ticket eröffnet, weil bei einem der "
+            "beiden Team-Konten die Exporte fehlschlagen. Es wurde am selben Tag "
+            "bestätigt, ein Rückruf binnen 48 Stunden zugesagt, seitdem ist "
+            "nichts passiert. Als Behelf wird jeder Datensatz einzeln exportiert, "
+            "etwa 40 pro Woche. Der Vertrag läuft bis Jahresende und enthält "
+            "Support am nächsten Werktag."
         ),
         "call_goal": (
             "Find out what is actually happening with the ticket and get a "
@@ -507,6 +519,20 @@ SCENARIOS = [
             "is included. Two of the package's six modules are in regular use; "
             "a competitor quoted roughly 800 euros for what looks like the "
             "same scope."
+        ),
+        "description_label": (
+            "Der Kunde ruft an, weil er über eine Kündigung oder einen kleineren "
+            "Tarif nachdenkt: Die laufenden Kosten erscheinen ihm im Verhältnis "
+            "zum Nutzen zu hoch. Für ein Gespräch ist er grundsätzlich noch "
+            "offen."
+        ),
+        "case_facts_label": (
+            "Das Paket „Insight Analytics“: 14 Lizenzen für 1.180 Euro im Monat, "
+            "seit März letzten Jahres. Die letzte Verlängerung hat den Preis um "
+            "12 Prozent angehoben, von 1.050 Euro, ohne dass sich am "
+            "Leistungsumfang etwas geändert hätte. Von den sechs Modulen des "
+            "Pakets sind zwei regelmäßig im Einsatz; ein Wettbewerber hat für "
+            "scheinbar denselben Umfang rund 800 Euro genannt."
         ),
         "call_goal": (
             "Get the price down, or get a clear reason why it cannot come "
@@ -556,6 +582,23 @@ SCENARIOS = [
             "percent of the monthly fee for any month that misses it. "
             "April has now missed it twice over."
         ),
+        "description_label": (
+            "Der Kunde ruft im Support an, nachdem derselbe Dienst wiederholt "
+            "ausgefallen ist, obwohl zugesichert worden war, das sei dauerhaft "
+            "behoben."
+        ),
+        "case_facts_label": (
+            "Der Export-Dienst ist dreimal ausgefallen: vierzig Minuten am 14. "
+            "März, dreieinhalb Stunden am 2. April und erneut seit heute Morgen "
+            "09:10 Uhr, zu Beginn dieses Anrufs noch immer. Nach dem zweiten "
+            "Ausfall wurde eine dauerhafte Lösung für das nächste Release "
+            "zugesagt, das am 18. April erschienen ist. Der Vertrag umfasst 30 "
+            "Lizenzen für 2.400 Euro im Monat und garantiert 99,5 Prozent "
+            "Verfügbarkeit im Monat, was in einem 30-Tage-Monat etwa dreieinhalb "
+            "Stunden Ausfall zulässt, mit einer Gutschrift von fünf Prozent der "
+            "Monatsgebühr für jeden Monat, der das verfehlt. Der April hat es nun "
+            "doppelt verfehlt."
+        ),
         "call_goal": (
             "Find out why the fix did not hold, and get a commitment on what "
             "happens now, both to the service itself and to the service "
@@ -582,11 +625,11 @@ SCENARIOS = [
             "und Termin, bevor sein Budget zugeht."
         ),
         "briefing": (
-            "Sie arbeiten im Vertrieb, und Ihr Gegenüber will erweitern. Sie kennen "
-            "die Preisliste samt Mengenstaffeln, dürfen Termine verbindlich "
-            "vergeben und den Ausbau selbst freigeben. Gut gelaufen ist das "
-            "Gespräch, wenn am Ende eine Zahl und ein Termin stehen — beides, nicht "
-            "eines von beiden."
+            "Sie arbeiten im Vertrieb, und Ihr Gegenüber will erweitern. Sie "
+            "kennen die Preisliste samt Mengenstaffeln, dürfen Termine "
+            "verbindlich vergeben und den Ausbau selbst freigeben. Gut gelaufen "
+            "ist das Gespräch, wenn am Ende eine Zahl und ein Termin stehen. "
+            "Beides, nicht eines von beiden."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -602,6 +645,21 @@ SCENARIOS = [
             "euros at the current rate. The budget for this is approved only "
             "until the quarter closes on 30 June. Thursday afternoon and "
             "Friday morning are both free for an hour-long walkthrough."
+        ),
+        "description_label": (
+            "Der Kunde ruft im Vertrieb an, weil er eine bestehende Lizenz auf "
+            "eine zweite Abteilung ausweiten will, und möchte vor Gesprächsende "
+            "einen konkreten nächsten Schritt."
+        ),
+        "case_facts_label": (
+            "Die aktuelle Lizenz deckt 18 Nutzer für 1.440 Euro im Monat ab, also "
+            "80 Euro je Nutzer. Die zweite Abteilung käme mit 12 Personen dazu, "
+            "macht zusammen 30. Die Preisliste weist ab 25 Nutzern eine Stufe von "
+            "72 Euro je Nutzer aus, dieselben 30 kosten dort also 2.160 Euro im "
+            "Monat gegenüber 2.400 Euro zum jetzigen Satz. Das Budget dafür ist "
+            "nur bis zum Quartalsende am 30. Juni freigegeben. "
+            "Donnerstagnachmittag und Freitagvormittag sind für eine einstündige "
+            "Vorführung beide frei."
         ),
         "call_goal": (
             "Get a price for the full 30 users and a walkthrough "
@@ -652,6 +710,21 @@ SCENARIOS = [
             "a line in the persona's own notes. The internal approval to sign "
             "expires on 6 June."
         ),
+        "description_label": (
+            "Der Kunde ruft im Vertrieb an, um einen Abschluss zu machen, der vor "
+            "drei Wochen in einem Gespräch mit einer anderen Kollegin vorbereitet "
+            "wurde. Der Nutzer war dabei nicht dabei und hat keine Notizen davon."
+        ),
+        "case_facts_label": (
+            "Das erste Gespräch war am 11. Mai, mit einer Kollegin, die der "
+            "Persona nur als Frau Sandner bekannt ist. Was die Persona daraus "
+            "mitgenommen hat: 25 Lizenzen zu je 68 Euro, also 1.700 Euro im "
+            "Monat, zwei Monate Probezeit mit Kündigungsmöglichkeit, Einführung "
+            "kostenfrei dabei, sonst einmalig 1.200 Euro, und Start am 1. Juli. "
+            "Schriftlich bestätigt wurde davon nichts; der einzige Beleg ist eine "
+            "Zeile in den eigenen Notizen der Persona. Die interne Freigabe zur "
+            "Unterschrift läuft am 6. Juni ab."
+        ),
         "call_goal": (
             "Get the agreement confirmed the way you understood it, and a "
             "signature under way before your internal approval expires on "
@@ -677,10 +750,10 @@ SCENARIOS = [
             "rückt näher."
         ),
         "briefing": (
-            "Sie arbeiten im Support. Sie dürfen die Ursache benennen, einen Termin "
-            "zusagen und einen Weg an der Störung vorbei anbieten. Gut gelaufen ist "
-            "das Gespräch, wenn Ihr Gegenüber weiß, ob der Stichtag hält — und wenn "
-            "nicht, was stattdessen gilt."
+            "Sie arbeiten im Support. Sie dürfen die Ursache benennen, einen "
+            "Termin zusagen und einen Weg an der Störung vorbei anbieten. Gut "
+            "gelaufen ist das Gespräch, wenn Ihr Gegenüber weiß, ob der Stichtag "
+            "hält, und wenn nicht, was stattdessen gilt."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -696,6 +769,20 @@ SCENARIOS = [
             "days, and anything still unassigned by then has to be handled "
             "outside the process. Nothing was changed on the customer's side "
             "in that time."
+        ),
+        "description_label": (
+            "Der Kunde ruft im Support an, weil ein wiederkehrender, "
+            "dokumentgetriebener Prozess stehen geblieben ist und keine Vorgänge "
+            "mehr zugeteilt werden. Ein Stichtag rückt näher, und der Anrufer "
+            "weiß nicht, ob er noch zu halten ist."
+        ),
+        "case_facts_label": (
+            "Der Prozess läuft seit über einem Jahr unverändert. Seit drei Tagen "
+            "bleiben Vorgänge unzugeteilt, etwa 30 am Tag, es warten also rund "
+            "90. Als Behelf wird jeder Vorgang von Hand zugeteilt, was je etwa "
+            "zwei Minuten dauert. Der Stichtag ist in acht Tagen; was bis dahin "
+            "unzugeteilt ist, muss außerhalb des Prozesses bearbeitet werden. Auf "
+            "Kundenseite wurde in dieser Zeit nichts verändert."
         ),
         "call_goal": (
             "Find out what is causing it and get a date by which the process "
@@ -723,7 +810,7 @@ SCENARIOS = [
             "technischen Hintergrund. Sie dürfen Aufwand und Kosten grob "
             "einschätzen und einen nächsten Schritt vereinbaren. Gut gelaufen ist "
             "das Gespräch, wenn Ihr Gegenüber am Ende mit eigenen Worten sagen "
-            "kann, was zu tun ist — ein Verweis auf die Unterlagen zählt nicht."
+            "kann, was zu tun ist. Ein Verweis auf die Unterlagen zählt nicht."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -739,6 +826,20 @@ SCENARIOS = [
             "on the customer's side understood; it named the deadline and "
             "nothing else. Whether the customer has to change anything at all "
             "is still open. Nothing has been budgeted for it."
+        ),
+        "description_label": (
+            "Der Kunde ruft in Beratung oder Entwicklung an, weil eine "
+            "verpflichtende Umstellung mit festem Stichtag einen seiner Prozesse "
+            "betrifft. Der Anrufer will wissen, was das für ihn bedeutet und was "
+            "er tun muss."
+        ),
+        "case_facts_label": (
+            "Die Frist läuft in knapp fünf Monaten ab. Der betroffene Prozess "
+            "wird von drei Personen bedient, von denen keine technisch ist. Vor "
+            "vier Wochen ging ein Rundschreiben zur Umstellung heraus, das auf "
+            "Kundenseite niemand verstanden hat; es nannte den Stichtag und sonst "
+            "nichts. Ob der Kunde überhaupt etwas ändern muss, ist noch offen. "
+            "Budget ist dafür keines eingeplant."
         ),
         "call_goal": (
             "Have it explained in plain words what has to be done and what it "
@@ -762,10 +863,11 @@ SCENARIOS = [
             "noch Zielzustand benennen."
         ),
         "briefing": (
-            "Sie arbeiten in der Beratung. Sie dürfen offen lassen, ob das machbar "
-            "ist, und dürfen fragen, statt zu antworten. Gut gelaufen ist das "
-            "Gespräch, wenn Ihr Gegenüber weiß, was als Nächstes passiert, wer es "
-            "tut und wann — eine Machbarkeit im Allgemeinen ist kein Ergebnis."
+            "Sie arbeiten in der Beratung. Sie dürfen offen lassen, ob das "
+            "machbar ist, und dürfen fragen, statt zu antworten. Gut gelaufen ist "
+            "das Gespräch, wenn Ihr Gegenüber weiß, was als Nächstes passiert, "
+            "wer es tut und wann. Eine Machbarkeit im Allgemeinen ist kein "
+            "Ergebnis."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -780,6 +882,19 @@ SCENARIOS = [
             "without a result; the caller cannot say why. No budget has been "
             "named. A target date has: this year if at all possible. Roughly "
             "20 cases a week go through the process."
+        ),
+        "description_label": (
+            "Der Kunde ruft in Beratung oder Entwicklung an und möchte einen "
+            "wiederkehrenden manuellen Prozess automatisieren, kann aber weder "
+            "sagen, was ihn auslöst, noch wie das fertige Ergebnis aussehen soll."
+        ),
+        "case_facts_label": (
+            "Zwei Abteilungen bearbeiten den Prozess unterschiedlich, und keine "
+            "kennt im Detail, wie die andere vorgeht. Zwei frühere Anläufe zur "
+            "Automatisierung, einer vor drei Jahren und einer im letzten Jahr, "
+            "endeten ohne Ergebnis; warum, kann der Anrufer nicht sagen. Ein "
+            "Budget wurde nicht genannt. Ein Zieltermin schon: möglichst noch "
+            "dieses Jahr. Durch den Prozess laufen etwa 20 Fälle pro Woche."
         ),
         "call_goal": (
             "Find out whether this is feasible at all and what happens next."
@@ -803,9 +918,9 @@ SCENARIOS = [
         "briefing": (
             "Sie betreuen den Kunden fachlich und kennen den Vertragsumfang. Sie "
             "dürfen die Anpassung als Kulanz vergeben, sie berechnen oder sie "
-            "ablehnen — die Entscheidung liegt bei Ihnen. Gut gelaufen ist das "
-            "Gespräch, wenn Ihr Gegenüber die Begründung nachvollziehen und selbst "
-            "wiedergeben kann, wie sie auch ausfällt."
+            "ablehnen. Die Entscheidung liegt bei Ihnen. Gut gelaufen ist das "
+            "Gespräch, wenn Ihr Gegenüber die Begründung nachvollziehen und "
+            "selbst wiedergeben kann, wie sie auch ausfällt."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -820,6 +935,19 @@ SCENARIOS = [
             "comparable was done two years ago as a goodwill gesture and never "
             "billed, which the caller remembers clearly. The contract runs for "
             "another fourteen months."
+        ),
+        "description_label": (
+            "Der Kunde ruft in Beratung oder Kundenbetreuung an, weil er eine "
+            "Anpassung möchte, die der laufende Vertrag nicht abdeckt und die "
+            "nach Aufwand berechnet werden müsste."
+        ),
+        "case_facts_label": (
+            "Der Vertrag deckt Betrieb und Störungsbehebung ab, keine "
+            "Erweiterungen. Die gewünschte Anpassung ist etwa ein halber Tag "
+            "Arbeit, was zum vereinbarten Tagessatz einen niedrigen vierstelligen "
+            "Betrag ergibt. Etwas Vergleichbares wurde vor zwei Jahren aus Kulanz "
+            "gemacht und nie berechnet, woran sich der Anrufer genau erinnert. "
+            "Der Vertrag läuft noch vierzehn Monate."
         ),
         "call_goal": (
             "Get the adjustment made, without any additional cost."
@@ -842,11 +970,11 @@ SCENARIOS = [
             "Stunden meldet sich niemand."
         ),
         "briefing": (
-            "Sie sitzen im Support und nehmen einen Anruf an, auf den seit Stunden "
-            "jemand wartet. Sie dürfen zugeben, was Sie nicht wissen, und dürfen "
-            "einen Rückruf mit fester Uhrzeit zusagen. Gut gelaufen ist das "
-            "Gespräch, wenn Ihr Gegenüber weiß, wer sich kümmert und wann er wieder "
-            "hört — auch dann, wenn Sie kein Ende nennen können."
+            "Sie sitzen im Support und nehmen einen Anruf an, auf den seit "
+            "Stunden jemand wartet. Sie dürfen zugeben, was Sie nicht wissen, und "
+            "dürfen einen Rückruf mit fester Uhrzeit zusagen. Gut gelaufen ist "
+            "das Gespräch, wenn Ihr Gegenüber weiß, wer sich kümmert und wann er "
+            "wieder hört, auch dann, wenn Sie kein Ende nennen können."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -861,6 +989,19 @@ SCENARIOS = [
             "hours ago, with a callback promised within the hour, and there "
             "has been no word since. A comparable outage last happened four "
             "months ago and took two days to explain."
+        ),
+        "description_label": (
+            "Der Kunde ruft in Support oder Kundenbetreuung an, weil eine "
+            "zentrale Systemkomponente seit heute Morgen ausgefallen ist und sich "
+            "niemand dazu zurückgemeldet hat."
+        ),
+        "case_facts_label": (
+            "Der Ausfall dauert seit fünf Stunden an und besteht zu Beginn dieses "
+            "Anrufs weiter. Betroffen sind alle Standorte des Kunden, rund 60 "
+            "Personen können nicht normal arbeiten. Vor drei Stunden wurde eine "
+            "erste Meldung aufgenommen und ein Rückruf binnen einer Stunde "
+            "zugesagt; seitdem kam nichts. Ein vergleichbarer Ausfall liegt vier "
+            "Monate zurück und brauchte zwei Tage bis zur Erklärung."
         ),
         "call_goal": (
             "Get a time by which it will be working again, and know who is "
@@ -904,6 +1045,20 @@ SCENARIOS = [
             "would be supplied for them, when what was meant is that they "
             "supply it, and they will notice that only if the recap is "
             "specific enough to contradict them."
+        ),
+        "description_label": (
+            "Der Kunde ruft in Support oder Beratung am Ende einer Klärung an, um "
+            "das Vereinbarte vor der schriftlichen Zusammenfassung noch einmal "
+            "laut durchzugehen."
+        ),
+        "case_facts_label": (
+            "Vier Punkte wurden zuvor besprochen: ein Liefertermin in zwei "
+            "Wochen, wer die Testdaten stellt, wie die Übergabe dokumentiert "
+            "wird, und was mit zwei offenen Punkten aus dem letzten Gespräch "
+            "passiert. Bei den Testdaten hat der Anrufer verstanden, dass sie für "
+            "ihn gestellt werden, gemeint war aber, dass er sie stellt. Auffallen "
+            "wird ihm das nur, wenn die Zusammenfassung konkret genug ist, um ihm "
+            "zu widersprechen."
         ),
         "call_goal": (
             "Be sure both sides mean the same thing before anything is put in "
@@ -952,6 +1107,21 @@ SCENARIOS = [
             "considers the two variants to be the same thing and describes "
             "both as though they were."
         ),
+        "description_label": (
+            "Der Kunde ruft in Beratung oder Anforderungsanalyse zu einem ersten "
+            "Gespräch über einen bestehenden manuellen Prozess an, damit er "
+            "später modelliert werden kann. Der Anrufer ist einer der Menschen, "
+            "die ihn ausführen."
+        ),
+        "case_facts_label": (
+            "Der Prozess hat etwa acht Schritte, drei davon mit Sonderfällen. "
+            "Dokumentiert ist er nirgends. Zwei Personen führen ihn "
+            "unterschiedlich aus: die eine prüft einen Eintrag vor der Freigabe "
+            "gegen eine Liste, die andere gibt zuerst frei und korrigiert "
+            "hinterher, weshalb etwa jeder zehnte Eintrag später korrigiert wird. "
+            "Der Anrufer hält die beiden Varianten für dasselbe und beschreibt "
+            "sie auch so."
+        ),
         "call_goal": (
             "Explain how the process works today and find out what happens "
             "next."
@@ -973,11 +1143,11 @@ SCENARIOS = [
             "Entscheidung in sechs Wochen."
         ),
         "briefing": (
-            "Sie beraten zum vorgeschlagenen Ansatz und sitzen selbst nicht in der "
-            "Entscheidung. Sie dürfen Risiken einräumen, Alternativen nennen und "
-            "Belege nachreichen. Gut gelaufen ist das Gespräch, wenn jeder Vorbehalt "
-            "entweder eine konkrete Antwort hat oder offen als Risiko benannt ist — "
-            "eine pauschale Beruhigung zählt für keinen."
+            "Sie beraten zum vorgeschlagenen Ansatz und sitzen selbst nicht in "
+            "der Entscheidung. Sie dürfen Risiken einräumen, Alternativen nennen "
+            "und Belege nachreichen. Gut gelaufen ist das Gespräch, wenn jeder "
+            "Vorbehalt entweder eine konkrete Antwort hat oder offen als Risiko "
+            "benannt ist. Eine pauschale Beruhigung zählt für keinen."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -993,6 +1163,20 @@ SCENARIOS = [
             "decision is due in six weeks and is taken by a group of four, of "
             "whom the caller is one. Roughly 40 people would work with the "
             "result day to day."
+        ),
+        "description_label": (
+            "Der Kunde ruft in Beratung oder Leitung an und hat Vorbehalte gegen "
+            "den vorgeschlagenen Ansatz: Abhängigkeit von einem einzigen "
+            "Anbieter, Grenzen bei komplexeren Anforderungen und Zweifel, ob das "
+            "in fünf Jahren noch trägt."
+        ),
+        "case_facts_label": (
+            "Ein früheres Projekt des Kunden auf einem vergleichbaren Ansatz "
+            "wurde nach zwei Jahren abgelöst. Der Anrufer war daran beteiligt und "
+            "bringt es zur Sprache, ohne genau zu wissen, warum es abgelöst "
+            "wurde. Eine Entscheidung steht in sechs Wochen an und wird von einem "
+            "Gremium aus vier Personen getroffen, zu denen der Anrufer gehört. "
+            "Mit dem Ergebnis würden etwa 40 Personen täglich arbeiten."
         ),
         "call_goal": (
             "Test whether the reservations can be answered, with something "
@@ -1020,8 +1204,8 @@ SCENARIOS = [
             "Sie arbeiten im Vertrieb und verantworten das Angebot, das auf dem "
             "Tisch liegt. Sie dürfen über Preis, Laufzeit und Leistungsumfang "
             "verhandeln und einen Nachlass selbst vergeben. Gut gelaufen ist das "
-            "Gespräch, wenn am Ende eine Zahl mit Gültigkeitsdatum steht oder eine "
-            "begründete Absage — eine Prüfung im Haus ist keines von beidem."
+            "Gespräch, wenn am Ende eine Zahl mit Gültigkeitsdatum steht oder "
+            "eine begründete Absage. Eine Prüfung im Haus ist keines von beidem."
         ),
         "description": (
             "The customer's procurement side (the persona) is calling the "
@@ -1035,6 +1219,19 @@ SCENARIOS = [
             "migration of existing data and the second year of support, which "
             "the caller does not volunteer and concedes only if asked what is "
             "actually in it. The decision is meant to be made this week."
+        ),
+        "description_label": (
+            "Der Einkauf des Kunden ruft in Vertrieb oder Leitung an und fordert "
+            "unter Verweis auf ein Konkurrenzangebot einen Nachlass."
+        ),
+        "case_facts_label": (
+            "Das vorliegende Angebot ist eine laufende Jahressumme im mittleren "
+            "fünfstelligen Bereich. Das genannte Konkurrenzangebot liegt rund 20 "
+            "Prozent darunter, deckt aber weniger ab: Die Übernahme der "
+            "bestehenden Daten und das zweite Supportjahr fehlen darin. Von sich "
+            "aus sagt der Anrufer das nicht und räumt es erst ein, wenn er "
+            "gefragt wird, was darin eigentlich enthalten ist. Die Entscheidung "
+            "soll noch diese Woche fallen."
         ),
         "call_goal": (
             "Get the price down. The competing quote is the lever, not the "
@@ -1058,11 +1255,11 @@ SCENARIOS = [
             "Betrieb gefährdet."
         ),
         "briefing": (
-            "Sie arbeiten in der Beratung und sprechen mit der IT-Seite des Kunden, "
-            "nicht mit dem Fachbereich, der Sie geholt hat. Sie dürfen "
+            "Sie arbeiten in der Beratung und sprechen mit der IT-Seite des "
+            "Kunden, nicht mit dem Fachbereich, der Sie geholt hat. Sie dürfen "
             "Zuständigkeiten vorschlagen, interne Regeln akzeptieren und den "
             "Fachbereich ausbremsen. Gut gelaufen ist das Gespräch, wenn "
-            "Entscheidungsweg, Freigabe und Betrieb benannt sind — die Zusage, die "
+            "Entscheidungsweg, Freigabe und Betrieb benannt sind. Die Zusage, die "
             "IT künftig einzubinden, ist keines davon."
         ),
         "description": (
@@ -1078,6 +1275,20 @@ SCENARIOS = [
             "not opposed to the approach in principle. It was bypassed, which "
             "is a different objection and not the one being made out loud. Two "
             "further departments are waiting to follow."
+        ),
+        "description_label": (
+            "Die IT-Seite des Kunden ruft in der Beratung an. Der Fachbereich ist "
+            "vom Ansatz überzeugt; die IT-Seite sieht Kontrolle, Sicherheit und "
+            "den täglichen Betrieb gefährdet, wenn Fachbereiche sich selbst etwas "
+            "einrichten."
+        ),
+        "case_facts_label": (
+            "Der Fachbereich hat in einer Testumgebung bereits begonnen, ohne die "
+            "IT zu fragen. Eine interne Richtlinie verbietet genau das, und die "
+            "IT-Seite hat erst nach drei Wochen davon erfahren. Gegen den Ansatz "
+            "an sich ist die IT-Seite nicht. Sie wurde übergangen, was ein "
+            "anderer Einwand ist als der, den sie laut vorbringt. Zwei weitere "
+            "Fachbereiche warten darauf, nachzuziehen."
         ),
         "call_goal": (
             "Settle who decides what from here on, and who runs it once it is "
@@ -1122,6 +1333,20 @@ SCENARIOS = [
             "caller has to hand their notes to a second person who was not on "
             "the call."
         ),
+        "description_label": (
+            "Der Kunde arbeitet in einem stark regulierten Umfeld und ruft in der "
+            "Beratung an, mit Fragen dazu, wo Daten liegen, wer darauf zugreifen "
+            "darf und was nachzuweisen ist. Der Anrufer macht sich Notizen und "
+            "liest Zusagen zurück."
+        ),
+        "case_facts_label": (
+            "In drei Monaten steht eine interne Prüfung an, und dieser Bereich "
+            "gehört zu dem, was sie sich ansieht. Von den drei Fragen sind zwei "
+            "belastbar beantwortet und eine nicht, und was zu dieser einen gesagt "
+            "wird, landet genau so in der Prüfung. Der Anrufer muss seine Notizen "
+            "an eine zweite Person weitergeben, die beim Gespräch nicht dabei "
+            "war."
+        ),
         "call_goal": (
             "Get an answer for each question that is solid enough to quote."
         ),
@@ -1163,6 +1388,19 @@ SCENARIOS = [
             "is hard to move. Nothing has been heard about the state of the "
             "work since the commitment was made, and the caller has heard "
             "nothing to suggest it is at risk."
+        ),
+        "description_label": (
+            "Der Kunde ruft im Projektmanagement an, um sich einen zugesagten "
+            "Termin bestätigen zu lassen, weil intern bereits Termine dahinter "
+            "geplant wurden."
+        ),
+        "case_facts_label": (
+            "Der Termin wurde vor sechs Wochen zugesagt und liegt in zehn Tagen. "
+            "Intern hängen zwei weitere Termine daran, einer davon mit einem "
+            "Dritten, der acht Wochen im Voraus gebucht wurde und schwer zu "
+            "verschieben ist. Seit der Zusage kam nichts zum Stand der Arbeiten, "
+            "und der Anrufer hat auch nichts gehört, was auf ein Risiko "
+            "hindeutet."
         ),
         "call_goal": (
             "Have the date confirmed, and if it does not hold, know what "
