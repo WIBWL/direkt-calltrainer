@@ -96,7 +96,15 @@ body {
 .app-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 9px;
+  flex-shrink: 0;
+}
+
+.app-brand-logo {
+  display: block;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
   flex-shrink: 0;
 }
 
@@ -3899,6 +3907,14 @@ h2 {
   align-items: center;
   gap: 11px;
   color: var(--color-navy-900);
+}
+
+.login-brand-logo {
+  display: block;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .login-brand-mark {
