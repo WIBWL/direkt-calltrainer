@@ -39,7 +39,11 @@ export const FOCUS_BACKING: Record<string, FocusBacking> = {
   // Interruptions first: how often somebody let the other side finish is the
   // most direct trace of listening the call leaves behind.
   active_listening: { kind: "metric", metrics: ["interruptions", "reaction_time", "pauses"] },
-  conciseness: { kind: "metric", metrics: ["word_count"] },
+  // Word count last: it grows with the call, not with how concise it was.
+  conciseness: {
+    kind: "metric",
+    metrics: ["fillers", "hesitations", "repetitions", "word_count"],
+  },
   intonation: { kind: "metric", metrics: ["intonation"] },
   training_regularity: { kind: "activity", metrics: [] },
   training_variety: { kind: "activity", metrics: [] },

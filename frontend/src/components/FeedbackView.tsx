@@ -46,7 +46,8 @@ export interface FollowUpActions {
 /** How many decimals a metric reads naturally in. Counts are whole things;
  * seconds and percentages are not. */
 const DECIMALS: Record<string, number> = {
-  questions: 0, word_count: 0, pace: 0, talk_share: 0, phonation_share: 0,
+  questions: 0, word_count: 0, pace: 0, talk_share: 0, phonation_share: 0, fillers: 0,
+  repetitions: 0, hesitations: 0,
 };
 
 /** The two halves (backend/db/models.py METRIC_ASPECTS), in slider order. */
@@ -782,8 +783,24 @@ function interruptionContext(measurement: Measurement): string | null {
 
 /** A second line under a metric's value, where its `detail` refines the same
  * figure rather than standing beside it. Absent for a call whose language has
- * no question words on file. */
+ * no word list on file. */
 function subline(measurement: Measurement): string | null {
+  if (measurement.key === "fillers") {
+    // Most frequent first, in the order the backend's `most_common` wrote them.
+    const words = measurement.detail?.["words"] as Record<string, number> | undefined;
+    const top = Object.entries(words ?? {}).slice(0, 2);
+    if (top.length === 0) return null;
+    return "meist " + top.map(([word, n]) => `„${word}“ (${n}×)`).join(", ");
+  }
+  if (measurement.key === "repetitions") {
+    const passages = measurement.detail?.["passages"] as string[] | undefined;
+    const first = passages?.[0];
+    if (!first) return null;
+    const words = first.split(" ");
+    return `z. B. „${words.slice(0, 6).join(" ")}${words.length > 6 ? " …" : ""}“`;
+  }
+  // Said on the tile itself, not only on a page: this one is a detection.
+  if (measurement.key === "hesitations") return "geschätzt aus der Tonhöhe";
   if (measurement.key !== "questions") return null;
   const open = measurement.detail?.["open"];
   const closed = measurement.detail?.["closed"];
