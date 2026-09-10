@@ -416,6 +416,7 @@ export default function App() {
           scenarioName={selectedScenario?.name ?? "Gespräch"}
           personaName={personaName}
           personaRole={selectedPersona?.role ?? "Gesprächspartner"}
+          personaAvatarUrl={selectedPersona?.avatar_url ?? null}
           languageLabel={selectedPersona?.language ?? "Sprache"}
           isMicrophoneMuted={isMicrophoneMuted}
           callState={displayState}

@@ -240,6 +240,13 @@ class Persona(_AuthoredContent, Base):
     # (ADR 0058), though every Persona is a built-in and does carry a slug.
     key: Mapped[str | None] = mapped_column(String(60), unique=True)
     name: Mapped[str] = mapped_column(String(120))
+    # Display field: where this Persona's portrait is served from, e.g.
+    # /personas/andreas-kastner-ceo.webp. A path, not the image: the file is a
+    # frontend build asset like every other one, and the row only says which of
+    # them belongs to this Persona -- so a new Persona still arrives as a seed
+    # change plus a file, with no code to touch. Nullable, and the UI falls back
+    # to the Persona's initials without one.
+    avatar_url: Mapped[str | None] = mapped_column(String(200))
     # Display field: the label on the selection card, in the UI language. The
     # prompt fields below are English (ADR 0043), so the two audiences this one
     # column used to serve at once are two columns now.

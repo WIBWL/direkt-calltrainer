@@ -36,6 +36,10 @@ tables, so provision.py writes them straight through without mapping.
 # Session keeps pointing at the row it was played on, so its history entry goes
 # on naming the Persona the User actually heard introduce itself, instead of
 # the transcript contradicting the label above it.
+# "avatar_url" is the path the Persona's portrait is served from. The images
+# are ordinary frontend assets in `frontend/public/personas/`, named after the
+# Persona's "id"; only the pairing lives in the table. A Persona seeded without
+# one plays exactly the same and shows its initials instead.
 LANGUAGE_NAMES = {"de": "Deutsch", "en": "Englisch"}
 
 # Tenants (ADR 0060, R-58). The two pilot companies plus a `default` tenant that
@@ -51,6 +55,7 @@ TENANTS = [
 PERSONAS = [
     {
         "id": "andreas-kastner-ceo",
+        "avatar_url": "/personas/andreas-kastner-ceo.webp",
         "name": "Andreas Kastner",
         "role_label": "Geschäftsführer, Fokus auf Strategie & Budget",
         "role": "Managing director of a mid-sized company, focused on strategy and budget",
@@ -109,6 +114,7 @@ PERSONAS = [
     },
     {
         "id": "theresia-jansen-marketing",
+        "avatar_url": "/personas/theresia-jansen-marketing.webp",
         "name": "Theresia Jansen",
         "role_label": "Marketing-Managerin bei einem Kundenunternehmen",
         "role": "Marketing manager at a company that is a customer of the user's",
@@ -169,6 +175,7 @@ PERSONAS = [
     # `tests/test_persona_scenario_library.py` enforces that pairing.
     {
         "id": "patrick-lohberg-it-lead",
+        "avatar_url": "/personas/patrick-lohberg-it-lead.webp",
         "name": "Patrick Lohberg",
         "role_label": "IT-Leitung, prüft Sicherheit, Betrieb und Integration",
         "role": (
@@ -226,6 +233,7 @@ PERSONAS = [
     },
     {
         "id": "kerstin-kaser-clerk",
+        "avatar_url": "/personas/kerstin-kaser-clerk.webp",
         "name": "Kerstin Kaser",
         "role_label": "Sachbearbeiterin, antwortet knapp und wartet ab",
         "role": (
@@ -280,6 +288,7 @@ PERSONAS = [
     },
     {
         "id": "marcel-kropp-cost-critical",
+        "avatar_url": "/personas/marcel-kropp-cost-critical.webp",
         "name": "Marcel Kropp",
         "role_label": "Bestandskunde, achtet streng auf jede Zusatzleistung",
         "role": (
@@ -338,6 +347,7 @@ PERSONAS = [
     },
     {
         "id": "fabian-jantzer-non-technical",
+        "avatar_url": "/personas/fabian-jantzer-non-technical.webp",
         "name": "Fabian Jantzer",
         "role_label": "Ansprechpartner ohne technisches Vorwissen",
         "role": (

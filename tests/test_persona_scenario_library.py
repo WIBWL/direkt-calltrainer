@@ -13,6 +13,8 @@ things to check and this module keeps them apart:
 Covers:
   F-04  customer persona library  (extensible; cost-critical customers,
         managing directors / IT leads focused on strategy & budget)
+  F-44  the selection card and the info panel behind it -- here the portrait
+        each seeded Persona carries
   F-03  scenario types  (support cases, pricing/offer talks, ...)
   F-01  the counterpart reflects conversational dynamics, not just facts
   R-07  cost-critical customer   R-08  budget-focused decision maker
@@ -24,6 +26,7 @@ Covers:
   R-12  spontaneous objections
 """
 
+import pathlib
 import re
 import uuid
 
@@ -450,3 +453,29 @@ def test_seeded_persona_objections_are_english(entry):
     for text in entry["objections"]:
         assert not _UMLAUTS.search(text), f"{entry['id']}: umlaut in an objection"
         assert _GERMAN_ONLY.search(text) is None, f"{entry['id']}: German in an objection"
+
+
+# --- the seeded portraits (F-44) ----------------------------------------
+#
+# The pairing of Persona and picture lives in the table (ADR 0041) while the
+# file is a frontend asset, so the two can drift apart without anything
+# failing at runtime: a wrong path is a missing image, and the UI quietly
+# falls back to the initials. These two tests are what make that a red test
+# instead.
+_PORTRAIT_DIR = pathlib.Path(__file__).resolve().parents[1] / "frontend" / "public" / "personas"
+
+
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_every_seeded_persona_carries_a_portrait_named_after_it(entry):
+    """The path is derived from the Persona's own id, so renaming one — which
+    is a new row anyway (see seed_data.py) — renames its picture too."""
+    assert entry["avatar_url"] == f"/personas/{entry['id']}.webp"
+
+
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_every_seeded_portrait_is_a_file_that_exists(entry):
+    """The other half: the path the row carries has to name a file the app
+    actually serves. `frontend/public/` is copied into `frontend/dist/` by the
+    Vite build, which is the directory the backend serves."""
+    served = _PORTRAIT_DIR / pathlib.PurePosixPath(entry["avatar_url"]).name
+    assert served.is_file(), f"{entry['id']}: no portrait at {entry['avatar_url']}"

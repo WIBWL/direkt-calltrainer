@@ -10,6 +10,7 @@ import LibraryPicker, {
   type LibraryItem,
 } from "./LibraryPicker";
 import { cx } from "../utils/cx";
+import PersonaAvatar from "./PersonaAvatar";
 import ScenarioBriefing from "./ScenarioBriefing";
 import SelectionSummary from "./SelectionSummary";
 import SetupSection from "./SetupSection";
@@ -124,6 +125,7 @@ export default function SetupView({
               title={persona.name}
               subtitle={persona.role}
               language={persona.language}
+              avatarUrl={persona.avatar_url}
               isSelected={persona.id === personaId}
               onSelect={() => onSelectPersona(persona.id)}
               onInfo={() => onShowPersonaInfo(persona.id)}
@@ -185,11 +187,16 @@ export default function SetupView({
  * The info affordance sits *outside* the card button rather than inside it —
  * a button cannot be nested in a button — using the same `card-wrap` shell
  * LibraryPicker puts its "Bearbeiten" link in. Reading about a Persona and
- * choosing one are separate acts: the "i" does not select the card. */
+ * choosing one are separate acts: the "i" does not select the card.
+ *
+ * The portrait is full-bleed across the top, which is why the text sits in its
+ * own padded wrapper instead of the button carrying the padding: the picture
+ * has to reach the card's edges, the text must not. */
 function ChoiceCard({
   title,
   subtitle,
   language,
+  avatarUrl,
   isSelected,
   onSelect,
   onInfo,
@@ -198,6 +205,7 @@ function ChoiceCard({
   title: string;
   subtitle: string;
   language: string;
+  avatarUrl: string | null;
   isSelected: boolean;
   onSelect: () => void;
   onInfo: () => void;
@@ -215,9 +223,13 @@ function ChoiceCard({
           {isSelected ? "✓" : ""}
         </span>
 
-        <span className="persona-name">{title}</span>
-        <span className="card-subtitle">{subtitle}</span>
-        <span className="card-meta">{language}</span>
+        <PersonaAvatar name={title} src={avatarUrl} className="persona-card-portrait" />
+
+        <span className="persona-card-body">
+          <span className="persona-name">{title}</span>
+          <span className="card-subtitle">{subtitle}</span>
+          <span className="card-meta">{language}</span>
+        </span>
       </button>
 
       <button

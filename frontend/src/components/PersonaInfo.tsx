@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ApiError, getPersona } from "../api";
 import type { PersonaDetail } from "../protocol";
+import PersonaAvatar from "./PersonaAvatar";
 
 interface PersonaInfoProps {
   /** The Persona to describe — its `extern_id` (ADR 0050). */
@@ -96,6 +97,15 @@ export default function PersonaInfo({ personaId, personaName, onClose }: Persona
 
           {detail && (
             <>
+              {/* Under the heading rather than above it: the panel is opened
+                  from a card that already showed the picture, so what is new
+                  here is the text. */}
+              <PersonaAvatar
+                name={detail.name}
+                src={detail.avatar_url}
+                className="persona-info-portrait"
+              />
+
               <p className="persona-info-language">Spricht {detail.language}</p>
 
               <div className="persona-info-sections">

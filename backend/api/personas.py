@@ -32,6 +32,10 @@ def list_personas() -> list[dict]:
     `id` on the wire is the `extern_id` (ADR 0050); the client sends it straight
     back in `session.start`. The language comes along because it is the
     Persona's own, not a separate choice (ADR 0043).
+
+    `avatar_url` is a path into the frontend's own static files, not an
+    external URL, and may be null -- the card then shows the Persona's
+    initials.
     """
     return [
         {
@@ -39,6 +43,7 @@ def list_personas() -> list[dict]:
             "name": p.name,
             "role": p.role_label,
             "language": p.language_name,
+            "avatar_url": p.avatar_url,
         }
         for p in library.list_personas()
     ]
@@ -65,6 +70,7 @@ def get_persona(extern_id: str) -> dict:
         "name": persona.name,
         "role": persona.role_label,
         "language": persona.language_name,
+        "avatar_url": persona.avatar_url,
         "traits": persona.traits_label,
         "training_goal": persona.training_goal,
         "objections": [label for label in persona.objection_labels if label],

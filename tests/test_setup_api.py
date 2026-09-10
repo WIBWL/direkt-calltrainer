@@ -74,7 +74,9 @@ async def test_personas_endpoint_lists_every_persona_with_card_fields(client):
         assert uuid.UUID(card["id"])  # a valid opaque id, not the slug
         assert card["role"] == persona["role_label"]
         assert card["language"] == LANGUAGE_NAMES[persona["language_id"]]
-        assert set(card) == {"id", "name", "role", "language"}  # personas aren't authored
+        # `avatar_url` is the portrait's path; no authoring fields, since
+        # Personas are curated (ADR 0058).
+        assert set(card) == {"id", "name", "role", "language", "avatar_url"}
         assert persona["name"] and persona["role_label"], "a card needs a visible name and role"
 
 
@@ -108,7 +110,8 @@ async def test_persona_detail_serves_the_german_display_text(client):
     assert detail["training_goal"] == seeded["training_goal"]
     assert detail["objections"] == seeded["objection_labels"]
     assert set(detail) == {
-        "id", "name", "role", "language", "traits", "training_goal", "objections",
+        "id", "name", "role", "language", "avatar_url", "traits", "training_goal",
+        "objections",
     }
 
 

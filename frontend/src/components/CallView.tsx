@@ -4,11 +4,15 @@ import type { CallState } from "../protocol";
 import { cx } from "../utils/cx";
 import { formatClock } from "../utils/time";
 import CallAnimation from "./CallAnimation";
+import PersonaAvatar from "./PersonaAvatar";
 
 interface CallViewProps {
   scenarioName: string;
   personaName: string;
   personaRole: string;
+  /** The Persona's portrait. Null after a reload, where the selection is gone
+   * and only the stored name is left — the initials stand in then. */
+  personaAvatarUrl: string | null;
   languageLabel: string;
   isMicrophoneMuted: boolean;
   callState: CallState;
@@ -16,18 +20,6 @@ interface CallViewProps {
   error: string | null;
   onToggleMicrophone: () => void;
   onEndCall: () => void;
-}
-
-/** Initials for the persona avatar, limited to the first two name parts. */
-function getInitials(name: string): string {
-  const initials = name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
-
-  return initials || "?";
 }
 
 /**
@@ -41,6 +33,7 @@ export default function CallView({
   scenarioName,
   personaName,
   personaRole,
+  personaAvatarUrl,
   languageLabel,
   isMicrophoneMuted,
   callState,
@@ -75,9 +68,11 @@ export default function CallView({
 
       <section className="call-panel" aria-labelledby="call-persona-name">
         <div className="call-persona">
-          <div className="call-persona-avatar" aria-hidden="true">
-            {getInitials(personaName)}
-          </div>
+          <PersonaAvatar
+            name={personaName}
+            src={personaAvatarUrl}
+            className="call-persona-avatar"
+          />
 
           <div className="call-persona-details">
             <h2 id="call-persona-name">{personaName}</h2>

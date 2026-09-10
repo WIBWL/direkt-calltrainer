@@ -58,3 +58,7 @@ class Persona:  # pylint: disable=too-many-instance-attributes
     # same order, same length. Built in one pass in `library._to_persona`, so
     # an objection and its label cannot fall out of step.
     objection_labels: tuple[str, ...] = ()
+    # Display: the path this Persona's portrait is served from. Defaulted
+    # rather than required, because it is display-only -- a Persona without a
+    # picture plays exactly the same, and the UI shows its initials instead.
+    avatar_url: str | None = None

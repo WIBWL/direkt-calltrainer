@@ -32,6 +32,10 @@ export interface Persona {
   // A Persona speaks exactly one language and the user cannot change it
   // (ADR 0043), so the card has to say which one it is.
   language: string;
+  // Path to the Persona's portrait, served from the app's own static files
+  // (`frontend/public/personas/`). Null for a Persona that has none — every
+  // place that shows it falls back to the initials.
+  avatar_url: string | null;
 }
 
 /**

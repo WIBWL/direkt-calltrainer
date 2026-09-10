@@ -77,6 +77,7 @@ def _to_persona(row: models.Persona) -> Persona:
         objection_labels=tuple(
             objection.text_label or "" for objection in ordered
         ),
+        avatar_url=row.avatar_url,
     )
 
 
