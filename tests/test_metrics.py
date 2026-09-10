@@ -15,6 +15,8 @@ Covers:
   F-51      lexical fillers, counted from the transcript per language
   F-08      passages said again word for word, one repeated sentence counting once
   ADR 0051  a recording with no detectable silence drops what rests on silence
+  F-63      the opening: greeting, own name and an offer of help (the concern,
+            when the user rang), and its tempo
 
 `conversation()` and `measure()` are pure functions over in-memory Turns: no
 database, no audio and no Praat -- the acoustic facts are handed in as the
@@ -242,6 +244,84 @@ def test_ordinary_silence_keeps_them() -> None:
     turns[1].loudness_db = [60.0, None] * 50
 
     assert {"phonation_share", "pace", "loudness"} <= set(_by_key(turns))
+
+
+def _opening_of(*said: tuple[str, int], language_id: str | None = "de", reverse=False):
+    """The opening Measurement for a call whose user turns were `said`, as
+    (text, phonation ms), after the Persona's own opening line."""
+    turns = [Turn(seq=1, persona_text="Brandt hier, ich rufe wegen der Lieferung an.")]
+    turns += [Turn(seq=i + 2, user_text=text, user_speech_ms=ms, user_phonation_ms=ms)
+              for i, (text, ms) in enumerate(said)]
+    found = [m for m in measure(conversation(turns, language_id, reverse))
+             if m.key == "opening"]
+    return found[0] if found else None
+
+
+def test_an_opening_with_all_three_parts() -> None:
+    """F-63. The called side: greeting, name, and an offer of help."""
+    opening = _opening_of(("Guten Tag, hier ist Schmidt. Was kann ich für Sie tun?", 3000))
+
+    assert opening.value == 3
+    assert (opening.detail["greeting"], opening.detail["name"], opening.detail["offer"]) == (
+        True, True, True)
+
+
+def test_the_caller_states_the_concern_instead() -> None:
+    """In a reverse the user rang, so the concern is named, not asked for."""
+    opening = _opening_of(("Hallo, mein Name ist Beck, ich rufe an wegen der Rechnung.", 3000),
+                          reverse=True)
+
+    assert opening.value == 3
+    assert "offer" not in opening.detail
+
+
+def test_each_side_is_checked_for_its_own_part() -> None:
+    """Stating a concern is no offer of help, and an offer is no concern."""
+    called = _opening_of(("Guten Tag, ich rufe an wegen der Rechnung.", 2000))
+    calling = _opening_of(("Guten Tag, was kann ich für Sie tun?", 2000), reverse=True)
+
+    assert called.detail["offer"] is False
+    assert calling.detail["concern"] is False
+
+
+def test_a_frame_without_a_name_is_no_introduction() -> None:
+    """"hier ist alles" and "hier ist Ihr Ansprechpartner" name nobody."""
+    for said in ("Hier ist alles in Ordnung.", "Hier ist Ihr Ansprechpartner."):
+        assert _opening_of((said, 2000)).detail["name"] is False
+
+
+def test_the_opening_follows_the_language_of_the_call() -> None:
+    """The patterns come from the Persona's language pack."""
+    opening = _opening_of(("Hello, this is Sarah. How can I help?", 2000), language_id="en")
+
+    assert opening.value == 3
+
+
+def test_i_am_introduces_a_name_in_english() -> None:
+    """"I'm Alice" is how most English speakers say it; "I'm fine" names nobody."""
+    assert _opening_of(("Hi Samantha, I'm Alice.", 2000), language_id="en").detail["name"]
+    assert not _opening_of(("I'm fine, thanks.", 2000), language_id="en").detail["name"]
+
+
+def test_the_opening_needs_a_vocabulary() -> None:
+    """No pack means no patterns: absent, not a zero that looks measured."""
+    assert _opening_of(("Guten Tag.", 1000), language_id=None) is None
+
+
+def test_the_opening_tempo_is_read_against_the_rest_of_the_call() -> None:
+    """Ten words in 2 s against twenty in 8 s: twice the user's own rate."""
+    opening = _opening_of(
+        ("Guten Tag hier ist Schmidt womit kann ich Ihnen helfen", 2000),
+        ("eins zwei drei vier fünf sechs sieben acht neun zehn "
+         "elf zwölf dreizehn vierzehn fünfzehn sechzehn siebzehn achtzehn neunzehn zwanzig", 8000),
+    )
+
+    assert opening.detail["pace_ratio"] == pytest.approx(2.0)
+
+
+def test_a_call_with_one_turn_has_no_tempo_to_compare() -> None:
+    """Without a rest of the call there is nothing to be faster or slower than."""
+    assert _opening_of(("Guten Tag, hier ist Schmidt.", 2000)).detail["pace_ratio"] is None
 
 
 def test_an_unmeasured_turn_contributes_no_reaction_time() -> None:

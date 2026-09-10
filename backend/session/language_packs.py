@@ -112,6 +112,14 @@ class LanguagePack:
     # Lexical fillers only: real words, so they survive transcription. Hesitation
     # sounds ("äh") do not -- Whisper drops them -- and so are not listed.
     filler_re: re.Pattern[str]
+    # The three parts of an opening turn (F-63). The name is unknown, so
+    # self_intro_re looks for the frames it is said in, followed by a capital.
+    greeting_re: re.Pattern[str]
+    self_intro_re: re.Pattern[str]
+    # The third part depends on who rang: the called side offers help, the
+    # caller states the concern (a reverse, ADR 0070).
+    offer_re: re.Pattern[str]
+    concern_re: re.Pattern[str]
     fallback_closing_line: str
 
 
@@ -259,6 +267,29 @@ _GERMAN = LanguagePack(
         r"sag\s+ich\s+mal|sagen\s+wir\s+mal|ehrlich\s+gesagt)\b",
         re.IGNORECASE,
     ),
+    greeting_re=re.compile(
+        r"\b(guten\s+(tag|morgen|abend)|hallo|grüß\s+gott|moin|servus|herzlich\s+willkommen)\b",
+        re.IGNORECASE,
+    ),
+    # "hier ist Schmidt", not "hier ist alles" or "hier ist Ihr Ansprechpartner".
+    self_intro_re=re.compile(
+        r"\bmein\s+name\s+ist\s+(?-i:[A-ZÄÖÜ])"
+        r"|\bhier\s+(?:ist|spricht)\s+(?!ihr\b|ihre\b|sie\b)(?-i:[A-ZÄÖÜ])"
+        r"|\b(?-i:[A-ZÄÖÜ])\w+\s+am\s+apparat\b",
+        re.IGNORECASE,
+    ),
+    offer_re=re.compile(
+        r"\b((was|wie)\s+(kann|darf)\s+ich\s+(für\s+sie|ihnen)\s+(tun|helfen|weiterhelfen)"
+        r"|wie\s+kann\s+ich\s+(ihnen\s+)?(helfen|weiterhelfen)"
+        r"|womit\s+kann\s+ich\s+(ihnen\s+)?(helfen|dienen)|worum\s+geht\s+es"
+        r"|was\s+führt\s+sie\s+zu\s+(mir|uns)|(was\s+ist\s+)?ihr\s+anliegen)",
+        re.IGNORECASE,
+    ),
+    concern_re=re.compile(
+        r"\b(ich\s+rufe\s+(sie\s+)?an\s*,?\s*(wegen|weil|bezüglich)|es\s+geht\s+um"
+        r"|ich\s+melde\s+mich\s+wegen|(grund|anlass)\s+meines\s+anrufs)",
+        re.IGNORECASE,
+    ),
     fallback_closing_line="Vielen Dank für Ihre Zeit. Auf Wiederhören.",
 )
 
@@ -353,6 +384,24 @@ _ENGLISH = LanguagePack(
     filler_re=re.compile(
         r"\b(basically|literally|actually|kind\s+of|sort\s+of|you\s+know|i\s+mean|"
         r"so\s+to\s+speak)\b",
+        re.IGNORECASE,
+    ),
+    greeting_re=re.compile(r"\b(hello|hi|good\s+(morning|afternoon|evening))\b", re.IGNORECASE),
+    # "I'm Alice" is the commonest of them. German has no safe equivalent:
+    # nouns are capitalised, so "ich bin Kunde" would pass for a name.
+    self_intro_re=re.compile(
+        r"\bmy\s+name\s+is\s+(?-i:[A-Z])|\bthis\s+is\s+(?-i:[A-Z])|\b(?-i:[A-Z])\w+\s+speaking\b"
+        r"|\bi(?:'m|\s+am)\s+(?-i:[A-Z])",
+        re.IGNORECASE,
+    ),
+    offer_re=re.compile(
+        r"\b(how\s+(can|may)\s+i\s+(help|assist)|what\s+can\s+i\s+do\s+for\s+you"
+        r"|what('s|\s+is)\s+(it|this)\s+about)",
+        re.IGNORECASE,
+    ),
+    concern_re=re.compile(
+        r"\b(i('m|\s+am)\s+calling\s+(about|because|regarding)"
+        r"|the\s+reason\s+i('m|\s+am)\s+calling|it's\s+about)",
         re.IGNORECASE,
     ),
     fallback_closing_line="Thank you for your time. Goodbye.",

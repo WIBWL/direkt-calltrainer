@@ -74,6 +74,8 @@ class Conversation:  # pylint: disable=too-many-instance-attributes  # a record 
     # For the metrics that read words rather than milliseconds. None means
     # they report what they can without a vocabulary.
     language_id: str | None = None
+    # A reverse (ADR 0070): the user rang. Decides the opening's third part.
+    reverse: bool = False
     # How long the user's audio ran, and how much of that was speech rather
     # than silence. Only the first is comparable with `persona_speech_ms`.
     user_speech_ms: int = 0
@@ -98,6 +100,9 @@ class Conversation:  # pylint: disable=too-many-instance-attributes  # a record 
     # "how did this sentence end" has no answer on a contour with the sentence
     # boundaries taken out.
     pitch_per_turn: tuple[tuple[float | None, ...], ...] = ()
+    # The user's turns in order, as (text, phonation ms): the opening is the
+    # first of them, and its tempo is read against the rest.
+    user_turns: tuple[tuple[str, int], ...] = ()
     # How many Persona replies there were, which is what the interruption rate
     # divides by.
     persona_turns: int = 0
@@ -281,6 +286,50 @@ def _hesitations(call: Conversation) -> Measurement | None:
         float(len(found)),
         {"total_ms": sum(hold.duration_ms for hold in found)},
     )
+
+
+# Below these the opening's tempo is not compared: a handful of words gives a
+# rate, not a tempo.
+_MIN_OPENING_WORDS = 4
+_MIN_REST_WORDS = 15
+
+
+def _opening(call: Conversation) -> Measurement | None:
+    """F-63. Whether the user's first turn greets, names them and offers help --
+    or, when they rang, states the concern -- plus its tempo against the rest.
+
+    Reads the frames these are said in, so a bare name ("Schmidt, guten Tag")
+    goes unrecognised: the screen says "nicht erkannt", never "fehlt".
+    """
+    pack = _pack(call)
+    if not pack or not call.user_turns:
+        return None
+    first = call.user_turns[0][0]
+    found = {
+        "greeting": bool(pack.greeting_re.search(first)),
+        "name": bool(pack.self_intro_re.search(first)),
+        # Stored under its own key, so the screen can name the part checked.
+        ("concern" if call.reverse else "offer"): bool(
+            (pack.concern_re if call.reverse else pack.offer_re).search(first)
+        ),
+    }
+    return Measurement(
+        "opening", float(sum(found.values())), found | {"pace_ratio": _opening_pace(call)}
+    )
+
+
+def _opening_pace(call: Conversation) -> float | None:
+    """The first turn's words per phonated minute over the rest's, or None."""
+    if not call.user_acoustics_complete or not _silence_found(call):
+        return None
+    (first, first_ms), rest = call.user_turns[0], call.user_turns[1:]
+    first_words = _count_words(first)
+    rest_words = sum(_count_words(text) for text, _ in rest)
+    rest_ms = sum(ms for _, ms in rest)
+    enough = first_words >= _MIN_OPENING_WORDS and rest_words >= _MIN_REST_WORDS
+    if not enough or not first_ms or not rest_ms:
+        return None
+    return (first_words / first_ms) / (rest_words / rest_ms)
 
 
 def _open_questions(text: str, pack: LanguagePack) -> int:
@@ -658,6 +707,8 @@ METRICS: tuple[MetricDef, ...] = (
     MetricDef("word_count", "Gesprochene Wörter", "Wörter", ASPECT_WHAT, "F-08", True,
               _word_count),
     MetricDef("fillers", "Füllwörter", "Anzahl", ASPECT_WHAT, "F-51", True, _fillers),
+    # Three parts checked, hence the unit; a fourth needs it changed with it.
+    MetricDef("opening", "Gesprächseinstieg", "von 3", ASPECT_WHAT, "F-63", True, _opening),
     MetricDef("repetitions", "Wiederholungen", "Anzahl", ASPECT_WHAT, "F-08", True,
               _repetitions),
     MetricDef("hesitations", "Verzögerungslaute", "Anzahl", ASPECT_HOW, "F-51", True,

@@ -119,7 +119,9 @@ def utterances(turns: Sequence[Turn]) -> list[Utterance]:
     return spoken
 
 
-def conversation(turns: Sequence[Turn], language_id: str | None = None) -> Conversation:
+def conversation(
+    turns: Sequence[Turn], language_id: str | None = None, reverse: bool = False
+) -> Conversation:
     """Fold the finished call into the facts its statistics are derived from.
 
     `language_id` is the Persona's. Optional: without it only the readings
@@ -157,6 +159,7 @@ def conversation(turns: Sequence[Turn], language_id: str | None = None) -> Conve
     return Conversation(
         user_text=" ".join(turn.user_text for turn in turns if turn.user_text),
         language_id=language_id,
+        reverse=reverse,
         user_speech_ms=user_ms,
         user_phonation_ms=user_phonation,
         # Only Turns the user spoke in: the opening Turn has no audio to measure.
@@ -171,6 +174,9 @@ def conversation(turns: Sequence[Turn], language_id: str | None = None) -> Conve
         # Grouped by utterance as well, which the terminal contours read:
         # where one sentence ended is not recoverable from the flat curve.
         pitch_per_turn=tuple(tuple(turn.pitch_hz) for turn in turns if turn.pitch_hz),
+        user_turns=tuple(
+            (turn.user_text, turn.user_phonation_ms) for turn in turns if turn.user_text
+        ),
         persona_turns=persona_turns,
         timeline=timeline(turns),
     )
