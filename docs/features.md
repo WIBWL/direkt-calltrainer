@@ -62,6 +62,7 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 | F-48 | Trainingshistorie | Übersicht vergangener Trainings, filterbar nach Szenario-Typ und Zeitraum. | Funktionale Vollständigkeit | COULD | R-29 |
 | F-61 | Rollentausch eines Gesprächs | Ein abgeschlossenes Gespräch lässt sich mit vertauschten Rollen wiederholen: der Nutzer ruft an, die KI nimmt ab und übernimmt die Seite des Nutzers. Während des Gesprächs sieht der Nutzer die Unterlagen, die zuvor die KI hatte, samt einer kurzen Liste, worauf zu achten ist. | Funktionale Vollständigkeit | COULD | R-25, R-28, R-01 |
 | F-62 | Persönliche Fokusziele | Der Nutzer wählt aus einem Katalog bis zu fünf Trainingsziele, die in Training und Auswertung besonders hervorgehoben werden; die übrigen Ziele bleiben unberührt. Die Auswahl wird beim ersten Start erfragt, ist mit „ohne Fokus“ beantwortbar und im Profil jederzeit änderbar. | Funktionale Vollständigkeit | SHOULD | R-30, Systementwurf |
+| F-63 | Analyse des Gesprächseinstiegs | Prüfung, ob der erste eigene Redebeitrag Begrüßung, eigenen Namen und Anliegen enthält, sowie dessen Tempo gegenüber dem restlichen Gespräch. | Funktionale Korrektheit | SHOULD | F-62 |
 
 ## Bedienoberfläche
 
