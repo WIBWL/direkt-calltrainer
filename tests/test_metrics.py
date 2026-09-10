@@ -12,6 +12,9 @@ Covers:
   F-53      every metric belongs to one half of the Kennzahlen slider
   F-51      Redefluss: how much of the recording was speech
   F-41      open and closed questions, split off the same question marks
+  F-51      lexical fillers, counted from the transcript per language
+  F-08      passages said again word for word, one repeated sentence counting once
+  ADR 0051  a recording with no detectable silence drops what rests on silence
 
 `conversation()` and `measure()` are pure functions over in-memory Turns: no
 database, no audio and no Praat -- the acoustic facts are handed in as the
@@ -162,6 +165,83 @@ def test_questions_are_still_counted_without_a_language() -> None:
 
     assert asked.value == 1
     assert "open" not in asked.detail
+
+
+def _fillers_in(text: str, language_id: str | None = "de"):
+    """The fillers Measurement for a call in which the user said `text`, or None."""
+    found = [m for m in measure(conversation([Turn(seq=1, user_text=text)], language_id))
+             if m.key == "fillers"]
+    return found[0] if found else None
+
+
+def test_fillers_are_counted_per_word_from_the_transcript() -> None:
+    """F-51. Case-insensitive, and a phrase counts once, as itself."""
+    counted = _fillers_in("Eigentlich passt das. Das ist halt so, sag ich mal, eigentlich.")
+
+    assert counted.value == 4
+    assert counted.detail["words"] == {"eigentlich": 2, "halt": 1, "sag ich mal": 1}
+
+
+def test_a_filler_inside_another_word_is_not_one() -> None:
+    """"Haltung" and "enthalten" both contain "halt"."""
+    assert _fillers_in("Die Haltung ist enthalten.").value == 0
+
+
+def test_fillers_follow_the_language_of_the_call() -> None:
+    """The list comes from the Persona's language pack."""
+    assert _fillers_in("Basically, you know, it works.", language_id="en").value == 2
+
+
+def test_fillers_need_a_vocabulary() -> None:
+    """No pack means no list: absent, rather than a zero that looks measured."""
+    assert _fillers_in("Eigentlich schon.", language_id=None) is None
+
+
+def _repetitions_in(text: str):
+    """The repetitions Measurement for a call in which the user said `text`."""
+    return next(m for m in measure(conversation([Turn(seq=1, user_text=text)], "de"))
+                if m.key == "repetitions")
+
+
+def test_a_repeated_sentence_counts_once_and_is_quoted() -> None:
+    """F-08. Its overlapping four-word matches merge into one passage."""
+    said = _repetitions_in(
+        "Die Lieferung ist leider unvollständig. Also die Lieferung ist leider unvollständig."
+    )
+
+    assert said.value == 1
+    assert said.detail["passages"] == ["die Lieferung ist leider unvollständig"]
+
+
+def test_three_repeated_words_are_no_repetition() -> None:
+    """"Ich habe das" twice is how people talk, not saying something twice."""
+    assert _repetitions_in("Ich habe das gesehen. Ich habe das gelesen.").value == 0
+
+
+def test_stammering_does_not_repeat_itself() -> None:
+    """A run of one word would otherwise match its own overlapping copies."""
+    assert _repetitions_in("ja ja ja ja ja ja").value == 0
+
+
+def test_a_recording_without_silence_drops_what_rests_on_silence() -> None:
+    """A noise floor above the threshold leaves nothing silent: pauses, Redefluss,
+    pace and the loudness span would report the noise as speech. Talk share
+    rests on the recording's length and stays."""
+    turns = _measured_call()
+    turns[1].loudness_db = [60.0] * 100
+
+    keys = set(_by_key(turns))
+
+    assert not {"pauses", "phonation_share", "pace", "loudness"} & keys
+    assert "talk_share" in keys
+
+
+def test_ordinary_silence_keeps_them() -> None:
+    """Stored calls are 37 to 67 % silent; half is well clear of the cut-off."""
+    turns = _measured_call()
+    turns[1].loudness_db = [60.0, None] * 50
+
+    assert {"phonation_share", "pace", "loudness"} <= set(_by_key(turns))
 
 
 def test_an_unmeasured_turn_contributes_no_reaction_time() -> None:

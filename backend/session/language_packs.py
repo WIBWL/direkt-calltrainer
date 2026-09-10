@@ -109,6 +109,9 @@ class LanguagePack:
     # closed one. Anchored, and deliberately shallow: a question word buried
     # further in counts as closed rather than being guessed at.
     open_question_re: re.Pattern[str]
+    # Lexical fillers only: real words, so they survive transcription. Hesitation
+    # sounds ("äh") do not -- Whisper drops them -- and so are not listed.
+    filler_re: re.Pattern[str]
     fallback_closing_line: str
 
 
@@ -250,6 +253,12 @@ _GERMAN = LanguagePack(
         r"wessen|wer|wen|wem|was|wann|wo|wie)\b",
         re.IGNORECASE,
     ),
+    # Word-bounded, so "halt" does not match "Haltung" or "enthalten".
+    filler_re=re.compile(
+        r"\b(quasi|sozusagen|gewissermaßen|irgendwie|eigentlich|halt|im\s+prinzip|"
+        r"sag\s+ich\s+mal|sagen\s+wir\s+mal|ehrlich\s+gesagt)\b",
+        re.IGNORECASE,
+    ),
     fallback_closing_line="Vielen Dank für Ihre Zeit. Auf Wiederhören.",
 )
 
@@ -338,6 +347,12 @@ _ENGLISH = LanguagePack(
     open_question_re=re.compile(
         r"^(?:(?:and|but|so|okay|well|now)[\s,]+){0,2}"
         r"(whose|whom|who|what|when|where|why|which|how)\b",
+        re.IGNORECASE,
+    ),
+    # Not "like": far more often a verb or a preposition than a filler.
+    filler_re=re.compile(
+        r"\b(basically|literally|actually|kind\s+of|sort\s+of|you\s+know|i\s+mean|"
+        r"so\s+to\s+speak)\b",
         re.IGNORECASE,
     ),
     fallback_closing_line="Thank you for your time. Goodbye.",

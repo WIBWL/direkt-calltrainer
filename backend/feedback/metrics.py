@@ -19,12 +19,13 @@ what those numbers mean would go.
 from __future__ import annotations
 
 import re
+from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from statistics import fmean
 
 from backend.db.models import ASPECT_HOW, ASPECT_WHAT
-from backend.feedback import intonation
+from backend.feedback import hesitations, intonation
 from backend.feedback.acoustics import Pause
 from backend.feedback.interruptions import Segment, classify
 from backend.session.language_packs import LANGUAGE_PACKS, LanguagePack
@@ -197,6 +198,91 @@ def _questions(call: Conversation) -> Measurement | None:
     return Measurement("questions", float(questions), detail)
 
 
+def _fillers(call: Conversation) -> Measurement | None:
+    """F-51. Lexical fillers ("quasi", "sozusagen") counted in the transcript.
+
+    Hesitation sounds are not among them: Whisper drops them, so a zero here
+    says nothing about "äh". The detail names the words, most frequent first.
+    """
+    pack = _pack(call)
+    words = _count_words(call.user_text)
+    if not pack or not words:
+        return None
+    # Lowered and with runs of whitespace closed, so "Sag  ich mal" is counted
+    # as the same phrase as "sag ich mal".
+    found = Counter(" ".join(hit.lower().split()) for hit in pack.filler_re.findall(call.user_text))
+    count = sum(found.values())
+    return Measurement(
+        "fillers",
+        float(count),
+        {"per_100_words": count * 100 / words, "words": dict(found.most_common())},
+    )
+
+
+def _repetitions(call: Conversation) -> Measurement | None:
+    """F-08. Passages the user said again, word for word, later in the call.
+
+    Overlapping matches merge, so one repeated sentence counts once. The detail
+    quotes them, so a reader can see what was counted.
+    """
+    words = _WORD_RE.findall(call.user_text)
+    if not words:
+        return None
+    passages = _repeated_passages(words)
+    repeated = sum(len(passage.split()) for passage in passages)
+    return Measurement(
+        "repetitions",
+        float(len(passages)),
+        {"share_of_words": repeated * 100 / len(words), "passages": passages[:5]},
+    )
+
+
+# Four words, so a repeated "ich habe das" is no repetition but a repeated
+# sentence is.
+_REPEAT_WORDS = 4
+
+
+def _repeated_passages(words: list[str]) -> list[str]:
+    """The stretches of `words` that repeat an earlier one of _REPEAT_WORDS or more."""
+    folded = [word.lower() for word in words]
+    first_seen: dict[tuple[str, ...], int] = {}
+    covered = [False] * len(words)
+    for index in range(len(words) - _REPEAT_WORDS + 1):
+        gram = tuple(folded[index:index + _REPEAT_WORDS])
+        first = first_seen.setdefault(gram, index)
+        # Only a later, non-overlapping occurrence: "ja ja ja ja ja" matching
+        # itself is stammering, not saying something twice.
+        if first + _REPEAT_WORDS <= index:
+            covered[index:index + _REPEAT_WORDS] = [True] * _REPEAT_WORDS
+    passages: list[str] = []
+    span: list[str] = []
+    for word, hit in zip(words, covered):
+        if hit:
+            span.append(word)
+        elif span:
+            passages.append(" ".join(span))
+            span = []
+    if span:
+        passages.append(" ".join(span))
+    return passages
+
+
+def _hesitations(call: Conversation) -> Measurement | None:
+    """F-51. Hesitation sounds, estimated from the pitch contour (hesitations.py).
+
+    Absent when a Turn's acoustics failed: its contour is missing, and the count
+    would be short by an unknown amount (ADR 0048).
+    """
+    if not call.user_acoustics_complete or not call.pitch_per_turn:
+        return None
+    found = [hold for turn in call.pitch_per_turn for hold in hesitations.holds(turn)]
+    return Measurement(
+        "hesitations",
+        float(len(found)),
+        {"total_ms": sum(hold.duration_ms for hold in found)},
+    )
+
+
 def _open_questions(text: str, pack: LanguagePack) -> int:
     """How many of the question marks in `text` end an open question.
 
@@ -225,7 +311,8 @@ def _pace(call: Conversation) -> Measurement | None:
     recording with, leaving only time the user was actually speaking in.
     """
     words = _count_words(call.user_text)
-    if not call.user_acoustics_complete or not words or not call.user_phonation_ms:
+    measurable = call.user_acoustics_complete and call.user_phonation_ms and _silence_found(call)
+    if not words or not measurable:
         return None
     return Measurement("pace", words * _MS_PER_MINUTE / call.user_phonation_ms)
 
@@ -266,7 +353,7 @@ def _phonation_share(call: Conversation) -> Measurement | None:
     that padding sits in the denominator. A reading against this user's own
     calls, not an absolute.
     """
-    if not call.user_acoustics_complete or not call.user_speech_ms:
+    if not call.user_acoustics_complete or not call.user_speech_ms or not _silence_found(call):
         return None
     return Measurement(
         "phonation_share",
@@ -281,7 +368,7 @@ def _pauses(call: Conversation) -> Measurement | None:
     Only pauses within an utterance count. A hesitation long enough to trip the
     client's VAD ends the Turn instead and is measured as reaction time.
     """
-    if not call.pauses:
+    if not call.pauses or not _silence_found(call):
         return None
     durations = [p.duration_ms for p in call.pauses]
     return Measurement(
@@ -300,7 +387,7 @@ def _loudness(call: Conversation) -> Measurement | None:
     presence, with the curve behind it. A range rather than a level, for the
     reason given on TurnAcoustics.loudness_db (ADR 0047)."""
     audible = sorted(v for v in call.loudness_db if v is not None)
-    if len(audible) < 3:
+    if len(audible) < 3 or not _silence_found(call):
         return None
     margin = len(audible) // 20  # 5th to 95th percentile, ignoring the extremes
     return Measurement(
@@ -570,6 +657,11 @@ METRICS: tuple[MetricDef, ...] = (
     MetricDef("pace", "Sprechtempo", "Wörter/min", ASPECT_HOW, "F-36", True, _pace),
     MetricDef("word_count", "Gesprochene Wörter", "Wörter", ASPECT_WHAT, "F-08", True,
               _word_count),
+    MetricDef("fillers", "Füllwörter", "Anzahl", ASPECT_WHAT, "F-51", True, _fillers),
+    MetricDef("repetitions", "Wiederholungen", "Anzahl", ASPECT_WHAT, "F-08", True,
+              _repetitions),
+    MetricDef("hesitations", "Verzögerungslaute", "Anzahl", ASPECT_HOW, "F-51", True,
+              _hesitations),
     MetricDef("reaction_time", "Reaktionszeit", "s", ASPECT_HOW, "F-53", True, _reaction_time),
     MetricDef("pauses", "Sprechpausen", "s", ASPECT_HOW, "F-51", True, _pauses),
     MetricDef("phonation_share", "Redefluss", "%", ASPECT_HOW, "F-51", True, _phonation_share),
@@ -594,6 +686,24 @@ METRICS: tuple[MetricDef, ...] = (
               "F-42", False),
     MetricDef("congruence", "Kongruenz von Inhalt und Stimme", None, ASPECT_HOW, "F-39", False),
 )
+
+
+# Below this share of silent frames the recording has no silence the threshold
+# could find: a noise floor, not a speaker who never paused. Stored calls run at
+# 37 to 67 %; one recorded over background noise came out at 0.6 %.
+_MIN_SILENT_SHARE = 0.10
+
+
+def _silence_found(call: Conversation) -> bool:
+    """Whether the recording separated speech from silence at all.
+
+    Pauses, phonation and the loudness span rest on that split; without it they
+    would report the noise as speech. Absent beats wrong (ADR 0051).
+    """
+    if not call.loudness_db:
+        return True
+    silent = sum(1 for value in call.loudness_db if value is None)
+    return silent / len(call.loudness_db) >= _MIN_SILENT_SHARE
 
 
 def _pack(call: Conversation) -> LanguagePack | None:
