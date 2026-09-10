@@ -1,7 +1,8 @@
 import { useState } from "react";
 
-import type { FocusState } from "../protocol";
+import type { FocusChoice, FocusState } from "../protocol";
 import FocusGoalPicker, { toggleGoal } from "./FocusGoalPicker";
+import FocusProfilePicker from "./FocusProfilePicker";
 
 /**
  * The training focus, asked once at the first start (F-62, ADR 0076).
@@ -29,18 +30,20 @@ export default function FocusDialog({
   saving,
 }: {
   focus: FocusState;
-  onChoose: (goals: string[]) => Promise<unknown>;
+  onChoose: (choice: FocusChoice) => Promise<unknown>;
   saving: boolean;
 }) {
   const [selected, setSelected] = useState<string[]>(focus.selected);
+  const [profile, setProfile] = useState({ role: focus.role, categories: focus.categories });
   const [failed, setFailed] = useState(false);
 
   // Awaited rather than fired and forgotten: a rejected promise would go
   // unhandled and the dialog would sit there looking as if the click worked.
+  // Role and call types go with either button: "no focus" is about the goals.
   const submit = async (goals: string[]) => {
     setFailed(false);
     try {
-      await onChoose(goals);
+      await onChoose({ goals, ...profile });
     } catch {
       setFailed(true);
     }
@@ -65,6 +68,14 @@ export default function FocusDialog({
           <strong>Alles andere wird weiterhin trainiert.</strong> Ein Fokus gewichtet nur, er
           schaltet nichts ab.
         </p>
+
+        <FocusProfilePicker
+          roles={focus.roles}
+          role={profile.role}
+          categories={profile.categories}
+          disabled={saving}
+          onChange={setProfile}
+        />
 
         <FocusGoalPicker
           goals={focus.goals}

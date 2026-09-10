@@ -1,7 +1,9 @@
 import { useState } from "react";
 
 import { useFocusContext } from "../FocusContext";
+import { CATEGORY_LABELS, type ScenarioCategory } from "../scenarioLibrary";
 import FocusGoalPicker, { toggleGoal } from "./FocusGoalPicker";
+import FocusProfilePicker from "./FocusProfilePicker";
 
 /**
  * The training focus on the profile page: what is currently picked, and how to
@@ -22,6 +24,10 @@ export default function FocusSettings() {
   const { focus, saving, choose } = useFocusContext();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
+  const [profile, setProfile] = useState<{
+    role: string | null;
+    categories: ScenarioCategory[];
+  }>({ role: null, categories: [] });
   const [failed, setFailed] = useState(false);
 
   if (!focus) {
@@ -41,22 +47,33 @@ export default function FocusSettings() {
   const start = () => {
     setFailed(false);
     setDraft(focus.selected);
+    setProfile({ role: focus.role, categories: focus.categories });
     setEditing(true);
   };
 
   const save = async () => {
     setFailed(false);
     try {
-      await choose(draft);
+      await choose({ goals: draft, ...profile });
       setEditing(false);
     } catch {
       setFailed(true);
     }
   };
 
+  const roleName = focus.roles.find((r) => r.key === focus.role)?.name;
+
   if (!editing) {
     return (
       <>
+        {(roleName || focus.categories.length > 0) && (
+          <p>
+            {roleName && <>Rolle: {roleName}. </>}
+            {focus.categories.length > 0 &&
+              <>Gespräche: {focus.categories.map((c) => CATEGORY_LABELS[c]).join(", ")}.</>}
+          </p>
+        )}
+
         {picked.length > 0 ? (
           <>
             <p>Auf diese Ziele schaut die Auswertung besonders genau:</p>
@@ -89,6 +106,14 @@ export default function FocusSettings() {
         Wählen Sie bis zu {focus.max_goals} Ziele. Ohne Auswahl trainieren Sie ohne besonderen
         Fokus.
       </p>
+
+      <FocusProfilePicker
+        roles={focus.roles}
+        role={profile.role}
+        categories={profile.categories}
+        disabled={saving}
+        onChange={setProfile}
+      />
 
       <FocusGoalPicker
         goals={focus.goals}

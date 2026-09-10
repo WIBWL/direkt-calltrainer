@@ -1,3 +1,5 @@
+import type { ScenarioCategory } from "./scenarioLibrary";
+
 /**
  * Mirrors the backend's WebSocket wire protocol (`backend/api/session_ws.py`,
  * see ADR 0033). JSON control messages; binary audio frames are sent/received
@@ -410,6 +412,13 @@ export interface FocusGroup {
   name: string;
 }
 
+/** A role on offer (F-62), with the call types it preselects. */
+export interface FocusRole {
+  key: string;
+  name: string;
+  categories: ScenarioCategory[];
+}
+
 /** The catalogue plus what the caller has picked out of it. */
 export interface FocusState {
   /** How many goals may be focused on at once. Read from here rather than
@@ -423,8 +432,19 @@ export interface FocusState {
   decision_required: boolean;
   /** The picked keys, in catalogue order. */
   selected: string[];
+  /** What the User said about their work (F-62); both optional. */
+  role: string | null;
+  categories: ScenarioCategory[];
+  roles: FocusRole[];
   groups: FocusGroup[];
   goals: FocusGoal[];
+}
+
+/** The whole of what PUT /api/focus replaces; leaving a part out clears it. */
+export interface FocusChoice {
+  goals: string[];
+  role: string | null;
+  categories: ScenarioCategory[];
 }
 
 export interface SessionHistoryPage {

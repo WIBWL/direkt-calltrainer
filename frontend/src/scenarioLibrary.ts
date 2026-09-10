@@ -70,6 +70,13 @@ export interface ReverseBrief {
   watch_points?: string[];
 }
 
+/** Why a Scenario is suggested (F-62): the kind of call it is, and which of
+ *  the User's focus goals its context exercises. */
+export interface ScenarioRecommendation {
+  call_type: boolean;
+  goals: string[];
+}
+
 export interface ScenarioCard {
   id: string;
   name: string;
@@ -89,6 +96,8 @@ export interface ScenarioCard {
    * nor shared, because it copies a case that was actually played. */
   reverse: boolean;
   origin_session: OriginSessionRef | null;
+  /** Set on the few the listing suggests; null for every other card. */
+  recommendation: ScenarioRecommendation | null;
 }
 
 /** The fields a User may author. `name` / `short_description` are the card;

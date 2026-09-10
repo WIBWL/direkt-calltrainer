@@ -4626,6 +4626,72 @@ h2 {
   width: min(920px, 100%);
 }
 
+/* Role and call types (F-62): chips, since there are few and each is a word
+   or two. The real control stays for the keyboard; the chip is what shows. */
+.focus-profile {
+  margin-top: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.focus-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+.focus-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.focus-chip:hover {
+  border-color: var(--color-blue-300);
+}
+
+.focus-chip.is-on {
+  border-color: var(--color-blue-600);
+  background: var(--color-surface-selected);
+  color: var(--color-navy-900);
+  font-weight: 600;
+}
+
+.focus-chip input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.focus-chip:has(input:focus-visible) {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 2px;
+}
+
+/* Two classes, to win over the dialog's own paragraph margins. */
+.focus-profile .focus-profile-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* Why a suggested card is suggested (F-62). */
+.card-reason {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--color-blue-600);
+}
+
 .focus-groups {
   margin-top: 1.25rem;
 }
