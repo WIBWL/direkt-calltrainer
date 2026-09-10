@@ -157,6 +157,15 @@ EVIDENCE_MIXED = "mixed"              # a measurable part plus an interpreted on
 EVIDENCE_INTERPRETIVE = "interpretive"  # an appraisal, not a measurement
 FOCUS_EVIDENCE = (EVIDENCE_MEASURED, EVIDENCE_MIXED, EVIDENCE_INTERPRETIVE)
 
+# FocusSelection.role: the work a User trains for. It preselects the call types
+# below and is not scored on itself; seed_data.py carries the German names.
+ROLE_SALES = "sales"
+ROLE_SERVICE = "service"
+ROLE_SUPPORT = "support"
+ROLE_CONSULTING = "consulting"
+ROLE_OTHER = "other"
+TRAINING_ROLES = (ROLE_SALES, ROLE_SERVICE, ROLE_SUPPORT, ROLE_CONSULTING, ROLE_OTHER)
+
 
 # MetricType.aspect: which half of the Kennzahlen a metric belongs to -- `how`
 # is the paraverbal side, `what` the verbal one. Display only, like
@@ -841,6 +850,7 @@ class FocusSelection(Base):
     """
 
     __tablename__ = "focus_selection"
+    __table_args__ = (_one_of("role", TRAINING_ROLES),)
 
     selection_id: Mapped[int] = mapped_column(primary_key=True)
     # Unique, not merely indexed: a subject has one current focus, and two rows
@@ -850,8 +860,14 @@ class FocusSelection(Base):
     # later change does not erase the fact that the initial choice was made.
     decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # One of TRAINING_ROLES, or NULL for a subject who gave none -- including
+    # everyone who answered before the question existed.
+    role: Mapped[str | None] = mapped_column(String(20))
 
     goals: Mapped[list["FocusSelectionGoal"]] = relationship(
+        back_populates="selection", cascade="all, delete-orphan", passive_deletes=True
+    )
+    categories: Mapped[list["FocusSelectionCategory"]] = relationship(
         back_populates="selection", cascade="all, delete-orphan", passive_deletes=True
     )
 
@@ -880,6 +896,28 @@ class FocusSelectionGoal(Base):
 
     selection: Mapped["FocusSelection"] = relationship(back_populates="goals")
     focus_goal: Mapped["FocusGoal"] = relationship(back_populates="selections")
+
+
+class FocusSelectionCategory(Base):
+    """One kind of call a subject says they take (F-62).
+
+    The same vocabulary as `scenario.category`, which is what lets it steer the
+    Scenario recommendations. Owned by the selection, like its goals.
+    """
+
+    __tablename__ = "focus_selection_category"
+    __table_args__ = (
+        _one_of("category", SCENARIO_CATEGORIES),
+        UniqueConstraint("selection_id", "category"),
+    )
+
+    selection_category_id: Mapped[int] = mapped_column(primary_key=True)
+    selection_id: Mapped[int] = mapped_column(
+        ForeignKey("focus_selection.selection_id", ondelete="CASCADE"), index=True
+    )
+    category: Mapped[str] = mapped_column(String(20))
+
+    selection: Mapped["FocusSelection"] = relationship(back_populates="categories")
 
 
 class AnalysisJob(Base):

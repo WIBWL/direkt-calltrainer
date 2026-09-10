@@ -26,7 +26,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session as DbSession
 
 from backend.db import models as db_models
-from backend.db.seed_data import FOCUS_GROUP_NAMES
+from backend.db.seed_data import FOCUS_GROUP_NAMES, TRAINING_ROLE_CATALOGUE
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +64,10 @@ class Selection:
     decided: bool
     decided_at: datetime | None
     keys: tuple[str, ...]
+    # What the subject said about their work: one role, and the call types they
+    # take (`scenario.category` values). Both optional.
+    role: str | None = None
+    categories: tuple[str, ...] = ()
 
     @property
     def decision_required(self) -> bool:
@@ -79,6 +83,11 @@ def groups() -> list[dict[str, str]]:
     second place to edit when the catalogue changes.
     """
     return [{"key": key, "name": name} for key, name in FOCUS_GROUP_NAMES.items()]
+
+
+def roles() -> list[dict]:
+    """The roles on offer, each with the call types it preselects."""
+    return TRAINING_ROLE_CATALOGUE
 
 
 def list_goals(db: DbSession) -> list[Goal]:
@@ -115,11 +124,7 @@ def selection(db: DbSession, subject_id: str) -> Selection:
     )
     if row is None:
         return Selection(decided=False, decided_at=None, keys=())
-    return Selection(
-        decided=True,
-        decided_at=row.decided_at,
-        keys=_selected_keys(db, row.selection_id),
-    )
+    return _as_selection(db, row)
 
 
 class UnknownGoal(ValueError):
@@ -130,8 +135,21 @@ class TooManyGoals(ValueError):
     """More goals than MAX_GOALS. Enforced here, not only in the interface."""
 
 
-def set_selection(db: DbSession, subject_id: str, keys: list[str]) -> Selection:
+class UnknownChoice(ValueError):
+    """A role or call type outside its vocabulary. A client bug, like UnknownGoal."""
+
+
+def set_selection(
+    db: DbSession,
+    subject_id: str,
+    keys: list[str],
+    role: str | None = None,
+    categories: list[str] | None = None,
+) -> Selection:
     """Replace the subject's focus with `keys`. An empty list is "no focus".
+
+    Role and call types are replaced along with it: the client always sends the
+    whole selection, so leaving them out means "none".
 
     Replaced rather than merged: the selection is a set of at most five, and the
     client always sends the whole of it, so a partial update would need a second
@@ -159,6 +177,12 @@ def set_selection(db: DbSession, subject_id: str, keys: list[str]) -> Selection:
     missing = [key for key in wanted if key not in rows]
     if missing:
         raise UnknownGoal(f"unknown focus goal(s): {', '.join(missing)}")
+    kinds = list(dict.fromkeys(categories or ()))
+    if role is not None and role not in db_models.TRAINING_ROLES:
+        raise UnknownChoice(f"unknown role: {role}")
+    strange = [kind for kind in kinds if kind not in db_models.SCENARIO_CATEGORIES]
+    if strange:
+        raise UnknownChoice(f"unknown call type(s): {', '.join(strange)}")
 
     now = datetime.now(UTC)
     record = (
@@ -168,7 +192,7 @@ def set_selection(db: DbSession, subject_id: str, keys: list[str]) -> Selection:
     )
     if record is None:
         record = db_models.FocusSelection(
-            subject_id=subject_id, decided_at=now, updated_at=now
+            subject_id=subject_id, decided_at=now, updated_at=now, role=role
         )
         db.add(record)
         db.flush()  # the goal rows below need the selection's id
@@ -176,22 +200,42 @@ def set_selection(db: DbSession, subject_id: str, keys: list[str]) -> Selection:
         # `decided_at` is deliberately untouched: it records when the question
         # was first answered, and a later change does not unmake that.
         record.updated_at = now
-        db.query(db_models.FocusSelectionGoal).filter_by(
-            selection_id=record.selection_id
-        ).delete(synchronize_session=False)
+        record.role = role
+        for table in (db_models.FocusSelectionGoal, db_models.FocusSelectionCategory):
+            db.query(table).filter_by(
+                selection_id=record.selection_id
+            ).delete(synchronize_session=False)
 
     for key in wanted:
         db.add(db_models.FocusSelectionGoal(
             selection_id=record.selection_id,
             focus_goal_id=rows[key].focus_goal_id,
         ))
+    for kind in kinds:
+        db.add(db_models.FocusSelectionCategory(
+            selection_id=record.selection_id, category=kind,
+        ))
     db.flush()  # so a caller in the same transaction reads the new set back
 
-    logger.info("Focus selection stored (%d goal(s))", len(wanted))
+    logger.info(
+        "Focus selection stored (%d goal(s), %d call type(s))", len(wanted), len(kinds)
+    )
+    return _as_selection(db, record)
+
+
+def _as_selection(db: DbSession, row: db_models.FocusSelection) -> Selection:
+    """One stored selection, read back in catalogue order."""
+    stored = {
+        kind for (kind,) in db.query(db_models.FocusSelectionCategory.category)
+        .filter_by(selection_id=row.selection_id)
+    }
     return Selection(
         decided=True,
-        decided_at=record.decided_at,
-        keys=_selected_keys(db, record.selection_id),
+        decided_at=row.decided_at,
+        keys=_selected_keys(db, row.selection_id),
+        role=row.role,
+        # Vocabulary order, not insertion order, for the reason _selected_keys gives.
+        categories=tuple(kind for kind in db_models.SCENARIO_CATEGORIES if kind in stored),
     )
 
 
