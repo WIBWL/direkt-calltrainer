@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
 import { ROUTES } from "../routes";
+import AppFooter from "./AppFooter";
 
 interface LoginViewProps {
   errorMessage?: string | undefined;
@@ -133,6 +134,8 @@ export default function LoginView({
           </p>
         </section>
       </main>
+
+      <AppFooter />
     </div>
   );
 }
