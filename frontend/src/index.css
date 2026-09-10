@@ -96,7 +96,7 @@ body {
 .app-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 9px;
   flex-shrink: 0;
 }
 
