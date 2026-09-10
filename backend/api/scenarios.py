@@ -32,7 +32,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFil
 from openai import OpenAIError
 from pydantic import BaseModel, Field
 
-from backend import library
+from backend import library, recommendations
 from backend.api.deps import current_tenant, current_tenant_id
 from backend.auth import AuthContext, require_user
 from backend.authored_text import FIELD_LIMITS, WIRE_FIELD_LIMITS, clean
@@ -144,6 +144,9 @@ def _card(scenario, subject: str) -> dict:
         # follow-up it is neither editable nor shareable.
         "reverse": scenario.reverse,
         "origin_session": _origin_session(scenario.origin_session),
+        # Set by the listing for the few it suggests (F-62), with the reason;
+        # a view over the cards, so a suggested one keeps its own origin too.
+        "recommendation": None,
     }
 
 
@@ -200,8 +203,19 @@ def list_scenarios(
 ) -> list[dict]:
     """Every Scenario the caller may select, each badged builtin/own/tenant,
     grouped by origin and by creation time within one."""
-    cards = [_card(s, user.sub) for s in library.list_scenarios(user.sub, tenant_id)]
-    return sorted(cards, key=_origin_group)
+    cards = sorted(
+        (_card(s, user.sub) for s in library.list_scenarios(user.sub, tenant_id)),
+        key=_origin_group,
+    )
+    picks = recommendations.for_subject(user.sub, [
+        recommendations.Candidate(card["id"], card["category"], card["reverse"])
+        for card in cards
+    ])
+    for card in cards:
+        pick = picks.get(card["id"])
+        if pick:
+            card["recommendation"] = {"call_type": pick.call_type, "goals": list(pick.goals)}
+    return cards
 
 
 @router.post("/document")

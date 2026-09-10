@@ -211,6 +211,18 @@ def list_scenarios(subject: str, tenant_id: int) -> list[Scenario]:
         return [_to_scenario(row) for row in rows]
 
 
+def played_scenario_ids(subject: str) -> set[str]:
+    """The ids of every Scenario this subject has a stored Session on."""
+    with session_scope() as db:
+        rows = db.scalars(
+            select(models.Scenario.extern_id)
+            .join(models.Session, models.Session.scenario_id == models.Scenario.scenario_id)
+            .where(models.Session.subject_id == subject)
+            .distinct()
+        ).all()
+        return {str(extern_id) for extern_id in rows}
+
+
 def get_scenario(extern_id: str, subject: str, tenant_id: int) -> Scenario | None:
     """The Scenario with this `extern_id`, or None — see `get_persona`."""
     ref = _as_extern_id(extern_id)
