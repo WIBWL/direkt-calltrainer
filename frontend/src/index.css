@@ -100,6 +100,14 @@ body {
   flex-shrink: 0;
 }
 
+.app-brand-logo {
+  display: block;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 .app-brand-mark {
   width: 38px;
   height: 38px;
@@ -3883,6 +3891,14 @@ h2 {
   align-items: center;
   gap: 11px;
   color: var(--color-navy-900);
+}
+
+.login-brand-logo {
+  display: block;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .login-brand-mark {

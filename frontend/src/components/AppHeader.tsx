@@ -44,11 +44,12 @@ export default function AppHeader({
 
   const brand = (
     <div className="app-brand">
-      <span className="app-brand-mark" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </span>
+      <img
+        className="app-brand-logo"
+        src="/logo.png"
+        alt=""
+        aria-hidden="true"
+      />
 
       <span className="app-brand-name">Calltrainer</span>
     </div>
