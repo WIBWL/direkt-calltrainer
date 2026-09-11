@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { ApiError } from "../api";
 import {
@@ -7,10 +7,12 @@ import {
   createScenario,
   deleteScenario,
   EMPTY_DRAFT,
-  extractPdf,
+  extractPdfs,
   FALLBACK_FIELD_LIMITS,
   getFieldLimits,
   getScenario,
+  MAX_DOCUMENT_MB,
+  MAX_DOCUMENTS_TOTAL_MB,
   setScenarioVisibility,
   updateScenario,
   type CategoryChoice,
@@ -20,6 +22,7 @@ import {
   type TextField,
   type Visibility,
 } from "../scenarioLibrary";
+import { cx } from "../utils/cx";
 import ConfirmDialog from "./ConfirmDialog";
 import ShareToggle from "./ShareToggle";
 
@@ -87,8 +90,15 @@ const FIELDS: {
   },
 ];
 
-/** Seconds as m:ss, for the "PDF wird ausgewertet …" counter. */
+/** Seconds as m:ss, for the "PDFs werden ausgewertet …" counter. */
 const formatElapsed = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+const MB = 1024 * 1024;
+
+/** A dropped file carries no type often enough that the extension has to count
+ * too — the file picker filters by `accept`, a drag does not. */
+const isPdf = (file: File) =>
+  file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 
 /** Create / edit / delete a user-authored Scenario (ADR 0058). Rendered as a
  * modal over the setup screen. */
@@ -108,6 +118,12 @@ export default function ScenarioEditor({
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfElapsed, setPdfElapsed] = useState(0);
   const [pdfNote, setPdfNote] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  // The Fakten field's own id: its label sits outside it now, above the row it
+  // shares with the drop zone, so the two are tied by htmlFor rather than by
+  // nesting — a <label> around both would hand a click on the zone to the
+  // textarea.
+  const factsId = useId();
   const [error, setError] = useState<string | null>(null);
   const [confirmingClose, setConfirmingClose] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -140,6 +156,19 @@ export default function ScenarioEditor({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [dismiss, confirmingClose, confirmingDelete]);
+
+  // A file dropped anywhere but the zone below would otherwise be *opened* by
+  // the browser, which navigates away from the editor and takes the unsaved
+  // draft with it. While this panel is up, a missed drop does nothing instead.
+  useEffect(() => {
+    const swallow = (e: DragEvent) => e.preventDefault();
+    window.addEventListener("dragover", swallow);
+    window.addEventListener("drop", swallow);
+    return () => {
+      window.removeEventListener("dragover", swallow);
+      window.removeEventListener("drop", swallow);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -220,7 +249,28 @@ export default function ScenarioEditor({
     }
   };
 
-  const handlePdf = async (file: File) => {
+  const handlePdfs = async (chosen: File[]) => {
+    const files = chosen.filter(isPdf);
+    if (files.length === 0) {
+      setError("Bitte PDF-Dateien auswählen oder ablegen.");
+      return;
+    }
+    // Checked here as well as on the server so an oversized drop is refused at
+    // once rather than after the upload. The server's answer is authoritative;
+    // these messages deliberately read the same, and name the file only when
+    // there is more than one, exactly as the server does.
+    const named = (file: File, message: string) =>
+      files.length > 1 ? `${file.name}: ${message}` : message;
+    const tooBig = files.find((file) => file.size > MAX_DOCUMENT_MB * MB);
+    if (tooBig) {
+      setError(named(tooBig, `Die Datei ist größer als ${MAX_DOCUMENT_MB} MB.`));
+      return;
+    }
+    if (files.reduce((sum, file) => sum + file.size, 0) > MAX_DOCUMENTS_TOTAL_MB * MB) {
+      setError(`Die Dokumente sind zusammen größer als ${MAX_DOCUMENTS_TOTAL_MB} MB.`);
+      return;
+    }
+
     setPdfBusy(true);
     setPdfNote(null);
     setError(null);
@@ -233,20 +283,29 @@ export default function ScenarioEditor({
       1000,
     );
     try {
-      const doc = await extractPdf(file);
+      const doc = await extractPdfs(files);
+      const what = files.length > 1 ? "den PDFs" : "dem PDF";
+      const read =
+        doc.documents.length > 1
+          ? `${doc.documents.length} Dokumente, ${doc.pages} Seiten gelesen`
+          : `${doc.pages} Seiten gelesen`;
       const replace =
         draft.case_facts.trim().length === 0 ||
-        window.confirm("Das Fakten-Feld mit den Fakten aus dem PDF ersetzen?");
+        window.confirm(`Das Fakten-Feld mit den Fakten aus ${what} ersetzen?`);
       if (replace) {
         setDraft((d) => ({ ...d, case_facts: doc.text }));
         setPdfNote(
           doc.summarised
-            ? `${doc.pages} Seiten gelesen und zusammengefasst. Bitte prüfen Sie den Text.`
-            : `${doc.pages} Seiten gelesen. Zusammenfassung nicht möglich, Rohtext übernommen.`,
+            ? `${read} und zusammengefasst. Bitte prüfen Sie den Text.`
+            : `${read}. Zusammenfassung nicht möglich, Rohtext übernommen.`,
         );
       }
     } catch (e: unknown) {
-      setError(e instanceof ApiError && e.detail ? e.detail : "Das PDF konnte nicht gelesen werden.");
+      setError(
+        e instanceof ApiError && e.detail
+          ? e.detail
+          : "Die PDFs konnten nicht gelesen werden.",
+      );
     } finally {
       window.clearInterval(ticker);
       setPdfBusy(false);
@@ -291,46 +350,149 @@ export default function ScenarioEditor({
                 {FIELDS.map((field) => {
                   const value = draft[field.key];
                   const limit = limits[field.key];
+                  const counter = (
+                    <span
+                      className={
+                        "editor-field-count" + (value.length >= limit ? " is-full" : "")
+                      }
+                      aria-hidden="true"
+                    >
+                      {value.length} / {limit}
+                    </span>
+                  );
+                  const caption = (
+                    <span>
+                      {field.label}
+                      {field.required && <span aria-hidden="true"> *</span>}
+                    </span>
+                  );
                   return (
                     <Fragment key={field.key}>
-                      <label className="editor-field">
-                        <span className="editor-field-label">
-                          <span>
-                            {field.label}
-                            {field.required && <span aria-hidden="true"> *</span>}
+                      {field.key === "case_facts" ? (
+                        <div className="editor-field">
+                          <label className="editor-field-label" htmlFor={factsId}>
+                            {caption}
+                            {counter}
+                          </label>
+
+                          {/* Typing them and dropping the documents in fill the
+                              same field, so they sit side by side at the same
+                              size with an "oder" between — not one under the
+                              other, which would read as a second step. */}
+                          <div className="facts-split">
+                            <textarea
+                              id={factsId}
+                              value={value}
+                              placeholder={field.placeholder}
+                              maxLength={limit}
+                              onChange={(e) =>
+                                setDraft((d) => ({ ...d, case_facts: e.target.value }))
+                              }
+                            />
+
+                            <span className="facts-split-or">oder</span>
+
+                            {/* A <label>, so a click anywhere in the zone opens
+                                the picker and the hidden input stays the
+                                keyboard's way in. */}
+                            <label
+                              className={cx(
+                                "pdf-dropzone",
+                                dragging && "is-dragging",
+                                pdfBusy && "is-busy",
+                              )}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                if (!pdfBusy) setDragging(true);
+                              }}
+                              onDragLeave={(e) => {
+                                // Only when the pointer really left the zone —
+                                // crossing a child fires this too.
+                                if (
+                                  !e.currentTarget.contains(e.relatedTarget as Node | null)
+                                ) {
+                                  setDragging(false);
+                                }
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                setDragging(false);
+                                if (pdfBusy) return;
+                                void handlePdfs(Array.from(e.dataTransfer.files));
+                              }}
+                            >
+                              <svg
+                                className="pdf-dropzone-cloud"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M7 18.5a4.5 4.5 0 0 1-.7-8.95 5.5 5.5 0 0 1 10.64-1.1A4.25 4.25 0 0 1 17.6 18.5" />
+                                <path d="M12 21v-8.5" />
+                                <path d="m8.8 15.7 3.2-3.2 3.2 3.2" />
+                              </svg>
+
+                              <span className="pdf-dropzone-title">
+                                {pdfBusy
+                                  ? `PDFs werden ausgewertet … (${formatElapsed(pdfElapsed)})`
+                                  : "PDFs hierher ziehen"}
+                              </span>
+
+                              {!pdfBusy && (
+                                <span className="pdf-dropzone-browse">
+                                  Dateien durchsuchen
+                                </span>
+                              )}
+
+                              <input
+                                type="file"
+                                accept="application/pdf,.pdf"
+                                multiple
+                                disabled={pdfBusy}
+                                onChange={(e) => {
+                                  const files = Array.from(e.target.files ?? []);
+                                  e.target.value = ""; // allow re-selecting the same files
+                                  if (files.length > 0) void handlePdfs(files);
+                                }}
+                              />
+                            </label>
+                          </div>
+
+                          {pdfNote && <span className="pdf-upload-note">{pdfNote}</span>}
+                        </div>
+                      ) : (
+                        <label className="editor-field">
+                          <span className="editor-field-label">
+                            {caption}
+                            {counter}
                           </span>
-                          <span
-                            className={
-                              "editor-field-count" +
-                              (value.length >= limit ? " is-full" : "")
-                            }
-                            aria-hidden="true"
-                          >
-                            {value.length} / {limit}
-                          </span>
-                        </span>
-                        {field.multiline ? (
-                          <textarea
-                            value={value}
-                            placeholder={field.placeholder}
-                            maxLength={limit}
-                            rows={3}
-                            onChange={(e) =>
-                              setDraft((d) => ({ ...d, [field.key]: e.target.value }))
-                            }
-                          />
-                        ) : (
-                          <input
-                            type="text"
-                            value={value}
-                            placeholder={field.placeholder}
-                            maxLength={limit}
-                            onChange={(e) =>
-                              setDraft((d) => ({ ...d, [field.key]: e.target.value }))
-                            }
-                          />
-                        )}
-                      </label>
+                          {field.multiline ? (
+                            <textarea
+                              value={value}
+                              placeholder={field.placeholder}
+                              maxLength={limit}
+                              rows={3}
+                              onChange={(e) =>
+                                setDraft((d) => ({ ...d, [field.key]: e.target.value }))
+                              }
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              value={value}
+                              placeholder={field.placeholder}
+                              maxLength={limit}
+                              onChange={(e) =>
+                                setDraft((d) => ({ ...d, [field.key]: e.target.value }))
+                              }
+                            />
+                          )}
+                        </label>
+                      )}
 
                       {field.key === "short_description" && (
                         <label className="editor-field">
@@ -365,33 +527,6 @@ export default function ScenarioEditor({
                             ))}
                           </select>
                         </label>
-                      )}
-
-                      {field.key === "case_facts" && (
-                        <div className="pdf-upload">
-                          <label className="pdf-upload-button">
-                            {pdfBusy
-                              ? `PDF wird ausgewertet … (${formatElapsed(pdfElapsed)})`
-                              : "Fakten aus PDF (KI)"}
-                            <input
-                              type="file"
-                              accept="application/pdf,.pdf"
-                              disabled={pdfBusy}
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                e.target.value = ""; // allow re-selecting the same file
-                                if (file) void handlePdf(file);
-                              }}
-                            />
-                          </label>
-                          <span className="editor-field-hint">
-                            Nur PDFs mit auslesbarem Text (keine Scans). Die KI zieht die
-                            relevanten Fakten heraus; das Ergebnis landet im Feld und kann
-                            dort bearbeitet werden. Bei großen Dokumenten kann das über
-                            eine Minute dauern.
-                          </span>
-                          {pdfNote && <span className="pdf-upload-note">{pdfNote}</span>}
-                        </div>
                       )}
                     </Fragment>
                   );

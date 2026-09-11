@@ -36,17 +36,10 @@ import re
 FIELD_LIMITS = {
     "title": 50,
     "short_description": 100,
-    # The trainee's briefing (ADR 0054). Room for three short sentences and no
-    # more: role, room for manoeuvre, good outcome. A cap that allowed a page
-    # would invite the script R-43 keeps out of the product, and this text is
-    # read in the seconds before a call starts.
-    "briefing": 600,
+    "briefing": 500,
     "description": 500,
-    "case_facts": 3000,
-    # The goal and the bar that settles it, in one field since the two were
-    # merged -- so the cap is the two old ones added together rather than one
-    # of them, which would have truncated every row that already held both.
-    "call_goal": 1000,
+    "case_facts": 2500,
+    "call_goal": 500,
 }
 
 # The same caps under the names the client knows: the `title` column is the card

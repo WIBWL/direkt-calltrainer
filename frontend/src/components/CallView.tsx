@@ -159,10 +159,9 @@ export default function CallView({
             body="Das Gespräch wird beendet und ausgewertet."
             cancelLabel="Gespräch fortsetzen"
             confirmLabel="Gespräch beenden"
-            // The one dialog where both answers are real: red ends a call that
-            // cannot be resumed, green carries on with it.
+            // Red for the end: a call cannot be resumed once the socket is
+            // torn down. Carrying on stays plain — it is where the User was.
             destructive
-            affirmativeCancel
             onCancel={() => setConfirmingEnd(false)}
             // Closed before the call is ended rather than left to unmount with
             // the screen: if the socket never answers, a dialog that only goes

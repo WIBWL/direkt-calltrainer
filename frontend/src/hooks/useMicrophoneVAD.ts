@@ -71,13 +71,14 @@ export function useMicrophoneVAD(
         // about a second, so the browser was waiting longer than everything
         // else together.
         //
-        // 700 ms is short enough to stop the pause feeling like a hang and long
-        // enough to sit out the breath in the middle of a sentence, which is
+        // 1000 ms is short enough to stop the pause feeling like a hang and
+        // long enough to sit out a breath in the middle of a sentence, which is
         // what this guards: cut it too fine and a user who pauses to think has
         // their turn sent half-finished, and the persona answers a fragment.
-        // If that starts happening, this is the number to raise -- not a prompt
-        // to fix.
-        redemptionMs: 700,
+        // Raised here from 700 for exactly that reason -- someone working out
+        // what to say next needs a moment to do it, and being cut off mid-
+        // thought is the failure that costs a turn rather than a second.
+        redemptionMs: 1000,
         onSpeechStart: () => console.debug("[VAD] speech start (unconfirmed)"),
         // Fires once sustained past minSpeechMs -- use this for barge-in, not onSpeechStart above.
         onSpeechRealStart: () => {

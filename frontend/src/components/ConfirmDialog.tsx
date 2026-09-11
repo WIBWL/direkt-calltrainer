@@ -11,12 +11,6 @@ interface ConfirmDialogProps {
   cancelLabel: string;
   /** Red rather than plain, for an action that destroys something. */
   destructive?: boolean;
-  /** Green rather than plain, where the way back is a choice in its own right
-   * and not merely "not yet". It is for the dialog whose question interrupts
-   * something the User is in the middle of — carrying on is then the answer
-   * most people want, and leaving it colourless makes the red one look like
-   * the only button on offer. */
-  affirmativeCancel?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -47,7 +41,6 @@ export default function ConfirmDialog({
   confirmLabel,
   cancelLabel,
   destructive = false,
-  affirmativeCancel = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -70,11 +63,7 @@ export default function ConfirmDialog({
         <h3 id={titleId}>{title}</h3>
         {body && <p>{body}</p>}
         <div className="editor-confirm-actions">
-          <button
-            type="button"
-            className={affirmativeCancel ? "editor-confirm-keep" : undefined}
-            onClick={onCancel}
-          >
+          <button type="button" onClick={onCancel}>
             {cancelLabel}
           </button>
           <button

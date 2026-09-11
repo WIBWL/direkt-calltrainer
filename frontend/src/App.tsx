@@ -22,14 +22,14 @@ import ScenarioEditor from "./components/ScenarioEditor";
 import ScenarioInfo from "./components/ScenarioInfo";
 import { useScreenTransition } from "./components/ScreenTransition";
 import SetupView from "./components/SetupView";
-import TranscriptView from "./components/TranscriptView";
+import FeedbackScreen from "./components/FeedbackScreen";
 import { useMicrophoneDevices } from "./hooks/useMicrophoneDevices";
 import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useSessionSocket, type CommittedSession } from "./hooks/useSessionSocket";
 import { useNextCalls } from "./hooks/useNextCalls";
 import NextCalls from "./components/NextCalls";
 import { useStreamedAudioPlayback } from "./hooks/useStreamedAudioPlayback";
-import type { Persona, TranscriptEntry } from "./protocol";
+import type { Persona, SessionDetail, TranscriptEntry } from "./protocol";
 import ReverseBriefPanel from "./components/ReverseBriefPanel";
 import { ROUTES, type TrainingStart } from "./routes";
 import {
@@ -179,6 +179,11 @@ export default function App() {
   // worker has produced it. Not kept anywhere but here: the wrap-up is
   // reachable for as long as this screen is, and no longer.
   const [endedSessionId, setEndedSessionId] = useState<string | null>(restored?.sessionId ?? null);
+  // The wrap-up once FeedbackView has polled it, for the downloadable report
+  // (F-64): the file carries everything the page shows, and the page's own
+  // poll is the only place that data arrives. Null while it is on its way, and
+  // for a call that was never stored — the file is then the protocol alone.
+  const [endedSessionDetail, setEndedSessionDetail] = useState<SessionDetail | null>(null);
   // Holds a just-received session.ended until playback actually finishes —
   // see the effect below.
   const [pendingEnd, setPendingEnd] = useState<PendingEnd | null>(null);
@@ -250,6 +255,10 @@ export default function App() {
   // A reload restores the post-call screen without a selection to look the
   // name up in, so the stored one stands in.
   const personaName = selectedPersona?.name ?? restored?.personaName ?? "Persona";
+  // The played case, resolved the same way and for the same screen. A
+  // Zufallsszenario needs nothing special: `beginSession` sets `scenarioId` to
+  // the drawn row, so the selection already *is* the case that was played.
+  const scenarioName = selectedScenario?.name ?? restored?.scenarioName ?? null;
 
   // The two lists load independently: either one failing leaves the other
   // usable, and names itself in the error line. A restored wrap-up owns the
@@ -341,17 +350,30 @@ export default function App() {
   // Withheld for a Zufallsszenario, which is the one case the User is meant
   // to walk into unread (F-62), and for a reverse, which has a briefing of
   // its own and would otherwise be given two.
-  const [caseFacts, setCaseFacts] = useState<string | null>(null);
+  //
+  // The briefing comes from here rather than off the selection card, although
+  // the card carries one: a follow-up is started from a wrap-up, and its row
+  // is not in this screen's copy of the library yet — the reload runs beside
+  // the commit, not before it. One fetch for both halves is also one moment at
+  // which the case screen is ready, instead of two.
+  //
+  // `null` means "not fetched yet" and is what the briefing screen waits on;
+  // empty strings mean the case has nothing to read.
+  const [committedCase, setCommittedCase] = useState<
+    { briefing: string; facts: string } | null
+  >(null);
 
   useEffect(() => {
     if (!committed || committed.reverse || secretScenario !== null) {
-      setCaseFacts(null);
+      setCommittedCase(null);
       return undefined;
     }
     let cancelled = false;
     getScenario(committed.scenarioId)
       .then((detail) => {
-        if (!cancelled) setCaseFacts(detail.case_facts);
+        if (!cancelled) {
+          setCommittedCase({ briefing: detail.briefing, facts: detail.case_facts });
+        }
       })
       .catch(() => {
         // The call is the point; it runs with or without the panel.
@@ -401,12 +423,10 @@ export default function App() {
       sessionId: pendingEnd.sessionId,
       turns: pendingEnd.turns,
       personaName,
+      scenarioName,
       // Kept so a reverse started from this screen after a reload still knows
       // which Persona to put on the other end (ADR 0070).
       personaId,
-      // The reveal is the payoff of a Zufallsszenario (F-62), so it survives a
-      // reload of this screen for the same reason `personaName` does.
-      revealedScenario: secretScenario,
     });
     // Straight to the wrap-up's own waiting screen where one is being written,
     // and straight past it where none is: no stored Session, no wrap-up, and a
@@ -496,11 +516,15 @@ export default function App() {
       // selected — so the check would be a screen between the button and the
       // conversation and nothing else, and it is skipped.
       //
-      // What is not skipped is the screen that starts the call: a reverse gets
-      // its briefing to read before arguing the case, everything else the
-      // ringing phone (F-63). Nothing goes straight into a conversation — the
-      // last press before someone has to speak is always their own.
-      setScreen(skipMicCheck ? (reverse ? "brief" : "incoming") : "mic-check");
+      // What is not skipped is the case: a reverse gets the briefing it has to
+      // argue from, and everything else the screen with its own Ausgangslage
+      // on it — the same one the microphone check leads to. A follow-up used to
+      // go from the wrap-up straight to the ringing phone, which was the one
+      // way into a call that never showed the User what they were walking
+      // into. From there the ringing phone (F-63) is one further press:
+      // nothing goes straight into a conversation, and the last press before
+      // someone has to speak is always their own.
+      setScreen(skipMicCheck ? (reverse ? "brief" : "case-brief") : "mic-check");
       if (skipMicCheck) setIsMicrophoneMuted(false);
     },
     [],
@@ -607,13 +631,25 @@ export default function App() {
     }
     // Everything else reads its case first. Nothing to read means nothing to
     // stop for: a Scenario with neither a briefing nor facts would otherwise
-    // get an empty screen and a button.
-    if (selectedScenario?.briefing || caseFacts) {
-      setScreen("case-brief");
+    // get an empty screen and a button. The case has had the whole microphone
+    // check to arrive, so the answer is known here — and where it is not, the
+    // screen decides for itself a moment later (see below).
+    if (committedCase && !committedCase.briefing && !committedCase.facts) {
+      playFade(() => setScreen("incoming"));
       return;
     }
+    setScreen("case-brief");
+  }, [committed, committedCase, secretScenario, playReverse, playFade]);
+
+  // The same question asked once more, for the way in that cannot answer it at
+  // the door: a follow-up commits and lands on this screen before its case has
+  // been fetched. An empty panel with a button under it stops the User for no
+  // reason, so the screen moves on by itself the moment the answer is in.
+  useEffect(() => {
+    if (screen !== "case-brief" || committedCase === null) return;
+    if (committedCase.briefing || committedCase.facts) return;
     playFade(() => setScreen("incoming"));
-  }, [committed, secretScenario, selectedScenario, caseFacts, playReverse, playFade]);
+  }, [screen, committedCase, playFade]);
 
   // The throw ends where every ordinary call now begins: at the ringing phone,
   // through the same fade an ordinary call gets. Nothing can cancel it, so the
@@ -664,9 +700,9 @@ export default function App() {
     (followUpId: string, followUpPersonaId: string, reverse = false) => {
       void reloadScenarios();
       // Skips the microphone check: this call is begun from a training that
-      // has just been read, not from the selection screen. The fade is the
-      // same one the check's own button plays, because the screen it covers is
-      // the same one — the wrap-up giving way to the ringing phone.
+      // has just been read, not from the selection screen. What it does not
+      // skip is the case — the wrap-up gives way to the briefing screen, and
+      // the call is started from there.
       playFade(() => beginSession(followUpId, followUpPersonaId, reverse, true));
     },
     [reloadScenarios, beginSession, playFade],
@@ -794,12 +830,12 @@ export default function App() {
     if (!committed?.reverse) {
       // An ordinary call keeps its facts in view the same way, which is the
       // same exception to ADR 0033 for the same reason: fixed before the call,
-      // never the Persona's lines. `caseFacts` is already null for a
+      // never the Persona's lines. The case is already null for a
       // Zufallsszenario, so nothing is revealed there.
       return (
         <CaseBriefPanel
           briefing={selectedScenario?.briefing}
-          caseFacts={caseFacts ?? undefined}
+          caseFacts={committedCase?.facts}
           variant={variant}
         />
       );
@@ -851,11 +887,22 @@ export default function App() {
   if (screen === "case-brief") {
     return (
       <AppLayout step="prepare" navigationLocked pageClassName="brief-page">
-        <CaseBriefPanel
-          briefing={selectedScenario?.briefing}
-          caseFacts={caseFacts ?? undefined}
-          variant="prepare"
-        />
+        {committedCase === null ? (
+          // The reverse's briefing screen says the same thing in the same
+          // place while its own text is in flight. Reached with the case
+          // already fetched from the microphone check, and without it from a
+          // wrap-up, where the commit and the request are the same moment.
+          <section className="scenario-briefing">
+            <h3 className="scenario-briefing-title">Ihre Ausgangslage</h3>
+            <p className="scenario-briefing-body">Wird geladen …</p>
+          </section>
+        ) : (
+          <CaseBriefPanel
+            briefing={committedCase.briefing}
+            caseFacts={committedCase.facts}
+            variant="prepare"
+          />
+        )}
         <div className="brief-actions">
           <button
             type="button"
@@ -896,13 +943,13 @@ export default function App() {
     // The same three branches `handleMicConfirmed` takes, in the same order,
     // reduced to the one question the button's label asks: is a briefing the
     // next screen? A Zufallsszenario reads nothing (F-62), and a Scenario with
-    // neither a briefing nor facts has no screen to stop on. `caseFacts` is
+    // neither a briefing nor facts has no screen to stop on. The case is
     // still being fetched for a moment after the commit, so a Scenario carried
     // by its facts alone can flip the label once, early, while nobody has
     // spoken into the meter yet.
     const briefingFollows =
       committed?.reverse === true ||
-      (secretScenario === null && Boolean(selectedScenario?.briefing || caseFacts));
+      (secretScenario === null && Boolean(selectedScenario?.briefing || committedCase?.facts));
     return (
       <AppLayout step="prepare" navigationLocked pageClassName="mic-check-page">
         <MicCheck
@@ -938,7 +985,7 @@ export default function App() {
     // A real answer and not "an element exists": `CaseBriefPanel` renders
     // nothing when there are no facts, and the page widens to two columns on
     // this, so asking the element would leave an empty second column.
-    const hasBrief = committed?.reverse === true || Boolean(caseFacts?.trim());
+    const hasBrief = committed?.reverse === true || Boolean(committedCase?.facts.trim());
     const brief = hasBrief ? briefPanel("call") : null;
     return (
       <AppLayout
@@ -988,14 +1035,20 @@ export default function App() {
       // Startseite" does, and has to do the same thing to get there: these two
       // screens are a state under the training route, not a route of their own.
       <AppLayout step="feedback" onHome={handleRestart}>
-        <TranscriptView
+        <FeedbackScreen
           transcript={transcript}
           personaName={personaName}
-          onRestart={handleRestart}
-          revealedScenario={secretScenario ?? restored?.revealedScenario ?? null}
+          scenarioName={scenarioName}
+          detail={endedSessionDetail}
+          actions={
+            <button className="back-to-start-button" type="button" onClick={handleRestart}>
+              Zur Startseite
+            </button>
+          }
           feedback={
             <FeedbackView
               sessionId={endedSessionId}
+              onDetail={setEndedSessionDetail}
               followUp={{
                 onStart: handleStartFollowUp,
                 // The new row is not in this screen's library copy yet, and
