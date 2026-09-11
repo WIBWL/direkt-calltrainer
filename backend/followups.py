@@ -1,17 +1,30 @@
-"""The next exercise, built from a Session's Feedback: a follow-up Scenario (F-60).
+"""The next call in the same matter, drafted from a Session's Feedback (F-60).
 
-The improvement points say what to work on; the model is asked for a Scenario
-that cannot be got through without it. `create_follow_up` runs in the Feedback
-worker, right after the wrap-up it is built from is stored (ADR 0069), and
-writes through `backend/library.py` like any authored Scenario, so sanitising,
-caps and ownership stay where they are.
+The improvement points say what to work on; the model is asked for the *next*
+call in the case the trainee has just played -- the same matter, moved on in
+time -- built so that the thing the feedback asked for is the only way through
+it. The draft is written here and stored by `backend/library.py` like any
+authored Scenario, so sanitising, caps and ownership stay where they are.
 
-Withheld from the model: the measured statistics (no target range exists,
-ADR 0051) and the played Scenario's prompt fields (withheld from the client
-anyway, ADR 0043) -- only its card goes in. The four case fields become the
-caller's briefing, so the prompt keeps the exercise's purpose out of them; the
-trainee's own briefing (ADR 0054) is the one further field where it may be said,
-beside `short_description`, because the caller reads neither.
+**Asked for, not written unbidden** (ADR 0069's amendment). It began as a second
+model call in the Feedback worker, arriving a little after the wrap-up whether
+anyone wanted it or not; the User now presses a button for it, exactly as they
+do for the reverse (F-61). What that buys is stated in the ADR; what it means
+here is that this module no longer knows anything about a worker. It drafts,
+`POST /api/sessions/{id}/follow-up` reads the material and stores the result,
+and a failure is a status code rather than a silent log line.
+
+The played Scenario's four prompt fields are in the material, which ADR 0043
+otherwise withholds from the client. That is the exception ADR 0070 already
+takes for the reverse, on the same ground: the case is one the User has just
+heard played out, so a draft that continues it tells them nothing they were
+not told by the call itself. The measured statistics stay out -- no target
+range exists to correct a figure against (ADR 0051).
+
+The four case fields become the caller's briefing, so the prompt keeps the
+exercise's purpose out of them. `short_description` and the trainee's own
+briefing (ADR 0054) are the two fields where it may be said, because the
+caller reads neither.
 
 The values are German: it lands in the User's own library, as F-58's text does.
 """
@@ -20,17 +33,34 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from openai import OpenAIError
 from pydantic import BaseModel, ValidationError
-from sqlalchemy.orm import selectinload
 
-from backend import library
 from backend.authored_text import WIRE_FIELD_LIMITS, clean
 from backend.clients import llm
-from backend.db import models as db_models
-from backend.db.session import session_scope
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class PlayedCall:
+    """The call a follow-up continues, as the prompt needs it.
+
+    Its own type rather than nine parameters: the API layer reads these off one
+    Session, and this module stays the only place that decides what a draft is
+    built from.
+    """
+
+    scenario_name: str
+    scenario_teaser: str
+    description: str = ""
+    case_facts: str = ""
+    call_goal: str = ""
+    success_condition: str = ""
+    # The wrap-up's summary: where that call actually ended up, which is what
+    # the next one has to start from.
+    outcome: str = ""
+    improvements: tuple[str, ...] = ()
+    phase_language: str | None = None
 
 
 class FollowUpError(RuntimeError):
@@ -92,25 +122,35 @@ def _fit(value: str, cap: int) -> str:
 # --- Prompt ---------------------------------------------------------------
 
 
-def _material(
-    scenario_name: str,
-    scenario_teaser: str,
-    improvements: list[str],
-    phase_language: str | None,
-) -> str:
-    """What the model is given: the played Scenario's card, and what to train."""
+def _material(call: PlayedCall) -> str:
+    """What the model is given: the case as it was played, and what to train."""
     lines = [
-        "Subject area of the call the trainee has just had:",
-        f"    {scenario_name} -- {scenario_teaser}",
+        "The call the trainee has just had:",
+        f"    {call.scenario_name} -- {call.scenario_teaser}",
         "",
-        "What their coach asked them to work on, quoting that call:",
+        "The case that was played, as the caller had it:",
     ]
-    lines += [f"    - {text}" for text in improvements]
-    if phase_language:
+    # Each of the four may be empty -- ADR 0045 lets an authored Scenario leave
+    # them so. A missing line is better than a labelled blank the model fills in.
+    lines += [
+        f"    {label}: {text}"
+        for label, text in (
+            ("Situation", call.description),
+            ("Facts", call.case_facts),
+            ("What the caller wanted", call.call_goal),
+            ("What would have settled it", call.success_condition),
+        )
+        if text
+    ]
+    if call.outcome:
+        lines += ["", "Where that call ended up:", f"    {call.outcome}"]
+    lines += ["", "What their coach asked them to work on, quoting that call:"]
+    lines += [f"    - {text}" for text in call.improvements]
+    if call.phase_language:
         lines += [
             "",
             "The coach's note on how their register moved through the call:",
-            f"    {phase_language}",
+            f"    {call.phase_language}",
         ]
     return "\n".join(lines)
 
@@ -121,16 +161,22 @@ def _messages(material: str) -> list[dict[str, str]]:
     Numbered, like the wrap-up's: a small model (ADR 0011) loses a rule that
     sits mid-paragraph. The ones it breaks without them are S2 (the caller must
     not learn what is being trained), S1 (no addressing the trainee) and S5
-    (invent a case rather than copy the one it was given the card of).
+    (carry the played case forward rather than play it again unchanged).
     """
     caps = ", ".join(f"{field} {cap}" for field, cap in WIRE_FIELD_LIMITS.items())
     system = (
         "# Role\n"
         "You design one exercise for a telephone-training tool. A trainee has "
         "just finished a practice call and been given coaching feedback on it. "
-        "Your job is to write the *next* scenario for them: a new call, in the "
-        "same subject area, built so that the thing the feedback asked for is "
-        "the only way through it.\n"
+        "Your job is to write the *next* call in that same matter: the case "
+        "they played, some time later, built so that the thing the feedback "
+        "asked for is the only way through it.\n"
+        "\n"
+        "# The material\n"
+        "You are given the case as the caller had it, where that call ended "
+        "up, and what the coach asked the trainee to work on. The case is "
+        "yours to carry forward -- not to replace, and not to play again "
+        "unchanged.\n"
         "\n"
         "# How the scenario is used\n"
         "The tool plays the caller and the trainee answers the phone. Four of "
@@ -145,28 +191,37 @@ def _messages(material: str) -> list[dict[str, str]]:
         'as "you". The trainee is never addressed, never described, and never '
         "referred to as a trainee: to the caller they are simply whoever picks "
         "up the phone.\n"
-        "S2. Never mention feedback, coaching, training, practice, a previous "
-        "call, or what is being worked on. Never name the weakness. A caller "
-        "who knows what the exercise is about gives the answer away, and these "
-        "four fields are the caller's to read.\n"
+        "S2. Never mention feedback, coaching, training, practice, or what is "
+        "being worked on, and never name the weakness. The caller may refer to "
+        "the earlier call as their own -- they made it, and it is part of the "
+        "case -- but never to it as an exercise. A caller who knows what the "
+        "exercise is about gives the answer away, and these four fields are "
+        "the caller's to read.\n"
         "S3. The facts are about the case, never about the caller: no name, no "
         "employer, no personality, no motive. Any character has to be able to "
         "carry them.\n"
         "S4. call_goal is what the *caller* wants out of this call. What the "
         "trainee ought to do is not part of it.\n"
-        "S5. Invent a new case: concrete figures, dates, a product or contract, "
-        "what happened before this call. Do not reuse the case from the "
-        "subject-area line -- you are given it to know the field, not to copy "
-        "it. A scenario with no specifics plays out as small talk.\n"
+        "S5. Carry the case forward: the same matter, a later call. Keep its "
+        "anchors -- the product or contract, the figures, the dates, the names "
+        "of things -- and move them on: what was agreed last time, what has "
+        "happened since, what is still open. A call that repeats the first one "
+        "is not an exercise, and a different matter is not this one.\n"
         "S6. success_condition is the bar the *caller* holds: what has to have "
         "happened before they consider the matter settled. This is where the "
         "exercise lives. Set it at exactly the thing the feedback says the "
         "trainee did not do, stated as the caller's own requirement, and set it "
         "so that a vague or evasive answer does not clear it.\n"
+        "S7. description is the situation in one or two sentences: who is "
+        "calling, and what has brought them back. Not the facts -- those are "
+        "case_facts. A description that repeats them is read out as the "
+        "opening line, and a caller who recites their whole case in the first "
+        "breath is the one thing that never happens on a real call.\n"
         "\n"
         "# Rules for what the trainee reads\n"
-        "C1. name: a short, plain title for the situation. No colon-prefix, no "
-        '"Folgegespräch", no numbering.\n'
+        "C1. name: a short, plain title for the situation this time. It may "
+        "read as the later call in a matter that was already started; no "
+        "numbering, no colon-prefix.\n"
         "C2. short_description: one short sentence for the trainee, on what "
         "this call will demand of them. At most 100 characters -- roughly "
         "twelve German words -- because it is a teaser on a selection card, "
@@ -208,8 +263,8 @@ def _messages(material: str) -> list[dict[str, str]]:
         'will demand of them", '
         '"briefing": "three sentences to the trainee: the role they answer '
         'in, the room they have, and what a good outcome is", '
-        '"description": "the situation, told to the caller: who they are '
-        'calling and why", '
+        '"description": "the situation this time, told to the caller: who '
+        'they are calling and what has happened since", '
         '"case_facts": "the concrete facts of the case, as short plain lines", '
         '"call_goal": "what the caller wants out of the call", '
         '"success_condition": "what has to have happened before the caller '
@@ -218,10 +273,11 @@ def _messages(material: str) -> list[dict[str, str]]:
         "# Before you answer, check silently\n"
         "The four caller fields say nothing about feedback, training or what "
         "is being practised; nothing in them addresses the trainee; the case is "
-        "one you invented rather than the one named in the subject area; "
-        "success_condition is a bar a vague answer would fail; and the room "
-        "briefing gives the trainee is room the caller would actually "
-        "accept.\n"
+        "the one you were given, carried forward rather than repeated or "
+        "swapped for another; description is one or two sentences and states no "
+        "fact that case_facts already carries; success_condition is a bar a "
+        "vague answer would fail; and the room briefing gives the trainee is "
+        "room the caller would actually accept.\n"
         "\n"
         "The seven keys stay in English. Every value is written in German. Your "
         "entire answer is the JSON object, starting with { and ending with }."
@@ -235,20 +291,21 @@ def _messages(material: str) -> list[dict[str, str]]:
 # --- Model call -----------------------------------------------------------
 
 
-async def draft_follow_up(
-    scenario_name: str,
-    scenario_teaser: str,
-    improvements: list[str],
-    phase_language: str | None = None,
-) -> dict[str, str]:
+async def draft_follow_up(call: PlayedCall) -> dict[str, str]:
     """One draft, cleaned and capped, ready to store.
 
     Thinking mode, as off the live path (ADR 0011). Propagates OpenAIError;
     raises FollowUpError when nothing usable came back -- unlike the wrap-up
     there is no partial result worth keeping, because a Scenario with no
-    situation in it is not an exercise.
+    situation in it is not an exercise. Both reach the caller as a 503, which
+    is the whole difference the amendment made: the same failure used to be a
+    log line nobody read.
+
+    Its own retry loop rather than `llm.complete_json` (F-61 uses that one):
+    this re-asks on a draft whose required fields came back *empty*, which is a
+    judgement about the content and not about whether it parsed.
     """
-    messages = _messages(_material(scenario_name, scenario_teaser, improvements, phase_language))
+    messages = _messages(_material(call))
     for attempt in range(2):  # initial attempt + one retry
         raw = await llm.complete(
             messages,
@@ -265,96 +322,3 @@ async def draft_follow_up(
         except (ValidationError, ValueError) as e:
             logger.warning("Follow-up draft did not validate (attempt %d): %s", attempt + 1, e)
     raise FollowUpError("the model produced no usable scenario draft")
-
-
-# --- The stored follow-up -------------------------------------------------
-
-
-@dataclass(frozen=True)
-class _SessionMaterial:
-    """What the prompt is built from, read out before the database handle is
-    gone. The played Scenario's card only, never its prompt fields."""
-
-    subject_id: str
-    scenario_name: str
-    scenario_teaser: str
-    improvements: list[str]
-    phase_language: str | None
-
-
-def _session_material(session_id: int) -> _SessionMaterial | None:
-    """This Session's material, or None if there is nothing to build from.
-
-    No ownership check and no consent check: the caller is the worker, running
-    a job for a Session that is already stored — which, per ADR 0066, it could
-    not be without consent.
-    """
-    with session_scope() as db:
-        session = (
-            db.query(db_models.Session)
-            .filter_by(session_id=session_id)
-            .options(
-                selectinload(db_models.Session.scenario),
-                selectinload(db_models.Session.feedback)
-                .selectinload(db_models.Feedback.points),
-            )
-            .one_or_none()
-        )
-        feedback = session.feedback if session else None
-        if feedback is None:
-            return None
-        improvements = [
-            point.text
-            for point in feedback.points
-            if point.kind == db_models.POINT_IMPROVEMENT
-        ]
-        if not improvements:
-            return None
-        return _SessionMaterial(
-            subject_id=session.subject_id,
-            scenario_name=session.scenario.title,
-            scenario_teaser=session.scenario.short_description,
-            improvements=improvements,
-            phase_language=feedback.phase_language,
-        )
-
-
-async def create_follow_up(session_id: int) -> None:
-    """Store this Session's follow-up Scenario, if its Feedback asks for one.
-
-    Never raises. It runs after the wrap-up has been stored and the job closed
-    (`backend/feedback/generator.py`), and the wrap-up is the thing the User is
-    waiting for: a model that will not produce a scenario must not turn a
-    finished wrap-up into a failed job. A Session with no improvement points
-    gets none, silently, for the same reason.
-
-    Exactly one per Session, and it is the UNIQUE on `derived_from_session_id`
-    that says so rather than a check here — `scripts/requeue_feedback.py` can
-    run this job again, and a second draft would arrive as a duplicate row
-    nobody asked for.
-    """
-    try:
-        material = _session_material(session_id)
-        if material is None:
-            return
-        draft = await draft_follow_up(
-            material.scenario_name,
-            material.scenario_teaser,
-            material.improvements,
-            material.phase_language,
-        )
-        # The draft is keyed as the client knows the fields (ADR 0061); the
-        # library writes columns, where the card's `name` is `title`.
-        draft["title"] = draft.pop("name")
-        # No tenant: the worker has no request and so no `tenant` claim to
-        # resolve one from (ADR 0060).
-        scenario = library.create_scenario(
-            draft, material.subject_id, None, derived_from_session_id=session_id
-        )
-        logger.info("Follow-up scenario %s stored for session %d", scenario.id, session_id)
-    except (OpenAIError, FollowUpError) as e:
-        # Expected: the gateway has no fallback, and a small model does not
-        # always write a scenario. The User keeps their wrap-up either way.
-        logger.warning("No follow-up scenario for session %d: %s", session_id, e)
-    except Exception:  # pylint: disable=broad-exception-caught
-        logger.exception("Follow-up scenario failed for session %d", session_id)

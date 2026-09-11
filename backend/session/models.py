@@ -101,8 +101,11 @@ def utterances(turns: Sequence[Turn]) -> list[Utterance]:
     return spoken
 
 
-def conversation(turns: Sequence[Turn]) -> Conversation:
+def conversation(turns: Sequence[Turn], language_id: str | None = None) -> Conversation:
     """Fold the finished call into the facts its statistics are derived from.
+
+    `language_id` is the Persona's. Optional: without it only the readings
+    that need a vocabulary drop out.
 
     Reaction time is the one measure that spans two Turns: the user's reply in
     Turn N answers the Persona line of Turn N-1, so it is counted from that
@@ -131,6 +134,7 @@ def conversation(turns: Sequence[Turn]) -> Conversation:
 
     return Conversation(
         user_text=" ".join(turn.user_text for turn in turns if turn.user_text),
+        language_id=language_id,
         user_speech_ms=user_ms,
         user_phonation_ms=user_phonation,
         # Only Turns the user spoke in: the opening Turn has no audio to measure.

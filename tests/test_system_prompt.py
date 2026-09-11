@@ -165,6 +165,17 @@ def testopening_instruction_offers_several_openers_from_the_language_pack():
     assert "Do not reuse" in instruction
 
 
+def testopening_instruction_keeps_the_background_out_of_the_opening():
+    """A Scenario whose `description` carries the whole case — which an
+    authored one can, and a generated follow-up did — reaches the model as
+    "Context of the call" and gets read out as the first line. `_case_block`
+    holds `case_facts` back one or two at a time; nothing held the description
+    back, so the caller opened by reciting their own file."""
+    instruction = opening_instruction(GERMAN)
+    assert "Name the reason in a clause, not in a summary" in instruction
+    assert "one piece at a time" in instruction
+
+
 # --- ADR 0045: the case on the Scenario, the objections on the Persona ---
 #
 # The faustregel these tests encode: the situation belongs to the Scenario and

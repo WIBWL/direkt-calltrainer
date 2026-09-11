@@ -9,6 +9,7 @@
  */
 import { apiFetch, ApiError, reauthenticate } from "./api";
 import { currentAccessToken } from "./auth";
+import type { SessionDetail } from "./protocol";
 
 /** builtin = shipped built-in, own = the caller authored it (ADR 0058),
  * tenant = a colleague shared it with the caller's company (ADR 0060). */
@@ -39,6 +40,36 @@ export const CATEGORY_LABELS: Record<ScenarioCategory, string> = {
 
 export const CATEGORIES = Object.keys(CATEGORY_LABELS) as ScenarioCategory[];
 
+/** The conversation a reverse replays (ADR 0070). Null on the card once that
+ * Session has been deleted — the reverse outlives it. */
+export interface OriginSessionRef {
+  id: string;
+  persona: string;
+  /** ISO 8601, as every timestamp on this wire is. */
+  started_at: string;
+}
+
+/** What the User reads while playing a reverse: the briefing the Persona had
+ * for the original call, in German, plus the checklist of what this call has to
+ * cover (ADR 0070). Generated once when the reverse is created and stored
+ * with it.
+ *
+ * `goal` and `goals` are two different things and both are wanted: the first is
+ * the one sentence on what the caller is after, the second the concrete points
+ * to raise, ask and come away with. */
+export interface ReverseBrief {
+  situation: string;
+  facts: string;
+  goal: string;
+  settled: string;
+  goals: string[];
+  /** What `goals` was called before it became a list of objectives rather than
+   * of things to watch out for. Read only so a briefing written before that
+   * still shows its list; nothing writes it, and it can go once no stored
+   * reverse predates the change. */
+  watch_points?: string[];
+}
+
 export interface ScenarioCard {
   id: string;
   name: string;
@@ -57,6 +88,11 @@ export interface ScenarioCard {
    * category in the picker; `origin` stays "own", so it is edited and shared
    * like anything else they own. */
   follow_up: boolean;
+  /** A reverse of one finished Session (F-61, ADR 0070). Also `origin: "own"`,
+   * and also its own category — but unlike a follow-up it is neither edited
+   * nor shared, because it copies a case that was actually played. */
+  reverse: boolean;
+  origin_session: OriginSessionRef | null;
 }
 
 /** The fields a User may author. `name` / `short_description` are the card and
@@ -99,9 +135,15 @@ export interface ScenarioDetail {
   /** "public" for a built-in. The editor never sees that value: it opens
    * only where `editable` is true, and those rows are private or tenant. */
   visibility: Visibility | "public";
-  /** The caller authored this row, so they may edit it. Decided by the
-   * server from the verified token, never inferred from `origin` here. */
+  /** The caller authored this row and may edit it. Decided by the server from
+   * the verified token, never inferred from `origin` here — and false on a
+   * reverse, which its author owns but cannot change (ADR 0070). */
   editable: boolean;
+  /** ADR 0070. `reverse_brief` is null on everything that is not a reverse;
+   * on one it is the panel shown during the call. */
+  reverse: boolean;
+  origin_session: OriginSessionRef | null;
+  reverse_brief: ReverseBrief | null;
 }
 
 /** The editor works on strings; a withheld or absent field is an empty one
@@ -185,6 +227,38 @@ export const setScenarioVisibility = (id: string, visibility: Visibility) =>
     method: "PUT",
     body: JSON.stringify({ visibility }),
   });
+
+/** What `POST /api/sessions/{id}/reverse` answers: enough to start the reverse
+ * immediately, without a second request for the row that was just written. */
+export interface ReverseScenario {
+  id: string;
+  name: string;
+  short_description: string;
+  reverse_brief: ReverseBrief | null;
+}
+
+/** Create (or find) the reverse of a finished Session: the same call with the
+ * roles swapped (F-61, ADR 0070). It stores a Scenario, so the reverse can be
+ * selected again later, and it is idempotent — the existing row comes back
+ * rather than a second copy. Slow (thinking mode), so callers show a busy
+ * state; 409 = nothing to swap or already a reverse, 503 = model unreachable,
+ * both with a `detail` to show. */
+export const createReverse = (sessionId: string) =>
+  apiFetch<ReverseScenario>(`/api/sessions/${sessionId}/reverse`, { method: "POST" });
+
+/** The card of a follow-up Scenario — what both the create route and the
+ * Session detail route hand back for one (F-60, ADR 0069). */
+export type FollowUpCard = NonNullable<SessionDetail["follow_up"]>;
+
+/** Draft (or find) the follow-up Scenario for a finished Session: the next
+ * exercise, built from what its wrap-up asked the User to work on (F-60,
+ * ADR 0069). Asked for rather than written unbidden, exactly like the reverse
+ * above — the two routes share their shape down to the status codes: 409 =
+ * that wrap-up names nothing to build from, 503 = model unreachable, both with
+ * a `detail` to show, and a second press returns the row the first one wrote.
+ * Slow (thinking mode), so callers show a busy state. */
+export const createFollowUp = (sessionId: string) =>
+  apiFetch<FollowUpCard>(`/api/sessions/${sessionId}/follow-up`, { method: "POST" });
 
 export interface DocumentText {
   /** The LLM's fact list, or (when `summarised` is false) the raw text. */

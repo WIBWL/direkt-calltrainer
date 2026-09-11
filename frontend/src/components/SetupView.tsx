@@ -34,6 +34,8 @@ interface SetupViewProps {
   /** Open a Scenario's read-only info panel; editing starts there
    * (ADR 0076). */
   onShowScenarioInfo: (id: string) => void;
+  /** Retire a reverse (ADR 0070); the only affordance it has. */
+  onRemoveScenario: (id: string) => void;
   personas: Persona[];
   personaId: string | null;
   /** Open the read-only info panel for this Persona. Held in App.tsx
@@ -66,6 +68,7 @@ export default function SetupView({
   tenantName,
   onNewScenario,
   onShowScenarioInfo,
+  onRemoveScenario,
   personas,
   personaId,
   onShowPersonaInfo,
@@ -110,6 +113,7 @@ export default function SetupView({
           newLabel="+ Individuelles Szenario"
           onNew={onNewScenario}
           onInfo={onShowScenarioInfo}
+          onRemove={onRemoveScenario}
         />
       </SetupSection>
 
@@ -140,7 +144,6 @@ export default function SetupView({
           scenario={selectedScenario?.name ?? NOT_SELECTED}
           persona={selectedPersona?.name ?? NOT_SELECTED}
           language={selectedPersona?.language ?? NOT_SELECTED}
-          voice="Durch Persona festgelegt"
         />
 
         {/* The trainee's side of the case (ADR 0054). Here as well as on the

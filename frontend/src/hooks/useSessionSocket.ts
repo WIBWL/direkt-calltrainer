@@ -19,6 +19,11 @@ const WS_URL =
 export interface CommittedSession {
   personaId: string;
   scenarioId: string;
+  /** Whether the committed Scenario is a reverse (ADR 0070). Client-side only:
+   * it decides whether the briefing panel is fetched and shown, and is never
+   * sent — the server reads the casting off the Scenario row, which is the one
+   * place it cannot be wrong. */
+  reverse: boolean;
 }
 
 interface UseSessionSocketOptions {
@@ -55,6 +60,13 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
   // reopened when the server starts the next reply (`state: "speaking"`), which
   // the wire order guarantees comes after every stale chunk.
   const acceptingAudioRef = useRef(true);
+  // Set when `sendActivate` was called before the handshake went out, which is
+  // the ordinary case for a Session begun straight from a finished training
+  // (F-60/F-61): there is no microphone check in front of it to spend the
+  // connection's first moment on. Sent from `onopen` instead of dropped —
+  // dropping it leaves the server holding the opening line and the Session
+  // clock unstarted, with nothing on screen to say so.
+  const pendingActivateRef = useRef(false);
 
   useEffect(() => {
     if (session === null) return;
@@ -63,6 +75,7 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     setCallState("thinking");
     sessionIdRef.current = null;
     acceptingAudioRef.current = true;
+    pendingActivateRef.current = false;
 
     const ws = new WebSocket(WS_URL);
     ws.binaryType = "arraybuffer";
@@ -94,6 +107,13 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
         token,
       };
       ws.send(JSON.stringify(start));
+      // Order matters: activate marks t=0 and must follow the handshake it
+      // belongs to, on the same socket.
+      if (pendingActivateRef.current) {
+        pendingActivateRef.current = false;
+        console.debug("[WS] -> deferred session.activate");
+        ws.send(JSON.stringify({ type: "session.activate" } satisfies ClientMessage));
+      }
     };
 
     ws.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
@@ -206,9 +226,14 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     [send],
   );
 
-  /** Marks t=0 on the Session's timeline: the opening line starts playing now. */
+  /** Marks t=0 on the Session's timeline: the opening line starts playing now.
+   *
+   * Held back rather than lost when the socket is not open yet — see
+   * `pendingActivateRef`. Every other message either has a fallback for a
+   * closed socket (`endSession`) or belongs to a call that is already running,
+   * and so cannot arrive this early. */
   const sendActivate = useCallback(() => {
-    send({ type: "session.activate" });
+    if (!send({ type: "session.activate" })) pendingActivateRef.current = true;
   }, [send]);
 
   const endSession = useCallback(() => {

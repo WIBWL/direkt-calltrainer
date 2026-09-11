@@ -64,6 +64,14 @@ class LanguagePack:
     # Frage...". Several varied openers spread that distribution; one anchor
     # collapses it.
     opening_examples: str
+    # The same, for a reverse (ADR 0070), where the Persona picks up instead of
+    # calling: several ways to answer a phone. A separate pool rather than a
+    # note on `opening_examples`, for the reason that field's comment gives --
+    # the model copies the shape of whatever examples it is shown, and an
+    # answering line and an opening line are different shapes. They say nothing
+    # about any case, because a callee who names one has invented the caller's
+    # reason before hearing it.
+    answering_examples: str
     # Quoted user phrases the English frame points at, in the target language.
     user_closing_examples: str
     vague_reassurance_examples: str
@@ -97,6 +105,10 @@ class LanguagePack:
     # Turn (docs/research/model-parameters.md; ADR 0071). Whole-message
     # patterns only: "Nein, danke, das passt" is a real answer.
     stt_phantom_re: re.Pattern[str]
+    # A question word at the start makes an open question, anything else a
+    # closed one. Anchored, and deliberately shallow: a question word buried
+    # further in counts as closed rather than being guessed at.
+    open_question_re: re.Pattern[str]
     fallback_closing_line: str
 
 
@@ -163,6 +175,12 @@ _GERMAN = LanguagePack(
         "Hallo, Sebastian Reuter hier. Ich wollte nochmal wegen der Lieferung "
         "nachhaken."
     ),
+    answering_examples=(
+        "Guten Tag, Sie sprechen mit Beck, was kann ich für Sie tun?\n"
+        "Kundenservice, Lehmann am Apparat — guten Tag.\n"
+        "Winkler, schönen guten Tag. Wie kann ich Ihnen helfen?\n"
+        "Ja, guten Tag, hier ist Reuter. Was liegt an?"
+    ),
     user_closing_examples='"das reicht mir"/"das wär\'s"',
     vague_reassurance_examples='"ich kümmere mich darum", "ich stelle das klar"',
     # Catches an explicit farewell or a request to postpone/continue elsewhere --
@@ -224,6 +242,14 @@ _GERMAN = LanguagePack(
         r"copyright [\w\s,.-]+)\W*$",
         re.IGNORECASE,
     ),
+    # Longest alternatives first, so "womit" is not shadowed by "wo"; leading
+    # fillers are skipped ("Und was brauchen Sie?").
+    open_question_re=re.compile(
+        r"^(?:(?:und|aber|also|okay|gut|ja|nun|jetzt)[\s,]+){0,2}"
+        r"(wieso|weshalb|warum|wofür|womit|worauf|worum|wohin|woher|welche[rnsm]?|"
+        r"wessen|wer|wen|wem|was|wann|wo|wie)\b",
+        re.IGNORECASE,
+    ),
     fallback_closing_line="Vielen Dank für Ihre Zeit. Auf Wiederhören.",
 )
 
@@ -261,6 +287,12 @@ _ENGLISH = LanguagePack(
         "last week.\n"
         "Hi, Peter Ross calling. I wanted to follow up on the delivery we "
         "discussed."
+    ),
+    answering_examples=(
+        "Good morning, Claire Hughes speaking — how can I help?\n"
+        "Customer service, Daniel here. What can I do for you?\n"
+        "Hello, Nina Alvarez speaking.\n"
+        "Good afternoon, Ross speaking — how can I help you today?"
     ),
     user_closing_examples='"that\'s all I needed"/"that\'ll do"',
     vague_reassurance_examples='"I\'ll look into it", "I\'ll get that sorted"',
@@ -301,6 +333,11 @@ _ENGLISH = LanguagePack(
     stt_phantom_re=re.compile(
         r"^\W*(thank you( for watching)?|thanks for watching|amen|subtitles? by [\w\s,.-]+|"
         r"copyright [\w\s,.-]+)\W*$",
+        re.IGNORECASE,
+    ),
+    open_question_re=re.compile(
+        r"^(?:(?:and|but|so|okay|well|now)[\s,]+){0,2}"
+        r"(whose|whom|who|what|when|where|why|which|how)\b",
         re.IGNORECASE,
     ),
     fallback_closing_line="Thank you for your time. Goodbye.",

@@ -23,7 +23,7 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 | F-23 | Mehrteilige Projektgespräche | Trainingsfälle erstrecken sich über mehrere Sitzungen, wobei sich der Gegenpart an vorangegangene Termine erinnert. | Funktionale Vollständigkeit | COULD | R-11 |
 | F-34 | Usergesteuertes Szenario | Der Nutzer beschreibt die zu trainierende Gesprächssituation per Freitext. | Funktionale Vollständigkeit | COULD | Systementwurf |
 | F-58 | Szenario aus hochgeladenem Dokument | Aus einem hochgeladenen Dokument erzeugt das System ein sitzungsbezogenes Szenario, um Gespräche mit stärkerem Unternehmensbezug zu üben. | Funktionale Vollständigkeit | SHOULD | R-42 |
-| F-60 | Folgeszenario aus dem Feedback | Aus den Verbesserungspunkten eines abgeschlossenen Gesprächs entwirft das System ein neues Szenario, das genau die dort benannten Punkte verlangt. Der Entwurf wird im Editor geprüft und erst mit dem Speichern zum eigenen Szenario. | Funktionale Vollständigkeit | SHOULD | R-22, Systementwurf |
+| F-60 | Folgeszenario aus dem Feedback | Aus den Verbesserungspunkten eines abgeschlossenen Gesprächs entwirft das System auf Knopfdruck das nächste Gespräch in derselben Sache – derselbe Fall, zeitlich später –, das genau die dort benannten Punkte verlangt. Es wird als eigenes Szenario gespeichert und lässt sich im Editor ändern. | Funktionale Vollständigkeit | SHOULD | R-22, Systementwurf |
 | F-59 | Mandantenbezogene Szenario-Bibliothek | Selbst erstellte Szenarien werden über die Sitzung hinaus mandantenbezogen gespeichert, sodass Kollegen ohne erneute Erfassung damit trainieren. | Funktionale Vollständigkeit | COULD | R-58 |
 
 ## Sprach- und Kommunikationsanalyse
@@ -60,6 +60,7 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 | F-12 | Aufzeichnung des Gesprächs | Aufzeichnung und Transkription zur nachträglichen Reflexion. Das Transkript liegt unmittelbar nach dem Gespräch vollständig in Textform vor und wird während des Gesprächs nicht angezeigt. | Funktionale Vollständigkeit | MUST | R-28, R-52 |
 | F-13 | Aufzeichnung des Fortschritts | Nutzerbezogene Verlaufsdaten über längere Zeiträume, nachvollziehbar dargestellt. | Funktionale Vollständigkeit | SHOULD | R-27, R-29, R-30 |
 | F-48 | Trainingshistorie | Übersicht vergangener Trainings, filterbar nach Szenario-Typ und Zeitraum. | Funktionale Vollständigkeit | COULD | R-29 |
+| F-61 | Rollentausch eines Gesprächs | Ein abgeschlossenes Gespräch lässt sich mit vertauschten Rollen wiederholen: der Nutzer ruft an, die KI nimmt ab und übernimmt die Seite des Nutzers. Während des Gesprächs sieht der Nutzer die Unterlagen, die zuvor die KI hatte, samt einer kurzen Liste, worauf zu achten ist. | Funktionale Vollständigkeit | COULD | R-25, R-28, R-01 |
 
 ## Bedienoberfläche
 
@@ -101,5 +102,5 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 |---|---|
 | MUST | 17 |
 | SHOULD | 11 |
-| COULD | 14 |
-| **Gesamt** | **42** |
+| COULD | 15 |
+| **Gesamt** | **43** |

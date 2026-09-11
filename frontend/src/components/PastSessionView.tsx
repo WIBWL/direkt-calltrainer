@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiFetch } from "../api";
 import { useStoredSession } from "../hooks/useStoredSession";
 import { ROUTES, type TrainingStart } from "../routes";
-import { getTenant } from "../scenarioLibrary";
+import { getTenant, type ReverseScenario } from "../scenarioLibrary";
 import { formatOffset } from "../utils/time";
 import AppLayout from "./AppLayout";
 import { FeedbackReport, MetricSection } from "./FeedbackView";
@@ -24,9 +24,11 @@ import ScenarioEditor from "./ScenarioEditor";
  * existed (ADR 0031/0050), so a guessed URL lands on the same screen as a stale
  * bookmark and neither learns anything from it.
  *
- * The follow-up Scenario written from this training (F-60) is offered here as
- * it is after the call, minus the waiting: nothing is in flight, so a Session
- * that has none simply shows none.
+ * Both Scenarios a finished training can produce are offered here exactly as
+ * they are after the call: the follow-up (F-60) and the reverse (F-61). Each
+ * is written when the User asks for it rather than in the background, which is
+ * what makes them offerable about a training read weeks later just as well as
+ * about one that has just ended.
  */
 export default function PastSessionView() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -51,6 +53,21 @@ export default function PastSessionView() {
   // the one this training was played with, not a fresh choice.
   const startFollowUp = (scenarioId: string, personaId: string) => {
     const start: TrainingStart = { scenarioId, personaId };
+    navigate(ROUTES.training, { state: { start } });
+  };
+
+  // The reverse (F-61) leaves by the same door, and is offered here and not
+  // only after the call for the reason ADR 0070 gives for storing it at all:
+  // standing on the other side of a conversation is worth doing about a
+  // training you have gone back to read, not just about the one that has just
+  // ended. The Persona is again the one this training was played with.
+  const startReverse = (reverse: ReverseScenario) => {
+    if (!detail) return;
+    const start: TrainingStart = {
+      scenarioId: reverse.id,
+      personaId: detail.persona_id,
+      reverse: true,
+    };
     navigate(ROUTES.training, { state: { start } });
   };
 
@@ -116,14 +133,22 @@ export default function PastSessionView() {
     <AppLayout pageClassName="app-page-narrow">
       {backLink}
       <h1>{detail.scenario}</h1>
-      <p className="page-lead">Gespräch mit {detail.persona}</p>
+      <p className="page-lead">
+        {/* Which side the User was on (ADR 0070) — the transcript below reads
+            very differently depending on it. */}
+        {detail.reverse
+          ? `Rollentausch: Sie riefen an, ${detail.persona} nahm ab`
+          : `Gespräch mit ${detail.persona}`}
+      </p>
 
       {detail.feedback ? (
         <FeedbackReport
           detail={detail}
-          // Nothing is being generated any more, so nothing is pending: a
-          // Session with no follow-up shows no block at all.
-          followUp={{ pending: false, onEdit: setEditingId, onStart: startFollowUp }}
+          // Re-read after one is written, so the card survives a reload of
+          // this page as the row the detail route now carries.
+          followUp={{ onEdit: setEditingId, onStart: startFollowUp, onCreated: reload }}
+          sessionId={sessionId ?? null}
+          onReverse={startReverse}
         />
       ) : (
         <>

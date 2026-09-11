@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import type { CallState } from "../protocol";
 import { cx } from "../utils/cx";
@@ -20,6 +20,10 @@ interface CallViewProps {
   error: string | null;
   onToggleMicrophone: () => void;
   onEndCall: () => void;
+  /** The reverse briefing (ADR 0070), or null. Passed in rather than fetched
+   * here: this screen stays presentational, and the panel is the same one the
+   * mic check already showed. */
+  brief?: ReactNode;
 }
 
 /**
@@ -41,6 +45,7 @@ export default function CallView({
   error,
   onToggleMicrophone,
   onEndCall,
+  brief = null,
 }: CallViewProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
@@ -66,59 +71,65 @@ export default function CallView({
         </p>
       </section>
 
-      <section className="call-panel" aria-labelledby="call-persona-name">
-        <div className="call-persona">
-          <PersonaAvatar
-            name={personaName}
-            src={personaAvatarUrl}
-            className="call-persona-avatar"
-          />
+      {/* One column, or two once there is a briefing to keep in view: reading
+          it must not mean scrolling the animation off the screen (ADR 0070). */}
+      <div className={cx("call-layout", brief ? "call-layout-with-brief" : null)}>
+        <section className="call-panel" aria-labelledby="call-persona-name">
+          <div className="call-persona">
+            <PersonaAvatar
+              name={personaName}
+              src={personaAvatarUrl}
+              className="call-persona-avatar"
+            />
 
-          <div className="call-persona-details">
-            <h2 id="call-persona-name">{personaName}</h2>
-            <p>{personaRole}</p>
+            <div className="call-persona-details">
+              <h2 id="call-persona-name">{personaName}</h2>
+              <p>{personaRole}</p>
+            </div>
           </div>
-        </div>
 
-        <p className="call-status">
-          <span className="call-status-dot" aria-hidden="true">
-            ●
-          </span>{" "}
-          Gespräch läuft ·{" "}
-          <span
-            className="call-duration"
-            aria-label={`Anrufdauer ${formattedDuration}`}
-          >
-            {formattedDuration}
-          </span>
-        </p>
-
-        <CallAnimation state={callState} audioLevel={audioLevel} />
-
-        {error && (
-          <p id="status" className="error">
-            {error}
+          <p className="call-status">
+            <span className="call-status-dot" aria-hidden="true">
+              ●
+            </span>{" "}
+            Gespräch läuft ·{" "}
+            <span
+              className="call-duration"
+              aria-label={`Anrufdauer ${formattedDuration}`}
+            >
+              {formattedDuration}
+            </span>
           </p>
-        )}
 
-        {/* The toggle state reflects whether local VAD microphone capture is paused. */}
-        <div className="call-controls">
-          <button
-            className={cx("mute-call-button", isMicrophoneMuted && "is-muted")}
-            type="button"
-            aria-pressed={isMicrophoneMuted}
-            onClick={onToggleMicrophone}
-          >
-            {isMicrophoneMuted
-              ? "Mikrofon einschalten"
-              : "Mikrofon stummschalten"}
-          </button>
+          <CallAnimation state={callState} audioLevel={audioLevel} />
 
-          <button className="end-call-button" type="button" onClick={onEndCall}>
-            Gespräch beenden
-          </button>
-        </div>
-      </section>
+          {error && (
+            <p id="status" className="error">
+              {error}
+            </p>
+          )}
+
+          {/* The toggle state reflects whether local VAD microphone capture is paused. */}
+          <div className="call-controls">
+            <button
+              className={cx("mute-call-button", isMicrophoneMuted && "is-muted")}
+              type="button"
+              aria-pressed={isMicrophoneMuted}
+              onClick={onToggleMicrophone}
+            >
+              {isMicrophoneMuted
+                ? "Mikrofon einschalten"
+                : "Mikrofon stummschalten"}
+            </button>
+
+            <button className="end-call-button" type="button" onClick={onEndCall}>
+              Gespräch beenden
+            </button>
+          </div>
+        </section>
+
+        {brief}
+      </div>
     </>
   );
 }

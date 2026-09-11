@@ -2,11 +2,19 @@
 
 ## Status
 
-Accepted. Builds on ADR 0058 (User-authored Scenarios) and ADR 0049 (the wrap-up
-it is written from); bounded by ADR 0051 (no target ranges) and ADR 0043 (a
-built-in's prompt fields stay withheld). Its lifecycle follows ADR 0026 (a
-Session's Scenario is not deletable), ADR 0066 (deletion) and ADR 0067
-(retention).
+Accepted, **amended twice on 2026-09-09** — see the two amendments at the end.
+Two clauses of the Decision below no longer hold: the follow-up is no longer
+written without being asked for, and it no longer invents a new situation in
+the same subject area but carries the played case forward. Everything else
+stands, and the Decision is left as written because the reasoning it records
+is what the amendments argue with.
+
+Builds on ADR 0058 (User-authored Scenarios) and ADR 0049 (the wrap-up it is
+written from); bounded by ADR 0051 (no target ranges) and ADR 0043 (a built-in's
+prompt fields stay withheld). Its lifecycle follows ADR 0026 (a Session's
+Scenario is not deletable), ADR 0066 (deletion) and ADR 0067 (retention). Since
+the amendment it is the sibling of ADR 0070 (the reverse), which was written on
+this one's pattern and then turned out to have the better half of it.
 
 ## Context
 
@@ -203,3 +211,124 @@ One thing is still deliberately not built:
   Scenario the User authored themselves — they already own that text — but a
   rule that holds for one half of the library and not the other would be no rule
   at all.
+
+
+## Amendment (2026-09-09): the follow-up is asked for, like the reverse
+
+The decision above turns on one comparison, and it was made against the wrong
+opponent. "Whether the User has to ask for it" weighed *writing it unbidden*
+against *a button that drafted into the editor and stored nothing* — and against
+that, unbidden wins on both counts it names: a draft that dies with the screen,
+and a decision asked before there is anything to look at.
+
+But those two objections are not to the button. They are to *not storing*. The
+reverse (ADR 0070) was designed on this ADR's pattern a fortnight later and kept
+the button while dropping the draft-only part: it is asked for, and what it
+writes is a row. Set side by side, the reverse's shape answers both of this
+ADR's objections and the automatic one does not answer the reverse's:
+
+* **The exercise no longer dies with the screen** — because it is stored, which
+  is this ADR's own decision and nothing to do with who triggers it.
+* **The User is no longer asked before there is anything to look at.** The
+  button sits *under the finished wrap-up*, beneath the very improvement points
+  it would be built from. They have read what it would be aimed at.
+* **A failure is now visible.** "Silent on failure" was the price of running
+  where nobody was waiting: an unreachable model meant a follow-up that simply
+  never appeared, indistinguishable from a wrap-up that named nothing to work
+  on. Asked for, the same failure is a 503 with a sentence in it, and the User
+  can press the button again.
+
+Against that stands what this ADR bought and now gives up: a User who never
+notices the offer gets no exercise. That is the trade, and it is worth making,
+because the thing being lost — an exercise nobody chose — is also what
+Consequences above worried about under "the User is no longer the reviewer
+before storage" and "a follow-up per Session accumulates". Twenty trainings no
+longer mean twenty rows in the library; they mean twenty *offers*, and as many
+rows as were wanted.
+
+**What changes.** `POST /api/sessions/{extern_id}/follow-up` comes back, on the
+sessions router beside `POST …/reverse` and deliberately identical to it: 404
+for an unknown or foreign Session, 409 where the wrap-up names nothing to build
+from, 503 for a model that would not answer, and idempotency through the same
+UNIQUE column, so a second press returns the row the first one wrote without a
+second model call — and reactivates it if the User had since removed it.
+`backend/feedback/generator.py` no longer calls `create_follow_up`, so the
+wrap-up job has one model call and one way to fail; `backend/followups.py` is
+left as the drafting module, the sibling of `backend/reversals.py`, and knows
+nothing about a worker any more.
+
+**What does not change**: the material the model is given, the prompt, the
+required-field floor, the storage path through `library.create_scenario`, the
+provenance column and its UNIQUE, the badge, the filter chip, and the whole
+lifecycle — deletion, withdrawal, retention.
+
+One thing changed for both routes at once while this was done: **a call begun
+from a finished training skips the microphone check.** That screen exists to
+catch a microphone that is not working before a conversation is spent on it
+(F-46) — a question already answered by the call the User has just had, on the
+same device, in the same page session. Skipped, it is a click between the
+button and the conversation and nothing else. The commit still happens exactly
+as ADR 0042 describes, and the confirmation the check would have carried is
+done by an effect one render later; `useSessionSocket.sendActivate` now holds
+that message back until the handshake has gone out instead of dropping it,
+which also closes a latent hole on the ordinary path — a User who confirmed the
+check before the socket opened lost their `session.activate` and waited for an
+opening line the server was still holding.
+
+Two smaller things follow from the move. `tenant_id` is **no longer NULL**: the
+draft is written in a request now, so the caller's company is resolved and
+stamped like it is for anything they author (ADR 0060), and sharing is a plain
+`visibility` flip rather than a flip plus a late stamp. And the post-call
+screen's busy line is gone — `useSessionFeedback` no longer polls past the
+wrap-up for something arriving behind it, because nothing does; the button
+carries its own busy state, as the reverse's does.
+
+## Amendment 2 (2026-09-09): the follow-up carries the played case forward
+
+The Decision above answered "how much of the played Scenario carries over" with
+*the card and nothing else*, and Consequences closed by naming the thing that
+answer ruled out: **"the same case, harder"** — not built, because it would need
+the played Scenario's four prompt fields, which ADR 0043 withholds for a
+built-in, and "a rule that holds for one half of the library and not the other
+would be no rule at all."
+
+That objection has since been answered, and not here. ADR 0070 needed the same
+four fields to build the reverse, took the exception, and stated the ground it
+rests on: the case is one **the User has just heard played out**. The rule that
+looked like it would have to split the library does not, because the exception
+is not about who authored a Scenario — it is about whether this User has played
+it. A built-in's answer key is withheld from the client; it is not withheld
+from the person who spent ten minutes on the receiving end of it.
+
+With that settled, the original choice is worth re-reading. "A new situation in
+the same subject area" was picked for **transfer**: a second run at a case the
+User now knows the answer to is not an exercise. True — but a follow-up call in
+the same matter is not a second run. The case moves on: what was agreed last
+time, what has happened since, what is still open. What the User knows is the
+history, which is exactly what a caller ringing back would expect them to know.
+And practising a weakness in an unfamiliar case asks two things at once, of
+which only one was the point.
+
+**What changes.** The material handed to the model gains the played Scenario's
+`description`, `case_facts`, `call_goal` and `success_condition`, and the
+wrap-up's `summary` — where that call actually ended up, which no other field
+carries. The prompt's S5 flips from *invent a new case* to *carry this one
+forward*: the same matter, a later call, its anchors kept and moved on. C1 lets
+the title read as the later call in a matter already begun, and S2 now lets the
+caller refer to their own earlier call — as their own call, never as an
+exercise.
+
+**What does not change.** The measured statistics still stay out (ADR 0051).
+S6 is untouched: `success_condition` still sits at exactly the thing the
+feedback says was missing, stated as the caller's own bar — which is what keeps
+this an exercise rather than a re-run, because the last call's behaviour does
+not clear it. The four briefing fields still say nothing about feedback,
+training or what is being practised. Storage, the provenance column and its
+UNIQUE, the badge, the filter chip, the German values and the whole lifecycle
+are all as the Decision and Amendment 1 leave them.
+
+**The cost.** Transfer is genuinely given up: nothing now asks the User to carry
+a skill into an unfamiliar case. If the pilot shows people getting good at one
+case and no further, that is the symptom, and the fix is a second kind of
+follow-up rather than a change to this one — the material is the only
+difference between them.

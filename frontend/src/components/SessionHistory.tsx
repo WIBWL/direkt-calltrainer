@@ -15,7 +15,7 @@ import { sessionPath } from "../routes";
  * two calls apart: when it was, which scenario, and with whom.
  */
 export default function SessionHistory() {
-  const { sessions, total, state, hasMore, loadingMore, loadMore } = useSessionHistory();
+  const { sessions, total, state, hasMore, loadingMore, showMore } = useSessionHistory();
 
   if (state === "loading") {
     return <p className="muted">Trainings werden geladen …</p>;
@@ -48,7 +48,7 @@ export default function SessionHistory() {
         <button
           type="button"
           className="session-more"
-          onClick={loadMore}
+          onClick={showMore}
           disabled={loadingMore}
         >
           {loadingMore ? "Wird geladen …" : `Weitere anzeigen (${sessions.length} von ${total})`}
@@ -70,6 +70,12 @@ function SessionRow({ session }: { session: SessionSummary }) {
         <span className="session-row-title">{session.scenario}</span>
         <span className="session-row-persona">
           {session.persona}
+          {session.reverse && (
+            // Which side of the phone the User was on (ADR 0070). Two rows on
+            // the same Scenario are otherwise indistinguishable, and they were
+            // opposite exercises.
+            <span className="chip chip-neutral">Rollentausch</span>
+          )}
           {session.status === "aborted" && (
             // Worth saying, because it explains a short call or a missing
             // wrap-up — but stated, not warned about.

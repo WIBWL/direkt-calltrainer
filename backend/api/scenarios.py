@@ -15,6 +15,12 @@ to the exercise (ADR 0043/0045). The *write* routes remain owner-scoped.
 uploaded text-layer PDF and has the LLM condense it into a fact list for the
 editor's Fakten field (`backend/documents.py`), storing nothing.
 
+A reverse (ADR 0070) is one of these rows too, listed and read through the same
+routes and badged `own` like anything else the caller owns. It is written by
+`POST /api/sessions/{id}/reverse` and by nothing here: the write routes below
+refuse it, because a reverse copies a case that was actually played and
+carries a briefing built from its author's own wrap-up.
+
 The wire vocabulary is English, matching the schema (ADR 0057, extended to this
 surface by ADR 0061). `backend/library.py` does the sanitising (ADR 0059); this
 module only validates shape and length and maps the card field `name` onto the
@@ -111,6 +117,19 @@ def _origin(scenario, subject: str) -> str:
     return "builtin"
 
 
+def _origin_session(origin) -> dict | None:
+    """The conversation a reverse replays, for its card (ADR 0070). None for an
+    ordinary Scenario, and for a reverse whose Session has since been deleted —
+    the row outlives it, so the client renders both cases."""
+    if origin is None:
+        return None
+    return {
+        "id": origin.id,
+        "persona": origin.persona,
+        "started_at": origin.started_at.isoformat(),
+    }
+
+
 def _card(scenario, subject: str) -> dict:
     return {
         "id": scenario.id,
@@ -134,6 +153,12 @@ def _card(scenario, subject: str) -> dict:
         # is the caller's own Scenario in every other respect, editable and
         # shareable like one.
         "follow_up": scenario.follow_up,
+        # A reverse (ADR 0070) is `origin: "own"` like anything else the caller
+        # owns; this is what separates it out into its own filter, and what
+        # tells the card not to offer an edit it would be refused. Unlike a
+        # follow-up it is neither editable nor shareable.
+        "reverse": scenario.reverse,
+        "origin_session": _origin_session(scenario.origin_session),
     }
 
 
@@ -141,10 +166,16 @@ def _card(scenario, subject: str) -> dict:
 # filter (ADR 0072). Not `scenario.category`, which is the thematic level-2
 # filter. `library.list_scenarios` returns them by creation time and Python's
 # sort is stable, so that order survives inside each group.
-_ORIGIN_ORDER = ("builtin", "own", "follow_up", "tenant")
+_ORIGIN_ORDER = ("builtin", "own", "follow_up", "reverse", "tenant")
 
 
 def _origin_group(card: dict) -> int:
+    """Which level-1 group a card belongs to. Three of the five are not values
+    of `origin`: a follow-up (ADR 0069) and a reverse (ADR 0070) are both
+    `own` on the wire and are separated out here, exactly as the filter
+    separates them. A row is never both."""
+    if card["reverse"]:
+        return _ORIGIN_ORDER.index("reverse")
     return _ORIGIN_ORDER.index("follow_up" if card["follow_up"] else card["origin"])
 
 
@@ -164,6 +195,11 @@ def _detail(scenario, subject: str) -> dict:
     up in the call anyway, so they are served. A Scenario the caller or a
     colleague authored withholds nothing: they wrote it, or work with the
     person who did.
+
+    A reverse (ADR 0070) is authored and therefore withholds nothing either,
+    which is the exception that ADR deliberately takes to ADR 0043: the played
+    case reaches the client because seeing what the Persona had is the point,
+    and the User has just heard it play out.
     """
     # No author at all = a shipped built-in. A colleague's shared row has an
     # author, just not this caller, and is served in full.
@@ -189,7 +225,15 @@ def _detail(scenario, subject: str) -> dict:
         "visibility": scenario.visibility,
         # Authorship, not visibility: a colleague's shared Scenario is
         # readable but not editable (ADR 0058 -- only the author may write).
-        "editable": scenario.created_by == subject,
+        # And a reverse is the caller's own yet still not editable: the write
+        # routes exclude it in their WHERE clause (ADR 0070), so a panel that
+        # offered the edit would open an editor whose Save answers 404.
+        "editable": scenario.created_by == subject and not scenario.reverse,
+        "reverse": scenario.reverse,
+        "origin_session": _origin_session(scenario.origin_session),
+        # The German briefing the User reads during a reverse call; null on
+        # every other row.
+        "reverse_brief": scenario.reverse_brief,
     }
 
 

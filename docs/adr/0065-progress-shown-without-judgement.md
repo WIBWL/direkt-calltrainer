@@ -18,7 +18,7 @@ The progress view shows the user their own values over time and does not evaluat
 
 Permitted, and the substance of F-13: the course of each Kennzahl across Sessions, plotted plainly; the descriptive history of F-48 (when, which Scenario, which Persona, how long, completed or aborted); and activity figures such as how many trainings were done in a period. Activity needs no norm — it counts what the user did, not how well.
 
-Not permitted without a further, explicit decision: target ranges or bands; colour that encodes good and bad; arrows, deltas or labels asserting improvement or decline; ranking against other users; and any aggregate score over Sessions. `metric_type` has no target column and gains none — the absence is the mechanism, not an oversight, exactly as in ADR 0051.
+Not permitted without a further, explicit decision: target ranges or bands; arrows, deltas or labels asserting improvement or decline; ranking against other users; and any aggregate score over Sessions. `metric_type` has no target column and gains none — the absence is the mechanism, not an oversight, exactly as in ADR 0051.
 
 Consistent with this, ADR 0064's endpoint returns raw measured values and no interpretation, and `feedback.score` stays unwritten. ADR 0004 does permit a numeric score as a supplementary addition that never replaces the qualitative feedback, so the column remains; this ADR declines to introduce one *across* Sessions, where it would be a ranking of a person over time rather than a note about one call.
 

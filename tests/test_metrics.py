@@ -9,14 +9,18 @@ Covers:
   ADR 0047/0048  a Turn's acoustics are measured inline and never load-bearing,
                  so a failed measurement stays visible downstream
   ADR 0051  no figure the user could take for measured when it was not
+  F-53      every metric belongs to one half of the Kennzahlen slider
+  F-51      Redefluss: how much of the recording was speech
+  F-41      open and closed questions, split off the same question marks
 
 `conversation()` and `measure()` are pure functions over in-memory Turns: no
 database, no audio and no Praat -- the acoustic facts are handed in as the
 numbers `analyze()` would have produced.
 """
 
+from backend.db.models import METRIC_ASPECTS
 from backend.feedback.acoustics import Pause
-from backend.feedback.metrics import describe_loudness_course, measure
+from backend.feedback.metrics import METRICS, describe_loudness_course, measure
 from backend.session.models import Turn, conversation
 
 # A recording that ran 4 s and held 2 s of speech: the two figures these tests
@@ -45,6 +49,18 @@ def _measured_call() -> list[Turn]:
 
 def _by_key(turns: list[Turn]) -> dict[str, float]:
     return {m.key: m.value for m in measure(conversation(turns))}
+
+
+def test_every_metric_belongs_to_one_half_of_the_grid() -> None:
+    """provision.py seeds `metric_type.aspect` from this inventory: a value
+    outside the vocabulary fails to seed, a missing one is filed under "what"
+    by the screen's fallback rather than showing up as a fault."""
+    assert all(metric.aspect in METRIC_ASPECTS for metric in METRICS)
+
+
+def test_both_halves_of_the_grid_are_measured() -> None:
+    """The slider hides itself when one half is empty (FeedbackView.tsx)."""
+    assert {metric.aspect for metric in METRICS if metric.active} == set(METRIC_ASPECTS)
 
 
 def test_talk_share_compares_audio_duration_on_both_sides() -> None:
@@ -96,6 +112,54 @@ def _call_with_one_unmeasured_turn() -> list[Turn]:
             user_acoustics_complete=False,
         ),
     ]
+
+
+def test_redefluss_is_the_share_of_the_recording_that_was_speech() -> None:
+    """F-51. 2 s of speech in a 4 s recording is 50%."""
+    assert _by_key(_measured_call())["phonation_share"] == 50.0
+
+
+def test_redefluss_is_absent_where_the_acoustics_failed() -> None:
+    """ADR 0048: both figures are short by an unknown amount."""
+    assert "phonation_share" not in _by_key(_call_with_one_unmeasured_turn())
+
+
+def _questions_asked(text: str, language_id: str | None = "de"):
+    """The questions Measurement for a call in which the user said `text`."""
+    found = [m for m in measure(conversation([Turn(seq=1, user_text=text)], language_id))
+             if m.key == "questions"]
+    assert found, "no questions measurement"
+    return found[0]
+
+
+def test_open_and_closed_questions_add_up_to_the_count() -> None:
+    """F-41. Both halves come off the same question marks, so the tile showing
+    the count and the split cannot contradict itself."""
+    asked = _questions_asked("Was brauchen Sie? Passt Ihnen Dienstag? Wirklich?")
+
+    assert asked.value == 3
+    assert (asked.detail["open"], asked.detail["closed"]) == (1, 2)
+
+
+def test_a_question_is_read_from_where_it_begins_not_from_the_sentence_before() -> None:
+    """The transcript runs sentences together; the question is the last clause
+    before the mark."""
+    assert _questions_asked("Das ist klar. Wann passt es Ihnen?").detail["open"] == 1
+
+
+def test_the_split_follows_the_language_the_call_ran_in() -> None:
+    """The question words come from the Persona's language pack."""
+    asked = _questions_asked("What do you need? Does Tuesday work?", language_id="en")
+
+    assert (asked.detail["open"], asked.detail["closed"]) == (1, 1)
+
+
+def test_questions_are_still_counted_without_a_language() -> None:
+    """The count is punctuation and needs no vocabulary."""
+    asked = _questions_asked("Was brauchen Sie?", language_id=None)
+
+    assert asked.value == 1
+    assert "open" not in asked.detail
 
 
 def test_an_unmeasured_turn_contributes_no_reaction_time() -> None:

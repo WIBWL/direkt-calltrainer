@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
 import { ROUTES } from "../routes";
+import AppFooter from "./AppFooter";
 
 interface LoginViewProps {
   errorMessage?: string | undefined;
@@ -15,11 +16,12 @@ export default function LoginView({
     <div className="login-page">
       <header className="login-header">
         <div className="login-brand">
-          <span className="login-brand-mark" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </span>
+          <img
+            className="login-brand-logo"
+            src="/logo.png"
+            alt=""
+            aria-hidden="true"
+          />
 
           <span className="login-brand-name">Calltrainer</span>
         </div>
@@ -103,10 +105,10 @@ export default function LoginView({
 
           {errorMessage ? (
             <div className="login-error" role="alert">
-                <strong>Anmeldung fehlgeschlagen</strong>
-                <span>{errorMessage}</span>
+              <strong>Anmeldung fehlgeschlagen</strong>
+              <span>{errorMessage}</span>
             </div>
-        ) : null}
+          ) : null}
 
           <button
             type="button"
@@ -132,6 +134,8 @@ export default function LoginView({
           </p>
         </section>
       </main>
+
+      <AppFooter />
     </div>
   );
 }

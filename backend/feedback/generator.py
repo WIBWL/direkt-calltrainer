@@ -11,9 +11,10 @@ the same call as the summary and the two lists. One call rather than a second
 one of its own, because the phases are read off the same transcript and a
 second round trip would buy nothing but latency and a second way to fail.
 
-The follow-up Scenario is the one thing that does get its own call, once the
-wrap-up is stored: it is written from the finished improvement points and the
-User is not waiting on it (ADR 0069, `backend/followups.py`).
+The wrap-up is all this job produces. It used to draft the follow-up Scenario
+too, once the wrap-up was stored — that now happens only when the User asks for
+it, from a route of its own (ADR 0069's amendment, `backend/followups.py`), so
+the job has one model call and one thing that can fail.
 
 Runs in the async worker (ADR 0018/0019), not in the live path.
 """
@@ -22,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, ValidationError
@@ -31,11 +33,34 @@ from backend.clients import llm
 from backend.db import models as db_models
 from backend.db.session import session_scope
 from backend.feedback import jobs, metrics
-from backend.followups import create_follow_up
 
 logger = logging.getLogger(__name__)
 
 _LANGUAGE_NAMES_EN = {"de": "German", "en": "English"}
+
+# The two wrap-ups written here rather than by the model, keyed by the same
+# English language name the prompt is built with. O2 asks the model to answer
+# in the Session's language and a 4B model (ADR 0011) still hands back the
+# English of the rule it is following -- which is exactly what a User saw when
+# a call they broke off immediately came back summarised as "nothing to
+# review". Neither path reaches the model, so neither can be got wrong.
+#
+# German for a language we do not know: the pilot runs in German, and a
+# sentence in the wrong language beats a KeyError on the one screen that is
+# meant to say why there is nothing to read.
+_NOTHING_SAID = {
+    "German": "In diesem Training wurde nicht gesprochen. Es gibt daher nichts auszuwerten.",
+    "English": "Nothing was said in this training, so there is nothing to review.",
+}
+_NO_WRAPUP = {
+    "German": "Für dieses Gespräch konnte kein Feedback erzeugt werden.",
+    "English": "No feedback could be written for this call.",
+}
+
+
+def _in_language(texts: dict[str, str], language: str) -> str:
+    """One of the tables above, in `language` or in German."""
+    return texts.get(language, texts["German"])
 
 
 class _Point(BaseModel):
@@ -90,18 +115,23 @@ async def _generate(session_id: int) -> None:
             jobs.mark(db, session_id, db_models.JOB_RUNNING)
             dossier, valid_turns = _dossier(session)
             language = _LANGUAGE_NAMES_EN.get(session.language_code, session.language_code)
+            # Read inside the transaction, like everything else here: the model
+            # call below runs with no database handle open (ADR 0070).
+            reverse = session.scenario.reverse
 
-        wrapup = await _ask(dossier, language)
+        # A call with nothing in it is answered here: O5 asks the model for
+        # this sentence, but it is the one case where there is nothing to
+        # write and no reason to spend a model call finding that out.
+        wrapup = (
+            _Wrapup(summary=_in_language(_NOTHING_SAID, language))
+            if not valid_turns
+            else await _ask(dossier, language, reverse)
+        )
 
         with session_scope() as db:
             _store(db, session_id, wrapup, valid_turns)
             jobs.mark(db, session_id, db_models.JOB_DONE)
         logger.info("Feedback stored for session %d (%d points)", session_id, len(wrapup.points))
-
-        # After the job is closed, not before it: the wrap-up is what the User
-        # is waiting on, and the follow-up is a second model call (ADR 0069).
-        # It never raises, so nothing below reaches the failure branch.
-        await create_follow_up(session_id)
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception("Feedback generation failed for session %d", session_id)
         # `jobs.mark` creates the row where it finds none, so a Session that
@@ -132,7 +162,15 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
     inventing the norm we declined to invent.
 
     Loudness is the exception: described rather than measured, see below.
+
+    In a reverse (ADR 0070) the simulated side is labelled `Agent` rather than
+    `Caller`, and the material says outright that the trainee did the calling.
+    The label is not cosmetic: every rule in the prompt about who may be quoted
+    and who may not be judged is written against these words, so leaving the
+    machine called "Caller" while the trainee *was* the caller is exactly the
+    confusion that would put the feedback on the wrong person.
     """
+    reverse = session.scenario.reverse
     lines = ["Measured statistics for this call (established fact):"]
     lines += [
         f"    {m.metric_type.name}: {float(m.value):.1f} {m.metric_type.unit or ''}".rstrip()
@@ -143,10 +181,18 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
     if course:
         lines.append(f"    {course}")
 
+    if reverse:
+        lines.append(
+            "In this call the trainee was the one who rang; the Agent answered "
+            "the phone on the company's side."
+        )
     lines.append("Transcript, timestamped from the start of the call:")
     turn_ids: set[int] = set()
     for turn in sorted(session.turns, key=lambda t: t.seq_index):
-        speaker = "User" if turn.speaker == db_models.SPEAKER_USER else "Caller"
+        if turn.speaker == db_models.SPEAKER_USER:
+            speaker = "User"
+        else:
+            speaker = "Agent" if reverse else "Caller"
         lines.append(
             f'    [turn_id={turn.turn_id}] {_timestamp(turn.start_offset_ms)} '
             f'{speaker}: "{turn.transcript}"'
@@ -178,8 +224,98 @@ def _timestamp(offset_ms: int) -> str:
     return f"{seconds // 60:02d}:{seconds % 60:02d}"
 
 
-def _messages(dossier: str, language: str) -> list[dict[str, str]]:
+def _phase_rules(reverse: bool) -> str:
+    """What each of F-42's three phases looks like, from the trainee's side.
+
+    The three registers -- warm, factual, warm -- hold in both castings, and
+    the observation the block exists to make is the same one. What differs is
+    what each phase is *made of*: someone answering a call opens by receiving a
+    concern, someone making one opens by stating it, and the closing that has
+    to be checked is a solution offered in the first case and a commitment
+    obtained in the second (ADR 0070).
+    """
+    if reverse:
+        return (
+            "H1. Opening: greeting, giving their own name, and saying what "
+            "they are calling about. Warm but clear, because the person who "
+            "picked up knows nothing yet. Look for whether the trainee named "
+            "themselves, put the concern in a sentence or two instead of "
+            "circling it, and said what they wanted out of the call.\n"
+            "H2. Core business: the actual matter is worked on. Factual and "
+            "specific, because a concern nobody can place does not get "
+            "handled. Look for the facts, figures and dates the trainee "
+            "brought, for whether they reacted to what was offered instead of "
+            "repeating their demand unchanged, and for whether they let the "
+            "other side finish. Where the call got difficult, look for "
+            "whether the trainee stayed level and kept pressing on the matter "
+            "rather than on the person.\n"
+            "H3. Closing: confirming what was agreed, then saying goodbye. "
+            "Warm again, back to the person. Look for a check that the "
+            "trainee actually has what they rang for -- who does what, and by "
+            "when -- before the goodbye, and for a sign-off that is more than "
+            "the bare word.\n"
+        )
+    return (
+        "H1. Opening: greeting, giving their own name, a little small talk. "
+        "Warm and personal, because the caller wants to feel liked and taken "
+        "seriously. Look for warmth, for the trainee naming themselves and "
+        "being concrete, and for 'I' rather than 'we'.\n"
+        "H2. Core business: the actual matter is worked on. Factual, precise "
+        "and competent, because the caller now wants their time and their "
+        "autonomy respected. Look for plain, specific language, and for "
+        "active listening -- letting the caller finish, acknowledging, "
+        "summarising back what they said. Where the caller got annoyed, look "
+        "for whether the trainee let them keep face and stayed level instead "
+        "of matching the irritation.\n"
+        "H3. Closing: confirming the solution, then saying goodbye. Warm "
+        "again, back to the person. Look for a check that everything is "
+        "settled before the goodbye, and for a sign-off that is more than "
+        "the bare word.\n"
+    )
+
+
+def _wanted(reverse: bool) -> str:
+    """What the summary opens on: the concern the call was about, named from
+    whichever side brought it."""
+    return "the trainee rang about" if reverse else "the caller wanted"
+
+
+def _worked_example(reverse: bool) -> str:
+    """The accepted point, shown rather than described.
+
+    Mirrored for a reverse (ADR 0070) because a model shown an example runs in
+    its direction: the specific one below is a trainee who *answered* a call,
+    and left as it is it invites feedback written for the wrong side of the
+    conversation.
+    """
+    if reverse:
+        return (
+            "Specific -- write points like this: 'At 02:14 you asked whether "
+            "the matter could be looked at soon, and let „ich melde mich“ "
+            "stand as the answer -- a promise with no date, where you had "
+            "come for one. Something like „Bis wann genau kann ich mit einer "
+            "Rückmeldung rechnen?“ would have made that hard to leave "
+            "open.'\n"
+        )
+    return (
+        "Specific -- write points like this: 'At 02:14 the caller asked when "
+        "they would hear back, and you answered that you would look into it "
+        "and see what could be done -- a process, where they had asked for a "
+        "date. Something like „I will come back to you by Friday with a firm "
+        "appointment“ would have given them something to hold on to.'\n"
+    )
+
+
+def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[str, str]]:
     """The prompt. English per ADR 0043; the Feedback itself is in `language`.
+
+    `reverse` (ADR 0070) swaps who was on which end of the line. Three things
+    move with it and nothing else: the label the simulated side carries in the
+    transcript, the words naming the person the trainee was talking *to*, and
+    the phase block, whose three registers were written for someone answering a
+    call and describe something different for someone making one. Every rule
+    about evidence, norms and scores is the same feedback either way, so it is
+    written once.
 
     "Be concrete" is itself an abstraction, and a small model (ADR 0011)
     answers an abstract brief with the safest thing it can say -- a generality
@@ -201,6 +337,11 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
     quotation marks exist because a verbatim quote is the one thing in this
     task that can break the JSON.
     """
+    # The transcript's own label for the simulated side, and the phrase for the
+    # person the trainee spoke to. Both are read straight out of the material,
+    # so they have to be the words `_dossier` actually wrote.
+    partner = "Agent" if reverse else "Caller"
+    other = "the agent" if reverse else "the caller"
     system = (
         "# Role\n"
         "You are a communication coach. You review one training phone call "
@@ -211,9 +352,9 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
         "The user message contains everything you are allowed to use: a "
         "transcript with timestamps and turn ids, and statistics measured "
         "from the trainee's speech. Nothing else exists.\n"
-        "M1. Turns marked 'User' are the trainee. Turns marked 'Caller' are a "
-        "simulated conversation partner: never the subject of your feedback, "
-        "never praised, never criticised, never addressed.\n"
+        f"M1. Turns marked 'User' are the trainee. Turns marked '{partner}' "
+        "are a simulated conversation partner: never the subject of your "
+        "feedback, never praised, never criticised, never addressed.\n"
         "M2. Quote only from 'User' turns.\n"
         "M3. The statistics were measured across the whole call. Treat them "
         "as established fact. Their labels are German because that is how "
@@ -227,8 +368,8 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
         "been established for this group of users. Do not judge a figure "
         "against a norm, do not call one too high, too low, too fast or too "
         "slow, and do not invent a range of your own. Report the figure and "
-        "say what it would mean for the caller, or leave it out.\n"
-        "F3. The Caller is a machine and needs time to answer. Gaps between "
+        f"say what it would mean for {other}, or leave it out.\n"
+        f"F3. The {partner} is a machine and needs time to answer. Gaps between "
         "the timestamps are therefore mostly that machine thinking, not the "
         "trainee hesitating. Never read a jump in the timestamps as a "
         "silence, a delay, or an awkward pause on the trainee's part. The "
@@ -246,7 +387,7 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
         "turn, or the measured figure the point rests on -- with the "
         "timestamp of the moment it happened, in the form the material writes "
         "it.\n"
-        "P2. Effect. What those words did to the caller at that point in the "
+        f"P2. Effect. What those words did to {other} at that point in the "
         "call.\n"
         "P3. Alternative -- improvements only. One sentence the trainee could "
         "have said instead, written out in full, in quotation marks, about "
@@ -277,11 +418,7 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
         "Too general -- reject a point like this: 'You came across as "
         "friendly and explained things clearly.' It names no moment, no "
         "words, and no consequence, and it would fit any call ever recorded.\n"
-        "Specific -- write points like this: 'At 02:14 the caller asked when "
-        "they would hear back, and you answered that you would look into it "
-        "and see what could be done -- a process, where they had asked for a "
-        "date. Something like „I will come back to you by Friday with a firm "
-        "appointment“ would have given them something to hold on to.'\n"
+        f"{_worked_example(reverse)}"
         "\n"
         "# The phase_language block\n"
         "A separate piece of feedback, about one thing only: whether the way "
@@ -291,21 +428,7 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
         "who stays in a single register throughout comes across as less "
         "empathetic even when every answer was correct, and that is the "
         "observation this block exists to make.\n"
-        "H1. Opening: greeting, giving their own name, a little small talk. "
-        "Warm and personal, because the caller wants to feel liked and taken "
-        "seriously. Look for warmth, for the trainee naming themselves and "
-        "being concrete, and for 'I' rather than 'we'.\n"
-        "H2. Core business: the actual matter is worked on. Factual, precise "
-        "and competent, because the caller now wants their time and their "
-        "autonomy respected. Look for plain, specific language, and for "
-        "active listening -- letting the caller finish, acknowledging, "
-        "summarising back what they said. Where the caller got annoyed, look "
-        "for whether the trainee let them keep face and stayed level instead "
-        "of matching the irritation.\n"
-        "H3. Closing: confirming the solution, then saying goodbye. Warm "
-        "again, back to the person. Look for a check that everything is "
-        "settled before the goodbye, and for a sign-off that is more than "
-        "the bare word.\n"
+        f"{_phase_rules(reverse)}"
         "H4. Work the phase boundaries out yourself from the transcript. They "
         "are consecutive stretches of turns and none of them has a fixed "
         "length. If a phase never happened -- a call that broke off has no "
@@ -319,7 +442,7 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
         "matter was actually solved belongs in strengths and improvements.\n"
         "H7. Every other rule still holds here: quote the trainee's own words "
         "with the timestamp (P1), never grade the call (N1), never measure a "
-        "figure against a norm (F2), and never make the Caller the subject "
+        f"figure against a norm (F2), and never make the {partner} the subject "
         "(M1).\n"
         "\n"
         "# Never\n"
@@ -329,6 +452,11 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
         "N3. No markdown, no headings, no bullet characters, no line breaks "
         "inside the JSON strings.\n"
         "N4. No text of any kind before or after the JSON object.\n"
+        "N5. Never write a turn id inside a text value, and never the "
+        "word 'turn' with a number after it. The material prefixes "
+        "every line with its id so that you can fill in the turn_id field "
+        "(O3); in the text a moment is named by its timestamp and nothing "
+        "else.\n"
         "\n"
         "# Output\n"
         "Answer with a single JSON object and nothing else -- no prose, no "
@@ -359,7 +487,10 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
         "written out as a sentence they could say aloud.\n"
         "\n"
         "Shape:\n"
-        '{"summary": "2-4 sentences: what the caller wanted, how the '
+        # "what the caller wanted" names the trainee in a reverse and the
+        # machine everywhere else, so the one word that flips is spelled out
+        # rather than left to be read either way.
+        f'{{"summary": "2-4 sentences: what {_wanted(reverse)}, how the '
         'trainee handled it, and where the call ended up", '
         '"phase_language": "one paragraph on how the register moved through '
         'opening, core business and closing, ending in the sentence to say '
@@ -390,7 +521,7 @@ def _messages(dossier: str, language: str) -> list[dict[str, str]]:
 # --- Model call and validation --------------------------------------------
 
 
-async def _ask(dossier: str, language: str) -> _Wrapup:
+async def _ask(dossier: str, language: str, reverse: bool = False) -> _Wrapup:
     """One attempt plus one retry, then a narrative-only fallback (ADR 0049).
 
     A response that never validates still produces Feedback -- the summary
@@ -401,7 +532,7 @@ async def _ask(dossier: str, language: str) -> _Wrapup:
     where agreement and word order come apart in a single pass. The trace is
     the revision pass, and it is free in the worker (ADR 0018/0019).
     """
-    messages = _messages(dossier, language)
+    messages = _messages(dossier, language, reverse)
     raw = ""
     for attempt in range(2):  # initial attempt + one retry
         raw = await llm.complete(messages, think=True)
@@ -410,16 +541,42 @@ async def _ask(dossier: str, language: str) -> _Wrapup:
         except (ValidationError, ValueError) as e:
             logger.warning("Wrap-up did not validate (attempt %d): %s", attempt + 1, e)
     logger.warning("Falling back to a narrative-only wrap-up")
-    return _Wrapup(summary=_unfenced_text(raw))
+    return _Wrapup(summary=_unfenced_text(raw, language))
 
 
-def _unfenced_text(raw: str) -> str:
+def _unfenced_text(raw: str, language: str) -> str:
     """The model's prose, for the fallback: readable even though it isn't JSON."""
     stripped = llm.without_fenced_blocks(raw).strip()
-    return stripped or "Für dieses Gespräch konnte kein Feedback erzeugt werden."
+    return stripped or _in_language(_NO_WRAPUP, language)
 
 
 # --- Storage --------------------------------------------------------------
+
+
+# `_dossier` prefixes every line with `[turn_id=12]` so a point can cite it
+# in the turn_id field (O3); a 4B model (ADR 0011) copies it into the prose
+# too, where P1 asked for the timestamp. N5 forbids it, this takes it back
+# out. Marker shapes only -- cutting "in Turn 12" out of a sentence would
+# leave it ungrammatical, so that form stays N5's job.
+_TURN_MARKER_RE = re.compile(
+    r"""
+    \s*                                                    # its leading space
+    (?:
+        [\[(] \s* turn [ _-]? (?:id)? \s* [:=#]? \s* \d+ \s* [\])]  # [turn_id=12]
+      | \b turn [ _-]? id \s* [:=#]? \s* \d+                   # turn_id=12
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def _without_turn_markers(text: str) -> str:
+    """One text value with the transcript's id markers taken back out."""
+    cleaned = _TURN_MARKER_RE.sub("", text)
+    # It takes its own space with it: close the gap it leaves behind.
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r" +([,.;:!?])", r"\1", cleaned)
+    return cleaned.strip()
 
 
 def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) -> None:
@@ -428,6 +585,9 @@ def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) 
     A point citing a Turn that is not this Session's is stored without the
     citation rather than dropped: the observation may still be sound, but a
     reference the user could follow to the wrong place must not survive.
+
+    Every text value passes `_without_turn_markers` on the way in: written
+    once, read on two screens, so the cleanup belongs here.
     """
     # Through the ORM, not a bulk delete. The database would carry the points
     # along by itself (feedback_point.feedback_id is ON DELETE CASCADE), but
@@ -439,11 +599,11 @@ def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) 
         db.flush()
     feedback = db_models.Feedback(
         session_id=session_id,
-        summary=wrapup.summary,
+        summary=_without_turn_markers(wrapup.summary),
         # NULL rather than "" where the model gave us nothing: the frontend
         # leaves the block out entirely then, which is honest about a call
         # nobody analysed for its phases. An empty paragraph would not be.
-        phase_language=wrapup.phase_language.strip() or None,
+        phase_language=_without_turn_markers(wrapup.phase_language) or None,
         score=None,  # ADR 0004: qualitative only, no score in the MVP
         created_at=datetime.now(UTC),
     )
@@ -451,7 +611,7 @@ def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) 
         db_models.FeedbackPoint(
             position=index,
             kind=kind,
-            text=point.text,
+            text=_without_turn_markers(point.text),
             turn_id=point.turn_id if point.turn_id in turn_ids else None,
         )
         for index, (kind, point) in enumerate(wrapup.points)

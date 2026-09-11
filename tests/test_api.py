@@ -83,6 +83,9 @@ async def test_scenarios_come_from_the_database(api_client: httpx.AsyncClient) -
     assert set(entry) == {
         "id", "name", "short_description", "briefing", "category", "origin",
         "shared", "follow_up",
+        # ADR 0070: which side of the phone this Scenario puts the User on,
+        # and the conversation a reverse replays.
+        "reverse", "origin_session",
     }
     assert uuid.UUID(entry["id"])  # extern_id the client sends back in session.start
     assert entry["name"] == "Kündigungsabsicht"
@@ -209,9 +212,11 @@ async def test_measurements_reach_the_wire_with_the_schema_vocabulary(
 
     assert len(body["measurements"]) == 1
     measurement = body["measurements"][0]
-    assert set(measurement) == {"key", "name", "unit", "value", "detail"}
+    assert set(measurement) == {"key", "name", "unit", "aspect", "value", "detail"}
     assert measurement["key"] == METRIC_KEY
     assert measurement["value"] > 0
+    # The grouping the Kennzahlen slider switches on.
+    assert measurement["aspect"] == "how"
 
 
 @pytest.mark.parametrize(
