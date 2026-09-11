@@ -21,8 +21,10 @@ import {
   METRIC_ASPECTS,
   METRIC_DISCLAIMER,
   metricAspect,
+  metricParts,
   metricSubline,
   withDerived,
+  type MetricPart,
 } from "../utils/metrics";
 import { formatOffset } from "../utils/time";
 import { useSessionFeedback } from "../hooks/useSessionFeedback";
@@ -732,12 +734,13 @@ function Metric({
   // left, which is the wrong half to keep (ADR 0004/0051, ADR 0088). Every other
   // tile leads with its measurement and lets the reading follow.
   const melody = measurement.key === INTONATION_KEY;
+  const parts = metricParts(measurement);
 
   const body = (
     <>
       <span className="metric-name">{measurement.name}</span>
-      {measurement.key === "opening" ? (
-        <OpeningParts detail={measurement.detail ?? {}} />
+      {parts ? (
+        <MetricParts parts={parts} />
       ) : (
         <span className={`metric-value${readingLight ? ` metric-value-${readingLight}` : ""}`}>
           {melody && reading ? reading : figure}
@@ -816,31 +819,19 @@ function interruptionContext(measurement: Measurement): string | null {
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
-/** The parts of an opening, in the order they are usually said (F-63). The
- *  third depends on who rang, and a stored call carries whichever was checked;
- *  the ones stored before the split carry "concern". */
-const OPENING_PARTS: [string, string][] = [
-  ["greeting", "Begrüßung"],
-  ["name", "Name"],
-  ["offer", "Hilfsangebot"],
-  ["concern", "Anliegen"],
-];
-
-/** The opening's headline: the three parts, each marked, in place of a count
- *  that reads like a grade. "nicht erkannt" for the screen reader, never
- *  "fehlt": a bare name slips past the patterns. */
-function OpeningParts({ detail }: { detail: Record<string, unknown> }) {
+/** A checklist Kennzahl's headline — the opening's (F-63) or the closing's
+ *  (ADR 0089): its parts, each marked, in place of a count that reads like a
+ *  grade. "nicht erkannt" for the screen reader, never "fehlt": a bare name or
+ *  a recap worded some other way slips past the patterns. */
+function MetricParts({ parts }: { parts: MetricPart[] }) {
   return (
     <span className="metric-parts">
-      {OPENING_PARTS.filter(([key]) => key in detail).map(([key, label]) => {
-        const said = detail[key] === true;
-        return (
-          <span key={key} className={"metric-part" + (said ? " is-said" : "")}>
-            <span aria-hidden="true">{said ? "✓" : "–"}</span> {label}
-            <span className="visually-hidden">{said ? " erkannt" : " nicht erkannt"}</span>
-          </span>
-        );
-      })}
+      {parts.map(({ key, label, said }) => (
+        <span key={key} className={"metric-part" + (said ? " is-said" : "")}>
+          <span aria-hidden="true">{said ? "✓" : "–"}</span> {label}
+          <span className="visually-hidden">{said ? " erkannt" : " nicht erkannt"}</span>
+        </span>
+      ))}
     </span>
   );
 }

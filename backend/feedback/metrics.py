@@ -364,6 +364,67 @@ def _opening_pace(call: Conversation) -> float | None:
     return (first_words / first_ms) / (rest_words / rest_ms)
 
 
+CLOSING_KEY = "closing"
+
+# The closing is read in the user's last this-many turns (ADR 0089). Two, not
+# one: a recap or the agreed next step usually comes a turn before the goodbye,
+# with the Persona's answer in between, and the last turn alone is often only
+# "Danke, auf Wiederhören". Not three: at the six to nine turns these calls run
+# to, three is a third of the call, and a "bis Freitag" from its middle would
+# pass for an agreement.
+CLOSING_WINDOW = 2
+
+# Below this many user turns there is no closing to speak of, and the window
+# would reach back into the opening. The same floor below which the post-call
+# screen offers neither a follow-up nor a reverse (`MIN_USER_TURNS` in
+# FeedbackView.tsx): a call hung up after a sentence or two has no end of its own.
+MIN_CLOSING_TURNS = 3
+
+
+def closing_parts(user_texts: Sequence[str], pack: LanguagePack) -> dict[str, bool] | None:
+    """The three parts of a closing, found in the last `CLOSING_WINDOW` of
+    `user_texts` -- or None when there are too few turns to have a closing.
+
+    A function of its own, not only the deriver's body, because it is what
+    `scripts/backfill_closing.py` runs over stored transcripts: the parts come
+    from words alone, so unlike the acoustic metrics they can reach calls
+    recorded before this existed (ADR 0048 does not bite).
+    """
+    if len(user_texts) < MIN_CLOSING_TURNS:
+        return None
+    window = " ".join(user_texts[-CLOSING_WINDOW:])
+    return {
+        "recap": bool(pack.recap_re.search(window)),
+        "agreement": bool(pack.agreement_re.search(window)),
+        "farewell": bool(pack.sign_off_re.search(window)),
+    }
+
+
+def closing_measurement(parts: dict[str, bool]) -> Measurement:
+    """The stored shape: how many parts were recognised, the parts themselves,
+    and how many turns were read, so the screen can say where it looked with the
+    backend's own number rather than a copy of it."""
+    return Measurement(
+        CLOSING_KEY, float(sum(parts.values())), parts | {"turns_read": CLOSING_WINDOW}
+    )
+
+
+def _closing(call: Conversation) -> Measurement | None:
+    """ADR 0089. Whether the user's last two turns sum up what was settled, name
+    a concrete next step and say goodbye.
+
+    The same parts whoever rang, unlike the opening: ending a call well asks the
+    same of both sides. Reads the phrases these are said in, so a recap worded
+    some other way goes unrecognised -- the screen says "nicht erkannt", never
+    "fehlt", exactly as for the opening.
+    """
+    pack = _pack(call)
+    if not pack:
+        return None
+    parts = closing_parts([text for text, _ in call.user_turns], pack)
+    return closing_measurement(parts) if parts is not None else None
+
+
 def _open_questions(text: str, pack: LanguagePack) -> int:
     """How many of the question marks in `text` end an open question.
 
@@ -815,6 +876,9 @@ METRICS: tuple[MetricDef, ...] = (
     MetricDef("fillers", "Füllwörter", "Anzahl", ASPECT_WHAT, "F-51", True, _fillers),
     # Three parts checked, hence the unit; a fourth needs it changed with it.
     MetricDef("opening", "Gesprächseinstieg", "von 3", ASPECT_WHAT, "F-63", True, _opening),
+    # Its counterpart at the other end of the call (ADR 0089), and the same
+    # unit for the same reason.
+    MetricDef(CLOSING_KEY, "Gesprächsabschluss", "von 3", ASPECT_WHAT, "F-65", True, _closing),
     MetricDef("repetitions", "Wiederholungen", "Anzahl", ASPECT_WHAT, "F-08", True,
               _repetitions),
     MetricDef("hesitations", "Verzögerungslaute", "Anzahl", ASPECT_HOW, "F-51", True,

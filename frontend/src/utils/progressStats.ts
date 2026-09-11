@@ -1,4 +1,5 @@
 import type { MetricAspect, SessionSummary } from "../protocol";
+import { isPartsMetric } from "./metrics";
 
 /**
  * Turning the training history into the series the dashboard draws
@@ -37,7 +38,8 @@ export interface SeriesPoint {
  *
  * `line` is every ordinary Kennzahl: a value per training, a course, a band.
  * `parts` is a checklist counted, where the value says how many of a fixed set
- * of parts were recognised (F-63's opening: greeting, name, offer). Drawn as a
+ * of parts were recognised (F-63's opening: greeting, name, offer; ADR 0089's
+ * closing: recap, next step, goodbye). Drawn as a
  * line with a band around it, that reads as a score climbing towards full
  * marks, which is exactly the reading ADR 0086 kept off the single call's tile
  * by showing the parts rather than "1 von 3". So it gets neither a line nor a
@@ -65,8 +67,6 @@ export interface MetricSeries {
   band: Band | null;
 }
 
-/** The checklist Kennzahlen (see `SeriesShape`). */
-const PARTS_KEYS = new Set(["opening"]);
 
 /**
  * Kennzahlen that are never read across trainings, on any view of this
@@ -128,7 +128,10 @@ export function toSeries(sessions: SessionSummary[]): MetricSeries[] {
         name: measurement.name,
         unit: measurement.unit,
         aspect: measurement.aspect,
-        shape: PARTS_KEYS.has(measurement.key) ? "parts" : "line",
+        // The same list the single call's tile reads (`utils/metrics`), so a
+        // new checklist Kennzahl cannot be a checklist on one screen and a
+        // climbing line on the other.
+        shape: isPartsMetric(measurement.key) ? "parts" : "line",
         derivation: null,
         points: [],
         band: null,

@@ -2,9 +2,9 @@
  * Which measured Kennzahlen stand behind a focus goal (F-62, F-13).
  *
  * The dashboard has to show something per picked goal, and the honest answer
- * differs per goal: six of the fourteen have a measured series today, one is
+ * differs per goal: eight of the fourteen have a measured series today, one is
  * answered by a comparison between two stretches of a call, two by activity
- * figures alone, and five have nothing but the wrap-up texts (see
+ * figures alone, and three have nothing but the wrap-up texts (see
  * docs/dashboard-konzept.md, section 4.2). This map is what lets the tile say
  * which of the four it is instead of rendering an empty box or inventing a
  * figure.
@@ -59,6 +59,11 @@ export const FOCUS_BACKING: Record<string, FocusBacking> = {
   },
   intonation: { kind: "metric", metrics: ["intonation"] },
   opening: { kind: "metric", metrics: ["opening"] },
+  // Its counterpart at the other end of the call (ADR 0089): recap, next step,
+  // goodbye, counted in the last two turns. It moved out of the text-only group
+  // below; whether the close was *clear* is still what the wrap-up says, and
+  // the goal's own page quotes that under the parts.
+  closing: { kind: "metric", metrics: ["closing"] },
   training_regularity: { kind: "activity", metrics: [] },
   training_variety: { kind: "activity", metrics: [] },
   // The one goal answered by a comparison rather than by a figure: the same
@@ -75,11 +80,10 @@ export const FOCUS_BACKING: Record<string, FocusBacking> = {
   //
   // Articulation has a note of its own: no measurement is *planned* for it
   // either (docs/dashboard-konzept.md, section 4.2), and the wrap-up has less
-  // to go on here than for the three below, where what was said is what the
-  // goal is about.
+  // to go on here than for the two below, where what was said is what the goal
+  // is about.
   articulation: { kind: "text", metrics: [], note: NO_MEASUREMENT_PLANNED },
   objection_handling: { kind: "text", metrics: [], note: NO_MEASUREMENT },
-  closing: { kind: "text", metrics: [], note: NO_MEASUREMENT },
   empathy: { kind: "text", metrics: [], note: NO_MEASUREMENT },
 };
 

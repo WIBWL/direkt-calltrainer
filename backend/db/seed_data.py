@@ -1714,8 +1714,13 @@ FOCUS_GOALS = [
     },
     {
         "id": "closing",
+        # `mixed` since ADR 0089, like the opening: whether the last two turns
+        # sum up, agree a next step and say goodbye is counted from the
+        # transcript (the Kennzahl `closing`); whether the close was *clear* --
+        # the right things summed up, a step the other side will actually take
+        # -- is still only the wrap-up's to say.
         "group": "phases",
-        "evidence": "interpretive",
+        "evidence": "mixed",
         "position": 8,
         "title": "Klarer Gesprächsabschluss",
         "caption": (

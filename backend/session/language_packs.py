@@ -120,6 +120,16 @@ class LanguagePack:
     # caller states the concern (a reverse, ADR 0070).
     offer_re: re.Pattern[str]
     concern_re: re.Pattern[str]
+    # The three parts of a closing (ADR 0089), read in the user's last two
+    # turns: a recap of what was settled, a concrete next step, a farewell.
+    # Unlike the opening they do not depend on who rang -- whoever ends a call
+    # well sums up, agrees what happens next and says goodbye. `sign_off_re` is
+    # wider than `farewell_re` above on purpose: that one decides live whether
+    # the call is over, where a false match cuts a call short, and "einen
+    # schönen Tag noch" is a farewell here without being a request to hang up.
+    recap_re: re.Pattern[str]
+    agreement_re: re.Pattern[str]
+    sign_off_re: re.Pattern[str]
     fallback_closing_line: str
 
 
@@ -290,6 +300,37 @@ _GERMAN = LanguagePack(
         r"|ich\s+melde\s+mich\s+wegen|(grund|anlass)\s+meines\s+anrufs)",
         re.IGNORECASE,
     ),
+    # "Ich fasse das noch einmal kurz zusammen", "wir haben also vereinbart",
+    # "halten wir fest". A few words may sit between the verb and its particle.
+    recap_re=re.compile(
+        r"\b(zusammen(gefasst|fassend)|zusammenzufassen|fasse\s+(\w+\s+){0,4}zusammen"
+        r"|halten\s+wir\s+(\w+\s+){0,2}fest"
+        r"|(wir\s+haben|haben\s+wir)\s+(\w+\s+){0,3}(vereinbart|besprochen|festgehalten|abgemacht)"
+        r"|(ich\s+)?wiederhole\s+(\w+\s+){0,2}(kurz|noch\s*(ein)?mal))",
+        re.IGNORECASE,
+    ),
+    # A next step with something concrete in it: a first-person action ("ich
+    # schicke Ihnen", "ich rufe Sie zurück"), what the other side will get, the
+    # words that settle it, or a deadline. Deliberately not "ich kümmere mich
+    # darum": that is the vague reassurance `vague_reassurance_examples` warns the
+    # Persona about, and it commits to nothing a caller could hold anyone to.
+    agreement_re=re.compile(
+        r"\b(ich\s+(schicke|sende|maile|leite|buche|trage|reserviere|bestätige)\w*\b"
+        r"|ich\s+(melde|rufe)\s+(\w+\s+){0,3}(zurück|an|bei\s+ihnen|bis)"
+        r"|sie\s+(bekommen|erhalten|hören)\s+(\w+\s+){0,3}(von\s+mir|bis|morgen|heute)"
+        r"|(nächste[nr]?|weitere[nr]?)\s+schritt|(so\s+)?verbleiben\s+wir|wir\s+verbleiben"
+        # "so" is required: "wie machen wir das?" is a question, not a deal.
+        r"|so\s+machen\s+wir\s+(es|das)|machen\s+wir\s+(es|das)\s+so|abgemacht"
+        r"|bis\s+(spätestens\s+)?(montag|dienstag|mittwoch|donnerstag|freitag|morgen|übermorgen"
+        r"|ende\s+der\s+woche|nächste[nr]?\s+woche|zum\s+\d|\d))",
+        re.IGNORECASE,
+    ),
+    sign_off_re=re.compile(
+        r"\b(tschüss|auf\s+wiederhören|auf\s+wiedersehen|wiederhören|ciao"
+        r"|schönen\s+(tag|abend|nachmittag|feierabend)|schönes\s+wochenende"
+        r"|danke\s+(\w+\s+){0,2}für\s+(ihren\s+anruf|das\s+gespräch|ihre\s+zeit|ihre\s+geduld))",
+        re.IGNORECASE,
+    ),
     fallback_closing_line="Vielen Dank für Ihre Zeit. Auf Wiederhören.",
 )
 
@@ -402,6 +443,25 @@ _ENGLISH = LanguagePack(
     concern_re=re.compile(
         r"\b(i('m|\s+am)\s+calling\s+(about|because|regarding)"
         r"|the\s+reason\s+i('m|\s+am)\s+calling|it's\s+about)",
+        re.IGNORECASE,
+    ),
+    recap_re=re.compile(
+        r"\b(to\s+(sum\s+up|summari[sz]e|recap)|let\s+me\s+(just\s+)?(sum\s+up|summari[sz]e|recap)"
+        r"|just\s+to\s+(recap|confirm)|in\s+summary"
+        r"|(so\s+)?we('ve|\s+have)\s+(\w+\s+){0,2}(agreed|discussed|settled))",
+        re.IGNORECASE,
+    ),
+    agreement_re=re.compile(
+        r"\b(i('ll|\s+will)\s+(send|email|call|ring|book|confirm|forward|get\s+back)"
+        r"|you('ll|\s+will)\s+(get|receive|hear)|next\s+step"
+        r"|(we('ll|\s+will)|let's)\s+(go\s+with|leave\s+it)"
+        r"|by\s+(monday|tuesday|wednesday|thursday|friday|tomorrow|the\s+end\s+of|next\s+week|\d))",
+        re.IGNORECASE,
+    ),
+    sign_off_re=re.compile(
+        r"\b(goodbye|good\s+bye|bye|take\s+care"
+        r"|have\s+a\s+(good|nice|great|lovely)\s+(day|one|evening|weekend)"
+        r"|thanks?(\s+you)?\s+(\w+\s+){0,2}for\s+(calling|your\s+time|the\s+call))",
         re.IGNORECASE,
     ),
     fallback_closing_line="Thank you for your time. Goodbye.",

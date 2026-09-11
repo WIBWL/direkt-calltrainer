@@ -67,6 +67,7 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 | F-62 | Persönliche Fokusziele | Der Nutzer wählt aus einem Katalog bis zu fünf Trainingsziele, die in Training und Auswertung besonders hervorgehoben werden; die übrigen Ziele bleiben unberührt. Die Auswahl wird beim ersten Start erfragt, ist mit „ohne Fokus“ beantwortbar und im Profil jederzeit änderbar. | Funktionale Vollständigkeit | SHOULD | R-30, Systementwurf |
 | F-63 | Analyse des Gesprächseinstiegs | Prüfung, ob der erste eigene Redebeitrag Begrüßung, eigenen Namen und Anliegen enthält, sowie dessen Tempo gegenüber dem restlichen Gespräch. | Funktionale Korrektheit | SHOULD | F-62 |
 | F-64 | Vorschlag für das nächste Gespräch | Nach einem Gespräch werden bis zu zwei bestehende Szenarien zum direkten Start angeboten: dasselbe Szenario in der anderen Sprache und ein weiteres aus der Bibliothek, begründet aus Profil, Fokuszielen und Historie. | Funktionale Vollständigkeit | COULD | F-62 |
+| F-65 | Analyse des Gesprächsabschlusses | Prüfung, ob die letzten beiden eigenen Redebeiträge das Ergebnis zusammenfassen, einen konkreten nächsten Schritt festhalten und sich verabschieden. | Funktionale Korrektheit | SHOULD | F-62 |
 
 ## Bedienoberfläche
 

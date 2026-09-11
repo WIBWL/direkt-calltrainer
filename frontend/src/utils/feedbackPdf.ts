@@ -22,6 +22,7 @@ import {
   METRIC_ASPECTS,
   METRIC_DISCLAIMER,
   metricAspect,
+  metricParts,
   metricSubline,
   withDerived,
 } from "./metrics";
@@ -523,12 +524,34 @@ export async function buildFeedbackPdf({
         doc.text(drawable(measurement.name.toUpperCase()), left, top + 4);
         doc.setCharSpace(0);
 
-        doc.setFont("app", "bold");
-        doc.setFontSize(13);
-        doc.setTextColor(...NAVY);
-        doc.text(drawable(formatMetricValue(measurement)), left, top + 10.5);
+        // A checklist Kennzahl (the opening, the closing) names its parts in
+        // words, as its tile does, rather than printing how many were
+        // recognised: "2" alone in display type is the mark ADR 0086 kept off
+        // the screen. Smaller than a figure, because it is a list of words. The
+        // fonts carry no check mark, so the two states are two lines.
+        const parts = metricParts(measurement);
+        const said = parts?.filter((part) => part.said).map((part) => part.label) ?? [];
+        const unsaid = parts?.filter((part) => !part.said).map((part) => part.label) ?? [];
 
-        const subline = metricSubline(measurement);
+        doc.setFont("app", "bold");
+        doc.setFontSize(parts ? 10 : 13);
+        doc.setTextColor(...NAVY);
+        const value = parts
+          ? said.length > 0
+            ? said.join(", ")
+            : "keiner der Teile erkannt"
+          : formatMetricValue(measurement);
+        // All three closing parts in a row are wider than half the page at
+        // 10pt; one step smaller rather than running into the tile beside it.
+        if (parts && doc.getTextWidth(drawable(value)) > column - 3) doc.setFontSize(8.5);
+        doc.text(drawable(value), left, top + 10.5);
+
+        // Where parts went unrecognised, that is the second line: it is the
+        // half of the checklist a reader would otherwise have to infer.
+        const subline =
+          parts && unsaid.length > 0 && said.length > 0
+            ? `nicht erkannt: ${unsaid.join(", ")}`
+            : metricSubline(measurement);
         if (subline) {
           doc.setFont("app", "normal");
           doc.setFontSize(7.5);

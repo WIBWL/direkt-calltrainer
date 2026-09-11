@@ -17,8 +17,60 @@ import type { Measurement, MetricAspect } from "../protocol";
  * seconds and percentages are not. */
 const DECIMALS: Record<string, number> = {
   questions: 0, word_count: 0, pace: 0, talk_share: 0, phonation_share: 0, fillers: 0,
-  repetitions: 0, hesitations: 0, opening: 0,
+  repetitions: 0, hesitations: 0, opening: 0, closing: 0,
 };
+
+/**
+ * The checklist Kennzahlen and their parts, in the order they are usually
+ * said: the opening (F-63, ADR 0086) and the closing (ADR 0089).
+ *
+ * Their value is how many parts were recognised, and none of the three places
+ * that show them leads with that number. "1 von 3" was not self-explanatory in
+ * the first test and read like a mark (ADR 0004), so the tile, the progress
+ * view and the PDF all show *which* parts, from this one list.
+ *
+ * The opening's third part depends on who rang, and a stored call carries
+ * whichever was checked; the ones stored before the split carry "concern".
+ */
+const METRIC_PARTS: Record<string, [key: string, label: string][]> = {
+  opening: [
+    ["greeting", "Begrüßung"],
+    ["name", "Name"],
+    ["offer", "Hilfsangebot"],
+    ["concern", "Anliegen"],
+  ],
+  closing: [
+    ["recap", "Zusammenfassung"],
+    ["agreement", "Vereinbarung"],
+    ["farewell", "Verabschiedung"],
+  ],
+};
+
+export interface MetricPart {
+  key: string;
+  label: string;
+  /** Recognised. The absence of a match is not proof of an absence — a bare
+   * name or a recap worded some other way slips past the patterns — so the
+   * other state is "nicht erkannt", never "fehlt". */
+  said: boolean;
+}
+
+/** Whether this Kennzahl is a checklist rather than a figure. */
+export function isPartsMetric(key: string): boolean {
+  return key in METRIC_PARTS;
+}
+
+/** The parts a checklist Kennzahl checked, in order, or null for any other
+ * Kennzahl. Only the parts the detail actually carries: the opening checks
+ * either the offer or the concern, never both. */
+export function metricParts(measurement: Measurement): MetricPart[] | null {
+  const parts = METRIC_PARTS[measurement.key];
+  if (!parts) return null;
+  const detail = measurement.detail ?? {};
+  return parts
+    .filter(([key]) => key in detail)
+    .map(([key, label]) => ({ key, label, said: detail[key] === true }));
+}
 
 /** The two halves (backend/db/models.py METRIC_ASPECTS), in slider order. */
 export const METRIC_ASPECTS: MetricAspect[] = ["how", "what"];
@@ -82,6 +134,7 @@ export function metricSubline(measurement: Measurement): string | null {
     return `z. B. „${words.slice(0, 6).join(" ")}${words.length > 6 ? " …" : ""}“`;
   }
   if (measurement.key === "opening") return openingSubline(measurement);
+  if (measurement.key === "closing") return closingSubline(measurement);
   // Said on the tile itself, not only on a page: this one is a detection.
   if (measurement.key === "hesitations") return "geschätzt aus der Tonhöhe";
   if (measurement.key !== "questions") return null;
@@ -98,6 +151,15 @@ function openingSubline(measurement: Measurement): string | null {
   if (typeof ratio !== "number") return null;
   const percent = Math.round((ratio - 1) * 100);
   return `Einstieg ${Math.abs(percent)} % ${percent >= 0 ? "schneller" : "langsamer"} als sonst`;
+}
+
+/** Where the closing was looked for (ADR 0089), with the backend's own number:
+ * a recap said three turns before the end was not read, and a reader who knows
+ * they gave one should be able to see why it went unrecognised. */
+function closingSubline(measurement: Measurement): string | null {
+  const read = measurement.detail?.["turns_read"];
+  if (typeof read !== "number") return null;
+  return `geprüft: ${read === 1 ? "Ihr letzter Beitrag" : `Ihre letzten ${read} Beiträge`}`;
 }
 
 /** The loudness curve out of a Measurement's `detail` (ADR 0029), or null. It

@@ -373,6 +373,7 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0086 | The Opening Turn Is Read as Three Parts, Depending on Who Rang | angenommen (löst ADR 0080s Einordnung des Gesprächseinstiegs ab) | F-63, F-62 |
 | ADR 0087 | What to Play Next Is Chosen From the Library | angenommen | F-64, F-62 |
 | ADR 0088 | Sprachmelodie Is a Tile, and Its Page Carries the Drawing | angenommen (kehrt die Block-Darstellung um) | F-35, F-53 |
+| ADR 0089 | The Closing Is Read as Three Parts, in the User's Last Two Turns | angenommen (Gegenstück zu ADR 0086; löst ADR 0080s Einordnung des Gesprächsabschlusses ab) | F-65, F-62 |
 
 Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug; ADR 0017, 0025, 0027 bis 0030, 0039, 0055 und 0057 sind reine Wartbarkeits-, Werkzeug- oder Schemaentscheidungen ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 

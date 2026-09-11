@@ -17,6 +17,8 @@ Covers:
   ADR 0085  a recording with no detectable silence drops what rests on silence
   F-63      the opening (ADR 0086): greeting, own name and an offer of help (the concern,
             when the user rang), and its tempo
+  F-65      the closing (ADR 0089): a recap, a concrete next step and a goodbye in the
+            user's last two turns, the same whoever rang
 
 `conversation()` and `measure()` are pure functions over in-memory Turns: no
 database, no audio and no Praat -- the acoustic facts are handed in as the
@@ -322,6 +324,108 @@ def test_the_opening_tempo_is_read_against_the_rest_of_the_call() -> None:
 def test_a_call_with_one_turn_has_no_tempo_to_compare() -> None:
     """Without a rest of the call there is nothing to be faster or slower than."""
     assert _opening_of(("Guten Tag, hier ist Schmidt.", 2000)).detail["pace_ratio"] is None
+
+
+# The first two user turns of every closing test below: an opening and one
+# answer, so the closing's window of two never reaches back into the greeting.
+_BEFORE_THE_CLOSE = ("Guten Tag, hier ist Schmidt.", "Ja, das Gerät startet nicht mehr.")
+
+
+def _closing_of(*last: str, language_id: str | None = "de", reverse=False):
+    """The closing Measurement for a call whose user turns end in `last`."""
+    turns = [Turn(seq=1, persona_text="Brandt hier, ich rufe wegen der Lieferung an.")]
+    turns += [Turn(seq=i + 2, user_text=text, user_speech_ms=1000, user_phonation_ms=1000)
+              for i, text in enumerate((*_BEFORE_THE_CLOSE, *last))]
+    found = [m for m in measure(conversation(turns, language_id, reverse))
+             if m.key == "closing"]
+    return found[0] if found else None
+
+
+def _parts(measurement) -> tuple[bool, bool, bool]:
+    return (measurement.detail["recap"], measurement.detail["agreement"],
+            measurement.detail["farewell"])
+
+
+def test_a_closing_with_all_three_parts() -> None:
+    """ADR 0089. A recap, a concrete next step and a goodbye, spread over the
+    last two turns the way they usually are: the recap and the step, the
+    Persona's answer, then the goodbye."""
+    closing = _closing_of(
+        "Ich fasse kurz zusammen: Wir tauschen das Gerät. Ich schicke Ihnen bis Freitag "
+        "die Bestätigung.",
+        "Danke für Ihren Anruf, auf Wiederhören.",
+    )
+
+    assert closing.value == 3
+    assert _parts(closing) == (True, True, True)
+    assert closing.detail["turns_read"] == 2
+
+
+def test_the_closing_reads_only_the_last_two_turns() -> None:
+    """A recap three turns before the end is not the closing -- at six to nine
+    turns a call, three would be a third of it."""
+    closing = _closing_of(
+        "Wir haben also vereinbart, dass Sie das Gerät einschicken.",
+        "Ja, genau so.",
+        "Tschüss.",
+    )
+
+    assert _parts(closing) == (False, False, True)
+
+
+def test_a_call_too_short_to_have_a_closing_has_none() -> None:
+    """Under three user turns the window would reach back into the opening:
+    absent, not a zero that looks measured."""
+    turns = [Turn(seq=1, persona_text="Guten Tag."),
+             Turn(seq=2, user_text="Hallo, auf Wiederhören.", user_speech_ms=1000,
+                  user_phonation_ms=1000)]
+    assert not [m for m in measure(conversation(turns, "de")) if m.key == "closing"]
+
+
+def test_a_vague_promise_is_no_agreement() -> None:
+    """"Ich kümmere mich darum" commits to nothing a caller could hold anyone to
+    -- the phrase the Persona's own prompt calls a vague reassurance."""
+    closing = _closing_of("Ich kümmere mich darum.", "Tschüss.")
+
+    assert closing.detail["agreement"] is False
+
+
+def test_a_question_about_how_is_no_agreement() -> None:
+    """"Wie machen wir das?" asks for the next step; it does not settle one."""
+    closing = _closing_of("Und wie machen wir das jetzt?", "Gut.")
+
+    assert closing.detail["agreement"] is False
+
+
+def test_a_greeting_is_no_farewell() -> None:
+    """"Schönen guten Tag" is how a call starts, not how it ends."""
+    closing = _closing_of("Schönen guten Tag nochmal.", "Ja.")
+
+    assert closing.detail["farewell"] is False
+
+
+def test_the_closing_is_the_same_whoever_rang() -> None:
+    """Unlike the opening, whose third part depends on who rang, a good close
+    asks the same of both sides."""
+    said = ("Ich melde mich bis Montag bei Ihnen.", "Einen schönen Tag noch.")
+
+    assert _parts(_closing_of(*said)) == _parts(_closing_of(*said, reverse=True))
+
+
+def test_the_closing_follows_the_language_of_the_call() -> None:
+    """The patterns come from the Persona's language pack."""
+    closing = _closing_of(
+        "Just to recap, I'll send you the new contract by Friday.",
+        "Thanks for your time, goodbye.",
+        language_id="en",
+    )
+
+    assert closing.value == 3
+
+
+def test_the_closing_needs_a_vocabulary() -> None:
+    """No pack means no patterns: absent rather than three misses."""
+    assert _closing_of("Auf Wiederhören.", "Tschüss.", language_id=None) is None
 
 
 def test_an_unmeasured_turn_contributes_no_reaction_time() -> None:

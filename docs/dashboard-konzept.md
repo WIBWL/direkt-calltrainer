@@ -308,13 +308,14 @@ Daten hinterlegt werden kann:
 | Lebendige Sprachmelodie | `intonation` (Tonhöhenumfang in Halbtönen, plus Kurve) | keine |
 | Deutliche Artikulation | Auswertungstext, und der dünn | keine Messung, und es ist keine geplant (siehe unten) |
 | Souveränität unter Druck | `pace`, `pauses`, `run_length`, `loudness`, `talk_share`, je über die fordernden Stellen und über den Rest (ADR 0081) | welche Stellen fordernd waren, entscheidet die Auswertung und nicht eine Messung |
-| Souveräner Gesprächseinstieg | Auswertungstext | keine Messung |
+| Souveräner Gesprächseinstieg | `opening`: Begrüßung, eigener Name und Hilfsangebot bzw. Anliegen im ersten Beitrag, dazu dessen Tempo (ADR 0086) | ob der Einstieg *zugewandt* klang, steht nur im Auswertungstext |
 | Sichere Einwandbehandlung | Auswertungstext | keine Messung |
-| Klarer Gesprächsabschluss | Auswertungstext, `phase_language` | keine Messung |
+| Klarer Gesprächsabschluss | `closing`: Zusammenfassung, konkreter nächster Schritt und Verabschiedung in den letzten zwei Beiträgen (ADR 0089), dazu Auswertungstext und `phase_language` | ob das Richtige zusammengefasst und ein tragfähiger Schritt vereinbart wurde, bleibt Text |
 | Empathie und Kundenorientierung | Auswertungstext | keine Messung, laut Katalog auch keine geplant |
 
-Neun Ziele sind also heute mit Zahlen unterlegbar, fünf zunächst nur mit Text.
-Das neunte ist der Sonderfall: „Souveränität unter Druck“ wird nicht als Verlauf
+Elf Ziele sind also heute mit Zahlen unterlegbar, drei nur mit Text. Zuletzt
+hinzugekommen ist der Gesprächsabschluss (ADR 0089), das Gegenstück zum
+Einstieg. Eines der elf ist der Sonderfall: „Souveränität unter Druck“ wird nicht als Verlauf
 gezeigt, sondern als Vergleich zweier Abschnitte innerhalb eines Gesprächs
 (Abschnitt 5.B und ADR 0081). Ein Verlauf daraus wäre der Unterschied zwischen
 den Abschnitten als Linie, also genau die Zahl, die es nicht geben soll.
@@ -342,7 +343,7 @@ für sich ausreichend:
   validiert, und ADR 0051 verbietet die Erfindung genau hier.
 
 Was bleibt, ist der Auswertungstext, und der ist bei diesem Ziel **dünner als bei
-den anderen fünf Textzielen**: Ob ein Abschluss klar war, steht im Gesagten und
+den beiden anderen Textzielen**: Ob ein Abschluss klar war, steht im Gesagten und
 ist aus dem Transkript lesbar. Ob jemand deutlich gesprochen hat, steht gerade
 nicht darin. Das Modell kann dazu nur etwas sagen, wenn es im Transkript
 Nachfragen des Gegenübers findet („Wie bitte?“), und das ist ein schwaches
