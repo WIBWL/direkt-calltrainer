@@ -115,7 +115,7 @@ export default function SetupView({
 
       <SetupSection
         index="02"
-        title="Gesprächspartner auswählen"
+        title="Gesprächspartner wählen"
         description="Jede Persona besitzt eine eigene Sprache, Stimme und Persönlichkeit."
       >
         <div className="persona-grid setup-persona-grid">

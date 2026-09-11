@@ -86,15 +86,17 @@ export default function PastSessionView() {
     }
   };
 
+  // Still a link, not a button: it navigates, so middle-click and "open in new
+  // tab" have to keep working. Only its appearance is the button's.
   const backLink = (
-    <Link to={ROUTES.profile} className="back-link">
+    <Link to={ROUTES.profile} className="back-to-start-button page-back-button">
       Zurück zum Profil
     </Link>
   );
 
   if (state === "missing") {
     return (
-      <AppLayout pageClassName="app-page-narrow">
+      <AppLayout>
         {backLink}
         <h1>Training nicht gefunden</h1>
         <div className="card">
@@ -109,7 +111,7 @@ export default function PastSessionView() {
 
   if (state === "failed") {
     return (
-      <AppLayout pageClassName="app-page-narrow">
+      <AppLayout>
         {backLink}
         <h1>Training</h1>
         <div className="card">
@@ -121,7 +123,7 @@ export default function PastSessionView() {
 
   if (state === "loading" || detail === null) {
     return (
-      <AppLayout pageClassName="app-page-narrow">
+      <AppLayout>
         {backLink}
         <h1>Training</h1>
         <p className="muted">Wird geladen …</p>
@@ -130,7 +132,7 @@ export default function PastSessionView() {
   }
 
   return (
-    <AppLayout pageClassName="app-page-narrow">
+    <AppLayout>
       {backLink}
       <h1>{detail.scenario}</h1>
       <p className="page-lead">
@@ -206,7 +208,7 @@ export default function PastSessionView() {
               </button>
               <button
                 type="button"
-                className="cancel-button"
+                className="consent-button consent-button-secondary"
                 onClick={() => setConfirming(false)}
                 disabled={deleting}
               >

@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import type { MicDevice } from "../hooks/useMicrophoneDevices";
 import { useMicrophoneLevel } from "../hooks/useMicrophoneLevel";
 import ScenarioBriefing from "./ScenarioBriefing";
-import SetupSection from "./SetupSection";
 
 const HEARD_THRESHOLD = 0.02;
 
@@ -78,7 +77,7 @@ export default function MicCheck({
   return (
     <>
       <section className="setup-intro mic-check-intro" aria-labelledby="mic-check-page-title">
-        <div className="eyebrow">Mikrofon vorbereiten</div>
+        <div className="eyebrow">Training vorbereiten</div>
 
         <h1 id="mic-check-page-title">Mikrofon testen</h1>
 
@@ -90,11 +89,9 @@ export default function MicCheck({
 
       <ScenarioBriefing briefing={briefing} className="mic-check-briefing" />
 
-      <SetupSection
-        index="01"
-        title="Mikrofon prüfen"
-        description="Sprechen Sie nach dem Start einen kurzen Testsatz."
-      >
+      {/* No SetupSection here: this screen has one box and no numbered steps to
+          count off, and the page heading above already names it. */}
+      <section className="setup-section">
         <dl className="mic-device-information">
           <div className="mic-device-information-row">
             <dt>
@@ -208,10 +205,11 @@ export default function MicCheck({
           </div>
         )}
 
-        <button className="cancel-button" type="button" onClick={onCancel}>
-          Abbrechen
-        </button>
-      </SetupSection>
+      </section>
+
+      <button className="back-to-start-button" type="button" onClick={onCancel}>
+        Zur Startseite
+      </button>
     </>
   );
 }

@@ -88,14 +88,14 @@ export default function ProfileView() {
         <ConsentSettings />
       </section>
 
-      <section className="profile-section">
+      <section className="card">
         <h2>Ihre Trainings</h2>
         <SessionHistory />
       </section>
 
       <section className="card">
         <h2>Ihre Daten</h2>
-        <p>
+        <p className="card-lead">
           Gespeichert werden Gesprächsprotokoll, Kennzahlen und Auswertung —{" "}
           <strong>keine Tonaufnahme</strong>.
         </p>

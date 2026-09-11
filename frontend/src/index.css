@@ -24,6 +24,10 @@
   --color-text-muted-secondary: #5f7180;
   --color-success: #2e8064;
   --color-danger: #b4453a;
+  /* The wordmark's "ai". Below 4.5:1 on white on purpose -- WCAG 1.4.3 exempts
+     brand names, so this may be the vivid orange and not a muted one. Do not
+     reuse it for ordinary text. */
+  --color-brand-accent: #ff6a00;
 
   /* Shared font families */
   --font-sans: "Hanken Grotesk", Arial, sans-serif;
@@ -98,6 +102,12 @@ body {
   align-items: center;
   gap: 9px;
   flex-shrink: 0;
+}
+
+/* Inherits weight and size from whatever wordmark it sits in, so the same
+   component works in the header, on the login screen and in the redirect card. */
+.brand-ai {
+  color: var(--color-brand-accent);
 }
 
 .app-brand-logo {
@@ -1204,7 +1214,10 @@ h2 {
   margin-bottom: 24px;
 }
 
-.setup-intro .eyebrow {
+/* The wrap-up's intro is not a `.setup-intro` but carries the same eyebrow, and
+   it looked like a different element for want of this. */
+.setup-intro .eyebrow,
+.feedback-intro .eyebrow {
   margin-bottom: 10px;
   font-size: 12px;
   font-weight: 700;
@@ -1365,9 +1378,14 @@ h2 {
   line-height: 1.5;
 }
 
+/* The sentence between a card's heading and its content, which would otherwise
+   sit flush against what it introduces. */
+.card p.card-lead {
+  margin-bottom: 1.1rem;
+}
+
 .start-call-button,
-.end-call-button,
-.restart-button {
+.end-call-button {
   display: block;
   width: 100%;
   border: none;
@@ -1381,8 +1399,7 @@ h2 {
   transition: background 0.2s, opacity 0.2s;
 }
 
-.start-call-button:hover,
-.restart-button:hover {
+.start-call-button:hover {
   background: var(--navy-light);
 }
 
@@ -1398,10 +1415,6 @@ h2 {
 
 .end-call-button:hover {
   opacity: 0.85;
-}
-
-.restart-button {
-  margin-top: 1.5rem;
 }
 
 .cancel-button {
@@ -1464,9 +1477,11 @@ h2 {
   margin-right: auto;
 }
 
+/* No minimum height: the stack is a fixed set of elements, so a floor taller
+   than they need only piles up as empty space under the buttons and breaks the
+   even padding. */
 .call-panel {
   width: 100%;
-  min-height: 560px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1657,7 +1672,6 @@ h2 {
 /* Tablet layouts preserve the two-button row while allowing both controls to shrink. */
 @media (max-width: 720px) {
   .call-panel {
-    min-height: 520px;
     padding: 24px;
   }
 
@@ -1685,7 +1699,6 @@ h2 {
   }
 
   .call-panel {
-    min-height: auto;
     gap: 20px;
     padding: 20px;
     border-radius: 18px;
@@ -1726,10 +1739,6 @@ h2 {
 /* The microphone page follows the centered 800px layout from the Figma screens. */
 .mic-check-page .setup-section {
   margin-bottom: 0;
-}
-
-.mic-check-page .setup-section-heading {
-  margin-bottom: 10px;
 }
 
 .mic-check-intro {
@@ -3129,11 +3138,11 @@ h2 {
   border-color: var(--color-border-subtle);
 }
 
-/* During a call: present, but plainly not a control. */
+/* Hidden rather than removed during the microphone check and the call: it keeps
+   its width, so the progress steps do not jump sideways on the way in and out.
+   `visibility` also takes it out of the tab order and off the screen reader. */
 .account-chip.is-locked {
-  opacity: 0.45;
-  padding-right: 6px;
-  cursor: default;
+  visibility: hidden;
 }
 
 .account-avatar {
@@ -3214,20 +3223,38 @@ h2 {
   margin-top: 28px;
 }
 
-.feedback-actions .restart-button {
+/* The quiet way back to the setup screen. Shared by the wrap-up and the
+   microphone check, which both lead there. */
+.back-to-start-button {
   width: auto;
-  margin-top: 0;
+  /* `inline-block` and the reset below so the class also works on a <Link>. */
+  display: inline-block;
+  text-decoration: none;
   padding: 11px 18px;
   border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
   background: var(--color-surface);
   color: var(--color-navy-900);
+  font: inherit;
   font-size: 13px;
   font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
-.feedback-actions .restart-button:hover {
+.back-to-start-button:hover {
   background: var(--color-blue-100);
+}
+
+/* On the microphone check it sits below the card, along its right edge. */
+.mic-check-page .back-to-start-button {
+  display: block;
+  margin: 22px 0 0 auto;
+}
+
+/* Above a page heading, where it replaces what used to be a plain back link. */
+.page-back-button {
+  margin-bottom: 1.25rem;
 }
 
 @media (max-width: 720px) {
@@ -3407,19 +3434,15 @@ h2 {
    one call you have in mind, and a stack of thin lines compares far better
    than a grid of boxes. */
 
-.profile-section {
-  margin-top: 1.5rem;
-}
-
+/* No frame of its own: the card around it already is one, and two nested
+   borders of nearly the same radius read as a mistake. Instead the rows run the
+   full width of the card, so a hover fill reaches its edges. */
 .session-list {
   list-style: none;
-  margin: 0;
+  margin: 0 -1.5rem;
   padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-choice);
-  background: var(--color-surface);
-  /* Clips the first and last row's hover fill to the rounded corners. */
-  overflow: hidden;
+  border-top: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .session-list li + li {
@@ -3430,7 +3453,7 @@ h2 {
   display: flex;
   align-items: center;
   gap: 18px;
-  padding: 13px 18px;
+  padding: 13px 1.5rem;
   text-decoration: none;
   color: inherit;
   transition: background 0.15s;
@@ -3792,21 +3815,30 @@ h2 {
   line-height: 1.5;
 }
 
-/* Quiet by default: this sits under a page the user came to read, and the
-   destructive weight belongs on the confirmation, not on the way in. */
+/* Sized to their labels: `.consent-button` grows to fill a row by default, and
+   this one spans the full page width, where a stretched confirm button is out
+   of all proportion to what it does. */
+.session-delete .consent-button {
+  flex: 0 0 auto;
+}
+
+/* It names what it destroys and asks again before doing it, which is where the
+   safety actually sits -- so it may look like the button it is. */
 .session-delete-trigger {
   border: none;
-  background: none;
-  padding: 0;
+  border-radius: 999px;
+  padding: 0.55rem 1.4rem;
   font: inherit;
-  font-size: 0.9rem;
-  color: var(--color-danger);
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-danger);
   cursor: pointer;
-  text-decoration: underline;
+  transition: background 0.2s;
 }
 
 .session-delete-trigger:hover {
-  opacity: 0.8;
+  background: #9a3a30;
 }
 
 /* --- The "i": long explanations, folded away ---------------------------- */
@@ -3944,6 +3976,18 @@ h2 {
 .profile-page .card .retention p {
   margin: 0 0 0.9rem;
   line-height: 1.5;
+}
+
+/* `.consent-button` carries `flex: 1`, so the two share the width evenly; they
+   drop under each other once that would squeeze the labels. */
+.retention-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.retention-actions .consent-button {
+  min-width: 15rem;
 }
 
 .profile-page .card .retention .consent-button {
@@ -4086,14 +4130,14 @@ h2 {
 .login-brand {
   display: inline-flex;
   align-items: center;
-  gap: 11px;
+  gap: 14px;
   color: var(--color-navy-900);
 }
 
 .login-brand-logo {
   display: block;
-  width: 36px;
-  height: 36px;
+  width: 58px;
+  height: 58px;
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -4130,8 +4174,9 @@ h2 {
 
 .login-brand-name {
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 32px;
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .login-main {
@@ -4142,7 +4187,7 @@ h2 {
   grid-template-columns: minmax(0, 1.18fr) minmax(430px, 0.82fr);
   gap: 90px;
   align-items: center;
-  padding: 58px 0 68px;
+  padding: 34px 0 68px;
 }
 
 .login-hero {
@@ -4182,25 +4227,33 @@ h2 {
     padding-top: 26px;
   }
 
+  .login-brand-logo {
+    width: 46px;
+    height: 46px;
+  }
+
+  .login-brand-name {
+    font-size: 26px;
+  }
+
   .login-main {
-    padding-top: 40px;
+    padding-top: 26px;
   }
 }
 
 .login-hero-badge {
   width: max-content;
-  min-width: 262px;
-  height: 30px;
-  padding: 0 16px;
+  max-width: 100%;
+  height: 27px;
+  padding: 0 13px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  gap: 7px;
   border: 1px solid #cbdbe6;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.86);
   color: var(--color-blue-600);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   box-shadow: 0 1px 2px rgba(3, 37, 62, 0.03);
 }
@@ -4215,7 +4268,7 @@ h2 {
 
 .login-hero-title {
   max-width: 650px;
-  margin: 28px 0 24px;
+  margin: 22px 0 24px;
   font-family: var(--font-display);
   font-size: 48px;
   font-weight: 700;
@@ -4460,15 +4513,6 @@ h2 {
   box-shadow: 0 10px 36px rgba(3, 37, 62, 0.035);
 }
 
-.login-card-eyebrow {
-  margin-bottom: 9px;
-  color: var(--color-blue-600);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
 .login-card-title {
   margin: 0 0 10px;
   color: var(--color-navy-900);
@@ -4579,14 +4623,6 @@ h2 {
 .login-submit-button:focus-visible {
   outline: 3px solid var(--color-blue-300);
   outline-offset: 3px;
-}
-
-.login-redirect-hint {
-  margin: 13px 8px 0;
-  color: var(--color-text-muted-secondary);
-  text-align: center;
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .login-divider {
@@ -4738,12 +4774,9 @@ h2 {
   }
 
   .login-hero-badge {
-    min-width: 0;
-    max-width: 100%;
     height: auto;
-    min-height: 30px;
-    padding: 6px 12px;
-    text-align: center;
+    min-height: 27px;
+    padding: 5px 12px;
   }
 
   .login-training-preview {

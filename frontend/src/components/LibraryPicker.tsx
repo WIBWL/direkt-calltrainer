@@ -205,13 +205,13 @@ export default function LibraryPicker({
         </div>
 
         <div className="scenario-library-filter-row">
-          <span className="scenario-library-filter-label">Herkunft</span>
+          <span className="scenario-library-filter-label">Szenariotyp</span>
 
           <FilterSlider
             options={originOptions}
             value={filter}
             onChange={onFilter}
-            label="Szenarien nach Herkunft filtern"
+            label="Szenarien nach Szenariotyp filtern"
           />
         </div>
 

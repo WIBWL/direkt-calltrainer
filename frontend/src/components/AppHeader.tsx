@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ROUTES } from "../routes";
 import { cx } from "../utils/cx";
 import { useAccount } from "../hooks/useAccount";
+import BrandName from "./BrandName";
 
 // The header uses the current screen to highlight the matching training step.
 export type TrainingStep = "prepare" | "call" | "feedback";
@@ -51,7 +52,9 @@ export default function AppHeader({
         aria-hidden="true"
       />
 
-      <span className="app-brand-name">Calltrainer</span>
+      <span className="app-brand-name">
+        <BrandName />
+      </span>
     </div>
   );
 
@@ -100,12 +103,14 @@ export default function AppHeader({
 
         {auth.isAuthenticated &&
           (navigationLocked ? (
-            // Not merely disabled: during a call the chip has nothing to offer,
-            // and a greyed-out control invites the click it is refusing.
-            <span className="account-chip is-locked" title="Während des Gesprächs nicht verfügbar">
-              <span className="account-avatar" aria-hidden="true">
-                {account.initials}
-              </span>
+            // Hidden, not greyed out: during the microphone check and the call
+            // the chip has nothing to offer, and a dimmed control still invites
+            // the click it is refusing. It carries the full content anyway so
+            // that it reserves the same width the real chip has -- otherwise
+            // the progress steps shift sideways on entering the call.
+            <span className="account-chip is-locked" aria-hidden="true">
+              <span className="account-avatar">{account.initials}</span>
+              <span className="account-chip-name">{account.displayName}</span>
             </span>
           ) : (
             <Link

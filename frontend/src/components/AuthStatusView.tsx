@@ -1,3 +1,5 @@
+import BrandName from "./BrandName";
+
 interface AuthStatusViewProps {
   message: string;
 }
@@ -11,7 +13,9 @@ export default function AuthStatusView({
         <span className="auth-status-spinner" aria-hidden="true" />
 
         <div>
-          <strong>Calltrainer</strong>
+          <strong>
+            <BrandName />
+          </strong>
           <span>{message}</span>
         </div>
       </div>

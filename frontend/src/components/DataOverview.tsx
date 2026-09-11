@@ -69,10 +69,8 @@ export default function DataOverview() {
       <RetentionSettings
         retention={data.retention}
         onChange={(retention: RetentionState) => setData({ ...data, retention })}
-      />
-
-      {data.sessions > 0 && (
-        <>
+      >
+        {data.sessions > 0 && (
           <button
             type="button"
             className="consent-button consent-button-secondary"
@@ -81,12 +79,13 @@ export default function DataOverview() {
           >
             {downloading ? "Wird vorbereitet …" : "Alle Daten als JSON herunterladen"}
           </button>
-          {downloadFailed && (
-            <p className="consent-error">
-              Der Export konnte nicht erstellt werden. Bitte versuchen Sie es erneut.
-            </p>
-          )}
-        </>
+        )}
+      </RetentionSettings>
+
+      {downloadFailed && (
+        <p className="consent-error">
+          Der Export konnte nicht erstellt werden. Bitte versuchen Sie es erneut.
+        </p>
       )}
     </>
   );
