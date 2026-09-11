@@ -34,6 +34,10 @@ class FocusChoice(BaseModel):
     the two is that this request was made at all (ADR 0076)."""
 
     goals: list[str] = Field(default_factory=list)
+    # What the User said about their work. Sent in full with every request,
+    # like the goals: a PUT that leaves them out means "none".
+    role: str | None = None
+    categories: list[str] = Field(default_factory=list)
 
 
 @router.get("")
@@ -55,8 +59,12 @@ def set_focus(choice: FocusChoice, caller: AuthContext = Depends(require_user)) 
     """
     with session_scope() as db:
         try:
-            selection = focus_service.set_selection(db, caller.sub, choice.goals)
-        except (focus_service.TooManyGoals, focus_service.UnknownGoal) as e:
+            selection = focus_service.set_selection(
+                db, caller.sub, choice.goals, choice.role, choice.categories
+            )
+        except (
+            focus_service.TooManyGoals, focus_service.UnknownGoal, focus_service.UnknownChoice,
+        ) as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
         return _state(focus_service.list_goals(db), selection)
 
@@ -77,6 +85,10 @@ def _state(
         "decided_at": selection.decided_at.isoformat() if selection.decided_at else None,
         "decision_required": selection.decision_required,
         "selected": [key for key in selection.keys if key in offered],
+        "role": selection.role,
+        "categories": list(selection.categories),
+        # The roles on offer, each with the call types it preselects.
+        "roles": focus_service.roles(),
         "groups": focus_service.groups(),
         # `evidence` is not on the wire. It says how far a goal can be measured
         # today, which is planning information for the analysis work rather than

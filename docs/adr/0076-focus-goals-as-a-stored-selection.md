@@ -8,7 +8,10 @@ reads one — the wrap-up and the progress dashboard — is a later step and is 
 part of this change.
 
 **Amended:** the catalogue is fourteen goals, not fifteen. "Souveräne
-Lautstärke" is retired — see the last section.
+Lautstärke" is retired — see the amendments at the end.
+
+**Amended 2026-09-11** — the selection now also carries a role and call types,
+and the setup screen reads it to suggest Scenarios. See the amendment at the end.
 
 ## Context
 
@@ -192,3 +195,75 @@ being measured and shown on a single call, where the device is at least constant
 for the length of that call and the curve describes a shape rather than a level.
 And no measurement is invented to replace the goal: the honest alternative would
 need a calibrated input, which a browser does not give.
+
+## Amendment (2026-09-11): the selection is read, to suggest Scenarios
+
+The Status above put "what reads one" off to a later step. This is that step
+for one reader: the setup screen suggests Scenarios from the selection. To give
+it something to match, the selection also records a role and the kinds of call
+a User takes (migration `d4e7a2c91b36`).
+
+### Role and call types sit beside the goals
+
+Asked on the same first-run screen and stored in the same selection, under the
+same rules: a setting, not training data, so no consent guard and untouched by
+every deletion path; replaced in full by each `PUT /api/focus`, so leaving them
+out means none. Both are optional, like the goals.
+
+The **call types** use the vocabulary of `scenario.category` (ADR 0072). That
+is not a convenience: it is the only attribute every seeded Scenario carries
+that a suggestion can match, so any other vocabulary would need a translation
+nobody could check. The **role** (`TRAINING_ROLES`, CHECK-enforced) is scored
+on nothing. It preselects the call types it usually means, which the User then
+adjusts — a role is a guess about someone's work, and they know better.
+
+Experience was considered and not asked. Scenarios have no difficulty, so the
+answer would change nothing, and a question whose answer changes nothing only
+costs time on the one screen that is already the longest.
+
+The role is nullable and not backfilled. Everyone who answered before it
+existed is not asked again; the profile section is where they add it.
+
+### How a suggestion is made
+
+Rule-based, in `backend/recommendations.py`: 2 for a matching call type, 1 for
+each picked goal whose call context exercises it (`GOAL_CATEGORIES`), an
+unplayed Scenario first on a tie, at most five. The voice goals steer nothing,
+since every Scenario trains the voice; a reverse replays one particular call
+and an uncategorised Scenario has no context, so neither is suggested.
+
+Rules rather than a model, for three reasons: the result is the same every
+time, each suggestion can name its reason on the card, and nothing a User said
+about their work leaves for a model provider. It is computed in the backend and
+not the frontend because that is where it can be tested — the frontend's tests
+cover the live-call audio path and nothing else.
+
+### A view over the cards, not a group
+
+The listing marks the suggested cards (`recommendation: {call_type, goals}`)
+and the setup screen offers them as **Ihre Empfehlungen**, first in the origin
+row. A suggested card keeps its own origin and appears under both: taking it out
+of "Standard" because it was also suggested would hide it from anyone looking
+there. ADR 0072's rule that every Scenario sits under exactly one origin option
+now holds for the origins proper, with the company option and the suggestions as
+views across them.
+
+Where there are suggestions, the screen opens on them with the category row on
+"Alle", since one category alone would often leave nothing. ADR 0072's opening
+selection, Standard with Betrieb & Störung, is the fallback where there are none.
+
+### The evidence obligation is untouched
+
+Suggesting a Scenario to practise a goal claims nothing about how the User does
+at it, so it is not a report on the goal. The obligation recorded in `evidence`
+stays with whatever comes to report on one — above all the wrap-up, which still
+does not read the selection.
+
+### Consequences
+
+The setup screen's first view now depends on the User, which makes a support
+question like "what did you see?" one more step to answer.
+
+The role describes a person's work and is personal data like the goals. Neither
+is in `/api/me/export` yet; the export was built around trainings, and a
+setting was not considered. That is an open point, not a decision.

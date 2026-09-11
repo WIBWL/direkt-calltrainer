@@ -84,7 +84,9 @@ def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-a
             )
             for index, spoken in enumerate(utterances(turns))
         ]
-        _write_analysis(db, session, conversation(turns, persona.language_id))
+        _write_analysis(
+            db, session, conversation(turns, persona.language_id, scenario.reverse)
+        )
         # The wrap-up itself is generated asynchronously (ADR 0018/0019); this
         # row is what makes its outcome queryable afterwards (ADR 0032).
         session.jobs = [db_models.AnalysisJob(

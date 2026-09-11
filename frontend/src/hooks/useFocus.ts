@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { apiFetch } from "../api";
-import type { FocusState } from "../protocol";
+import type { FocusChoice, FocusState } from "../protocol";
 
 export type FocusLoadState = "loading" | "ready" | "failed";
 
@@ -43,13 +43,13 @@ export function useFocus() {
     };
   }, []);
 
-  /** Replace the selection. An empty list is "no focus" — a real answer. */
-  const choose = useCallback(async (goals: string[]): Promise<FocusState> => {
+  /** Replace the selection. No goals is "no focus" — a real answer. */
+  const choose = useCallback(async (choice: FocusChoice): Promise<FocusState> => {
     setSaving(true);
     try {
       const data = await apiFetch<FocusState>("/api/focus", {
         method: "PUT",
-        body: JSON.stringify({ goals }),
+        body: JSON.stringify(choice),
       });
       setFocus(data);
       setState("ready");

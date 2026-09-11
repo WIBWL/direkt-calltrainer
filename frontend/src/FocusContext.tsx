@@ -2,12 +2,12 @@ import { createContext, useContext, type ReactNode } from "react";
 
 import FocusDialog from "./components/FocusDialog";
 import { useFocus } from "./hooks/useFocus";
-import type { FocusState } from "./protocol";
+import type { FocusChoice, FocusState } from "./protocol";
 
 interface FocusContextValue {
   focus: FocusState | null;
   saving: boolean;
-  choose: (goals: string[]) => Promise<FocusState>;
+  choose: (choice: FocusChoice) => Promise<FocusState>;
 }
 
 const FocusContext = createContext<FocusContextValue | null>(null);

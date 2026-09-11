@@ -146,7 +146,9 @@ def facts(turn: Turn) -> TurnFacts | None:
     )
 
 
-def conversation(turns: Sequence[Turn], language_id: str | None = None) -> Conversation:
+def conversation(
+    turns: Sequence[Turn], language_id: str | None = None, reverse: bool = False
+) -> Conversation:
     """Fold the finished call into the facts its statistics are derived from.
 
     `language_id` is the Persona's. Optional: without it only the readings
@@ -184,6 +186,7 @@ def conversation(turns: Sequence[Turn], language_id: str | None = None) -> Conve
     return Conversation(
         user_text=" ".join(turn.user_text for turn in turns if turn.user_text),
         language_id=language_id,
+        reverse=reverse,
         user_speech_ms=user_ms,
         user_phonation_ms=user_phonation,
         # Only Turns the user spoke in: the opening Turn has no audio to measure.
@@ -198,12 +201,13 @@ def conversation(turns: Sequence[Turn], language_id: str | None = None) -> Conve
         # Grouped by utterance as well, which the terminal contours read:
         # where one sentence ended is not recoverable from the flat curve.
         pitch_per_turn=tuple(tuple(turn.pitch_hz) for turn in turns if turn.pitch_hz),
+        # The utterances the user actually spoke in, which is the set
+        # `user_acoustics_complete` is taken over: the opening reading needs
+        # their text and length, F-53's Sprechlänge only how many there are.
+        user_turns=tuple(
+            (turn.user_text, turn.user_phonation_ms) for turn in turns if turn.user_text
+        ),
         persona_turns=persona_turns,
-        # Utterances the user actually spoke in, which is the same set
-        # `user_acoustics_complete` is taken over. A run of speech ends at a
-        # pause or at the utterance, so the runs of a call are its pauses plus
-        # these (F-53's Sprechlänge am Stück).
-        user_turns=sum(1 for turn in turns if turn.user_text),
         timeline=timeline(turns),
     )
 

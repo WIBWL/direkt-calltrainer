@@ -809,6 +809,17 @@ FOCUS_GROUP_NAMES = {
     "habit": "Ihr Training",
 }
 
+# The roles the first-run question offers (F-62), in display order, each with
+# the call types it preselects. Keys match models.TRAINING_ROLES.
+TRAINING_ROLE_CATALOGUE = [
+    {"key": "sales", "name": "Vertrieb", "categories": ["pricing", "closing", "requirements"]},
+    {"key": "service", "name": "Kundenservice", "categories": ["operations", "requirements"]},
+    {"key": "support", "name": "Technischer Support", "categories": ["operations"]},
+    {"key": "consulting", "name": "Beratung / Key Account",
+     "categories": ["requirements", "pricing"]},
+    {"key": "other", "name": "Sonstiges", "categories": []},
+]
+
 FOCUS_GOALS = [
     # --- A. Paraverbal: the measurable core of the voice.
     {

@@ -27,6 +27,7 @@ interface SetupViewProps {
   scenarioCategory: CategoryFilter;
   onScenarioCategory: (c: CategoryFilter) => void;
   scenarioCategoryCounts: Record<CategoryFilter, number>;
+  showRecommended: boolean;
   tenantName: string | null;
   onNewScenario: () => void;
   onEditScenario: (id: string) => void;
@@ -58,6 +59,7 @@ export default function SetupView({
   scenarioCategory,
   onScenarioCategory,
   scenarioCategoryCounts,
+  showRecommended,
   tenantName,
   onNewScenario,
   onEditScenario,
@@ -101,6 +103,7 @@ export default function SetupView({
           category={scenarioCategory}
           onCategory={onScenarioCategory}
           categoryCounts={scenarioCategoryCounts}
+          showRecommended={showRecommended}
           tenantName={tenantName}
           newLabel="+ Individuelles Szenario"
           onNew={onNewScenario}

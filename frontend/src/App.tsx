@@ -53,7 +53,7 @@ type EditorState = { id: string | null } | null;
 /** Every level 1 value, including "tenant": counting it costs nothing when the
  * caller has no company, and the picker decides whether to offer the option. */
 const ORIGIN_FILTERS: LibraryFilter[] = [
-  "all", "standard", "own", "followUp", "reverse", "tenant",
+  "recommended", "all", "standard", "own", "followUp", "reverse", "tenant",
 ];
 
 /** What the selection screen opens on (ADR 0072): the seeded library, and the
@@ -63,6 +63,15 @@ const ORIGIN_FILTERS: LibraryFilter[] = [
  * shortlist, and both rows are one press from anything else. */
 const DEFAULT_ORIGIN: LibraryFilter = "standard";
 const DEFAULT_CATEGORY: CategoryFilter = "operations";
+
+/** Where the screen opens: on the suggestions where there are any (F-62), with
+ * the category row on "Alle" -- suggestions spread over the categories, and one
+ * of them alone would often leave nothing. Otherwise the defaults above. */
+function startingFilters(scenarios: ScenarioCard[]): [LibraryFilter, CategoryFilter] {
+  return scenarios.some((s) => s.recommendation)
+    ? ["recommended", "all"]
+    : [DEFAULT_ORIGIN, DEFAULT_CATEGORY];
+}
 
 /** The card as the picker takes it. Its own function because the first
  * selection is made against the same filters the picker applies, before there
@@ -77,15 +86,17 @@ const toLibraryItem = (s: ScenarioCard) => ({
   followUp: s.follow_up,
   reverse: s.reverse,
   originSession: s.origin_session,
+  recommendation: s.recommendation,
 });
 
 /** The Scenario to start on: the first the default filters actually show, so
  * the summary at the bottom of the screen does not name a card that is not on
  * it. Falls back to the first of all, for a library those filters leave empty. */
 function firstSelectable(scenarios: ScenarioCard[]): string | null {
+  const [origin, category] = startingFilters(scenarios);
   const items = scenarios.map(toLibraryItem);
   const visible = items.find(
-    (item) => matchesFilter(item, DEFAULT_ORIGIN) && matchesCategory(item, DEFAULT_CATEGORY),
+    (item) => matchesFilter(item, origin) && matchesCategory(item, category),
   );
   return (visible ?? items[0])?.id ?? null;
 }
@@ -179,7 +190,12 @@ export default function App() {
     listScenarios()
       .then((data) => {
         setScenarios(data);
-        if (!restored) setScenarioId(firstSelectable(data));
+        if (!restored) {
+          const [origin, category] = startingFilters(data);
+          setScenarioFilter(origin);
+          setScenarioCategory(category);
+          setScenarioId(firstSelectable(data));
+        }
       })
       .catch((e) =>
         setLoadError(`Szenarien konnten nicht geladen werden: ${e.message}`),
@@ -650,6 +666,7 @@ export default function App() {
         scenarioCategory={scenarioCategory}
         onScenarioCategory={setScenarioCategory}
         scenarioCategoryCounts={scenarioCategoryCounts}
+        showRecommended={scenarios.some((s) => s.recommendation)}
         tenantName={tenantName}
         onNewScenario={() => setEditingScenario({ id: null })}
         onEditScenario={(id) => setEditingScenario({ id })}

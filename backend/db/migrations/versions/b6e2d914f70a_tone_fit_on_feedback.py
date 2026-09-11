@@ -1,7 +1,7 @@
 """Whether the tone suited the occasion, as prose on the feedback row
 
 Revision ID: b6e2d914f70a
-Revises: a91c5f70d8e3
+Revises: d4e7a2c91b36
 
 F-35's own caveat says how much melody is appropriate depends on the occasion,
 and nothing in the application said which occasion a call was. This column
@@ -27,7 +27,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision: str = "b6e2d914f70a"
-down_revision: Union[str, None] = "a91c5f70d8e3"
+down_revision: Union[str, None] = "d4e7a2c91b36"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -24,6 +24,8 @@ from backend import deletion, focus
 from backend.db.models import (
     FOCUS_EVIDENCE,
     FOCUS_GROUPS,
+    SCENARIO_CATEGORIES,
+    TRAINING_ROLES,
     FocusGoal,
     FocusSelection,
     FocusSelectionGoal,
@@ -297,3 +299,47 @@ def test_deleting_the_trainings_leaves_the_focus_alone(db_session: DbSession) ->
     db_session.commit()
 
     assert focus.selection(db_session, TEST_AUTH.sub).keys == ("pace",)
+
+
+# --- Role and call types (F-62) ---------------------------------------------
+
+
+async def test_role_and_call_types_are_stored_and_read_back(
+    api_client: httpx.AsyncClient,
+) -> None:
+    """Beside the goals, in the same request and the same response."""
+    await api_client.put("/api/focus", json={
+        "goals": ["pace"], "role": "sales", "categories": ["closing", "pricing"],
+    })
+    read = (await api_client.get("/api/focus")).json()
+
+    assert read["role"] == "sales"
+    # Vocabulary order, not the order they were sent in.
+    assert read["categories"] == ["pricing", "closing"]
+
+
+async def test_leaving_them_out_clears_them(api_client: httpx.AsyncClient) -> None:
+    """A PUT is the whole selection, so omitting them means "none"."""
+    await api_client.put("/api/focus", json={"goals": [], "role": "support",
+                                             "categories": ["operations"]})
+    body = (await api_client.put("/api/focus", json={"goals": []})).json()
+
+    assert body["role"] is None
+    assert body["categories"] == []
+
+
+@pytest.mark.parametrize("choice", [{"role": "pilot"}, {"categories": ["smalltalk"]}])
+async def test_an_unknown_role_or_call_type_is_refused(
+    api_client: httpx.AsyncClient, choice: dict,
+) -> None:
+    """A 400, never a silent drop, for the reason given for goals."""
+    response = await api_client.put("/api/focus", json={"goals": [], **choice})
+
+    assert response.status_code == 400
+
+
+def test_every_role_preselects_known_call_types() -> None:
+    """The catalogue and the CHECK vocabulary are two lists; this keeps them one."""
+    assert [role["key"] for role in focus.roles()] == list(TRAINING_ROLES)
+    for role in focus.roles():
+        assert set(role["categories"]) <= set(SCENARIO_CATEGORIES)

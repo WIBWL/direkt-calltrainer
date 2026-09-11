@@ -45,7 +45,10 @@ _EXCHANGES = 8
 # One user utterance's worth of measured audio. The numbers are arbitrary but
 # not empty: a segment with no loudness samples yields no loudness figure, and
 # a test that asserted on an absent metric would pass for the wrong reason.
-_LOUDNESS = (62.0, 64.5, 61.0, 66.0, 63.5)
+# Two frames are silent, because `metrics._silence_found` withholds every
+# figure that rests on telling speech from silence when a curve has almost none
+# of it -- a curve of nothing but speech is a recording over a noise floor.
+_LOUDNESS = (62.0, 64.5, None, 61.0, 66.0, 63.5, None, 62.5)
 
 
 def _call(pressing: set[int]) -> list[Turn]:

@@ -123,6 +123,8 @@ async def test_scenarios_endpoint_withholds_the_case(client):
             # ADR 0070. Neither is prompt input: one is a casting marker,
             # the other names a Session the caller already owns.
             "reverse", "origin_session",
+            # F-62: which picked goals a suggestion rests on -- the User's own.
+            "recommendation",
         }
         assert "case_facts" not in entry
         assert "call_goal" not in entry

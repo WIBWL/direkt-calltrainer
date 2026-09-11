@@ -52,8 +52,13 @@ export const FOCUS_BACKING: Record<string, FocusBacking> = {
   // Interruptions first: how often somebody let the other side finish is the
   // most direct trace of listening the call leaves behind.
   active_listening: { kind: "metric", metrics: ["interruptions", "reaction_time", "pauses"] },
-  conciseness: { kind: "metric", metrics: ["word_count"] },
+  // Word count last: it grows with the call, not with how concise it was.
+  conciseness: {
+    kind: "metric",
+    metrics: ["fillers", "hesitations", "repetitions", "word_count"],
+  },
   intonation: { kind: "metric", metrics: ["intonation"] },
+  opening: { kind: "metric", metrics: ["opening"] },
   training_regularity: { kind: "activity", metrics: [] },
   training_variety: { kind: "activity", metrics: [] },
   // The one goal answered by a comparison rather than by a figure: the same
@@ -70,10 +75,9 @@ export const FOCUS_BACKING: Record<string, FocusBacking> = {
   //
   // Articulation has a note of its own: no measurement is *planned* for it
   // either (docs/dashboard-konzept.md, section 4.2), and the wrap-up has less
-  // to go on here than for the four below, where what was said is what the goal
-  // is about.
+  // to go on here than for the three below, where what was said is what the
+  // goal is about.
   articulation: { kind: "text", metrics: [], note: NO_MEASUREMENT_PLANNED },
-  opening: { kind: "text", metrics: [], note: NO_MEASUREMENT },
   objection_handling: { kind: "text", metrics: [], note: NO_MEASUREMENT },
   closing: { kind: "text", metrics: [], note: NO_MEASUREMENT },
   empathy: { kind: "text", metrics: [], note: NO_MEASUREMENT },

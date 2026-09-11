@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 
-import type { Origin, OriginSessionRef, ScenarioCategory } from "../scenarioLibrary";
+import { useFocusContext } from "../FocusContext";
+import type {
+  Origin,
+  OriginSessionRef,
+  ScenarioCategory,
+  ScenarioRecommendation,
+} from "../scenarioLibrary";
 import { CATEGORIES, CATEGORY_LABELS } from "../scenarioLibrary";
 import FilterSlider, { type FilterOption } from "./FilterSlider";
 
@@ -9,7 +15,8 @@ import FilterSlider, { type FilterOption } from "./FilterSlider";
  * finished Session (ADR 0070). Both are `origin: "own"` on the wire and options
  * of their own here — "Individuell" means hand-authored, and nothing else. Not
  * to be confused with the level-2 CategoryFilter below. */
-export type LibraryFilter = "all" | "standard" | "own" | "followUp" | "reverse" | "tenant";
+export type LibraryFilter =
+  | "recommended" | "all" | "standard" | "own" | "followUp" | "reverse" | "tenant";
 
 /** Level 2, the thematic category (ADR 0072). */
 export type CategoryFilter = "all" | ScenarioCategory;
@@ -23,6 +30,7 @@ const CATEGORY_FILTER_LABELS: Record<CategoryFilter, string> = {
 
 /** Static labels; the "tenant" option is labelled with the company name. */
 const ORIGIN_LABELS: Record<Exclude<LibraryFilter, "tenant">, string> = {
+  recommended: "Ihre Empfehlungen",
   all: "Alle",
   standard: "Standard",
   own: "Individuell",
@@ -55,6 +63,22 @@ export interface LibraryItem {
   reverse: boolean;
   /** The conversation it replays; null once that Session has been deleted. */
   originSession: OriginSessionRef | null;
+  /** Why it is suggested (F-62), or null if it is not. */
+  recommendation: ScenarioRecommendation | null;
+}
+
+/** Why a card is suggested, in one line: "Passt zu Ihren Gesprächen · Übt
+ *  „Sichere Einwandbehandlung"". */
+function recommendationReason(
+  recommendation: ScenarioRecommendation,
+  goalTitle: (key: string) => string,
+): string {
+  const parts: string[] = [];
+  if (recommendation.call_type) parts.push("Passt zu Ihren Gesprächen");
+  if (recommendation.goals.length > 0) {
+    parts.push("Übt " + recommendation.goals.map((g) => `„${goalTitle(g)}“`).join(", "));
+  }
+  return parts.join(" · ");
 }
 
 /** "Gespräch vom 3. September mit Anna Beck" — which conversation a reverse
@@ -80,6 +104,8 @@ interface LibraryPickerProps {
   category: CategoryFilter;
   onCategory: (c: CategoryFilter) => void;
   categoryCounts: Record<CategoryFilter, number>;
+  /** Whether anything is suggested; without a basis there is no such option. */
+  showRecommended: boolean;
   /** The caller's company name (ADR 0060); null = default tenant, no company
    * option or badge. */
   tenantName: string | null;
@@ -96,16 +122,18 @@ interface LibraryPickerProps {
  *
  * A reverse is `origin: "own"` on the wire but is deliberately *not* under
  * "Individuell": that option means what the User wrote, and a reverse is a
- * copy of a call they had. Every Scenario therefore still sits under exactly
- * one origin option, which is what keeps the counts adding up. */
+ * copy of a call they had. Every Scenario sits under exactly one of the
+ * origin options proper; "tenant" and "recommended" are views across them. */
 export function matchesFilter(item: LibraryItem, filter: LibraryFilter): boolean {
+  // A view over the cards, like the company option: a suggested Scenario stays
+  // under its own origin too.
+  if (filter === "recommended") return item.recommendation !== null;
   if (filter === "all") return true;
   if (filter === "standard") return item.origin === "builtin";
   if (filter === "followUp") return item.followUp;
   if (filter === "reverse") return item.reverse;
   // "Individuell" is what is left of `own` once the two kinds the system wrote
-  // itself are taken out, so every Scenario sits under exactly one option and
-  // the counts add up.
+  // itself are taken out.
   if (filter === "own") return item.origin === "own" && !item.followUp && !item.reverse;
   return item.shared;
 }
@@ -157,6 +185,7 @@ export default function LibraryPicker({
   category,
   onCategory,
   categoryCounts,
+  showRecommended,
   tenantName,
   newLabel,
   onNew,
@@ -177,7 +206,15 @@ export default function LibraryPicker({
   const hidden = items.length - COLLAPSED_CARDS;
   const shown = expanded ? items : items.slice(0, COLLAPSED_CARDS);
 
+  const { focus } = useFocusContext();
+  const goalTitle = (key: string) => focus?.goals.find((g) => g.key === key)?.title ?? key;
+
   const originOptions: FilterOption<LibraryFilter>[] = [
+    ...(showRecommended ? (["recommended"] as const) : []).map((f) => ({
+      value: f as LibraryFilter,
+      label: ORIGIN_LABELS[f],
+      count: originCounts[f],
+    })),
     ...BASE_ORIGINS.map((f) => ({
       value: f as LibraryFilter,
       label: ORIGIN_LABELS[f],
@@ -259,6 +296,11 @@ export default function LibraryPicker({
               <span className="card-subtitle">
                 {item.reverse ? reverseSubtitle(item) : item.subtitle}
               </span>
+              {filter === "recommended" && item.recommendation && (
+                <span className="card-reason">
+                  {recommendationReason(item.recommendation, goalTitle)}
+                </span>
+              )}
               <span className={"card-badge card-badge-" + badgeClass(item)}>
                 {badgeLabel(item, tenantName)}
               </span>
