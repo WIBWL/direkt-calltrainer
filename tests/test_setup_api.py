@@ -68,7 +68,9 @@ async def test_personas_endpoint_lists_every_persona_with_card_fields(client):
         assert uuid.UUID(card["id"])  # a valid opaque id, not the slug
         assert card["role"] == persona["role_label"]
         assert card["language"] == LANGUAGE_NAMES[persona["language_id"]]
-        assert set(card) == {"id", "name", "role", "language"}  # personas aren't authored
+        assert card["language_code"] == persona["language_id"]
+        # personas aren't authored; `language_code` is display, not prompt
+        assert set(card) == {"id", "name", "role", "language", "language_code"}
         assert persona["name"] and persona["role_label"], "a card needs a visible name and role"
 
 

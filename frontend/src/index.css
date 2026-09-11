@@ -4604,3 +4604,31 @@ h2 {
     transform: none;
   }
 }
+
+/* --- The language flag beside a Persona's name -------------------------- */
+
+/* The name and its flag on one line, the flag sitting on the text's baseline
+   rather than at the top of a tall name that has wrapped. */
+.persona-name-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* Scoped: the same class carries a Scenario's title, where it is not a flex
+   child. Without this a long name pushes the flag off the card instead of
+   clamping, which is what the rule above it exists to prevent. */
+.persona-name-row .persona-name {
+  min-width: 0;
+}
+
+.language-flag {
+  flex: 0 0 auto;
+  width: 20px;
+  height: auto;
+  border-radius: 2px;
+  /* The white stripes of one flag and the white card behind it are the same
+     colour: without an edge the flag has no left and right side. */
+  box-shadow: 0 0 0 1px rgba(3, 37, 62, 0.22);
+}
+

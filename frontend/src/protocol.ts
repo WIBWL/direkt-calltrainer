@@ -32,6 +32,9 @@ export interface Persona {
   // A Persona speaks exactly one language and the user cannot change it
   // (ADR 0043), so the card has to say which one it is.
   language: string;
+  // The same language as a code ("de", "en"), for the flag on the card. The
+  // display name above is what is read; this is what is switched on.
+  language_code: string;
 }
 
 export interface Scenario {

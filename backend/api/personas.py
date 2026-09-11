@@ -31,6 +31,11 @@ def list_personas() -> list[dict]:
             "name": p.name,
             "role": p.role_label,
             "language": p.language_name,
+            # The code as well as the name: the card puts a flag beside the
+            # Persona, and picking one off a display string ("Deutsch") would
+            # break the first time that string is reworded. Not a prompt field,
+            # so ADR 0043 has nothing to say about it.
+            "language_code": p.language_id,
         }
         for p in library.list_personas()
     ]

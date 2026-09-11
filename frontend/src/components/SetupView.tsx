@@ -4,6 +4,7 @@ import { useConsentContext } from "../ConsentContext";
 import { ROUTES } from "../routes";
 import type { Persona } from "../protocol";
 import type { ScenarioCard } from "../scenarioLibrary";
+import LanguageFlag from "./LanguageFlag";
 import LibraryPicker, {
   type CategoryFilter,
   type LibraryFilter,
@@ -121,6 +122,7 @@ export default function SetupView({
               title={persona.name}
               subtitle={persona.role}
               language={persona.language}
+              languageCode={persona.language_code}
               isSelected={persona.id === personaId}
               onSelect={() => onSelectPersona(persona.id)}
             />
@@ -174,12 +176,15 @@ function ChoiceCard({
   title,
   subtitle,
   language,
+  languageCode,
   isSelected,
   onSelect,
 }: {
   title: string;
   subtitle: string;
   language: string;
+  /** Which flag goes beside the name; the language stays as text below it. */
+  languageCode: string;
   isSelected: boolean;
   onSelect: () => void;
 }) {
@@ -194,7 +199,10 @@ function ChoiceCard({
         {isSelected ? "✓" : ""}
       </span>
 
-      <span className="persona-name">{title}</span>
+      <span className="persona-name-row">
+        <span className="persona-name">{title}</span>
+        <LanguageFlag code={languageCode} />
+      </span>
       <span className="card-subtitle">{subtitle}</span>
       <span className="card-meta">{language}</span>
     </button>
