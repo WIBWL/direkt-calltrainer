@@ -74,6 +74,22 @@ POINT_STRENGTH = "strength"
 POINT_IMPROVEMENT = "improvement"
 POINT_KINDS = (POINT_STRENGTH, POINT_IMPROVEMENT)
 
+# Measurement.segment (ADR 0081): which stretch of the call a figure describes.
+#
+# `call` is the whole conversation and is what ADR 0051 has always written; the
+# other two split it by whether the simulated caller was pressing at that point,
+# so that F-62's "Souveränität unter Druck" has something behind it other than
+# an opinion. A row is about exactly one of the three.
+#
+# A value and not a NULL for the whole call, deliberately: Postgres does not
+# collapse NULLs in a unique index, so `UNIQUE(session, metric, segment)` with a
+# nullable column would let two whole-call speaking rates exist side by side --
+# exactly the invariant ADR 0051 put that constraint there to protect.
+SEGMENT_CALL = "call"
+SEGMENT_PRESSURE = "pressure"
+SEGMENT_REST = "rest"
+MEASUREMENT_SEGMENTS = (SEGMENT_CALL, SEGMENT_PRESSURE, SEGMENT_REST)
+
 # Consent.purpose (ADR 0066). One purpose today: storing a finished Session and
 # everything hanging off it. Named rather than implied, so a second purpose --
 # ADR 0065's research use of de-identified measurements is the candidate -- is
@@ -584,25 +600,70 @@ class Turn(Base):
     # heard words exactly. This is the counterfactual beside it, never part of
     # it.
     unheard_text: Mapped[str | None] = mapped_column(Text)
+    # The raw paraverbal facts measured while this utterance's audio was still
+    # in memory: speaking and phonation time, the pauses inside it, its stretch
+    # of the loudness curve, and whether the measurement succeeded at all
+    # (ADR 0048). User rows only; NULL on a Persona row and on every row
+    # recorded before ADR 0081.
+    #
+    # This is the one place the schema keeps a number per utterance, and it is
+    # the exception ADR 0081 takes to ADR 0051 -- narrowly. These are *raw
+    # facts*, not statistics: no rate, no share, nothing derived and nothing
+    # anybody is shown. ADR 0051's rule is that a figure the user reads
+    # describes the whole call, and that is untouched; every Measurement still
+    # spans a stretch of conversation rather than one utterance.
+    #
+    # It exists because the audio is gone by the end of the call (ADR 0048) and
+    # which stretch of a call was demanding is decided later, by the wrap-up.
+    # Without these the worker would have nothing left to measure, and any
+    # later change to how a call is divided would reach no stored Session --
+    # the recurring cost this codebase pays elsewhere for not keeping them.
+    #
+    # JSON and not six columns: nothing queries inside it, Python is its only
+    # reader (`feedback/segments.py` folds it straight back into the in-memory
+    # `Turn` the derivations already take), and its shape follows what
+    # `acoustics.py` measures, which is where it belongs.
+    acoustics_json: Mapped[dict | None] = mapped_column(JSONB)
+    # True on a Persona utterance the wrap-up marked as pressing: an objection,
+    # a demand, a question the trainee was under pressure to answer (ADR 0081).
+    # NULL means nobody has judged this row -- no wrap-up yet, a failed one, or
+    # a call recorded before the column existed -- which is deliberately not the
+    # same as False.
+    pressed: Mapped[bool | None] = mapped_column(Boolean)
 
     session: Mapped["Session"] = relationship(back_populates="turns")
     feedback_points: Mapped[list["FeedbackPoint"]] = relationship(back_populates="turn")
 
 
 class Measurement(Base):
-    """One metric measured over the whole Session (ADR 0051).
+    """One metric measured over one stretch of the Session (ADR 0051, ADR 0081).
 
-    Session-level, not per Turn: none of the Kennzahlen (Redeanteil, Fragen,
-    Sprechtempo, Wortanzahl, Reaktionszeit, Sprechpausen) is meaningful for a
-    single utterance, and there is exactly one set of them per Session.
+    Not per Turn: none of the Kennzahlen (Redeanteil, Fragen, Sprechtempo,
+    Wortanzahl, Reaktionszeit, Sprechpausen) is meaningful for a single
+    utterance, and the frame of reference of every figure shown is a stretch of
+    conversation.
+
+    `segment` says which stretch. `call` is the whole of it and is the only
+    value ADR 0051 knew; `pressure` and `rest` are the same metric over the
+    exchanges the wrap-up marked as demanding and over the remainder, which is
+    what gives "Souveränität unter Druck" a measurement instead of an opinion.
+    Exactly one row per Session, metric and segment.
     """
 
     __tablename__ = "measurement"
-    # "Exactly one set per Session" is the invariant the docstring above states;
-    # this is what enforces it. Without it a second writer -- a retried job, a
-    # future "recalculate" -- would store a second speaking rate for the same
-    # call and the wrap-up would show both.
-    __table_args__ = (UniqueConstraint("session_id", "metric_type_id"),)
+    __table_args__ = (
+        # "Exactly one set per Session" is the invariant the docstring above
+        # states; this is what enforces it. Without it a second writer -- a
+        # retried job, a future "recalculate" -- would store a second speaking
+        # rate for the same call and the wrap-up would show both.
+        #
+        # Widened by ADR 0081 to include the segment, which is why that column
+        # is NOT NULL with a real value for the whole call: a nullable one
+        # would take the whole-call rows out of the constraint's reach, since
+        # Postgres treats two NULLs as distinct.
+        UniqueConstraint("session_id", "metric_type_id", "segment"),
+        _one_of("segment", MEASUREMENT_SEGMENTS),
+    )
 
     measurement_id: Mapped[int] = mapped_column(primary_key=True)
     session_id: Mapped[int] = mapped_column(
@@ -612,6 +673,9 @@ class Measurement(Base):
         ForeignKey("metric_type.metric_type_id"), index=True
     )
     value: Mapped[Decimal] = mapped_column(Numeric(10, 4))
+    # One of MEASUREMENT_SEGMENTS. Python-side default like every other one in
+    # this schema, so a row written from psql has to name it.
+    segment: Mapped[str] = mapped_column(String(20), default=SEGMENT_CALL)
     detail_json: Mapped[dict | None] = mapped_column(JSONB)  # e.g. the metric's course over the call
 
     session: Mapped["Session"] = relationship(back_populates="measurements")
@@ -673,6 +737,15 @@ class Feedback(Base):
     # model call as `summary`, so a wrap-up that fell back to narrative-only,
     # or one generated before this column existed, legitimately has none.
     phase_language: Mapped[str | None] = mapped_column(Text)
+    # Whether the tone of voice suited the occasion of this call. Prose for the
+    # same reason `phase_language` is (ADR 0056): what counts as the right
+    # register for a complaint is not the same as for a price negotiation, and
+    # no measured norm exists for either, so a figure here would be the
+    # invented threshold ADR 0051 refused. The paragraph is what closes the gap
+    # F-35's own caveat names -- how much melody is appropriate depends on the
+    # occasion, and until now nothing in the application said which occasion
+    # this was. Nullable on the same grounds as the column above.
+    tone_fit: Mapped[str | None] = mapped_column(Text)
     score: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
@@ -708,6 +781,23 @@ class FeedbackPoint(Base):
     metric_type_id: Mapped[int | None] = mapped_column(
         ForeignKey("metric_type.metric_type_id"), index=True
     )
+    # Which of F-62's focus goals this point is about, assigned by the wrap-up
+    # as it writes the point. A reference table like the one above, so no
+    # ondelete here either.
+    #
+    # This is what makes a point countable across a user's trainings, and it is
+    # the whole of the dashboard's stage 2: "the closing was named as an
+    # improvement in 4 of 8 wrap-ups" is a frequency of statements, not a
+    # measurement of a person, which is what keeps it inside ADR 0004/0065.
+    # A closed vocabulary and not free text, because two spellings of the same
+    # weakness would count as two.
+    #
+    # Nullable in three cases that mean different things and all end up NULL: a
+    # point about nothing in the catalogue, a model answer that left the key
+    # out, and every wrap-up written before this column existed.
+    focus_goal_id: Mapped[int | None] = mapped_column(
+        ForeignKey("focus_goal.focus_goal_id"), index=True
+    )
     # POINT_STRENGTH or POINT_IMPROVEMENT, see the constants above.
     kind: Mapped[str] = mapped_column(String(20))
     position: Mapped[int] = mapped_column(Integer)
@@ -717,6 +807,7 @@ class FeedbackPoint(Base):
     turn: Mapped["Turn | None"] = relationship(back_populates="feedback_points")
     finding: Mapped["Finding | None"] = relationship(back_populates="feedback_points")
     metric_type: Mapped["MetricType | None"] = relationship(back_populates="feedback_points")
+    focus_goal: Mapped["FocusGoal | None"] = relationship()
 
 
 class Consent(Base):
