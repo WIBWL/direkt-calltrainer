@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { colorOf } from "../utils/metricGroups";
 import type { MetricSeries } from "../utils/progressStats";
-import { formatValue } from "../utils/progressStats";
+import { formatPoint } from "../utils/progressStats";
 import { formatDate } from "../utils/time";
 
 /**
@@ -143,7 +143,7 @@ export default function Sparkline({
           {active !== null && point && (
             <>
               <span className="sparkline-readout-value">
-                {formatValue(point.value, series.unit)}
+                {formatPoint(series, point.value)}
               </span>{" "}
               <span className="sparkline-readout-when">
                 {formatDate(point.at) ?? point.at}
@@ -162,10 +162,10 @@ export default function Sparkline({
 function describe(series: MetricSeries): string {
   const values = series.points.map((p) => p.value);
   const last = values[values.length - 1] ?? 0;
-  const lowest = formatValue(Math.min(...values), series.unit);
-  const highest = formatValue(Math.max(...values), series.unit);
+  const lowest = formatPoint(series, Math.min(...values));
+  const highest = formatPoint(series, Math.max(...values));
   return (
     `${series.name}: ${values.length} Trainings, Werte von ${lowest} bis ${highest}, ` +
-    `zuletzt ${formatValue(last, series.unit)}.`
+    `zuletzt ${formatPoint(series, last)}.`
   );
 }

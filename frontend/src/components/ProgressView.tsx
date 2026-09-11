@@ -1,40 +1,64 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { useConsentContext } from "../ConsentContext";
 import { useFocusContext } from "../FocusContext";
 import { useProgressData } from "../hooks/useProgressData";
-import type { FocusGoal, MetricAspect, SessionSummary } from "../protocol";
+import type { FocusGoal, SessionSummary } from "../protocol";
 import { ROUTES, progressGoalPath, progressMetricPath } from "../routes";
 import { backingOf } from "../utils/focusMetrics";
 import { mentionsFor } from "../utils/goalMentions";
-import { GROUPS, groupOf } from "../utils/metricGroups";
 import { segmentTrainings } from "../utils/segmentStats";
 import {
   MIN_SESSIONS_FOR_SERIES,
   activity,
   durationSeries,
-  formatValue,
+  formatPoint,
+  formatBand,
   variety,
-  withinPeriod,
+  latest,
   toSeries,
   type MetricSeries,
 } from "../utils/progressStats";
 import { formatDate } from "../utils/time";
 import ActivityCalendar from "./ActivityCalendar";
 import AppLayout from "./AppLayout";
-import FilterSlider from "./FilterSlider";
+import InfoDetails from "./InfoDetails";
+import MentionTally from "./MentionTally";
+import PartsStrip, { partsSummary } from "./PartsStrip";
+import ProgressMetricTable from "./ProgressMetricTable";
 import ProgressPractice from "./ProgressPractice";
 import ProgressRecurring from "./ProgressRecurring";
 import Sparkline from "./Sparkline";
 import VarietyGrid from "./VarietyGrid";
 
-/** The periods the user can switch between. Six months is the retention limit
- *  (ADR 0067), so "Gesamt" means everything still stored and nothing older. */
+/**
+ * Kennzahlen that stay out of the overview, though their own page and the
+ * focus goals still reach them.
+ *
+ * `word_count` grows with the length of the call and with nothing else worth
+ * reading across trainings, so its row would repeat the Gesprächsdauer beside
+ * it in other units. It is still measured and still listed under "Prägnante
+ * Sprache".
+ *
+ * The loudness is not here because it never reaches this screen at all:
+ * `progressStats.NOT_ACROSS_CALLS` drops it before any series is built.
+ */
+const OVERVIEW_HIDDEN = new Set(["word_count"]);
+
+/**
+ * Which trainings the screen is read over, counted in trainings (see
+ * `progressStats.latest` for why not in days).
+ *
+ * It used to be 30 days, six months and "Gesamt". Six months is the retention
+ * limit (ADR 0067), so the second and third said the same thing on almost
+ * every account, and the first was empty for anybody who trains in bursts.
+ * "Alle" is still everything stored and nothing older.
+ */
 const PERIODS = [
-  { key: "30", label: "30 Tage", days: 30 },
-  { key: "180", label: "6 Monate", days: 180 },
-  { key: "all", label: "Gesamt", days: null },
+  { key: "5", label: "Letzte 5", count: 5 },
+  { key: "10", label: "Letzte 10", count: 10 },
+  { key: "all", label: "Alle", count: null },
 ] as const;
 
 type PeriodKey = (typeof PERIODS)[number]["key"];
@@ -42,13 +66,23 @@ type PeriodKey = (typeof PERIODS)[number]["key"];
 /**
  * The progress dashboard (F-13, docs/dashboard-konzept.md).
  *
- * Three questions in the order Hattie & Timperley put them: where am I going
- * (the focus goals), how am I going (the Kennzahlen over time), what next
- * (what the wrap-ups keep coming back to, and the one thing to practise next).
- * Both used to be a labelled placeholder; they became real once each feedback
- * point carried the focus goal it was about (ADR 0080) --
- * `ProgressRecurring` counts what recurs, `ProgressPractice` turns the most
- * frequent improvement into a single suggestion with a button.
+ * Top to bottom: where am I going (the focus goals), what next (what the
+ * wrap-ups keep coming back to, with the one thing to practise beside it), how
+ * am I going (every Kennzahl over time), and last what I did (the calendar and
+ * the variety grid). The first three are Hattie & Timperley's feed up, feed
+ * forward and feed back; the order puts the one block that leads back into
+ * training second rather than last, because a dashboard whose only way out is
+ * at the bottom of its longest page ends in looking (Zimmerman's reflection
+ * phase has to hand over to planning, dashboard-konzept.md section 3). The
+ * activity blocks moved down for the same reason: they are context, and they
+ * were the first thing on the page only because in the pilot there was little
+ * else to show.
+ *
+ * The recurring themes and the suggestion used to be a labelled placeholder;
+ * they became real once each feedback point carried the focus goal it was
+ * about (ADR 0080) -- `ProgressRecurring` counts what recurs,
+ * `ProgressPractice` turns the most frequent improvement into a single
+ * suggestion with a button, and the two now share one row.
  *
  * Everything numeric on this screen was measured when a call ended and stored
  * with the Session (ADR 0051); this view groups those values and describes
@@ -68,17 +102,18 @@ export default function ProgressView() {
   const { sessions, state, truncated, total } = useProgressData();
   const { focus } = useFocusContext();
   const { consent } = useConsentContext();
-  // "Gesamt" by default: in the pilot a 30-day window is usually empty, and an
-  // empty screen on arrival teaches the user that there is nothing here.
+  // Everything by default, as dashboard-konzept.md section 10 decided: the
+  // first look should show all there is, and narrowing is one click away.
   const [period, setPeriod] = useState<PeriodKey>("all");
 
-  const days = PERIODS.find((p) => p.key === period)?.days ?? null;
-  const inPeriod = withinPeriod(sessions, days);
+  const count = PERIODS.find((p) => p.key === period)?.count ?? null;
+  const inPeriod = latest(sessions, count);
   // The call length rides along with the measured Kennzahlen. It is derived
   // from the two timestamps rather than measured from the audio, but it belongs
   // to the same family: descriptive, and in need of no norm to be readable.
   const duration = durationSeries(inPeriod);
   const series = [...toSeries(inPeriod), ...(duration ? [duration] : [])];
+  const overview = series.filter((s) => !OVERVIEW_HIDDEN.has(s.key));
   const counts = activity(inPeriod);
   const goals = pickedGoals(focus?.goals ?? [], focus?.selected ?? []);
 
@@ -163,7 +198,7 @@ export default function ProgressView() {
           </li>
         </ul>
 
-        <div className="progress-periods" role="group" aria-label="Zeitraum">
+        <div className="progress-periods" role="group" aria-label="Welche Trainings">
           {PERIODS.map((option) => (
             <button
               type="button"
@@ -184,62 +219,56 @@ export default function ProgressView() {
         </p>
       )}
 
-      {/* Activity first, because it is the one thing that says something from
-          the very first training onwards, while the Kennzahlen need a handful
-          of calls before they carry anything.
+      {/* No "nothing in this period" branch any more: counted in trainings,
+          the selection is never empty while anything is stored, and the case
+          of nothing stored returned above. */}
+      {goals.length > 0 ? (
+        <FocusSection
+          goals={goals}
+          series={series}
+          sessionCount={inPeriod.length}
+          sessions={inPeriod}
+          allSessions={sessions}
+        />
+      ) : (
+        <OverviewSection series={overview} />
+      )}
 
-          The calendar sits outside the period check and reads every stored
-          training: it pages through months on its own, so the switch above
-          would only ever take months away from it. */}
-      <section className="progress-section">
+      {/* Second, directly under the goals: what the wrap-ups keep naming, and
+          beside the improvements the one call to practise them in. It is the
+          only block on the page that leads back into training, and it used to
+          be the last one. */}
+      <ProgressRecurring
+        sessions={inPeriod}
+        catalogue={focus?.goals ?? []}
+        practice={<ProgressPractice sessions={inPeriod} catalogue={focus?.goals ?? []} />}
+      />
+
+      <ProgressMetricTable series={overview} />
+
+      {/* Last, as context. The calendar sits outside the period check and reads
+          every stored training: it pages through months on its own, so the
+          switch above would only ever take months away from it. The variety
+          grid beside it does follow the switch. */}
+      <section className="progress-section" aria-labelledby="activity-title">
+        <div className="progress-section-head">
+          <h2 id="activity-title">Ihr Training</h2>
+        </div>
         <div className="progress-columns">
           <div className="card progress-activity-card">
-            <h2>Wann Sie trainiert haben</h2>
+            <h3 className="progress-card-title">Wann Sie trainiert haben</h3>
             <ActivityCalendar sessions={sessions} />
           </div>
 
           <div className="card progress-variety-card">
-            <h2>Womit Sie trainiert haben</h2>
-            {inPeriod.length === 0 ? (
-              <p className="muted">In diesem Zeitraum liegt kein Training.</p>
-            ) : (
-              <>
-                <VarietyGrid variety={variety(inPeriod)} />
-                <p className="focus-tile-note">
-                  Wie oft Sie welches Szenario mit welchem Gesprächspartner gespielt haben.
-                </p>
-              </>
-            )}
+            <h3 className="progress-card-title">Womit Sie trainiert haben</h3>
+            <VarietyGrid variety={variety(inPeriod)} />
+            <p className="focus-tile-note">
+              Wie oft Sie welches Szenario mit welchem Gesprächspartner gespielt haben.
+            </p>
           </div>
         </div>
       </section>
-
-      {inPeriod.length === 0 ? (
-        <div className="card">
-          <p>
-            In diesem Zeitraum liegt kein Training. Wählen Sie oben einen größeren Zeitraum.
-          </p>
-        </div>
-      ) : (
-        <>
-          {goals.length > 0 ? (
-            <FocusSection
-              goals={goals}
-              series={series}
-              sessionCount={inPeriod.length}
-              sessions={inPeriod}
-            />
-          ) : (
-            <OverviewSection series={series} />
-          )}
-
-          <MetricSection series={series} sessionCount={inPeriod.length} />
-
-          <ProgressRecurring sessions={inPeriod} catalogue={focus?.goals ?? []} />
-
-          <ProgressPractice sessions={inPeriod} catalogue={focus?.goals ?? []} />
-        </>
-      )}
     </Frame>
   );
 }
@@ -250,10 +279,28 @@ function Frame({ children }: { children: ReactNode }) {
   return (
     <AppLayout wide progressActive pageClassName="app-page-wide progress-page">
       <h1>Ihr Fortschritt</h1>
+      {/* What the page is, first, and that nothing on it is a grade, in one
+          sentence -- that half cannot move behind the "i": a reader who is not
+          told that no figure is judged fills the gap in and assumes higher is
+          better (dashboard-konzept.md section 2). The reason why belongs
+          behind it. */}
       <p className="page-lead">
-        Ihre eigenen Werte über die Zeit. Sie werden hier nicht bewertet: Für keine dieser
-        Größen gibt es einen belegten Richtwert, an dem sie zu messen wäre.
+        Woran Sie arbeiten, was Ihre Auswertungen wiederholt nennen und wie Sie über Ihre
+        Trainings hinweg gesprochen haben. Bewertet wird hier nichts.
       </p>
+      <InfoDetails label="Warum hier nichts bewertet wird">
+        <p>
+          Für keine dieser Größen gibt es einen belegten Richtwert, an dem sie für Ihre
+          Gespräche zu messen wäre. Ein Redeanteil von 60 % kann in einem Beratungsgespräch
+          genau richtig und in einer Beschwerde zu viel sein. Deshalb zeigt diese Seite Ihre
+          eigenen Werte und den Bereich, in dem sie meistens liegen, aber keine Zielwerte,
+          keine Farben für gut oder schlecht und keine Pfeile.
+        </p>
+        <p>
+          Gezeigt werden nur Ihre eigenen Trainings. Einen Vergleich mit anderen gibt es nicht
+          und wird es nicht geben.
+        </p>
+      </InfoDetails>
       {children}
     </AppLayout>
   );
@@ -272,6 +319,7 @@ function FocusSection({
   series,
   sessionCount,
   sessions,
+  allSessions,
 }: {
   goals: FocusGoal[];
   series: MetricSeries[];
@@ -279,6 +327,8 @@ function FocusSection({
   /** For the goals with no measurement of their own, which are answered by how
    *  often the wrap-ups named them. */
   sessions: SessionSummary[];
+  /** Everything stored, whatever the switch says (see `FocusTile`). */
+  allSessions: SessionSummary[];
 }) {
   return (
     <section className="progress-section">
@@ -297,6 +347,7 @@ function FocusSection({
               series={series}
               sessionCount={sessionCount}
               sessions={sessions}
+              allSessions={allSessions}
             />
           </li>
         ))}
@@ -308,39 +359,52 @@ function FocusSection({
 /**
  * One focus goal.
  *
- * Three shapes, because the honest answer differs per goal (see
- * `utils/focusMetrics.ts`): a Kennzahl with its course, an activity figure, or
- * the plain statement that this goal has no measurement yet. The third is
- * deliberately not hidden. A tile that quietly disappears would let the user
- * believe the goal is being tracked.
+ * Four shapes, because the honest answer differs per goal (see
+ * `utils/focusMetrics.ts`): Kennzahlen with their course, a comparison of two
+ * stretches of a call, an activity figure, or what the wrap-ups said where
+ * there is no measurement. The last is deliberately not hidden. A tile that
+ * quietly disappears would let the user believe the goal is being tracked.
  */
 function FocusTile({
   goal,
   series,
   sessionCount,
   sessions,
+  allSessions,
 }: {
   goal: FocusGoal;
   series: MetricSeries[];
   sessionCount: number;
   sessions: SessionSummary[];
+  /** Every stored training, for the regularity goal, which is about the
+   *  calendar and not about the trainings the switch selected. */
+  allSessions: SessionSummary[];
 }) {
   const backing = backingOf(goal.key);
   const primary = series.find((s) => s.key === backing.metrics[0]);
+  const supporting = backing.metrics
+    .slice(1)
+    .filter((key) => !OVERVIEW_HIDDEN.has(key))
+    .map((key) => series.find((s) => s.key === key))
+    .filter((s): s is MetricSeries => s !== undefined)
+    .slice(0, MAX_SUPPORTING);
 
   return (
     <div className="focus-tile">
       <h3 className="focus-tile-title">{goal.title}</h3>
 
       {backing.kind === "metric" && primary ? (
-        <MetricBody series={primary} sessionCount={sessionCount} />
+        <>
+          <MetricBody series={primary} sessionCount={sessionCount} />
+          {supporting.length > 0 && <SupportingMetrics series={supporting} />}
+        </>
       ) : backing.kind === "segment" ? (
         <SegmentBody sessions={sessions} />
       ) : backing.kind === "activity" ? (
         <p className="focus-tile-note">
           {goal.key === "training_regularity"
-            ? `${sessionCount} ${sessionCount === 1 ? "Training" : "Trainings"} im gewählten Zeitraum.`
-            : "Wie breit Sie trainieren, sehen Sie an den Szenarien und Gesprächspartnern oben."}
+            ? regularityText(allSessions)
+            : "Wie breit Sie trainieren, zeigt das Raster unter „Ihr Training“."}
         </p>
       ) : (
         <GoalMentionBody goal={goal.key} sessions={sessions} note={backing.note} />
@@ -349,9 +413,9 @@ function FocusTile({
       {/* One drill-down per tile, and it is the goal's own page rather than a
           Kennzahl's: a tile stands for a goal, and the goals with no
           measurement need the level most. That page links on to the chart
-          where there is one, and the Kennzahlen grid below still reaches the
+          where there is one, and the Kennzahlen table below still reaches the
           charts in one click. Activity goals have none -- what answers them is
-          the two figures at the top of this very screen. */}
+          the calendar and the variety grid on this very screen. */}
       {backing.kind !== "activity" && (
         <Link className="progress-detail-link" to={progressGoalPath(goal.key)}>
           Was dazu gesagt wurde
@@ -359,6 +423,56 @@ function FocusTile({
       )}
     </div>
   );
+}
+
+/** How many of a goal's further Kennzahlen stand on its tile under the first.
+ *  Two: `pace` and `active_listening` name three between them, which together
+ *  are the goal, and a third line would turn the tile into the table below. */
+const MAX_SUPPORTING = 2;
+
+/**
+ * The goal's other Kennzahlen, one line each: name, the last value, a small
+ * course.
+ *
+ * The first Kennzahl alone told half the story. Sprechtempo, Sprechpausen and
+ * Sprechlänge am Stück are together the rhythm of somebody's speaking, and each
+ * can look unchanged while the rhythm moves (`focusMetrics.FOCUS_BACKING`). So
+ * the tile carries the rest too, smaller, in the same hue and on the same
+ * terms: no band, no colour for a value, the figure printed beside the line.
+ */
+function SupportingMetrics({ series }: { series: MetricSeries[] }) {
+  return (
+    <ul className="focus-supporting">
+      {series.map((s) => {
+        const last = s.points[s.points.length - 1];
+        return (
+          <li key={s.key} className="focus-supporting-row">
+            <span className="focus-supporting-name">{s.name}</span>
+            <span className="focus-supporting-value">
+              {last ? formatPoint(s, last.value) : "–"}
+            </span>
+            {s.shape === "line" && s.points.length >= MIN_SESSIONS_FOR_SERIES && (
+              <span className="focus-supporting-course">
+                <Sparkline series={s} height={22} showDots={false} interactive={false} />
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Regular training in words: how many trainings in the last 30 days, and when
+ *  the last one was. A count and a date, no verdict on either -- how often is
+ *  often enough is exactly the kind of number nobody has established. */
+function regularityText(sessions: SessionSummary[]): string {
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const completed = sessions.filter((s) => s.status === "completed");
+  const recent = completed.filter((s) => new Date(s.started_at).getTime() >= cutoff).length;
+  const last = completed[0]?.started_at;
+  const count = `${recent} ${recent === 1 ? "Training" : "Trainings"} in den letzten 30 Tagen`;
+  return last ? `${count}, zuletzt am ${formatDate(last) ?? last}.` : `${count}.`;
 }
 
 /**
@@ -427,42 +541,66 @@ function GoalMentionBody({
     return <p className="focus-tile-note">{note}</p>;
   }
 
+  // Pips and a count in small type, the way the recurring block draws the same
+  // kind of statement. The large figure this used to lead with made "3 von 8"
+  // the most prominent thing on the tile, and in display type a count over a
+  // denominator reads as a mark (`MentionTally`).
   return (
     <>
-      <p className="progress-metric-figure">
-        {improvements > 0 ? `${improvements} von ${total}` : `${strengths} von ${total}`}
-      </p>
+      <ul className="focus-mentions">
+        {improvements > 0 && (
+          <li>
+            <span className="focus-mentions-label">Als Verbesserung genannt</span>
+            <MentionTally count={improvements} total={total} />
+            <span className="focus-mentions-count">
+              {improvements} von {total}
+            </span>
+          </li>
+        )}
+        {strengths > 0 && (
+          <li>
+            <span className="focus-mentions-label">Als Stärke genannt</span>
+            <MentionTally count={strengths} total={total} />
+            <span className="focus-mentions-count">
+              {strengths} von {total}
+            </span>
+          </li>
+        )}
+      </ul>
       <p className="focus-tile-note">
-        {improvements > 0
-          ? `In ${improvements} von ${total} ausgewerteten Trainings als Verbesserungspunkt genannt`
-          : `In ${strengths} von ${total} ausgewerteten Trainings als Stärke genannt`}
-        {improvements > 0 && strengths > 0 && `, in ${strengths} als Stärke`}. Zu diesem Ziel gibt
-        es keine Messung. Gezählt wird, was Ihre Auswertungen geschrieben haben.
+        Keine Messung. Gezählt wird, in wie vielen ausgewerteten Trainings es genannt wurde.
       </p>
     </>
   );
 }
 
 /** A metric's current state: the last value, its course, and the user's own
- *  usual range in words. Shared by the focus tiles and the metric grid. */
-function MetricBody({
-  series,
-  sessionCount,
-  interactive = true,
-}: {
-  series: MetricSeries;
-  sessionCount: number;
-  /** Off inside a link: a hover layer nested in an anchor fights it for the
-   *  pointer, and the whole cell is the target there. */
-  interactive?: boolean;
-}) {
+ *  usual range in words. Shared by the focus tiles and the overview that
+ *  stands in for them. */
+function MetricBody({ series, sessionCount }: { series: MetricSeries; sessionCount: number }) {
   const last = series.points[series.points.length - 1];
+
+  // A checklist has no course and no band (see `SeriesShape`): the counts per
+  // training, and how often all parts were there.
+  if (series.shape === "parts") {
+    const summary = partsSummary(series);
+    return (
+      <>
+        <p className="progress-metric-figure">
+          {last ? formatPoint(series, last.value) : "noch kein Wert"}
+          {last && <span className="progress-metric-figure-label"> zuletzt</span>}
+        </p>
+        <PartsStrip series={series} />
+        {summary && <p className="focus-tile-note">{summary}.</p>}
+      </>
+    );
+  }
 
   if (series.points.length < MIN_SESSIONS_FOR_SERIES) {
     return (
       <>
         <p className="progress-metric-figure">
-          {last ? formatValue(last.value, series.unit) : "noch kein Wert"}
+          {last ? formatPoint(series, last.value) : "noch kein Wert"}
         </p>
         <p className="focus-tile-note">
           Ab {MIN_SESSIONS_FOR_SERIES} Trainings wird hier der Verlauf gezeigt. Bisher{" "}
@@ -475,14 +613,12 @@ function MetricBody({
   return (
     <>
       <p className="progress-metric-figure">
-        {last ? formatValue(last.value, series.unit) : ""}
+        {last ? formatPoint(series, last.value) : ""}
         <span className="progress-metric-figure-label"> zuletzt</span>
       </p>
-      <Sparkline series={series} interactive={interactive} />
+      <Sparkline series={series} />
       <p className="focus-tile-note">
-        Ihr üblicher Bereich {formatValue(series.band?.low ?? 0, null)} bis{" "}
-        {formatValue(series.band?.high ?? 0, series.unit)}, aus {series.points.length}{" "}
-        Trainings.
+        Ihr üblicher Bereich {formatBand(series) ?? "–"}, aus {series.points.length} Trainings.
       </p>
     </>
   );
@@ -546,99 +682,6 @@ function OverviewSection({ series }: { series: MetricSeries[] }) {
           Fokusziele wählen
         </Link>
       </div>
-    </section>
-  );
-}
-
-// --- All Kennzahlen (block C) ------------------------------------------------
-
-/**
- * Every Kennzahl over time, one half of them at a time.
- *
- * The switch is the reason this block is readable at all. Ten charts of equal
- * size side by side is a wall: nothing leads, nothing is worth stopping at, and
- * the screen reads as a report somebody has to work through. Five is a group
- * the eye takes in at once.
- *
- * `FilterSlider` and not a set of tabs, because the application already
- * switches two other things this way (the Scenario library's two filter rows,
- * the Kennzahlen after a call) and a third pattern for the same act would be a
- * third thing to learn. The split is the schema's own `aspect`, so it matches
- * the one the post-call screen uses and no mapping is invented here.
- */
-function MetricSection({
-  series,
-  sessionCount,
-}: {
-  series: MetricSeries[];
-  sessionCount: number;
-}) {
-  const [half, setHalf] = useState<MetricAspect>("how");
-
-  if (series.length === 0) {
-    return (
-      <section className="progress-section">
-        <h2>Kennzahlen über die Zeit</h2>
-        <div className="card">
-          <p>
-            Zu den Trainings in diesem Zeitraum liegen keine Kennzahlen vor. Das kommt vor,
-            wenn ein Gespräch sehr kurz war oder die Messung nicht durchlief.
-          </p>
-        </div>
-      </section>
-    );
-  }
-
-  const halves: { value: MetricAspect; label: string }[] = [
-    { value: "how", label: GROUPS.speech.label },
-    { value: "what", label: GROUPS.content.label },
-  ];
-  const options = halves.map((option) => ({
-    ...option,
-    count: series.filter((s) => groupOf(s.aspect) === groupOf(option.value)).length,
-  }));
-  const shown = series.filter((s) => groupOf(s.aspect) === groupOf(half));
-
-  return (
-    <section className="progress-section">
-      <div className="progress-section-head">
-        <h2>
-          {/* The family's hue, said once here rather than on each of the six
-              tiles below, which under this switch all belong to it. */}
-          <span
-            className="progress-group-dot"
-            style={{ "--series": GROUPS[groupOf(half)].color } as CSSProperties}
-            aria-hidden="true"
-          />
-          Kennzahlen über die Zeit
-        </h2>
-        <FilterSlider
-          options={options}
-          value={half}
-          onChange={setHalf}
-          label="Welche Kennzahlen"
-        />
-      </div>
-
-      {/* Small multiples: same size, same shape, so the eye compares them
-          instead of reading each one on its own terms. */}
-      <ul className="progress-metric-grid">
-        {shown.map((s) => (
-          <li key={s.key}>
-            <Link className="progress-metric-cell" to={progressMetricPath(s.key)}>
-              <span className="progress-metric-cell-name">{s.name}</span>
-              <MetricBody series={s} sessionCount={sessionCount} interactive={false} />
-            </Link>
-          </li>
-        ))}
-      </ul>
-
-      <p className="muted progress-note">
-        {half === "how"
-          ? "Wie Sie gesprochen haben: Tempo, Pausen, Lautstärke, Sprachmelodie."
-          : "Worüber gesprochen wurde: Redeanteil, Fragen, Wortanzahl, Dauer."}{" "}
-        Die Farbe steht für die Gruppe, nie für einen Wert.
-      </p>
     </section>
   );
 }

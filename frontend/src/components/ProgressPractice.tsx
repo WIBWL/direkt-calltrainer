@@ -7,6 +7,7 @@ import { ROUTES, type TrainingStart } from "../routes";
 import { listScenarios, type ScenarioCard } from "../scenarioLibrary";
 import { mentionSummary } from "../utils/goalMentions";
 import { PRACTICE_CATEGORY, PRACTICE_REASON } from "../utils/practiceRoutes";
+import InfoDetails from "./InfoDetails";
 
 /**
  * Block E of the dashboard: one thing to practise next.
@@ -83,58 +84,73 @@ export default function ProgressPractice({
 
   if (!suggestion || !personaId) return null;
 
+  // A card in the recurring block's row rather than a section of its own
+  // (see `ProgressRecurring`), headed the way the two lists beside it are.
   return (
-    <section className="progress-section" aria-labelledby="practice-title">
-      <div className="progress-section-head">
-        <h2 id="practice-title">Was Sie als Nächstes üben könnten</h2>
-      </div>
+    <section className="card recurring-card progress-practice" aria-labelledby="practice-title">
+      <h3 className="recurring-heading" id="practice-title">
+        Als Nächstes üben
+      </h3>
 
-      <div className="card progress-practice">
-        {/* The ground, then the offer, then the button. That order is the
-            argument: a suggestion whose ground the reader has not seen is an
-            instruction, and this screen has no standing to give one. */}
-        <p className="progress-practice-why">
-          <span className="progress-practice-chip">Vorschlag</span>
-          {goal?.title ?? target.goal} wurde in {target.count} Ihrer Auswertungen als
-          Verbesserungspunkt genannt, zuletzt am {formatDay(source.started_at)} im Gespräch
-          „{source.scenario}“.
-        </p>
+      {/* The ground, then the offer, then the button. That order is the
+          argument: a suggestion whose ground the reader has not seen is an
+          instruction, and this screen has no standing to give one. */}
+      <p className="progress-practice-why">
+        <span className="progress-practice-chip">Vorschlag</span>
+        {goal?.title ?? target.goal} wurde in {target.count} Ihrer Auswertungen als
+        Verbesserungspunkt genannt, zuletzt am {formatDay(source.started_at)} im Gespräch
+        „{source.scenario}“.
+      </p>
 
-        <div className="progress-practice-offer">
-          <div className="progress-practice-text">
-            <p className="progress-practice-what">{suggestion.name}</p>
-            <ul className="progress-practice-facts">
-              <li>mit {source.persona}</li>
-              <li>{suggestion.why}</li>
-            </ul>
-          </div>
-
-          <button
-            type="button"
-            // `consent-button` is the app's primary button, misnamed after the
-            // screen it first stood on. The `button-primary` that used to be
-            // here is styled nowhere, so this rendered as a bare browser
-            // button.
-            className="consent-button consent-button-primary progress-practice-start"
-            onClick={() => {
-              // The same door the history uses to start a follow-up: the two
-              // screens are separate routes, so the pairing travels as location
-              // state and the training screen consumes it once (see
-              // `TrainingStart`).
-              const start: TrainingStart = { scenarioId: suggestion.id, personaId };
-              navigate(ROUTES.training, { state: { start } });
-            }}
-          >
-            Dieses Training starten
-          </button>
+      <div className="progress-practice-offer">
+        <div className="progress-practice-text">
+          <p className="progress-practice-what">{suggestion.name}</p>
+          <ul className="progress-practice-facts">
+            <li>mit {source.persona}</li>
+            <li>{suggestion.why}</li>
+          </ul>
         </div>
 
-        <p className="progress-practice-note">
-          Ein Vorschlag, keine Vorgabe. Er folgt daraus, was Ihre Auswertungen mehrfach genannt
-          haben, und aus einer festen Zuordnung, welches Ziel sich in welcher Art von Gespräch
-          üben lässt. Über die Startseite können Sie jederzeit etwas anderes wählen.
-        </p>
+        <button
+          type="button"
+          // `consent-button` is the app's primary button, misnamed after the
+          // screen it first stood on. The `button-primary` that used to be
+          // here is styled nowhere, so this rendered as a bare browser
+          // button.
+          className="consent-button consent-button-primary progress-practice-start"
+          onClick={() => {
+            // The same door the history uses to start a follow-up: the two
+            // screens are separate routes, so the pairing travels as location
+            // state and the training screen consumes it once (see
+            // `TrainingStart`).
+            const start: TrainingStart = { scenarioId: suggestion.id, personaId };
+            navigate(ROUTES.training, { state: { start } });
+          }}
+        >
+          Dieses Training starten
+        </button>
       </div>
+
+      {/* "Ein Vorschlag, keine Vorgabe" stays in view: it is what keeps the
+          button above from reading as an instruction. How the suggestion was
+          put together is background and sits behind the "i". */}
+      <p className="progress-practice-note">
+        Ein Vorschlag, keine Vorgabe. Über die Startseite können Sie jederzeit etwas anderes
+        wählen.
+      </p>
+      <InfoDetails label="Wie dieser Vorschlag zustande kommt">
+        <p>
+          Er folgt daraus, was Ihre Auswertungen mehrfach als Verbesserung genannt haben. Gibt es
+          zu dem Gespräch, in dem das zuletzt vorkam, ein Folgeszenario, wird dieses
+          vorgeschlagen. Sonst ein Szenario aus der Art von Gespräch, in der sich das Ziel üben
+          lässt, bevorzugt eines, das Sie noch nicht gespielt haben.
+        </p>
+        <p>
+          Der Gesprächspartner ist derselbe wie in dem Training, in dem der Punkt zuletzt genannt
+          wurde. So bleibt die Stimme gleich, und das nächste Gespräch ist eine Übung an genau
+          diesem Punkt.
+        </p>
+      </InfoDetails>
     </section>
   );
 }

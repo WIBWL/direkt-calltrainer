@@ -4576,10 +4576,8 @@ h2 {
   color: var(--color-blue-600);
 }
 
-/* Focus tiles and the metric grid are the same shape on purpose: small
-   multiples compare only when they are identically sized (Tufte). */
-.focus-tiles,
-.progress-metric-grid {
+/* The focus tiles: small multiples, so identically sized (Tufte). */
+.focus-tiles {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -4588,8 +4586,7 @@ h2 {
   gap: 12px;
 }
 
-.focus-tile,
-.progress-metric-cell {
+.focus-tile {
   display: block;
   height: 100%;
   padding: 14px 16px;
@@ -4600,45 +4597,20 @@ h2 {
   text-decoration: none;
 }
 
-.progress-metric-cell {
-  transition: border-color 0.15s, background 0.15s, transform 0.15s, box-shadow 0.15s;
-}
-
-.progress-metric-cell:hover {
-  border-color: var(--color-blue-300);
-  background: var(--color-surface-selected);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px #03253e12;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .progress-metric-cell:hover {
-    transform: none;
-  }
-}
-
-.progress-metric-cell:focus-visible {
-  outline: 2px solid var(--color-blue-600);
-  outline-offset: -2px;
-}
-
-.focus-tile-title,
-.progress-metric-cell-name {
+.focus-tile-title {
   display: block;
   margin: 0 0 0.4rem;
   font-size: 0.9rem;
   font-weight: 600;
   line-height: 1.3;
   /* Ink, not the series hue: the palette rules keep text in text colours and
-     let a coloured mark beside it carry the identity. Here that mark is the
-     rule above the name. */
+     let a coloured mark beside it carry the identity. */
   color: var(--color-navy-900);
 }
 
-/* A dot in the family's hue beside the heading, once per section rather than
-   once per tile. Under the Sprechweise/Inhalt switch every tile in the grid
-   belongs to the same family, so a mark on each of them repeats the same word
-   six times; the charts inside already carry the hue. */
+/* A dot in the family's hue, once per group heading rather than once per row:
+   every row under the heading belongs to the same family, and the sparklines
+   in them already carry the hue. */
 .progress-group-dot {
   display: inline-block;
   width: 10px;
@@ -4649,13 +4621,249 @@ h2 {
   vertical-align: baseline;
 }
 
-/* The switch sizes to its options instead of stretching across the row: a track
-   running the full width of a wide screen with two labels at its left end reads
-   as an unfinished progress bar. The library's own row is full width by design
-   -- five filters fill it -- so this narrows it here rather than there. */
-.progress-section-head .filter-slider {
-  flex: 0 0 auto;
-  width: auto;
+/* --- Kennzahlen over time, one row each (block C) ------------------------- */
+/* A sparkline table: every row the same height and every course the same
+   width, which is what makes sixteen of them comparable at a glance. No colour
+   in any cell depends on a value; the hue is the group's and sits on the
+   sparkline and on the dot in the group heading. */
+
+.metric-table-card {
+  padding: 0.25rem 0 0.5rem;
+}
+
+.metric-table-scroll {
+  overflow-x: auto;
+}
+
+.metric-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.metric-table th,
+.metric-table td {
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.metric-table th:first-child,
+.metric-table td:first-child {
+  padding-left: 1.5rem;
+}
+
+.metric-table th:last-child,
+.metric-table td:last-child {
+  padding-right: 1.5rem;
+}
+
+.metric-table thead th {
+  padding-top: 12px;
+  padding-bottom: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+/* The family heading between the groups: a quiet band, not a row of data. */
+.metric-table-group th {
+  padding-top: 18px;
+  padding-bottom: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-navy-900);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.metric-table-row td,
+.metric-table-row th {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.metric-table tbody:last-child .metric-table-row:last-child td,
+.metric-table tbody:last-child .metric-table-row:last-child th {
+  border-bottom: none;
+}
+
+.metric-table-row {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.metric-table-row:hover {
+  background: var(--color-surface-selected);
+}
+
+.metric-table-name {
+  font-weight: 500;
+  min-width: 12rem;
+}
+
+.metric-table-name a {
+  color: var(--color-navy-900);
+  text-decoration: none;
+}
+
+.metric-table-row:hover .metric-table-name a {
+  color: var(--color-blue-600);
+}
+
+.metric-table-name a:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Two classes, so it outranks the table's own left alignment above. */
+.metric-table .metric-table-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.metric-table-last {
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+/* Every course the same width, so the eye can run down the column and compare
+   shapes rather than reading each one on its own scale. */
+.metric-table-course {
+  width: 30%;
+  min-width: 180px;
+}
+
+/* Scoped to the page and the card as well, because the metric detail page's
+   rule for its large chart (`.progress-page .card .sparkline`) matches a
+   sparkline in any card on these pages and would otherwise make every row
+   160px tall. */
+.progress-page .metric-table-card .metric-table .sparkline {
+  height: 36px;
+  margin-bottom: 0;
+}
+
+.metric-table-band {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-table-wait {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* A checklist Kennzahl across the trainings: one mark per training with the
+   count in it. Every mark alike, whatever it holds -- shading by count would be
+   a colour meaning "more is better" (ADR 0065), and the number is the reading. */
+.parts-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.parts-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--color-surface-filter);
+  color: var(--color-navy-900);
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-tile .parts-strip {
+  margin: 0.2rem 0 0.1rem;
+}
+
+/* A goal's further Kennzahlen under its first: smaller, one line each, the
+   figure beside a thin course. Separated by a rule so they read as supporting
+   the figure above rather than as a second headline. */
+.focus-supporting {
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0.6rem 0 0;
+  border-top: 1px solid var(--color-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.focus-supporting-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 64px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.focus-supporting-name {
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focus-supporting-value {
+  font-weight: 600;
+  color: var(--color-navy-900);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.focus-supporting .sparkline {
+  height: 22px;
+}
+
+/* What the wrap-ups said about a goal with no measurement: a label, the pips
+   and the count, the same marks the recurring block uses for the same kind of
+   statement. */
+.focus-mentions {
+  list-style: none;
+  margin: 0.2rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.focus-mentions li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label count"
+    "pips  pips";
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.focus-mentions-label {
+  grid-area: label;
+  font-size: 0.85rem;
+  color: var(--color-navy-900);
+}
+
+.focus-mentions-count {
+  grid-area: count;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.focus-mentions .recurring-pips,
+.focus-mentions .recurring-track {
+  grid-area: pips;
 }
 
 /* Air between the last row of tiles and the sentence under them. */
@@ -4743,8 +4951,13 @@ h2 {
   margin: 0;
 }
 
-.progress-columns h2 {
-  margin-bottom: 1rem;
+/* The two cards' own titles, one level under the section heading "Ihr
+   Training" that now stands above both. */
+.progress-card-title {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
 }
 
 /* --- When the user trained ------------------------------------------------ */

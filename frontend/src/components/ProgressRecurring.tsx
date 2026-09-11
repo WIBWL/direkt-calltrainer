@@ -1,5 +1,9 @@
+import type { ReactNode } from "react";
+
 import type { FocusGoal, SessionSummary } from "../protocol";
 import { MIN_MENTIONS, mentionSummary, type GoalMentions } from "../utils/goalMentions";
+import InfoDetails from "./InfoDetails";
+import MentionTally from "./MentionTally";
 
 /**
  * Block D of the dashboard: what the wrap-ups keep coming back to.
@@ -21,15 +25,27 @@ import { MIN_MENTIONS, mentionSummary, type GoalMentions } from "../utils/goalMe
  * a plausible weakness under somebody's own name is the worst thing this
  * screen could do and an empty stretch of page discusses nothing. It is real
  * now, so the placeholder is gone rather than kept alongside.
+ *
+ * The practice suggestion (block E) is the third card in the same row, beside
+ * the improvements it is drawn from. Stacked under this block it read as a
+ * separate section at the foot of the page; beside it, the ground and the offer
+ * are one glance. It is handed in rather than built here because it has its own
+ * data to fetch and its own reasons to render nothing, and the grid simply
+ * closes up when it does.
  */
 export default function ProgressRecurring({
   sessions,
   catalogue,
+  practice,
 }: {
   sessions: SessionSummary[];
   /** The focus catalogue, for turning a key into its German title. Served with
    *  the selection (`GET /api/focus`), so the wording lives in one place. */
   catalogue: FocusGoal[];
+  /** The suggestion card, shown beside the two lists. Only where there is
+   *  something recurring: with nothing named twice it has no ground to stand
+   *  on, and `ProgressPractice` would render nothing anyway. */
+  practice?: ReactNode;
 }) {
   const { strengths, improvements, total } = mentionSummary(sessions);
   const titles = new Map(catalogue.map((goal) => [goal.key, goal.title]));
@@ -65,17 +81,31 @@ export default function ProgressRecurring({
               total={total}
               empty="Bisher wurde kein Verbesserungspunkt mehrfach genannt."
             />
+            {practice}
           </div>
 
-          {/* Under both cards rather than inside one of them: it describes the
-              counting, which is the same on either side. */}
+          {/* Under the cards rather than inside one of them: it describes the
+              counting, which is the same on either side. One sentence stays in
+              view -- that this is what was written and not what was measured is
+              the half a reader must not miss -- and the rules of the count move
+              behind the "i", as on every other screen of the app. */}
           <p className="progress-preview-note recurring-note">
-            Gezählt wird, in wie vielen Ihrer {total} ausgewerteten Trainings ein Thema genannt
-            wurde, nicht wie oft es vorkam. Das ist eine Häufigkeit von Aussagen und keine
-            Messung: Es steht hier, weil die Auswertungen es geschrieben haben, nicht weil etwas
-            nachgemessen wurde. Aufgenommen wird ein Thema ab {MIN_MENTIONS} Nennungen, denn ein
-            einzelner Punkt aus einem einzelnen Gespräch ist eine Beobachtung und kein Muster.
+            Gezählt wird, was Ihre Auswertungen geschrieben haben, nicht was gemessen wurde.
           </p>
+          <InfoDetails label="Wie gezählt wird">
+            <p>
+              Gezählt wird, in wie vielen Ihrer {total} ausgewerteten Trainings ein Thema genannt
+              wurde, nicht wie oft es in einem Training vorkam. Das ist eine Häufigkeit von
+              Aussagen und keine Messung: Es steht hier, weil die Auswertungen es geschrieben
+              haben, nicht weil etwas nachgemessen wurde.
+            </p>
+            <p>
+              Aufgenommen wird ein Thema ab {MIN_MENTIONS} Nennungen, denn ein einzelner Punkt
+              aus einem einzelnen Gespräch ist eine Beobachtung und kein Muster. Trainings ohne
+              Auswertung, und Auswertungen von vor der Einführung dieser Zuordnung, zählen nicht
+              mit.
+            </p>
+          </InfoDetails>
         </>
       )}
     </section>
@@ -137,7 +167,7 @@ function Column({
                       and the raw key is a poor label but an honest one. */}
                   {titles.get(entry.goal) ?? entry.goal}
                 </span>
-                <Tally count={entry.count} total={total} />
+                <MentionTally count={entry.count} total={total} />
               </span>
               <span className="recurring-count">
                 {entry.count} <span className="recurring-count-of">von {total}</span>
@@ -147,41 +177,5 @@ function Column({
         </ul>
       )}
     </div>
-  );
-}
-
-/**
- * How many of the trainings named this, drawn.
- *
- * One pip per analysed training, filled where the theme came up. A count over a
- * denominator of three or eight is what this is, and pips say that where a bar
- * would round it into a proportion and invite reading it as a level. Above
- * `MAX_PIPS` the row of dots stops being countable at a glance, so it becomes a
- * single track instead, which is the lesser evil at that width.
- *
- * Decoration only: the figure stands beside it in words, and this carries
- * `aria-hidden` for that reason. It is a frequency of statements either way,
- * never a measurement and never a score (ADR 0065).
- */
-const MAX_PIPS = 12;
-
-function Tally({ count, total }: { count: number; total: number }) {
-  if (total > MAX_PIPS) {
-    const share = total > 0 ? Math.min(1, count / total) : 0;
-    return (
-      <span className="recurring-track" aria-hidden="true">
-        <span className="recurring-track-fill" style={{ width: `${share * 100}%` }} />
-      </span>
-    );
-  }
-  return (
-    <span className="recurring-pips" aria-hidden="true">
-      {Array.from({ length: total }, (_, index) => (
-        <span
-          key={index}
-          className={`recurring-pip${index < count ? " is-named" : ""}`}
-        />
-      ))}
-    </span>
   );
 }

@@ -12,11 +12,58 @@ Er greift ausschließlich auf echte, gespeicherte Werte zu und kommt ohne neuen
 Endpunkt aus, weil `GET /api/sessions` die Messwerte je Sitzung bereits
 mitliefert.
 
-Zwei Grafiken oben tragen den Bildschirm, solange kaum gemessen wurde: ein
-**Kalender** der Trainingstage (`ActivityCalendar.tsx`) und das Raster
-Szenario × Persona (`VarietyGrid.tsx`). Beide brauchen nur die Sitzungsdaten,
-keine Messwerte. Die Gesprächsdauer läuft als abgeleitete Reihe neben den
-gemessenen Kennzahlen mit.
+**Überarbeitung (September 2026).** Der Bildschirm ist umgebaut worden, weil
+drei Dinge nicht mehr stimmten, seit das Inventar von neun auf sechzehn
+Kennzahlen gewachsen war:
+
+* **Kennzahlen als Tabelle statt als Kachelraster.** Der Umschalter über dem
+  Raster war für neun Kennzahlen gedacht und zeigte zuletzt neun und sieben
+  Kacheln, also wieder die Wand, gegen die er gebaut worden war. Jetzt steht
+  jede Kennzahl in einer Zeile (`ProgressMetricTable.tsx`): Name, letzter Wert,
+  Verlauf als Sparkline, eigener üblicher Bereich, Zahl der Trainings, unter den
+  beiden Gruppen Sprechweise und Gesprächsinhalt. Das ist Tuftes
+  Sparkline-Tabelle, passt auf einen Bildschirm und ist barrierefreier als
+  sechzehn verlinkte Grafiken. Der Umschalter entfällt.
+* **Reihenfolge.** Fokusziele, dann das Wiederkehrende mit dem Übungsvorschlag
+  als dritter Karte in derselben Reihe, dann die Kennzahlen, zuletzt Kalender und
+  Vielfalt unter „Ihr Training“. Der einzige Block, der zurück ins Training
+  führt, stand vorher ganz unten auf der längsten Seite (Abschnitt 3, Zimmerman).
+* **Kennzahlen, die keine Kurve vertragen.** Zählwerte (Fragen, Füllwörter,
+  Wiederholungen, Verzögerungslaute, Unterbrechungen) stehen als ganze Zahl je
+  Gespräch, ihr üblicher Bereich gerundet und nie unter null. Eine Fassung je 100
+  gesprochene Wörter (Abschnitt 4.1 hatte das für die Fragen vorgesehen) war
+  kurz gebaut und ist wieder entfernt, weil sie jede Anzahl zur Kommazahl machte;
+  die Gesprächsdauer steht als eigene Zeile daneben. Die Wortanzahl selbst fehlt
+  in der Übersicht, weil sie über mehrere Trainings nur die Gesprächsdauer
+  wiederholt. **Die Lautstärke fehlt auf dem ganzen Dashboard**, auch im
+  Druck-Vergleich auf der Zielseite: Ihr dB-Wert ist der Pegel der Aufnahme und
+  über mehrere Gespräche vor allem Mikrofon und Abstand (derselbe Grund, aus dem
+  das Fokusziel dazu zurückgezogen wurde, Abschnitt 4.2). Innerhalb eines
+  Gesprächs bleibt sie in dessen Auswertung. Der
+  Gesprächseinstieg („von 3“) bekommt keine Kurve und kein Band, sondern je
+  Training die Zahl der erkannten Teile (`PartsStrip.tsx`) und den Satz „in X von
+  N Trainings alle 3 Teile erkannt“: Eine Linie über einem Band läse sich als
+  Note auf dem Weg zur Bestnote, und genau diese Lesart hat ADR 0086 schon auf
+  der Kachel des einzelnen Gesprächs vermieden.
+
+Das Raster Szenario × Gesprächspartner sortiert Zeilen und Spalten nach
+Häufigkeit und zeigt fünf Szenarien, den Rest hinter „weitere Szenarien
+anzeigen“; mit einem Dutzend gespielter Szenarien war es das längste Element der
+Seite geworden.
+
+Dazu drei kleinere Änderungen: Die Fokuskacheln zeigen unter der ersten
+Kennzahl bis zu zwei weitere, weil etwa Sprechtempo, Pausen und Sprechlänge
+zusammen erst den Rhythmus ergeben. Ziele ohne Messung zeigen ihre Nennungen als
+Punktreihe wie der Block D statt als große Ziffer „3 von 8“. Erklärungen stehen
+hinter einem „i“ (`InfoDetails`), wobei der eine Satz, der nicht überlesen werden
+darf, sichtbar bleibt. Und der Schalter wählt jetzt **die letzten 5, die letzten
+10 oder alle Trainings** statt 30 Tage, 6 Monate oder Gesamt (Abschnitt 10).
+
+Kalender der Trainingstage (`ActivityCalendar.tsx`) und Raster Szenario ×
+Persona (`VarietyGrid.tsx`) brauchen nur die Sitzungsdaten, keine Messwerte. Sie
+standen zuerst oben, weil sie im Pilotbetrieb das Einzige waren, was schon etwas
+zeigte, und stehen seit der Überarbeitung unten. Die Gesprächsdauer läuft als
+abgeleitete Reihe neben den gemessenen Kennzahlen mit.
 
 Der Kalender stand zuerst als Balkendiagramm je Tag, Woche oder Monat da. Die
 Zahlen sind dieselben; was ein Kalender hinzufügt, ist die Form einer Woche:
@@ -331,42 +378,54 @@ Eigene Route `/fortschritt`, verlinkt aus dem Kopfbereich und aus dem Profil.
 Nicht im Profil selbst: Dieses ist bereits lang und behandelt Konto, Daten und
 Einstellungen, während das Dashboard eine Arbeitsansicht ist.
 
+Stand nach der Überarbeitung (September 2026). Die Buchstaben der Abschnitte
+unten sind die ursprünglichen, die Reihenfolge auf dem Bildschirm ist B, D mit E,
+C und zuletzt der Aktivitätsteil aus A.
+
 ```
 +-----------------------------------------------------------------------+
-|  Ihr Fortschritt                     [ 30 Tage | 6 Monate | Gesamt ]   |
+|  Ihr Fortschritt              [ Letzte 5 | Letzte 10 | Alle ]          |
 |  14 Trainings, 6 Szenarien, 2 Gesprächspartner                         |  A
 +-----------------------------------------------------------------------+
 |  IHRE FOKUSZIELE                                                       |
 |  +----------------------+ +----------------------+ +-----------------+ |
 |  | Sprechtempo          | | Redeanteil           | | Einwand-        | |
 |  | 132 W/min            | | 46 %                 | | behandlung      | |  B
-|  | ~~~~/\~~~~~ (12)     | | ~~~~~~\_~~~ (12)     | | Text, keine     | |
-|  | Ihr Bereich 118-141  | | Ihr Bereich 41-58    | | Messung         | |
-|  | > Details            | | > Details            | | > Details       | |
+|  | ~~~~/\~~~~~ (12)     | | ~~~~~~\_~~~ (12)     | | Verbesserung    | |
+|  | Ihr Bereich 118-141  | | Ihr Bereich 41-58    | | ●●●○○○○○ 3/8    | |
+|  | Pausen   0,6 s  ~~~  | |                      | | keine Messung   | |
+|  | am Stück 1,2 s  ~~~  | |                      | |                 | |
 |  +----------------------+ +----------------------+ +-----------------+ |
 +-----------------------------------------------------------------------+
-|  KENNZAHLEN UEBER DIE ZEIT                                             |
-|  Redeanteil    ~~~~~~~~   Fragen        ~~~~~~~~   Sprechtempo ~~~~~~  |  C
-|  Reaktionszeit ~~~~~~~~   Sprechpausen  ~~~~~~~~   Lautstaerke  ~~~~~  |
-|  (Small Multiples, gleiche Breite, je mit eigenem Streuungsband)       |
-+-----------------------------------------------------------------------+
 |  WAS IN IHREN AUSWERTUNGEN WIEDERKEHRT                                 |
-|  Haeufig als Staerke genannt      Haeufig als Verbesserung genannt     |  D
-|  - Klare Struktur (5 von 8)       - Zu frueh auf den Preis (4 von 8)   |
-|  - Ruhiger Ton (4 von 8)          - Abschluss bleibt offen (3 von 8)   |
-|                                                                        |
-|  [ Abschluss gezielt ueben ]  Szenario "Abschluss nach Uebergabe"      |  E
-|                               mit Thomas Brandt                        |
+|  +----------------+ +--------------------+ +------------------------+ |  D
+|  | Als Stärke     | | Als Verbesserung   | | ALS NÄCHSTES ÜBEN      | |  E
+|  | 1 Klare Str. 5 | | 1 Abschluss    4   | | Abschluss nach Übergabe| |
+|  | 2 Ruhiger T. 4 | | 2 Einwände     3   | | mit Thomas Brandt  [>] | |
+|  +----------------+ +--------------------+ +------------------------+ |
++-----------------------------------------------------------------------+
+|  KENNZAHLEN ÜBER DIE ZEIT                                              |
+|  Kennzahl         Zuletzt   Verlauf        Ihr Bereich       Trainings |  C
+|  ● Sprechweise                                                         |
+|  Sprechtempo      132 W/min ~~~/\~~~~      118 bis 141 W/min       12  |
+|  Sprechpausen     0,6 s     ~~~~\_~~~      0,4 bis 0,8 s           12  |
+|  ● Gesprächsinhalt                                                     |
+|  Fragen           4         ~~~~\/~~~      3 bis 6                 12  |
+|  Gesprächseinstieg 3 Teile  [3][2][3][3]   in 9 von 12 alle 3      12  |
++-----------------------------------------------------------------------+
+|  IHR TRAINING                                                          |
+|  [ Kalender des Monats ]      [ Szenario × Gesprächspartner ]          |  A
 +-----------------------------------------------------------------------+
 ```
 
 ### A. Kopf
 
-Zeitraumwahl und die reinen Aktivitätszahlen. Aktivität braucht keine Norm, sie
-zählt, was getan wurde (ADR 0065 nennt das ausdrücklich als erlaubt). Der
-Zeitraum ist auf sechs Monate begrenzt, weil ältere Trainings gelöscht werden
-(ADR 0067). Die Auswahl „Gesamt“ heißt also „alles, was noch da ist“, und sagt
-das auch.
+Die Auswahl der Trainings und die reinen Aktivitätszahlen. Aktivität braucht
+keine Norm, sie zählt, was getan wurde (ADR 0065 nennt das ausdrücklich als
+erlaubt). Gewählt wird nach Anzahl, nicht nach Tagen: die letzten 5, die letzten
+10 oder alle. Nach Tagen war die Auswahl bei jemandem, der in Schüben trainiert,
+oft leer, und „6 Monate“ und „Gesamt“ waren wegen der Löschfrist (ADR 0067) fast
+immer dasselbe. „Alle“ heißt also „alles, was noch da ist“.
 
 ### B. Fokusziele
 
@@ -404,13 +463,17 @@ Setzen von Zielen bleibt freiwillig (F-62).
 
 ### C. Kennzahlen über die Zeit
 
-Alle vorhandenen Kennzahlen als Small Multiples: gleiche Größe, gleiche
-Zeitachse, untereinander vergleichbar. Bewusst ohne Auswahl und ohne
-Umschalter, damit der Bereich nicht zu einem Analysewerkzeug wird. Wer mehr
-will, öffnet die Detailebene.
+Alle vorhandenen Kennzahlen als Sparkline-Tabelle, eine Zeile je Kennzahl:
+gleiche Höhe, gleiche Breite des Verlaufs, untereinander vergleichbar. Bewusst
+ohne Auswahl und ohne Umschalter, damit der Bereich nicht zu einem
+Analysewerkzeug wird. Wer mehr will, öffnet die Detailebene über den Namen oder
+die Zeile.
 
-Kennzahlen, die im Zeitraum nur einmal vorliegen, erscheinen als einzelner Punkt
-mit Wert, nicht als Kurve.
+Kennzahlen, die unter den gewählten Trainings seltener als dreimal vorliegen,
+zeigen den letzten Wert und statt der Kurve den Hinweis, ab wann eine gezeigt
+wird. Zählwerte stehen als ganze Zahl je Gespräch; der Gesprächseinstieg steht
+als Zahl erkannter Teile je Training, ohne Kurve und ohne Band; die Lautstärke
+fehlt (siehe Überarbeitung oben).
 
 ### D. Stärken und Schwächen
 
@@ -553,11 +616,14 @@ Drei Ebenen, mehr nicht:
   flacher Verlauf überhaupt als Form lesbar ist, und auf dem zuletzt gemessenen
   Punkt sitzt eine Marke, weil das der Wert ist, den die Kachel daneben als Zahl
   nennt.
-* **Zehn Kennzahlen sind zu viele auf einmal**, deshalb zeigt die Übersicht
-  eine Hälfte: derselbe Umschalter (`FilterSlider`), den die Szenario-Bibliothek
-  und der Auswertungsbildschirm schon benutzen, auf derselben Einteilung
-  (`metric_type.aspect`). Fünf bis sechs Kacheln nimmt das Auge auf einen Blick;
-  zehn sind eine Wand.
+* **Sechzehn Kennzahlen als Kacheln sind eine Wand**, auch in zwei Hälften.
+  Eine Zeitlang zeigte die Übersicht deshalb eine Hälfte hinter einem
+  Umschalter (`FilterSlider`, Einteilung nach `metric_type.aspect`); mit
+  wachsendem Inventar waren das neun und sieben Kacheln. Seit der Überarbeitung
+  steht jede Kennzahl als Zeile in einer Tabelle, die beiden Gruppen als
+  Zeilengruppen mit einer Überschrift in ihrer Farbe. Eine Zeile ist klein genug,
+  dass alle auf einen Bildschirm passen, und gleich groß genug, dass sie
+  vergleichbar bleiben.
 * **Zeigen, was unter dem Zeiger liegt.** Die Verläufe und die Aktivitätsbalken
   haben eine Hover-Ebene: Auf einem Verlauf erscheint unter dem Diagramm, aus
   welchem Training der Punkt stammt, bei den Balken die Anzahl je Zeitraum. Sie
@@ -632,8 +698,10 @@ Offene Fragen an die Projektleitung, die ich nicht allein entscheiden sollte:
 * ~~Soll der Zeitraumfilter voreingestellt 30 Tage oder alles zeigen?~~
   Beantwortet und gebaut: „Gesamt“ (`ProgressView.tsx`). Im Pilotbetrieb wären
   30 Tage oft leer, und ein leerer Bildschirm beim Ankommen bringt der
-  Nutzerin bei, dass hier nichts ist. Die 30 Tage bleiben als Filter daneben
-  stehen und sind einen Klick entfernt.
+  Nutzerin bei, dass hier nichts ist. Seit der Überarbeitung wird nach Anzahl
+  gewählt (letzte 5, letzte 10, alle), voreingestellt bleibt „Alle“. Aus
+  demselben Grund: Eine Auswahl nach Anzahl ist nie leer, solange überhaupt
+  etwas gespeichert ist.
 
 ## 11. Umsetzung in Stufen
 

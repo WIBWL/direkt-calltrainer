@@ -1,4 +1,5 @@
 import type { SegmentMeasurement, SessionSummary } from "../protocol";
+import { NOT_ACROSS_CALLS } from "./progressStats";
 
 /**
  * The demanding stretches of a call against the rest of it (ADR 0081).
@@ -73,15 +74,22 @@ export interface SegmentTraining {
  * facts were kept (ADR 0048 — those cannot be recomputed, their audio is
  * gone). All three are the same answer on screen: this call has no comparison,
  * which is not a gap in the data but a fact about the call.
+ *
+ * The dashboard's own list, so the Kennzahlen it never reads across trainings
+ * (`NOT_ACROSS_CALLS`, the loudness) are left out here too. Within one call the
+ * comparison would still be sound -- same microphone on both sides -- and the
+ * single call's own page keeps it through `pairFor`; but a column of dB spans
+ * running down this page, one training under the next, invites exactly the
+ * reading across calls the rest of the dashboard refuses.
  */
 export function segmentTrainings(sessions: SessionSummary[]): SegmentTraining[] {
   return sessions
-    .filter((session) => session.segments.length > 0)
     .map((session) => ({
       sessionId: session.session_id,
       at: session.started_at,
       scenario: session.scenario,
       persona: session.persona,
-      pairs: pairsOf(session.segments),
-    }));
+      pairs: pairsOf(session.segments).filter((pair) => !NOT_ACROSS_CALLS.has(pair.key)),
+    }))
+    .filter((training) => training.pairs.length > 0);
 }

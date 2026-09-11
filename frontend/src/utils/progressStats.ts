@@ -32,19 +32,69 @@ export interface SeriesPoint {
   persona: string;
 }
 
+/**
+ * How a series may be drawn.
+ *
+ * `line` is every ordinary Kennzahl: a value per training, a course, a band.
+ * `parts` is a checklist counted, where the value says how many of a fixed set
+ * of parts were recognised (F-63's opening: greeting, name, offer). Drawn as a
+ * line with a band around it, that reads as a score climbing towards full
+ * marks, which is exactly the reading ADR 0086 kept off the single call's tile
+ * by showing the parts rather than "1 von 3". So it gets neither a line nor a
+ * band here, only how often each count occurred.
+ */
+export type SeriesShape = "line" | "parts";
+
 export interface MetricSeries {
   key: string;
   /** The German display name, straight from `metric_type.name`. */
   name: string;
   unit: string | null;
   /** Which half of the Kennzahlen this one belongs to, from the schema's own
-   *  column. It decides the side of the dashboard's switch and the hue the
-   *  chart is drawn in (`utils/metricGroups`) — identity, never a value. */
+   *  column. It decides the group the row sits in and the hue the chart is
+   *  drawn in (`utils/metricGroups`) — identity, never a value. */
   aspect: MetricAspect | null;
+  shape: SeriesShape;
+  /** How the figure was derived from the stored one, where it was, as a
+   *  sentence for the reader. Null for a value shown exactly as measured. */
+  derivation: string | null;
   /** Oldest first, so the chart reads left to right in time. */
   points: SeriesPoint[];
-  /** The user's own usual range, or null with too few points to describe one. */
+  /** The user's own usual range, or null with too few points to describe one
+   *  and always null for a `parts` series. */
   band: Band | null;
+}
+
+/** The checklist Kennzahlen (see `SeriesShape`). */
+const PARTS_KEYS = new Set(["opening"]);
+
+/**
+ * Kennzahlen that are never read across trainings, on any view of this
+ * dashboard.
+ *
+ * `loudness` is a span in dB of the recording's level, and across calls that
+ * level is the microphone, its distance and the browser's gain as much as the
+ * speaker -- the reason the focus goal "Souveräne Lautstärke" was retired
+ * (ADR 0076's amendment). A course of it over several trainings would draw
+ * the headset. Inside one call the device is the same, so the single call's
+ * own page keeps its curve and its comparison of two stretches; only the
+ * views that set one call beside another leave it out. Exported for
+ * `segmentStats`, whose per-training comparison is on the dashboard too.
+ */
+export const NOT_ACROSS_CALLS = new Set(["loudness"]);
+
+/**
+ * The unit the backend gives a plain count ("Fragen", "Unterbrechungen", …).
+ *
+ * A count is a whole number of things and is shown as one. It is also shown
+ * without the word, since "4 Anzahl" says less than "4" beside a column
+ * already headed with the Kennzahl's name.
+ */
+const COUNT_UNIT = "Anzahl";
+
+/** Whether a series counts things, and so reads in whole numbers. */
+export function isCount(series: Pick<MetricSeries, "unit">): boolean {
+  return series.unit === COUNT_UNIT;
 }
 
 export interface Band {
@@ -71,11 +121,15 @@ export function toSeries(sessions: SessionSummary[]): MetricSeries[] {
       // definitions changed with ADR 0051, and splicing two different
       // measurements into one line would be the quiet kind of wrong.
       if (!measurement.active) continue;
+      if (NOT_ACROSS_CALLS.has(measurement.key)) continue;
+
       const series = byKey.get(measurement.key) ?? {
         key: measurement.key,
         name: measurement.name,
         unit: measurement.unit,
         aspect: measurement.aspect,
+        shape: PARTS_KEYS.has(measurement.key) ? "parts" : "line",
+        derivation: null,
         points: [],
         band: null,
       };
@@ -91,9 +145,60 @@ export function toSeries(sessions: SessionSummary[]): MetricSeries[] {
   }
 
   for (const series of byKey.values()) {
-    series.band = band(series.points.map((p) => p.value));
+    series.band = series.shape === "line" ? band(series.points.map((p) => p.value)) : null;
   }
   return [...byKey.values()];
+}
+
+/**
+ * One value of a series as the reader should see it.
+ *
+ * The same as `formatValue` for an ordinary Kennzahl. A checklist is written
+ * out as how many parts were recognised, never as "2 von 3": that fraction is
+ * what reads as a grade, and "erkannt" keeps it a detection, which is all it
+ * is -- a bare name slips past the patterns (F-63).
+ */
+export function formatPoint(series: MetricSeries, value: number): string {
+  if (series.shape === "parts") {
+    const count = Math.round(value);
+    return `${count} ${count === 1 ? "Teil" : "Teile"} erkannt`;
+  }
+  if (isCount(series)) return String(Math.round(value));
+  return formatValue(value, series.unit);
+}
+
+/**
+ * The user's usual range in words, or null where there is none to describe.
+ *
+ * For a count the two ends are whole numbers, and never below zero: the band is
+ * a median widened by a spread, which around a median of 0 or 1 reaches past
+ * zero on paper, and "-0,5 bis 1,5 Unterbrechungen" describes nothing anybody
+ * did. Where both ends round to the same number the range is that number.
+ */
+export function formatBand(series: MetricSeries): string | null {
+  if (!series.band) return null;
+  if (isCount(series)) {
+    const low = Math.max(0, Math.round(series.band.low));
+    const high = Math.max(low, Math.round(series.band.high));
+    return low === high ? `meist ${low}` : `${low} bis ${high}`;
+  }
+  return `${formatValue(series.band.low, null)} bis ${formatValue(series.band.high, series.unit)}`;
+}
+
+/** How many parts a checklist Kennzahl has, read off its unit ("von 3").
+ *  Null where the unit does not say, so no caller has to guess a number. */
+export function partsTotal(series: MetricSeries): number | null {
+  const match = series.unit?.match(/(\d+)/);
+  return match ? Number(match[1]) : null;
+}
+
+/** In how many trainings every part of a checklist was recognised. A count of
+ *  trainings over a named denominator, the same kind of statement as the
+ *  recurring block's "in 4 von 8 genannt", never a share or a direction. */
+export function completeParts(series: MetricSeries): number | null {
+  const total = partsTotal(series);
+  if (total === null) return null;
+  return series.points.filter((p) => Math.round(p.value) >= total).length;
 }
 
 /**
@@ -161,15 +266,20 @@ export function activity(sessions: SessionSummary[]): Activity {
   };
 }
 
-/** Sessions inside the selected period. `null` days means everything that is
- *  still stored, which after six months is all there is (ADR 0067). */
-export function withinPeriod(sessions: SessionSummary[], days: number | null): SessionSummary[] {
-  if (days === null) return sessions;
-  const cutoff = Date.now() - days * MS_PER_DAY;
-  return sessions.filter((s) => new Date(s.started_at).getTime() >= cutoff);
+/**
+ * The most recent `count` trainings, or all of them for `null`.
+ *
+ * Counted in trainings rather than in days. Somebody who trains in bursts --
+ * three calls before an appointment, then nothing for a month -- finds a
+ * 30-day window empty half the time, and an empty dashboard teaches that there
+ * is nothing here; "the last five" is never empty while anything is stored,
+ * and it is also the unit the Kennzahlen are read in, one point per training.
+ * The history arrives newest first (ADR 0064), so this is a slice. `null`
+ * means everything still stored, which is at most six months (ADR 0067).
+ */
+export function latest(sessions: SessionSummary[], count: number | null): SessionSummary[] {
+  return count === null ? sessions : sessions.slice(0, count);
 }
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** How long the call ran, in minutes, or null where it has no recorded end.
  *
@@ -209,6 +319,8 @@ export function durationSeries(sessions: SessionSummary[]): MetricSeries | null 
     // rather than how somebody spoke. Written here rather than read off the
     // wire because this one is the exception that has no `metric_type` row.
     aspect: "what",
+    shape: "line",
+    derivation: "Aus Beginn und Ende des Gesprächs gerechnet, nicht aus der Aufnahme.",
     points,
     band: band(points.map((p) => p.value)),
   };
@@ -371,8 +483,24 @@ export function variety(sessions: SessionSummary[]): Variety {
   }
   const cells = [...counts.values()];
   return {
-    scenarios: [...new Set(cells.map((c) => c.scenario))].sort(),
-    personas: [...new Set(cells.map((c) => c.persona))].sort(),
+    scenarios: byFrequency(cells, (c) => c.scenario),
+    personas: byFrequency(cells, (c) => c.persona),
     cells,
   };
+}
+
+/**
+ * The distinct names along one side of the grid, most played first.
+ *
+ * Frequency first because the grid is cut after a few rows (`VarietyGrid`), and
+ * what the reader should see before "Mehr anzeigen" is where their training has
+ * actually gone. Alphabetical on a tie, so the order does not shuffle between
+ * two loads of the same data.
+ */
+function byFrequency(cells: VarietyCell[], name: (cell: VarietyCell) => string): string[] {
+  const totals = new Map<string, number>();
+  for (const cell of cells) totals.set(name(cell), (totals.get(name(cell)) ?? 0) + cell.count);
+  return [...totals.entries()]
+    .sort(([a, x], [b, y]) => y - x || a.localeCompare(b, "de"))
+    .map(([key]) => key);
 }

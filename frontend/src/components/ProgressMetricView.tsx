@@ -4,10 +4,17 @@ import { useProgressData } from "../hooks/useProgressData";
 import { ROUTES, sessionPath } from "../routes";
 import { goalsForMetric } from "../utils/focusMetrics";
 import { statementsFor } from "../utils/goalMentions";
-import { MIN_SESSIONS_FOR_SERIES, formatValue, toSeries } from "../utils/progressStats";
+import {
+  MIN_SESSIONS_FOR_SERIES,
+  formatPoint,
+  formatBand,
+  isCount,
+  toSeries,
+} from "../utils/progressStats";
 import { formatDate } from "../utils/time";
 import AppLayout from "./AppLayout";
 import GoalStatements from "./GoalStatements";
+import PartsStrip, { partsSummary } from "./PartsStrip";
 import Sparkline from "./Sparkline";
 
 /**
@@ -77,17 +84,34 @@ export default function ProgressMetricView() {
       <h1>{series.name}</h1>
       <p className="page-lead">
         {series.points.length} {series.points.length === 1 ? "Training" : "Trainings"}
-        {series.unit && <>, gemessen in {series.unit}</>}. Ohne Zielwert, denn für diese
-        Nutzergruppe gibt es keinen belegten Richtwert.
+        {/* A checklist's unit is "von 3", which as "gemessen in von 3" says
+            nothing; its strip below says what the numbers count. */}
+        {/* Nor for a count, whose unit is the bare word "Anzahl". */}
+        {series.unit && series.shape === "line" && !isCount(series) && (
+          <>, gemessen in {series.unit}</>
+        )}
+        . Ohne
+        Zielwert, denn für diese Nutzergruppe gibt es keinen belegten Richtwert.
+        {series.derivation && <> {series.derivation}</>}
       </p>
 
-      {series.points.length >= MIN_SESSIONS_FOR_SERIES ? (
+      {series.shape === "parts" ? (
+        // No line and no band for a checklist (see `SeriesShape`): the count per
+        // training, and how often every part was there.
+        <div className="card">
+          <PartsStrip series={series} />
+          <p className="muted">
+            {partsSummary(series) ?? "Je Training, wie viele Teile erkannt wurden"}. Die Zahl
+            in jedem Feld ist ein Training, das älteste links. Welche Teile es waren, steht in
+            der Auswertung des Trainings selbst.
+          </p>
+        </div>
+      ) : series.points.length >= MIN_SESSIONS_FOR_SERIES ? (
         <div className="card">
           <Sparkline series={series} width={640} height={160} />
           {series.band && (
             <p className="muted">
-              Das Band ist der Bereich, in dem Ihre Werte meistens liegen:{" "}
-              {formatValue(series.band.low, null)} bis {formatValue(series.band.high, series.unit)}.
+              Das Band ist der Bereich, in dem Ihre Werte meistens liegen: {formatBand(series)}.
               Es ist aus Ihren eigenen Werten gerechnet und kein Zielbereich.
             </p>
           )}
@@ -124,9 +148,7 @@ export default function ProgressMetricView() {
                 </td>
                 <td>{point.scenario}</td>
                 <td>{point.persona}</td>
-                <td className="progress-table-value">
-                  {formatValue(point.value, series.unit)}
-                </td>
+                <td className="progress-table-value">{formatPoint(series, point.value)}</td>
               </tr>
             ))}
           </tbody>
