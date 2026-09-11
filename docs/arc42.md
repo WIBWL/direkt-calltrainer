@@ -7,7 +7,7 @@
 Im Gegensatz zu klassischen Verkaufstrainern liegt der Fokus nicht auf Abschlussquoten, sondern auf Kommunikation, Klarheit und Wirkung des Sprechenden, ohne dass umfangreiche kundenspezifische Fachkenntnisse vorausgesetzt werden (C-05):
 
 - Kommunikation, Klarheit und Wirkung des Sprechenden
-- Erkennung von Sprechverhalten (Redeanteil, Fragen, Sprechtempo, Wortanzahl, Reaktionszeit, Sprechpausen, Lautstärke — ADR 0051)
+- Erkennung von Sprechverhalten (Redeanteil, Fragen, Sprechtempo, Wortanzahl, Reaktionszeit, Sprechpausen, Sprechlänge am Stück, Lautstärke, Sprachmelodie, Unterbrechungen — ADR 0051, ADR 0077, ADR 0078; seit ADR 0081 fünf davon zusätzlich getrennt nach fordernden und übrigen Gesprächsabschnitten)
 - Vermeidung von überlangen/überkomplexen Erklärungen
 
 Nach jedem Trainingsgespräch erhält der Nutzer ein qualitatives Wrap-up mit konkreten Verbesserungsvorschlägen statt eines reinen Scores.
@@ -353,6 +353,19 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0066 | Consent Is What Permits a Session to Be Stored | angenommen (schränkt ADR 0034 ein) | C-04, F-49, F-31, F-12 |
 | ADR 0067 | Stored Sessions Expire After Six Months, Unless the User Says Otherwise | angenommen (schließt ADR 0031s offene Frist) | C-04, F-49, F-12 |
 | ADR 0068 | The Consent Log Outlives the Data It Permitted | angenommen (präzisiert ADR 0066) | C-04, F-49 |
+| ADR 0069 | The Follow-up Scenario Is Written From the Feedback and Stored | angenommen, zweimal ergänzt (der Nutzer fragt ihn an; der Entwurf führt denselben Fall fort) | F-60, F-09, F-10, F-58 |
+| ADR 0070 | Reverse — Replaying a Session With the Roles Swapped | angenommen (setzt ADR 0043 und ADR 0033 punktuell aus, ergänzt ADR 0066) | F-61, F-09, F-49 |
+| ADR 0071 | The Model Reads Its Notes and the Last Exchanges, Not the Whole History | angenommen (eingeschränkt durch ADR 0075) | Q-03, Q-07 |
+| ADR 0072 | The Scenario Category as a Closed Vocabulary | angenommen | F-03, F-43, F-44 |
+| ADR 0073 | The Settlement Check Rides on the Per-Turn Nudge | angenommen (verfeinert ADR 0037 und ADR 0038) | Q-01, Q-03 |
+| ADR 0074 | Dialogue Generation May Run on Gemini, Under One Switch and on Two Models | angenommen (kehrt ADR 0040s Entfernung des Gemini-Pfads um, schränkt ADR 0011 auf STT ein) | Q-03, Q-08, C-04 |
+| ADR 0075 | The Caller’s Notes Are Kept Only Where the Model Cannot Read Its Own History | angenommen (schränkt ADR 0071 auf das Gateway ein) | Q-03, Q-08 |
+| ADR 0076 | Focus Goals as a Stored Selection | angenommen, ergänzt (das Ziel zur Lautstärke ist zurückgezogen) | F-62, F-13, C-04 |
+| ADR 0077 | The Liveliness Reading Moves to the Pitch Variation Quotient | angenommen (ändert ADR 0051s Ausnahme für F-35) | F-35, Q-01, Q-04 |
+| ADR 0078 | A Classification May Carry a Traffic Light | angenommen (ändert ADR 0004 und ADR 0051, lässt ADR 0065 unberührt) | Q-01, Q-04, F-35, F-51 |
+| ADR 0079 | Whether the Tone Suited the Occasion, as Prose | angenommen (folgt ADR 0056s Muster für F-42) | F-09, F-35, F-42, Q-01 |
+| ADR 0080 | Feedback Points Carry a Focus Goal | angenommen (Stufe 2 des Dashboard-Konzepts, eingeschränkt durch ADR 0004 und ADR 0065) | F-13, F-62, F-10 |
+| ADR 0081 | Measurements Over the Demanding Stretches of a Call | angenommen (ändert ADR 0051 in zwei Punkten) | F-62, F-13, F-53, Q-01 |
 
 Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug; ADR 0017, 0025, 0027 bis 0030, 0039, 0055 und 0057 sind reine Wartbarkeits-, Werkzeug- oder Schemaentscheidungen ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 

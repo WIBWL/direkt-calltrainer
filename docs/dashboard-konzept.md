@@ -12,17 +12,65 @@ Er greift ausschließlich auf echte, gespeicherte Werte zu und kommt ohne neuen
 Endpunkt aus, weil `GET /api/sessions` die Messwerte je Sitzung bereits
 mitliefert.
 
-Zwei Grafiken oben tragen den Bildschirm, solange kaum gemessen wurde: die
-Trainings im Zeitverlauf (`ActivityChart.tsx`, Balken je Tag, Woche oder Monat
-je nach Zeitraum, abgebrochene Gespräche als hellerer Anteil) und das Raster
+Zwei Grafiken oben tragen den Bildschirm, solange kaum gemessen wurde: ein
+**Kalender** der Trainingstage (`ActivityCalendar.tsx`) und das Raster
 Szenario × Persona (`VarietyGrid.tsx`). Beide brauchen nur die Sitzungsdaten,
 keine Messwerte. Die Gesprächsdauer läuft als abgeleitete Reihe neben den
 gemessenen Kennzahlen mit.
 
-Die Bereiche D und E aus Abschnitt 5 sind als sichtbar gekennzeichnete
-Beispielansicht angelegt (`ProgressPreview.tsx`), weil ihnen die Datengrundlage
-fehlt. Stufe 2 steht aus. Aus Stufe 3 sind die Sprachmelodie und die
-Unterbrechungen inzwischen gebaut (Abschnitt 4.1).
+Der Kalender stand zuerst als Balkendiagramm je Tag, Woche oder Monat da. Die
+Zahlen sind dieselben; was ein Kalender hinzufügt, ist die Form einer Woche:
+ob die Trainings auf Werktagen liegen, ob vierzehn Tage nichts passiert ist, ob
+sie sich vor einem Termin häufen. Nichts davon ist in einer Balkenreihe lesbar,
+und alles davon ist das, was man eine Trainingshistorie fragt. Ein Tag mit
+Trainings trägt deren Anzahl und eine Einfärbung in drei Stufen (ein, zwei,
+drei und mehr), ein leerer Tag sein Datum, der heutige einen Ring. Gezählt
+werden nur abgeschlossene Trainings. Ein abgebrochenes Gespräch wird weder
+gezählt noch eigens markiert, denn die Frage lautet, wann jemand trainiert hat.
+
+Gezeigt wird ein Monat, beim Aufruf der laufende; zwei Pfeile blättern zurück
+bis zum Monat des ältesten Trainings und wieder vor. Sechs Monate
+nebeneinander waren eine Wand aus Rastern, in der ausgerechnet der gesuchte
+Monat am schwersten zu finden war, und die Karte daneben stand neben einem
+halben Meter leerem Rand.
+
+Der Zeitraumschalter über dem Bildschirm lässt den Kalender bewusst
+unberührt. Er sagt, über welche Trainings die Kennzahlen gelesen werden; ein
+Kalender trägt seinen Zeitraum schon im Raster. Ihm Monate wegzuschneiden
+hieße, dieselbe Aussage zweimal zu treffen, das zweite Mal als Loch in einer
+Grafik. Der Kalender liest deshalb alle gespeicherten Trainings, das Raster
+daneben weiterhin die des gewählten Zeitraums.
+
+Bereich D ist inzwischen echt (`ProgressRecurring.tsx`, Rechenteil
+`utils/goalMentions.ts`). Die Beispielansicht ist entfernt: Seit ADR 0080 trägt
+jeder Feedback-Punkt das Fokusziel, um das es geht, sodass gezählt werden kann,
+was die Auswertungen gesagt haben. Bereich E ist ebenfalls gebaut
+(`ProgressPractice.tsx`, Tabelle in `utils/practiceRoutes.ts`). Eine
+Abweichung von Abschnitt 5.E: Die Persona wird nicht nach Anforderungsgrad
+gewählt, weil der Draht auf einer Persona keinen trägt. Vorgeschlagen wird der
+Gesprächspartner aus dem Training, in dem der Punkt zuletzt genannt wurde.
+
+Die zweite Ebene ist seither vollständig (Abschnitt 7). Sie besteht aus zwei
+Seiten: `/fortschritt/:metrik` für eine Kennzahl (`ProgressMetricView.tsx`) und
+`/fortschritt/ziel/:ziel` für ein Fokusziel (`ProgressGoalView.tsx`). Beide
+zeigen unter Diagramm und Tabelle die Sätze aus den Auswertungen zu diesem Ziel,
+wörtlich und je mit Link in das Gespräch, aus dem sie stammen
+(`GoalStatements.tsx`). Dafür trägt ein markierter Feedback-Punkt seinen Text auf
+der Liste mit, was die Ergänzung zu ADR 0064 begründet. Die Zielseite ist der
+Grund, dass die Kacheln der sechs Ziele ohne Messung keine Sackgasse mehr sind:
+Eine Häufigkeit, hinter die niemand schauen kann, liest sich wie eine Messung.
+
+Aus Stufe 3 sind die Sprachmelodie und die Unterbrechungen gebaut, Füllwörter
+sind bewusst verworfen (Whisper normalisiert sie weg), das Fokusziel zur
+Lautstärke ist zurückgezogen (Abschnitt 4.2). Hinzugekommen ist der Vergleich
+für „Souveränität unter Druck“ (ADR 0081): Dieselben Kennzahlen werden ein
+zweites und drittes Mal gerechnet, über die Stellen, an denen das Gegenüber
+widersprochen oder nachgehakt hat, und über den Rest. Welche Stellen das waren,
+markiert die Auswertung in dem Modellaufruf, den sie ohnehin macht; damit danach
+überhaupt noch etwas zu messen ist, hält jede Nutzeräußerung ihre Rohwerte fest
+(die Aufnahme ist zu diesem Zeitpunkt längst gelöscht, ADR 0048). Verglichen wird
+nichts: Es stehen zwei Zahlen nebeneinander, und wie groß ein Unterschied sein
+darf, sagt niemand. Damit ist Stufe 3 abgeschlossen: Was dort offen aussah, ist entweder gebaut oder mit Begründung verworfen, und die Artikulation ist der letzte Fall der zweiten Art (Abschnitt 4.2).
 
 ## 1. Zweck
 
@@ -182,13 +230,15 @@ abgebrochen), also Aktivität und Vielfalt.
 
 ### 4.2 Abdeckung der Fokusziele
 
-Der Katalog aus F-62 hat 15 Ziele. Was davon heute mit Daten hinterlegt werden
-kann:
+Der Katalog aus F-62 hat 14 Ziele. „Souveräne Lautstärke“ stand hier bis zur
+Ergänzung von ADR 0076 und ist zurückgezogen: Gemessen wird der Pegel der
+Aufnahme, und der sagt genauso viel über Mikrofon und Sitzabstand wie über die
+sprechende Person. Die Kennzahl `loudness` bleibt, das Ziel nicht. Was heute mit
+Daten hinterlegt werden kann:
 
 | Fokusziel | Heute belegbar durch | Lücke |
 |---|---|---|
 | Ausgewogenes Sprechtempo | `pace`, `pauses` | keine |
-| Souveräne Lautstärke | `loudness` samt Kurve | keine |
 | Ausgewogener Redeanteil | `talk_share` | keine |
 | Aktive Bedarfsermittlung | `questions`, `talk_share` | ob an Kundenaussagen angeknüpft wird, ist Text |
 | Aktives Zuhören | `interruptions`, `reaction_time`, `pauses` | ob an Kundenaussagen angeknüpft wird, ist Text |
@@ -196,17 +246,54 @@ kann:
 | Regelmäßiges Training | Sitzungsdaten | keine |
 | Trainingsvielfalt | Persona × Szenario | keine |
 | Lebendige Sprachmelodie | `intonation` (Tonhöhenumfang in Halbtönen, plus Kurve) | keine |
-| Deutliche Artikulation | nichts | eigene Messung nötig |
-| Souveränität unter Druck | nichts | verlangt Werte je Gesprächsphase, gespeichert wird nur je Sitzung (ADR 0051) |
+| Deutliche Artikulation | Auswertungstext, und der dünn | keine Messung, und es ist keine geplant (siehe unten) |
+| Souveränität unter Druck | `pace`, `pauses`, `run_length`, `loudness`, `talk_share`, je über die fordernden Stellen und über den Rest (ADR 0081) | welche Stellen fordernd waren, entscheidet die Auswertung und nicht eine Messung |
 | Souveräner Gesprächseinstieg | Auswertungstext | keine Messung |
 | Sichere Einwandbehandlung | Auswertungstext | keine Messung |
 | Klarer Gesprächsabschluss | Auswertungstext, `phase_language` | keine Messung |
 | Empathie und Kundenorientierung | Auswertungstext | keine Messung, laut Katalog auch keine geplant |
 
-Neun Ziele sind also heute mit Zahlen unterlegbar, sechs zunächst nur mit Text.
+Neun Ziele sind also heute mit Zahlen unterlegbar, fünf zunächst nur mit Text.
+Das neunte ist der Sonderfall: „Souveränität unter Druck“ wird nicht als Verlauf
+gezeigt, sondern als Vergleich zweier Abschnitte innerhalb eines Gesprächs
+(Abschnitt 5.B und ADR 0081). Ein Verlauf daraus wäre der Unterschied zwischen
+den Abschnitten als Linie, also genau die Zahl, die es nicht geben soll.
 Das ist kein Mangel des Dashboards, sondern der Umsetzungsstand. Der Entwurf
 muss beides tragen können, und ein Ziel ohne Messung darf keine leere Kachel
 erzeugen (Abschnitt 6).
+
+**Die Artikulation bekommt keine Messung, und das ist eine Entscheidung und kein
+Rückstand.** Sie stand als letzter offener Punkt in Stufe 3. Drei Gründe, jeder
+für sich ausreichend:
+
+* **Das Mikrofon ist nicht herauszurechnen.** Undeutlichkeit zeigt sich in der
+  spektralen Schärfe des Signals, und die hängt von Mikrofon, Abstand und der
+  automatischen Verstärkung des Browsers ab. Das ist genau das Argument, mit dem
+  heute das Fokusziel zur Lautstärke zurückgezogen wurde, nur trifft es hier
+  härter: Bei der Lautstärke bleibt innerhalb eines Gesprächs wenigstens der
+  Vergleich zweier Abschnitte gültig, weil das Gerät dasselbe ist. Ein Wert für
+  Deutlichkeit hat keinen solchen inneren Bezugspunkt.
+* **Der Erkenner räumt auf, bevor irgendetwas messen könnte.** Whisper
+  normalisiert verschluckte Endungen zu korrekten Wörtern, wie es die Füllwörter
+  wegnormalisiert. Aus dem Transkript ist Undeutlichkeit deshalb nicht ablesbar,
+  und die Wortfehlerrate zu messen hieße, die Erkennerqualität zu berichten.
+* **Es gäbe keinen Schwellenwert.** Selbst mit einem sauberen Maß bliebe offen,
+  ab wann jemand undeutlich spricht. Für diese Nutzergruppe ist nichts
+  validiert, und ADR 0051 verbietet die Erfindung genau hier.
+
+Was bleibt, ist der Auswertungstext, und der ist bei diesem Ziel **dünner als bei
+den anderen fünf Textzielen**: Ob ein Abschluss klar war, steht im Gesagten und
+ist aus dem Transkript lesbar. Ob jemand deutlich gesprochen hat, steht gerade
+nicht darin. Das Modell kann dazu nur etwas sagen, wenn es im Transkript
+Nachfragen des Gegenübers findet („Wie bitte?“), und das ist ein schwaches
+Indiz. Daraus folgt eine Frage an die Projektleitung, die hier nicht allein
+entschieden wird: **Soll „Deutliche Artikulation“ im Katalog bleiben?** Ein Ziel
+anzubieten, zu dem die Anwendung dauerhaft fast nichts sagen kann, ist dieselbe
+Art von Versprechen, wegen der die Lautstärke gegangen ist. Bis das entschieden
+ist, bleibt das Ziel wählbar, und `focus_goal.evidence` steht auf
+`interpretive` statt wie bisher auf `mixed` — die Spalte sagt, wie weit ein Ziel
+ableitbar ist, und „gemischt“ war eine Zusage auf eine Messung, die nicht
+kommt.
 
 ### 4.3 Zwei methodische Vorbehalte, die in die Oberfläche gehören
 
@@ -294,9 +381,19 @@ Jede Kachel zeigt:
   Konstruktion, die `metrics.py` schon für die Lautstärkekurve verwendet. Das
   ist kein Zielbereich, sondern eine Beschreibung der eigenen Streuung, und es
   ist der einzige Bezugspunkt, den ADR 0051 zulässt,
-* bei Zielen ohne Messung stattdessen die letzten Aussagen aus den
-  Auswertungstexten zu diesem Ziel,
+* bei Zielen ohne Messung stattdessen, wie oft das Ziel in den Auswertungen
+  genannt wurde, und auf der Detailebene die Sätze selbst,
 * einen Verweis in die Detailebene.
+
+Eine Kachel fällt aus diesem Schema, und zwar begründet: **„Souveränität unter
+Druck“ hat keine Sparkline.** Dahinter steht kein Verlauf, sondern ein Vergleich
+zweier Abschnitte innerhalb eines Gesprächs (ADR 0081). Die Kachel zählt daher
+nur, in wie vielen Trainings es überhaupt eine fordernde Passage gab; die beiden
+Zahlenreihen stehen eine Ebene tiefer als Tabelle je Training. Eine Linie
+daraus wäre der Unterschied zwischen den Abschnitten über die Zeit, also die
+eine Zahl, die es zu diesem Ziel nicht geben darf, und aggregiert über mehrere
+Gespräche wäre sie zusätzlich falsch: Der Druck war in jedem Gespräch ein
+anderer.
 
 **Wenn keine Fokusziele gesetzt sind**, tritt an diese Stelle ein Block
 „Überblick“: die drei Kennzahlen mit der größten Streuung über den Zeitraum,
@@ -403,21 +500,70 @@ Drei Ebenen, mehr nicht:
 2. **Detail einer Kennzahl oder eines Fokusziels**. Größeres Diagramm mit allen
    Punkten des Zeitraums, Werte als Tabelle darunter (das ist zugleich die
    barrierefreie Alternative), je Punkt Datum, Szenario und Persona, und was die
-   Auswertungen zu diesem Ziel gesagt haben. Als eigene Route
-   (`/fortschritt/:metrik`), damit der Zustand teilbar und die
-   Zurück-Navigation die des Browsers ist.
+   Auswertungen zu diesem Ziel gesagt haben. Zwei eigene Routen,
+   `/fortschritt/:metrik` und `/fortschritt/ziel/:ziel`, damit der Zustand
+   teilbar und die Zurück-Navigation die des Browsers ist.
+
+   Die Zitate stehen unter der Tabelle und nicht als Spalte darin: Ein Satz in
+   einer Tabellenzelle ist bei keiner Breite lesbar. Stärken und
+   Verbesserungspunkte stehen beide da und sind benannt. Nur die
+   Verbesserungspunkte zu zeigen würde aus einem Protokoll dessen, was gesagt
+   wurde, eine Mängelliste machen, und genau diese Lesart schließen ADR 0004 und
+   ADR 0065 aus. Zusammengefasst wird nichts: Die Seite zitiert, sie urteilt
+   nicht ein zweites Mal.
+
+   Eine Kennzahl zeigt die Sätze zu den Zielen, für die sie die *erste*
+   Kennzahl ist (`focusMetrics.goalsForMetric`). Sonst sammelte die
+   Reaktionszeit Aussagen aus drei Zielen ein, für die sie nur eine Nebengröße
+   ist.
 3. **Ein einzelnes Training**. Führt in die bestehende Ansicht
    `PastSessionView`. Diese Ebene ist bereits gebaut und wird nicht verdoppelt.
 
 ## 8. Visuelle Sprache und Barrierefreiheit
 
-* **Keine Bewertungsfarben.** Ein Verlauf ist blau, wie alles andere.
-  Rot und Grün behaupten Ziele (ADR 0065).
+* **Keine Bewertungsfarben, aber Farbe.** Die erste Fassung war durchgehend
+  blau, und das war zu viel des Guten: Zehn gleich große, gleich blaue Kacheln
+  lesen sich als ein Block, in dem nichts führt. Farbe ist jetzt zugelassen,
+  aber ausschließlich als **Identität**: Ein Farbton gehört einer Gruppe von
+  Kennzahlen, nie einem Wert. Zwei Regeln tragen das, und beide sind baulich
+  und nicht eine Frage der Sorgfalt (`frontend/src/utils/metricGroups.ts`):
+
+  1. Der Farbton hängt an der Kennzahl, nicht an ihrer Zahl. Das Modul, das ihn
+     vergibt, bekommt nie einen Messwert zu sehen, also kann ein Wert keine
+     Farbe verändern. Genau das ist der Unterschied zu einer Ampel.
+  2. Rot, Gelb und Grün kommen nicht vor. Nicht weil sie hässlich wären,
+     sondern weil diese Anwendung sie bereits ausgegeben hat: ADR 0078 benutzt
+     genau diese drei für die Ampel in der Einzelauswertung. Ein Farbton, der
+     dort etwas bedeutet, darf hier nicht Identität tragen.
+
+  Drei Töne, nicht zehn: Sprechweise, Gesprächsinhalt, Aktivität. Es sind die
+  Slots 1, 5 und 7 der dokumentierten Palette, geprüft als Menge gegen weißen
+  Kartengrund (Farbsehschwäche ΔE 13,0 bei einem Zielwert von 8, Normalsicht
+  16,3 bei einer Untergrenze von 15). Ein Ton je Kennzahl wären acht, und ab
+  acht sind benachbarte Paare nicht mehr sicher unterscheidbar.
+
+  Was ADR 0065 verbietet, bleibt verboten: Zielbänder, Ampelfarben, Pfeile,
+  Deltas mit „besser“, Rangfolgen, jede Gesamtnote.
 * **Keine Pfeile, keine Deltas, kein „besser“.** Auch nicht als Tooltip.
 * **Streuungsband statt Trendlinie.** Der eigene übliche Bereich wird als
   schwaches Band hinterlegt, die Werte als Punkte mit dünner Verbindung.
   Eine Regressionsgerade würde eine Richtung behaupten und wird nicht gezogen.
 * **Sparklines ohne Achsen** in der Übersicht, mit Achsen erst im Detail.
+  Unter der Linie liegt eine schwache Fläche in der Gruppenfarbe, damit ein
+  flacher Verlauf überhaupt als Form lesbar ist, und auf dem zuletzt gemessenen
+  Punkt sitzt eine Marke, weil das der Wert ist, den die Kachel daneben als Zahl
+  nennt.
+* **Zehn Kennzahlen sind zu viele auf einmal**, deshalb zeigt die Übersicht
+  eine Hälfte: derselbe Umschalter (`FilterSlider`), den die Szenario-Bibliothek
+  und der Auswertungsbildschirm schon benutzen, auf derselben Einteilung
+  (`metric_type.aspect`). Fünf bis sechs Kacheln nimmt das Auge auf einen Blick;
+  zehn sind eine Wand.
+* **Zeigen, was unter dem Zeiger liegt.** Die Verläufe und die Aktivitätsbalken
+  haben eine Hover-Ebene: Auf einem Verlauf erscheint unter dem Diagramm, aus
+  welchem Training der Punkt stammt, bei den Balken die Anzahl je Zeitraum. Sie
+  ergänzt die Textalternative und ersetzt sie nicht — die Zahlen stehen
+  weiterhin im `aria-label` und auf der Detailebene als Tabelle, sonst hinge
+  eine Aussage an einer Zeigergeste.
 * **Zahl neben der Kurve.** Der letzte Wert steht als Zahl daneben, damit die
   Kachel auch ohne Kurvenlesen etwas sagt.
 * **Barrierefreiheit** (die Anwendung führt eine Erklärung nach BITV):
@@ -432,12 +578,20 @@ Drei Ebenen, mehr nicht:
 
 Vorschlag, damit die spätere Umsetzung nicht am Datenweg hängt:
 
-* **Ein Endpunkt** `GET /api/progress?period=...`, der alles für die Übersicht
-  liefert: Aktivitätszahlen, je Kennzahl die Reihe (Zeitpunkt, Wert,
-  Sitzungs-Id), die Fokusziele mit ihrer Zuordnung, die gezählten Punkte aus den
-  Auswertungen und den Übungsvorschlag. Ein Endpunkt statt vier, aus demselben
-  Grund wie bei `/api/focus`: Der Bildschirm braucht alles gleichzeitig, und
-  Teilzustände sehen aus wie Fehler.
+* **Kein eigener Endpunkt.** Vorgeschlagen war `GET /api/progress?period=...`,
+  gebaut wurde er nicht, und das hat sich gehalten. `GET /api/sessions` liefert
+  je Sitzung bereits die Messwerte (ADR 0064) und seit ADR 0080 die Fokusziele
+  der Feedback-Punkte; alles Weitere ist Gruppieren im Browser
+  (`utils/progressStats.ts`, `utils/goalMentions.ts`). Ein zweiter Weg zu
+  denselben Zahlen wäre die erste Stelle, an der sie auseinanderlaufen. Der
+  Zeitraum ist aus demselben Grund ein Filter im Browser und kein Parameter:
+  Eine Seite lädt, danach kostet ein Wechsel des Zeitraums keine Anfrage.
+  Gedeckelt ist das durch die Aufbewahrung von sechs Monaten (ADR 0067) und
+  durch eine Seite von 100 Sitzungen, worüber die Ansicht Auskunft gibt.
+* **Ein markierter Feedback-Punkt trägt seinen Text mit** (Ergänzung zu ADR
+  0064). Was die Liste weiterhin nicht trägt, ist die Auswertung als Text:
+  Zusammenfassung, Phasenabsatz, `tone_fit` und jeder nicht markierte Punkt
+  bleiben auf der Detailroute.
 * **Auf Anfrage berechnet, nicht materialisiert.** Sechs Monate Aufbewahrung
   begrenzen die Datenmenge je Konto auf eine Größenordnung, die eine Abfrage
   ohne Aggregattabelle trägt. Eine Aggregattabelle wäre eine zweite Wahrheit,
@@ -450,21 +604,23 @@ Vorschlag, damit die spätere Umsetzung nicht am Datenweg hängt:
 * **Keine neue Messung in dieser Stufe.** Was Abschnitt 4.2 als Lücke ausweist,
   bleibt Lücke und wird als solche angezeigt.
 
-## 10. Was noch entschieden werden muss
+## 10. Was entschieden werden musste
 
-Diese Punkte gehören in ADRs, bevor gebaut wird:
+Alle drei Punkte sind entschieden, alle drei durch ADR 0080:
 
-1. **Aggregation von Feedback-Punkten über Sitzungen** (Abschnitt D). ADR 0065
-   regelt die Kennzahlen, nicht die Texte. Zu entscheiden ist, dass eine
-   gezählte Häufigkeit von Aussagen keine Bewertung im Sinne von ADR 0004 ist,
-   und unter welcher Formulierung sie erscheint. Ohne diese Entscheidung ist
-   Bereich D nicht gedeckt.
-2. **Zuordnung der Feedback-Punkte zum Fokuszielkatalog** im Generator,
-   einschließlich der Frage, was passiert, wenn das Modell einen Schlüssel
-   erfindet (Antwort im Sinne des Hauses: verwerfen, nicht raten).
-3. **Der Übungsvorschlag** (Abschnitt E): Eine Empfehlung ist eine Aussage über
-   den Nutzer. Zu klären ist, ob die feste Zuordnungstabelle ausreicht oder ob
-   das als Bevormundung wirkt.
+1. ~~**Aggregation von Feedback-Punkten über Sitzungen**~~ (Bereich D).
+   Entschieden: Eine gezählte Häufigkeit von Aussagen ist keine Bewertung im
+   Sinne von ADR 0004, solange sie als Häufigkeit auftritt. Die Formulierung
+   steht in der ADR und in `ProgressRecurring.tsx`: „genannt“ durchgehend, eine
+   Anzahl über einem benannten Nenner, nie ein Prozentsatz, nie eine Richtung.
+2. ~~**Zuordnung der Feedback-Punkte zum Fokuszielkatalog**~~. Gebaut als
+   `feedback_point.focus_goal_id`, vergeben von der Auswertung im ohnehin
+   stattfindenden Modellaufruf. Ein erfundener Schlüssel wird an der
+   Schreibgrenze zu NULL (`generator._goal_ids`): verworfen, nicht geraten, und
+   keine Ausnahme, die eine ganze Auswertung kostet.
+3. ~~**Der Übungsvorschlag**~~ (Bereich E). Die redaktionelle Tabelle bleibt,
+   aber der Vorschlag nennt immer zuerst seinen Grund, und ein Ziel ohne Eintrag
+   in der Tabelle erzeugt keinen Vorschlag statt eines beliebigen.
 
 Offene Fragen an die Projektleitung, die ich nicht allein entscheiden sollte:
 
@@ -473,16 +629,19 @@ Offene Fragen an die Projektleitung, die ich nicht allein entscheiden sollte:
   tatsächlich gespielt wurden, mit ihrer Häufigkeit. Ein Raster über die ganze
   Bibliothek mit leeren Feldern hätte aus einer Beschreibung eine Aufgabenliste
   gemacht.
-* Soll der Zeitraumfilter voreingestellt 30 Tage oder alles zeigen? Bei der
-  aktuellen Datenlage im Pilotbetrieb wären 30 Tage oft leer.
+* ~~Soll der Zeitraumfilter voreingestellt 30 Tage oder alles zeigen?~~
+  Beantwortet und gebaut: „Gesamt“ (`ProgressView.tsx`). Im Pilotbetrieb wären
+  30 Tage oft leer, und ein leerer Bildschirm beim Ankommen bringt der
+  Nutzerin bei, dass hier nichts ist. Die 30 Tage bleiben als Filter daneben
+  stehen und sind einen Klick entfernt.
 
 ## 11. Umsetzung in Stufen
 
 | Stufe | Inhalt | Voraussetzung |
 |---|---|---|
 | 1 (gebaut) | Kopf, Kennzahlen mit Verläufen, Fokuszielkacheln für die acht messbaren Ziele, alle Zustände aus Abschnitt 6, Detailebene | Nur vorhandene Daten. Kein Schemaeingriff. |
-| 2 | Bereich D und E | Zuordnung im Generator, eine Spalte, ADR aus Abschnitt 10 |
-| 3 | Fokusziele ohne Messung mit Zahlen unterlegen | Neue Messungen: Sprachmelodie (F0), Füllwörter, Unterbrechungen zählen, Werte je Gesprächsphase |
+| 2 (gebaut) | Bereich D und E, dazu die zweite Ebene für Kennzahl und Fokusziel mit den zitierten Aussagen | Zuordnung im Generator, eine Spalte, ADR aus Abschnitt 10. Erledigt durch ADR 0080 (`feedback_point.focus_goal_id`, Migration `d4c81b70e2a5`) samt der redaktionellen Tabelle in `utils/practiceRoutes.ts` und der Ergänzung zu ADR 0064 für den Text auf der Liste. |
+| 3 (abgeschlossen) | Fokusziele ohne Messung mit Zahlen unterlegen | Gebaut: Sprachmelodie (F-35), Unterbrechungen (F-51), Abschnittswerte für „Souveränität unter Druck“ (ADR 0081). Verworfen mit Begründung: Füllwörter (Whisper normalisiert sie weg), das Fokusziel zur Lautstärke (misst das Mikrofon mit), die Artikulation (Abschnitt 4.2). Keine offenen Punkte mehr. |
 
 Stufe 1 ist für sich genommen brauchbar und hält jede bestehende Entscheidung
 ein. Das ist der Zuschnitt, mit dem angefangen werden sollte.
