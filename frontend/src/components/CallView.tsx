@@ -6,10 +6,8 @@ import { formatClock } from "../utils/time";
 import CallAnimation from "./CallAnimation";
 
 interface CallViewProps {
-  scenarioName: string;
   personaName: string;
   personaRole: string;
-  languageLabel: string;
   isMicrophoneMuted: boolean;
   callState: CallState;
   audioLevel: number;
@@ -36,16 +34,16 @@ function getInitials(name: string): string {
 
 /**
  * Presentational: the live-call screen (F-46 — mic status via the animation,
- * call duration, and the end-call button). The Session itself is owned and kept
+ * call duration, and the end-call button). One panel and nothing above it:
+ * during a call the screen shows who is on the line, and the Scenario's name
+ * is neither needed nor wanted there (see the note in the markup). The Session itself is owned and kept
  * alive at the App level (see App.tsx) so it can be pre-warmed before this
  * screen ever mounts — so the timer counts from mount, not from Session start,
  * which is close enough given pre-warm is at most a few seconds.
  */
 export default function CallView({
-  scenarioName,
   personaName,
   personaRole,
-  languageLabel,
   isMicrophoneMuted,
   callState,
   audioLevel,
@@ -68,15 +66,12 @@ export default function CallView({
 
   return (
     <>
-      <section className="setup-intro call-intro" aria-labelledby="call-page-title">
-        <div className="eyebrow">Gespräch läuft</div>
-
-        <h1 id="call-page-title">{scenarioName}</h1>
-
-        <p className="setup-intro-description">
-          Gespräch mit {personaName} · {languageLabel}
-        </p>
-      </section>
+      {/* No heading above the panel, and none of what used to be in it: the
+          Scenario's name, the Persona's and the language stood over the call
+          as a page title, which is a caption on a phone call. What is on the
+          other end of the line is in the panel itself, and it is the only
+          thing on this screen. It also means a Zufallsszenario's case cannot
+          leak here by construction rather than by a condition (F-62). */}
 
       {/* One column, or two once there is a briefing to keep in view: reading
           it must not mean scrolling the animation off the screen (ADR 0070). */}
@@ -88,7 +83,9 @@ export default function CallView({
             </div>
 
             <div className="call-persona-details">
-              <h2 id="call-persona-name">{personaName}</h2>
+              {/* The page's heading now that the title above is gone: this
+                  screen is about the person on the line. */}
+              <h1 id="call-persona-name">{personaName}</h1>
               <p>{personaRole}</p>
             </div>
           </div>

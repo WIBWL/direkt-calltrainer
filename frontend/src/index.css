@@ -1262,19 +1262,6 @@ h2 {
   }
 }
 
-.call-intro {
-  max-width: 800px;
-  margin-bottom: 40px;
-}
-
-/* Only the two panels below take the wider page. The heading keeps the width
-   and the position it has on every other call -- what changes during a reverse
-   is what is under it, not what the screen is about. */
-.call-page-wide .call-intro {
-  margin-left: auto;
-  margin-right: auto;
-}
-
 .call-panel {
   width: 100%;
   min-height: 560px;
@@ -1318,7 +1305,7 @@ h2 {
   align-items: center;
 }
 
-.call-persona-details h2,
+.call-persona-details h1,
 .call-persona-details p {
   margin: 0;
   color: #000000;
@@ -1484,17 +1471,8 @@ h2 {
   }
 }
 
-/* Narrow phones stack controls and allow long scenario and persona names to wrap. */
+/* Narrow phones stack the controls and let a long persona name wrap. */
 @media (max-width: 480px) {
-  .call-intro {
-    margin-bottom: 28px;
-  }
-
-  .call-intro h1 {
-    font-size: 32px;
-    overflow-wrap: anywhere;
-  }
-
   .call-panel {
     min-height: auto;
     gap: 20px;
@@ -1512,7 +1490,7 @@ h2 {
     width: 100%;
   }
 
-  .call-persona-details h2,
+  .call-persona-details h1,
   .call-persona-details p {
     font-size: 16px;
   }

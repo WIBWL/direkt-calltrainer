@@ -591,7 +591,6 @@ export default function App() {
         pageClassName={committed?.reverse ? "call-page call-page-wide" : "call-page"}
       >
         <CallView
-          scenarioName={selectedScenario?.name ?? "Gespräch"}
           personaName={personaName}
           // In a reverse the Persona is on the company's side, not the role it
           // carries (ADR 0070) — the same reason the prompt drops that field.
@@ -600,7 +599,6 @@ export default function App() {
               ? "Nimmt Ihren Anruf entgegen"
               : selectedPersona?.role ?? "Gesprächspartner"
           }
-          languageLabel={selectedPersona?.language ?? "Sprache"}
           isMicrophoneMuted={isMicrophoneMuted}
           callState={displayState}
           audioLevel={playback.audioLevel}
