@@ -107,20 +107,19 @@ def _case_block(scenario: Scenario) -> str:
             "present them as news to yourself."
         )
     if scenario.call_goal:
-        parts.append(f"What you want from this call: {scenario.call_goal}")
-    if scenario.success_condition:
         parts.append(
-            f"You consider the matter settled when: {scenario.success_condition}"
+            "What you want from this call, and when you count the matter "
+            f"settled: {scenario.call_goal}"
         )
         # Bare, this was recited as a demand every Turn and never weighed
-        # against what the user had already conceded.
+        # against what the user had already conceded. It covers the whole
+        # field now that the bar lives in it beside the goal.
         parts.append(
-            "That condition is yours to check silently, never to read out: "
-            "before each reply, hold what the user has actually said so far "
-            "against it, and never restate a demand you have already made. "
-            "The moment it is met, say so plainly in your own words and "
-            "close the call -- asking once more to be sure is exactly the "
-            "wrong move."
+            "That is yours to check silently, never to read out: before each "
+            "reply, hold what the user has actually said so far against it, "
+            "and never restate a demand you have already made. The moment it "
+            "is met, say so plainly in your own words and close the call -- "
+            "asking once more to be sure is exactly the wrong move."
         )
     return "".join(f"{part}\n" for part in parts)
 
@@ -143,14 +142,10 @@ def _reverse_case_block(scenario: Scenario) -> str:
         )
     if scenario.call_goal:
         parts.append(
-            f"What the caller wants from this call: {scenario.call_goal}\n"
+            "What the caller wants from this call, and when they will count "
+            f"the matter settled: {scenario.call_goal}\n"
             "That is their goal and not yours: never state it as your own "
             "reason for calling, and never ask them to do it for you."
-        )
-    if scenario.success_condition:
-        parts.append(
-            "The caller will count the matter as settled when: "
-            f"{scenario.success_condition}"
         )
         parts.append(
             "That is their bar, not a line to read out. Before each reply, "
@@ -410,11 +405,13 @@ def build_state_prompt(
     """
     if scenario.reverse:
         return _reverse_state_prompt(previous_notes, user_text, persona_text, persona, scenario)
-    settled = (
-        f"The caller considers the matter settled when: {scenario.success_condition}\n"
-        if scenario.success_condition else ""
+    # One line, since the bar the caller judges by now sits in the goal.
+    settled = ""
+    goal = (
+        "What the caller wants, and when they count the matter settled: "
+        f"{scenario.call_goal}\n"
+        if scenario.call_goal else ""
     )
-    goal = f"What the caller wants: {scenario.call_goal}\n" if scenario.call_goal else ""
     return [
         {
             "role": "system",
@@ -453,11 +450,13 @@ def _reverse_state_prompt(
     "User" and the Persona as "Agent" -- so the two sides stay distinguishable
     without the word "Caller" being attached to the machine.
     """
-    settled = (
-        f"The caller counts the matter as settled when: {scenario.success_condition}\n"
-        if scenario.success_condition else ""
+    # One line, since the bar the caller judges by now sits in the goal.
+    settled = ""
+    goal = (
+        "What the caller wants, and when they count the matter settled: "
+        f"{scenario.call_goal}\n"
+        if scenario.call_goal else ""
     )
-    goal = f"What the caller wants: {scenario.call_goal}\n" if scenario.call_goal else ""
     return [
         {
             "role": "system",

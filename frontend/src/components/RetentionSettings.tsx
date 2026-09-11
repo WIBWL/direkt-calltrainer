@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { apiFetch } from "../api";
 import type { RetentionState } from "../protocol";
@@ -18,9 +18,13 @@ import { formatDate } from "../utils/time";
 export default function RetentionSettings({
   retention,
   onChange,
+  children,
 }: {
   retention: RetentionState;
   onChange: (next: RetentionState) => void;
+  /** Rendered beside the toggle: the export button shares its row, because the
+   *  two are the same kind of thing — what happens to the stored data. */
+  children?: ReactNode;
 }) {
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -66,18 +70,22 @@ export default function RetentionSettings({
         </p>
       )}
 
-      <button
-        type="button"
-        className="consent-button consent-button-secondary"
-        onClick={() => void toggle()}
-        disabled={saving}
-      >
-        {saving
-          ? "Wird gespeichert …"
-          : retention.auto_delete
-            ? "Automatische Löschung aussetzen"
-            : "Automatisch löschen lassen"}
-      </button>
+      <div className="retention-actions">
+        <button
+          type="button"
+          className="consent-button consent-button-secondary"
+          onClick={() => void toggle()}
+          disabled={saving}
+        >
+          {saving
+            ? "Wird gespeichert …"
+            : retention.auto_delete
+              ? "Automatische Löschung aussetzen"
+              : "Automatisch löschen lassen"}
+        </button>
+
+        {children}
+      </div>
     </div>
   );
 }

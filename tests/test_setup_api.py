@@ -39,6 +39,12 @@ from backend.db.session import session_scope
 
 # pylint: disable=missing-function-docstring,redefined-outer-name
 
+# The Personas actually on offer. A seed entry may carry `active: False` while
+# something it needs to run is still missing (a KugelAudio voice, today), and
+# `library.list_personas` filters those out -- so the endpoint serves a subset
+# of the seed, and these tests compare against that subset.
+OFFERED_PERSONAS = [p for p in SEEDED_PERSONAS if p.get("active", True)]
+
 
 @pytest.fixture
 async def client(seeded_database):  # pylint: disable=unused-argument
@@ -59,16 +65,22 @@ async def test_personas_endpoint_lists_every_persona_with_card_fields(client):
     resp = await client.get("/api/personas")
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body) == len(SEEDED_PERSONAS)
+    assert len(body) == len(OFFERED_PERSONAS)
     # Keyed by name: `id` on the wire is the extern_id UUID now (ADR 0058), not
     # the seed slug, and the endpoint orders by name while the seed does not.
     by_name = {entry["name"]: entry for entry in body}
-    for persona in SEEDED_PERSONAS:
+    for persona in OFFERED_PERSONAS:
         card = by_name[persona["name"]]
         assert uuid.UUID(card["id"])  # a valid opaque id, not the slug
         assert card["role"] == persona["role_label"]
         assert card["language"] == LANGUAGE_NAMES[persona["language_id"]]
-        assert set(card) == {"id", "name", "role", "language"}  # personas aren't authored
+        assert card["language_code"] == persona["language_id"]
+        # `avatar_url` is the portrait's path and `language_code` the flag's;
+        # both are display, neither is prompt. No authoring fields, since
+        # Personas are curated (ADR 0058).
+        assert set(card) == {
+            "id", "name", "role", "language", "language_code", "avatar_url",
+        }
         assert persona["name"] and persona["role_label"], "a card needs a visible name and role"
 
 
@@ -77,12 +89,61 @@ async def test_personas_endpoint_serves_the_label_not_the_prompt_role(client):
     fields stay on the server."""
     body = (await client.get("/api/personas")).json()
     served = {e["role"] for e in body}
-    assert served == {p["role_label"] for p in SEEDED_PERSONAS}
+    assert served == {p["role_label"] for p in OFFERED_PERSONAS}
     for persona in SEEDED_PERSONAS:
         assert persona["role"] not in served
         assert persona["traits"] not in served
     for entry in body:
         assert "traits" not in entry and "behavior" not in entry
+
+
+async def test_persona_detail_serves_the_german_display_text(client):
+    """F-44 / ADR 0043: the info panel behind a card is fed by
+    `GET /api/personas/{id}`, and every text on it is the UI-language
+    display field -- never the English prompt field beside it."""
+    cards = (await client.get("/api/personas")).json()
+    card = next(c for c in cards if c["name"] == "Marcel Kropp")
+
+    resp = await client.get(f"/api/personas/{card['id']}")
+    assert resp.status_code == 200
+    detail = resp.json()
+
+    seeded = next(p for p in SEEDED_PERSONAS if p["name"] == "Marcel Kropp")
+    assert detail["role"] == seeded["role_label"]
+    assert detail["traits"] == seeded["traits_label"]
+    assert detail["training_goal"] == seeded["training_goal"]
+    assert detail["objections"] == seeded["objection_labels"]
+    assert set(detail) == {
+        "id", "name", "role", "language", "avatar_url", "traits", "training_goal",
+        "objections",
+    }
+
+
+async def test_persona_detail_withholds_the_english_prompt_fields(client):
+    """ADR 0043, the same rule the card route follows: `role`, `traits`,
+    `behavior` and an objection's English `text` brief the model and stay on
+    the server. The panel would be the obvious place to leak them, because
+    it shows a field of each name."""
+    cards = (await client.get("/api/personas")).json()
+    served = []
+    for card in cards:
+        detail = (await client.get(f"/api/personas/{card['id']}")).json()
+        served.append(detail["traits"])
+        served.extend(detail["objections"])
+        assert "behavior" not in detail
+
+    for persona in SEEDED_PERSONAS:
+        assert persona["traits"] not in served
+        assert persona["behavior"] not in served
+        for objection in persona["objections"]:
+            assert objection not in served
+
+
+async def test_persona_detail_404s_for_an_unknown_id(client):
+    """An id that is not a Persona's answers 404, exactly as an inactive
+    one does -- an inactive Persona is not on offer either."""
+    resp = await client.get(f"/api/personas/{uuid.uuid4()}")
+    assert resp.status_code == 404
 
 
 async def test_scenarios_endpoint_lists_every_scenario_with_its_teaser(client):
@@ -98,6 +159,9 @@ async def test_scenarios_endpoint_lists_every_scenario_with_its_teaser(client):
         assert card["short_description"] == scenario["short_description"]
         assert card["origin"] == "builtin"
         assert card["category"] == scenario["category"]
+        # ADR 0054: the trainee's own briefing rides on the card, because the
+        # setup screen and the microphone check both read it from this list.
+        assert card["briefing"] == scenario["briefing"]
 
 
 async def test_scenarios_endpoint_withholds_the_english_call_context(client):
@@ -118,8 +182,8 @@ async def test_scenarios_endpoint_withholds_the_case(client):
     body = (await client.get("/api/scenarios")).json()
     for entry in body:
         assert set(entry) == {
-            "id", "name", "short_description", "category", "origin", "shared",
-            "follow_up",
+            "id", "name", "short_description", "briefing", "category", "origin",
+            "shared", "follow_up",
             # ADR 0070. Neither is prompt input: one is a casting marker,
             # the other names a Session the caller already owns.
             "reverse", "origin_session",
@@ -128,7 +192,6 @@ async def test_scenarios_endpoint_withholds_the_case(client):
         }
         assert "case_facts" not in entry
         assert "call_goal" not in entry
-        assert "success_condition" not in entry
 
 
 async def test_a_deactivated_scenario_is_not_offered(client):

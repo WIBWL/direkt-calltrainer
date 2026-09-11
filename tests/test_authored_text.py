@@ -68,7 +68,7 @@ def test_seed_scenarios_are_unchanged_by_the_sanitiser(entry):
     """ADR 0059: seed text goes through `clean` too, and it is expected to be a
     no-op -- a change here would be a silent edit to a shipped prompt."""
     for field in ("name", "short_description", "description",
-                  "case_facts", "call_goal", "success_condition"):
+                  "case_facts", "call_goal"):
         assert clean(entry[field]) == entry[field], field
 
 
@@ -92,7 +92,6 @@ def test_seed_content_is_within_the_field_limits(entry):
         "description": FIELD_LIMITS["description"],
         "case_facts": FIELD_LIMITS["case_facts"],
         "call_goal": FIELD_LIMITS["call_goal"],
-        "success_condition": FIELD_LIMITS["success_condition"],
     }
     for field, cap in limits.items():
         if field in entry:

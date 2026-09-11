@@ -1,4 +1,5 @@
 import { currentAccessToken, userManager } from "./auth";
+import type { PersonaDetail } from "./protocol";
 
 /** A non-2xx reply from the backend. */
 export class ApiError extends Error {
@@ -66,3 +67,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   }
   return (response.status === 204 ? null : await response.json()) as T;
 }
+
+/** The read-only detail behind a Persona card (ADR 0058: Personas are
+ * curated, so there is nothing to write back). */
+export const getPersona = (id: string) =>
+  apiFetch<PersonaDetail>(`/api/personas/${id}`);

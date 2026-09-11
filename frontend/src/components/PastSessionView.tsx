@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { apiFetch } from "../api";
 import { useStoredSession } from "../hooks/useStoredSession";
 import { ROUTES, type TrainingStart } from "../routes";
-import { getTenant, type ReverseScenario } from "../scenarioLibrary";
+import { type ReverseScenario } from "../scenarioLibrary";
 import { formatOffset } from "../utils/time";
 import AppLayout from "./AppLayout";
 import { FeedbackReport, MetricSection } from "./FeedbackView";
-import ScenarioEditor from "./ScenarioEditor";
+import { useScreenTransition } from "./ScreenTransition";
 
 /**
  * One past training, opened from the history (F-48): the wrap-up that was
@@ -34,20 +34,10 @@ export default function PastSessionView() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { detail, state, reload } = useStoredSession(sessionId ?? null);
   const navigate = useNavigate();
+  const { playReverse } = useScreenTransition();
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
-  // Open only while the follow-up is being edited; the editor needs the
-  // company name to decide whether sharing is on offer at all (ADR 0060).
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [tenantName, setTenantName] = useState<string | null>(null);
-
-  useEffect(() => {
-    getTenant()
-      .then((t) => setTenantName(t.name))
-      .catch(() => setTenantName(null)); // no company, no sharing toggle
-  }, []);
-
   // Starting the follow-up belongs to the training flow, which is another
   // route — so hand it the pairing and go (see TrainingStart). The Persona is
   // the one this training was played with, not a fresh choice.
@@ -68,7 +58,10 @@ export default function PastSessionView() {
       personaId: detail.persona_id,
       reverse: true,
     };
-    navigate(ROUTES.training, { state: { start } });
+    // The navigation happens behind the card, which is why the transition is
+    // mounted above the router: this page is unmounted by the very cut it
+    // asked for (see ScreenTransition.tsx).
+    playReverse(() => navigate(ROUTES.training, { state: { start } }));
   };
 
   // Back to the history rather than to the now-empty page this was. Replacing
@@ -86,15 +79,17 @@ export default function PastSessionView() {
     }
   };
 
+  // Still a link, not a button: it navigates, so middle-click and "open in new
+  // tab" have to keep working. Only its appearance is the button's.
   const backLink = (
-    <Link to={ROUTES.profile} className="back-link">
+    <Link to={ROUTES.profile} className="back-to-start-button page-back-button">
       Zurück zum Profil
     </Link>
   );
 
   if (state === "missing") {
     return (
-      <AppLayout pageClassName="app-page-narrow">
+      <AppLayout>
         {backLink}
         <h1>Training nicht gefunden</h1>
         <div className="card">
@@ -109,7 +104,7 @@ export default function PastSessionView() {
 
   if (state === "failed") {
     return (
-      <AppLayout pageClassName="app-page-narrow">
+      <AppLayout>
         {backLink}
         <h1>Training</h1>
         <div className="card">
@@ -121,7 +116,7 @@ export default function PastSessionView() {
 
   if (state === "loading" || detail === null) {
     return (
-      <AppLayout pageClassName="app-page-narrow">
+      <AppLayout>
         {backLink}
         <h1>Training</h1>
         <p className="muted">Wird geladen …</p>
@@ -130,7 +125,7 @@ export default function PastSessionView() {
   }
 
   return (
-    <AppLayout pageClassName="app-page-narrow">
+    <AppLayout>
       {backLink}
       <h1>{detail.scenario}</h1>
       <p className="page-lead">
@@ -146,7 +141,7 @@ export default function PastSessionView() {
           detail={detail}
           // Re-read after one is written, so the card survives a reload of
           // this page as the row the detail route now carries.
-          followUp={{ onEdit: setEditingId, onStart: startFollowUp, onCreated: reload }}
+          followUp={{ onStart: startFollowUp, onCreated: reload }}
           sessionId={sessionId ?? null}
           onReverse={startReverse}
         />
@@ -211,7 +206,7 @@ export default function PastSessionView() {
               </button>
               <button
                 type="button"
-                className="cancel-button"
+                className="consent-button consent-button-secondary"
                 onClick={() => setConfirming(false)}
                 disabled={deleting}
               >
@@ -235,21 +230,6 @@ export default function PastSessionView() {
           </p>
         )}
       </section>
-
-      {/* Re-read after a save: the card above carries the title and teaser as
-          they were when this page loaded. */}
-      {editingId !== null && (
-        <ScenarioEditor
-          scenarioId={editingId}
-          tenantName={tenantName}
-          onClose={() => setEditingId(null)}
-          onSaved={() => {
-            setEditingId(null);
-            reload();
-          }}
-          onRefresh={reload}
-        />
-      )}
     </AppLayout>
   );
 }

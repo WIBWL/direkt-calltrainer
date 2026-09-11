@@ -216,7 +216,7 @@ def _standing_nudge(orch, replies=3):
     return orch._messages_for_turn(closing=False)[-1]["content"]
 
 
-def test_standing_nudge_restates_the_success_condition(persona, scenario):
+def test_standing_nudge_restates_the_settlement_bar(persona, scenario):
     """The criterion the call ends on is carried on every turn past the
     opening, not only in the system prompt.
 
@@ -225,7 +225,7 @@ def test_standing_nudge_restates_the_success_condition(persona, scenario):
     far up-context while the nudge next to the reply offered nothing but moves
     that carry the call on.
     """
-    with_condition = replace(scenario, success_condition="a refund date is named")
+    with_condition = replace(scenario, call_goal="a refund date is named")
     nudge = _standing_nudge(SessionOrchestrator(persona, with_condition))
 
     assert "a refund date is named" in nudge
@@ -256,9 +256,10 @@ def test_standing_nudge_puts_the_open_case_first(persona, scenario):
     assert nudge.index("press a point you have not pressed yet") < nudge.index("carry the call on")
 
 
-def test_settlement_check_falls_back_without_a_success_condition(persona, scenario):
-    """ADR 0024/0045: an authored Scenario can leave the condition blank, and
-    the check still has to name something to weigh the call against."""
+def test_settlement_check_falls_back_without_a_call_goal(persona, scenario):
+    """ADR 0024/0045: an authored Scenario can leave the goal and its bar
+    blank, and the check still has to name something to weigh the call
+    against."""
     nudge = _standing_nudge(SessionOrchestrator(persona, scenario))
 
     assert "what you came for has been given" in nudge
@@ -269,7 +270,7 @@ def test_settlement_check_is_withheld_over_the_opening_exchanges(persona, scenar
     very first reply, where the persona has only just said what it wants. The
     check cannot be answered honestly there, and the model answered it wrong."""
     early = _standing_nudge(
-        SessionOrchestrator(persona, replace(scenario, success_condition="a date is named")),
+        SessionOrchestrator(persona, replace(scenario, call_goal="a date is named")),
         replies=SETTLEMENT_CHECK_AFTER_REPLIES - 1,
     )
 
@@ -281,7 +282,7 @@ def test_settlement_check_is_withheld_over_the_opening_exchanges(persona, scenar
 def test_closing_turn_carries_only_the_closing_nudge(persona, scenario):
     """The user has already said goodbye: the call is ending either way, and a
     second, longer instruction beside it only competes with it."""
-    orch = SessionOrchestrator(persona, replace(scenario, success_condition="a date is named"))
+    orch = SessionOrchestrator(persona, replace(scenario, call_goal="a date is named"))
     orch._messages.append({"role": "assistant", "content": "Vorherige Antwort."})
 
     nudge = orch._messages_for_turn(closing=True)[-1]["content"]

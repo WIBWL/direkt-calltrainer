@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ROUTES } from "../routes";
 import { cx } from "../utils/cx";
 import { useAccount } from "../hooks/useAccount";
+import BrandName from "./BrandName";
 
 // The header uses the current screen to highlight the matching training step.
 export type TrainingStep = "prepare" | "call" | "feedback";
@@ -28,6 +29,14 @@ interface AppHeaderProps {
   progressActive?: boolean | undefined;
   /** Widens the header bar to a wide page's measure, so the two align. */
   wide?: boolean | undefined;
+  /**
+   * Resets the training flow when the brand is clicked. Every training screen
+   * lives under the one route, so from the feedback screen the brand's link
+   * points at the path already on display: the router renders nothing new and
+   * the click does nothing at all. The screens that are a state rather than a
+   * route hand the reset in here; everywhere else the plain link is right.
+   */
+  onHome?: (() => void) | undefined;
 }
 
 // Keeping the step configuration here avoids duplicating the markup.
@@ -43,6 +52,7 @@ export default function AppHeader({
   accountActive = false,
   progressActive = false,
   wide = false,
+  onHome,
 }: AppHeaderProps) {
   const auth = useAuth();
   const account = useAccount();
@@ -50,13 +60,16 @@ export default function AppHeader({
 
   const brand = (
     <div className="app-brand">
-      <span className="app-brand-mark" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </span>
+      <img
+        className="app-brand-logo"
+        src="/logo.png"
+        alt=""
+        aria-hidden="true"
+      />
 
-      <span className="app-brand-name">Calltrainer</span>
+      <span className="app-brand-name">
+        <BrandName />
+      </span>
     </div>
   );
 
@@ -66,7 +79,16 @@ export default function AppHeader({
         {navigationLocked ? (
           brand
         ) : (
-          <Link to={ROUTES.training} className="app-brand-link" aria-label="Zum Training">
+          <Link
+            to={ROUTES.training}
+            className="app-brand-link"
+            aria-label="Zum Training"
+            onClick={onHome}
+            // The reset is the whole of the navigation where `onHome` is set,
+            // and the route does not change: pushing the path a second time
+            // would leave a history entry that goes nowhere.
+            replace={Boolean(onHome)}
+          >
             {brand}
           </Link>
         )}
@@ -117,12 +139,14 @@ export default function AppHeader({
 
         {auth.isAuthenticated &&
           (navigationLocked ? (
-            // Not merely disabled: during a call the chip has nothing to offer,
-            // and a greyed-out control invites the click it is refusing.
-            <span className="account-chip is-locked" title="Während des Gesprächs nicht verfügbar">
-              <span className="account-avatar" aria-hidden="true">
-                {account.initials}
-              </span>
+            // Hidden, not greyed out: during the microphone check and the call
+            // the chip has nothing to offer, and a dimmed control still invites
+            // the click it is refusing. It carries the full content anyway so
+            // that it reserves the same width the real chip has -- otherwise
+            // the progress steps shift sideways on entering the call.
+            <span className="account-chip is-locked" aria-hidden="true">
+              <span className="account-avatar">{account.initials}</span>
+              <span className="account-chip-name">{account.displayName}</span>
             </span>
           ) : (
             <Link

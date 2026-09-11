@@ -60,8 +60,13 @@ export default function ReverseBriefPanel({
       <dl className="reverse-brief-fields">
         <Field label="Situation" text={brief.situation} />
         <Field label="Was Sie wissen" text={brief.facts} />
-        <Field label="Was Sie erreichen wollen" text={brief.goal} />
-        <Field label="Erledigt ist es, wenn" text={brief.settled} />
+        {/* One field: what is wanted and what settles it were two, and a
+            briefing written before the merge still carries the second half
+            separately — appended here so nothing stored goes unread. */}
+        <Field
+          label="Was Sie erreichen wollen"
+          text={[brief.goal, brief.settled].filter(Boolean).join(" ")}
+        />
       </dl>
 
       {goals.length > 0 && (

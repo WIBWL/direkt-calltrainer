@@ -34,6 +34,28 @@ export interface Persona {
   // A Persona speaks exactly one language and the user cannot change it
   // (ADR 0043), so the card has to say which one it is.
   language: string;
+  // The same language as a code ("de", "en"), for the flag on the card. The
+  // display name above is what is read; this is what is switched on.
+  language_code: string;
+  // Path to the Persona's portrait, served from the app's own static files
+  // (`frontend/public/personas/`). Null for a Persona that has none — every
+  // place that shows it falls back to the initials.
+  avatar_url: string | null;
+}
+
+/**
+ * What the info panel behind a Persona card shows (`GET /api/personas/{id}`).
+ *
+ * Every text here is German display content, never the English prompt fields
+ * the model reads (ADR 0043): `traits` is the `traits_label` column and
+ * `objections` the objections' `text_label`, not their `text`. `traits` is
+ * nullable because the column is — a Persona seeded without one still plays,
+ * the panel just leaves the line out.
+ */
+export interface PersonaDetail extends Persona {
+  traits: string | null;
+  training_goal: string;
+  objections: string[];
 }
 
 export interface Scenario {

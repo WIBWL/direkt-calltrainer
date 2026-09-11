@@ -7,7 +7,7 @@ import type {
   ScenarioCategory,
   ScenarioRecommendation,
 } from "../scenarioLibrary";
-import { CATEGORIES, CATEGORY_LABELS } from "../scenarioLibrary";
+import { CATEGORIES, CATEGORY_LABELS, RANDOM_SCENARIO_ID } from "../scenarioLibrary";
 import FilterSlider, { type FilterOption } from "./FilterSlider";
 
 /** Level 1, the origin of a Scenario: who it comes from. "followUp" is the
@@ -23,7 +23,7 @@ export type CategoryFilter = "all" | ScenarioCategory;
 
 export const CATEGORY_FILTERS: CategoryFilter[] = ["all", ...CATEGORIES];
 
-const CATEGORY_FILTER_LABELS: Record<CategoryFilter, string> = {
+export const CATEGORY_FILTER_LABELS: Record<CategoryFilter, string> = {
   all: "Alle",
   ...CATEGORY_LABELS,
 };
@@ -38,14 +38,21 @@ const ORIGIN_LABELS: Record<Exclude<LibraryFilter, "tenant">, string> = {
   reverse: "Rollentausch",
 };
 
-const BASE_ORIGINS = ["all", "standard", "own", "followUp", "reverse"] as const;
+/** The order the chips are shown in, the company's among them rather than
+ * appended after. Not the order of the grid — that is alphabetical — but the
+ * order the kinds are met in: everything, then what ships, then what the User
+ * wrote, then what their company shared, and last the two the system builds
+ * out of a finished training, which exist only once there has been one. */
+const ORIGIN_ORDER = ["all", "standard", "own", "tenant", "followUp", "reverse"] as const;
 
-/** How many Scenario cards the grid shows before the "show all" tile takes over
- * the sixth place. Five and not six, so that tile is always on the first two
- * rows of a three-column grid rather than starting a third one by itself: the
- * seeded library alone is seventeen rows deep, and a selection screen that
- * opens on all of them is a scroll before it is a choice. */
-const COLLAPSED_CARDS = 5;
+/** How many tiles the collapsed grid shows: two full rows of three. The seeded
+ * library alone is seventeen rows deep, and a selection screen that opens on
+ * all of them is a scroll before it is a choice.
+ *
+ * Every tile here is a case to pick — opening the rest is a button under the
+ * grid instead (like the training history's), because it is not one of the
+ * choices and reading it as a sixth case is a moment's confusion every time. */
+const COLLAPSED_TILES = 6;
 
 export interface LibraryItem {
   id: string;
@@ -111,10 +118,15 @@ interface LibraryPickerProps {
   tenantName: string | null;
   newLabel: string;
   onNew: () => void;
-  onEdit: (id: string) => void;
-  /** Retire a reverse (ADR 0070), which is the only affordance it has in
-   * place of editing. */
-  onRemove: (id: string) => void;
+  /** Open the read-only info panel. Editing is reached from inside it
+   * (ADR 0076), so the card carries no separate edit affordance -- not even
+   * on the caller's own rows, where it used to sit. */
+  onInfo: (id: string) => void;
+  /** Offer the Zufallsszenario tile (F-62). Decided by the caller, not here,
+   * because the tile draws from what these filters show and `items` is that
+   * set *after* the two `slice`s below have had it — the caller is the one
+   * place that still knows how many drawable rows there really are. */
+  offerRandom?: boolean;
 }
 
 /** Whether an item passes the active origin filter. "tenant" = anything shared
@@ -145,7 +157,9 @@ export function matchesCategory(item: LibraryItem, category: CategoryFilter): bo
   return category === "all" || item.category === category;
 }
 
-/** The card's origin, which is also its badge class suffix. Not the level-2
+/** The card's origin, which is also the suffix of its `card-origin-` class —
+ * the one that carries the colour of both the tile and its badge. Not the
+ * level-2
  * category — the prop of that name is the thematic filter.
  *
  * The two kinds the system wrote itself come first: both are `origin: "own"`,
@@ -189,41 +203,56 @@ export default function LibraryPicker({
   tenantName,
   newLabel,
   onNew,
-  onEdit,
-  onRemove,
+  onInfo,
+  offerRandom = false,
 }: LibraryPickerProps) {
   // Which card is asking to be confirmed, if any. One id rather than a set:
   // asking about a second row answers the first with "no", which is the safe
   // way round and saves a stray confirmation sitting armed on a card the User
   // has moved on from.
-  const [confirmingRemoval, setConfirmingRemoval] = useState<string | null>(null);
   // The grid opens on one row and a half of cards; the rest is behind the tile
   // at the end of it. Collapsed again whenever the filters change, because what
   // "the first five" are has changed with them.
   const [expanded, setExpanded] = useState(false);
   useEffect(() => setExpanded(false), [filter, category]);
 
-  const hidden = items.length - COLLAPSED_CARDS;
-  const shown = expanded ? items : items.slice(0, COLLAPSED_CARDS);
+  // The random tile is a case to pick like the others, so it takes one of the
+  // six places rather than adding a seventh.
+  const cards = offerRandom ? COLLAPSED_TILES - 1 : COLLAPSED_TILES;
+  const hidden = items.length - cards;
+  const shown = expanded ? items : items.slice(0, cards);
+  const randomSelected = selectedId === RANDOM_SCENARIO_ID;
 
   const { focus } = useFocusContext();
   const goalTitle = (key: string) => focus?.goals.find((g) => g.key === key)?.title ?? key;
 
   const originOptions: FilterOption<LibraryFilter>[] = [
-    ...(showRecommended ? (["recommended"] as const) : []).map((f) => ({
-      value: f as LibraryFilter,
-      label: ORIGIN_LABELS[f],
-      count: originCounts[f],
-    })),
-    ...BASE_ORIGINS.map((f) => ({
-      value: f as LibraryFilter,
-      label: ORIGIN_LABELS[f],
-      count: originCounts[f],
-    })),
-    // Only for a caller who has colleagues to share with (ADR 0060).
-    ...(tenantName
-      ? [{ value: "tenant" as LibraryFilter, label: tenantName, count: originCounts.tenant }]
+    // The suggestions lead the row, and only when there are any (F-62): a chip
+    // that filters down to nothing is a promise the screen cannot keep. Outside
+    // `ORIGIN_ORDER` because it is not a kind of Scenario but a view across
+    // the kinds -- a suggested card keeps its origin and appears under both.
+    ...(showRecommended
+      ? [
+          {
+            value: "recommended" as LibraryFilter,
+            label: ORIGIN_LABELS.recommended,
+            count: originCounts.recommended,
+          },
+        ]
       : []),
+    ...ORIGIN_ORDER.flatMap((f) => {
+      // The company's chip is the one that can be absent — it is offered only
+      // to a caller who has colleagues to share with (ADR 0060), and it is
+      // labelled with the company's own name rather than a static word.
+      // `flatMap` so it drops out of the middle of the row without leaving a
+      // gap.
+      if (f === "tenant") {
+        return tenantName
+          ? [{ value: f as LibraryFilter, label: tenantName, count: originCounts.tenant }]
+          : [];
+      }
+      return [{ value: f as LibraryFilter, label: ORIGIN_LABELS[f], count: originCounts[f] }];
+    }),
   ];
 
   const categoryOptions: FilterOption<CategoryFilter>[] = CATEGORY_FILTERS.map((c) => ({
@@ -244,13 +273,13 @@ export default function LibraryPicker({
         </div>
 
         <div className="scenario-library-filter-row">
-          <span className="scenario-library-filter-label">Herkunft</span>
+          <span className="scenario-library-filter-label">Szenariotyp</span>
 
           <FilterSlider
             options={originOptions}
             value={filter}
             onChange={onFilter}
-            label="Szenarien nach Herkunft filtern"
+            label="Szenarien nach Szenariotyp filtern"
           />
         </div>
 
@@ -266,24 +295,52 @@ export default function LibraryPicker({
         </div>
       </div>
 
-      {items.length === 0 && (
-        <p className="library-empty">
-          {filter === "followUp"
-            ? "Zu dieser Auswahl gibt es noch kein Folgeszenario."
-            : filter === "reverse"
-              ? "Noch kein Rollentausch. Sie erstellen einen nach einem Gespräch, unter der Auswertung."
-              : "Zu dieser Auswahl gibt es kein Szenario."}
-        </p>
+      {items.length === 0 && !offerRandom && (
+        // Only when the grid is genuinely bare. The pool is drawn from this
+        // same filtered set, so an empty `items` already implies no tile —
+        // the second condition is there because this line saying "kein
+        // Szenario" above a visible card is exactly what got it removed once
+        // before, and that must not come back through a changed caller.
+        <p className="library-empty">Zu dieser Auswahl gibt es kein Szenario.</p>
       )}
 
       <div className="persona-grid scenario-grid">
+        {/* First, and in a fixed place: it is the one tile whose position must
+            not move as the filters do, because nothing on screen leads to it.
+            It is also the only card that says what it is *for* rather than what
+            it is about — there is nothing to say about a case not yet drawn. */}
+        {offerRandom && (
+          <div className="card-wrap">
+            <button
+              type="button"
+              className={
+                "persona-card library-random-card card-origin-random" +
+                (randomSelected ? " selected" : "")
+              }
+              onClick={() => onSelect(RANDOM_SCENARIO_ID)}
+              aria-pressed={randomSelected}
+            >
+              <span className="choice-check" aria-hidden="true">
+                {randomSelected ? "✓" : ""}
+              </span>
+              <span className="persona-name">Zufallsszenario</span>
+              <span className="card-subtitle">
+                Worum es geht, erfahren Sie erst im Gespräch — wie bei einem Anruf, der
+                einfach hereinkommt.
+              </span>
+              <span className="card-badge">Überraschung</span>
+            </button>
+          </div>
+        )}
+
         {shown.map((item) => (
           <div key={item.id} className="card-wrap">
             <button
+              // The origin's colour stays; the "editable" padding does not,
+              // because the card no longer carries an edit link (ADR 0076).
               className={
-                "persona-card" +
-                (item.id === selectedId ? " selected" : "") +
-                (item.origin === "own" ? " editable" : "")
+                "persona-card card-origin-" + badgeClass(item) +
+                (item.id === selectedId ? " selected" : "")
               }
               onClick={() => onSelect(item.id)}
               type="button"
@@ -301,82 +358,42 @@ export default function LibraryPicker({
                   {recommendationReason(item.recommendation, goalTitle)}
                 </span>
               )}
-              <span className={"card-badge card-badge-" + badgeClass(item)}>
-                {badgeLabel(item, tenantName)}
-              </span>
+              {/* Unclassed: its colours come from the card's own origin class,
+                  so the badge and the tile it sits on cannot disagree. */}
+              <span className="card-badge">{badgeLabel(item, tenantName)}</span>
             </button>
-            {/* A reverse is not editable (ADR 0070) — it copies a case that
-                was played — so the affordance on it is removal instead, and
-                that asks first: it sits where every other card carries
-                "Bearbeiten", one slip away from a row the User cannot get
-                back. Recreating it means going to the training it came from
-                and spending a model call, if that training is even still
-                stored. */}
-            {item.reverse ? (
-              confirmingRemoval === item.id ? (
-                <span className="card-remove-confirm">
-                  <button
-                    type="button"
-                    className="card-edit card-edit-danger"
-                    onClick={() => {
-                      setConfirmingRemoval(null);
-                      onRemove(item.id);
-                    }}
-                  >
-                    Ja, entfernen
-                  </button>
-                  <button
-                    type="button"
-                    className="card-edit"
-                    onClick={() => setConfirmingRemoval(null)}
-                  >
-                    Abbrechen
-                  </button>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className="card-edit"
-                  onClick={() => setConfirmingRemoval(item.id)}
-                >
-                  Entfernen
-                </button>
-              )
-            ) : (
-              item.origin === "own" && (
-                <button type="button" className="card-edit" onClick={() => onEdit(item.id)}>
-                  Bearbeiten
-                </button>
-              )
-            )}
-          </div>
-        ))}
-
-        {/* The tile in the sixth place, and a tile rather than a link under the
-            grid: it is the last thing in the same row of choices, so it is
-            found by the eye already reading them. Absent when everything is on
-            screen — there is nothing behind it to open. */}
-        {hidden > 0 && (
-          <div className="card-wrap">
+            {/* Every Scenario is readable (ADR 0076), so the "i" is on every
+                card — unlike the old "Bearbeiten", which was on the caller's
+                own rows only and now lives inside the panel. */}
             <button
               type="button"
-              className="persona-card library-more-card"
-              onClick={() => setExpanded(!expanded)}
+              className="card-info"
+              onClick={() => onInfo(item.id)}
+              aria-label={`Mehr über ${item.name}`}
+              title={`Mehr über ${item.name}`}
             >
-              <span className="persona-name">
-                {expanded ? "Weniger anzeigen" : "Alle anzeigen"}
-              </span>
-              <span className="card-subtitle">
-                {expanded
-                  ? `Zurück auf ${COLLAPSED_CARDS}`
-                  : hidden === 1
-                    ? "1 weiteres Szenario"
-                    : `${hidden} weitere Szenarien`}
-              </span>
+              <span aria-hidden="true">i</span>
             </button>
+
           </div>
-        )}
+        ))}
       </div>
+
+      {/* Under the grid, not in it: it opens the rest of the library rather
+          than being part of it. It looks like the training history's control
+          but does less — everything is already here, so this only unfolds it,
+          where that one fetches the next page. Hence "Alle" and not
+          "Weitere": one press and the grid is complete. */}
+      {hidden > 0 && (
+        <button
+          type="button"
+          className="library-more"
+          onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+        >
+          {expanded ? "Weniger anzeigen" : `Alle anzeigen (${items.length})`}
+        </button>
+      )}
     </>
   );
 }

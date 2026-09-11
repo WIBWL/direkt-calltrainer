@@ -24,6 +24,10 @@
   --color-text-muted-secondary: #5f7180;
   --color-success: #2e8064;
   --color-danger: #b4453a;
+  /* The wordmark's "ai". Below 4.5:1 on white on purpose -- WCAG 1.4.3 exempts
+     brand names, so this may be the vivid orange and not a muted one. Do not
+     reuse it for ordinary text. */
+  --color-brand-accent: #ff6a00;
 
   /* Chart identity hues (F-13, utils/metricGroups.ts). Slots 1, 5 and 7 of the
      documented categorical palette, in that order, validated as an all-pairs
@@ -129,7 +133,21 @@ body {
 .app-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 9px;
+  flex-shrink: 0;
+}
+
+/* Inherits weight and size from whatever wordmark it sits in, so the same
+   component works in the header, on the login screen and in the redirect card. */
+.brand-ai {
+  color: var(--color-brand-accent);
+}
+
+.app-brand-logo {
+  display: block;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
   flex-shrink: 0;
 }
 
@@ -331,19 +349,24 @@ h2 {
   transition: border-color 0.2s;
 }
 
-/* The indicator remains visible as an empty circle for unselected choices. */
+/* The indicator remains visible as an empty circle for unselected choices.
+   18px, the same as the "i" ring in the corner below it: the two are the only
+   marks in a card's right margin and a difference in size between them reads
+   as a difference in importance that is not there. Nothing to weigh against
+   here the way there was for the "i" — this is a `span`, not a target, so
+   WCAG 2.5.8 has nothing to say about it. */
 .choice-check {
   position: absolute;
   top: 12px;
   right: 12px;
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   border: 1px solid var(--color-blue-300);
   border-radius: 50%;
   color: transparent;
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1;
 }
@@ -529,6 +552,9 @@ h2 {
   }
 }
 
+/* Shown only where the grid is genuinely bare — the Zufallsszenario tile is
+   drawn from the same filtered set, so when there is nothing to list there is
+   nothing to draw either and the grid really is empty. */
 .library-empty {
   margin: 0 0 1rem;
   color: var(--color-text-muted);
@@ -545,7 +571,7 @@ h2 {
 
 .library-new-button {
   margin-left: auto;
-  border: 1px dashed var(--color-blue-300);
+  border: 1px solid var(--color-blue-300);
   background: var(--color-surface);
   color: var(--color-blue-600);
   border-radius: 12px;
@@ -627,10 +653,72 @@ h2 {
 }
 
 .setup-persona-grid .persona-card {
-  min-height: 104px;
-  justify-content: center;
-  padding: 16px 46px 16px 16px;
+  /* A row, unlike the Scenario cards: the portrait sits beside the text, not
+     above it, and reaches the card's top, bottom and left edges — so the card
+     carries no padding of its own and the text brings its own inset.
+     `overflow: hidden` is what rounds the picture's corners with the card's,
+     and `stretch` is what gives it the card's full height. */
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  min-height: 124px;
+  padding: 0;
+  overflow: hidden;
   border-width: 1.5px;
+}
+
+.persona-card-portrait {
+  /* Flex so the initials fallback centres itself.
+     Width is fixed and the height stretches to the card's, rather than the
+     other way round: in a flex row the main size is resolved before the cross
+     size, so an `aspect-ratio` with a stretched height has nothing to compute
+     from and the slot blows up to its content's width. 72px is deliberately
+     narrower than the 3:4 the portraits are cropped for: three cards to a row
+     leave the body barely 90px of text once the check and the "i" have their
+     corner, which is what wrapped two-word names onto two lines and pushed
+     every role to the clamp. The slot gives that width back. Nothing is lost
+     by it — the source is square and `object-fit: cover` trims the sides
+     anyway, and at this width the zoom below still leaves the widest head in
+     the set (hair included) a clear margin either side; the picture is the
+     same size, there is just less room beside the face. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 72px;
+  font-size: 24px;
+}
+
+/* And the clamp is what keeps that drift small: three lines of role at most,
+   so one long text cannot stretch every card in its grid row. */
+.setup-persona-grid .card-subtitle {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* The slot is taller than it is wide and the source is square, so `object-fit:
+   cover` already trims the sides. The zoom on top of that is what brings the
+   face up to a size one Persona can be told from another at: unzoomed, the
+   card would show the whole half-body shot in 118px. Every picture is framed
+   the same way — square, subject centred, face in the upper third — which is
+   what lets one origin serve all of them. The two large square slots show the
+   pose whole and need neither: their box matches the source. */
+.persona-card-portrait > img {
+  transform: scale(1.5);
+  transform-origin: center 18%;
+}
+
+.persona-card-body {
+  /* min-width: 0 lets a long role wrap instead of pushing the portrait out.
+     The right inset leaves the check and the "i" their corners. */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 14px 44px 14px 14px;
 }
 
 .setup-persona-grid .persona-name {
@@ -643,7 +731,14 @@ h2 {
   line-height: 1.45;
 }
 
+/* A row, because the flag rides on this line now. The flag is 20px against a
+   12px word, which is wider than the text is tall but not taller — a flag is a
+   wide shape, and shrinking it to the word's measure would make the stripes
+   mush. */
 .setup-persona-grid .card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-top: 0.15rem;
   font-size: 12px;
   font-weight: 600;
@@ -663,12 +758,6 @@ h2 {
   }
 }
 
-/* Reserve room at the bottom for the absolutely-positioned "Bearbeiten" link
-   so it never sits on top of the card badge. */
-.persona-card.editable {
-  padding-bottom: 2.75rem;
-}
-
 .card-badge {
   align-self: flex-start;
   margin-top: 0.15rem;
@@ -678,107 +767,281 @@ h2 {
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  /* Inherited from the card's `card-origin-` class, so a badge and the tile it
+     sits on are the same colour by construction rather than by agreement. The
+     fallbacks only ever apply to a card without an origin, which the picker
+     does not produce. */
+  background: var(--origin-tint, var(--color-blue-100));
+  color: var(--origin-ink, var(--navy));
 }
 
-.card-badge-builtin {
-  background: var(--color-blue-100);
-  color: var(--color-blue-600);
+/* One colour per origin, declared once and read twice: as the tile's gradient
+   and as its badge. Seven kinds, six hues — before this the colour was on the
+   badge alone, and two kinds could share one because the label underneath
+   carried the difference. On a tinted tile the colour is what is read first,
+   so a kind needs its own wherever the difference is one of origin. Own and
+   shared are the exception: same origin, same author, same green.
+
+   `--origin-tint` is a wash rather than a colour: it is the top-left corner of
+   a gradient that is white again two thirds of the way down, so a grid of them
+   is a set of tinted cards and not a paint chart. */
+.card-origin-builtin {
+  --origin-tint: var(--color-blue-100);
+  --origin-ink: var(--color-blue-600);
 }
 
-.card-badge-own {
-  background: #e3f3ec;
-  color: var(--color-success);
+/* Own Scenario, hand-authored or shared with the company — the same colour
+   either way, and nothing on the badge to tell them apart but the label. A ring
+   around the shared one made it read as a kind of its own, when it is the same
+   Scenario of the User's with one more place it can be seen from.
+
+   Olive, not the green it used to be: that green sat 28° from the follow-up's
+   teal, the closest two hues in the whole set, and on a pale wash 28° is not a
+   difference anyone reads. This sits in the one gap the other five leave — 38°
+   clear of its nearest neighbour — at the same lightness as the green it
+   replaces, so only the hue moved. It also fixes the badge, whose text was the
+   only one in the set under the 4.5:1 small-text minimum (4.17); this pairing
+   is 6.0. */
+.card-origin-own,
+.card-origin-shared {
+  --origin-tint: #ecf3d6;
+  --origin-ink: #4a6212;
 }
 
-.card-badge-tenant {
-  background: #ece3f7;
-  color: #5b3a9c;
-}
-
-/* Written from a Session's feedback rather than by hand (F-60). */
-.card-badge-follow-up {
-  background: var(--color-blue-100);
-  color: var(--navy);
+/* Written from a Session's feedback rather than by hand (F-60). Teal, not the
+   blue it used to share with Standard. */
+.card-origin-follow-up {
+  --origin-tint: #d1edee;
+  --origin-ink: #0d6b6a;
 }
 
 /* A reverse (ADR 0070). Amber rather than a shade of the "own" green: it is
    the caller's row on paper, but what the badge is saying is that the roles
    are the other way round, which is not a degree of ownership. */
-.card-badge-reverse {
-  background: #fdf0dd;
-  color: #8a5200;
+.card-origin-reverse {
+  --origin-tint: #fdf0dd;
+  --origin-ink: #8a5200;
 }
 
-/* Own Scenario that has been shared with the company: reads as "mine" but
-   signals it is out there. */
-.card-badge-shared {
-  background: #e3f3ec;
-  color: var(--color-success);
-  box-shadow: inset 0 0 0 1px #5b3a9c33;
+.card-origin-tenant {
+  --origin-tint: #ece3f7;
+  --origin-ink: #5b3a9c;
 }
 
-.card-edit {
+/* The Zufallsszenario (F-62). Rose, and not the purple it started on: that is
+   the company's, and a case the User has never seen must not look like one a
+   colleague sent them. */
+.card-origin-random {
+  --origin-tint: #fce7ef;
+  --origin-ink: #9c3a63;
+}
+
+/* The wash itself. Only Scenario cards take it — a Persona card has no origin
+   and keeps the plain white it always had. */
+.scenario-grid .persona-card {
+  background: linear-gradient(
+    160deg,
+    var(--origin-tint, var(--color-surface)) 0%,
+    var(--color-surface) 70%
+  );
+}
+
+/* Selection deepens the wash instead of painting over it: the blue border and
+   the filled check already say which card is picked, and a flat fill would
+   make the selected card the one whose kind has become unreadable. */
+.scenario-grid .persona-card.selected {
+  background: linear-gradient(
+    160deg,
+    var(--origin-tint, var(--color-surface)) 0%,
+    var(--color-surface-selected) 85%
+  );
+}
+
+/* The "i" on a selection card, Personas and Scenarios alike. Bottom-right, on
+   the same 12px right edge and at the same 24px size as the check bubble above
+   it, so the two sit in one column down the card's right gutter -- the gutter
+   both grids' padding already keeps clear of text. Round and quiet: it must
+   read as an aside to the choice, not as a second way of making it. It replaced
+   the Scenario card's "Bearbeiten" link, which moved into the panel (ADR 0076),
+   so a card carries one secondary affordance rather than two. */
+/* The button keeps its 24px box and the ring inside it is drawn on the span,
+   so the affordance can be quieter than its target: the "i" is the smaller of
+   the two things in a card's corner and should look it, but shrinking the
+   button itself would take the tap target under the 24px WCAG 2.5.8 asks for,
+   and the card behind it is a target too, so the spacing exception does not
+   apply. `place-items` centres the ring in that box. */
+.card-info {
   position: absolute;
-  left: 12px;
+  right: 12px;
   bottom: 12px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border: 0;
   background: transparent;
-  padding: 0.1rem 0.3rem;
   font: inherit;
-  font-size: 0.75rem;
-  color: var(--color-blue-600);
-  text-decoration: underline;
+  color: var(--color-navy-900);
   cursor: pointer;
 }
 
-/* The tile that opens the rest of the library. A card in the grid rather than a
-   link under it, so it is read as the last of the choices -- but dashed and
-   unfilled, because it is not one of them: nothing is selected by pressing it.
-   No check circle and no badge, hence the plain padding. */
-.library-more-card {
-  align-items: flex-start;
-  justify-content: center;
-  padding: 1rem;
-  border-style: dashed;
-  background: transparent;
-  color: var(--color-blue-600);
+.card-info > span {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--color-navy-900);
+  border-radius: 50%;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: background-color 0.2s, border-color 0.2s;
 }
 
-.library-more-card .persona-name {
-  color: inherit;
+.card-info:hover > span {
+  background: var(--color-blue-100);
 }
 
-.library-more-card:hover {
-  border-style: solid;
-  background: #fff;
+/* On the ring rather than on the button, so the focus outline traces what is
+   actually visible; `outline` follows the border-radius. The button's own
+   outline is suppressed above by having no border of its own to trace. */
+.card-info:focus-visible {
+  outline: none;
 }
 
-/* The removal confirmation takes the place of the "Entfernen" link rather than
-   opening anything: the card must not change size while the question is being
-   asked, or the grid reflows under the pointer that is about to answer it. */
-.card-remove-confirm {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  right: 12px;
+.card-info:focus-visible > span {
+  outline: 2px solid var(--color-navy-900);
+  outline-offset: 2px;
+}
+
+/* --- Persona info panel (read-only; shares the editor's modal shell) --- */
+
+/* Name, role and language sit beside the portrait rather than under it, so the
+   panel opens on who this is and the sections below carry only what the card
+   did not already say. */
+.persona-info-header {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.1rem 0.7rem;
-  align-items: baseline;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 1.4rem;
 }
 
-.card-remove-confirm .card-edit {
-  position: static;
-  padding-left: 0;
+.persona-info-portrait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 160px;
+  height: 160px;
+  border-radius: 14px;
+  font-size: 44px;
 }
 
-.card-edit-danger {
-  color: var(--color-danger);
+.persona-info-identity {
+  min-width: 0;
 }
+
+.persona-info-role {
+  margin: 0 0 0.3rem;
+  line-height: 1.4;
+}
+
+/* Shared by all three portrait slots. The slot owns size, shape and clipping;
+   the picture inside fills it, which is what lets a slot crop by scaling the
+   picture (see `.persona-card-portrait img`). */
+.persona-avatar {
+  overflow: hidden;
+}
+
+.persona-avatar > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* What an <img> would have covered, the initials get instead. */
+.persona-avatar-fallback {
+  background: #eaf5fc;
+  color: var(--color-blue-600);
+  font-weight: 600;
+}
+
+.persona-info-language {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* The panel is only so wide; below this the two columns stop fitting. */
+@media (max-width: 520px) {
+  .persona-info-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .persona-info-portrait {
+    width: 128px;
+    height: 128px;
+    font-size: 36px;
+  }
+}
+
+.persona-info-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.persona-info-section h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.persona-info-section p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.persona-info-hint {
+  margin: 0 0 0.45rem !important;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.persona-info-objections {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  line-height: 1.5;
+}
+
+/* Bordered like the cases beside it. It was dashed for a while, to set it
+   apart as the one tile that is not a case — but it is the selection the
+   screen opens on, and a dashed box in the first place of the grid reads as a
+   placeholder for something missing rather than as the choice already made.
+   Its colour still comes from `card-origin-random` like every other card's,
+   and that, its badge and its text are enough to set it apart.
+
+   The control that opens the rest of the grid is `.library-more`, styled with
+   the training history's `.session-more` further down. */
 
 /* --- Scenario editor modal --- */
 
-.editor-backdrop {
+/* `.call-confirm-scrim` is the same thing over the live call (the end-call
+   question): ConfirmDialog positions itself `absolute; inset: 0`, so whatever
+   holds it has to be a fixed, full-screen box. One rule rather than two, so the
+   app's dialogs cannot end up sitting on two different scrims. */
+.editor-backdrop,
+.call-confirm-scrim {
   position: fixed;
   inset: 0;
   background: rgba(3, 37, 62, 0.45);
@@ -786,6 +1049,14 @@ h2 {
   place-items: center;
   padding: 1rem;
   z-index: 50;
+}
+
+/* The end-call dialog is the only thing on its scrim, and ConfirmDialog draws
+   a scrim of its own — two of them stacked would darken the call screen twice
+   as much as any other dialog in the app. So this one contributes the fixed
+   full-screen box and nothing else. */
+.call-confirm-scrim {
+  background: none;
 }
 
 .editor-panel {
@@ -809,6 +1080,10 @@ h2 {
 .editor-panel h2 {
   margin: 0 0 1rem;
   color: var(--color-navy-900);
+}
+
+.persona-info-identity h2 {
+  margin: 0 0 0.35rem;
 }
 
 .editor-fields {
@@ -986,6 +1261,22 @@ h2 {
   color: var(--color-danger);
 }
 
+/* "Bearbeiten" in the read-only info panel (ADR 0076). Filled in the same dark
+   blue as the "Weiter zum Mikrofontest" button, and hovering to the same
+   lighter blue: it is the one action that leads somewhere from a panel that
+   otherwise only closes. Shape comes from `.editor-actions button` so it lines
+   up with "Schließen" beside it; only the colour is its own. */
+.editor-edit {
+  border-color: var(--navy) !important;
+  background: var(--navy) !important;
+  color: var(--color-surface);
+  font-weight: 600;
+}
+
+.editor-edit:hover {
+  background: var(--navy-light) !important;
+}
+
 /* In-panel replacement for window.confirm when a click outside would discard
    unsaved edits — a second scrim over the editor so it stays in the app's look. */
 .editor-confirm {
@@ -1039,6 +1330,15 @@ h2 {
   color: var(--color-surface);
 }
 
+/* The way back, where it is a choice and not just a retreat. Both tokens carry
+   white text above the 4.5:1 small-text minimum (5.45 and 4.79), so the pair
+   reads by colour *and* by label rather than by colour alone. */
+.editor-confirm-keep {
+  border-color: var(--color-success) !important;
+  background: var(--color-success) !important;
+  color: var(--color-surface);
+}
+
 .setup-page {
   width: min(940px, calc(100% - 32px));
 }
@@ -1048,7 +1348,11 @@ h2 {
   margin-bottom: 24px;
 }
 
-.setup-intro .eyebrow {
+/* The wrap-up's intro is not a `.setup-intro` but carries the same eyebrow, and
+   it looked like a different element for want of this. */
+.setup-intro .eyebrow,
+.feedback-intro .eyebrow,
+.feedback-wait .eyebrow {
   margin-bottom: 10px;
   font-size: 12px;
   font-weight: 700;
@@ -1105,15 +1409,18 @@ h2 {
   margin-bottom: 22px;
 }
 
+/* The number is set exactly like the title beside it -- same face, colour, size,
+   weight, line height and tracking -- so the two read as one heading with a
+   number in front of it. It was 14px mono in blue before, which read as a label
+   stuck to the heading rather than as part of it. */
 .setup-section-index {
   flex-shrink: 0;
-  padding-top: 2px;
-  color: var(--color-blue-600);
-  font-family: var(--font-mono);
-  font-size: 14px;
+  color: var(--color-navy-900);
+  font-family: var(--font-display);
+  font-size: 25px;
   font-weight: 700;
-  line-height: 1.4;
-  letter-spacing: 0.04em;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
 }
 
 .setup-section-heading-text {
@@ -1139,7 +1446,7 @@ h2 {
 /* The summary groups all confirmed choices into one compact panel. */
 .selection-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
   margin: 0 0 14px;
   padding: 8px;
@@ -1209,9 +1516,14 @@ h2 {
   line-height: 1.5;
 }
 
+/* The sentence between a card's heading and its content, which would otherwise
+   sit flush against what it introduces. */
+.card p.card-lead {
+  margin-bottom: 1.1rem;
+}
+
 .start-call-button,
-.end-call-button,
-.restart-button {
+.end-call-button {
   display: block;
   width: 100%;
   border: none;
@@ -1225,8 +1537,7 @@ h2 {
   transition: background 0.2s, opacity 0.2s;
 }
 
-.start-call-button:hover,
-.restart-button:hover {
+.start-call-button:hover {
   background: var(--navy-light);
 }
 
@@ -1242,10 +1553,6 @@ h2 {
 
 .end-call-button:hover {
   opacity: 0.85;
-}
-
-.restart-button {
-  margin-top: 1.5rem;
 }
 
 .cancel-button {
@@ -1295,22 +1602,8 @@ h2 {
   }
 }
 
-.call-intro {
-  max-width: 800px;
-  margin-bottom: 40px;
-}
-
-/* Only the two panels below take the wider page. The heading keeps the width
-   and the position it has on every other call -- what changes during a reverse
-   is what is under it, not what the screen is about. */
-.call-page-wide .call-intro {
-  margin-left: auto;
-  margin-right: auto;
-}
-
 .call-panel {
   width: 100%;
-  min-height: 560px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1331,8 +1624,8 @@ h2 {
 }
 
 .call-persona-avatar {
-  width: 96px;
-  height: 96px;
+  width: 160px;
+  height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1340,7 +1633,7 @@ h2 {
   border-radius: 50%;
   background: #eaf5fc;
   color: var(--color-blue-600);
-  font-size: 24px;
+  font-size: 40px;
   font-weight: 600;
 }
 
@@ -1351,7 +1644,7 @@ h2 {
   align-items: center;
 }
 
-.call-persona-details h2,
+.call-persona-details h1,
 .call-persona-details p {
   margin: 0;
   color: #000000;
@@ -1501,7 +1794,6 @@ h2 {
 /* Tablet layouts preserve the two-button row while allowing both controls to shrink. */
 @media (max-width: 720px) {
   .call-panel {
-    min-height: 520px;
     padding: 24px;
   }
 
@@ -1517,35 +1809,25 @@ h2 {
   }
 }
 
-/* Narrow phones stack controls and allow long scenario and persona names to wrap. */
+/* Narrow phones stack the controls and let a long persona name wrap. */
 @media (max-width: 480px) {
-  .call-intro {
-    margin-bottom: 28px;
-  }
-
-  .call-intro h1 {
-    font-size: 32px;
-    overflow-wrap: anywhere;
-  }
-
   .call-panel {
-    min-height: auto;
     gap: 20px;
     padding: 20px;
     border-radius: 18px;
   }
 
   .call-persona-avatar {
-    width: 80px;
-    height: 80px;
-    font-size: 21px;
+    width: 120px;
+    height: 120px;
+    font-size: 30px;
   }
 
   .call-persona-details {
     width: 100%;
   }
 
-  .call-persona-details h2,
+  .call-persona-details h1,
   .call-persona-details p {
     font-size: 16px;
   }
@@ -1572,42 +1854,28 @@ h2 {
   margin-bottom: 0;
 }
 
-.mic-check-page .setup-section-heading {
-  margin-bottom: 10px;
-}
-
 .mic-check-intro {
   max-width: 800px;
   margin-bottom: 40px;
 }
 
-/* The active microphone is shown as read-only information above the test area. */
+/* The device picker above the test area. One element now: the box the <dd>
+   used to draw, with the label's row gone.
+
+   The 16px below it is what the old stack left between this box and the test
+   panel (6px of the list's own padding plus a 10px margin), so removing the
+   label changed the gap under the field by nothing. The 4px of side padding
+   went with it, which lines the field up with the panel below instead of
+   insetting it by four pixels — the reason it was inset was the label, which
+   needed to start where text starts. */
 .mic-device-information {
-  margin: 0 0 10px;
-  padding: 6px 4px;
-}
-
-.mic-device-information-row {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-}
-
-.mic-device-information dt {
-  color: #082f49;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 24px;
-}
-
-.mic-device-information dd {
+  box-sizing: border-box;
   width: 100%;
   height: 44px;
   min-width: 0;
   display: flex;
   align-items: center;
-  margin: 0;
+  margin: 0 0 16px;
   padding: 0 14px;
   overflow: hidden;
   border: 1px solid var(--color-border-subtle);
@@ -1617,8 +1885,14 @@ h2 {
   font-size: 12px;
   font-weight: 600;
   line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+/* The <select> drops its own outline so it can fill the box edge to edge, so
+   the box has to carry the focus ring — without this, reaching the picker by
+   keyboard would show nothing at all (WCAG 2.4.7). */
+.mic-device-information:focus-within {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
 }
 
 /* Fills the dd's existing box look -- the picker, not just a status label now. */
@@ -1791,13 +2065,8 @@ h2 {
   outline-offset: 3px;
 }
 
-/* Tablet layouts keep device names readable and enlarge the initial action. */
+/* Tablet layouts enlarge the initial action. */
 @media (max-width: 720px) {
-  .mic-device-information dd {
-    overflow-wrap: anywhere;
-    white-space: normal;
-  }
-
   .mic-test-panel > .start-call-button {
     width: 100%;
   }
@@ -1840,7 +2109,8 @@ h2 {
     gap: 12px;
   }
 
-  .setup-section-heading-text h2 {
+  .setup-section-heading-text h2,
+  .setup-section-index {
     font-size: 22px;
   }
 
@@ -2162,26 +2432,6 @@ h2 {
   color: var(--text-muted);
 }
 
-/* The secondary action: outlined, so it reads as the alternative to starting
-   rather than as a second primary button. */
-.follow-up-draft {
-  border: 1px solid var(--navy);
-  border-radius: 999px;
-  padding: 0.45rem 1.1rem;
-  font: inherit;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-  background: transparent;
-  color: var(--navy);
-  transition: background 0.2s, color 0.2s;
-}
-
-.follow-up-draft:hover {
-  background: var(--navy);
-  color: #fff;
-}
-
 /* --- Reverse: the roles swapped (F-61, ADR 0070) ------------------------ */
 
 /* The offer under the feedback. Same card as the follow-up, other accent, so
@@ -2231,9 +2481,6 @@ h2 {
 }
 
 .reverse-brief-eyebrow {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
   color: #8a5200;
 }
 
@@ -2420,6 +2667,74 @@ h2 {
   }
 }
 
+/* --- The facts of the case, for an ordinary call ------------------------ */
+
+/* The same box as the reverse's briefing, for the same reason -- ADR 0070's
+   exception to ADR 0033: text fixed before the call starts, never the
+   Persona's lines. In the app's blue rather than the reverse's amber, because
+   the two are different things and a call must not be mistaken for the other
+   kind at a glance. */
+.case-brief {
+  margin: 0 auto 1.5rem;
+  max-width: 720px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--color-blue-600);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-filter);
+  padding: 1.25rem 1.4rem;
+}
+
+.case-brief-eyebrow {
+  color: var(--color-blue-600);
+}
+
+/* `pre-line` because facts are often written as short lines rather than as a
+   paragraph, and the sanitiser keeps single newlines (it only collapses runs). */
+.case-brief-body {
+  margin: 0.4rem 0 0;
+  white-space: pre-line;
+}
+
+/* Beside the animation, with no scroll box of its own -- a fact hidden behind
+   a gesture is a fact not found, which is the one thing that must not happen
+   mid-call. Below the two-column breakpoint it goes back to being a block
+   under the call. */
+.case-brief-call {
+  margin: 0 auto;
+  background: var(--color-surface);
+}
+
+@media (min-width: 1080px) {
+  .case-brief-call {
+    max-width: none;
+  }
+}
+
+/* --- One type scale for the three pre-call panels ----------------------- */
+
+/* "Ihre Ausgangslage" (ADR 0054), "Fakten des Falls" and a reverse's "Ihre
+   Unterlagen" are read one under the other on the same screen, and the first
+   two always are. Their label and their prose are therefore one declaration
+   each rather than three copies: they had drifted to two different scales, and
+   two blocks of the same kind set differently read as two kinds of thing.
+   Only what genuinely differs — the colour, the spacing, the `pre-line` on the
+   facts — stays with each panel. */
+.scenario-briefing-title,
+.case-brief-eyebrow,
+.reverse-brief-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.scenario-briefing-body,
+.case-brief-body {
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
 /* --- Transcript (F-12) -------------------------------------------------- */
 
 .transcript-line {
@@ -2455,79 +2770,45 @@ h2 {
   color: var(--color-navy-900);
 }
 
-.feedback-summary-card {
-  position: relative;
-  overflow: hidden;
-  padding: 32px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 22px;
-  background: var(--color-surface);
+/* Every section of the feedback page has the same shape: a heading row above,
+   a white box below. Half of them used to carry the heading inside the box,
+   which made two blocks of the same kind look like two different kinds of
+   thing. A box may still hold a title, but only for an *item* within a
+   section — the two offers under "Nächste Schritte" are things you can pick,
+   not sections of the page. */
+.feedback-section {
+  margin-bottom: 28px;
 }
 
-.feedback-summary-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 4px;
-  background: var(--color-blue-600);
+.feedback-section-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
-.feedback-summary-kicker {
-  margin-bottom: 20px;
+.feedback-section-heading {
+  min-width: 0;
+}
+
+.feedback-section-eyebrow {
+  margin-bottom: 4px;
   font-size: 11px;
-  font-weight: 500;
-  color: var(--color-navy-900);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-blue-600);
 }
 
-.feedback-summary-title {
-  margin: 0 0 20px;
+.feedback-section-title {
+  margin: 0;
   font-size: 20px;
+  line-height: 1.2;
   font-weight: 700;
   color: var(--color-navy-900);
 }
 
-.feedback-summary-text {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.57;
-  color: var(--color-text-muted-secondary);
-}
-
-.feedback-details {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 16px;
-  margin-bottom: 28px;
-}
-
-.feedback-point-card {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding: 24px;
-  border: 1px solid;
-  border-radius: 16px;
-  background: var(--color-surface);
-}
-
-.feedback-point-card.success {
-  border-color: #b9dac7;
-}
-
-.feedback-point-card.danger {
-  border-color: #e8c8a8;
-}
-
-.feedback-point-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.feedback-point-icon {
+/* The mark before a heading, in the colours that half of the wrap-up carries. */
+.feedback-section-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2539,36 +2820,67 @@ h2 {
   font-weight: 600;
 }
 
-.feedback-point-card.success .feedback-point-icon {
+.feedback-section-head.is-success .feedback-section-icon {
   background: #eaf7f0;
   color: #226048;
 }
 
-.feedback-point-card.danger .feedback-point-icon {
+.feedback-section-head.is-success .feedback-section-eyebrow {
+  color: #226048;
+}
+
+.feedback-section-head.is-danger .feedback-section-icon {
   background: #fff3e8;
   color: #9a4d14;
 }
 
-.feedback-point-eyebrow {
-  margin-bottom: 4px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.feedback-point-card.success .feedback-point-eyebrow {
-  color: #226048;
-}
-
-.feedback-point-card.danger .feedback-point-eyebrow {
+.feedback-section-head.is-danger .feedback-section-eyebrow {
   color: #9a4d14;
 }
 
-.feedback-point-title {
+/* Kept at the far end of the heading row: a count, a control. */
+.feedback-section-aside {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* The one white box on this page. What differs between sections is what is in
+   it, not what it looks like. */
+.feedback-box {
+  padding: 24px 28px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 16px;
+  background: var(--color-surface);
+}
+
+.feedback-box.success {
+  border-color: #b9dac7;
+}
+
+.feedback-box.danger {
+  border-color: #e8c8a8;
+}
+
+.feedback-summary-text {
   margin: 0;
-  font-size: 20px;
-  line-height: 1.2;
-  font-weight: 700;
-  color: var(--color-navy-900);
+  font-size: 14px;
+  line-height: 1.57;
+  color: var(--color-text-muted-secondary);
+}
+
+/* The two halves of the wrap-up side by side. Each is a section of its own
+   with its own heading, so the grid holds sections rather than boxes. */
+.feedback-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.feedback-details .feedback-section {
+  margin-bottom: 0;
 }
 
 .feedback-point-list {
@@ -2612,33 +2924,9 @@ h2 {
   flex: 1;
 }
 
-.feedback-phase-card {
-  /* `.card` above carries only a margin-top, so without a top margin here the
-     follow-up box and this one sit flush against each other. */
-  margin-top: 28px;
-  margin-bottom: 28px;
-  padding: 24px 28px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 16px;
-  background: var(--color-surface);
-}
-
-.feedback-phase-eyebrow {
-  margin-bottom: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--color-blue-600);
-}
-
-.feedback-phase-title {
-  margin: 0 0 16px;
-  font-size: 20px;
-  line-height: 1.3;
-  font-weight: 700;
-  color: var(--color-navy-900);
-}
-
+/* This section keeps a class of its own only for how its background note is
+   set — the white box is `.feedback-box` inside it, and the spacing comes from
+   `.feedback-section`, like every other section on the page. */
 .feedback-phase-text {
   margin: 0 0 14px;
   font-size: 14px;
@@ -2716,32 +3004,6 @@ h2 {
   margin-bottom: 32px;
 }
 
-.feedback-metrics-eyebrow {
-  margin-bottom: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--color-blue-600);
-}
-
-.feedback-metrics-title {
-  margin: 0 0 20px;
-  font-size: 24px;
-  line-height: 1.25;
-  font-weight: 700;
-  color: var(--color-navy-900);
-}
-
-/* Sized between the label and the value, so it belongs to the number above. */
-.feedback-metrics-section .metric-subline {
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.3;
-  color: var(--color-text-muted);
-}
-
-/* The Kennzahlen slider: the same track as the scenario filters. Only two
-   options here, so they split it instead of sitting left-aligned. */
 .feedback-metrics-filter {
   margin-bottom: 18px;
 }
@@ -2810,103 +3072,9 @@ h2 {
   margin-top: 14px;
 }
 
-.feedback-transcript-section {
-  margin-top: 40px;
-  margin-bottom: 32px;
-}
-
-.feedback-transcript-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 16px;
-}
-
-.feedback-transcript-eyebrow {
-  margin-bottom: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--color-blue-600);
-}
-
-.feedback-transcript-title {
-  margin: 0;
-  font-size: 24px;
-  line-height: 1.25;
-  font-weight: 700;
-  color: var(--color-navy-900);
-}
-
-.feedback-transcript-count {
-  flex-shrink: 0;
-  padding: 5px 9px;
-  border-radius: 999px;
-  background: var(--color-blue-100);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-blue-600);
-}
-
-.feedback-transcript-card {
-  overflow: hidden;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 16px;
-  background: var(--color-surface);
-}
-
-.feedback-transcript-card .transcript-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  margin: 0;
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--color-border-subtle);
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--color-navy-900);
-}
-
 /* The empty state stands in for a line, so it takes a line's inset. Without
    it the sentence starts at the card's own border, out of column with every
    line the card otherwise holds. */
-.feedback-transcript-card .transcript-empty {
-  margin: 0;
-  padding: 18px 20px;
-  color: var(--color-text-muted-secondary);
-}
-
-.feedback-transcript-card .transcript-line:last-child {
-  border-bottom: 0;
-}
-
-.feedback-transcript-card .transcript-time {
-  flex: 0 0 42px;
-  padding-top: 2px;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted-secondary);
-}
-
-.feedback-transcript-card .transcript-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
-  border-radius: 50%;
-  background: var(--color-blue-100);
-  color: var(--color-navy-900);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.feedback-transcript-card .transcript-content {
-  flex: 1;
-  min-width: 0;
-}
 /* --- Header: brand link and account chip -------------------------------- */
 /* The header grew navigation when the app grew a second page. Both ends of it
    collapse to their non-interactive form during a call, because leaving the
@@ -2957,11 +3125,11 @@ h2 {
   border-color: var(--color-border-subtle);
 }
 
-/* During a call: present, but plainly not a control. */
+/* Hidden rather than removed during the microphone check and the call: it keeps
+   its width, so the progress steps do not jump sideways on the way in and out.
+   `visibility` also takes it out of the tab order and off the screen reader. */
 .account-chip.is-locked {
-  opacity: 0.45;
-  padding-right: 6px;
-  cursor: default;
+  visibility: hidden;
 }
 
 .account-avatar {
@@ -3021,41 +3189,54 @@ h2 {
   min-width: 0;
 }
 
-.feedback-transcript-card .transcript-speaker {
-  margin-bottom: 4px;
-  font-size: 12px;
-  line-height: 1.3;
-  font-weight: 700;
-  color: var(--color-navy-900);
-}
-
-.feedback-transcript-card .transcript-text {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--color-text-muted-secondary);
-}
-
+/* The way back and the file to take away. `wrap` because the second label is
+   long: on a narrow page it drops to its own line rather than squeezing the
+   first. */
 .feedback-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-start;
+  gap: 12px;
   margin-top: 28px;
 }
 
-.feedback-actions .restart-button {
+/* The quiet way back to the setup screen. Shared by the wrap-up and the
+   microphone check, which both lead there. */
+.back-to-start-button {
   width: auto;
-  margin-top: 0;
+  /* `inline-block` and the reset below so the class also works on a <Link>. */
+  display: inline-block;
+  text-decoration: none;
   padding: 11px 18px;
   border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
   background: var(--color-surface);
   color: var(--color-navy-900);
+  font: inherit;
   font-size: 13px;
   font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
-.feedback-actions .restart-button:hover {
+.back-to-start-button:hover {
   background: var(--color-blue-100);
+}
+
+/* On the two screens that lead into a call it sits below the card, along its
+   left edge — away from the corner the starting button occupies, so the way
+   out and the way on are not neighbours. One rule for both because a reverse's
+   briefing screen replaces the microphone check rather than following it: the
+   same button in the same place is the whole point. */
+.mic-check-page .back-to-start-button,
+.brief-page .back-to-start-button {
+  display: block;
+  margin: 22px auto 0 0;
+}
+
+/* Above a page heading, where it replaces what used to be a plain back link. */
+.page-back-button {
+  margin-bottom: 1.25rem;
 }
 
 @media (max-width: 720px) {
@@ -3075,19 +3256,19 @@ h2 {
     grid-column: auto;
   }
 
+  .feedback-section-head {
+    align-items: flex-start;
+  }
+
+  .feedback-section-aside {
+    margin-top: 2px;
+  }
+
   .feedback-transcript-heading {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .feedback-transcript-card .transcript-line {
-    gap: 10px;
-    padding: 16px;
-  }
-
-  .feedback-transcript-card .transcript-empty {
-    padding: 16px;
-  }
 }
 
 .feedback-meta {
@@ -3235,19 +3416,15 @@ h2 {
    one call you have in mind, and a stack of thin lines compares far better
    than a grid of boxes. */
 
-.profile-section {
-  margin-top: 1.5rem;
-}
-
+/* No frame of its own: the card around it already is one, and two nested
+   borders of nearly the same radius read as a mistake. Instead the rows run the
+   full width of the card, so a hover fill reaches its edges. */
 .session-list {
   list-style: none;
-  margin: 0;
+  margin: 0 -1.5rem;
   padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-choice);
-  background: var(--color-surface);
-  /* Clips the first and last row's hover fill to the rounded corners. */
-  overflow: hidden;
+  border-top: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .session-list li + li {
@@ -3269,7 +3446,7 @@ h2 {
   gap: 18px;
   flex: 1;
   min-width: 0;
-  padding: 13px 18px;
+  padding: 13px 1.5rem;
   text-decoration: none;
   color: inherit;
   transition: background 0.15s;
@@ -3424,10 +3601,11 @@ h2 {
 }
 
 /* Spans the full row underneath it, so the question and its answer are not
-   squeezed into the space the bin occupied. */
+   squeezed into the space the bin occupied. The side padding is the row's own,
+   so the question starts where the row's text does. */
 .session-row-confirm {
   flex: 0 0 100%;
-  padding: 0 18px 14px;
+  padding: 0 1.5rem 14px;
 }
 
 .session-row-confirm p {
@@ -3456,7 +3634,12 @@ h2 {
   font-size: 0.9rem;
 }
 
-.session-more {
+/* "There is more below", in the two places that say it: the training history
+   and the Scenario grid. One rule rather than a copy each — they look alike on
+   purpose, though what they do differs and their labels say so: the history
+   fetches the next page, the grid only unfolds what it already has. */
+.session-more,
+.library-more {
   display: block;
   width: 100%;
   margin-top: 12px;
@@ -3471,7 +3654,8 @@ h2 {
   transition: background 0.2s;
 }
 
-.session-more:hover:not(:disabled) {
+.session-more:hover:not(:disabled),
+.library-more:hover {
   background: var(--color-surface-selected);
 }
 
@@ -3718,21 +3902,30 @@ h2 {
   line-height: 1.5;
 }
 
-/* Quiet by default: this sits under a page the user came to read, and the
-   destructive weight belongs on the confirmation, not on the way in. */
+/* Sized to their labels: `.consent-button` grows to fill a row by default, and
+   this one spans the full page width, where a stretched confirm button is out
+   of all proportion to what it does. */
+.session-delete .consent-button {
+  flex: 0 0 auto;
+}
+
+/* It names what it destroys and asks again before doing it, which is where the
+   safety actually sits -- so it may look like the button it is. */
 .session-delete-trigger {
   border: none;
-  background: none;
-  padding: 0;
+  border-radius: 999px;
+  padding: 0.55rem 1.4rem;
   font: inherit;
-  font-size: 0.9rem;
-  color: var(--color-danger);
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-danger);
   cursor: pointer;
-  text-decoration: underline;
+  transition: background 0.2s;
 }
 
 .session-delete-trigger:hover {
-  opacity: 0.8;
+  background: #9a3a30;
 }
 
 /* --- The traffic light on a classification (ADR 0078) -------------------- */
@@ -5779,7 +5972,7 @@ h2 {
 }
 
 .info-summary:hover {
-  color: var(--color-text);
+  color: var(--color-navy-900);
 }
 
 .info-summary:focus-visible {
@@ -5887,6 +6080,18 @@ h2 {
 .profile-page .card .retention p {
   margin: 0 0 0.9rem;
   line-height: 1.5;
+}
+
+/* `.consent-button` carries `flex: 1`, so the two share the width evenly; they
+   drop under each other once that would squeeze the labels. */
+.retention-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.retention-actions .consent-button {
+  min-width: 15rem;
 }
 
 .profile-page .card .retention .consent-button {
@@ -6029,8 +6234,16 @@ h2 {
 .login-brand {
   display: inline-flex;
   align-items: center;
-  gap: 11px;
+  gap: 14px;
   color: var(--color-navy-900);
+}
+
+.login-brand-logo {
+  display: block;
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .login-brand-mark {
@@ -6065,8 +6278,9 @@ h2 {
 
 .login-brand-name {
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 32px;
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .login-main {
@@ -6077,7 +6291,7 @@ h2 {
   grid-template-columns: minmax(0, 1.18fr) minmax(430px, 0.82fr);
   gap: 90px;
   align-items: center;
-  padding: 58px 0 68px;
+  padding: 34px 0 68px;
 }
 
 .login-hero {
@@ -6117,25 +6331,33 @@ h2 {
     padding-top: 26px;
   }
 
+  .login-brand-logo {
+    width: 46px;
+    height: 46px;
+  }
+
+  .login-brand-name {
+    font-size: 26px;
+  }
+
   .login-main {
-    padding-top: 40px;
+    padding-top: 26px;
   }
 }
 
 .login-hero-badge {
   width: max-content;
-  min-width: 262px;
-  height: 30px;
-  padding: 0 16px;
+  max-width: 100%;
+  height: 27px;
+  padding: 0 13px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  gap: 7px;
   border: 1px solid #cbdbe6;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.86);
   color: var(--color-blue-600);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   box-shadow: 0 1px 2px rgba(3, 37, 62, 0.03);
 }
@@ -6150,7 +6372,7 @@ h2 {
 
 .login-hero-title {
   max-width: 650px;
-  margin: 28px 0 24px;
+  margin: 22px 0 24px;
   font-family: var(--font-display);
   font-size: 48px;
   font-weight: 700;
@@ -6395,15 +6617,6 @@ h2 {
   box-shadow: 0 10px 36px rgba(3, 37, 62, 0.035);
 }
 
-.login-card-eyebrow {
-  margin-bottom: 9px;
-  color: var(--color-blue-600);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
 .login-card-title {
   margin: 0 0 10px;
   color: var(--color-navy-900);
@@ -6514,14 +6727,6 @@ h2 {
 .login-submit-button:focus-visible {
   outline: 3px solid var(--color-blue-300);
   outline-offset: 3px;
-}
-
-.login-redirect-hint {
-  margin: 13px 8px 0;
-  color: var(--color-text-muted-secondary);
-  text-align: center;
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .login-divider {
@@ -6673,12 +6878,9 @@ h2 {
   }
 
   .login-hero-badge {
-    min-width: 0;
-    max-width: 100%;
     height: auto;
-    min-height: 30px;
-    padding: 6px 12px;
-    text-align: center;
+    min-height: 27px;
+    padding: 5px 12px;
   }
 
   .login-training-preview {
@@ -6750,5 +6952,984 @@ h2 {
   .login-training-wave span {
     animation: none;
     transform: none;
+  }
+}
+
+/* --- The language flag beside a Persona's name -------------------------- */
+
+/* The name and its flag on one line, the flag sitting on the text's baseline
+   rather than at the top of a tall name that has wrapped. */
+.language-flag {
+  flex: 0 0 auto;
+  width: 20px;
+  height: auto;
+  border-radius: 2px;
+  /* The white stripes of one flag and the white card behind it are the same
+     colour: without an edge the flag has no left and right side. */
+  box-shadow: 0 0 0 1px rgba(3, 37, 62, 0.22);
+}
+
+/* --- The transcript as a file rather than a page section (F-64) --------- */
+
+/* Only the failure has anything to say; the offer itself is a button in the
+   actions row and needs no box around it. */
+.transcript-download-error {
+  margin: 0.6rem 0 0;
+  max-width: 62ch;
+}
+
+/* The answer to "what was that about?", on the post-call screen after a
+   Zufallsszenario (F-62). Directly under the title, above the wrap-up, because
+   every line of that already assumes it. */
+.scenario-reveal {
+  margin: 0.6rem 0 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.scenario-reveal strong {
+  color: var(--navy);
+}
+
+/* --- The die, thrown before a Zufallsszenario (F-62) -------------------- */
+
+.rolling-page {
+  max-width: 640px;
+}
+
+.rolling-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 2.5rem 1.5rem 3rem;
+  text-align: center;
+}
+
+.rolling-title {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  color: var(--navy);
+}
+
+.rolling-lead {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--text-muted);
+}
+
+/* The stage owns the perspective, so the cube's own transform stays a plain
+   rotation and the keyframes below read as one.
+
+   The height is headroom, not the die: the throw opens 44px above where the
+   die comes to rest, and a box drawn tight around the resting position lets
+   that first frame overlap the heading. So the die sits low in a tall box and
+   the throw happens inside it. */
+.dice-stage {
+  position: relative;
+  width: 96px;
+  height: 176px;
+  margin: 1.2rem 0 1.4rem;
+  perspective: 520px;
+}
+
+.dice {
+  position: absolute;
+  top: 56px;
+  left: 0;
+  width: 96px;
+  height: 96px;
+  transform-style: preserve-3d;
+  animation: dice-tumble var(--roll-ms, 2000ms) cubic-bezier(0.3, 0.1, 0.2, 1) forwards;
+}
+
+.dice-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  gap: 6px;
+  padding: 11px;
+  border-radius: 16px;
+  background: linear-gradient(150deg, #ffffff 0%, #e8f1f8 100%);
+  box-shadow: inset 0 0 0 2px var(--color-border);
+  /* The far faces would otherwise show through the near ones — the cube is
+     translucent nowhere else, so this is what makes it read as solid. */
+  backface-visibility: hidden;
+}
+
+.dice-pip {
+  border-radius: 50%;
+  background: var(--navy);
+}
+
+.dice-pip.is-empty {
+  background: none;
+}
+
+/* 48px = half the cube's edge; every face is the same square pushed out along
+   its own axis. */
+.dice-face-front {
+  transform: translateZ(48px);
+}
+
+.dice-face-back {
+  transform: rotateY(180deg) translateZ(48px);
+}
+
+.dice-face-right {
+  transform: rotateY(90deg) translateZ(48px);
+}
+
+.dice-face-left {
+  transform: rotateY(-90deg) translateZ(48px);
+}
+
+.dice-face-top {
+  transform: rotateX(90deg) translateZ(48px);
+}
+
+.dice-face-bottom {
+  transform: rotateX(-90deg) translateZ(48px);
+}
+
+.dice-shadow {
+  position: absolute;
+  left: 12px;
+  bottom: 0;
+  width: 72px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(3, 37, 62, 0.18);
+  filter: blur(3px);
+  animation: dice-shadow var(--roll-ms, 2000ms) cubic-bezier(0.3, 0.1, 0.2, 1) forwards;
+}
+
+/* Whole turns all the way, so it lands square on the front face rather than at
+   whatever angle the last bounce left it. The two short hops at the end are
+   what make it a thrown object and not a spinning one: it loses height, then
+   settles. */
+@keyframes dice-tumble {
+  0% {
+    transform: translateY(-44px) rotateX(0deg) rotateY(0deg) scale(0.82);
+  }
+  16% {
+    transform: translateY(4px) rotateX(200deg) rotateY(160deg) scale(1);
+  }
+  32% {
+    transform: translateY(-30px) rotateX(380deg) rotateY(320deg) scale(1);
+  }
+  52% {
+    transform: translateY(4px) rotateX(560deg) rotateY(520deg) scale(1);
+  }
+  70% {
+    transform: translateY(-14px) rotateX(672deg) rotateY(648deg) scale(1);
+  }
+  84% {
+    transform: translateY(0) rotateX(720deg) rotateY(720deg) scale(1);
+  }
+  91% {
+    transform: translateY(-5px) rotateX(720deg) rotateY(720deg) scale(1);
+  }
+  100% {
+    transform: translateY(0) rotateX(720deg) rotateY(720deg) scale(1);
+  }
+}
+
+/* Tied to the hops above: the shadow tightens as the die comes down, which is
+   what gives the bounce its height. */
+@keyframes dice-shadow {
+  0% {
+    opacity: 0.05;
+    transform: scale(0.55);
+  }
+  16%,
+  52%,
+  84%,
+  100% {
+    opacity: 0.22;
+    transform: scale(1);
+  }
+  32% {
+    opacity: 0.08;
+    transform: scale(0.7);
+  }
+  70% {
+    opacity: 0.14;
+    transform: scale(0.85);
+  }
+  91% {
+    opacity: 0.18;
+    transform: scale(0.93);
+  }
+}
+
+/* The screen is not shown at all under reduced motion (see App.tsx), so there
+   is nothing to disable here — this only covers a throw already on screen when
+   the setting changes. */
+@media (prefers-reduced-motion: reduce) {
+  .dice,
+  .dice-shadow {
+    animation: none;
+  }
+}
+
+/* --- Screen transitions (F-61, ADR 0070) -------------------------------- */
+
+/* The film cut played when the roles are swapped: the card turns over the
+   screen, the screen changes behind it, the card leaves. Two phases, driven
+   from ScreenTransition.tsx — which also sets --cover-ms/--reveal-ms, so the
+   timers that fire the actual screen change and these animations are the same
+   numbers rather than two copies of them.
+
+   Deliberately above everything and untouchable: a transition the user can
+   click through is a transition that lands them on a half-built screen. */
+.screen-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  pointer-events: all;
+  perspective: 1200px;
+}
+
+/* The palette's navy, kept after a neutral grey was tried against it: the
+   grey is the more conventional "lights down" colour, and the navy is the one
+   that looks like this app doing it. Opaque either way, because the screen
+   changes underneath at the covered frame — a veil you can see through shows
+   the change happening. */
+.screen-transition-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--color-navy-900);
+}
+
+.screen-transition-card {
+  position: relative;
+  width: min(38vh, 34vw);
+  filter: drop-shadow(0 24px 48px rgba(3, 37, 62, 0.55));
+  transform-style: preserve-3d;
+}
+
+.reverse-card {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Cover: the screen darkens to opaque while the card flies in and turns.
+   `forwards` matters on both — the cut happens on the last frame, and a card
+   that snapped back to its start there would be visible for one frame. */
+.screen-transition-cover .screen-transition-scrim {
+  animation: screen-transition-scrim-in var(--cover-ms) cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.screen-transition-cover .screen-transition-card {
+  animation: reverse-card-in var(--cover-ms) cubic-bezier(0.34, 1.2, 0.5, 1) forwards;
+}
+
+/* Reveal: the card keeps turning the same way and leaves towards the viewer,
+   the scrim lifts off the new screen. Same direction of spin as the cover, so
+   the two phases read as one movement interrupted by the cut. */
+.screen-transition-reveal .screen-transition-scrim {
+  animation: screen-transition-scrim-out var(--reveal-ms) cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.screen-transition-reveal .screen-transition-card {
+  animation: reverse-card-out var(--reveal-ms) cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes screen-transition-scrim-in {
+  from {
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes screen-transition-scrim-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Y, not Z: the card turns over the way a card is turned over, so the reverse
+   symbol sweeps through its own edge instead of spinning flat like a wheel.
+   The slight Z tilt keeps it from looking like a closing door. */
+@keyframes reverse-card-in {
+  from {
+    opacity: 0;
+    transform: rotateY(-200deg) rotateZ(-24deg) scale(0.35);
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: rotateY(0deg) rotateZ(0deg) scale(1);
+  }
+}
+
+@keyframes reverse-card-out {
+  from {
+    opacity: 1;
+    transform: rotateY(0deg) rotateZ(0deg) scale(1);
+  }
+  60% {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+    transform: rotateY(200deg) rotateZ(20deg) scale(1.9);
+  }
+}
+
+/* The screen the cut lands on comes up rather than appearing: without it the
+   reveal is a hard edit from an opaque scrim to a finished page. */
+.brief-page .reverse-brief,
+.brief-page .scenario-briefing,
+.brief-page .case-brief,
+.brief-page .brief-actions,
+.brief-page .back-to-start-button {
+  animation: screen-enter 420ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+.brief-page .brief-actions,
+.brief-page .back-to-start-button {
+  animation-delay: 90ms;
+}
+
+@keyframes screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* A press should be felt, not just registered. Cheap, applies to every primary
+   action in the app, and the one place a click still says nothing is a button
+   that starts something slow. */
+.follow-up-button:active,
+.start-call-button:active {
+  transform: scale(0.97);
+}
+
+/* `opacity` is carried over from each button's own rule above: the disabled
+   start button fades rather than snapping, and redeclaring `transition` here
+   would drop that. */
+.follow-up-button,
+.start-call-button {
+  transition: background 0.2s, color 0.2s, opacity 0.2s, transform 0.08s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The transition itself is not started at all under reduced motion (see
+     ScreenTransition.tsx) — this covers the entry and the press, which are. */
+  .brief-page .reverse-brief,
+  .brief-page .scenario-briefing,
+  .brief-page .case-brief,
+  .brief-page .brief-actions,
+  .brief-page .back-to-start-button {
+    animation: none;
+  }
+
+  .follow-up-button,
+  .start-call-button {
+    transition: background 0.2s, color 0.2s, opacity 0.2s;
+  }
+
+  .follow-up-button:active,
+  .start-call-button:active {
+    transform: none;
+  }
+}
+
+/* --- The phone ringing before an ordinary call (F-63) ------------------- */
+
+.incoming-page {
+  max-width: 640px;
+}
+
+.incoming {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 0 2rem;
+}
+
+/* One grid cell holding both the device and the rings, so the rings inherit
+   the phone's exact box and can be drawn in its shape rather than as circles
+   around something twice as tall as it is wide. */
+.incoming-stage {
+  display: grid;
+  /* Positioned, so the mute arm below can be placed against this box — which
+     is the device's own box — rather than against whatever ancestor happens to
+     be positioned further up. A static grid container is not a containing
+     block, and the arm would have landed somewhere else entirely. */
+  position: relative;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.incoming-stage > * {
+  grid-area: 1 / 1;
+}
+
+.incoming-rings {
+  position: relative;
+  justify-self: stretch;
+  align-self: stretch;
+}
+
+/* Three rings over the sounding half of the cycle, then nothing: they stop
+   where the figure stops rather than pulsing on through its silence. */
+.incoming-rings span {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--color-blue-300);
+  border-radius: 38px;
+  opacity: 0;
+  animation: incoming-ring var(--ring-cycle, 4400ms) ease-out infinite;
+}
+
+.incoming-rings span:nth-child(2) {
+  animation-delay: 0.5s;
+}
+
+.incoming-rings span:nth-child(3) {
+  animation-delay: 1s;
+}
+
+@keyframes incoming-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  22% {
+    opacity: 0;
+  }
+  30%, 100% {
+    transform: scale(1.28);
+    opacity: 0;
+  }
+}
+
+/* The device. The frame is a gradient rather than a flat grey because a
+   brushed metal edge is most of what makes a rectangle read as a phone; the
+   padding is the frame's thickness and the screen sits inside it. Tilts in the
+   two-then-pause rhythm a phone actually rings in — a constant wobble reads as
+   a loading state, and this one is waiting for a person, not for the network. */
+.incoming-phone {
+  position: relative;
+  width: 214px;
+  padding: 5px;
+  border-radius: 38px;
+  background: linear-gradient(
+    148deg,
+    #b9c0c7 0%,
+    #6f777f 16%,
+    #d3d9de 38%,
+    #7c848c 62%,
+    #aeb6bd 82%,
+    #6f777f 100%
+  );
+  box-shadow: 0 24px 55px rgba(3, 37, 62, 0.38);
+  animation: incoming-shake var(--ring-cycle, 4400ms) ease-in-out infinite;
+}
+
+/* Two bursts and then still, on the figure's own bars: it sounds from 0 to
+   0.8s and again from 1.1 to 1.9s of a 4.4s cycle, which is 0-18% and 25-43%
+   of it. The percentages are why the two only stay together as long as they
+   share `--ring-cycle`. */
+@keyframes incoming-shake {
+  0%, 18%, 25%, 43%, 100% {
+    transform: rotate(0deg);
+  }
+  4.5%, 29.5% {
+    transform: rotate(-2deg);
+  }
+  9%, 34% {
+    transform: rotate(2deg);
+  }
+  13.5%, 38.5% {
+    transform: rotate(-1.4deg);
+  }
+}
+
+/* The keys down the sides, in the frame's own metal. */
+.incoming-key {
+  position: absolute;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #8b939b, #c3cad0, #7f878f);
+}
+
+/* The silent switch, drawn like the other keys and, unlike them, meaning
+   something: `.incoming-mute-switch` below is what is actually pressed. */
+.incoming-key-silent {
+  left: -3px;
+  top: 74px;
+  height: 20px;
+  transition: background 0.2s;
+}
+
+/* Orange while silenced, which is what the switch on a real phone shows. */
+.incoming-key-silent.is-silenced {
+  background: linear-gradient(180deg, #b45309, #f59e0b, #b45309);
+}
+
+/* The control for it: an arm reaching in from the left of the device, with the
+   label and the arrow inside the button rather than beside it. That is the
+   whole point of the shape — a 3px sliver is far under the 24px a target needs
+   (WCAG 2.5.8), and this makes the target 210px wide without drawing the
+   switch any bigger than a switch.
+
+   `top`/`height` centre it on the sliver (74px + 20/2 = 84; 62 + 44/2 = 84),
+   and the right edge lands 6px inside the frame, so the arrowhead stops just
+   short of the switch and the press area still covers it. */
+.incoming-mute-switch {
+  position: absolute;
+  top: 62px;
+  left: -204px;
+  width: 210px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0 10px 0 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.incoming-mute-label {
+  white-space: nowrap;
+}
+
+.incoming-mute-arrow {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 12px;
+}
+
+.incoming-mute-switch:hover {
+  color: var(--navy);
+}
+
+/* The switch lights up with its own control, so the arm and the sliver read as
+   one thing. `:has` on the stage because the sliver sits inside the phone,
+   which is the button's *earlier* sibling — no combinator reaches backwards.
+   Decoration only: where `:has` is unsupported, nothing is lost but the
+   highlight. */
+.incoming-stage:has(.incoming-mute-switch:hover) .incoming-key-silent {
+  background: linear-gradient(180deg, #c3cad0, #ffffff, #c3cad0);
+}
+
+.incoming-stage:has(.incoming-mute-switch:hover) .incoming-key-silent.is-silenced {
+  background: linear-gradient(180deg, #f59e0b, #fbbf24, #f59e0b);
+}
+
+.incoming-mute-switch:focus-visible {
+  outline: 2px solid var(--color-blue-300);
+  outline-offset: 2px;
+}
+
+.incoming-key-up {
+  left: -3px;
+  top: 108px;
+  height: 34px;
+}
+
+.incoming-key-down {
+  left: -3px;
+  top: 152px;
+  height: 34px;
+}
+
+.incoming-key-power {
+  right: -3px;
+  top: 124px;
+  height: 48px;
+}
+
+.incoming-screen {
+  position: relative;
+  height: 396px;
+  padding: 2.6rem 0.9rem 1.3rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 33px;
+  overflow: hidden;
+  background: linear-gradient(168deg, #14364f 0%, var(--color-navy-900) 55%, #061a2b 100%);
+  color: var(--color-surface);
+}
+
+/* The pill cut out of the display. Black, not dark blue: it is a hole in the
+   screen, and the one part of the device that is never lit. */
+.incoming-island {
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 82px;
+  height: 24px;
+  border-radius: 999px;
+  background: #000000;
+}
+
+.incoming-avatar {
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  /* Two `auto` margins, here and on the actions below, split the free space:
+     the caller sits in the middle of the display and the buttons stay at its
+     foot, which is where a phone puts them. */
+  margin: auto 0 0.7rem;
+  /* Flex and not grid, matching the app's other two portrait slots: the
+     picture inside is sized at 100% of this box, and a centred *grid* item
+     resolves that against a track rather than against the box. The initials
+     fallback centres the same way either way. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+/* Head and shoulders, the selection card's crop: the source is a square
+   half-body shot and at 72px the whole of it leaves a face nobody could tell
+   from another. The two large square slots show the pose whole and need no
+   zoom; this one is small, so it does. */
+.incoming-avatar > img {
+  transform: scale(1.5);
+  transform-origin: center 18%;
+}
+
+/* The initials fall back to the display's own look rather than the light blue
+   every other slot uses — this one sits on a dark phone screen. */
+.incoming-avatar.persona-avatar-fallback {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--color-surface);
+}
+
+.incoming-caller {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Pushed to the bottom of the display, where a phone puts them. */
+.incoming-actions {
+  display: flex;
+  gap: 2.4rem;
+  margin-top: auto;
+}
+
+.incoming-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.incoming-button {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #fff;
+  transition: transform 0.12s ease-out, filter 0.2s;
+}
+
+.incoming-button:hover {
+  filter: brightness(1.12);
+}
+
+.incoming-button:active {
+  transform: scale(0.94);
+}
+
+.incoming-handset {
+  width: 27px;
+  height: 27px;
+}
+
+.incoming-accept {
+  background: #2fb463;
+  /* The one thing on this screen that has to be pressed, so it is the one
+     thing that keeps moving once the rest has settled. */
+  animation: incoming-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes incoming-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(47, 180, 99, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 15px rgba(47, 180, 99, 0);
+  }
+}
+
+.incoming-decline {
+  background: #e5484d;
+}
+
+.incoming-action-label {
+  font-size: 0.72rem;
+  color: var(--color-blue-300);
+}
+
+.incoming-hint {
+  margin: 2.4rem 0 0;
+  max-width: 34ch;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* The arm reaches 204px left of a device that is centred in the page, so it
+   needs a viewport of roughly 214 + 2x204 to sit inside one. Below that the
+   words go and the arrow stays: it still points at the switch, the target is
+   still 78px wide, and the button keeps its name through `aria-label` — which
+   is why the name is there and not read off the <span>. */
+@media (max-width: 720px) {
+  .incoming-mute-switch {
+    left: -72px;
+    width: 78px;
+  }
+
+  .incoming-mute-label {
+    display: none;
+  }
+}
+
+/* A short window is the common case on a laptop once the header and the hint
+   are counted; the device gives up height before anything else does. */
+@media (max-height: 780px) {
+  .incoming-screen {
+    height: 330px;
+    padding-top: 2.3rem;
+  }
+
+  .incoming-avatar {
+    width: 58px;
+    height: 58px;
+    margin: auto 0 0.5rem;
+    font-size: 1.2rem;
+  }
+}
+
+/* The screen stays — it is a decision, not decoration — but nothing on it
+   moves. */
+@media (prefers-reduced-motion: reduce) {
+  .incoming-rings span,
+  .incoming-phone,
+  .incoming-accept {
+    animation: none;
+  }
+
+  .incoming-rings span {
+    opacity: 0.22;
+  }
+
+  .incoming-button {
+    transition: filter 0.2s;
+  }
+
+  .incoming-button:active {
+    transform: none;
+  }
+}
+
+/* --- The trainee's briefing (ADR 0054) ---------------------------------- */
+/* Shown on the setup screen under the selection summary and again on the
+   microphone check. Deliberately quiet -- a tinted panel, not a callout: it is
+   read once, before the call, and it competes with the start button on both
+   screens. The left rule is what separates it from the storage note above it
+   on the setup screen, which uses the same tinted background. */
+
+.scenario-briefing {
+  margin: 0 0 1.25rem;
+  padding: 14px 16px;
+  border-left: 3px solid var(--color-blue-600);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-filter);
+}
+
+.scenario-briefing-title {
+  margin: 0 0 6px;
+  color: var(--color-blue-600);
+}
+
+.scenario-briefing-body {
+  margin: 0;
+  /* Not muted: on the screen before the call this is one of only two things
+     to read, and on the setup screen it is what the selection is judged by. */
+  color: var(--color-navy-900);
+}
+
+
+
+/* --- "Feedback wird erstellt" (the wait after the call) ------------------ */
+
+/* The wrap-up is written in the worker (ADR 0049), so hanging up is followed
+   by a real wait. It gets a screen rather than a grey line on the finished
+   page, and the screen gets something to watch: the call's own waveform, being
+   read by a magnifier passing over it. Centred and alone, because that is the
+   whole of it. */
+
+.feedback-wait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-block: 24px 8px;
+}
+
+.feedback-wait .feedback-title {
+  margin-bottom: 8px;
+}
+
+.feedback-wait-stage {
+  position: relative;
+  width: min(340px, 100%);
+  height: 180px;
+  display: grid;
+  place-items: center;
+  /* The lens travels past the last bar at each end; without this it leaves the
+     scene and drags the page sideways with it on a narrow screen. */
+  overflow: hidden;
+}
+
+.feedback-wait-wave {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 96px;
+}
+
+.feedback-wait-bar {
+  width: 9px;
+  /* The bar's own share of the scene (--h) is its resting shape; the animation
+     only scales it. That way `animation: none` under reduced motion leaves a
+     waveform standing rather than eleven bars of equal height. */
+  height: var(--h);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--color-blue-300), var(--color-blue-600));
+  animation: feedback-wait-bounce 1.3s ease-in-out infinite;
+  /* Staggered along the row, so it reads as a wave passing through rather than
+     as eleven bars pulsing together. */
+  animation-delay: calc(var(--i) * 110ms);
+}
+
+.feedback-wait-lens {
+  position: absolute;
+  color: var(--color-navy-900);
+  animation: feedback-wait-scan 5.2s ease-in-out infinite;
+}
+
+/* Around the resting height rather than up from it: a waveform is read from
+   its middle outwards. */
+@keyframes feedback-wait-bounce {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+/* Slower than the bars on purpose — the tempo difference is what makes one of
+   them the thing being read and the other the thing reading it. The tilt at
+   each end is the wrist turning round. */
+@keyframes feedback-wait-scan {
+  0%,
+  100% {
+    transform: translateX(-140px) rotate(-10deg);
+  }
+  50% {
+    transform: translateX(140px) rotate(10deg);
+  }
+}
+
+.feedback-wait-caption {
+  margin: 0 0 6px;
+  min-height: 1.5rem;
+  font-size: 1rem;
+  color: var(--color-navy-900);
+  /* Keyed on the caption index in FeedbackWaiting.tsx, so React remounts the
+     paragraph and the fade plays again for every line. */
+  animation: feedback-wait-caption-in 400ms ease-out both;
+}
+
+@keyframes feedback-wait-caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.feedback-wait-note {
+  margin: 0 0 20px;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+/* A way out, not an offer: quiet enough that waiting stays the obvious thing
+   to do, present because the transcript may be the only copy (F-64). */
+.feedback-wait-skip {
+  border: none;
+  background: none;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.feedback-wait-skip:hover {
+  color: var(--color-navy-900);
+}
+
+/* Unlike the die (F-62) and the card turn (F-61) this screen is still shown
+   under reduced motion — there is nothing behind it to skip to, only a wait.
+   What is left is the waveform standing still with the lens over it. */
+@media (prefers-reduced-motion: reduce) {
+  .feedback-wait-bar,
+  .feedback-wait-lens,
+  .feedback-wait-caption {
+    animation: none;
   }
 }

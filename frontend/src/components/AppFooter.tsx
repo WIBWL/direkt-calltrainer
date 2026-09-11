@@ -8,7 +8,7 @@ export default function AppFooter() {
     <footer className="app-footer">
       <div className="app-footer-inner">
         <div className="app-footer-information">
-          <span className="app-footer-copyright">© 2026 Train to Call</span>
+          <span className="app-footer-copyright">© 2026 Universität Würzburg</span>
 
           <span className="app-footer-disclaimer">
             KI-gestützter Trainingsprototyp. Ergebnisse dienen ausschließlich zu Übungszwecken.

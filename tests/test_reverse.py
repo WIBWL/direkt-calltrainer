@@ -40,19 +40,28 @@ from tests.conftest import TEST_PERSONAS, a_finished_session, asked, stub_comple
 
 _DESCRIPTION = "The customer is calling support about an unresolved contract issue."
 _FACTS = "A ticket was opened eleven days ago. A callback was promised within 48 hours."
-_GOAL = "Find out what is happening and get a date."
-_SETTLED = "someone names a date. A promise to look into it is not enough."
+_GOAL = (
+    "Find out what is happening and get a date. The matter is settled when "
+    "someone names one. A promise to look into it is not enough."
+)
+# The German display twins a built-in carries beside its English prompt text
+# (ADR 0043/0076). A reverse has to take them along, or the info panel behind
+# its card falls back to the English.
+_DESCRIPTION_DE = "Der Kunde ruft im Support an, weil ein Vertragsfall offen ist."
+_FACTS_DE = "Das Ticket liegt seit elf Tagen. Ein Rückruf binnen 48 Stunden war zugesagt."
 _IMPROVEMENTS = [
     "Bei 02:14 haben Sie „ich kümmere mich darum“ gesagt, wo nach einem Termin "
     "gefragt war.",
 ]
 
-# What the stubbed model answers with: the five keys the briefing panel reads.
+# What the stubbed model answers with: the four keys the briefing panel reads.
 _BRIEF = {
     "situation": "Sie rufen bei Ihrem Dienstleister an, weil ein Ticket seit elf Tagen liegt.",
     "facts": "Ticket seit elf Tagen offen. Rückruf binnen 48 Stunden zugesagt.",
-    "goal": "Sie wollen wissen, woran es liegt, und ein Datum bekommen.",
-    "settled": "Jemand nennt Ihnen einen Tag.",
+    "goal": (
+        "Sie wollen wissen, woran es liegt, und ein Datum bekommen. Erledigt "
+        "ist es, wenn Ihnen jemand einen Tag nennt."
+    ),
     "goals": [
         "Nennen Sie gleich zu Beginn, worum es geht.",
         "Lassen Sie sich ein konkretes Datum nennen.",
@@ -63,21 +72,21 @@ _REPLY = json.dumps(_BRIEF)
 
 
 async def _draft() -> dict:
-    return await draft_brief(_DESCRIPTION, _FACTS, _GOAL, _SETTLED, _IMPROVEMENTS)
+    return await draft_brief(_DESCRIPTION, _FACTS, _GOAL, _IMPROVEMENTS)
 
 
 # --- The briefing itself (no database) ------------------------------------
 
 
 async def test_the_prompt_carries_the_played_case(monkeypatch: pytest.MonkeyPatch) -> None:
-    """ADR 0070's exception to ADR 0043: the four prompt fields are exactly
+    """ADR 0070's exception to ADR 0043: the three prompt fields are exactly
     what the briefing is a translation of."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await _draft()
 
     prompt = asked(calls)
-    for field in (_DESCRIPTION, _FACTS, _GOAL, _SETTLED):
+    for field in (_DESCRIPTION, _FACTS, _GOAL):
         assert field in prompt
 
 
@@ -231,7 +240,8 @@ def _give_the_scenario_a_case(db: DbSession) -> None:
     scenario.description = _DESCRIPTION
     scenario.case_facts = _FACTS
     scenario.call_goal = _GOAL
-    scenario.success_condition = _SETTLED
+    scenario.description_label = _DESCRIPTION_DE
+    scenario.case_facts_label = _FACTS_DE
     db.commit()
 
 
@@ -270,10 +280,12 @@ async def test_the_route_writes_a_reverse_carrying_the_played_case(
 
     row = _reverse_row(db_session)
     assert str(row.extern_id) == body["id"]
-    # The case is copied, not re-invented.
-    assert (row.description, row.case_facts, row.call_goal, row.success_condition) == (
-        _DESCRIPTION, _FACTS, _GOAL, _SETTLED
+    # The case is copied, not re-invented -- the display twins with it, or the
+    # info panel behind the card would read a built-in's case out in English.
+    assert (row.description, row.case_facts, row.call_goal) == (
+        _DESCRIPTION, _FACTS, _GOAL
     )
+    assert (row.description_label, row.case_facts_label) == (_DESCRIPTION_DE, _FACTS_DE)
     assert row.reverse_brief == _BRIEF
 
 
@@ -405,7 +417,14 @@ async def test_the_detail_route_serves_the_briefing(
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """This is how the panel gets its text during the call, and the deliberate
-    exception to ADR 0043 -- for a case the User has already heard played."""
+    exception to ADR 0043 -- for a case the User has already heard played.
+
+    The case comes back in the display language, not in the English the prompt
+    reads: `_detail` prefers the twin (ADR 0076), and a reverse of a built-in
+    only has one because `_insert_reverse` copies it along with the field it
+    belongs to. It did not, once, and the info panel read the case out in
+    English -- which this line is here to catch.
+    """
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     stub_completions(monkeypatch, _REPLY)
@@ -415,7 +434,8 @@ async def test_the_detail_route_serves_the_briefing(
 
     assert detail["reverse"] is True
     assert detail["reverse_brief"] == _BRIEF
-    assert detail["case_facts"] == _FACTS
+    assert detail["case_facts"] == _FACTS_DE
+    assert detail["description"] == _DESCRIPTION_DE
 
 
 async def test_a_reverse_read_for_a_call_swaps_the_casting(
@@ -457,7 +477,7 @@ async def test_a_reverse_cannot_be_edited(
     response = await api_client.patch(
         f"/api/scenarios/{created.json()['id']}",
         json={"name": "Anders", "short_description": "Anders", "description": "Anders",
-              "case_facts": "", "call_goal": "", "success_condition": "", "category": ""},
+              "case_facts": "", "call_goal": "", "category": ""},
     )
 
     assert response.status_code == 404
@@ -494,7 +514,7 @@ async def test_a_client_cannot_author_a_reverse(
     response = await api_client.post(
         "/api/scenarios",
         json={"name": "Fake", "short_description": "Fake", "description": "Fake",
-              "case_facts": "", "call_goal": "", "success_condition": "",
+              "case_facts": "", "call_goal": "",
               "category": "", "reverse": True},
     )
 
@@ -687,7 +707,7 @@ async def test_withdrawing_consent_leaves_an_authored_scenario_alone(
     await api_client.post(
         "/api/scenarios",
         json={"name": "Eigenes", "short_description": "Eigenes", "description": "Eigenes",
-              "case_facts": "", "call_goal": "", "success_condition": "", "category": ""},
+              "case_facts": "", "call_goal": "", "category": ""},
     )
 
     deletion.delete_subject_sessions(db_session, "test-subject")

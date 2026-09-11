@@ -38,10 +38,11 @@ from backend.scenarios import OriginSession, Scenario
 
 # Fields an authoring caller may set on a Scenario. `description` and the three
 # case fields are prompt input (ADR 0045); `title` / `short_description` are the
-# card. Everything else on the row (ids, ownership, `active`) is set here.
+# card and `briefing` the trainee's own text (ADR 0054). Everything else on the
+# row (ids, ownership, `active`) is set here.
 _SCENARIO_FIELDS = (
-    "title", "short_description",
-    "description", "case_facts", "call_goal", "success_condition",
+    "title", "short_description", "briefing",
+    "description", "case_facts", "call_goal",
     "category",
 )
 
@@ -52,6 +53,7 @@ _NULLABLE_SCENARIO_FIELDS = frozenset({"category"})
 
 
 def _to_persona(row: models.Persona) -> Persona:
+    ordered = sorted(row.objections, key=lambda e: e.position)
     return Persona(
         id=str(row.extern_id),
         name=row.name,
@@ -62,6 +64,8 @@ def _to_persona(row: models.Persona) -> Persona:
             kugelaudio_voice_id=row.kugelaudio_voice_id,
         ),
         role_label=row.role_label,
+        traits_label=row.traits_label,
+        training_goal=row.training_goal,
         role=row.role,
         traits=row.traits,
         behavior=row.behavior,
@@ -69,10 +73,12 @@ def _to_persona(row: models.Persona) -> Persona:
         # only orders what the database returns, so the mapping would depend on
         # how the row was obtained. `position` (ADR 0026) is the authored
         # order, and it is the order the prompt gets.
-        objections=tuple(
-            objection.text
-            for objection in sorted(row.objections, key=lambda e: e.position)
+        objections=tuple(objection.text for objection in ordered),
+        # Same source, same order: the label of objection i is at index i.
+        objection_labels=tuple(
+            objection.text_label or "" for objection in ordered
         ),
+        avatar_url=row.avatar_url,
     )
 
 
@@ -81,10 +87,12 @@ def _to_scenario(row: models.Scenario) -> Scenario:
         id=str(row.extern_id),
         name=row.title,
         short_description=row.short_description,
+        briefing=row.briefing,
         description=row.description,
         case_facts=row.case_facts,
+        description_label=row.description_label,
+        case_facts_label=row.case_facts_label,
         call_goal=row.call_goal,
-        success_condition=row.success_condition,
         category=row.category,
         created_by=row.created_by,
         visibility=row.visibility,
@@ -271,13 +279,27 @@ def create_scenario(
         return _to_scenario(row)
 
 
+# What the write routes below match on, beside ownership: a row that was
+# authored rather than built from a finished Session. `follow_up` is not a
+# column -- it is `derived_from_session_id is not None` (see `_to_scenario`),
+# so the absence of that provenance is what says "hand-authored" here.
+_AUTHORED_ONLY = (
+    models.Scenario.reverse.is_(False),
+    models.Scenario.derived_from_session_id.is_(None),
+)
+
+
 def update_scenario(extern_id: str, data: dict, subject: str) -> Scenario | None:
     """Edit a Scenario the caller authored. None if it is not theirs.
 
-    A reverse is not among them (ADR 0070): it is a copy of a case that was
-    played, and editing it would leave a row claiming to replay a conversation
-    it no longer matches. Excluded in the WHERE clause rather than checked
-    afterwards, so it answers exactly like a row that is not the caller's.
+    Neither of the two kinds written from a Session is among them. A reverse
+    (ADR 0070) is a copy of a case that was played, and editing it would leave
+    a row claiming to replay a conversation it no longer matches. A follow-up
+    (ADR 0069) is the same argument one step on: it is the *next call in that
+    matter*, drafted to sit exactly at the improvement point the wrap-up found,
+    and an edited one is no longer the exercise that reading produced. Both are
+    excluded in the WHERE clause rather than checked afterwards, so they answer
+    exactly like a row that is not the caller's.
     """
     ref = _as_extern_id(extern_id)
     if ref is None:
@@ -287,7 +309,7 @@ def update_scenario(extern_id: str, data: dict, subject: str) -> Scenario | None
             select(models.Scenario).where(
                 models.Scenario.extern_id == ref,
                 models.Scenario.created_by == subject,
-                models.Scenario.reverse.is_(False),
+                *_AUTHORED_ONLY,
             )
         ).one_or_none()
         if row is None:
@@ -310,10 +332,11 @@ def set_scenario_visibility(
     """Share the caller's Scenario with their tenant, or make it private again
     (ADR 0060). Only `private` <-> `tenant`. None if the row is not theirs.
 
-    A reverse is excluded for a second reason on top of the one in
-    `update_scenario`: its briefing is derived from the author's own wrap-up
-    (ADR 0070), so sharing the row would hand colleagues a reading of that
-    person's feedback.
+    Both kinds written from a Session are excluded for a second reason on top
+    of the one in `update_scenario`: a reverse's briefing is derived from the
+    author's own wrap-up (ADR 0070) and a follow-up is drafted from that same
+    wrap-up's improvement points (ADR 0069), so sharing either row would hand
+    colleagues a reading of that person's feedback.
 
     A row that somehow has no `tenant_id` (created before tenant stamping) is
     stamped with the caller's tenant here, so sharing still works."""
@@ -325,7 +348,7 @@ def set_scenario_visibility(
             select(models.Scenario).where(
                 models.Scenario.extern_id == ref,
                 models.Scenario.created_by == subject,
-                models.Scenario.reverse.is_(False),
+                *_AUTHORED_ONLY,
             )
         ).one_or_none()
         if row is None:
@@ -452,7 +475,14 @@ def _insert_reverse(
             description=played.description,
             case_facts=played.case_facts,
             call_goal=played.call_goal,
-            success_condition=played.success_condition,
+            # The German display twins travel with the fields they belong to.
+            # Without them a reverse of a built-in kept the English prompt text
+            # and nothing to show instead, and `_detail`'s
+            # `case_facts_label or case_facts` fell back to it -- so the info
+            # panel read the played case out in English. NULL on a reverse of
+            # an authored Scenario, which has no twins and needs none.
+            description_label=played.description_label,
+            case_facts_label=played.case_facts_label,
             # Carried over so a reverse sits under the same category filter as
             # the call it replays -- it is the same kind of call, seen from the
             # other side (ADR 0072).

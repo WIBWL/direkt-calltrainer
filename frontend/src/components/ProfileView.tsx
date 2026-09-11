@@ -97,7 +97,7 @@ export default function ProfileView() {
         <FocusSettings />
       </section>
 
-      <section className="profile-section">
+      <section className="card">
         <div className="progress-section-head">
           <h2>Ihre Trainings</h2>
           {/* The history lists single calls; the dashboard is the same data
@@ -112,7 +112,7 @@ export default function ProfileView() {
 
       <section className="card">
         <h2>Ihre Daten</h2>
-        <p>
+        <p className="card-lead">
           Gespeichert werden Gesprächsprotokoll, Kennzahlen und Auswertung, aber{" "}
           <strong>keine Tonaufnahme</strong>.
         </p>

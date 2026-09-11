@@ -22,7 +22,9 @@ not told by the call itself. The measured statistics stay out -- no target
 range exists to correct a figure against (ADR 0051).
 
 The four case fields become the caller's briefing, so the prompt keeps the
-exercise's purpose out of them.
+exercise's purpose out of them. `short_description` and the trainee's own
+briefing (ADR 0054) are the two fields where it may be said, because the
+caller reads neither.
 
 The values are German: it lands in the User's own library, as F-58's text does.
 """
@@ -53,7 +55,6 @@ class PlayedCall:
     description: str = ""
     case_facts: str = ""
     call_goal: str = ""
-    success_condition: str = ""
     # The wrap-up's summary: where that call actually ended up, which is what
     # the next one has to start from.
     outcome: str = ""
@@ -81,10 +82,10 @@ class _Draft(BaseModel):
 
     name: str = ""
     short_description: str = ""
+    briefing: str = ""
     description: str = ""
     case_facts: str = ""
     call_goal: str = ""
-    success_condition: str = ""
 
     def sanitised(self) -> dict[str, str]:
         """Cleaned and capped to what the authoring API enforces (ADR 0059/0063),
@@ -134,8 +135,7 @@ def _material(call: PlayedCall) -> str:
         for label, text in (
             ("Situation", call.description),
             ("Facts", call.case_facts),
-            ("What the caller wanted", call.call_goal),
-            ("What would have settled it", call.success_condition),
+            ("What the caller wanted, and what settled it", call.call_goal),
         )
         if text
     ]
@@ -176,11 +176,12 @@ def _messages(material: str) -> list[dict[str, str]]:
         "unchanged.\n"
         "\n"
         "# How the scenario is used\n"
-        "The tool plays the caller and the trainee answers the phone. Four of "
-        "the fields you write -- description, case_facts, call_goal, "
-        "success_condition -- are handed to the model that plays that caller, "
-        "as its briefing. The other two -- name, short_description -- are the "
-        "card the trainee reads before they start.\n"
+        "The tool plays the caller and the trainee answers the phone. Three "
+        "of the fields you write -- description, case_facts, call_goal -- are "
+        "handed to the model that plays that caller, as its briefing. The "
+        "other three -- name, short_description, briefing -- are read by the "
+        "trainee before they start and never by the "
+        "caller.\n"
         "\n"
         "# Rules for the caller's briefing\n"
         "S1. Write it entirely from the caller's side, addressed to the caller "
@@ -203,18 +204,18 @@ def _messages(material: str) -> list[dict[str, str]]:
         "of things -- and move them on: what was agreed last time, what has "
         "happened since, what is still open. A call that repeats the first one "
         "is not an exercise, and a different matter is not this one.\n"
-        "S6. success_condition is the bar the *caller* holds: what has to have "
-        "happened before they consider the matter settled. This is where the "
-        "exercise lives. Set it at exactly the thing the feedback says the "
-        "trainee did not do, stated as the caller's own requirement, and set it "
-        "so that a vague or evasive answer does not clear it.\n"
+        "S6. call_goal says both what the caller wants and the bar they hold: "
+        "what has to have happened before they consider the matter settled. "
+        "That bar is where the exercise lives. Set it at exactly the thing the "
+        "feedback says the trainee did not do, stated as the caller's own "
+        "requirement, and set it so a vague or evasive answer does not clear it.\n"
         "S7. description is the situation in one or two sentences: who is "
         "calling, and what has brought them back. Not the facts -- those are "
         "case_facts. A description that repeats them is read out as the "
         "opening line, and a caller who recites their whole case in the first "
         "breath is the one thing that never happens on a real call.\n"
         "\n"
-        "# Rules for the card\n"
+        "# Rules for what the trainee reads\n"
         "C1. name: a short, plain title for the situation this time. It may "
         "read as the later call in a matter that was already started; no "
         "numbering, no colon-prefix.\n"
@@ -223,8 +224,17 @@ def _messages(material: str) -> list[dict[str, str]]:
         "twelve German words -- because it is a teaser on a selection card, "
         "not a summary; count them before you answer. Anything longer is cut "
         "off mid-sentence. The situation itself belongs in description, which "
-        "has five times the room. This is the one place where the purpose of "
-        "the exercise may be said out loud -- the caller never reads it.\n"
+        "has five times the room. This and briefing are the two places where "
+        "the purpose of the exercise may be said out loud -- the caller reads "
+        "neither.\n"
+        "C3. briefing: the trainee's own side of the case, in three short "
+        'sentences addressed to them as "Sie". Say exactly three things and '
+        "stop: the role they answer the phone in, the room they have (what "
+        "they may offer, promise or escalate), and what counts as a good "
+        "outcome. Never what to say or in which order -- told that, they read "
+        "a script instead of holding a conversation. It has to agree with "
+        "the bar inside call_goal: never offer them something the caller "
+        "would not accept, or the call cannot be won.\n"
         "\n"
         "# Never\n"
         "N1. No markdown, no headings, no bullet characters, no line breaks "
@@ -236,11 +246,15 @@ def _messages(material: str) -> list[dict[str, str]]:
         "\n"
         "# Output\n"
         "Answer with a single JSON object and nothing else.\n"
-        "O1. Exactly these six keys, spelled exactly like this, all six always "
-        "present: name, short_description, description, case_facts, call_goal, "
-        "success_condition. The keys are identifiers: never translate them, "
-        "never add one.\n"
-        "O2. Every value is written in German. The keys stay as they are.\n"
+        "O1. Exactly these six keys, spelled exactly like this, all six "
+        "always present: name, short_description, briefing, description, "
+        "case_facts, call_goal. The keys are identifiers: "
+        "never translate them, never add one.\n"
+        "O2. Every value is written in German. The keys stay as they are."
+        ' German is written with its own letters: "ä", "ö", "ü" and "ß", never '
+        '"ae", "oe", "ue" or "ss" -- a title reading "Rueckfrage" is wrong '
+        'where "Rückfrage" is the word.'
+        "\n"
         "O3. Maximum lengths, in characters -- a value over its limit is cut "
         f"off, so stay under it: {caps}.\n"
         "\n"
@@ -248,20 +262,22 @@ def _messages(material: str) -> list[dict[str, str]]:
         '{"name": "short title of the situation", '
         '"short_description": "one sentence to the trainee about what this call '
         'will demand of them", '
+        '"briefing": "three sentences to the trainee: the role they answer '
+        'in, the room they have, and what a good outcome is", '
         '"description": "the situation this time, told to the caller: who '
         'they are calling and what has happened since", '
         '"case_facts": "the concrete facts of the case, as short plain lines", '
-        '"call_goal": "what the caller wants out of the call", '
-        '"success_condition": "what has to have happened before the caller '
-        'considers it settled"}\n'
+        '"call_goal": "what the caller wants out of the call, and what has '
+        'to have happened before they consider it settled"}\n'
         "\n"
         "# Before you answer, check silently\n"
-        "The four briefing fields say nothing about feedback, training or what "
+        "The three caller fields say nothing about feedback, training or what "
         "is being practised; nothing in them addresses the trainee; the case is "
         "the one you were given, carried forward rather than repeated or "
         "swapped for another; description is one or two sentences and states no "
-        "fact that case_facts already carries; and success_condition is a bar a "
-        "vague answer would fail.\n"
+        "fact that case_facts already carries; the bar in call_goal is one a "
+        "vague answer would fail; and the room briefing gives the trainee is "
+        "room the caller would actually accept.\n"
         "\n"
         "The six keys stay in English. Every value is written in German. Your "
         "entire answer is the JSON object, starting with { and ending with }."

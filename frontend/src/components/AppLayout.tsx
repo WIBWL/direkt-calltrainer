@@ -16,6 +16,8 @@ interface AppLayoutProps {
   /** Widens the header to the same measure as a wide page, so brand and account
    *  chip line up with the content instead of sitting inside it. */
   wide?: boolean;
+  /** Passed through to the header — see `onHome` there. */
+  onHome?: () => void;
   /** Per-screen modifier on the page element; the shared `app-page` is added here. */
   pageClassName?: string;
   children: ReactNode;
@@ -29,6 +31,7 @@ export default function AppLayout({
   accountActive,
   progressActive,
   wide,
+  onHome,
   pageClassName,
   children,
 }: AppLayoutProps) {
@@ -40,6 +43,7 @@ export default function AppLayout({
         accountActive={accountActive}
         progressActive={progressActive}
         wide={wide}
+        onHome={onHome}
       />
 
       <main className={cx("app-page", pageClassName)}>{children}</main>

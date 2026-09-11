@@ -52,8 +52,10 @@ _PHASE = "Der Ton bleibt über alle drei Phasen gleich sachlich."
 # the same subject area (ADR 0069's second amendment).
 _DESCRIPTION = "Sie rufen bei Ihrem Anbieter an, weil Sie kündigen wollen."
 _FACTS = "Vertrag seit 2019, monatlich 89 Euro, dritte Störung in sechs Wochen."
-_GOAL = "Eine Zusage, dass die Störung dauerhaft behoben wird."
-_BAR = "Ein Termin mit Datum. Eine Prüfzusage reicht nicht."
+_GOAL = (
+    "Eine Zusage, dass die Störung dauerhaft behoben wird. Geklärt ist die "
+    "Sache mit einem Termin mit Datum. Eine Prüfzusage reicht nicht."
+)
 _OUTCOME = "Der Kunde legte ohne festen Termin auf."
 _CALL = PlayedCall(
     scenario_name=_CARD_NAME,
@@ -61,21 +63,28 @@ _CALL = PlayedCall(
     description=_DESCRIPTION,
     case_facts=_FACTS,
     call_goal=_GOAL,
-    success_condition=_BAR,
     outcome=_OUTCOME,
     improvements=tuple(_IMPROVEMENTS),
     phase_language=_PHASE,
 )
 
 # What the stubbed model answers with: the six keys of the authoring wire
-# (ADR 0061, so `name` and not `title`).
+# (ADR 0061, so `name` and not `title`), the trainee's briefing (ADR 0054)
+# among them.
 _DRAFT = {
     "name": "Rückruf zur offenen Reklamation",
     "short_description": "Der Anrufer lässt sich diesmal nicht ohne festes Datum abwimmeln.",
+    "briefing": (
+        "Sie sitzen im Support und nehmen den Rückruf entgegen. Sie dürfen ein "
+        "Datum zusagen und intern eskalieren. Gut gelaufen ist das Gespräch, "
+        "wenn ein Tag genannt ist."
+    ),
     "description": "Sie rufen bei Ihrem Dienstleister an, weil eine Gutschrift ausbleibt.",
     "case_facts": "Gutschrift über 640 Euro, zugesagt am 3. März, bis heute nicht gebucht.",
-    "call_goal": "Ein Datum, an dem das Geld auf dem Konto ist.",
-    "success_condition": "Jemand nennt einen Tag. „Wir prüfen das“ reicht nicht.",
+    "call_goal": (
+        "Ein Datum, an dem das Geld auf dem Konto ist. Jemand nennt einen "
+        "Tag. „Wir prüfen das“ reicht nicht."
+    ),
 }
 _REPLY = json.dumps(_DRAFT)
 
@@ -107,7 +116,7 @@ async def test_the_played_case_reaches_the_model(monkeypatch: pytest.MonkeyPatch
     await draft_follow_up(_CALL)
 
     prompt = asked(calls)
-    assert all(text in prompt for text in (_DESCRIPTION, _FACTS, _GOAL, _BAR))
+    assert all(text in prompt for text in (_DESCRIPTION, _FACTS, _GOAL))
 
 
 async def test_the_wrapups_summary_says_where_the_last_call_ended(
@@ -191,7 +200,7 @@ async def test_the_draft_is_asked_in_thinking_mode(monkeypatch: pytest.MonkeyPat
     assert calls[0][1] is True
 
 
-async def test_the_six_fields_come_back_as_the_library_expects_them(
+async def test_the_seven_fields_come_back_as_the_library_expects_them(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     stub_completions(monkeypatch, _REPLY)
@@ -199,6 +208,23 @@ async def test_the_six_fields_come_back_as_the_library_expects_them(
     draft = await draft_follow_up(_CALL)
 
     assert draft == _DRAFT
+
+
+async def test_the_prompt_asks_for_the_trainees_briefing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR 0054: a generated Scenario briefs the trainee too, or every
+    follow-up lands in the library with the one field the setup screen and the
+    microphone check read left empty."""
+    calls = stub_completions(monkeypatch, _REPLY)
+
+    await draft_follow_up(_CALL)
+
+    system = calls[0][0][0]["content"]
+    assert "briefing" in system
+    # Read by the trainee, never handed to the caller -- the separation the
+    # whole field rests on.
+    assert "never by the caller" in system
 
 
 async def test_a_fenced_reply_is_unwrapped(monkeypatch: pytest.MonkeyPatch) -> None:
