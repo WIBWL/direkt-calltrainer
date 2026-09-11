@@ -31,6 +31,35 @@ from backend.session.language_packs import LANGUAGE_PACKS, LanguagePack
 
 _MS_PER_MINUTE = 60_000
 _MS_PER_SECOND = 1000
+
+# The metric key `_run_length` feeds, named here so the API and the tests agree
+# on the string rather than each spelling it out.
+RUN_LENGTH_KEY = "run_length"
+
+# The text behind that Kennzahl's "i", kept beside the derivation it explains.
+# Plain German, no dashes: it is read by somebody who has just finished a call.
+RUN_LENGTH_EXPLANATION = (
+    "Gemessen wird, wie lange Sie am Stück sprechen, bevor Sie absetzen. Ihre "
+    "reine Sprechzeit geteilt durch die Anzahl Ihrer Sprechabschnitte. Als "
+    "Abschnitt zählt alles zwischen zwei Pausen ab einer Viertelsekunde "
+    "innerhalb einer Äußerung; eine längere Unterbrechung beendet die Äußerung "
+    "und taucht stattdessen in der Reaktionszeit auf. "
+    "Diese Zahl beschreibt als einzige hier das Sprechen selbst und nicht die "
+    "Stille dazwischen. Zwei Menschen können denselben Redefluss und dieselbe "
+    "mittlere Pausenlänge haben und trotzdem sehr verschieden klingen: der eine "
+    "spricht in Zwei-Wort-Häppchen, der andere in ganzen Sätzen. Genau das "
+    "steht hier. "
+    "Eine Einordnung gibt es bewusst nicht. In der Forschung hängt dieses Maß "
+    "eng damit zusammen, wie lebendig Zuhörer jemanden finden, enger sogar als "
+    "die Tonhöhenschwankung. Ein Zusammenhang ist aber kein Grenzwert, und es "
+    "ist nirgends belegt, ab wann ein Abschnitt zu kurz ist. Wie lang er sein "
+    "sollte, hängt außerdem vom Gespräch ab: wer zuhört und kurz bestätigt, "
+    "spricht zu Recht in kurzen Abschnitten. "
+    "Vergleichen Sie die Zahl deshalb nur mit Ihren eigenen anderen Gesprächen. "
+    "Weil wir schon ab einer Viertelsekunde trennen, fallen die Abschnitte "
+    "kürzer aus als in Veröffentlichungen zu diesem Maß, die meist später "
+    "trennen."
+)
 # Words, for rate denominators: letter runs, so punctuation and the digits STT
 # writes for numbers don't inflate the count.
 _WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
@@ -100,6 +129,10 @@ class Conversation:  # pylint: disable=too-many-instance-attributes  # a record 
     # How many Persona replies there were, which is what the interruption rate
     # divides by.
     persona_turns: int = 0
+    # How many utterances the user spoke. Only ever a denominator: a run of
+    # speech is bounded by a pause inside an utterance or by the utterance
+    # itself, so the number of runs is the pauses plus the utterances.
+    user_turns: int = 0
     # The bare segments the overlap classification of F-51 runs on. Empty for a
     # call whose sides were never measured, in which case no overlap can be
     # established either way.
@@ -295,6 +328,72 @@ def _pauses(call: Conversation) -> Measurement | None:
     )
 
 
+def _run_length(call: Conversation) -> Measurement | None:
+    """How long the user speaks before they break off (mean length of runs).
+
+    A run is a stretch of speech bounded by silence. Inside one utterance, a
+    pause ends a run and starts the next, so an utterance holding `p` pauses
+    holds `p + 1` runs, and the whole call holds its pauses plus its
+    utterances. Divide the speaking time by that and you have the average
+    length of a stretch spoken without breaking off.
+
+    This is the one figure here about the *speech*, not about the silence.
+    `_pauses` reports how long a break lasts and `_phonation_share` how much of
+    the recording was speech at all, and a speaker can score the same on both
+    while sounding entirely different: two-word bursts and whole sentences run
+    at the same phonation share if the pauses between them match.
+
+    Why this one and not another paraverbal figure: it is the only measure in
+    this module that has been checked against what listeners actually hear.
+    Hincks (2005) found mean length of runs correlating with liveliness ratings
+    at r = 0.72 for female speakers, ahead of the pitch variation quotient's
+    0.64 -- which is to say the figure F-35's whole reading rests on was beaten
+    by this one on the same data.
+
+    No step and no colour all the same. A correlation is not a boundary, and
+    nothing published says where a short run stops being conversational, so
+    ADR 0078's first condition is not met and this stays a bare figure
+    (ADR 0004/0051).
+
+    Two things bound what it can mean here, and the note beside it says both.
+    Runs are separated by pauses of at least 250 ms inside an utterance
+    (`acoustics._MIN_PAUSE_S`); a hesitation long enough to trip the 500 ms VAD
+    ends the utterance instead and is counted as reaction time. And the figure
+    is in seconds rather than in syllables, which is what the literature counts,
+    because nothing here counts syllables and Whisper's words are a poor
+    substitute for them.
+
+    A third thing follows from the first and is worth stating before somebody
+    compares this against a published figure: **the number is not comparable to
+    one.** 250 ms is Praat's silence threshold, inherited because that is what
+    already segmented this audio, and it is at the short end of what fluency
+    research uses. A shorter threshold finds more pauses, so it produces more
+    and shorter runs; the first real call measured here came out at 1.2 s over
+    27 runs, well under the figures the literature reports for the same measure
+    at a longer threshold. That costs nothing as long as the figure is only ever
+    read against this speaker's own other calls, which is all ADR 0051 allows
+    anyway, and it is exactly why no step was put on it.
+    """
+    if not call.user_acoustics_complete or not call.user_turns:
+        return None
+    runs = call.user_turns + len(call.pauses)
+    if not call.user_phonation_ms:
+        return None
+    return Measurement(
+        RUN_LENGTH_KEY,
+        call.user_phonation_ms / runs / _MS_PER_SECOND,
+        {
+            "runs": runs,
+            "phonation_ms": call.user_phonation_ms,
+            # The two terms of the denominator, because a call with many short
+            # utterances and one with few interrupted ones reach the same run
+            # count by different routes.
+            "utterances": call.user_turns,
+            "pause_count": len(call.pauses),
+        },
+    )
+
+
 def _loudness(call: Conversation) -> Measurement | None:
     """F-37. Dynamic range across the whole call as the measure of vocal
     presence, with the curve behind it. A range rather than a level, for the
@@ -363,6 +462,14 @@ def _intonation(call: Conversation) -> Measurement | None:
             "band_low_st": shape.band_low_st,
             "band_high_st": shape.band_high_st,
             "movement_st_per_s": shape.movement_st_per_s,
+            # The pitch variation quotient and the number of ten-second windows
+            # it was averaged over. The reading on this Kennzahl is taken off
+            # this figure and off nothing else -- it is the only one of the five
+            # with a published boundary behind it (Hincks 2005). Stored rather
+            # than derived at read time, unlike the step itself: it is a
+            # measurement, and the audio it needs is gone by then (ADR 0048).
+            "pvq": shape.pvq,
+            "pvq_windows": shape.pvq_windows,
             # How much voiced speech all of this rests on -- the floor under the
             # five-step reading, and worth showing beside a figure from a short
             # call.
@@ -573,6 +680,8 @@ METRICS: tuple[MetricDef, ...] = (
     MetricDef("reaction_time", "Reaktionszeit", "s", ASPECT_HOW, "F-53", True, _reaction_time),
     MetricDef("pauses", "Sprechpausen", "s", ASPECT_HOW, "F-51", True, _pauses),
     MetricDef("phonation_share", "Redefluss", "%", ASPECT_HOW, "F-51", True, _phonation_share),
+    MetricDef(RUN_LENGTH_KEY, "Sprechlänge am Stück", "s", ASPECT_HOW, "F-53", True,
+              _run_length),
     MetricDef(LOUDNESS_KEY, "Lautstärke", "dB", ASPECT_HOW, "F-37", True, _loudness),
     # F-35, a MUST that had no measurement until the pitch curve existed. The
     # unit is semitones so the figure describes delivery rather than the voice

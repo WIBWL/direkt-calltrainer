@@ -10,26 +10,53 @@ rest can reach the same figure as one who is lively throughout, and a speaker
 who ends every sentence on a rise reaches it the same way as one who closes
 every sentence firmly. Those are different things to work on.
 
-So the contour is described by four factors, and each one is chosen because it
+So the contour is described by five figures, and each one is chosen because it
 is (a) readable off the contour without inventing a norm and (b) something a
 speaker can actually do differently tomorrow:
 
-    Umfang      how far the voice ranges, 5th to 95th percentile in semitones
-    Bewegung    how much it moves per second of speech, semitones per second
-    Satzenden   whether utterances end falling, rising or level
-    Verlauf     whether the range widens or narrows across the call
+    Umfang        how far the voice ranges, 5th to 95th percentile in semitones
+    Bewegung      how much it moves per second of speech, semitones per second
+    Lebendigkeit  the pitch variation quotient: SD/mean of F0 per 10 s window
+    Satzenden     whether utterances end falling, rising or level
+    Verlauf       whether the range widens or narrows across the call
 
-Three of the four need no reference point outside the speaker. The fourth,
-Satzenden, has a natural zero: a slope is rising or falling regardless of whose
-voice it is, and what a final rise or fall conventionally signals is one of the
-better-established findings about intonation. That is why the interpretation
-this module supports is concentrated there, and why the other three are reported
-as figures rather than as verdicts. ADR 0051 declined to invent norms for the
-Kennzahlen; nothing here does either.
+Three of the five need no reference point outside the speaker. The other two do,
+and it is worth being exact about how good those reference points are, because
+that is what decides how far this module is allowed to interpret.
 
-Everything is computed in semitones relative to the speaker's own median, which
-is the standard normalisation in phonetics and the reason a low and a high voice
-produce comparable numbers.
+Satzenden has a natural zero: a slope rises or falls regardless of whose voice
+it is, and the floor below which a movement is not heard as a movement at all is
+a measured perceptual threshold rather than a chosen one -- see TERMINAL_FLAT_ST
+and the glissando threshold it comes from.
+
+Lebendigkeit is the only figure here with published boundaries behind it, and
+that is why the reading at the foot of this module rests on it and no longer on
+the Umfang. Hincks (2005) measured the pitch variation quotient against human
+liveliness ratings and reports where monotone ends and lively begins. Those
+boundaries were established on 18 Swedish students presenting in L2 English in a
+classroom, which is neither this population nor this channel; the module carries
+that caveat to every place the step is shown rather than dropping it after the
+first mention.
+
+Everything else is in semitones relative to the speaker's own median. That is
+the standard normalisation in phonetics and the reason a low and a high voice
+produce comparable numbers -- and it is the better-supported choice, not merely
+the conventional one. Nolan (2003) had listeners imitate intonation spans across
+male and female voices: semitones and ERB-rate both beat Hertz, Mel and Bark by
+a wide margin, and semitones came out slightly ahead of ERB-rate (relative error
+31%/21% for male/female listeners against 35%/25% for ERB and 40%/43% for Hertz).
+The ERB-rate scale that Hermes & van Gestel (1991) preferred for judgements of
+*prominence* does not win on span, which is what this module measures.
+
+What is deliberately not attempted here, and would be the next real improvement:
+Prosogram-style stylisation of the whole contour (Mertens 2004), which replaces
+every sub-threshold movement with a level tone before anything is counted. It
+cannot be done in this module as it stands, because it is defined over vowel
+nuclei -- segmented from the intensity peak, -3 dB to the left and -9 dB to the
+right -- and the intensity curve lives in acoustics.py on a different grid and
+is not carried alongside the pitch. The terminal contour below is the one place
+where the segment is already known, so it is the one place the threshold is
+applied honestly.
 """
 
 from __future__ import annotations
@@ -46,10 +73,33 @@ STEP_MS = 10
 # places its nuclear movement, and short enough not to reach back into the
 # sentence before it.
 TERMINAL_WINDOW_MS = 400
-# Below this slope an ending counts as level rather than as a movement. Two
-# semitones over the final stretch is around the smallest interval a listener
-# reliably hears as a direction rather than as wobble.
-TERMINAL_FLAT_ST = 2.0
+
+# The glissando threshold: below this rate of change, a pitch movement lasting
+# T seconds is not heard as a movement at all, only as a level tone. In
+# semitones per second, as G = GLISSANDO_ST_S2 / T**2.
+#
+# 0.32 and not the 0.16 usually quoted. Both figures are in the literature and
+# the difference is not a rounding: 0.16 was established on isolated vowels
+# ('t Hart 1976), and Mertens & d'Alessandro found that carrying it over to
+# running speech keeps a great many intra-syllabic glides that no listener
+# actually hears. The doubled threshold is what reproduces expert transcriptions
+# of continuous speech and is what Prosogram uses (Mertens 2004). This module
+# measures continuous speech.
+GLISSANDO_ST_S2 = 0.32
+
+# Below this total movement an ending counts as level rather than as a
+# direction. Derived rather than chosen: the glissando threshold over a window
+# of T seconds is GLISSANDO_ST_S2 / T**2 semitones per second, so across the
+# window itself it comes to GLISSANDO_ST_S2 / T semitones -- 0.8 over 400 ms.
+#
+# This replaces a hand-set 2.0, which was 2.5 times the perceptual threshold and
+# therefore filed a good many endings as level that a listener hears as falling
+# or rising. Worth knowing about the change: it cannot be checked against the
+# stored Sessions, because the terminal slope needs the 10 ms contour and only
+# the thinned curve is kept (ADR 0048). It is a better-founded number, not a
+# verified one, and the counts it produces are worth eyeballing on the first
+# real calls after it ships.
+TERMINAL_FLAT_ST = round(GLISSANDO_ST_S2 / (TERMINAL_WINDOW_MS / 1000), 2)
 # A terminal contour needs this many voiced frames in its window to be read at
 # all; below it the "slope" would be two points and a guess.
 MIN_TERMINAL_FRAMES = 8
@@ -57,6 +107,13 @@ MIN_TERMINAL_FRAMES = 8
 # A jump larger than this between neighbouring frames is not a voice, it is the
 # tracker changing its mind. Excluded from the movement figure, which would
 # otherwise be dominated by them.
+#
+# A heuristic, and stated as one: it is a plausibility bound on the tracker, not
+# a perceptual threshold. The audibility figures in the literature -- the
+# glissando threshold above, and the differential glissando threshold of 20 ST/s
+# for hearing a *change* of slope -- answer a different question, namely which
+# movements a listener notices, and neither of them rules a frame out as a
+# measurement error.
 MAX_STEP_ST = 6.0
 
 # The movement figure is read off a contour smoothed over this many frames
@@ -76,12 +133,33 @@ MOVEMENT_SMOOTH_FRAMES = 3
 # is a shape, and a shape needs enough points to have one.
 MIN_VOICED_FRAMES = 20
 
+# --- The pitch variation quotient -------------------------------------------
+# Hincks (2005): the standard deviation of F0 divided by its mean, computed over
+# a window of speech rather than over the whole recording, and in Hertz rather
+# than in semitones. The unit looks like the wrong one for this module and is
+# not: a quotient of two frequencies is dimensionless, so it normalises across
+# voices by construction, the same job the semitone conversion does elsewhere.
+# Following her definition exactly is the point -- it is what makes the
+# boundaries below apply to this figure at all.
+PVQ_WINDOW_MS = 10_000
+
+# How much of a window has to carry voicing for that window to be usable.
+#
+# This is a floor of ours and not Hincks's. Hers is "no more than 4 seconds of
+# pause in the 10 seconds", which cannot be applied here: the contour this module
+# receives is the user's utterances laid end to end with the Persona's turns and
+# the silence between utterances already removed, so the pauses her rule counts
+# are largely not in it. What is left to guard against is a window that is nearly
+# all unvoiced -- consonants, breath, a trailing whisper -- and 30% is a lenient
+# bound on that, well under the voiced share of ordinary speech.
+MIN_VOICED_SHARE_IN_WINDOW = 0.3
+
 # The metric this module feeds, named here so the API, the tests and the
 # interface agree on the string rather than each spelling it out.
 RANGE_KEY = "intonation"
 
-# --- The five-step reading -------------------------------------------------
-# Where the Umfang is read as monotone, balanced or overdone, in semitones.
+# --- The three-step reading -------------------------------------------------
+# Where the pitch variation quotient is read as monotone or lively.
 #
 # Worth stating plainly, because the rest of this module is careful not to:
 # THIS IS A JUDGEMENT, and ADR 0004/0051 rule judgements out for the Kennzahlen
@@ -90,26 +168,40 @@ RANGE_KEY = "intonation"
 # removable by deleting this block, `liveliness`, `liveliness_steps` and the
 # two places that call them.
 #
-# The numbers are not pulled out of the air, but they are not measured on this
-# population either. They come from the F0 standard deviations usually reported
-# for speech -- around 1 semitone for speech heard as monotone, 2 to 3 for
-# ordinary conversation, 4 and above for animated delivery -- converted to the
-# 5th-to-95th-percentile span this metric actually reports, which for a roughly
-# normal distribution is about 3.3 standard deviations. That conversion is the
-# whole derivation, and it is why the interface says "Einschätzung" and shows
-# the scale: a reader who disagrees can see the boundary they are disagreeing
-# with.
-VERY_MONOTONE_MAX_ST = 4.0   # ~1.2 st SD
-MONOTONE_MAX_ST = 7.0        # ~2.1 st SD
-BALANCED_MAX_ST = 12.0       # ~3.6 st SD
-LIVELY_MAX_ST = 18.0         # ~5.5 st SD, or an octave error the trim missed
+# What changed, and why it is worth recording here rather than only in the
+# history: this reading used to sit on the Umfang, on five steps whose
+# boundaries were derived by taking the F0 standard deviations usually quoted
+# for speech and converting them to a 5th-to-95th-percentile span through a
+# factor of about 3.3. A literature review of that derivation found nothing
+# behind either half of it -- no source in the reviewed set states the span
+# figures, none states the distribution of log F0 that the conversion assumes,
+# and none reports either for German. It was two guesses stacked on each other
+# wearing a citation.
+#
+# Hincks (2005) is the closest thing to a measured boundary that exists for
+# this: the pitch variation quotient computed over 10-second windows, read
+# against the liveliness ratings of human listeners, with the mean of 9 such
+# windows correlating at r = 0.83 with those ratings. So the reading moves onto
+# the figure that has the evidence and off the one that does not, while the
+# Umfang stays what it always was -- the Kennzahl's headline number, reported
+# without a verdict.
+#
+# The caveat that remains, and it is not small: those boundaries come from 18
+# Swedish students giving classroom presentations in L2 English, recorded on a
+# room microphone. This is German, spontaneous, adversarial at times, and over a
+# telephone band that cuts below 300 Hz. Whether the figures transfer is not
+# addressed by any source reviewed. Hence "Einschätzung" in the interface, the
+# visible scale, and the sentence about where the numbers come from.
+PVQ_MONOTONE_MAX = 0.15
+PVQ_LIVELY_MAX = 0.25
 
 # How much voiced speech a step needs under it. The figure itself is reported
 # from MIN_VOICED_FRAMES (0.2 s) upwards, because a spread is a spread; calling
 # somebody monotone on that much material would be something else entirely. Ten
 # seconds of voicing is roughly a minute of a normal call, given how much of
 # speech carries no pitch at all and how much of a call the other side is
-# talking.
+# talking -- which puts it at two to three of Hincks's windows, against the nine
+# her reliability figure rests on. A floor, then, and not a sufficiency.
 MIN_VOICED_MS_FOR_READING = 10_000
 
 
@@ -144,8 +236,14 @@ class Endings:
 
 
 @dataclass(frozen=True)
-class Profile:
-    """The four factors, or as many of them as the contour supported."""
+class Profile:  # pylint: disable=too-many-instance-attributes  # a record of measurements
+    """The five figures, or as many of them as the contour supported.
+
+    Eleven fields for five figures, because three of them are reported with the
+    material they rest on -- the band with both its ends, the quotient with its
+    window count -- and a figure whose basis is not carried beside it invites
+    being read as firmer than it is.
+    """
 
     # 5th to 95th percentile, in semitones. None below MIN_VOICED_FRAMES.
     range_st: float | None = None
@@ -158,6 +256,12 @@ class Profile:
     # Mean absolute change between neighbouring voiced frames, in semitones per
     # second of voiced speech.
     movement_st_per_s: float | None = None
+    # The pitch variation quotient, averaged over the windows it could be
+    # measured in, and how many those were. Dimensionless: a standard deviation
+    # of F0 over its mean, both in Hertz. The reading below rests on this and on
+    # nothing else.
+    pvq: float | None = None
+    pvq_windows: int = 0
     # How much voiced speech the figures rest on. The reading below has a floor
     # under it: five steps read off two seconds of humming would be a verdict on
     # nothing.
@@ -192,11 +296,14 @@ def profile(contour: tuple[float | None, ...], per_utterance: tuple[tuple[float 
     median = _median(sorted(voiced))
     thirds = _thirds(contour)
     band = _band(voiced)
+    quotient, windows = _pvq(contour)
     return Profile(
         range_st=_range_st(voiced),
         band_low_st=None if band is None else round(semitones(band[0], median), 2),
         band_high_st=None if band is None else round(semitones(band[1], median), 2),
         movement_st_per_s=_movement(per_utterance or (contour,)),
+        pvq=quotient,
+        pvq_windows=windows,
         voiced_ms=len(voiced) * STEP_MS,
         endings=_endings(per_utterance),
         range_first_st=_range_st([hz for hz in thirds[0] if hz]),
@@ -230,6 +337,46 @@ def _range_st(voiced: list[float]) -> float | None:
     """That band as one figure: the spread from its bottom to its top."""
     band = _band(voiced)
     return None if band is None else round(semitones(band[1], band[0]), 2)
+
+
+def _pvq(contour: tuple[float | None, ...]) -> tuple[float | None, int]:
+    """The pitch variation quotient, and how many windows it was read from.
+
+    Hincks (2005)'s measure, kept to her definition because the boundaries in
+    `liveliness` only apply to something computed the way she computed it: the
+    standard deviation of F0 over its mean, in Hertz, over a window of speech,
+    with the windows then averaged.
+
+    Windowed and not taken over the call at once, and that is what the measure
+    is for. A quotient over the whole contour counts the drift between one
+    utterance and the next as though it were variation inside a sentence, so a
+    speaker who opened high and finished low reads as lively without ever having
+    moved within a phrase. Ten seconds is short enough to sit inside the
+    speaker's current register and long enough to hold several phrases.
+
+    A trailing remainder shorter than a full window is dropped, since a quotient
+    over three seconds is not the same statistic and averaging it in with the
+    others would quietly weight the end of the call. The exception is a call too
+    short to fill one window at all, which is measured whole rather than not at
+    all -- the reading has its own floor (MIN_VOICED_MS_FOR_READING) and will
+    withhold a step from it anyway.
+    """
+    per_window = PVQ_WINDOW_MS // STEP_MS
+    quotients: list[float] = []
+    for start in range(0, len(contour), per_window):
+        window = contour[start:start + per_window]
+        if len(window) < per_window and quotients:
+            break
+        voiced = [hz for hz in window if hz]
+        floor = max(MIN_VOICED_FRAMES, int(len(window) * MIN_VOICED_SHARE_IN_WINDOW))
+        if len(voiced) < floor:
+            continue
+        mean = sum(voiced) / len(voiced)
+        variance = sum((hz - mean) ** 2 for hz in voiced) / (len(voiced) - 1)
+        quotients.append(math.sqrt(variance) / mean)
+    if not quotients:
+        return None, 0
+    return round(sum(quotients) / len(quotients), 4), len(quotients)
 
 
 def _movement(per_utterance: tuple[tuple[float | None, ...], ...]) -> float | None:
@@ -440,80 +587,137 @@ def utterance_breaks(
 
 
 class Liveliness(str, Enum):
-    """How the Umfang is read on the five-step scale.
+    """How the pitch variation quotient is read on the three-step scale.
 
     Everything above this line describes; this describes and then decides, on
-    two of the invented thresholds ADR 0051 declined to invent. It is presented
-    as an Einschätzung with its scale visible, never as a measurement, and it
-    is deliberately absent from the progress view (ADR 0065).
+    thresholds ADR 0051 declined to invent. It is presented as an Einschätzung
+    with its scale visible, never as a measurement, and it is deliberately
+    absent from the progress view (ADR 0065).
+
+    Three steps and not the five this used to have. The five came from a scale
+    built here; these three are the ones Hincks reports, and inventing a fourth
+    boundary to sit between them would put back exactly what the review took
+    out.
     """
 
-    VERY_MONOTONE = "very_monotone"
     MONOTONE = "monotone"
-    BALANCED = "balanced"
     LIVELY = "lively"
-    # "Overdrawn" rather than "too much": the step above lively is either a very
-    # expressive speaker or a tracking error, and both are worth a second look
-    # rather than a correction.
-    EXAGGERATED = "exaggerated"
+    # Not "too much". The top step is where the liveliest speakers in Hincks's
+    # corpus sat, not a point at which anything goes wrong, and the wording has
+    # to stay clear of suggesting otherwise.
+    VERY_LIVELY = "very_lively"
 
 
 LABELS: dict[Liveliness, str] = {
-    Liveliness.VERY_MONOTONE: "stark monoton",
     Liveliness.MONOTONE: "monoton",
-    Liveliness.BALANCED: "ausgewogen",
     Liveliness.LIVELY: "lebendig",
-    Liveliness.EXAGGERATED: "überzeichnet",
+    Liveliness.VERY_LIVELY: "sehr lebendig",
+}
+
+# The traffic light on each step, governed by ADR 0078.
+#
+# It exists so a reader gets an impression of the call before the reading
+# starts: the wrap-up hands them nine figures at equal weight, and colour is the
+# only channel on that screen that says which one to look at first. It points,
+# it does not grade. Green means nothing here needs attention today, not "well
+# done"; red means look here first, not "you did badly".
+#
+# ADR 0078's conditions, and where each is met: the colour sits on the
+# classification and never on the semitone figure (`api/sessions.py`), the whole
+# scale travels with it in percent (`liveliness_steps`), the step is always
+# written out in words (`LABELS`), the caveat names the population the
+# boundaries came from (`EXPLANATION`), colour and wording are served from here
+# beside the threshold, and none of it reaches the progress view (ADR 0065).
+#
+# What the three colours are claiming, written out because ADR 0078's sixth
+# condition requires it: a traffic light asserts a direction whether or not one
+# was intended, so the assertion is made explicit and can be argued with.
+#
+#   monotone       red     Look here first. The end F-35 exists to make
+#                          visible, and the one step where something is
+#                          reliably harder for the listener: on the telephone,
+#                          with no face to read, a flat delivery costs the
+#                          emphasis that carries the meaning.
+#   lively         green   Nothing here needs attention today. Where Hincks's
+#                          listeners heard ordinary, engaged speech.
+#   very_lively    yellow  NOT a claim that expressiveness is a fault. Nothing
+#                          reviewed supports that, and above 0.25 is simply
+#                          where the liveliest speakers in her corpus sat. The
+#                          yellow marks the one region where the *figure* is
+#                          least trustworthy: an octave error inflates a
+#                          standard deviation badly, and high variation is also
+#                          what nervousness and disfluency produce. It means
+#                          "worth a look at the contour", and the wording says
+#                          exactly that rather than leaving the colour to imply
+#                          something harsher.
+#
+# Removing the light is deleting this table, the `light` line in
+# `liveliness_steps`, and the two lines that read it in the frontend.
+LIGHTS: dict[Liveliness, str] = {
+    Liveliness.MONOTONE: "red",
+    Liveliness.LIVELY: "green",
+    Liveliness.VERY_LIVELY: "yellow",
 }
 
 # The upper bound of each step except the last, in the order they are read and
 # shown. One table for the decision and for the legend, so a recalibration
 # cannot move a boundary in one and leave it in the other.
 _LADDER: tuple[tuple[float, Liveliness], ...] = (
-    (VERY_MONOTONE_MAX_ST, Liveliness.VERY_MONOTONE),
-    (MONOTONE_MAX_ST, Liveliness.MONOTONE),
-    (BALANCED_MAX_ST, Liveliness.BALANCED),
-    (LIVELY_MAX_ST, Liveliness.LIVELY),
+    (PVQ_MONOTONE_MAX, Liveliness.MONOTONE),
+    (PVQ_LIVELY_MAX, Liveliness.LIVELY),
 )
 
-# The text behind the info icon, beside the thresholds it explains.
+# The text behind the info icon, beside the thresholds it explains. Plain
+# German and no dashes, because it is read by someone who has just finished a
+# call and wants to know what the colour on their screen means.
 EXPLANATION = (
-    "Gemessen wird die Spanne zwischen Ihrem tiefsten und höchsten üblichen Ton "
-    "(5. bis 95. Perzentil) in Halbtönen, bezogen auf Ihre eigene mittlere "
-    "Stimmlage. In Halbtönen und nicht in Hertz, damit eine tiefe und eine hohe "
-    "Stimme bei gleicher Lebendigkeit dieselbe Zahl ergeben. Die fünf Stufen "
-    "sind aus den in der Literatur üblichen Streuungswerten gesprochener "
-    "Sprache abgeleitet und für diese Nutzergruppe nicht validiert: eine "
-    "Orientierung, kein Urteil. Wie viel Melodie angemessen ist, hängt außerdem "
-    "vom Anlass ab — eine Reklamation klingt zu Recht anders als ein "
-    "Verkaufsgespräch."
+    "Die Zahl der Kennzahl ist der Umfang: der Abstand zwischen Ihrem tiefsten "
+    "und Ihrem höchsten üblichen Ton, in Halbtönen. Halbtöne statt Hertz, damit "
+    "eine tiefe und eine hohe Stimme bei gleicher Lebendigkeit dieselbe Zahl "
+    "bekommen. Zum Umfang selbst sagen wir nichts, denn es gibt keinen belegten "
+    "Wert dafür, ab wann eine Spanne eng oder weit ist. "
+    "Die farbige Einstufung stammt deshalb aus einer anderen Größe, der "
+    "Lebendigkeit. Sie misst, wie stark Ihre Tonhöhe um Ihre eigene mittlere "
+    "Stimmlage schwankt, jeweils über zehn Sekunden Sprechzeit. Für diese Größe "
+    "gibt es Grenzwerte, die gegen das Urteil echter Zuhörer geprüft wurden. "
+    "Geprüft wurden sie allerdings an 18 schwedischen Studierenden, die auf "
+    "Englisch im Seminarraum präsentiert haben, nicht an deutschen "
+    "Telefongesprächen. Nehmen Sie die Farbe deshalb als Hinweis und nicht als "
+    "Urteil. Wie viel Melodie passend ist, hängt außerdem vom Anlass ab: eine "
+    "Reklamation klingt zu Recht anders als ein Verkaufsgespräch."
 )
 
 
-def liveliness(range_st: float | None, voiced_ms: int | None = None) -> Liveliness | None:
-    """The step a range falls on, or None where nothing was measured.
+def liveliness(pvq: float | None, voiced_ms: int | None = None) -> Liveliness | None:
+    """The step a pitch variation quotient falls on, or None where there is none.
 
-    `voiced_ms` is how much voiced speech the range came from; below
+    `voiced_ms` is how much voiced speech the figure came from; below
     MIN_VOICED_MS_FOR_READING there is no step, only the figure. None means the
     Session did not record it, which is treated as "no reason to withhold" --
     the figure was measured under the same rules either way.
 
-    On the range alone, deliberately. The movement figure is the better
-    discriminator in principle -- a contour that drifts slowly from high to low
-    covers ground without sounding lively -- but the range is the one of the two
-    for which published figures exist to anchor a boundary. Reading the movement
-    would mean inventing a second threshold with nothing behind it and hiding it
-    inside a verdict, so it stays what it is: a factor reported beside the step,
-    with the wording that tells the two apart.
+    On the quotient and on nothing else, which is a change from reading it off
+    the Umfang, and the reason is that the Umfang has no published boundary and
+    this does. The other four figures stay what they were: reported beside the
+    step, uninterpreted, each of them saying something the step cannot. In
+    particular the movement figure is the better discriminator in principle -- a
+    contour drifting slowly from high to low covers ground without sounding
+    lively -- but no source reviewed anchors a boundary for it, so reading it
+    would mean inventing a threshold and hiding it inside a verdict.
+
+    A Session measured before the quotient existed passes None here and gets no
+    step. That is deliberate: the old five-step reading was withdrawn because
+    its derivation did not hold up, and back-filling it from the stored Umfang
+    would be reinstating it under a new name.
     """
-    if range_st is None:
+    if pvq is None:
         return None
     if voiced_ms is not None and voiced_ms < MIN_VOICED_MS_FOR_READING:
         return None
     for bound, step in _LADDER:
-        if range_st < bound:
+        if pvq < bound:
             return step
-    return Liveliness.EXAGGERATED
+    return Liveliness.VERY_LIVELY
 
 
 def liveliness_steps() -> list[dict[str, str | None]]:
@@ -522,23 +726,26 @@ def liveliness_steps() -> list[dict[str, str | None]]:
 
     Built from the constants rather than written twice: a recalibration has to
     reach the legend, or the user is shown a boundary that no longer decides
-    anything. `light` is null throughout -- these steps carry no colour, because
-    a scale that is bad at both ends cannot be drawn as a traffic light without
-    claiming a direction it does not have.
+    anything. The same goes for `light`, which is why it is served from here
+    beside the threshold it belongs to rather than mapped in the frontend.
+
+    Stated in percent, because that is what the quotient is: a standard
+    deviation as a share of the mean it was taken around. "15 %" is a true
+    reading of 0.15 and a legible one; the raw ratio is neither.
     """
     spans: list[tuple[Liveliness, str]] = []
     floor: float | None = None
     for bound, step in _LADDER:
-        spans.append((step, f"unter {_st(bound)} Halbtönen" if floor is None
-                      else f"{_st(floor)} bis {_st(bound)} Halbtöne"))
+        spans.append((step, f"unter {_percent(bound)}" if floor is None
+                      else f"{_percent(floor)} bis {_percent(bound)}"))
         floor = bound
-    spans.append((Liveliness.EXAGGERATED, f"über {_st(floor)} Halbtönen"))
+    spans.append((Liveliness.VERY_LIVELY, f"über {_percent(floor)}"))
     return [
-        {"step": step.value, "label": LABELS[step], "range": span, "light": None}
+        {"step": step.value, "label": LABELS[step], "range": span, "light": LIGHTS[step]}
         for step, span in spans
     ]
 
 
-def _st(value: float) -> str:
-    """A threshold as the interface states it: no decimal point on a whole one."""
-    return f"{value:g}"
+def _percent(value: float) -> str:
+    """A threshold as the interface states it: 0.15 -> "15 %"."""
+    return f"{value * 100:g} %"

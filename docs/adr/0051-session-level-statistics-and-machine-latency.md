@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted. Narrows ADR 0014 (which statistics), ADR 0047 (what is measured), ADR 0048 (when it is evaluated) and ADR 0026 (what a statistic hangs off).
+Accepted. Narrows ADR 0014 (which statistics), ADR 0047 (what is measured), ADR 0048 (when it is evaluated) and ADR 0026 (what a statistic hangs off). Amended by ADR 0078 and ADR 0081, each on one point, and it is worth being precise about which: the rule below is "no statistic carries a target range", and it stands under both.
+
+**ADR 0081** narrows the first bullet. A statistic still describes a stretch of conversation and never a single utterance, but "the whole call" is no longer the only stretch: the same Kennzahlen are also measured over the exchanges where the partner pushed back and over the remainder, so that F-62's "Souveränität unter Druck" rests on a measurement. Two things make that a narrowing rather than a reversal. The raw facts now kept per utterance (`turn.acoustics_json`) are *facts and not statistics* — nothing derived, nothing shown — and they exist because the audio is discarded when the call ends (ADR 0048) while the split is decided afterwards. And nothing compares the two figures: no difference, no index, no verdict, because how large a gap means something is exactly the norm this ADR refuses to invent. ADR 0078 permits a colour on a *classification* whose whole scale is shown to the user in the unit they are reading, which is the opposite case from the invisible band behind a raw figure that this ADR was written against. `metric_type` still has no target column, no `Finding` row is written from a threshold, and the prompt still forbids the model judging a figure against a norm of its own.
 
 ## Context
 

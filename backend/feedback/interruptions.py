@@ -98,14 +98,28 @@ EXPLANATION = (
 
 
 class TrafficLight(str, Enum):
-    """The provisional three-step reading of the rate.
+    """The three-step reading of the count.
 
-    Worth stating plainly: this is the one thing in the measurement chain that
-    judges rather than describes, and it rests on two invented thresholds. It
-    exists because it was asked for and is being looked at; it is not covered by
-    any decision record yet, and the interface must present it as an orientation.
-    Nothing else in this module depends on it, so it can be removed by deleting
-    this class and its two constants.
+    Governed by ADR 0078, which says what a light on a Kennzahl may claim and
+    under which conditions. This one was built before that ADR existed and was
+    described here as an unrecorded exception; it is now one of two instances of
+    a written pattern, and it meets the conditions: the colour sits on a named
+    step, the whole scale travels with it (`steps()`), the step is written out
+    in words, the interface says "Einschätzung", and none of it reaches the
+    progress view.
+
+    What the colours claim, per ADR 0078's sixth condition. They point, they do
+    not grade:
+
+        green    Nothing here needs your attention today. Not "well done".
+        yellow   Worth a second look at how the call went.
+        red      This is where to look first.
+
+    The weak part is not the pattern but the numbers: GREEN_MAX_COUNT and
+    YELLOW_MAX_COUNT are invented working values with nothing behind them, which
+    is why the wording stays at an orientation. Nothing else in this module
+    depends on the class, so it can be removed by deleting it and its two
+    constants.
     """
 
     GREEN = "green"

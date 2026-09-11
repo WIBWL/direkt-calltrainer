@@ -211,6 +211,78 @@ def test_pauses_come_from_the_same_segmentation_as_phonation() -> None:
     assert values["pauses"] == 1.0
 
 
+# --- F-53: how long the user speaks before breaking off ---------------------
+# Mean length of runs. A run is bounded by a pause inside an utterance or by
+# the utterance itself, so the runs of a call are its pauses plus its
+# utterances. The tests below pin that arithmetic, because it is the whole
+# metric and it is off by one in either direction if the boundaries are counted
+# wrong.
+
+
+def test_an_uninterrupted_utterance_is_one_run() -> None:
+    """No pause inside it, so the whole speaking time is a single stretch and
+    the figure is that stretch."""
+    values = _by_key(_measured_call())
+
+    assert values["run_length"] == _PHONATION_MS / 1_000
+
+
+def test_a_pause_inside_an_utterance_splits_it_into_two_runs() -> None:
+    """The point of the metric. The speaking time has not changed and the
+    phonation share has not changed; what changed is that it came out in two
+    pieces instead of one, and this is the only figure that says so."""
+    turns = _measured_call()
+    turns[1].pauses = [Pause(offset_ms=2_000, duration_ms=500)]
+
+    values = _by_key(turns)
+
+    assert values["run_length"] == _PHONATION_MS / 2 / 1_000
+    # ... while the two figures about the silence are unmoved by the split.
+    assert values["phonation_share"] == _by_key(_measured_call())["phonation_share"]
+
+
+def test_the_detail_carries_both_terms_of_the_denominator() -> None:
+    """A call of many short utterances and one of few interrupted ones reach
+    the same run count by different routes, and the figure alone cannot be read
+    back into either."""
+    turns = _measured_call()
+    turns[1].pauses = [Pause(offset_ms=2_000, duration_ms=500)]
+
+    detail = {m.key: m.detail for m in measure(conversation(turns))}["run_length"]
+
+    assert detail["utterances"] == 1
+    assert detail["pause_count"] == 1
+    assert detail["runs"] == 2
+    assert detail["phonation_ms"] == _PHONATION_MS
+
+
+def test_an_unmeasured_turn_suppresses_the_run_length() -> None:
+    """Phonation short by an unknown amount over a run count that is not,
+    which is a figure nobody can interpret. Withheld for the whole call, the
+    same trade ADR 0051 makes for the other acoustic statistics."""
+    assert "run_length" not in set(_by_key(_call_with_one_unmeasured_turn()))
+
+
+def test_a_call_the_user_never_spoke_in_has_no_run_length() -> None:
+    """The opening Turn carries no user audio. Dividing by zero utterances
+    would be an exception; reporting nothing is the answer."""
+    turns = [Turn(seq=1, persona_text="Guten Tag.", persona_offset_ms=0, persona_end_ms=1_000)]
+
+    assert "run_length" not in set(_by_key(turns))
+
+
+def test_the_run_length_carries_no_step_and_no_colour() -> None:
+    """It correlates with what listeners hear (Hincks 2005, r = 0.72, ahead of
+    the pitch variation quotient F-35's reading rests on) and that is still not
+    a boundary. Nothing published says where a short run stops being
+    conversational, so ADR 0078's first condition is unmet and this stays a
+    bare figure."""
+    detail = {m.key: m.detail for m in measure(conversation(_measured_call()))}["run_length"]
+
+    assert "light" not in detail
+    assert "step" not in detail
+
+
 # --- F-51: cutting in on the Persona (ADR 0035) ----------------------------
 
 

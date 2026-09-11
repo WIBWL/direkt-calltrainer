@@ -1,9 +1,9 @@
-"""The four factors read off a pitch contour (F-35).
+"""The five figures read off a pitch contour (F-35).
 
 Constructed contours in Hertz, at the 10 ms grid `acoustics.py` produces: no
-audio, no Praat, no database. The point of this file is that each factor
+audio, no Praat, no database. The point of this file is that each figure
 measures the thing it claims to and not one of the others, because that
-separation is the whole reason there are four of them instead of one.
+separation is the whole reason there are five of them instead of one.
 
 The case that matters most is the pair at the top: a wide-but-slow contour and a
 narrow-but-lively one. A single range figure calls the first one expressive and
@@ -13,15 +13,18 @@ import pytest
 
 from backend.api.sessions import _served_detail
 from backend.feedback.intonation import (
-    BALANCED_MAX_ST,
-    LIVELY_MAX_ST,
+    GLISSANDO_ST_S2,
+    LABELS,
+    LIGHTS,
     MAX_STEP_ST,
     MIN_VOICED_MS_FOR_READING,
-    MONOTONE_MAX_ST,
+    PVQ_LIVELY_MAX,
+    PVQ_MONOTONE_MAX,
+    PVQ_WINDOW_MS,
     RANGE_KEY,
     STEP_MS,
     TERMINAL_FLAT_ST,
-    VERY_MONOTONE_MAX_ST,
+    TERMINAL_WINDOW_MS,
     Ending,
     Liveliness,
     effective_step_ms,
@@ -247,83 +250,185 @@ def test_ending_values_are_the_documented_vocabulary() -> None:
     assert {e.value for e in Ending} == {"falling", "rising", "level"}
 
 
-# --- The five-step reading of the range -------------------------------------
+# --- The pitch variation quotient -------------------------------------------
+# Hincks (2005)'s measure: SD over mean of F0, in Hertz, per window of speech.
+# The figure the reading rests on, and the only one here with a boundary anybody
+# has published.
+
+
+def test_a_flat_voice_and_a_moving_one_differ_in_the_quotient() -> None:
+    """The measure has to separate the two cases it is used to judge, before
+    any threshold is applied to it."""
+    flat = profile(_steady(120, 400), ())
+    moving = profile(_zigzag(120, 13.0, 40, 400), ())
+
+    assert flat.pvq == 0.0
+    assert moving.pvq is not None and moving.pvq > PVQ_LIVELY_MAX
+
+
+def test_the_quotient_is_measured_per_window_and_not_over_the_whole_call() -> None:
+    """The reason it is windowed at all.
+
+    A speaker who holds one register for a minute and then another for a minute
+    has moved their voice hardly at all within any phrase, but the two levels
+    laid end to end look like a wide spread to any statistic taken over the
+    whole contour. Windowing is what keeps the drift out of the figure.
+    """
+    per_window = PVQ_WINDOW_MS // STEP_MS
+    two_registers = _steady(110, per_window) + _steady(190, per_window)
+
+    shape = profile(two_registers, ())
+
+    assert shape.pvq_windows == 2
+    assert shape.pvq == 0.0  # flat inside each window, however far apart they sit
+    # ... while the range, which is not windowed, sees the whole spread.
+    assert shape.range_st is not None and shape.range_st > 8
+
+
+def test_a_window_that_is_nearly_all_unvoiced_is_skipped() -> None:
+    """Breath, a trailing whisper, a stretch Praat found nothing in. A quotient
+    off a handful of frames is a number without a measurement behind it."""
+    per_window = PVQ_WINDOW_MS // STEP_MS
+    good = _zigzag(120, 6.0, 20, per_window)
+    mostly_silent = _steady(120, 50) + (None,) * (per_window - 50)
+
+    assert profile(good + mostly_silent, ()).pvq_windows == 1
+
+
+def test_a_trailing_part_window_is_dropped_rather_than_averaged_in() -> None:
+    """A quotient over three seconds is a different statistic, and averaging it
+    with full windows would quietly weight the end of the call."""
+    per_window = PVQ_WINDOW_MS // STEP_MS
+
+    shape = profile(_zigzag(120, 6.0, 20, per_window + 400), ())
+
+    assert shape.pvq_windows == 1
+
+
+def test_a_call_too_short_for_one_window_is_still_measured() -> None:
+    """Not dropped: the reading has its own floor and will withhold the step.
+    Refusing the figure as well would leave the block with nothing in it."""
+    shape = profile(_zigzag(120, 6.0, 20, 400), ())
+
+    assert shape.pvq is not None
+    assert shape.pvq_windows == 1
+
+
+# --- The three-step reading of the quotient ---------------------------------
 # The one part of this module that judges. These tests pin the boundaries, not
-# because the numbers are established -- they are not -- but so that changing
-# one is a deliberate act with a test to update.
+# because the numbers are established for this population -- they are not -- but
+# so that changing one is a deliberate act with a test to update.
+#
+# The reading used to sit on the Umfang, on five steps derived here by
+# converting quoted F0 standard deviations to a percentile span. A literature
+# review found nothing behind either half of that derivation, so it moved to the
+# figure Hincks measured against human liveliness ratings.
 
 
 def test_each_step_of_the_scale_is_reachable() -> None:
     """A scale with an unreachable step is a scale with fewer steps. Each
     boundary is taken from just below and just above."""
-    assert liveliness(0.5) is Liveliness.VERY_MONOTONE
-    assert liveliness(VERY_MONOTONE_MAX_ST - 0.1) is Liveliness.VERY_MONOTONE
-    assert liveliness(VERY_MONOTONE_MAX_ST) is Liveliness.MONOTONE
-    assert liveliness(MONOTONE_MAX_ST - 0.1) is Liveliness.MONOTONE
-    assert liveliness(MONOTONE_MAX_ST) is Liveliness.BALANCED
-    assert liveliness(BALANCED_MAX_ST - 0.1) is Liveliness.BALANCED
-    assert liveliness(BALANCED_MAX_ST) is Liveliness.LIVELY
-    assert liveliness(LIVELY_MAX_ST - 0.1) is Liveliness.LIVELY
-    assert liveliness(LIVELY_MAX_ST) is Liveliness.EXAGGERATED
+    assert liveliness(0.0) is Liveliness.MONOTONE
+    assert liveliness(PVQ_MONOTONE_MAX - 0.001) is Liveliness.MONOTONE
+    assert liveliness(PVQ_MONOTONE_MAX) is Liveliness.LIVELY
+    assert liveliness(PVQ_LIVELY_MAX - 0.001) is Liveliness.LIVELY
+    assert liveliness(PVQ_LIVELY_MAX) is Liveliness.VERY_LIVELY
 
 
-def test_an_unmeasured_range_gets_no_step() -> None:
-    """Whispering, or a call too short to have a shape. "stark monoton" would
-    be a verdict on a measurement that was never taken."""
+def test_an_unmeasured_quotient_gets_no_step() -> None:
+    """Whispering, a call too short to have a shape, or a Session measured
+    before this figure existed. "monoton" would be a verdict on a measurement
+    that was never taken -- and for the older Sessions it would be the withdrawn
+    five-step reading coming back under a new name."""
     assert liveliness(None) is None
 
 
 def test_a_monotone_contour_reads_as_monotone_and_a_lively_one_as_lively() -> None:
     """End to end over the measurement, not over the thresholds: a voice that
     barely moves and one that works in every phrase must not land on the same
-    step, which is the whole point of the feature."""
+    step, which is the whole point of the feature.
+
+    Six semitones peak to peak for the lively case, and the figure is worth
+    knowing: four semitones of the same alternation comes to a quotient of 0.115
+    and reads as monotone. The boundary is not generous, which is the sort of
+    thing only an end-to-end case surfaces.
+    """
     flat = profile(_steady(120, 400), ())
-    lively = profile(_zigzag(120, 13.0, 40, 400), ())
+    lively = profile(_zigzag(120, 6.0, 20, 400), ())
 
-    assert flat.range_st is not None and lively.range_st is not None
-    assert liveliness(flat.range_st) is Liveliness.VERY_MONOTONE
-    assert liveliness(lively.range_st) is Liveliness.LIVELY
+    assert liveliness(flat.pvq) is Liveliness.MONOTONE
+    assert liveliness(lively.pvq) is Liveliness.LIVELY
 
 
-def test_the_scale_is_built_from_the_thresholds_and_carries_no_colour() -> None:
-    """The legend and the logic come from the same constants, so a
-    recalibration reaches both. No colour: the scale is uncomfortable at both
-    ends, so there is no direction for one to point in."""
+def test_the_scale_is_built_from_the_thresholds_and_carries_its_colours() -> None:
+    """The legend, the logic and the colour come from the same constants, so a
+    recalibration reaches all three. The light travels beside the threshold it
+    was read from; the frontend maps no step to any colour of its own."""
     steps = liveliness_steps()
 
     assert [s["step"] for s in steps] == [step.value for step in Liveliness]
-    assert [s["label"] for s in steps] == [
-        "stark monoton", "monoton", "ausgewogen", "lebendig", "überzeichnet",
-    ]
-    assert steps[0]["range"] == "unter 4 Halbtönen"
-    assert steps[2]["range"] == "7 bis 12 Halbtöne"
-    assert steps[4]["range"] == "über 18 Halbtönen"
-    assert all(s["light"] is None for s in steps)
+    assert [s["label"] for s in steps] == ["monoton", "lebendig", "sehr lebendig"]
+    assert steps[0]["range"] == "unter 15 %"
+    assert steps[1]["range"] == "15 % bis 25 %"
+    assert steps[2]["range"] == "über 25 %"
+    assert [s["light"] for s in steps] == ["red", "green", "yellow"]
+
+
+def test_every_step_has_a_colour_and_a_word() -> None:
+    """Colour is never the only channel (ADR 0077). A step the backend can
+    return with no label would reach the screen as a colour and nothing else,
+    which is the one thing a traffic light on an unvalidated threshold must not
+    become."""
+    assert set(LIGHTS) == set(Liveliness)
+    assert set(LABELS) == set(Liveliness)
+    assert set(LIGHTS.values()) <= {"green", "yellow", "red"}
+
+
+def test_the_top_step_is_not_the_red_one() -> None:
+    """Pins the direction the light claims, because the direction is the whole
+    risk of having one. Monotone is the end F-35 exists to make visible; the
+    top step is where Hincks's liveliest speakers sat, and nothing reviewed
+    calls expressiveness a fault. Its yellow says "worth a look at the
+    contour", never "too much"."""
+    assert LIGHTS[Liveliness.MONOTONE] == "red"
+    assert LIGHTS[Liveliness.LIVELY] == "green"
+    assert LIGHTS[Liveliness.VERY_LIVELY] == "yellow"
 
 
 def test_the_step_is_derived_when_the_session_is_read() -> None:
     """Not stored with the Measurement, on purpose.
 
-    The figure is a measurement and is written once; the step is a judgement on
-    thresholds nothing has validated, so it is computed on every read from the
-    stored figure. That is what lets a recalibration reach trainings recorded
-    months ago, whose audio is long gone (ADR 0048) and which therefore could
-    never be measured again.
+    The figures are measurements and are written once; the step is a judgement
+    on thresholds nothing has validated for this population, so it is computed
+    on every read. That is what let the scale be replaced outright without a
+    migration and without leaving old trainings labelled by one that no longer
+    exists.
     """
-    served = _served_detail(RANGE_KEY, 9.0, {"median_hz": 120.0})
+    served = _served_detail(RANGE_KEY, {"median_hz": 120.0, "pvq": 0.18})
 
     assert served == {
         "median_hz": 120.0,
-        "liveliness": "balanced",
-        "liveliness_label": "ausgewogen",
+        "pvq": 0.18,
+        "liveliness": "lively",
+        "liveliness_label": "lebendig",
+        "liveliness_light": "green",
     }
+
+
+def test_a_session_measured_before_the_quotient_gets_no_step() -> None:
+    """The reading moved onto a figure those Sessions do not carry, and their
+    audio is gone (ADR 0048) so it cannot be measured now. Reading the step off
+    the Umfang instead would reinstate the scale the review withdrew."""
+    served = _served_detail(RANGE_KEY, {"median_hz": 120.0})
+
+    assert served == {"median_hz": 120.0}
 
 
 def test_serving_leaves_a_detail_that_was_never_measured_alone() -> None:
     """A Session stored before the pitch curve existed carries no detail at
     all. There is nothing to read a step off, and inventing one would put a
     word on a training that was never measured."""
-    assert _served_detail(RANGE_KEY, 9.0, None) is None
+    assert _served_detail(RANGE_KEY, None) is None
 
 
 # --- Where one utterance ends and the next begins ---------------------------
@@ -401,8 +506,26 @@ def test_movement_is_not_counted_across_the_seam_between_two_utterances() -> Non
 
 
 def test_a_step_is_read_only_from_enough_voiced_speech() -> None:
-    """Five steps on two seconds of humming would be a verdict on nothing. The
-    figure is still reported -- a spread is a spread -- but it carries no word."""
-    assert liveliness(9.0, MIN_VOICED_MS_FOR_READING) is Liveliness.BALANCED
-    assert liveliness(9.0, MIN_VOICED_MS_FOR_READING - 1) is None
-    assert liveliness(9.0, None) is Liveliness.BALANCED  # not recorded: no reason to withhold
+    """A step off two seconds of humming would be a verdict on nothing. The
+    figure is still reported -- a quotient is a quotient -- but it carries no
+    word. The floor is two to three of Hincks's windows against the nine her
+    reliability figure rests on, so it is a floor and not a sufficiency."""
+    assert liveliness(0.18, MIN_VOICED_MS_FOR_READING) is Liveliness.LIVELY
+    assert liveliness(0.18, MIN_VOICED_MS_FOR_READING - 1) is None
+    assert liveliness(0.18, None) is Liveliness.LIVELY  # not recorded: no reason to withhold
+
+
+def test_the_level_threshold_is_the_glissando_threshold_over_the_window() -> None:
+    """Derived, not chosen, and this pins the derivation rather than the number.
+
+    Below the glissando threshold a pitch movement is not heard as a movement at
+    all. Over a window of T seconds that threshold, G = GLISSANDO_ST_S2 / T**2
+    semitones per second, comes to GLISSANDO_ST_S2 / T semitones across the
+    window itself. The figure this replaced was hand-set at 2.0 semitones, two
+    and a half times the perceptual floor, which filed endings as level that a
+    listener hears as falling or rising.
+    """
+    window_s = TERMINAL_WINDOW_MS / 1000
+
+    assert TERMINAL_FLAT_ST == pytest.approx(GLISSANDO_ST_S2 / window_s)
+    assert TERMINAL_FLAT_ST < 2.0
