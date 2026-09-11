@@ -56,13 +56,13 @@ const ORIGIN_FILTERS: LibraryFilter[] = [
   "all", "standard", "own", "followUp", "reverse", "tenant",
 ];
 
-/** What the selection screen opens on (ADR 0072): the seeded library, and the
- * call context most trainings start from. "Alle" on both rows was the honest
- * default while there was little to filter, and is now a wall of every Scenario
- * the User has ever owned or been shared — a starting point has to be a
- * shortlist, and both rows are one press from anything else. */
-const DEFAULT_ORIGIN: LibraryFilter = "standard";
-const DEFAULT_CATEGORY: CategoryFilter = "operations";
+/** What the selection screen opens on (ADR 0072): everything, on both rows.
+ * Opening on a shortlist (Standard + Betrieb & Störung, which this was) hides
+ * the User's own Scenarios behind a filter they have to know to press — and
+ * what is on screen is capped by `COLLAPSED_CARDS` anyway, so "Alle" is a
+ * first page of the library rather than a wall of it. */
+const DEFAULT_ORIGIN: LibraryFilter = "all";
+const DEFAULT_CATEGORY: CategoryFilter = "all";
 
 /** The card as the picker takes it. Its own function because the first
  * selection is made against the same filters the picker applies, before there
