@@ -87,12 +87,12 @@ source of that content, and which imports without a database.
 | WebSocket wire protocol & handshake (+ token in `session.start`) | F-46, F-50, ADR 0009, ADR 0033, ADR 0035 | `test_websocket_protocol.py` |
 | Centralized logging (session-tagged, kept for the whole run) | ADR 0039, ADR 0055 | `test_logging.py` |
 | Persistence schema (ORM metadata) and the invariants the database enforces (unique measurement/turn) | ADR 0025/0026/0029/0032/0051/0053, F-09, F-12, F-14 | `test_persistence_schema.py` |
-| Session statistics: what each metric divides by, and what suppresses it | F-08, F-24, F-35, F-36, F-41, F-51, F-53, F-63, ADR 0047, ADR 0048, ADR 0051 | `test_metrics.py` |
+| Session statistics: what each metric divides by, and what suppresses it | F-08, F-24, F-35, F-36, F-41, F-51, F-53, F-63, ADR 0047, ADR 0048, ADR 0051, ADR 0082, ADR 0083, ADR 0085, ADR 0086 | `test_metrics.py` |
 | Praat measurement against synthetic waveforms: the pitch curve's grid, its unit, and what is refused rather than guessed | F-35, F-37, F-51, ADR 0047, ADR 0048 | `test_acoustics.py` |
 | Pitch contour factors: range vs movement, terminal contours per utterance, development across the call, what is refused, the five-step reading and the seams between the user's turns | F-35, ADR 0004, ADR 0051 | `test_intonation.py` |
 | Overlapping speech: the rule order that keeps a backchannel from counting, terminal overlap, hard vs soft, and the provisional traffic light | F-51, ADR 0035, ADR 0036, ADR 0051 | `test_interruptions.py` |
-| Scenario suggestions: call types and focus goals steer them, voice goals do not, a suggested Scenario keeps its own origin, and the offers after a call | F-62, F-64, ADR 0072, ADR 0076 | `test_recommendations.py` |
-| Hesitation sounds read off the pitch contour: a held flat stretch counts, running speech and short vowels do not, and a failed measurement suppresses the figure | F-51, ADR 0048 | `test_hesitations.py` |
+| Scenario suggestions: call types and focus goals steer them, voice goals do not, a suggested Scenario keeps its own origin, and the offers after a call | F-62, F-64, ADR 0072, ADR 0076, ADR 0087 | `test_recommendations.py` |
+| Hesitation sounds read off the pitch contour: a held flat stretch counts, running speech and short vowels do not, and a failed measurement suppresses the figure | F-51, ADR 0048, ADR 0084 | `test_hesitations.py` |
 | Async wrap-up job status (queued → running → done/failed), and every path that can strand it | F-09, F-10, ADR 0019, ADR 0032, ADR 0034, ADR 0050 | `test_feedback_job_status.py` |
 | Wrap-up prompt & phase block (F-42), and the thinking-mode call it is asked with | F-09, F-42, F-43, ADR 0004, ADR 0011, ADR 0043, ADR 0049, ADR 0051, ADR 0056 | `test_wrapup_prompt.py` |
 | Documented gaps (current-state guards) | F-13/48, F-53, F-56, ADR 0006/0009 | `test_documented_gaps.py` |

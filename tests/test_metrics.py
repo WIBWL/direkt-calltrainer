@@ -9,13 +9,13 @@ Covers:
   ADR 0047/0048  a Turn's acoustics are measured inline and never load-bearing,
                  so a failed measurement stays visible downstream
   ADR 0051  no figure the user could take for measured when it was not
-  F-53      every metric belongs to one half of the Kennzahlen slider
+  F-53      every metric belongs to one half of the Kennzahlen slider (ADR 0082)
   F-51      Redefluss: how much of the recording was speech
   F-41      open and closed questions, split off the same question marks
-  F-51      lexical fillers, counted from the transcript per language
+  F-51      lexical fillers, counted from the transcript per language (ADR 0083)
   F-08      passages said again word for word, one repeated sentence counting once
-  ADR 0051  a recording with no detectable silence drops what rests on silence
-  F-63      the opening: greeting, own name and an offer of help (the concern,
+  ADR 0085  a recording with no detectable silence drops what rests on silence
+  F-63      the opening (ADR 0086): greeting, own name and an offer of help (the concern,
             when the user rang), and its tempo
 
 `conversation()` and `measure()` are pure functions over in-memory Turns: no

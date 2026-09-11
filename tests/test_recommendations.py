@@ -5,7 +5,7 @@ Covers:
   ADR 0076  a suggestion names its reason and claims no measurement
   ADR 0072  a suggested Scenario keeps its own origin: the suggestions are a
             view over the cards, not a group that takes them out of theirs
-  F-64      what to play next: the same Scenario in the other language, and
+  F-64      what to play next (ADR 0087): the same Scenario in the other language, and
             another from the library, without a model or a stored Session
 
 The scoring is a pure function over plain values; one test runs the listing.

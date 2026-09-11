@@ -719,10 +719,12 @@ function Metric({
     (measurement.unit && measurement.unit !== "Anzahl" ? ` ${measurement.unit}` : "");
 
   // Sprachmelodie is the one Kennzahl whose unit a reader cannot place, so the
-  // reading leads and the semitones stand under it as the evidence. The figure
-  // is never dropped: without it only the invented threshold would be left,
-  // which is the wrong half to keep (ADR 0004/0051). Every other tile leads
-  // with its measurement and lets the reading follow.
+  // reading leads and the semitones stand under it. Since ADR 0077 the reading
+  // comes from the pitch variation quotient and the figure is the Umfang, so the
+  // figure is the measurement shown beside the reading rather than its evidence.
+  // It is never dropped: without it only the part resting on thresholds would be
+  // left, which is the wrong half to keep (ADR 0004/0051, ADR 0088). Every other
+  // tile leads with its measurement and lets the reading follow.
   const melody = measurement.key === INTONATION_KEY;
 
   const body = (
