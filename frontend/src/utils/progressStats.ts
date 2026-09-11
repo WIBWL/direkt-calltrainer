@@ -373,7 +373,8 @@ export function activityStep(count: number): ActivityStep {
  * chart has the same numbers and none of that.
  *
  * One month at a time, and the month is the caller's to choose. The period
- * switch above the dashboard says which trainings the Kennzahlen are read over;
+ * switch, which stands below the calendar, says which trainings the Kennzahlen
+ * are read over;
  * a calendar already carries its own range in the grid, so letting the switch
  * cut months off it would be the same statement twice, the second time as a
  * missing chunk of a chart.

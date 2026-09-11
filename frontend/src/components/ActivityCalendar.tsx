@@ -24,10 +24,11 @@ import {
  * border. Paging back stops at the oldest stored training: earlier months hold
  * nothing and never will.
  *
- * The period switch above the dashboard deliberately does not reach this block.
- * It says which trainings the Kennzahlen are read over; a calendar carries its
- * own range in the grid, so cutting months off it would state the same thing
- * twice, the second time as a hole in a chart.
+ * The period switch deliberately does not reach this block, and since the
+ * dashboard was rearranged it says so by standing *below* it. It says which
+ * trainings the Kennzahlen are read over; a calendar carries its own range in
+ * the grid, so cutting months off it would state the same thing twice, the
+ * second time as a hole in a chart.
  *
  * It is also the one block on this screen that needs no caveat: counting what
  * somebody did implies no norm, which ADR 0065 names as explicitly permitted.

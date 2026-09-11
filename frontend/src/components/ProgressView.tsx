@@ -29,6 +29,7 @@ import PartsStrip, { partsSummary } from "./PartsStrip";
 import ProgressMetricTable from "./ProgressMetricTable";
 import ProgressPractice from "./ProgressPractice";
 import ProgressRecurring from "./ProgressRecurring";
+import SectionHeading from "./SectionHeading";
 import Sparkline from "./Sparkline";
 import VarietyGrid from "./VarietyGrid";
 
@@ -66,17 +67,23 @@ type PeriodKey = (typeof PERIODS)[number]["key"];
 /**
  * The progress dashboard (F-13, docs/dashboard-konzept.md).
  *
- * Top to bottom: where am I going (the focus goals), what next (what the
- * wrap-ups keep coming back to, with the one thing to practise beside it), how
- * am I going (every Kennzahl over time), and last what I did (the calendar and
- * the variety grid). The first three are Hattie & Timperley's feed up, feed
- * forward and feed back; the order puts the one block that leads back into
- * training second rather than last, because a dashboard whose only way out is
- * at the bottom of its longest page ends in looking (Zimmerman's reflection
- * phase has to hand over to planning, dashboard-konzept.md section 3). The
- * activity blocks moved down for the same reason: they are context, and they
- * were the first thing on the page only because in the pilot there was little
- * else to show.
+ * Top to bottom: what I did (three counted figures, the calendar and the
+ * variety grid, over every stored training), then the period switch, then
+ * where am I going (the focus goals), what next (what the wrap-ups keep coming
+ * back to, with the one thing to practise beside it) and how am I going (every
+ * Kennzahl over time). The last three are Hattie & Timperley's feed up, feed
+ * forward and feed back, read over the trainings the switch selects; the order
+ * keeps the one block that leads back into training high rather than last,
+ * because a dashboard whose only way out is at the bottom of its longest page
+ * ends in looking (Zimmerman's reflection phase has to hand over to planning,
+ * dashboard-konzept.md section 3).
+ *
+ * The activity block has moved twice. It opened the page in the pilot, when it
+ * was the only thing with anything in it; it went to the foot as context once
+ * the rest filled up; and it is back at the top, now with the switch placed
+ * *under* it. That placement is the point: everything above the switch counts
+ * every stored training, everything below is read over the selection, and the
+ * page says so by where the control stands rather than by a caveat.
  *
  * The recurring themes and the suggestion used to be a labelled placeholder;
  * they became real once each feedback point carried the focus goal it was
@@ -114,7 +121,9 @@ export default function ProgressView() {
   const duration = durationSeries(inPeriod);
   const series = [...toSeries(inPeriod), ...(duration ? [duration] : [])];
   const overview = series.filter((s) => !OVERVIEW_HIDDEN.has(s.key));
-  const counts = activity(inPeriod);
+  // Over everything stored, like the calendar they stand beside: the three
+  // figures sit above the switch now, so they cannot follow it.
+  const counts = activity(sessions);
   const goals = pickedGoals(focus?.goals ?? [], focus?.selected ?? []);
 
   if (state === "loading") {
@@ -166,39 +175,71 @@ export default function ProgressView() {
 
   return (
     <Frame>
-      <div className="progress-head">
-        {/* Three counted facts as figures rather than one sentence. Activity
-            needs no norm to be readable (ADR 0065 says so outright), so it is
-            the one thing on this screen that can lead with a number and no
-            caveat -- which is exactly what gives the page something to open
-            with. */}
-        <ul className="progress-facts">
-          <li>
-            <span className="progress-fact-figure">{counts.sessions}</span>
-            <span className="progress-fact-label">
-              {counts.sessions === 1 ? "Training" : "Trainings"}
+      {truncated && (
+        <p className="muted progress-note">
+          Gezeigt werden Ihre {sessions.length} neuesten Trainings von insgesamt {total}.
+        </p>
+      )}
+
+      {/* First, and above the switch: what was done, over every stored
+          training. Activity needs no norm to be readable (ADR 0065 says so
+          outright), so it is the one block that can open the page with a figure
+          and no caveat. It stood last for a while, as context; at the top it is
+          the ground the rest of the page stands on, and it is the part a
+          returning User checks first ("when did I last train?"). */}
+      <section className="progress-section progress-training-section" aria-labelledby="activity-title">
+        <SectionHeading id="activity-title" eyebrow="WAS SIE GETAN HABEN" title="Ihr Training" />
+
+        <div className="progress-training">
+          <ul className="progress-stats">
+            <li className="card progress-stat">
+              <span className="progress-stat-figure">{counts.sessions}</span>
+              <span className="progress-stat-label">
+                {counts.sessions === 1 ? "Training" : "Trainings"}
+              </span>
               {counts.firstAt && counts.lastAt && (
-                <span className="progress-fact-span">
+                <span className="progress-stat-span">
                   {formatDate(counts.firstAt)} bis {formatDate(counts.lastAt)}
                 </span>
               )}
-            </span>
-          </li>
-          <li>
-            <span className="progress-fact-figure">{counts.scenarios}</span>
-            <span className="progress-fact-label">
-              {counts.scenarios === 1 ? "Szenario" : "Szenarien"}
-            </span>
-          </li>
-          <li>
-            <span className="progress-fact-figure">{counts.personas}</span>
-            <span className="progress-fact-label">
-              {counts.personas === 1 ? "Gesprächspartner" : "Gesprächspartner"}
-            </span>
-          </li>
-        </ul>
+            </li>
+            <li className="card progress-stat">
+              <span className="progress-stat-figure">{counts.scenarios}</span>
+              <span className="progress-stat-label">
+                {counts.scenarios === 1 ? "Szenario" : "Szenarien"}
+              </span>
+            </li>
+            <li className="card progress-stat">
+              <span className="progress-stat-figure">{counts.personas}</span>
+              <span className="progress-stat-label">Gesprächspartner</span>
+            </li>
+          </ul>
 
-        <div className="progress-periods" role="group" aria-label="Welche Trainings">
+          <div className="card progress-activity-card">
+            <h3 className="progress-card-title">Wann Sie trainiert haben</h3>
+            <ActivityCalendar sessions={sessions} />
+          </div>
+
+          <div className="card progress-variety-card">
+            <h3 className="progress-card-title">Womit Sie trainiert haben</h3>
+            <VarietyGrid variety={variety(sessions)} />
+            <p className="focus-tile-note">
+              Wie oft Sie welches Szenario mit welchem Gesprächspartner gespielt haben.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* The switch sits where its reach begins. Everything above it counts
+          every stored training; everything below is read over the selection.
+          It used to sit in the page head beside the counted facts, where it
+          looked as if it governed them and the calendar too, and the calendar
+          then needed a comment explaining why it did not. */}
+      <div className="progress-scope">
+        <span className="progress-scope-label" id="progress-scope-label">
+          Ausgewertet werden
+        </span>
+        <div className="progress-periods" role="group" aria-labelledby="progress-scope-label">
           {PERIODS.map((option) => (
             <button
               type="button"
@@ -211,13 +252,11 @@ export default function ProgressView() {
             </button>
           ))}
         </div>
+        <span className="progress-scope-note">
+          {inPeriod.length} {inPeriod.length === 1 ? "Training" : "Trainings"}, für alles
+          darunter
+        </span>
       </div>
-
-      {truncated && (
-        <p className="muted progress-note">
-          Gezeigt werden Ihre {sessions.length} neuesten Trainings von insgesamt {total}.
-        </p>
-      )}
 
       {/* No "nothing in this period" branch any more: counted in trainings,
           the selection is never empty while anything is stored, and the case
@@ -245,30 +284,6 @@ export default function ProgressView() {
       />
 
       <ProgressMetricTable series={overview} />
-
-      {/* Last, as context. The calendar sits outside the period check and reads
-          every stored training: it pages through months on its own, so the
-          switch above would only ever take months away from it. The variety
-          grid beside it does follow the switch. */}
-      <section className="progress-section" aria-labelledby="activity-title">
-        <div className="progress-section-head">
-          <h2 id="activity-title">Ihr Training</h2>
-        </div>
-        <div className="progress-columns">
-          <div className="card progress-activity-card">
-            <h3 className="progress-card-title">Wann Sie trainiert haben</h3>
-            <ActivityCalendar sessions={sessions} />
-          </div>
-
-          <div className="card progress-variety-card">
-            <h3 className="progress-card-title">Womit Sie trainiert haben</h3>
-            <VarietyGrid variety={variety(inPeriod)} />
-            <p className="focus-tile-note">
-              Wie oft Sie welches Szenario mit welchem Gesprächspartner gespielt haben.
-            </p>
-          </div>
-        </div>
-      </section>
     </Frame>
   );
 }
@@ -331,13 +346,17 @@ function FocusSection({
   allSessions: SessionSummary[];
 }) {
   return (
-    <section className="progress-section">
-      <div className="progress-section-head">
-        <h2>Ihre Fokusziele</h2>
-        <Link to={ROUTES.profile} className="progress-section-link">
-          Ziele ändern
-        </Link>
-      </div>
+    <section className="progress-section" aria-labelledby="focus-title">
+      <SectionHeading
+        id="focus-title"
+        eyebrow="WORAN SIE ARBEITEN"
+        title="Ihre Fokusziele"
+        aside={
+          <Link to={ROUTES.profile} className="progress-section-link">
+            Ziele ändern
+          </Link>
+        }
+      />
 
       <ul className="focus-tiles">
         {goals.map((goal) => (
@@ -404,7 +423,7 @@ function FocusTile({
         <p className="focus-tile-note">
           {goal.key === "training_regularity"
             ? regularityText(allSessions)
-            : "Wie breit Sie trainieren, zeigt das Raster unter „Ihr Training“."}
+            : "Wie breit Sie trainieren, zeigt das Raster oben unter „Ihr Training“."}
         </p>
       ) : (
         <GoalMentionBody goal={goal.key} sessions={sessions} note={backing.note} />
@@ -648,10 +667,8 @@ function OverviewSection({ series }: { series: MetricSeries[] }) {
     .slice(0, 3);
 
   return (
-    <section className="progress-section">
-      <div className="progress-section-head">
-        <h2>Überblick</h2>
-      </div>
+    <section className="progress-section" aria-labelledby="overview-title">
+      <SectionHeading id="overview-title" eyebrow="WAS SICH BEWEGT" title="Überblick" />
 
       {withSpread.length > 0 ? (
         <ul className="focus-tiles">
@@ -704,8 +721,8 @@ function EmptyState({ goals }: { goals: FocusGoal[] }) {
       </div>
 
       {goals.length > 0 && (
-        <section className="progress-section">
-          <h2>Ihre Fokusziele</h2>
+        <section className="progress-section" aria-labelledby="focus-title">
+          <SectionHeading id="focus-title" eyebrow="WORAN SIE ARBEITEN" title="Ihre Fokusziele" />
           <p className="muted">
             Diese Ziele haben Sie gewählt. Sie werden hier ausgewertet, sobald Trainings
             vorliegen.

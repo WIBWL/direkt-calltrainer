@@ -3856,6 +3856,19 @@ h2 {
   transition: background 0.2s, border-color 0.2s, opacity 0.2s;
 }
 
+/* A link wearing the button's clothes ("Fokusziele wählen", "Training
+   starten"). An `<a>` is inline, and an inline box's vertical padding takes up
+   no line height: it paints over the line above instead, which is how the
+   button came to sit on top of the sentence it answers. `inline-flex` makes the
+   padding count, and the underline a link would carry does not belong on a
+   button. */
+a.consent-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .consent-button:disabled {
   opacity: 0.5;
   cursor: default;
@@ -4538,57 +4551,140 @@ h2 {
   margin: 0;
 }
 
-.progress-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 1.25rem;
-}
-
-/* The three counted facts the screen opens with. Figures, because activity is
-   the one thing here that needs no norm to be readable (ADR 0065) and therefore
-   the only thing that can lead. */
-
-.progress-facts {
-  list-style: none;
+/* The section headings are the wrap-up's (`SectionHeading`), and they need the
+   wrap-up's size back: `.progress-page h2` above is written for the second-level
+   pages' plain headings and would otherwise shrink these to body size. */
+.progress-page .feedback-section-title {
+  font-size: 20px;
   margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 28px;
 }
 
-.progress-facts li {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.progress-fact-figure {
-  font-family: var(--font-display);
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-navy-900);
-}
-
-.progress-fact-label {
-  display: flex;
-  flex-direction: column;
-  font-size: 0.9rem;
-  color: var(--color-text-muted);
-}
-
-.progress-fact-span {
-  font-size: 0.78rem;
+.progress-page .feedback-section-aside {
+  font-size: 0.85rem;
 }
 
 .progress-note {
   margin-top: -0.5rem;
   font-size: 0.85rem;
+}
+
+/* --- Ihr Training: the band that opens the page ---------------------------- */
+/* Three columns on a wide screen: the counted figures stacked on the left, the
+   calendar at its natural width beside them, and the rest to the variety table,
+   which is the one that runs out of room first (a Persona's name gets clipped
+   otherwise). The calendar is sized to the calendar rather than to a share of
+   the page: one month of seven columns has a natural width, and a larger share
+   only stretched the card, not the grid in it. */
+/* The first block on the page follows the lead and its "i", not another
+   block, so it needs less than a section's usual distance. */
+.progress-training-section {
+  margin-top: 1.5rem;
+}
+
+.progress-training {
+  display: grid;
+  grid-template-columns: minmax(170px, 210px) minmax(260px, 340px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* Each card is as tall as what is in it. Stretching them to the tallest would
+   draw a border around empty space beside the variety table once it is
+   expanded to every Scenario. */
+.progress-training .card {
+  margin: 0;
+}
+
+/* The three counted figures as cards with one large number each. Activity is
+   the one thing here that needs no norm to be readable (ADR 0065), and so the
+   one thing that can lead with a figure and no caveat. */
+.progress-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.progress-page .progress-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 1rem 1.25rem;
+}
+
+.progress-stat-figure {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-navy-900);
+}
+
+.progress-stat-label {
+  font-size: 0.9rem;
+  color: var(--color-navy-900);
+}
+
+.progress-stat-span {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+/* Between the two widths the figures go into a row of three above the other
+   two cards, and below 900px everything stacks. */
+@media (max-width: 1100px) {
+  .progress-training {
+    grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  }
+
+  .progress-stats {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .progress-training {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .progress-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- The period switch, where its reach begins ---------------------------- */
+/* A rule across the page with the switch on it: above it every stored
+   training, below it the selection. Placed rather than explained -- the line
+   says where the switch stops mattering before anybody reads the note. */
+.progress-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-top: 2.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.progress-scope-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+.progress-scope-note {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* The section right under the rule needs less air than one under a block. */
+.progress-scope + .progress-section {
+  margin-top: 1.75rem;
 }
 
 /* Period switch. Buttons rather than a select: three options that are always
@@ -4643,19 +4739,37 @@ h2 {
   margin: 0;
 }
 
+/* The same distance from every section heading to what it heads. A `.card`
+   brings a 1.5rem top margin of its own, so the sections led by a card sat
+   2.5rem under their heading and the ones led by tiles 1rem, and the page read
+   as unevenly spaced without anyone being able to say why. */
+.progress-section-head + .card,
+.progress-section .feedback-section-head + .card {
+  margin-top: 0;
+}
+
 .progress-section-link {
   font-size: 0.85rem;
   color: var(--color-blue-600);
 }
 
-/* The focus tiles: small multiples, so identically sized (Tufte). */
+/* The focus tiles: small multiples, so identically sized (Tufte). `auto-fit`
+   rather than `auto-fill`, so two or three picked goals share the row instead
+   of standing at its left end beside empty tracks; five still fit on one row
+   at the page's full width. */
 .focus-tiles {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 12px;
+}
+
+/* A single goal would otherwise be one tile the width of the page, its
+   sparkline stretched into a line across the screen. */
+.focus-tiles:has(> li:only-child) {
+  max-width: 560px;
 }
 
 .focus-tile {
@@ -4987,44 +5101,28 @@ h2 {
   color: var(--color-blue-600);
 }
 
+/* The sentence and its button on one line, the button at the far end, wrapping
+   under the text when the card gets narrow. */
 .progress-invite {
   margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+
+.progress-invite p {
+  flex: 1 1 320px;
+  margin: 0;
 }
 
 .progress-invite .consent-button {
   flex: 0 0 auto;
-  margin-top: 0.5rem;
-}
-
-/* Two panels side by side on a wide screen, stacked below it. The calendar
-   column is sized to the calendar rather than to a share of the page: one month
-   of seven columns has a natural width, and a larger share only stretched the
-   card, not the grid in it. Everything left over goes to the variety table,
-   which is the one that runs out of room first (a Persona's name gets clipped
-   otherwise). */
-.progress-columns {
-  display: grid;
-  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-
-@media (max-width: 900px) {
-  .progress-columns {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Each card is as tall as what is in it. Stretching both to the taller one made
-   sense while the left card was a fixed-height bar chart; a calendar over six
-   months is 700px tall, and matching that would draw a border around half a
-   metre of nothing beside it. */
-.progress-columns .card {
-  margin: 0;
 }
 
 /* The two cards' own titles, one level under the section heading "Ihr
-   Training" that now stands above both. */
+   Training" that stands above both. */
 .progress-card-title {
   margin: 0 0 1rem;
   font-size: 0.95rem;
@@ -5553,8 +5651,10 @@ h2 {
   align-items: start;
 }
 
+/* No margin of their own: the section heading above sets the distance, as it
+   does for every other block on the page. */
 .recurring-columns .card {
-  margin: 1.5rem 0 0;
+  margin: 0;
 }
 
 .recurring-heading {

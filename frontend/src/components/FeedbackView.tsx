@@ -13,7 +13,6 @@ import type {
 import { Link } from "react-router-dom";
 
 import { sessionMetricPath } from "../routes";
-import { cx } from "../utils/cx";
 import {
   ASPECT_LABELS,
   ASPECT_LEADS,
@@ -36,6 +35,7 @@ import {
 import FilterSlider, { type FilterOption } from "./FilterSlider";
 import InfoDetails from "./InfoDetails";
 import LoudnessCourse from "./LoudnessCourse";
+import SectionHeading from "./SectionHeading";
 
 /** What a screen can do with the follow-up Scenario (F-60): open it in the
  * start it as the next call. That belongs to whoever owns the screen, so it is
@@ -169,52 +169,6 @@ export default function FeedbackView({
  * happens with the answer is not — after a call the training flow is already
  * here, from the history it has to be handed over.
  */
-/**
- * The heading of a section on the feedback page: eyebrow, title, and whatever
- * belongs at its right-hand end.
- *
- * It sits *above* the white box rather than inside it, and every section does
- * the same — which was the point of introducing it. Half of them used to carry
- * their heading inside the box and half above it, so two blocks of the same
- * kind looked like two different kinds of thing.
- *
- * A box may still hold a title of its own, but only for an *item* inside a
- * section: the two offers under "Nächste Schritte" are each a thing you can
- * pick, not a section of the page.
- */
-export function SectionHeading({
-  eyebrow,
-  title,
-  icon,
-  aside,
-  tone,
-}: {
-  eyebrow: string;
-  title: string;
-  /** The mark before the heading, where a section has one. */
-  icon?: ReactNode;
-  /** Kept at the far end of the row — a count, a control. */
-  aside?: ReactNode;
-  tone?: "success" | "danger";
-}) {
-  return (
-    <div className={cx("feedback-section-head", tone && `is-${tone}`)}>
-      {icon && (
-        <div className="feedback-section-icon" aria-hidden="true">
-          {icon}
-        </div>
-      )}
-
-      <div className="feedback-section-heading">
-        <div className="feedback-section-eyebrow">{eyebrow}</div>
-        <h2 className="feedback-section-title">{title}</h2>
-      </div>
-
-      {aside && <div className="feedback-section-aside">{aside}</div>}
-    </div>
-  );
-}
-
 export function FeedbackReport({
   detail,
   followUp,

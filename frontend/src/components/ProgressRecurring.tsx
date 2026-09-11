@@ -4,6 +4,7 @@ import type { FocusGoal, SessionSummary } from "../protocol";
 import { MIN_MENTIONS, mentionSummary, type GoalMentions } from "../utils/goalMentions";
 import InfoDetails from "./InfoDetails";
 import MentionTally from "./MentionTally";
+import SectionHeading from "./SectionHeading";
 
 /**
  * Block D of the dashboard: what the wrap-ups keep coming back to.
@@ -53,9 +54,11 @@ export default function ProgressRecurring({
 
   return (
     <section className="progress-section" aria-labelledby="recurring-title">
-      <div className="progress-section-head">
-        <h2 id="recurring-title">Was in Ihren Auswertungen wiederkehrt</h2>
-      </div>
+      <SectionHeading
+        id="recurring-title"
+        eyebrow="WAS GENANNT WURDE"
+        title="Was in Ihren Auswertungen wiederkehrt"
+      />
 
       {nothing ? (
         <div className="card">

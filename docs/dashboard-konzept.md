@@ -24,10 +24,20 @@ Kennzahlen gewachsen war:
   beiden Gruppen Sprechweise und Gesprächsinhalt. Das ist Tuftes
   Sparkline-Tabelle, passt auf einen Bildschirm und ist barrierefreier als
   sechzehn verlinkte Grafiken. Der Umschalter entfällt.
-* **Reihenfolge.** Fokusziele, dann das Wiederkehrende mit dem Übungsvorschlag
-  als dritter Karte in derselben Reihe, dann die Kennzahlen, zuletzt Kalender und
-  Vielfalt unter „Ihr Training“. Der einzige Block, der zurück ins Training
-  führt, stand vorher ganz unten auf der längsten Seite (Abschnitt 3, Zimmerman).
+* **Reihenfolge.** Zuoberst „Ihr Training“: die drei Zahlen (Trainings,
+  Szenarien, Gesprächspartner) als Karten, der Kalender und das Raster
+  Szenario × Gesprächspartner, alle drei über sämtliche gespeicherten Trainings.
+  Darunter eine Trennlinie mit dem Zeitraumschalter, und erst unter ihr
+  Fokusziele, das Wiederkehrende mit dem Übungsvorschlag als dritter Karte in
+  derselben Reihe und zuletzt die Kennzahlen. Die Stellung des Schalters sagt
+  damit, was er erreicht: alles darüber zählt jedes Training, alles darunter
+  liest die Auswahl. Vorher stand er im Kopf neben den Zahlen, sah aus, als
+  gelte er für sie und den Kalender, und der Kalender brauchte eine Erklärung,
+  warum er es nicht tut. Der Übungsvorschlag, der einzige Block, der zurück ins
+  Training führt, bleibt weit oben (Abschnitt 3, Zimmerman). Die
+  Abschnittsüberschriften sind dieselben wie auf der Feedback-Seite
+  (`SectionHeading.tsx`, Oberzeile und Titel), damit die Seite über viele
+  Trainings und die über eines dieselbe Sprache sprechen.
 * **Kennzahlen, die keine Kurve vertragen.** Zählwerte (Fragen, Füllwörter,
   Wiederholungen, Verzögerungslaute, Unterbrechungen) stehen als ganze Zahl je
   Gespräch, ihr üblicher Bereich gerundet und nie unter null. Eine Fassung je 100
@@ -62,8 +72,9 @@ darf, sichtbar bleibt. Und der Schalter wählt jetzt **die letzten 5, die letzte
 Kalender der Trainingstage (`ActivityCalendar.tsx`) und Raster Szenario ×
 Persona (`VarietyGrid.tsx`) brauchen nur die Sitzungsdaten, keine Messwerte. Sie
 standen zuerst oben, weil sie im Pilotbetrieb das Einzige waren, was schon etwas
-zeigte, und stehen seit der Überarbeitung unten. Die Gesprächsdauer läuft als
-abgeleitete Reihe neben den gemessenen Kennzahlen mit.
+zeigte, dann eine Zeitlang unten als Kontext, und stehen jetzt wieder oben,
+diesmal über dem Zeitraumschalter (siehe Reihenfolge oben). Die Gesprächsdauer
+läuft als abgeleitete Reihe neben den gemessenen Kennzahlen mit.
 
 Der Kalender stand zuerst als Balkendiagramm je Tag, Woche oder Monat da. Die
 Zahlen sind dieselben; was ein Kalender hinzufügt, ist die Form einer Woche:
@@ -81,12 +92,14 @@ nebeneinander waren eine Wand aus Rastern, in der ausgerechnet der gesuchte
 Monat am schwersten zu finden war, und die Karte daneben stand neben einem
 halben Meter leerem Rand.
 
-Der Zeitraumschalter über dem Bildschirm lässt den Kalender bewusst
-unberührt. Er sagt, über welche Trainings die Kennzahlen gelesen werden; ein
+Der Zeitraumschalter lässt den Kalender bewusst unberührt und steht deshalb
+unter ihm. Er sagt, über welche Trainings die Kennzahlen gelesen werden; ein
 Kalender trägt seinen Zeitraum schon im Raster. Ihm Monate wegzuschneiden
 hieße, dieselbe Aussage zweimal zu treffen, das zweite Mal als Loch in einer
-Grafik. Der Kalender liest deshalb alle gespeicherten Trainings, das Raster
-daneben weiterhin die des gewählten Zeitraums.
+Grafik. Der Kalender liest deshalb alle gespeicherten Trainings, und seit der
+Schalter unter dem Block steht, tun das auch die drei Zahlen und das Raster
+daneben: Ein Teil des Blocks über dem Schalter, der ihm trotzdem folgt, wäre
+genau die Unklarheit, die die neue Stellung beseitigen soll.
 
 Bereich D ist inzwischen echt (`ProgressRecurring.tsx`, Rechenteil
 `utils/goalMentions.ts`). Die Beispielansicht ist entfernt: Seit ADR 0080 trägt
@@ -379,13 +392,20 @@ Nicht im Profil selbst: Dieses ist bereits lang und behandelt Konto, Daten und
 Einstellungen, während das Dashboard eine Arbeitsansicht ist.
 
 Stand nach der Überarbeitung (September 2026). Die Buchstaben der Abschnitte
-unten sind die ursprünglichen, die Reihenfolge auf dem Bildschirm ist B, D mit E,
-C und zuletzt der Aktivitätsteil aus A.
+unten sind die ursprünglichen, die Reihenfolge auf dem Bildschirm ist A mit dem
+Aktivitätsteil, dann der Zeitraumschalter, dann B, D mit E und C.
 
 ```
 +-----------------------------------------------------------------------+
-|  Ihr Fortschritt              [ Letzte 5 | Letzte 10 | Alle ]          |
-|  14 Trainings, 6 Szenarien, 2 Gesprächspartner                         |  A
+|  Ihr Fortschritt                                                       |
+|  WAS SIE GETAN HABEN · Ihr Training                                    |
+|  +----------+ +----------------+ +---------------------------------+  |  A
+|  | 14       | | Kalender des   | | Szenario × Gesprächspartner     |  |
+|  | Trainings| | Monats         | |                                 |  |
+|  | 6 Szen.  | |                | |                                 |  |
+|  | 2 Partner| |                | |                                 |  |
+|  +----------+ +----------------+ +---------------------------------+  |
+|  ---- Ausgewertet werden [ Letzte 5 | Letzte 10 | Alle ] ----------   |
 +-----------------------------------------------------------------------+
 |  IHRE FOKUSZIELE                                                       |
 |  +----------------------+ +----------------------+ +-----------------+ |
@@ -413,17 +433,15 @@ C und zuletzt der Aktivitätsteil aus A.
 |  Fragen           4         ~~~~\/~~~      3 bis 6                 12  |
 |  Gesprächseinstieg 3 Teile  [3][2][3][3]   in 9 von 12 alle 3      12  |
 +-----------------------------------------------------------------------+
-|  IHR TRAINING                                                          |
-|  [ Kalender des Monats ]      [ Szenario × Gesprächspartner ]          |  A
-+-----------------------------------------------------------------------+
 ```
 
 ### A. Kopf
 
-Die Auswahl der Trainings und die reinen Aktivitätszahlen. Aktivität braucht
-keine Norm, sie zählt, was getan wurde (ADR 0065 nennt das ausdrücklich als
-erlaubt). Gewählt wird nach Anzahl, nicht nach Tagen: die letzten 5, die letzten
-10 oder alle. Nach Tagen war die Auswahl bei jemandem, der in Schüben trainiert,
+Die reinen Aktivitätszahlen mit Kalender und Vielfalt, darunter die Auswahl der
+Trainings. Aktivität braucht keine Norm, sie zählt, was getan wurde (ADR 0065
+nennt das ausdrücklich als erlaubt), und sie zählt immer alle gespeicherten
+Trainings. Die Auswahl gilt für alles unter ihr. Gewählt wird nach Anzahl, nicht
+nach Tagen: die letzten 5, die letzten 10 oder alle. Nach Tagen war die Auswahl bei jemandem, der in Schüben trainiert,
 oft leer, und „6 Monate“ und „Gesamt“ waren wegen der Löschfrist (ADR 0067) fast
 immer dasselbe. „Alle“ heißt also „alles, was noch da ist“.
 

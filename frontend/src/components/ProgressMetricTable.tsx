@@ -11,6 +11,7 @@ import {
 } from "../utils/progressStats";
 import InfoDetails from "./InfoDetails";
 import PartsStrip, { partsSummary } from "./PartsStrip";
+import SectionHeading from "./SectionHeading";
 import Sparkline from "./Sparkline";
 
 /**
@@ -38,8 +39,12 @@ import Sparkline from "./Sparkline";
 export default function ProgressMetricTable({ series }: { series: MetricSeries[] }) {
   if (series.length === 0) {
     return (
-      <section className="progress-section">
-        <h2>Kennzahlen über die Zeit</h2>
+      <section className="progress-section" aria-labelledby="metric-table-title">
+        <SectionHeading
+          id="metric-table-title"
+          eyebrow="WIE SIE GESPROCHEN HABEN"
+          title="Kennzahlen über die Zeit"
+        />
         <div className="card">
           <p>
             Zu den Trainings in diesem Zeitraum liegen keine Kennzahlen vor. Das kommt vor,
@@ -57,9 +62,11 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
 
   return (
     <section className="progress-section" aria-labelledby="metric-table-title">
-      <div className="progress-section-head">
-        <h2 id="metric-table-title">Kennzahlen über die Zeit</h2>
-      </div>
+      <SectionHeading
+        id="metric-table-title"
+        eyebrow="WIE SIE GESPROCHEN HABEN"
+        title="Kennzahlen über die Zeit"
+      />
 
       <div className="card metric-table-card">
         {/* Scrolls inside itself on a narrow screen rather than pushing the
