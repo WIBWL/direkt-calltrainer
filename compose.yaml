@@ -179,9 +179,10 @@ services:
 
   # Local identity provider (ADR 0009). `start-dev` keeps realms in an embedded
   # H2 file, so no DB of its own. `--import-realm` reads keycloak/direkt-realm.json
-  # at boot: the calltrainer-frontend client and the dev users alice/bob/carol
-  # (password = username). Import is SKIPPED if the realm already exists, so
-  # after editing the JSON: `docker compose down -v && docker compose up`.
+  # at boot: the calltrainer-frontend client and the dev users
+  # niklas/mathias/eberhard (password = username). Import is SKIPPED if the
+  # realm already exists, so after editing the JSON:
+  # `docker compose down -v && docker compose up`.
   # KC_HOSTNAME fixes the issuer to localhost:18081 no matter which host the
   # token request arrived on; --hostname-strict=false lets the app container
   # reach it as `keycloak:8080` for the JWKS. Host port 18081, not 18080, so it

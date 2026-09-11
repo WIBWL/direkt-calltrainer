@@ -84,37 +84,37 @@
 
   "users": [
     {
-      "id": "00000000-0000-4000-8000-00000000a11c",
-      "username": "alice",
+      "id": "00000000-0000-4000-8000-000000000001",
+      "username": "niklas",
       "enabled": true,
       "emailVerified": true,
-      "email": "alice@example.test",
-      "firstName": "Alice",
-      "lastName": "Example",
+      "email": "niklas.heyder@solox.de",
+      "firstName": "Niklas",
+      "lastName": "Heyder",
       "attributes": { "tenant": ["solox"] },
-      "credentials": [{ "type": "password", "value": "alice", "temporary": false }]
+      "credentials": [{ "type": "password", "value": "niklas", "temporary": false }]
     },
     {
-      "id": "00000000-0000-4000-8000-000000000b0b",
-      "username": "bob",
+      "id": "00000000-0000-4000-8000-000000000002",
+      "username": "mathias",
       "enabled": true,
       "emailVerified": true,
-      "email": "bob@example.test",
-      "firstName": "Bob",
-      "lastName": "Example",
+      "email": "mathias.koehler@solox.de",
+      "firstName": "Mathias",
+      "lastName": "Köhler",
       "attributes": { "tenant": ["solox"] },
-      "credentials": [{ "type": "password", "value": "bob", "temporary": false }]
+      "credentials": [{ "type": "password", "value": "mathias", "temporary": false }]
     },
     {
-      "id": "00000000-0000-4000-8000-00000000ca01",
-      "username": "carol",
+      "id": "00000000-0000-4000-8000-000000000003",
+      "username": "eberhard",
       "enabled": true,
       "emailVerified": true,
-      "email": "carol@example.test",
-      "firstName": "Carol",
-      "lastName": "Example",
+      "email": "eberhard.hertling@appollo.systems",
+      "firstName": "Eberhard",
+      "lastName": "Hertling",
       "attributes": { "tenant": ["appollo"] },
-      "credentials": [{ "type": "password", "value": "carol", "temporary": false }]
+      "credentials": [{ "type": "password", "value": "eberhard", "temporary": false }]
     }
   ]
 }
