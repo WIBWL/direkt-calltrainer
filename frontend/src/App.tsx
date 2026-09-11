@@ -19,6 +19,8 @@ import TranscriptView from "./components/TranscriptView";
 import { useMicrophoneDevices } from "./hooks/useMicrophoneDevices";
 import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useSessionSocket, type CommittedSession } from "./hooks/useSessionSocket";
+import { useNextCalls } from "./hooks/useNextCalls";
+import NextCalls from "./components/NextCalls";
 import { useStreamedAudioPlayback } from "./hooks/useStreamedAudioPlayback";
 import type { Persona, TranscriptEntry } from "./protocol";
 import ReverseBriefPanel from "./components/ReverseBriefPanel";
@@ -141,6 +143,17 @@ export default function App() {
   // failing backend from looping: a failed Session is only ever retried by
   // another deliberate click, never automatically.
   const [committed, setCommitted] = useState<CommittedSession | null>(null);
+  // The pairing just played, kept past the end of the call for the offers of
+  // what to play next (F-64): `committed` is cleared the moment the call ends.
+  const [lastPlayed, setLastPlayed] = useState<{
+    scenarioId: string;
+    personaId: string;
+  } | null>(null);
+  const nextCalls = useNextCalls(
+    lastPlayed?.scenarioId ?? null,
+    lastPlayed?.personaId ?? null,
+    screen === "transcript",
+  );
   // The briefing shown during a reverse (ADR 0070). Held here rather than in
   // the screens because both the mic check and the call show it, and because
   // it is fetched once per committed Session rather than once per screen.
@@ -301,6 +314,9 @@ export default function App() {
       personaId,
     });
     setScreen("transcript");
+    if (committed) {
+      setLastPlayed({ scenarioId: committed.scenarioId, personaId: committed.personaId });
+    }
     // This Session is over — the next one connects when the user commits
     // to it, not while the transcript is still being read (ADR 0042).
     setCommitted(null);
@@ -647,6 +663,14 @@ export default function App() {
                 onCreated: () => void reloadScenarios(),
               }}
               onReverse={handleReverse}
+              next={
+                <NextCalls
+                  offers={nextCalls}
+                  onStart={(scenarioId, personaId) =>
+                    handleStartFollowUp(scenarioId, personaId)
+                  }
+                />
+              }
             />
           }
         />

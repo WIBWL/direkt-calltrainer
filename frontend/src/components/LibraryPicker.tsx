@@ -69,7 +69,7 @@ export interface LibraryItem {
 
 /** Why a card is suggested, in one line: "Passt zu Ihren Gesprächen · Übt
  *  „Sichere Einwandbehandlung"". */
-function recommendationReason(
+export function recommendationReason(
   recommendation: ScenarioRecommendation,
   goalTitle: (key: string) => string,
 ): string {

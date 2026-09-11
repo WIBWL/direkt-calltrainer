@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { ApiError } from "../api";
 import type {
@@ -95,6 +95,7 @@ export default function FeedbackView({
   sessionId,
   followUp,
   onReverse,
+  next,
 }: {
   sessionId: string | null;
   /** Omitted where there is nowhere to act on the follow-up (F-60). */
@@ -104,14 +105,20 @@ export default function FeedbackView({
    * screen begins the call itself, the history hands the pairing to the
    * training flow. Omitted where there is nowhere to go with it. */
   onReverse?: (reverse: ReverseScenario) => void;
+  /** What to play next (F-64). Shown without a wrap-up too: it needs no
+   *  stored Session, so a call that was not kept still gets it. */
+  next?: ReactNode;
 }) {
   const { detail, state } = useSessionFeedback(sessionId);
 
   if (!detail?.feedback) {
     return (
-      <div className="card">
-        <p className="muted">{NOTICE[state]}</p>
-      </div>
+      <>
+        <div className="card">
+          <p className="muted">{NOTICE[state]}</p>
+        </div>
+        {next}
+      </>
     );
   }
   return (
@@ -120,6 +127,7 @@ export default function FeedbackView({
       followUp={followUp}
       sessionId={sessionId}
       onReverse={onReverse}
+      next={next}
     />
   );
 }
@@ -145,11 +153,13 @@ export function FeedbackReport({
   followUp,
   sessionId,
   onReverse,
+  next,
 }: {
   detail: SessionDetail;
   followUp?: FollowUpActions | undefined;
   sessionId?: string | null | undefined;
   onReverse?: ((reverse: ReverseScenario) => void) | undefined;
+  next?: ReactNode;
 }) {
   const { feedback, measurements, turns, persona, scenario } = detail;
   if (!feedback) return null;
@@ -224,6 +234,8 @@ export function FeedbackReport({
           {reverseOffer}
         </div>
       )}
+
+      {next}
 
       {feedback.phase_language && <PhaseLanguage text={feedback.phase_language} />}
 

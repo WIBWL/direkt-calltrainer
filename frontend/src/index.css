@@ -5420,6 +5420,47 @@ h2 {
   color: var(--color-navy-900);
 }
 
+/* What to play next (F-64): one row per offer, the button on the right. */
+.next-calls {
+  margin-top: 16px;
+}
+
+.next-calls-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.next-call {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.next-call-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.next-call-title {
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+.next-call-reason {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.next-call .follow-up-button {
+  flex: none;
+}
+
 /* Why a suggested card is suggested (F-62). */
 .card-reason {
   font-size: 0.78rem;

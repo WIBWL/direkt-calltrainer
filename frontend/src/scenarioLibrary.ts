@@ -167,6 +167,27 @@ export const getTenant = () =>
 
 export const listScenarios = () => apiFetch<ScenarioCard[]>("/api/scenarios");
 
+/** One way to go on after a call (F-64): the same Scenario in the other
+ *  language, or another from the library. */
+export interface NextCallOffer {
+  kind: "language" | "library";
+  scenario_id: string;
+  scenario_name: string;
+  persona_id: string;
+  persona_name: string;
+  /** The Persona's language, e.g. "Englisch". */
+  language: string;
+  /** Why a library offer was chosen, when the profile chose it. */
+  recommendation: ScenarioRecommendation | null;
+  unplayed: boolean;
+}
+
+export const getNextCalls = (scenarioId: string, personaId: string) =>
+  apiFetch<NextCallOffer[]>(
+    `/api/scenarios/${encodeURIComponent(scenarioId)}/next` +
+      `?persona=${encodeURIComponent(personaId)}`,
+  );
+
 export const getScenario = (id: string) =>
   apiFetch<ScenarioDetail>(`/api/scenarios/${id}`);
 
