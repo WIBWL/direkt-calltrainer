@@ -282,7 +282,6 @@ async def create_reverse(
             material.description,
             material.case_facts,
             material.call_goal,
-            material.success_condition,
             material.improvements,
         )
     except (OpenAIError, ReverseError) as e:
@@ -331,7 +330,6 @@ class _ReverseMaterial:
     description: str
     case_facts: str
     call_goal: str
-    success_condition: str
     improvements: list[str]
 
 
@@ -360,7 +358,6 @@ def _reverse_material(extern_id: uuid.UUID, subject: str) -> _ReverseMaterial | 
             description=scenario.description,
             case_facts=scenario.case_facts,
             call_goal=scenario.call_goal,
-            success_condition=scenario.success_condition,
             # Absent when the wrap-up has not landed, which is allowed here:
             # the briefing is built from the case, and the coaching points only
             # decide which goal the checklist names first.
@@ -493,7 +490,6 @@ def _follow_up_material(extern_id: uuid.UUID, subject: str) -> _FollowUpMaterial
                 description=scenario.description,
                 case_facts=scenario.case_facts,
                 call_goal=scenario.call_goal,
-                success_condition=scenario.success_condition,
                 # Where the call ended up, in the wrap-up's own words. The next
                 # call starts from that, and no other field says it.
                 outcome=feedback.summary if feedback else "",

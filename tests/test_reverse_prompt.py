@@ -41,11 +41,13 @@ from tests.conftest import TEST_PERSONAS, TEST_SCENARIOS
 
 GERMAN = get_pack("de")
 
-# A case on both, so the reverse block has all three fields to turn around.
+# A case on both, so the reverse block has both fields to turn around.
 _CASE = {
     "case_facts": "A ticket was opened eleven days ago; a callback was promised.",
-    "call_goal": "Find out what is happening and get a date.",
-    "success_condition": "someone names a date. A promise to look into it is not enough.",
+    "call_goal": (
+        "Find out what is happening and get a date. The matter is settled when "
+        "someone names one. A promise to look into it is not enough."
+    ),
 }
 
 
@@ -147,10 +149,13 @@ def test_the_goal_is_named_as_the_callers_and_not_the_personas(prompt):
     assert "What you want from this call" not in prompt
 
 
-def test_the_settlement_condition_is_the_callers_bar(prompt):
-    assert "The caller will count the matter as settled when" in prompt
+def test_the_settlement_bar_is_the_callers(prompt):
+    """The bar rides in `call_goal` since the two fields were merged, so this
+    is the same assertion one heading up: it is the *caller* who counts the
+    matter settled, and the persona who has to meet that."""
+    assert "when they will count the matter settled" in prompt
     assert "That is their bar" in prompt
-    assert "You consider the matter settled when" not in prompt
+    assert "when you count the matter settled" not in prompt
 
 
 def test_the_facts_are_the_personas_records(prompt):
@@ -162,7 +167,7 @@ def test_the_facts_are_the_personas_records(prompt):
 
 def test_a_scenario_without_a_case_produces_no_dangling_headings(persona, played):
     """Each field is optional on its own, exactly as in the ordinary block."""
-    empty = replace(played, reverse=True, case_facts="", call_goal="", success_condition="")
+    empty = replace(played, reverse=True, case_facts="", call_goal="")
     prompt = build_system_prompt(persona, empty, GERMAN)
     assert "Facts of the case" not in prompt
     assert "What the caller wants from this call" not in prompt
@@ -253,8 +258,8 @@ def test_the_settlement_check_asks_whether_the_caller_was_given_it(reversed_scen
     assert "Have you actually given the caller that" in SETTLEMENT_CHECK_REVERSE
     assert "Has the user actually given you that" not in SETTLEMENT_CHECK_REVERSE
     # And the criterion it is formatted with is still the Scenario's own.
-    filled = SETTLEMENT_CHECK_REVERSE.format(criterion=reversed_scenario.success_condition)
-    assert reversed_scenario.success_condition in filled
+    filled = SETTLEMENT_CHECK_REVERSE.format(criterion=reversed_scenario.call_goal)
+    assert reversed_scenario.call_goal in filled
 
 
 # --- The per-turn anti-repeat nudge (ADR 0038) -----------------------------
@@ -310,7 +315,7 @@ def test_a_reverse_turn_carries_the_reversed_nudge_and_check(persona, reversed_s
 
     assert "put forward what you can actually do" in nudge
     assert "Have you actually given the caller that" in nudge
-    assert reversed_scenario.success_condition in nudge
+    assert reversed_scenario.call_goal in nudge
 
 
 def test_an_ordinary_turn_carries_neither(persona, played):

@@ -16,7 +16,7 @@ export type CategoryFilter = "all" | ScenarioCategory;
 
 export const CATEGORY_FILTERS: CategoryFilter[] = ["all", ...CATEGORIES];
 
-const CATEGORY_FILTER_LABELS: Record<CategoryFilter, string> = {
+export const CATEGORY_FILTER_LABELS: Record<CategoryFilter, string> = {
   all: "Alle",
   ...CATEGORY_LABELS,
 };
@@ -30,7 +30,12 @@ const ORIGIN_LABELS: Record<Exclude<LibraryFilter, "tenant">, string> = {
   reverse: "Rollentausch",
 };
 
-const BASE_ORIGINS = ["all", "standard", "own", "followUp", "reverse"] as const;
+/** The order the chips are shown in, the company's among them rather than
+ * appended after. Not the order of the grid — that is alphabetical — but the
+ * order the kinds are met in: everything, then what ships, then what the User
+ * wrote, then what their company shared, and last the two the system builds
+ * out of a finished training, which exist only once there has been one. */
+const ORIGIN_ORDER = ["all", "standard", "own", "tenant", "followUp", "reverse"] as const;
 
 /** How many tiles the collapsed grid shows: two full rows of three. The seeded
  * library alone is seventeen rows deep, and a selection screen that opens on
@@ -91,10 +96,10 @@ interface LibraryPickerProps {
    * (ADR 0076), so the card carries no separate edit affordance -- not even
    * on the caller's own rows, where it used to sit. */
   onInfo: (id: string) => void;
-  /** Offer the Zufallsszenario tile (F-62). Decided by the caller, not here:
-   * the tile stands outside both filters, and `items` has already been through
-   * them — an empty grid under one chip says nothing about whether there is
-   * anything in the library to draw. */
+  /** Offer the Zufallsszenario tile (F-62). Decided by the caller, not here,
+   * because the tile draws from what these filters show and `items` is that
+   * set *after* the two `slice`s below have had it — the caller is the one
+   * place that still knows how many drawable rows there really are. */
   offerRandom?: boolean;
 }
 
@@ -189,17 +194,18 @@ export default function LibraryPicker({
   const shown = expanded ? items : items.slice(0, cards);
   const randomSelected = selectedId === RANDOM_SCENARIO_ID;
 
-  const originOptions: FilterOption<LibraryFilter>[] = [
-    ...BASE_ORIGINS.map((f) => ({
-      value: f as LibraryFilter,
-      label: ORIGIN_LABELS[f],
-      count: originCounts[f],
-    })),
-    // Only for a caller who has colleagues to share with (ADR 0060).
-    ...(tenantName
-      ? [{ value: "tenant" as LibraryFilter, label: tenantName, count: originCounts.tenant }]
-      : []),
-  ];
+  const originOptions: FilterOption<LibraryFilter>[] = ORIGIN_ORDER.flatMap((f) => {
+    // The company's chip is the one that can be absent — it is offered only to
+    // a caller who has colleagues to share with (ADR 0060), and it is labelled
+    // with the company's own name rather than a static word. `flatMap` so it
+    // drops out of the middle of the row without leaving a gap.
+    if (f === "tenant") {
+      return tenantName
+        ? [{ value: f as LibraryFilter, label: tenantName, count: originCounts.tenant }]
+        : [];
+    }
+    return [{ value: f as LibraryFilter, label: ORIGIN_LABELS[f], count: originCounts[f] }];
+  });
 
   const categoryOptions: FilterOption<CategoryFilter>[] = CATEGORY_FILTERS.map((c) => ({
     value: c,
@@ -241,14 +247,13 @@ export default function LibraryPicker({
         </div>
       </div>
 
-      {items.length === 0 && (
-        <p className="library-empty">
-          {filter === "followUp"
-            ? "Zu dieser Auswahl gibt es noch kein Folgeszenario."
-            : filter === "reverse"
-              ? "Noch kein Rollentausch. Sie erstellen einen nach einem Gespräch, unter der Auswertung."
-              : "Zu dieser Auswahl gibt es kein Szenario."}
-        </p>
+      {items.length === 0 && !offerRandom && (
+        // Only when the grid is genuinely bare. The pool is drawn from this
+        // same filtered set, so an empty `items` already implies no tile —
+        // the second condition is there because this line saying "kein
+        // Szenario" above a visible card is exactly what got it removed once
+        // before, and that must not come back through a changed caller.
+        <p className="library-empty">Zu dieser Auswahl gibt es kein Szenario.</p>
       )}
 
       <div className="persona-grid scenario-grid">

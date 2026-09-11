@@ -240,14 +240,16 @@ def test_scenario_row_maps_the_case_fields():
             short_description="Der Kunde erwägt zu kündigen.",
             description="The customer is calling to say they are considering cancelling.",
             case_facts="14 licences, 1,180 euros a month since March last year.",
-            call_goal="Get the price down, or a clear reason why not.",
-            success_condition="Settled once a specific figure with a date is committed to.",
+            call_goal=(
+                "Get the price down, or a clear reason why not. Settled once a "
+                "specific figure with a date is committed to."
+            ),
         )
     )
     assert scenario.case_facts == "14 licences, 1,180 euros a month since March last year."
-    assert scenario.call_goal == "Get the price down, or a clear reason why not."
-    assert scenario.success_condition == (
-        "Settled once a specific figure with a date is committed to."
+    assert scenario.call_goal == (
+        "Get the price down, or a clear reason why not. Settled once a "
+        "specific figure with a date is committed to."
     )
 
 
@@ -284,7 +286,6 @@ def test_seeded_scenarios_carry_the_case():
     for entry in SEED.SCENARIOS:
         assert entry["case_facts"].strip(), f"{entry['id']}: no case facts"
         assert entry["call_goal"].strip(), f"{entry['id']}: no call goal"
-        assert entry["success_condition"].strip(), f"{entry['id']}: no success condition"
 
 
 def test_seeded_scenario_context_does_not_carry_the_trainer_objective():
@@ -390,7 +391,7 @@ def test_scenario_row_maps_its_category():
     what `/api/scenarios` badges the card from."""
     row = models.Scenario(
         key="row-category", title="t", short_description="s", description="d",
-        case_facts="", call_goal="", success_condition="", category="requirements",
+        case_facts="", call_goal="", category="requirements",
     )
     assert _to_scenario(row).category == "requirements"
     row.category = None
@@ -414,9 +415,9 @@ _GERMAN_ONLY = re.compile(
     re.IGNORECASE,
 )
 
-# The four fields interpolated into the system prompt (ADR 0045). `name` and
+# The three fields interpolated into the system prompt (ADR 0045). `name` and
 # `short_description` are display text and stay German on purpose.
-_PROMPT_FIELDS = ("description", "case_facts", "call_goal", "success_condition")
+_PROMPT_FIELDS = ("description", "case_facts", "call_goal")
 
 
 @pytest.mark.parametrize("entry", SEED.SCENARIOS, ids=lambda e: e["id"])

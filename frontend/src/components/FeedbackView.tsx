@@ -22,9 +22,14 @@ import InfoDetails from "./InfoDetails";
 import LoudnessCourse from "./LoudnessCourse";
 
 /** What a screen can do with the follow-up Scenario (F-60): open it in the
- * editor, or start it as the next call. Both belong to whoever owns the screen,
- * so they are passed in — the post-call screen starts the call itself, the
- * history hands the pairing to the training flow.
+ * start it as the next call. That belongs to whoever owns the screen, so it is
+ * passed in — the post-call screen starts the call itself, the history hands
+ * the pairing to the training flow.
+ *
+ * There is no edit beside it: a follow-up is the exercise one reading of the
+ * wrap-up produced (ADR 0069), and the write routes refuse it the way they
+ * refuse a reverse. Removing it is the one thing left to do with one, and that
+ * is offered where a reverse's is — in the info panel behind its card.
  *
  * `onStart` gets the Persona too: the follow-up is played against the same
  * partner as the training it came out of, so there is nothing left to choose.
@@ -34,7 +39,6 @@ import LoudnessCourse from "./LoudnessCourse";
  * for the screen's own copy of the library, which does not hold the new row
  * yet and is what "Starten" reads its names off. */
 export interface FollowUpActions {
-  onEdit: (scenarioId: string) => void;
   onStart: (scenarioId: string, personaId: string) => void;
   onCreated?: (() => void) | undefined;
 }
@@ -60,6 +64,23 @@ const ASPECT_LEADS: Record<MetricAspect, string> = {
     "Der Zuschnitt des Gesprächs: wie viel Raum Sie eingenommen und wie viel Sie " +
     "gefragt haben.",
 };
+
+/**
+ * How many times the User has to have spoken before the two offers under
+ * "Nächste Schritte" appear at all.
+ *
+ * Both build a new exercise out of *this* call: the follow-up carries the case
+ * forward from where it ended (ADR 0069), the reverse replays it from the other
+ * side (ADR 0070). A call that was hung up after a sentence or two has no
+ * "where it ended" to carry anywhere — it would cost a model call and the
+ * better part of a minute to produce an exercise drafted from nothing. So they
+ * are not offered there rather than offered and disappointing.
+ *
+ * Counted in the User's own utterances: `turns` is the stored transcript, one
+ * row per speaker (ADR 0051), so the Persona's greeting and its answer to a
+ * single "Hallo?" would otherwise make three on their own.
+ */
+const MIN_USER_TURNS = 3;
 
 /** Everything that is not a finished wrap-up is a one-line notice. There is
  * no entry for "ready": the hook reports it only once feedback is present. */
@@ -196,6 +217,8 @@ export function FeedbackReport({
   if (!feedback) return null;
 
   const improvements = feedback.points.filter((p) => p.kind === "improvement");
+  const spokenTurns = turns.filter((turn) => turn.speaker === "user").length;
+  const longEnough = spokenTurns >= MIN_USER_TURNS;
 
   // Built here rather than inline below so that "is there anything to offer?"
   // and "what is on offer?" are the same question asked once — the row must
@@ -204,7 +227,7 @@ export function FeedbackReport({
   // Only where the wrap-up named something to work on: those points are the
   // follow-up's whole input, and the route refuses without them (ADR 0069).
   const followUpOffer =
-    followUp && improvements.length > 0 ? (
+    followUp && longEnough && improvements.length > 0 ? (
       <FollowUp
         scenario={detail.follow_up}
         personaId={detail.persona_id}
@@ -213,13 +236,17 @@ export function FeedbackReport({
       />
     ) : null;
   // No condition on the points: a reverse copies the case that was played, so
-  // it is available for any call that happened — except a reverse itself, which
-  // is already the other way round (ADR 0070).
+  // it is available for any call that was actually conducted — except a reverse
+  // itself, which is already the other way round (ADR 0070).
   const reverseOffer =
-    onReverse && sessionId && !detail.reverse ? (
+    onReverse && longEnough && sessionId && !detail.reverse ? (
       <Reverse sessionId={sessionId} onReverse={onReverse} />
     ) : null;
 
+  // First in the report, so that on the post-call screen it lands directly
+  // under the title: which Scenario, against which Persona. It sat below the
+  // transcript for a while — not because it moved, but because the transcript
+  // section was above the report and has since gone.
   return (
     <>
       <div className="feedback-meta" aria-label="Trainingsdetails">
@@ -262,8 +289,9 @@ export function FeedbackReport({
       {/* Last, because it is what to do *after* reading all of the above. The
           two are side by side: they are alternatives, and stacked they read as
           a sequence. Either can be absent — a wrap-up with no improvement
-          points has no follow-up to offer, and a reverse cannot be reversed
-          again — and whichever is left then takes the full width on its own. */}
+          points has no follow-up to offer, a reverse cannot be reversed
+          again, and a call too short to build anything out of offers neither —
+          and whichever is left then takes the full width on its own. */}
       {(followUpOffer || reverseOffer) && (
         <section className="feedback-section">
           <SectionHeading eyebrow="WIE ES WEITERGEHT" title="Nächste Schritte" />
@@ -430,7 +458,6 @@ function FollowUp({
   scenario,
   personaId,
   sessionId,
-  onEdit,
   onStart,
   onCreated,
 }: {
@@ -507,9 +534,6 @@ function FollowUp({
         >
           Starten
         </button>
-        <button type="button" className="follow-up-draft" onClick={() => onEdit(card.id)}>
-          Bearbeiten
-        </button>
       </div>
       <p className="follow-up-note">
         „Starten“ ruft denselben Gesprächspartner wie in diesem Training an – ohne
@@ -522,7 +546,8 @@ function FollowUp({
 /** "Rollen tauschen" (F-61, ADR 0070): the same call from the other side.
  *
  * Two presses, not one, and the same two the follow-up beside it takes:
- * *Rollen tauschen* writes the Scenario, *Gespräch starten* begins the call.
+ * *Rollen tauschen* writes the Scenario, *Starten* begins the call — the same
+ * word the follow-up beside it uses, because it is the same second press.
  * Preparing it takes a model call and the better part of a minute, so the
  * button that starts a conversation must not be the one that was pressed
  * before there was anything to start — and the User gets to read what came
@@ -568,13 +593,19 @@ function Reverse({
         </p>
         <p className="follow-up-name">{created.name}</p>
         <p className="follow-up-teaser">{created.short_description}</p>
-        <button
-          type="button"
-          className="follow-up-button"
-          onClick={() => onReverse(created)}
-        >
-          Gespräch starten
-        </button>
+        {/* In the same row wrapper the follow-up's button sits in, rather
+            than bare under the teaser: that is where the 0.9rem above it comes
+            from, and sharing the wrapper is what keeps the two offers spaced
+            alike without the number being written twice. */}
+        <div className="follow-up-actions">
+          <button
+            type="button"
+            className="follow-up-button"
+            onClick={() => onReverse(created)}
+          >
+            Starten
+          </button>
+        </div>
         <p className="follow-up-note">
           Sie rufen an, die KI nimmt ab — mit demselben Gesprächspartner wie in diesem
           Training.

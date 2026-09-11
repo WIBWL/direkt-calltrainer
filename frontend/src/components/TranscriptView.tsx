@@ -2,7 +2,6 @@ import { useState, type ReactNode } from "react";
 
 import type { TranscriptEntry } from "../protocol";
 import { downloadTranscriptPdf } from "../utils/transcriptPdf";
-import { SectionHeading } from "./FeedbackView";
 
 interface TranscriptViewProps {
   transcript: TranscriptEntry[];
@@ -67,57 +66,34 @@ export default function TranscriptView({
           </p>
         )}
       </div>
-      <section className="feedback-section">
-        <SectionHeading
-          eyebrow="GESPRÄCH IM DETAIL"
-          title="Vollständiges Transkript"
-          aside={`${transcript.length} Beiträge`}
-        />
-
-        <div className="feedback-box transcript-download">
-          {transcript.length === 0 ? (
-            <p className="transcript-empty">Es wurden keine Beiträge aufgezeichnet.</p>
-          ) : (
-            <>
-              <p className="transcript-download-lead">
-                Das vollständige Protokoll dieses Gesprächs — jeder Beitrag mit Zeitmarke,
-                in der Reihenfolge, in der er gesprochen wurde.
-              </p>
-
-              <button
-                type="button"
-                className="follow-up-button"
-                disabled={busy}
-                onClick={download}
-              >
-                {busy ? "PDF wird erstellt …" : "Transkript als PDF herunterladen"}
-              </button>
-
-              {failed && (
-                <p className="follow-up-error">
-                  Das PDF konnte nicht erstellt werden. Bitte versuchen Sie es erneut.
-                </p>
-              )}
-
-              {/* Said because it is true and because it is easy to forget once
-                  a file is on the desktop: this one carries what was said. */}
-              <p className="transcript-download-note">
-                Die Datei wird auf Ihrem Gerät erzeugt und nicht hochgeladen. Sie enthält den
-                gesprochenen Inhalt des Trainings — bewahren Sie sie entsprechend auf.
-              </p>
-            </>
-          )}
-        </div>
-      </section>
-
-
       {feedback}
 
+      {/* Both are what to do once the reading is done, so they share the row
+          rather than the download having a section of its own. It had one: a
+          box explaining what a transcript is, above a report that comments on
+          it. The button says what it does. */}
       <div className="feedback-actions">
         <button className="back-to-start-button" type="button" onClick={onRestart}>
           Zur Startseite
         </button>
+
+        {transcript.length > 0 && (
+          <button
+            type="button"
+            className="back-to-start-button"
+            disabled={busy}
+            onClick={download}
+          >
+            {busy ? "PDF wird erstellt …" : "Transkript als PDF herunterladen"}
+          </button>
+        )}
       </div>
+
+      {failed && (
+        <p className="follow-up-error transcript-download-error">
+          Das PDF konnte nicht erstellt werden. Bitte versuchen Sie es erneut.
+        </p>
+      )}
     </>
   );
 }

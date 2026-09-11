@@ -45,8 +45,10 @@ _NEW = {
     ),
     "description": "The customer is calling to demand a discount.",
     "case_facts": "Contract runs to March, 40 seats, last raised 8 percent.",
-    "call_goal": "Get 20 percent off or a real reason why not.",
-    "success_condition": "Settled once a figure and a date are named.",
+    "call_goal": (
+        "Get 20 percent off or a real reason why not. Settled once a figure "
+        "and a date are named."
+    ),
 }
 
 
@@ -141,16 +143,15 @@ async def test_a_built_in_is_readable_but_not_editable(client, as_user):
 
 async def test_a_built_in_withholds_the_callers_intent(client, as_user):
     """ADR 0076: `description` and `case_facts` are the situation and come
-    up in the call anyway; `call_goal` and `success_condition` are what the
-    caller wants and when the exercise is over. Reading those in advance
-    would hand the trainee the answer, so a built-in serves them as None --
-    None rather than "", so "withheld" stays distinguishable from "empty"."""
+    up in the call anyway; `call_goal` is what the caller wants and the bar
+    that ends the exercise. Reading that in advance would hand the trainee the
+    answer, so a built-in serves it as None -- None rather than "", so
+    "withheld" stays distinguishable from "empty"."""
     as_user(ALICE)
     built_in_id = (await client.get("/api/scenarios")).json()[0]["id"]
     detail = (await client.get(f"/api/scenarios/{built_in_id}")).json()
 
     assert detail["call_goal"] is None
-    assert detail["success_condition"] is None
     # The situation is served, and the seed gives every built-in one.
     assert detail["description"]
 
@@ -164,7 +165,6 @@ async def test_my_own_scenario_withholds_nothing(client, as_user):
     detail = (await client.get(f"/api/scenarios/{new_id}")).json()
     assert detail["editable"] is True
     assert detail["call_goal"] == _NEW["call_goal"]
-    assert detail["success_condition"] == _NEW["success_condition"]
 
 
 async def test_an_oversize_field_is_rejected(client, as_user):
@@ -182,7 +182,7 @@ async def test_field_limits_endpoint_reports_the_api_caps(client, as_user):
 
     assert set(limits) == {
         "name", "short_description", "briefing", "description",
-        "case_facts", "call_goal", "success_condition",
+        "case_facts", "call_goal",
     }
     assert limits["name"] == FIELD_LIMITS["title"]
     assert limits["case_facts"] == FIELD_LIMITS["case_facts"]
@@ -249,7 +249,6 @@ async def test_sharing_makes_it_visible_to_a_colleague_not_to_other_companies(
     assert detail["editable"] is False
     # Nothing is withheld from a colleague: only a built-in withholds.
     assert detail["call_goal"] == _NEW["call_goal"]
-    assert detail["success_condition"] == _NEW["success_condition"]
     assert (await client.patch(f"/api/scenarios/{new_id}", json=_NEW)).status_code == 404
 
     # Someone in another company still does not see it.

@@ -211,7 +211,6 @@ def _seed_scenarios(db: DbSession) -> int:
                  "description_label": clean(s["description_label"]),
                  "case_facts_label": clean(s["case_facts_label"]),
                  "call_goal": clean(s["call_goal"]),
-                 "success_condition": clean(s["success_condition"]),
                  # Not cleaned: a closed vocabulary, not authored prose, and
                  # the CHECK constraint is what validates it (ADR 0072).
                  "category": s["category"],

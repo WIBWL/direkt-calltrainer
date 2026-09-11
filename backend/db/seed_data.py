@@ -379,7 +379,7 @@ PERSONAS = [
             "a yes settles the point for you"
         ),
         "training_goal": (
-            "Verständlich erklären ohne Fachjargon (F-40): Der Nutzer muss "
+            "Verständlich erklären ohne Fachjargon: Der Nutzer muss "
             "Fachbegriffe in Bilder übersetzen, statt sie mit weiteren "
             "Fachbegriffen zu erklären."
         ),
@@ -410,9 +410,11 @@ PERSONAS = [
 # English call context the model reads, which is what lets any Persona run any
 # Scenario regardless of the language that Persona speaks.
 #
-# Four prompt fields (ADR 0045): "description" is the situation, and
-# "case_facts"/"call_goal"/"success_condition" are the case. Two authoring rules
-# hold them together:
+# Three prompt fields (ADR 0045): "description" is the situation, and
+# "case_facts"/"call_goal" are the case. "call_goal" says both what the caller
+# wants and the bar they judge it by -- they were two fields until the split
+# proved to be one the editor imposed and nothing else read. Two authoring
+# rules hold them together:
 #   * The facts are about the *case*, never about the caller (no name, no
 #     employer, no motive), because both Personas have to be able to carry
 #     them (ADR 0001, ADR 0015).
@@ -421,14 +423,14 @@ PERSONAS = [
 #     being told to keep itself as a customer.
 #
 # "briefing" (ADR 0054) is the third audience: display text addressed to the
-# *trainee*, never to the model. The four fields above brief the caller; this
+# *trainee*, never to the model. The three fields above brief the caller; this
 # one briefs whoever picks up the phone, and it says three things and stops --
 # the role they answer in, the room they have (what may be offered, promised or
 # escalated), and what counts as a good outcome. What to say is not its
 # business: told that, the trainee reads a script and the exercise stops being
-# a conversation (R-43). It has to agree with "success_condition", because the
-# two describe one case from two sides -- a briefing that offers what the
-# caller's bar does not recognise makes the call unwinnable in a way neither
+# a conversation (R-43). It has to agree with the bar inside "call_goal",
+# because the two describe one case from two sides -- a briefing that offers
+# what the caller would not accept makes the call unwinnable in a way neither
 # field reveals on its own.
 #
 # "description_label" and "case_facts_label" are the German twins of the two
@@ -512,10 +514,8 @@ SCENARIOS = [
             "Support am nächsten Werktag."
         ),
         "call_goal": (
-            "Find out what is actually happening with the ticket and get a "
-            "date by which the export works again."
-        ),
-        "success_condition": (
+            "Find out what is actually happening with the ticket and get a date "
+            "by which the export works again. The matter is settled when "
             "someone names what is wrong and when it will be fixed, or says "
             "plainly that it cannot be fixed and what happens instead. A "
             "promise to look into it is not enough on its own, because that "
@@ -566,14 +566,12 @@ SCENARIOS = [
             "scheinbar denselben Umfang rund 800 Euro genannt."
         ),
         "call_goal": (
-            "Get the price down, or get a clear reason why it cannot come "
-            "down. Cancelling is a real option and one you say out loud."
-        ),
-        "success_condition": (
-            "a specific figure is committed to together with a date it takes "
-            "effect from, or it is stated plainly that there will be no "
-            "reduction and why. An offer to check internally and come back can "
-            "be a result too."
+            "Get the price down, or get a clear reason why it cannot come down. "
+            "Cancelling is a real option and one you say out loud. The matter "
+            "is settled when a specific figure is committed to together with a "
+            "date it takes effect from, or it is stated plainly that there will "
+            "be no reduction and why. An offer to check internally and come "
+            "back can be a result too."
         ),
     },
     # --- Beschwerde und Eskalation (Nutzer sitzt im Support) -------------
@@ -632,15 +630,13 @@ SCENARIOS = [
         ),
         "call_goal": (
             "Find out why the fix did not hold, and get a commitment on what "
-            "happens now, both to the service itself and to the service "
-            "credit April has earned."
-        ),
-        "success_condition": (
-            "the actual cause of the repeat failure is named and a dated next "
-            "step is committed to, and the service credit for April is either "
-            "confirmed or plainly refused with a reason. Another assurance "
-            "that it is fixed, with nothing behind it, is word for word what "
-            "was said after the second outage."
+            "happens now, both to the service itself and to the service credit "
+            "April has earned. The matter is settled when the actual cause of "
+            "the repeat failure is named and a dated next step is committed to, "
+            "and the service credit for April is either confirmed or plainly "
+            "refused with a reason. Another assurance that it is fixed, with "
+            "nothing behind it, is word for word what was said after the second "
+            "outage."
         ),
     },
     # --- Terminvereinbarung und Ausbau (Nutzer sitzt im Vertrieb) ---------
@@ -693,12 +689,10 @@ SCENARIOS = [
             "Vorführung beide frei."
         ),
         "call_goal": (
-            "Get a price for the full 30 users and a walkthrough "
-            "actually scheduled, before the budget window closes on 30 June."
-        ),
-        "success_condition": (
-            "a price for 30 users is named and a specific day and "
-            "time for the walkthrough is agreed. An offer to send something "
+            "Get a price for the full 30 users and a walkthrough actually "
+            "scheduled, before the budget window closes on 30 June. The matter "
+            "is settled when a price for 30 users is named and a specific day "
+            "and time for the walkthrough is agreed. An offer to send something "
             "over is only a result if a date comes with it."
         ),
     },
@@ -758,14 +752,12 @@ SCENARIOS = [
         ),
         "call_goal": (
             "Get the agreement confirmed the way you understood it, and a "
-            "signature under way before your internal approval expires on "
-            "6 June."
-        ),
-        "success_condition": (
-            "the terms are confirmed as you understood them, or you are told "
-            "where they actually differ and why, and a step towards "
-            "signature is agreed with a date on it. Checking back with the "
-            "colleague first is a result too, as long as a date comes with it."
+            "signature under way before your internal approval expires on 6 "
+            "June. The matter is settled when the terms are confirmed as you "
+            "understood them, or you are told where they actually differ and "
+            "why, and a step towards signature is agreed with a date on it. "
+            "Checking back with the colleague first is a result too, as long as "
+            "a date comes with it."
         ),
     },
     # --- Aus dem Szenariokatalog: Profil A, Betrieb und Betreuung ---------
@@ -825,13 +817,11 @@ SCENARIOS = [
         ),
         "call_goal": (
             "Find out what version 4.2 broke and get a date by which the "
-            "invoices are assigned again, in time for the close on 18 September."
-        ),
-        "success_condition": (
-            "a cause and a date are named, or it is said plainly that it will "
-            "not be running before 18 September, together with what applies to "
-            "the invoices left over. A promise to look into it is not a result "
-            "on its own."
+            "invoices are assigned again, in time for the close on 18 "
+            "September. The matter is settled when a cause and a date are "
+            "named, or it is said plainly that it will not be running before 18 "
+            "September, together with what applies to the invoices left over. A "
+            "promise to look into it is not a result on its own."
         ),
     },
     # S-02. C-05 is met by a case that carries its own facts: the changeover is
@@ -893,14 +883,12 @@ SCENARIOS = [
             "informiert sind, weiß der Anrufer nicht."
         ),
         "call_goal": (
-            "Have it explained in plain words what has to be done before "
-            "31 March and what it will cost, in words a non-technical person "
-            "can repeat back."
-        ),
-        "success_condition": (
-            "three concrete steps are named that the caller can repeat back in "
-            "their own words. A pointer to documentation, or a term that is "
-            "left unexplained, does not count."
+            "Have it explained in plain words what has to be done before 31 "
+            "March and what it will cost, in words a non-technical person can "
+            "repeat back. The matter is settled when three concrete steps are "
+            "named that the caller can repeat back in their own words. A "
+            "pointer to documentation, or a term that is left unexplained, does "
+            "not count."
         ),
     },
     # S-03. The one case the catalogue records as evidenced from both pilot
@@ -961,11 +949,10 @@ SCENARIOS = [
             "möglichst noch dieses Jahr."
         ),
         "call_goal": (
-            "Find out whether this is feasible at all and what happens next."
-        ),
-        "success_condition": (
-            "the caller can say what happens next, who does it and when. A "
-            "general statement that it is feasible is not enough."
+            "Find out whether this is feasible at all and what happens next. "
+            "The matter is settled when the caller can say what happens next, "
+            "who does it and when. A general statement that it is feasible is "
+            "not enough."
         ),
     },
     # S-04. R-07's case: the one customer type quoted verbatim in the pilot
@@ -1023,13 +1010,12 @@ SCENARIOS = [
         ),
         "call_goal": (
             "Get the second approval step made, without any additional cost. "
-            "The change two years ago is the precedent to point at."
-        ),
-        "success_condition": (
-            "either it is agreed at no charge, or the reason for billing it is "
-            "given in a way the caller can repeat back, and the difference from "
-            "the goodwill change two years ago is addressed. A bare \"that is "
-            "not covered\", with no reason behind it, is not one."
+            "The change two years ago is the precedent to point at. The matter "
+            "is settled when either it is agreed at no charge, or the reason "
+            "for billing it is given in a way the caller can repeat back, and "
+            "the difference from the goodwill change two years ago is "
+            "addressed. A bare \"that is not covered\", with no reason behind it, "
+            "is not one."
         ),
     },
     # S-05. R-06's emotional case. The five hours of downtime and the silence
@@ -1086,13 +1072,10 @@ SCENARIOS = [
         ),
         "call_goal": (
             "Get a time by which Kontura Archive is back, and a name for who is "
-            "dealing with it."
-        ),
-        "success_condition": (
-            "a name and a time are given, or it is said openly that neither is "
-            "settled yet, together with a commitment to when it will be. A "
-            "second callback promise with no time on it is what already "
-            "happened at 09:05."
+            "dealing with it. The matter is settled when a name and a time are "
+            "given, or it is said openly that neither is settled yet, together "
+            "with a commitment to when it will be. A second callback promise "
+            "with no time on it is what already happened at 09:05."
         ),
     },
     # S-07. Trains the ground F-54 sits on: the summary at the end of a call.
@@ -1153,13 +1136,10 @@ SCENARIOS = [
         ),
         "call_goal": (
             "Be sure both sides mean the same thing before anything is put in "
-            "writing."
-        ),
-        "success_condition": (
-            "the recap covers all four points, and the test data is named "
-            "clearly enough for the caller to notice they had it the wrong way "
-            "round and put it right. A recap general enough for both readings to "
-            "fit is not a result."
+            "writing. The matter is settled when the recap covers all four "
+            "points, and the test data is named clearly enough for the caller "
+            "to notice they had it the wrong way round and put it right. A "
+            "recap general enough for both readings to fit is not a result."
         ),
     },
     # --- Aus dem Szenariokatalog: Profil B, Beratung und Einführung --------
@@ -1229,11 +1209,10 @@ SCENARIOS = [
             "beiden Freigabewege für dasselbe und beschreibt sie auch so."
         ),
         "call_goal": (
-            "Explain how the check works today and find out what happens next."
-        ),
-        "success_condition": (
-            "the steps have been played back and the difference between the two "
-            "ways of releasing has been named out loud."
+            "Explain how the check works today and find out what happens next. "
+            "The matter is settled when the steps have been played back and the "
+            "difference between the two ways of releasing has been named out "
+            "loud."
         ),
     },
     # S-09. R-12's ground on the Scenario side: three reservations that each
@@ -1294,12 +1273,10 @@ SCENARIOS = [
         ),
         "call_goal": (
             "Test whether the three reservations can be answered with something "
-            "concrete, before the steering group meets on 14 November."
-        ),
-        "success_condition": (
-            "each of the three reservations has either a concrete answer or is "
-            "named openly as a risk. A blanket assurance that it will not be a "
-            "problem does not count for any of them."
+            "concrete, before the steering group meets on 14 November. The "
+            "matter is settled when each of the three reservations has either a "
+            "concrete answer or is named openly as a risk. A blanket assurance "
+            "that it will not be a problem does not count for any of them."
         ),
     },
     # S-10. R-10, and the sharpest case in the library for the sales/no-sales
@@ -1358,12 +1335,10 @@ SCENARIOS = [
         ),
         "call_goal": (
             "Get 15 percent off the annual figure. The competing quote is the "
-            "lever, not the point."
-        ),
-        "success_condition": (
-            "a figure is committed to with a date it is valid until, or it is "
-            "stated plainly that there will be no discount and why. An offer "
-            "to check internally is not a result."
+            "lever, not the point. The matter is settled when a figure is "
+            "committed to with a date it is valid until, or it is stated "
+            "plainly that there will be no discount and why. An offer to check "
+            "internally is not a result."
         ),
     },
     # S-11. R-08's other half, and R-04 read the second way: the IT side is not
@@ -1421,12 +1396,9 @@ SCENARIOS = [
         ),
         "call_goal": (
             "Settle who decides what from here on, and who runs it once it is "
-            "live."
-        ),
-        "success_condition": (
-            "responsibility, the approval path and who operates it are each "
-            "named. An assurance that IT will be involved in future, without "
-            "saying how, is not one."
+            "live. The matter is settled when responsibility, the approval path "
+            "and who operates it are each named. An assurance that IT will be "
+            "involved in future, without saying how, is not one."
         ),
     },
     # S-12. Systementwurf, not evidenced: plausible for the consulting profile
@@ -1492,9 +1464,7 @@ SCENARIOS = [
         ),
         "call_goal": (
             "Get an answer for each of the three questions that is solid enough "
-            "to quote in the audit on 11 December."
-        ),
-        "success_condition": (
+            "to quote in the audit on 11 December. The matter is settled when "
             "every question is either answered or expressly marked as open, "
             "with a commitment on who supplies it by when. An uncertain answer "
             "that sounds certain counts as not settled."
@@ -1553,13 +1523,11 @@ SCENARIOS = [
         ),
         "call_goal": (
             "Have 20 September confirmed, and if it does not hold, know what "
-            "applies instead and whether the consultant booked from 26 September "
-            "can still be used."
-        ),
-        "success_condition": (
-            "the date is confirmed, or a new one is named together with what "
-            "happens to the training and the consultant booked behind it. A new "
-            "date on its own leaves the cancellation deadline of 12 September "
+            "applies instead and whether the consultant booked from 26 "
+            "September can still be used. The matter is settled when the date "
+            "is confirmed, or a new one is named together with what happens to "
+            "the training and the consultant booked behind it. A new date on "
+            "its own leaves the cancellation deadline of 12 September "
             "unanswered."
         ),
     },

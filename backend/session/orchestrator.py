@@ -489,9 +489,9 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         # (ADR 0070): the criterion is the caller's either way, but there it is
         # the persona's to meet rather than to be satisfied by.
         if self._scenario.reverse:
-            criterion = self._scenario.success_condition.strip() or GENERIC_CRITERION_REVERSE
+            criterion = self._scenario.call_goal.strip() or GENERIC_CRITERION_REVERSE
             return SETTLEMENT_CHECK_REVERSE.format(criterion=criterion)
-        criterion = self._scenario.success_condition.strip() or GENERIC_CRITERION
+        criterion = self._scenario.call_goal.strip() or GENERIC_CRITERION
         return SETTLEMENT_CHECK.format(criterion=criterion)
 
     def _schedule_state_refresh(self, turn: Turn) -> None:

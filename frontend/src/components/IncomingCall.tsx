@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from "react";
 
 import { RINGTONE_CYCLE_MS, useRingtone } from "../hooks/useRingtone";
+import PersonaAvatar from "./PersonaAvatar";
 
 /**
  * The phone ringing between the microphone check and an ordinary call (F-63).
@@ -26,6 +27,12 @@ import { RINGTONE_CYCLE_MS, useRingtone } from "../hooks/useRingtone";
  * (WCAG 2.1 SC 1.4.2), and this project publishes an accessibility statement.
  * The choice is remembered, because someone who turns it off in an open-plan
  * office does not want to turn it off again before every call.
+ *
+ * It is the phone's own silent switch rather than a link under the device —
+ * the place a person already reaches for, and one fewer thing beside a screen
+ * that is meant to read as a phone and not as a page about one. The hit area
+ * is much larger than the sliver it draws, because the sliver is 3px wide and
+ * a target has to be 24px (WCAG 2.5.8).
  */
 
 /** Where the ringtone preference lives. Per browser, per person, and of no
@@ -46,16 +53,6 @@ function saveMuted(muted: boolean) {
   } catch {
     // see above; the toggle still works for this call
   }
-}
-
-/** Up to two letters, from a name that is a Persona's and therefore short.
- * Falls back to the first character rather than to a placeholder: a blank
- * circle on a ringing phone reads as something failing to load. */
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  const letters = parts.slice(0, 2).map((p) => p.charAt(0));
-  return letters.join("").toUpperCase();
 }
 
 /** The handset, as an arc with two thickened ends. Drawn rather than taken
@@ -81,16 +78,21 @@ function Handset({ declining = false }: { declining?: boolean }) {
 
 export default function IncomingCall({
   personaName,
+  personaAvatarUrl,
   onAccept,
   onDecline,
 }: {
   personaName: string;
+  /** `persona.avatar_url`; null falls back to the initials, as everywhere. */
+  personaAvatarUrl: string | null;
   onAccept: () => void;
   onDecline: () => void;
 }) {
   // Lazy initializer: read once on mount, not on every render.
   const [muted, setMuted] = useState(loadMuted);
   useRingtone(!muted);
+
+  const muteLabel = muted ? "Klingelton einschalten" : "Klingelton ausschalten";
 
   const toggleSound = () => {
     setMuted((was) => {
@@ -119,7 +121,10 @@ export default function IncomingCall({
           {/* The device's own hardware: the keys down its sides and the black
               pill in the display. Drawn because a phone without them reads as
               a blue rectangle with a name in it, which is what this was. */}
-          <span className="incoming-key incoming-key-silent" aria-hidden="true" />
+          <span
+            className={`incoming-key incoming-key-silent${muted ? " is-silenced" : ""}`}
+            aria-hidden="true"
+          />
           <span className="incoming-key incoming-key-up" aria-hidden="true" />
           <span className="incoming-key incoming-key-down" aria-hidden="true" />
           <span className="incoming-key incoming-key-power" aria-hidden="true" />
@@ -127,12 +132,16 @@ export default function IncomingCall({
           <div className="incoming-screen">
             <div className="incoming-island" aria-hidden="true" />
 
-            {/* The name and nothing else: a real phone shows who is calling,
-                not a caption saying that someone is. Who they are comes out in
-                the call, which is the exercise. */}
-            <div className="incoming-avatar" aria-hidden="true">
-              {initials(personaName)}
-            </div>
+            {/* The portrait and the name, which is what a phone shows: not a
+                caption saying that someone is calling. Who they *are* comes out
+                in the call, which is the exercise. Zoomed to head and
+                shoulders like the selection card's, because at 72px the whole
+                half-body shot leaves a face too small to recognise. */}
+            <PersonaAvatar
+              name={personaName}
+              src={personaAvatarUrl}
+              className="incoming-avatar"
+            />
 
             <p className="incoming-caller" id="incoming-title">
               {personaName}
@@ -166,15 +175,55 @@ export default function IncomingCall({
             </div>
           </div>
         </div>
+
+        {/* The silent switch's control: the label and the arrow are the target
+            as much as the switch is, which is what makes a 3px sliver
+            clickable without drawing it any bigger.
+
+            A sibling of the phone rather than a child of it, because the phone
+            shakes: 200px out from its centre, a 2° tilt swings text by about
+            7px, and a label that bobs is a label nobody reads. The sliver it
+            points at stays inside the device, where it belongs.
+
+            The name is on the button as well as on screen — the same words, so
+            WCAG 2.5.3 is satisfied either way — because the label is hidden on
+            narrow screens where the arm does not fit, and a hidden <span> takes
+            its text out of the accessibility tree with it. */}
+        <button
+          type="button"
+          className="incoming-mute-switch"
+          onClick={toggleSound}
+          aria-pressed={muted}
+          aria-label={muteLabel}
+          title={muteLabel}
+        >
+          <span className="incoming-mute-label" aria-hidden="true">
+            {muteLabel}
+          </span>
+
+          <svg className="incoming-mute-arrow" viewBox="0 0 44 12" aria-hidden="true">
+            <path
+              d="M1 6 H39"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+            />
+            <path
+              d="M33.5 1.8 L39.6 6 L33.5 10.2"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
       </div>
 
       <p className="incoming-hint">
         Sobald Sie annehmen, meldet sich Ihr Gegenüber — reagieren Sie wie am Telefon.
       </p>
-
-      <button type="button" className="incoming-mute" onClick={toggleSound} aria-pressed={muted}>
-        {muted ? "Klingelton einschalten" : "Klingelton ausschalten"}
-      </button>
     </section>
   );
 }

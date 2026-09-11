@@ -20,6 +20,7 @@ import {
   type TextField,
   type Visibility,
 } from "../scenarioLibrary";
+import ConfirmDialog from "./ConfirmDialog";
 import ShareToggle from "./ShareToggle";
 
 interface ScenarioEditorProps {
@@ -54,12 +55,8 @@ const FIELDS: {
     placeholder: "Ein Satz für die Auswahlkarte",
     required: true,
   },
-  {
-    key: "briefing",
-    label: "Briefing für die trainierende Person (optional)",
-    placeholder: "Ihre Rolle, Ihr Spielraum, was ein gutes Ergebnis ist.",
-    multiline: true,
-  },
+  // Situation first, then the briefing: the case exists before the trainee's
+  // side of it does, and the two are read that way round in the info panel too.
   {
     key: "description",
     label: "Situation",
@@ -68,21 +65,24 @@ const FIELDS: {
     required: true,
   },
   {
-    key: "case_facts",
-    label: "Fakten des Falls (optional)",
-    placeholder: "Zahlen, Namen, Daten. Leer = Modell improvisiert.",
+    key: "briefing",
+    label: "Briefing für die trainierende Person (optional)",
+    placeholder: "Ihre Rolle, Ihr Spielraum, was ein gutes Ergebnis ist.",
     multiline: true,
   },
+  // Goal and bar in one field: a goal without the mark that settles it is half
+  // a case, and the caller weighs both the same way — silently, against what
+  // has actually been said.
   {
     key: "call_goal",
     label: "Ziel des Anrufs (optional)",
-    placeholder: "Was will der Anrufer erreichen?",
+    placeholder: "Was will der Anrufer erreichen, und woran ist das Anliegen geklärt?",
     multiline: true,
   },
   {
-    key: "success_condition",
-    label: "Erfolgsbedingung (optional)",
-    placeholder: "Woran ist das Anliegen geklärt?",
+    key: "case_facts",
+    label: "Fakten des Falls (optional)",
+    placeholder: "Zahlen, Namen, Daten. Leer = Modell improvisiert.",
     multiline: true,
   },
 ];
@@ -110,6 +110,7 @@ export default function ScenarioEditor({
   const [pdfNote, setPdfNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmingClose, setConfirmingClose] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // What the draft looked like when the editor opened (empty for a new
   // Scenario, the loaded row for an edit) — so a click outside only prompts
@@ -133,11 +134,12 @@ export default function ScenarioEditor({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (confirmingClose) setConfirmingClose(false);
+      else if (confirmingDelete) setConfirmingDelete(false);
       else dismiss();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dismiss, confirmingClose]);
+  }, [dismiss, confirmingClose, confirmingDelete]);
 
   useEffect(() => {
     let cancelled = false;
@@ -253,7 +255,7 @@ export default function ScenarioEditor({
 
   const handleDelete = async () => {
     if (scenarioId === null) return;
-    if (!window.confirm("Dieses Szenario wirklich löschen?")) return;
+    setConfirmingDelete(false);
     setSaving(true);
     setError(null);
     try {
@@ -272,13 +274,13 @@ export default function ScenarioEditor({
       onMouseDown={(e) => {
         // Only a press that both starts and ends on the backdrop itself — not a
         // text selection dragged out of the panel — counts as "click outside".
-        if (e.target === e.currentTarget && !confirmingClose) dismiss();
+        if (e.target === e.currentTarget && !confirmingClose && !confirmingDelete) dismiss();
       }}
     >
       <div className="editor-panel" role="dialog" aria-modal="true" aria-labelledby="editor-title">
         <div className="editor-scroll">
           <h2 id="editor-title">
-            {isNew ? "Neues Szenario" : "Szenario bearbeiten"}
+            {isNew ? "Neues Szenario anlegen" : "Szenario bearbeiten"}
           </h2>
 
           {loading ? (
@@ -286,31 +288,6 @@ export default function ScenarioEditor({
           ) : (
             <>
               <div className="editor-fields">
-                <label className="editor-field">
-                  <span className="editor-field-label">
-                    <span>Kategorie</span>
-                  </span>
-                  <select
-                    value={draft.category}
-                    onChange={(e) =>
-                      setDraft((d) => ({ ...d, category: e.target.value as CategoryChoice }))
-                    }
-                  >
-                    {/* Optional on purpose (ADR 0072): a Scenario that fits none
-                        of the three is better uncategorised than filed wrongly.
-                        It then shows under "Alle" and under no category. */}
-                    <option value="">Ohne Kategorie</option>
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {CATEGORY_LABELS[c]}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="editor-field-hint">
-                    Bestimmt, unter welchem Filter das Szenario in der Bibliothek auftaucht.
-                  </span>
-                </label>
-
                 {FIELDS.map((field) => {
                   const value = draft[field.key];
                   const limit = limits[field.key];
@@ -354,6 +331,41 @@ export default function ScenarioEditor({
                           />
                         )}
                       </label>
+
+                      {field.key === "short_description" && (
+                        <label className="editor-field">
+                          <span className="editor-field-label">
+                            <span>
+                              Kategorie
+                              <span aria-hidden="true"> *</span>
+                            </span>
+                          </span>
+                          <select
+                            value={draft.category}
+                            onChange={(e) =>
+                              setDraft((d) => ({
+                                ...d,
+                                category: e.target.value as CategoryChoice,
+                              }))
+                            }
+                          >
+                            {/* Marked like the other answers that have to be
+                                given, and "Ohne Kategorie" is one of them —
+                                which is why it is not in `canSave`: the field
+                                cannot be left unanswered, because it starts on
+                                a valid answer. A Scenario that fits none of the
+                                four is better uncategorised than filed wrongly
+                                (ADR 0072); it then shows under "Alle" and under
+                                no category. */}
+                            <option value="">Ohne Kategorie</option>
+                            {CATEGORIES.map((c) => (
+                              <option key={c} value={c}>
+                                {CATEGORY_LABELS[c]}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
 
                       {field.key === "case_facts" && (
                         <div className="pdf-upload">
@@ -402,7 +414,7 @@ export default function ScenarioEditor({
                   <button
                     type="button"
                     className="editor-delete"
-                    onClick={handleDelete}
+                    onClick={() => setConfirmingDelete(true)}
                     disabled={saving}
                   >
                     Löschen
@@ -427,29 +439,27 @@ export default function ScenarioEditor({
       </div>
 
       {confirmingClose && (
-        <div
-          className="editor-confirm"
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="editor-confirm-title"
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            if (e.target === e.currentTarget) setConfirmingClose(false);
-          }}
-        >
-          <div className="editor-confirm-box">
-            <h3 id="editor-confirm-title">Eingaben verwerfen?</h3>
-            <p>Deine Änderungen an diesem Szenario werden nicht gespeichert.</p>
-            <div className="editor-confirm-actions">
-              <button type="button" onClick={() => setConfirmingClose(false)}>
-                Weiter bearbeiten
-              </button>
-              <button type="button" className="editor-confirm-discard" onClick={onClose}>
-                Verwerfen
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title="Eingaben verwerfen?"
+          body="Deine Änderungen an diesem Szenario werden nicht gespeichert."
+          cancelLabel="Weiter bearbeiten"
+          confirmLabel="Verwerfen"
+          destructive
+          onCancel={() => setConfirmingClose(false)}
+          onConfirm={onClose}
+        />
+      )}
+
+      {confirmingDelete && (
+        <ConfirmDialog
+          title="Dieses Szenario wirklich löschen?"
+          body="Es verschwindet aus Ihrer Bibliothek. Bereits gespielte Trainings bleiben erhalten."
+          cancelLabel="Behalten"
+          confirmLabel="Löschen"
+          destructive
+          onCancel={() => setConfirmingDelete(false)}
+          onConfirm={() => void handleDelete()}
+        />
       )}
     </div>
   );

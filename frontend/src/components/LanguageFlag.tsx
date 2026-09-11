@@ -1,5 +1,5 @@
 /**
- * The flag beside a Persona's name: which language this one speaks.
+ * The flag on a Persona's language line: which language this one speaks.
  *
  * Drawn as SVG rather than written as a flag emoji, because Windows ships no
  * glyphs for those — Chrome and Edge there render 🇩🇪 as the letters "DE",

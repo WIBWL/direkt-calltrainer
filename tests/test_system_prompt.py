@@ -200,10 +200,8 @@ def _case_scenario(**overrides):
         ),
         "call_goal": (
             "Get the price down, or get a clear reason why not. Cancelling is a "
-            "real option and one you say out loud."
-        ),
-        "success_condition": (
-            "Settled once a specific figure with a date has been committed to. "
+            "real option and one you say out loud. The matter is settled once a "
+            "specific figure with a date has been committed to. "
             '"I will look into it" is not enough.'
         ),
     }
@@ -235,13 +233,14 @@ def test_prompt_carries_the_call_goal(persona):
     assert "What you want from this call" in prompt
 
 
-def test_prompt_carries_the_success_condition(persona):
+def test_prompt_carries_the_settlement_bar(persona):
     """ADR 0045: the observable condition under which the caller considers the
-    matter settled — the criterion [CALL_END] can be weighed against."""
+    matter settled — the criterion [CALL_END] can be weighed against. It rides
+    in `call_goal` since the goal and its bar were merged into one field."""
     scenario = _case_scenario()
     prompt = build_system_prompt(persona, scenario, GERMAN)
-    assert scenario.success_condition in prompt
-    assert "settled when" in prompt
+    assert scenario.call_goal in prompt
+    assert "when you count the matter settled" in prompt
 
 
 def test_prompt_never_carries_the_trainees_briefing(persona):
@@ -304,13 +303,12 @@ def test_prompt_omits_the_objection_block_for_a_persona_without_objections(perso
 def test_the_case_is_identical_for_every_persona_running_the_scenario():
     """ADR 0045's faustregel, and what keeps ADR 0001/0015 intact: the Scenario
     supplies the situation, the Persona only the manner. Both Personas get the
-    same facts, goal and condition."""
+    same facts and the same goal."""
     scenario = _case_scenario()
     for persona in TEST_PERSONAS:
         prompt = build_system_prompt(persona, scenario, get_pack(persona.language_id))
         assert scenario.case_facts in prompt
         assert scenario.call_goal in prompt
-        assert scenario.success_condition in prompt
 
 
 # --- Recognising that the call is over ------------------------------------
@@ -357,7 +355,7 @@ def test_prompt_forbids_re_asking_an_answered_question(prompt):
     assert "already answered is the same mistake" in lowered
 
 
-def test_success_condition_is_a_criterion_not_a_line_to_recite(persona):
+def test_settlement_bar_is_a_criterion_not_a_line_to_recite(persona):
     """ADR 0045: handed over bare, the condition was read out as a demand in
     every reply instead of being weighed against what the user had said."""
     prompt = build_system_prompt(persona, _case_scenario(), GERMAN)
@@ -386,8 +384,8 @@ def test_prompt_repeats_the_language_rule_where_the_case_is(persona):
     assert "no english words carried over" not in bare
 
 
-def test_no_usage_rule_without_a_success_condition(persona):
-    """ADR 0024: a user-authored Scenario may leave the condition blank, and
-    the rule for using it must not survive it."""
-    prompt = build_system_prompt(persona, _case_scenario(success_condition=""), GERMAN)
+def test_no_usage_rule_without_a_call_goal(persona):
+    """ADR 0024: a user-authored Scenario may leave the goal and its bar blank,
+    and the rule for using them must not survive it."""
+    prompt = build_system_prompt(persona, _case_scenario(call_goal=""), GERMAN)
     assert "check silently" not in prompt.lower()

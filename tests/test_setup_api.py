@@ -190,7 +190,6 @@ async def test_scenarios_endpoint_withholds_the_case(client):
         }
         assert "case_facts" not in entry
         assert "call_goal" not in entry
-        assert "success_condition" not in entry
 
 
 async def test_a_deactivated_scenario_is_not_offered(client):

@@ -43,8 +43,10 @@ FIELD_LIMITS = {
     "briefing": 600,
     "description": 500,
     "case_facts": 3000,
-    "call_goal": 500,
-    "success_condition": 500,
+    # The goal and the bar that settles it, in one field since the two were
+    # merged -- so the cap is the two old ones added together rather than one
+    # of them, which would have truncated every row that already held both.
+    "call_goal": 1000,
 }
 
 # The same caps under the names the client knows: the `title` column is the card

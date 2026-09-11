@@ -7,19 +7,24 @@ one of their own Sessions (ADR 0069). The list carries card fields only.
 
 `GET /api/scenarios/{id}` is the read view behind that list (ADR 0076): any
 Scenario the caller may select, with `editable` saying whether they may also
-open the editor on it. A built-in withholds `call_goal` and `success_condition`
-— the caller's intent and the mark by which the call is done are the answer key
-to the exercise (ADR 0043/0045). The *write* routes remain owner-scoped.
+open the editor on it. `call_goal` — the caller's intent and the bar that
+settles it — is the answer key to the exercise (ADR 0043/0045) and is withheld
+from a built-in. The *write* routes remain owner-scoped.
 
 `POST /api/scenarios/document` (F-58) is a stateless helper: it extracts an
 uploaded text-layer PDF and has the LLM condense it into a fact list for the
 editor's Fakten field (`backend/documents.py`), storing nothing.
 
-A reverse (ADR 0070) is one of these rows too, listed and read through the same
-routes and badged `own` like anything else the caller owns. It is written by
-`POST /api/sessions/{id}/reverse` and by nothing here: the write routes below
-refuse it, because a reverse copies a case that was actually played and
-carries a briefing built from its author's own wrap-up.
+A reverse (ADR 0070) and a follow-up (ADR 0069) are rows of this table too,
+listed and read through the same routes and badged `own` like anything else the
+caller owns. Each is written by its own route on the Session
+(`POST /api/sessions/{id}/reverse`, `.../follow-up`) and by nothing here: the
+edit and share routes below refuse both. A reverse copies a case that was
+actually played and carries a briefing built from its author's own wrap-up; a
+follow-up is drafted to sit exactly at that wrap-up's improvement point. In
+either case an edited row would no longer be the thing the Session produced,
+and a shared one would pass on a reading of the author's feedback. DELETE
+takes both: the one action left on them is removing them again.
 
 The wire vocabulary is English, matching the schema (ADR 0057, extended to this
 surface by ADR 0061). `backend/library.py` does the sanitising (ADR 0059); this
@@ -84,7 +89,6 @@ class ScenarioInput(BaseModel):
     description: str = _limited("description", required=True)
     case_facts: str = _limited("case_facts", required=False)
     call_goal: str = _limited("call_goal", required=False)
-    success_condition: str = _limited("success_condition", required=False)
     # Display/filter only (ADR 0072), never prompt input -- and a closed
     # vocabulary rather than the free text it replaces, so the value the
     # category filter runs on is one the database will accept. "" is the empty
@@ -150,13 +154,13 @@ def _card(scenario, subject: str) -> dict:
         "shared": scenario.visibility == VISIBILITY_TENANT,
         # Drafted from a Session's feedback (ADR 0069). A category of its own in
         # the library, carried beside `origin` rather than as a value of it: it
-        # is the caller's own Scenario in every other respect, editable and
-        # shareable like one.
+        # is the caller's own Scenario, but like a reverse it is neither
+        # editable nor shareable -- it is the exercise one reading of their
+        # feedback produced, and an edited one is no longer that.
         "follow_up": scenario.follow_up,
         # A reverse (ADR 0070) is `origin: "own"` like anything else the caller
         # owns; this is what separates it out into its own filter, and what
-        # tells the card not to offer an edit it would be refused. Unlike a
-        # follow-up it is neither editable nor shareable.
+        # tells the card not to offer an edit it would be refused.
         "reverse": scenario.reverse,
         "origin_session": _origin_session(scenario.origin_session),
     }
@@ -187,10 +191,10 @@ def _detail(scenario, subject: str) -> dict:
     may select. `editable` is what separates them, and it is decided here
     from the verified `sub` rather than taken from the client.
 
-    A built-in withholds `call_goal` and `success_condition` — None, not
-    "", so the client can tell "withheld" from "the author left it empty".
-    Those two are the caller's *intent* and the mark by which the call is
-    done; reading them in advance would hand the trainee the answer to the
+    A built-in withholds `call_goal` — None, not "", so the client can tell
+    "withheld" from "the author left it empty". That field is the caller's
+    *intent* and the bar by which the call is done; reading it in advance
+    would hand the trainee the answer to the
     exercise. `description` and `case_facts` are the situation, which comes
     up in the call anyway, so they are served. A Scenario the caller or a
     colleague authored withholds nothing: they wrote it, or work with the
@@ -217,7 +221,6 @@ def _detail(scenario, subject: str) -> dict:
         "description": scenario.description_label or scenario.description,
         "case_facts": scenario.case_facts_label or scenario.case_facts,
         "call_goal": None if built_in else scenario.call_goal,
-        "success_condition": None if built_in else scenario.success_condition,
         # "" rather than null, so the editor's select has a value to sit on.
         "category": scenario.category or "",
         # `public` for a built-in now that this route serves one. The editor
@@ -225,11 +228,19 @@ def _detail(scenario, subject: str) -> dict:
         "visibility": scenario.visibility,
         # Authorship, not visibility: a colleague's shared Scenario is
         # readable but not editable (ADR 0058 -- only the author may write).
-        # And a reverse is the caller's own yet still not editable: the write
-        # routes exclude it in their WHERE clause (ADR 0070), so a panel that
-        # offered the edit would open an editor whose Save answers 404.
-        "editable": scenario.created_by == subject and not scenario.reverse,
+        # And the two kinds built from a Session are the caller's own yet still
+        # not editable: the write routes exclude both in their WHERE clause
+        # (ADR 0069, ADR 0070), so a panel that offered the edit would open an
+        # editor whose Save answers 404.
+        "editable": (
+            scenario.created_by == subject and
+            not scenario.reverse and
+            not scenario.follow_up
+        ),
         "reverse": scenario.reverse,
+        # Beside `reverse` and for the same reason the panel needs it: these
+        # two are the rows whose only action is "Löschen".
+        "follow_up": scenario.follow_up,
         "origin_session": _origin_session(scenario.origin_session),
         # The German briefing the User reads during a reverse call; null on
         # every other row.

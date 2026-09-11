@@ -2,8 +2,8 @@
 
 A reverse replays one finished Session with the roles swapped, and the User
 walks into it holding what the Persona held: the situation, the facts of the
-case, what the caller wants, and the bar the caller counts as settled. Those
-four exist already — they are the Scenario's prompt fields — but they are
+case, and what the caller wants together with the bar they count as settled.
+Those exist already — they are the Scenario's prompt fields — but they are
 written in English, addressed to whoever is playing the caller, and phrased as
 instructions to a model. This module turns them into German prose addressed to
 the User, and adds the short checklist of goals — the concrete things to
@@ -46,8 +46,10 @@ logger = logging.getLogger(__name__)
 FIELD_LIMITS = {
     "situation": 600,
     "facts": 1500,
-    "goal": 400,
-    "settled": 400,
+    # The goal and the bar that settles it, in one field since the two were
+    # merged -- the two old caps added together, so a briefing that already
+    # held both is not truncated by it.
+    "goal": 800,
 }
 GOAL_LIMIT = 120
 MAX_GOALS = 5
@@ -69,7 +71,6 @@ class _Brief(BaseModel):
     situation: str = ""
     facts: str = ""
     goal: str = ""
-    settled: str = ""
     goals: list[str] = []
 
     def sanitised(self) -> dict:
@@ -95,10 +96,9 @@ def _material(
     description: str,
     case_facts: str,
     call_goal: str,
-    success_condition: str,
     improvements: list[str],
 ) -> str:
-    """What the model is given: the four fields to turn around, and — where a
+    """What the model is given: the three fields to turn around, and — where a
     wrap-up exists — what the coach asked the User to work on, which decides
     the order the goals come in. A Session whose wrap-up has not landed simply
     has no such lines, and the goals are read off the case alone."""
@@ -108,8 +108,7 @@ def _material(
         "",
         f"SITUATION: {description or '(none given)'}",
         f"FACTS OF THE CASE: {case_facts or '(none given)'}",
-        f"WHAT THE CALLER WANTED: {call_goal or '(none given)'}",
-        f"THE CALLER COUNTED IT SETTLED WHEN: {success_condition or '(none given)'}",
+        f"WHAT THE CALLER WANTED, AND WHAT SETTLED IT: {call_goal or '(none given)'}",
     ]
     if improvements:
         lines += [
@@ -159,16 +158,16 @@ def _messages(material: str) -> list[dict[str, str]]:
         "R4. Plain, short sentences, no headings and no lists inside these "
         "four fields. Each is one short paragraph.\n"
         "\n"
-        "# The four fields\n"
+        "# The three fields\n"
         "situation: where you are calling from and why, in two or three "
         "sentences.\n"
         "facts: what you know about the case — the concrete points, as short "
         "plain sentences, one after another in a single paragraph. This is "
         "the field they will glance at mid-call, so keep every figure and "
         "date the material gives and drop nothing.\n"
-        "goal: what you want out of this call.\n"
-        "settled: what has to have happened before you consider the matter "
-        "dealt with.\n"
+        "goal: what you want out of this call, and what has to have happened "
+        "before you consider the matter dealt with — the wish and the bar "
+        "in one field.\n"
         "\n"
         "# Rules for goals\n"
         "G1. Three to five items: the checklist of what this call has to "
@@ -183,7 +182,7 @@ def _messages(material: str) -> list[dict[str, str]]:
         "manner, tone, pace or attitude — those are not goals.\n"
         "G3. Draw them from the material and nothing else: the figures and "
         "dates in the facts that have to be said out loud, the questions the "
-        "case leaves open, and the bar in the settled field, which is always "
+        "case leaves open, and the bar named in the goal field, always "
         "among them. Invent no demand the material does not carry. Where "
         "coaching points are given, let them decide which goals come first — "
         "state each as the thing to achieve, never as a remark about how it "
@@ -201,20 +200,23 @@ def _messages(material: str) -> list[dict[str, str]]:
         "\n"
         "# Output\n"
         "Answer with a single JSON object and nothing else.\n"
-        "O1. Exactly these five keys, spelled exactly like this, all five "
-        "always present: situation, facts, goal, settled, goals. The keys are "
+        "O1. Exactly these four keys, spelled exactly like this, all four "
+        "always present: situation, facts, goal, goals. The keys are "
         "identifiers: never translate them, never add one. `goal` and `goals` "
-        "are two different fields: `goal` is the one sentence on what you want "
-        "out of this call, `goals` is the checklist of what has to happen in "
-        "it.\n"
+        "are two different fields: `goal` is what you want out of this call "
+        "and the bar that settles it, `goals` is the checklist of what has to "
+        "happen in it.\n"
         "O2. Every value is written in German, and goals is a list of German "
-        "strings. The keys stay as they are.\n"
+        "strings. The keys stay as they are."
+        ' German is written with its own letters: "ä", "ö", "ü" and "ß", never '
+        '"ae", "oe", "ue" or "ss".'
+        "\n"
         "\n"
         "Shape:\n"
         '{"situation": "where you are calling from and why", '
         '"facts": "what you know about the case, as short plain sentences", '
-        '"goal": "what you want out of this call", '
-        '"settled": "what has to have happened before it is dealt with", '
+        '"goal": "what you want out of this call, and what has to have '
+        'happened before it is dealt with", '
         '"goals": ["one thing to raise, ask or obtain", "another"]}\n'
         "\n"
         "# Before you answer, check silently\n"
@@ -241,7 +243,6 @@ async def draft_brief(
     description: str,
     case_facts: str,
     call_goal: str,
-    success_condition: str,
     improvements: list[str] | None = None,
 ) -> dict:
     """One briefing, cleaned and capped, ready to store on the reverse.
@@ -255,7 +256,7 @@ async def draft_brief(
     to try again.
     """
     messages = _messages(
-        _material(description, case_facts, call_goal, success_condition, improvements or [])
+        _material(description, case_facts, call_goal, improvements or [])
     )
     brief = await llm.complete_json(messages, _Brief, "Reverse briefing")
     if brief is None:

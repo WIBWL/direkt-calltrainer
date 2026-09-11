@@ -4,6 +4,7 @@ import type { CallState } from "../protocol";
 import { cx } from "../utils/cx";
 import { formatClock } from "../utils/time";
 import CallAnimation from "./CallAnimation";
+import ConfirmDialog from "./ConfirmDialog";
 import PersonaAvatar from "./PersonaAvatar";
 
 interface CallViewProps {
@@ -46,6 +47,23 @@ export default function CallView({
   brief = null,
 }: CallViewProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  // The end-call button asks first. A call cannot be resumed once it is over —
+  // the socket is torn down and the Session is written — and the button sits a
+  // few pixels from the mute toggle, which is pressed mid-conversation. So the
+  // one control that cannot be undone is the one that asks.
+  const [confirmingEnd, setConfirmingEnd] = useState(false);
+
+  // Escape goes back to the call, the way it closes every other dialog in the
+  // app. Nothing else on this screen listens for it, so there is no ordering
+  // to keep here (see the note in ConfirmDialog).
+  useEffect(() => {
+    if (!confirmingEnd) return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setConfirmingEnd(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [confirmingEnd]);
 
   useEffect(() => {
     const startedAt = Date.now();
@@ -119,7 +137,11 @@ export default function CallView({
                 : "Mikrofon stummschalten"}
             </button>
 
-            <button className="end-call-button" type="button" onClick={onEndCall}>
+            <button
+              className="end-call-button"
+              type="button"
+              onClick={() => setConfirmingEnd(true)}
+            >
               Gespräch beenden
             </button>
           </div>
@@ -127,6 +149,31 @@ export default function CallView({
 
         {brief}
       </div>
+
+      {/* Its own scrim rather than the panel's: the question is about the call
+          as a whole, and the call is the whole screen. */}
+      {confirmingEnd && (
+        <div className="call-confirm-scrim">
+          <ConfirmDialog
+            title="Gespräch wirklich beenden?"
+            body="Das Gespräch wird beendet und ausgewertet."
+            cancelLabel="Gespräch fortsetzen"
+            confirmLabel="Gespräch beenden"
+            // The one dialog where both answers are real: red ends a call that
+            // cannot be resumed, green carries on with it.
+            destructive
+            affirmativeCancel
+            onCancel={() => setConfirmingEnd(false)}
+            // Closed before the call is ended rather than left to unmount with
+            // the screen: if the socket never answers, a dialog that only goes
+            // away with the next screen would never go away.
+            onConfirm={() => {
+              setConfirmingEnd(false);
+              onEndCall();
+            }}
+          />
+        </div>
+      )}
     </>
   );
 }

@@ -1,14 +1,13 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { apiFetch } from "../api";
 import { useStoredSession } from "../hooks/useStoredSession";
 import { ROUTES, type TrainingStart } from "../routes";
-import { getTenant, type ReverseScenario } from "../scenarioLibrary";
+import { type ReverseScenario } from "../scenarioLibrary";
 import { formatOffset } from "../utils/time";
 import AppLayout from "./AppLayout";
 import { FeedbackReport, MetricSection } from "./FeedbackView";
-import ScenarioEditor from "./ScenarioEditor";
 import { useScreenTransition } from "./ScreenTransition";
 
 /**
@@ -39,17 +38,6 @@ export default function PastSessionView() {
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
-  // Open only while the follow-up is being edited; the editor needs the
-  // company name to decide whether sharing is on offer at all (ADR 0060).
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [tenantName, setTenantName] = useState<string | null>(null);
-
-  useEffect(() => {
-    getTenant()
-      .then((t) => setTenantName(t.name))
-      .catch(() => setTenantName(null)); // no company, no sharing toggle
-  }, []);
-
   // Starting the follow-up belongs to the training flow, which is another
   // route — so hand it the pairing and go (see TrainingStart). The Persona is
   // the one this training was played with, not a fresh choice.
@@ -153,7 +141,7 @@ export default function PastSessionView() {
           detail={detail}
           // Re-read after one is written, so the card survives a reload of
           // this page as the row the detail route now carries.
-          followUp={{ onEdit: setEditingId, onStart: startFollowUp, onCreated: reload }}
+          followUp={{ onStart: startFollowUp, onCreated: reload }}
           sessionId={sessionId ?? null}
           onReverse={startReverse}
         />
@@ -237,21 +225,6 @@ export default function PastSessionView() {
           </p>
         )}
       </section>
-
-      {/* Re-read after a save: the card above carries the title and teaser as
-          they were when this page loaded. */}
-      {editingId !== null && (
-        <ScenarioEditor
-          scenarioId={editingId}
-          tenantName={tenantName}
-          onClose={() => setEditingId(null)}
-          onSaved={() => {
-            setEditingId(null);
-            reload();
-          }}
-          onRefresh={reload}
-        />
-      )}
     </AppLayout>
   );
 }

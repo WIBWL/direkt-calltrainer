@@ -6,6 +6,7 @@ import type { Persona } from "../protocol";
 import { RANDOM_SCENARIO_ID, type ScenarioCard } from "../scenarioLibrary";
 import LanguageFlag from "./LanguageFlag";
 import LibraryPicker, {
+  CATEGORY_FILTER_LABELS,
   type CategoryFilter,
   type LibraryFilter,
   type LibraryItem,
@@ -18,10 +19,17 @@ import SetupSection from "./SetupSection";
 
 const NOT_SELECTED = "Noch nicht ausgewählt";
 
-/** What the summary can honestly say about a case that has not been drawn yet
- * (F-62). It names the choice that was made without naming its outcome — which
- * is the whole of what the User is agreeing to here. */
-const RANDOM_SELECTED = "Zufallsszenario – wird beim Start gezogen";
+/** What the summary says about a case that has not been drawn yet (F-62): the
+ * choice that was made, and not its outcome, because there is none yet — plus
+ * the category it will be drawn from, which is the one thing about it that is
+ * already settled. Under "Alle" the word stands alone: "Zufallsszenario Alle"
+ * would name a filter rather than a subject, and with no category chosen there
+ * is nothing to narrow. */
+function randomSelectedLabel(category: CategoryFilter): string {
+  return category === "all"
+    ? "Zufallsszenario"
+    : `Zufallsszenario ${CATEGORY_FILTER_LABELS[category]}`;
+}
 
 interface SetupViewProps {
   scenarioItems: LibraryItem[];
@@ -153,7 +161,9 @@ export default function SetupView({
       <SetupSection index="03" title="Auswahl prüfen" description="Ihre Trainingsauswahl steht fest.">
         <SelectionSummary
           scenario={
-            randomPicked ? RANDOM_SELECTED : selectedScenario?.name ?? NOT_SELECTED
+            randomPicked
+              ? randomSelectedLabel(scenarioCategory)
+              : selectedScenario?.name ?? NOT_SELECTED
           }
           persona={selectedPersona?.name ?? NOT_SELECTED}
           language={selectedPersona?.language ?? NOT_SELECTED}
@@ -222,7 +232,7 @@ function ChoiceCard({
   title: string;
   subtitle: string;
   language: string;
-  /** Which flag goes beside the name; the language stays as text below it. */
+  /** Which flag goes on the language line, beside the word it illustrates. */
   languageCode: string;
   avatarUrl: string | null;
   isSelected: boolean;
@@ -245,14 +255,18 @@ function ChoiceCard({
         <PersonaAvatar name={title} src={avatarUrl} className="persona-card-portrait" />
 
         <span className="persona-card-body">
-          {/* The flag sits with the name, the portrait beside the whole block:
-              one says who is calling, the other in which language. */}
-          <span className="persona-name-row">
-            <span className="persona-name">{title}</span>
-            <LanguageFlag code={languageCode} />
-          </span>
+          <span className="persona-name">{title}</span>
           <span className="card-subtitle">{subtitle}</span>
-          <span className="card-meta">{language}</span>
+          {/* The flag sits with the word it illustrates rather than with the
+              name: beside the name it competed for a column barely wide enough
+              for the name alone, and it was never saying anything about the
+              name. Ahead of the word, so that every card in a row has its flag
+              at the same x — "Deutsch" and "Englisch" are not the same
+              length. */}
+          <span className="card-meta">
+            <LanguageFlag code={languageCode} />
+            {language}
+          </span>
         </span>
       </button>
 

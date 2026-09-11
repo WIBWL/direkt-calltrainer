@@ -85,8 +85,8 @@ async def test_the_refresh_gets_the_exchange_and_the_condition_to_weigh_it_again
     prompt = fake_pipeline.llm.state_calls[-1]
     assert USER[0] in prompt[-1]["content"] and PERSONA[0] in prompt[-1]["content"]
     assert persona.name in prompt[0]["content"]
-    if scenario.success_condition:
-        assert scenario.success_condition in prompt[0]["content"]
+    if scenario.call_goal:
+        assert scenario.call_goal in prompt[0]["content"]
 
 
 async def test_a_failed_refresh_keeps_the_previous_notes(persona, scenario, fake_pipeline):

@@ -316,19 +316,24 @@ h2 {
   transition: border-color 0.2s;
 }
 
-/* The indicator remains visible as an empty circle for unselected choices. */
+/* The indicator remains visible as an empty circle for unselected choices.
+   18px, the same as the "i" ring in the corner below it: the two are the only
+   marks in a card's right margin and a difference in size between them reads
+   as a difference in importance that is not there. Nothing to weigh against
+   here the way there was for the "i" — this is a `span`, not a target, so
+   WCAG 2.5.8 has nothing to say about it. */
 .choice-check {
   position: absolute;
   top: 12px;
   right: 12px;
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   border: 1px solid var(--color-blue-300);
   border-radius: 50%;
   color: transparent;
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1;
 }
@@ -514,6 +519,9 @@ h2 {
   }
 }
 
+/* Shown only where the grid is genuinely bare — the Zufallsszenario tile is
+   drawn from the same filtered set, so when there is nothing to list there is
+   nothing to draw either and the grid really is empty. */
 .library-empty {
   margin: 0 0 1rem;
   color: var(--color-text-muted);
@@ -530,7 +538,7 @@ h2 {
 
 .library-new-button {
   margin-left: auto;
-  border: 1px dashed var(--color-blue-300);
+  border: 1px solid var(--color-blue-300);
   background: var(--color-surface);
   color: var(--color-blue-600);
   border-radius: 12px;
@@ -631,15 +639,19 @@ h2 {
      Width is fixed and the height stretches to the card's, rather than the
      other way round: in a flex row the main size is resolved before the cross
      size, so an `aspect-ratio` with a stretched height has nothing to compute
-     from and the slot blows up to its content's width. 93px against the 124px
-     minimum above is the 3:4 the portraits are cropped for; a card whose role
-     runs long grows a little taller than that, which is the right trade — the
-     picture reaching the card's edges matters more here than the exact
-     ratio. */
+     from and the slot blows up to its content's width. 72px is deliberately
+     narrower than the 3:4 the portraits are cropped for: three cards to a row
+     leave the body barely 90px of text once the check and the "i" have their
+     corner, which is what wrapped two-word names onto two lines and pushed
+     every role to the clamp. The slot gives that width back. Nothing is lost
+     by it — the source is square and `object-fit: cover` trims the sides
+     anyway, and at this width the zoom below still leaves the widest head in
+     the set (hair included) a clear margin either side; the picture is the
+     same size, there is just less room beside the face. */
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 93px;
+  flex: 0 0 72px;
   font-size: 24px;
 }
 
@@ -686,7 +698,14 @@ h2 {
   line-height: 1.45;
 }
 
+/* A row, because the flag rides on this line now. The flag is 20px against a
+   12px word, which is wider than the text is tall but not taller — a flag is a
+   wide shape, and shrinking it to the word's measure would make the stripes
+   mush. */
 .setup-persona-grid .card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-top: 0.15rem;
   font-size: 12px;
   font-weight: 600;
@@ -738,14 +757,22 @@ h2 {
   --origin-ink: var(--color-blue-600);
 }
 
-/* Own Scenario, hand-authored or shared with the company — the same green
+/* Own Scenario, hand-authored or shared with the company — the same colour
    either way, and nothing on the badge to tell them apart but the label. A ring
    around the shared one made it read as a kind of its own, when it is the same
-   Scenario of the User's with one more place it can be seen from. */
+   Scenario of the User's with one more place it can be seen from.
+
+   Olive, not the green it used to be: that green sat 28° from the follow-up's
+   teal, the closest two hues in the whole set, and on a pale wash 28° is not a
+   difference anyone reads. This sits in the one gap the other five leave — 38°
+   clear of its nearest neighbour — at the same lightness as the green it
+   replaces, so only the hue moved. It also fixes the badge, whose text was the
+   only one in the set under the 4.5:1 small-text minimum (4.17); this pairing
+   is 6.0. */
 .card-origin-own,
 .card-origin-shared {
-  --origin-tint: #e3f3ec;
-  --origin-ink: var(--color-success);
+  --origin-tint: #ecf3d6;
+  --origin-ink: #4a6212;
 }
 
 /* Written from a Session's feedback rather than by hand (F-60). Teal, not the
@@ -804,6 +831,12 @@ h2 {
    read as an aside to the choice, not as a second way of making it. It replaced
    the Scenario card's "Bearbeiten" link, which moved into the panel (ADR 0076),
    so a card carries one secondary affordance rather than two. */
+/* The button keeps its 24px box and the ring inside it is drawn on the span,
+   so the affordance can be quieter than its target: the "i" is the smaller of
+   the two things in a card's corner and should look it, but shrinking the
+   button itself would take the tap target under the 24px WCAG 2.5.8 asks for,
+   and the card behind it is a target too, so the spacing exception does not
+   apply. `place-items` centres the ring in that box. */
 .card-info {
   position: absolute;
   right: 12px;
@@ -813,23 +846,38 @@ h2 {
   width: 24px;
   height: 24px;
   padding: 0;
-  border: 1px solid var(--color-navy-900);
-  border-radius: 50%;
+  border: 0;
   background: transparent;
   font: inherit;
-  font-size: 0.8rem;
-  font-weight: 700;
-  line-height: 1;
   color: var(--color-navy-900);
   cursor: pointer;
+}
+
+.card-info > span {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--color-navy-900);
+  border-radius: 50%;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
   transition: background-color 0.2s, border-color 0.2s;
 }
 
-.card-info:hover {
+.card-info:hover > span {
   background: var(--color-blue-100);
 }
 
+/* On the ring rather than on the button, so the focus outline traces what is
+   actually visible; `outline` follows the border-radius. The button's own
+   outline is suppressed above by having no border of its own to trace. */
 .card-info:focus-visible {
+  outline: none;
+}
+
+.card-info:focus-visible > span {
   outline: 2px solid var(--color-navy-900);
   outline-offset: 2px;
 }
@@ -943,29 +991,24 @@ h2 {
   line-height: 1.5;
 }
 
-/* Set apart from the cases beside it, because it is not one: dashed where they
-   are solid, and solid once it is hovered or picked. Its colour comes from
-   `card-origin-random` like every other card's. It keeps the selected state of
-   an ordinary card — it *is* a selection, just one whose outcome is not known
-   yet.
+/* Bordered like the cases beside it. It was dashed for a while, to set it
+   apart as the one tile that is not a case — but it is the selection the
+   screen opens on, and a dashed box in the first place of the grid reads as a
+   placeholder for something missing rather than as the choice already made.
+   Its colour still comes from `card-origin-random` like every other card's,
+   and that, its badge and its text are enough to set it apart.
 
    The control that opens the rest of the grid is `.library-more`, styled with
    the training history's `.session-more` further down. */
-.library-random-card {
-  border-style: dashed;
-}
-
-.library-random-card:hover {
-  border-style: solid;
-}
-
-.library-random-card.selected {
-  border-style: solid;
-}
 
 /* --- Scenario editor modal --- */
 
-.editor-backdrop {
+/* `.call-confirm-scrim` is the same thing over the live call (the end-call
+   question): ConfirmDialog positions itself `absolute; inset: 0`, so whatever
+   holds it has to be a fixed, full-screen box. One rule rather than two, so the
+   app's dialogs cannot end up sitting on two different scrims. */
+.editor-backdrop,
+.call-confirm-scrim {
   position: fixed;
   inset: 0;
   background: rgba(3, 37, 62, 0.45);
@@ -973,6 +1016,14 @@ h2 {
   place-items: center;
   padding: 1rem;
   z-index: 50;
+}
+
+/* The end-call dialog is the only thing on its scrim, and ConfirmDialog draws
+   a scrim of its own — two of them stacked would darken the call screen twice
+   as much as any other dialog in the app. So this one contributes the fixed
+   full-screen box and nothing else. */
+.call-confirm-scrim {
+  background: none;
 }
 
 .editor-panel {
@@ -1246,6 +1297,15 @@ h2 {
   color: var(--color-surface);
 }
 
+/* The way back, where it is a choice and not just a retreat. Both tokens carry
+   white text above the 4.5:1 small-text minimum (5.45 and 4.79), so the pair
+   reads by colour *and* by label rather than by colour alone. */
+.editor-confirm-keep {
+  border-color: var(--color-success) !important;
+  background: var(--color-success) !important;
+  color: var(--color-surface);
+}
+
 .setup-page {
   width: min(940px, calc(100% - 32px));
 }
@@ -1258,7 +1318,8 @@ h2 {
 /* The wrap-up's intro is not a `.setup-intro` but carries the same eyebrow, and
    it looked like a different element for want of this. */
 .setup-intro .eyebrow,
-.feedback-intro .eyebrow {
+.feedback-intro .eyebrow,
+.feedback-wait .eyebrow {
   margin-bottom: 10px;
   font-size: 12px;
   font-weight: 700;
@@ -1762,33 +1823,23 @@ h2 {
   margin-bottom: 40px;
 }
 
-/* The active microphone is shown as read-only information above the test area. */
+/* The device picker above the test area. One element now: the box the <dd>
+   used to draw, with the label's row gone.
+
+   The 16px below it is what the old stack left between this box and the test
+   panel (6px of the list's own padding plus a 10px margin), so removing the
+   label changed the gap under the field by nothing. The 4px of side padding
+   went with it, which lines the field up with the panel below instead of
+   insetting it by four pixels — the reason it was inset was the label, which
+   needed to start where text starts. */
 .mic-device-information {
-  margin: 0 0 10px;
-  padding: 6px 4px;
-}
-
-.mic-device-information-row {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-}
-
-.mic-device-information dt {
-  color: #082f49;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 24px;
-}
-
-.mic-device-information dd {
+  box-sizing: border-box;
   width: 100%;
   height: 44px;
   min-width: 0;
   display: flex;
   align-items: center;
-  margin: 0;
+  margin: 0 0 16px;
   padding: 0 14px;
   overflow: hidden;
   border: 1px solid var(--color-border-subtle);
@@ -1798,8 +1849,14 @@ h2 {
   font-size: 12px;
   font-weight: 600;
   line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+/* The <select> drops its own outline so it can fill the box edge to edge, so
+   the box has to carry the focus ring — without this, reaching the picker by
+   keyboard would show nothing at all (WCAG 2.4.7). */
+.mic-device-information:focus-within {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
 }
 
 /* Fills the dd's existing box look -- the picker, not just a status label now. */
@@ -1972,13 +2029,8 @@ h2 {
   outline-offset: 3px;
 }
 
-/* Tablet layouts keep device names readable and enlarge the initial action. */
+/* Tablet layouts enlarge the initial action. */
 @media (max-width: 720px) {
-  .mic-device-information dd {
-    overflow-wrap: anywhere;
-    white-space: normal;
-  }
-
   .mic-test-panel > .start-call-button {
     width: 100%;
   }
@@ -2343,26 +2395,6 @@ h2 {
   color: var(--text-muted);
 }
 
-/* The secondary action: outlined, so it reads as the alternative to starting
-   rather than as a second primary button. */
-.follow-up-draft {
-  border: 1px solid var(--navy);
-  border-radius: 999px;
-  padding: 0.45rem 1.1rem;
-  font: inherit;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-  background: transparent;
-  color: var(--navy);
-  transition: background 0.2s, color 0.2s;
-}
-
-.follow-up-draft:hover {
-  background: var(--navy);
-  color: #fff;
-}
-
 /* --- Reverse: the roles swapped (F-61, ADR 0070) ------------------------ */
 
 /* The offer under the feedback. Same card as the follow-up, other accent, so
@@ -2412,9 +2444,6 @@ h2 {
 }
 
 .reverse-brief-eyebrow {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
   color: #8a5200;
 }
 
@@ -2599,6 +2628,74 @@ h2 {
   .reverse-brief-call {
     max-width: none;
   }
+}
+
+/* --- The facts of the case, for an ordinary call ------------------------ */
+
+/* The same box as the reverse's briefing, for the same reason -- ADR 0070's
+   exception to ADR 0033: text fixed before the call starts, never the
+   Persona's lines. In the app's blue rather than the reverse's amber, because
+   the two are different things and a call must not be mistaken for the other
+   kind at a glance. */
+.case-brief {
+  margin: 0 auto 1.5rem;
+  max-width: 720px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--color-blue-600);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-filter);
+  padding: 1.25rem 1.4rem;
+}
+
+.case-brief-eyebrow {
+  color: var(--color-blue-600);
+}
+
+/* `pre-line` because facts are often written as short lines rather than as a
+   paragraph, and the sanitiser keeps single newlines (it only collapses runs). */
+.case-brief-body {
+  margin: 0.4rem 0 0;
+  white-space: pre-line;
+}
+
+/* Beside the animation, with no scroll box of its own -- a fact hidden behind
+   a gesture is a fact not found, which is the one thing that must not happen
+   mid-call. Below the two-column breakpoint it goes back to being a block
+   under the call. */
+.case-brief-call {
+  margin: 0 auto;
+  background: var(--color-surface);
+}
+
+@media (min-width: 1080px) {
+  .case-brief-call {
+    max-width: none;
+  }
+}
+
+/* --- One type scale for the three pre-call panels ----------------------- */
+
+/* "Ihre Ausgangslage" (ADR 0054), "Fakten des Falls" and a reverse's "Ihre
+   Unterlagen" are read one under the other on the same screen, and the first
+   two always are. Their label and their prose are therefore one declaration
+   each rather than three copies: they had drifted to two different scales, and
+   two blocks of the same kind set differently read as two kinds of thing.
+   Only what genuinely differs — the colour, the spacing, the `pre-line` on the
+   facts — stays with each panel. */
+.scenario-briefing-title,
+.case-brief-eyebrow,
+.reverse-brief-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.scenario-briefing-body,
+.case-brief-body {
+  font-size: 0.92rem;
+  line-height: 1.55;
 }
 
 /* --- Transcript (F-12) -------------------------------------------------- */
@@ -3055,9 +3152,14 @@ h2 {
   min-width: 0;
 }
 
+/* The way back and the file to take away. `wrap` because the second label is
+   long: on a narrow page it drops to its own line rather than squeezing the
+   first. */
 .feedback-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-start;
+  gap: 12px;
   margin-top: 28px;
 }
 
@@ -3084,10 +3186,15 @@ h2 {
   background: var(--color-blue-100);
 }
 
-/* On the microphone check it sits below the card, along its right edge. */
-.mic-check-page .back-to-start-button {
+/* On the two screens that lead into a call it sits below the card, along its
+   left edge — away from the corner the starting button occupies, so the way
+   out and the way on are not neighbours. One rule for both because a reverse's
+   briefing screen replaces the microphone check rather than following it: the
+   same button in the same place is the whole point. */
+.mic-check-page .back-to-start-button,
+.brief-page .back-to-start-button {
   display: block;
-  margin: 22px 0 0 auto;
+  margin: 22px auto 0 0;
 }
 
 /* Above a page heading, where it replaces what used to be a plain back link. */
@@ -4699,19 +4806,6 @@ h2 {
 
 /* The name and its flag on one line, the flag sitting on the text's baseline
    rather than at the top of a tall name that has wrapped. */
-.persona-name-row {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-/* Scoped: the same class carries a Scenario's title, where it is not a flex
-   child. Without this a long name pushes the flag off the card instead of
-   clamping, which is what the rule above it exists to prevent. */
-.persona-name-row .persona-name {
-  min-width: 0;
-}
-
 .language-flag {
   flex: 0 0 auto;
   width: 20px;
@@ -4724,31 +4818,11 @@ h2 {
 
 /* --- The transcript as a file rather than a page section (F-64) --------- */
 
-.transcript-empty {
-  margin: 0;
-  color: var(--text-muted);
-}
-
-.transcript-download {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.4rem;
-  padding: 1.4rem 1.5rem 1.5rem;
-}
-
-.card p.transcript-download-lead,
-.transcript-download-lead {
-  margin: 0 0 0.5rem;
+/* Only the failure has anything to say; the offer itself is a button in the
+   actions row and needs no box around it. */
+.transcript-download-error {
+  margin: 0.6rem 0 0;
   max-width: 62ch;
-  color: var(--text-muted);
-}
-
-.transcript-download-note {
-  margin: 0.7rem 0 0;
-  max-width: 62ch;
-  font-size: 0.82rem;
-  color: var(--text-muted);
 }
 
 /* The answer to "what was that about?", on the post-call screen after a
@@ -5069,11 +5143,15 @@ h2 {
 /* The screen the cut lands on comes up rather than appearing: without it the
    reveal is a hard edit from an opaque scrim to a finished page. */
 .brief-page .reverse-brief,
-.brief-page .brief-actions {
+.brief-page .scenario-briefing,
+.brief-page .case-brief,
+.brief-page .brief-actions,
+.brief-page .back-to-start-button {
   animation: screen-enter 420ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
 
-.brief-page .brief-actions {
+.brief-page .brief-actions,
+.brief-page .back-to-start-button {
   animation-delay: 90ms;
 }
 
@@ -5092,7 +5170,6 @@ h2 {
    action in the app, and the one place a click still says nothing is a button
    that starts something slow. */
 .follow-up-button:active,
-.follow-up-draft:active,
 .start-call-button:active {
   transform: scale(0.97);
 }
@@ -5101,7 +5178,6 @@ h2 {
    start button fades rather than snapping, and redeclaring `transition` here
    would drop that. */
 .follow-up-button,
-.follow-up-draft,
 .start-call-button {
   transition: background 0.2s, color 0.2s, opacity 0.2s, transform 0.08s ease-out;
 }
@@ -5110,18 +5186,19 @@ h2 {
   /* The transition itself is not started at all under reduced motion (see
      ScreenTransition.tsx) — this covers the entry and the press, which are. */
   .brief-page .reverse-brief,
-  .brief-page .brief-actions {
+  .brief-page .scenario-briefing,
+  .brief-page .case-brief,
+  .brief-page .brief-actions,
+  .brief-page .back-to-start-button {
     animation: none;
   }
 
   .follow-up-button,
-  .follow-up-draft,
   .start-call-button {
     transition: background 0.2s, color 0.2s, opacity 0.2s;
   }
 
   .follow-up-button:active,
-  .follow-up-draft:active,
   .start-call-button:active {
     transform: none;
   }
@@ -5145,6 +5222,11 @@ h2 {
    around something twice as tall as it is wide. */
 .incoming-stage {
   display: grid;
+  /* Positioned, so the mute arm below can be placed against this box — which
+     is the device's own box — rather than against whatever ancestor happens to
+     be positioned further up. A static grid container is not a containing
+     block, and the arm would have landed somewhere else entirely. */
+  position: relative;
   margin: 1.5rem 0 0.5rem;
 }
 
@@ -5241,10 +5323,79 @@ h2 {
   background: linear-gradient(180deg, #8b939b, #c3cad0, #7f878f);
 }
 
+/* The silent switch, drawn like the other keys and, unlike them, meaning
+   something: `.incoming-mute-switch` below is what is actually pressed. */
 .incoming-key-silent {
   left: -3px;
   top: 74px;
   height: 20px;
+  transition: background 0.2s;
+}
+
+/* Orange while silenced, which is what the switch on a real phone shows. */
+.incoming-key-silent.is-silenced {
+  background: linear-gradient(180deg, #b45309, #f59e0b, #b45309);
+}
+
+/* The control for it: an arm reaching in from the left of the device, with the
+   label and the arrow inside the button rather than beside it. That is the
+   whole point of the shape — a 3px sliver is far under the 24px a target needs
+   (WCAG 2.5.8), and this makes the target 210px wide without drawing the
+   switch any bigger than a switch.
+
+   `top`/`height` centre it on the sliver (74px + 20/2 = 84; 62 + 44/2 = 84),
+   and the right edge lands 6px inside the frame, so the arrowhead stops just
+   short of the switch and the press area still covers it. */
+.incoming-mute-switch {
+  position: absolute;
+  top: 62px;
+  left: -204px;
+  width: 210px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0 10px 0 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.incoming-mute-label {
+  white-space: nowrap;
+}
+
+.incoming-mute-arrow {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 12px;
+}
+
+.incoming-mute-switch:hover {
+  color: var(--navy);
+}
+
+/* The switch lights up with its own control, so the arm and the sliver read as
+   one thing. `:has` on the stage because the sliver sits inside the phone,
+   which is the button's *earlier* sibling — no combinator reaches backwards.
+   Decoration only: where `:has` is unsupported, nothing is lost but the
+   highlight. */
+.incoming-stage:has(.incoming-mute-switch:hover) .incoming-key-silent {
+  background: linear-gradient(180deg, #c3cad0, #ffffff, #c3cad0);
+}
+
+.incoming-stage:has(.incoming-mute-switch:hover) .incoming-key-silent.is-silenced {
+  background: linear-gradient(180deg, #f59e0b, #fbbf24, #f59e0b);
+}
+
+.incoming-mute-switch:focus-visible {
+  outline: 2px solid var(--color-blue-300);
+  outline-offset: 2px;
 }
 
 .incoming-key-up {
@@ -5295,17 +5446,39 @@ h2 {
 .incoming-avatar {
   width: 72px;
   height: 72px;
+  overflow: hidden;
   /* Two `auto` margins, here and on the actions below, split the free space:
      the caller sits in the middle of the display and the buttons stay at its
      foot, which is where a phone puts them. */
   margin: auto 0 0.7rem;
-  display: grid;
-  place-items: center;
+  /* Flex and not grid, matching the app's other two portrait slots: the
+     picture inside is sized at 100% of this box, and a centred *grid* item
+     resolves that against a track rather than against the box. The initials
+     fallback centres the same way either way. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.14);
   font-family: var(--font-display);
   font-size: 1.5rem;
   font-weight: 700;
+}
+
+/* Head and shoulders, the selection card's crop: the source is a square
+   half-body shot and at 72px the whole of it leaves a face nobody could tell
+   from another. The two large square slots show the pose whole and need no
+   zoom; this one is small, so it does. */
+.incoming-avatar > img {
+  transform: scale(1.5);
+  transform-origin: center 18%;
+}
+
+/* The initials fall back to the display's own look rather than the light blue
+   every other slot uses — this one sits on a dark phone screen. */
+.incoming-avatar.persona-avatar-fallback {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--color-surface);
 }
 
 .incoming-caller {
@@ -5381,10 +5554,26 @@ h2 {
 }
 
 .incoming-hint {
-  margin: 1.4rem 0 0;
+  margin: 2.4rem 0 0;
   max-width: 34ch;
   text-align: center;
   color: var(--text-muted);
+}
+
+/* The arm reaches 204px left of a device that is centred in the page, so it
+   needs a viewport of roughly 214 + 2x204 to sit inside one. Below that the
+   words go and the arrow stays: it still points at the switch, the target is
+   still 78px wide, and the button keeps its name through `aria-label` — which
+   is why the name is there and not read off the <span>. */
+@media (max-width: 720px) {
+  .incoming-mute-switch {
+    left: -72px;
+    width: 78px;
+  }
+
+  .incoming-mute-label {
+    display: none;
+  }
 }
 
 /* A short window is the common case on a laptop once the header and the hint
@@ -5425,24 +5614,6 @@ h2 {
   }
 }
 
-/* The ringtone switch. Quiet and under everything else — it is required to be
-   there (WCAG 1.4.2) rather than something the screen is about. */
-.incoming-mute {
-  margin-top: 1rem;
-  border: none;
-  background: none;
-  padding: 0.3rem 0.5rem;
-  font: inherit;
-  font-size: 0.8rem;
-  color: var(--color-blue-600);
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.incoming-mute:hover {
-  color: var(--navy);
-}
-
 /* --- The trainee's briefing (ADR 0054) ---------------------------------- */
 /* Shown on the setup screen under the selection summary and again on the
    microphone check. Deliberately quiet -- a tinted panel, not a callout: it is
@@ -5460,26 +5631,152 @@ h2 {
 
 .scenario-briefing-title {
   margin: 0 0 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--color-blue-600);
 }
 
 .scenario-briefing-body {
   margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.6;
-  /* Not muted: on the microphone check this is the only thing on the screen
-     worth reading, and the mic test below it is already the loud element. */
+  /* Not muted: on the screen before the call this is one of only two things
+     to read, and on the setup screen it is what the selection is judged by. */
   color: var(--color-navy-900);
 }
 
-/* On the microphone check it sits between the intro and the test section, so it
-   carries the gap the intro would otherwise leave. */
-.mic-check-briefing {
-  max-width: 800px;
-  margin-top: -20px;
-  margin-bottom: 32px;
+
+
+/* --- "Feedback wird erstellt" (the wait after the call) ------------------ */
+
+/* The wrap-up is written in the worker (ADR 0049), so hanging up is followed
+   by a real wait. It gets a screen rather than a grey line on the finished
+   page, and the screen gets something to watch: the call's own waveform, being
+   read by a magnifier passing over it. Centred and alone, because that is the
+   whole of it. */
+
+.feedback-wait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-block: 24px 8px;
+}
+
+.feedback-wait .feedback-title {
+  margin-bottom: 8px;
+}
+
+.feedback-wait-stage {
+  position: relative;
+  width: min(340px, 100%);
+  height: 180px;
+  display: grid;
+  place-items: center;
+  /* The lens travels past the last bar at each end; without this it leaves the
+     scene and drags the page sideways with it on a narrow screen. */
+  overflow: hidden;
+}
+
+.feedback-wait-wave {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 96px;
+}
+
+.feedback-wait-bar {
+  width: 9px;
+  /* The bar's own share of the scene (--h) is its resting shape; the animation
+     only scales it. That way `animation: none` under reduced motion leaves a
+     waveform standing rather than eleven bars of equal height. */
+  height: var(--h);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--color-blue-300), var(--color-blue-600));
+  animation: feedback-wait-bounce 1.3s ease-in-out infinite;
+  /* Staggered along the row, so it reads as a wave passing through rather than
+     as eleven bars pulsing together. */
+  animation-delay: calc(var(--i) * 110ms);
+}
+
+.feedback-wait-lens {
+  position: absolute;
+  color: var(--color-navy-900);
+  animation: feedback-wait-scan 5.2s ease-in-out infinite;
+}
+
+/* Around the resting height rather than up from it: a waveform is read from
+   its middle outwards. */
+@keyframes feedback-wait-bounce {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+/* Slower than the bars on purpose — the tempo difference is what makes one of
+   them the thing being read and the other the thing reading it. The tilt at
+   each end is the wrist turning round. */
+@keyframes feedback-wait-scan {
+  0%,
+  100% {
+    transform: translateX(-140px) rotate(-10deg);
+  }
+  50% {
+    transform: translateX(140px) rotate(10deg);
+  }
+}
+
+.feedback-wait-caption {
+  margin: 0 0 6px;
+  min-height: 1.5rem;
+  font-size: 1rem;
+  color: var(--color-navy-900);
+  /* Keyed on the caption index in FeedbackWaiting.tsx, so React remounts the
+     paragraph and the fade plays again for every line. */
+  animation: feedback-wait-caption-in 400ms ease-out both;
+}
+
+@keyframes feedback-wait-caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.feedback-wait-note {
+  margin: 0 0 20px;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+/* A way out, not an offer: quiet enough that waiting stays the obvious thing
+   to do, present because the transcript may be the only copy (F-64). */
+.feedback-wait-skip {
+  border: none;
+  background: none;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.feedback-wait-skip:hover {
+  color: var(--color-navy-900);
+}
+
+/* Unlike the die (F-62) and the card turn (F-61) this screen is still shown
+   under reduced motion — there is nothing behind it to skip to, only a wait.
+   What is left is the waveform standing still with the lens over it. */
+@media (prefers-reduced-motion: reduce) {
+  .feedback-wait-bar,
+  .feedback-wait-lens,
+  .feedback-wait-caption {
+    animation: none;
+  }
 }

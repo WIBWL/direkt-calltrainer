@@ -9,8 +9,10 @@
  *
  * Rendered in two places, which is why it is a component rather than markup in
  * one of them: on the setup screen as soon as a Scenario is picked (it is part
- * of choosing one), and again on the microphone check, where it is the last
- * thing read before the call starts.
+ * of choosing one), and again on the screen between the microphone check and
+ * the ringing phone, where it sits above the facts of the case and is the last
+ * thing read before the call starts. It used to sit on the check itself, which
+ * put the case on the same screen as a level meter.
  *
  * Renders nothing for a Scenario without one. Every built-in carries a
  * briefing, but a Scenario authored before the field existed does not, and an

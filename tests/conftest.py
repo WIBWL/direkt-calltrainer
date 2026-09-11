@@ -629,7 +629,6 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
         description="Beschreibung",
         case_facts="",
         call_goal="",
-        success_condition="",
         active=True,
         visibility=db_models.VISIBILITY_PUBLIC,
     )

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 
 import type { MicDevice } from "../hooks/useMicrophoneDevices";
 import { useMicrophoneLevel } from "../hooks/useMicrophoneLevel";
-import ScenarioBriefing from "./ScenarioBriefing";
 
 const HEARD_THRESHOLD = 0.02;
 
@@ -23,11 +22,11 @@ interface MicCheckProps {
   onDevicesRefresh: () => void;
   onConfirmed: () => void;
   onCancel: () => void;
-  /** The selected Scenario's briefing (ADR 0054), shown above the test. This
-   * screen is where the Session is already committed to and the user is
-   * waiting anyway (ADR 0042), so it costs no extra step — and it is the last
-   * thing read before the call starts. */
-  briefing: string | undefined;
+  /** Whether the check leads to a briefing screen rather than into the call
+   * (ADR 0070's reverse, and any Scenario with a briefing or facts to read).
+   * The button has to name the step it actually takes: "Gespräch starten" on a
+   * button that opens a page of text is a promise the next screen breaks. */
+  briefingFollows: boolean;
 }
 
 /** Pre-call microphone test: lets the user pick an input device and confirm
@@ -39,7 +38,7 @@ export default function MicCheck({
   onDevicesRefresh,
   onConfirmed,
   onCancel,
-  briefing,
+  briefingFollows,
 }: MicCheckProps) {
   const { level, error, start, stop } = useMicrophoneLevel(deviceId);
 
@@ -87,33 +86,32 @@ export default function MicCheck({
         </p>
       </section>
 
-      <ScenarioBriefing briefing={briefing} className="mic-check-briefing" />
-
       {/* No SetupSection here: this screen has one box and no numbered steps to
           count off, and the page heading above already names it. */}
       <section className="setup-section">
-        <dl className="mic-device-information">
-          <div className="mic-device-information-row">
-            <dt>
-              <label htmlFor="mic-device-select">Mikrofon</label>
-            </dt>
-            <dd>
-              <select
-                id="mic-device-select"
-                className="mic-device-select"
-                value={deviceId ?? ""}
-                onChange={(e) => onDeviceChange(e.target.value || null)}
-              >
-                <option value="">Standardmikrofon</option>
-                {devices.map((device, index) => (
-                  <option key={device.deviceId} value={device.deviceId}>
-                    {device.label || `Mikrofon ${index + 1}`}
-                  </option>
-                ))}
-              </select>
-            </dd>
-          </div>
-        </dl>
+        {/* No visible label over it: the page is called "Mikrofon testen" and
+            the control's own value names the device, so the word only said
+            again what stood under it. The <dl> went with the label — a
+            description list with nothing to describe is markup for a pairing
+            that no longer exists — and the accessible name moved onto the
+            <select>, so it is gone from the screen and not from the screen
+            reader. */}
+        <div className="mic-device-information">
+          <select
+            id="mic-device-select"
+            className="mic-device-select"
+            aria-label="Mikrofon"
+            value={deviceId ?? ""}
+            onChange={(e) => onDeviceChange(e.target.value || null)}
+          >
+            <option value="">Standardmikrofon</option>
+            {devices.map((device, index) => (
+              <option key={device.deviceId} value={device.deviceId}>
+                {device.label || `Mikrofon ${index + 1}`}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {phase === "idle" && (
           <div className="mic-test-panel">
@@ -185,7 +183,11 @@ export default function MicCheck({
 
               <div className="mic-test-result-copy">
                 <h3>Mikrofon funktioniert</h3>
-                <p>Ihre Stimme wurde erkannt. Sie können das Gespräch jetzt starten.</p>
+                <p>
+                  {briefingFollows
+                    ? "Ihre Stimme wurde erkannt. Sie erhalten jetzt Ihr Briefing."
+                    : "Ihre Stimme wurde erkannt. Sie können das Gespräch jetzt starten."}
+                </p>
               </div>
             </div>
 
@@ -199,7 +201,7 @@ export default function MicCheck({
               </button>
 
               <button className="start-call-button" type="button" onClick={onConfirmed}>
-                Gespräch starten
+                {briefingFollows ? "Weiter zum Briefing" : "Gespräch starten"}
               </button>
             </div>
           </div>

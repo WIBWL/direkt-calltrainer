@@ -52,8 +52,10 @@ _PHASE = "Der Ton bleibt über alle drei Phasen gleich sachlich."
 # the same subject area (ADR 0069's second amendment).
 _DESCRIPTION = "Sie rufen bei Ihrem Anbieter an, weil Sie kündigen wollen."
 _FACTS = "Vertrag seit 2019, monatlich 89 Euro, dritte Störung in sechs Wochen."
-_GOAL = "Eine Zusage, dass die Störung dauerhaft behoben wird."
-_BAR = "Ein Termin mit Datum. Eine Prüfzusage reicht nicht."
+_GOAL = (
+    "Eine Zusage, dass die Störung dauerhaft behoben wird. Geklärt ist die "
+    "Sache mit einem Termin mit Datum. Eine Prüfzusage reicht nicht."
+)
 _OUTCOME = "Der Kunde legte ohne festen Termin auf."
 _CALL = PlayedCall(
     scenario_name=_CARD_NAME,
@@ -61,13 +63,12 @@ _CALL = PlayedCall(
     description=_DESCRIPTION,
     case_facts=_FACTS,
     call_goal=_GOAL,
-    success_condition=_BAR,
     outcome=_OUTCOME,
     improvements=tuple(_IMPROVEMENTS),
     phase_language=_PHASE,
 )
 
-# What the stubbed model answers with: the seven keys of the authoring wire
+# What the stubbed model answers with: the six keys of the authoring wire
 # (ADR 0061, so `name` and not `title`), the trainee's briefing (ADR 0054)
 # among them.
 _DRAFT = {
@@ -80,8 +81,10 @@ _DRAFT = {
     ),
     "description": "Sie rufen bei Ihrem Dienstleister an, weil eine Gutschrift ausbleibt.",
     "case_facts": "Gutschrift über 640 Euro, zugesagt am 3. März, bis heute nicht gebucht.",
-    "call_goal": "Ein Datum, an dem das Geld auf dem Konto ist.",
-    "success_condition": "Jemand nennt einen Tag. „Wir prüfen das“ reicht nicht.",
+    "call_goal": (
+        "Ein Datum, an dem das Geld auf dem Konto ist. Jemand nennt einen "
+        "Tag. „Wir prüfen das“ reicht nicht."
+    ),
 }
 _REPLY = json.dumps(_DRAFT)
 
@@ -113,7 +116,7 @@ async def test_the_played_case_reaches_the_model(monkeypatch: pytest.MonkeyPatch
     await draft_follow_up(_CALL)
 
     prompt = asked(calls)
-    assert all(text in prompt for text in (_DESCRIPTION, _FACTS, _GOAL, _BAR))
+    assert all(text in prompt for text in (_DESCRIPTION, _FACTS, _GOAL))
 
 
 async def test_the_wrapups_summary_says_where_the_last_call_ended(

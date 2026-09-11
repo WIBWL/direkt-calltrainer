@@ -364,8 +364,12 @@ class Scenario(_AuthoredContent, Base):
     # API falls back to the prompt field itself.
     description_label: Mapped[str | None] = mapped_column(Text)
     case_facts_label: Mapped[str | None] = mapped_column(Text)
+    # What the caller wants *and* the bar they judge it by, in one field. They
+    # were two columns until they were merged: an author writing a goal without
+    # saying when it is met writes half a case, and the prompt weighs both the
+    # same way anyway -- silently, against what has actually been said, never
+    # recited back.
     call_goal: Mapped[str] = mapped_column(Text)
-    success_condition: Mapped[str] = mapped_column(Text)
     # Display field, in the UI language, addressed to the *trainee* and never
     # to the model (ADR 0054): the role they answer in, the room they have, and
     # what counts as a good outcome. It is the counterpart of the four fields
