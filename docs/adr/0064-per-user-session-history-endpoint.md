@@ -43,3 +43,15 @@ The reversal has a real cost: a user's Sessions are now enumerable by that user,
 Pagination is offset-based, which is the wrong tool if Sessions are ever written while a user pages through them — an insert shifts every subsequent row by one. At the volume of a pilot, where a user writes a Session every few minutes at most and reads their history between calls, this cannot bite; keyset pagination is the answer if it ever does.
 
 Nothing here decides what the progress view may *say* about the values it plots. That is ADR 0065.
+
+## Amendment: tagged points travel with their text
+
+Since ADR 0080 every `feedback_point` carries the focus goal it is about, and the listing carries those tags as `feedback_goals`. They went on the wire without their text, on the reading of "it does not carry the wrap-up text" above.
+
+That reading is narrowed here: **a tagged point travels with the sentence it was written as.** The progress view's second level has to say what the wrap-ups wrote about a goal, not only how often they wrote it (`docs/dashboard-konzept.md`, section 7), and six of the fourteen focus goals have nothing else behind them at all — for them the counted mentions *are* the content, and a count with no way to read what was counted asks the user to take a number on trust.
+
+The payload argument does not apply at this size. What the original decision keeps off the listing is `detail_json`, a sampled curve per metric per Session, which is three orders of magnitude larger than a tagged point and which no cross-Session view plots. A wrap-up carries a handful of points, each a sentence or two.
+
+What stays on the detail route is the wrap-up as a text: the summary, the phase-language paragraph, `tone_fit`, and any point the model left untagged. So the listing still cannot reconstruct a wrap-up; it carries what can be counted, plus the wording of each thing counted.
+
+One thing this makes visible that was already true: `_feedback_goals` walks `feedback.points` and each point's `focus_goal`, which the listing query did not eager-load — a page of 20 wrap-ups cost a query per wrap-up and one per tagged point. Both now hang off the existing `selectinload`, so a page is a fixed number of queries again, as the paragraph on batching above always claimed.

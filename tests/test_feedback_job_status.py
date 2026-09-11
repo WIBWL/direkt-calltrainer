@@ -151,6 +151,66 @@ def test_a_generated_wrapup_leaves_the_job_done(
     assert len(feedback.points) == 2
 
 
+@pytest.mark.parametrize(
+    "goal, expected",
+    [
+        ("closing", "closing"),
+        # Not in the catalogue: the model reached for a sixteenth key.
+        ("small_talk", None),
+        # In the catalogue, but about the training habit rather than the call.
+        ("training_regularity", None),
+        ("", None),
+    ],
+    ids=["known", "invented", "habit goal", "none offered"],
+)
+def test_a_points_goal_is_resolved_against_the_catalogue(
+    db_session: DbSession, app_database: str, monkeypatch: pytest.MonkeyPatch,
+    goal: str, expected: str | None,
+) -> None:
+    """The tag decides whether a point can be counted across trainings, so what
+    happens to a bad one matters.
+
+    Dropped to NULL, never raised on: a point with a good observation and a
+    made-up key is still a good observation, and losing the wrap-up over its
+    label would be the wrong trade. A wrong key is worse than none, because it
+    puts the point into somebody's tally of a weakness they do not have.
+
+    The two habit goals are refused at this end as well as in the prompt. A
+    rule the model can ignore is not a constraint, and neither goal is anything
+    a single call could show.
+    """
+    _store()
+    session_id = db_session.query(Session).one().session_id
+    _stub_model(monkeypatch, json.dumps({
+        "summary": _SUMMARY,
+        "strengths": [],
+        "improvements": [{"text": "Mehr Pausen lassen.", "goal": goal}],
+    }))
+
+    generate_feedback(session_id)
+
+    point = db_session.query(Feedback).filter_by(session_id=session_id).one().points[0]
+    assert (point.focus_goal.key if point.focus_goal else None) == expected
+
+
+def test_a_wrapup_written_before_the_tag_leaves_its_points_untagged(
+    db_session: DbSession, app_database: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A model answer with no `goal` key at all, which is what every stored
+    wrap-up from before this feature looks like. The point is kept and simply
+    carries no tag; the dashboard leaves it out of its counts rather than
+    filing it under a goal nobody chose."""
+    _store()
+    session_id = db_session.query(Session).one().session_id
+    _stub_model(monkeypatch, _REPLY)
+
+    generate_feedback(session_id)
+
+    points = db_session.query(Feedback).filter_by(session_id=session_id).one().points
+    assert len(points) == 2
+    assert all(point.focus_goal_id is None for point in points)
+
+
 def test_a_failed_generation_is_recorded_with_its_error(
     db_session: DbSession, app_database: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:

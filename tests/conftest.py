@@ -98,6 +98,7 @@ from backend.scenarios import Scenario  # noqa: E402
 # The ORM models keep a namespace: `Persona` and `Scenario` above are the value
 # objects the app passes around, and both names would otherwise collide here.
 from backend.db import models as db_models  # noqa: E402
+from backend.db.seed_data import FOCUS_GOALS  # noqa: E402
 from backend.db.session import reset_engine, session_scope  # noqa: E402
 from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted  # noqa: E402
 from backend.session.models import Turn  # noqa: E402
@@ -633,7 +634,21 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
         key=METRIC_KEY, name="Sprechtempo", unit="Wörter/min", aspect=db_models.ASPECT_HOW,
         feature_id="F-36", active=True,
     )
-    db_session.add_all([language, default_tenant, persona, scenario, metric_type])
+    # The focus catalogue, from the same list that seeds it in production. Not
+    # hand-written like the rows above: the wrap-up resolves each point's tag
+    # against these keys (`generator._goal_ids`), so a made-up catalogue here
+    # would let a test pass on a key the real system does not have.
+    focus_goals = [
+        db_models.FocusGoal(
+            key=goal["id"], group_key=goal["group"], position=goal["position"],
+            title=goal["title"], caption=goal["caption"], info=goal["info"],
+            evidence=goal["evidence"], active=True,
+        )
+        for goal in FOCUS_GOALS
+    ]
+    db_session.add_all(
+        [language, default_tenant, persona, scenario, metric_type, *focus_goals]
+    )
     db_session.commit()
     return ReferenceRows(
         persona=persona, scenario=scenario, language=language, metric_type=metric_type

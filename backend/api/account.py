@@ -213,6 +213,7 @@ def _feedback(feedback: db_models.Feedback | None) -> dict | None:
     return {
         "summary": feedback.summary,
         "phase_language": feedback.phase_language,
+        "tone_fit": feedback.tone_fit,
         "created_at": feedback.created_at.isoformat(),
         "points": [
             {"kind": p.kind, "text": p.text} for p in feedback.points

@@ -30,6 +30,7 @@ from types import SimpleNamespace
 import pytest
 
 from backend.clients.llm import _strip_reasoning
+from backend.db.seed_data import FOCUS_GOALS
 from backend.feedback.generator import (
     _ask, _dossier, _in_language, _LANGUAGE_NAMES_EN, _messages, _NO_WRAPUP,
     _NOTHING_SAID, _without_turn_markers, _Wrapup,
@@ -79,14 +80,110 @@ def test_phase_block_stays_off_the_score_ladder(system_prompt: str) -> None:
     assert "N1. No score, grade, rating, percentage, or star" in system_prompt
 
 
-def test_prompt_asks_for_four_keys_including_the_phase_block(system_prompt: str) -> None:
-    """The key is an identifier on the wire (protocol.ts reads `phase_language`),
-    so it is named in the rule, in the shape, and in the closing reminder —
-    the three places a small model reads a key name from."""
-    assert "summary, phase_language, strengths, improvements" in system_prompt
+def test_prompt_asks_for_six_keys_including_the_phase_and_tone_blocks(
+    system_prompt: str,
+) -> None:
+    """The keys are identifiers on the wire (protocol.ts reads `phase_language`
+    and `tone_fit`), so each is named in the rule, in the shape, and in the
+    closing reminder: the three places a small model reads a key name from.
+
+    `pressure_turns` (ADR 0081) is the sixth and the only one nobody reads: it
+    decides which exchanges the segment measurements are computed over.
+    """
+    assert (
+        "summary, phase_language, tone_fit, pressure_turns, strengths, improvements"
+        in system_prompt
+    )
     assert '"phase_language": "one paragraph' in system_prompt
-    assert "The four keys stay in English" in system_prompt
+    assert '"tone_fit": "one paragraph' in system_prompt
+    assert '"pressure_turns": [<ids of the Caller utterances' in system_prompt
+    assert "The six keys stay in English" in system_prompt
+    assert "five keys" not in system_prompt
+    assert "four keys" not in system_prompt
     assert "three keys" not in system_prompt
+
+
+def test_the_tone_block_starts_from_the_occasion_and_not_from_the_figures(
+    system_prompt: str,
+) -> None:
+    """The whole point of the block. Asked the other way round the model reads
+    a figure, calls it lively, and decides afterwards what call it must have
+    been -- which is the invented norm ADR 0051 refused, with a story on top."""
+    assert "# The tone_fit block" in system_prompt
+    assert "G1. Start from the occasion, not from the figures." in system_prompt
+    assert "the quotation is what carries the observation" in system_prompt
+
+
+def test_the_tone_block_rules_out_a_correct_register_for_a_kind_of_call(
+    system_prompt: str,
+) -> None:
+    """The failure mode that would make this block a norm by the back door: two
+    people handle the same complaint well sounding quite different, and a model
+    left to itself will happily say what a complaint 'should' sound like."""
+    assert "There is no correct register for a kind of call" in system_prompt
+    assert "Do not manufacture a mismatch" in system_prompt
+
+
+def test_the_tone_block_is_kept_apart_from_the_phase_block(system_prompt: str) -> None:
+    """Two paragraphs about how somebody sounded, written in one call, will
+    collapse into each other unless the difference is stated: one is a change
+    across the call, the other is the call against its occasion."""
+    assert "Do not repeat the phase_language block" in system_prompt
+
+
+def test_the_dossier_names_the_occasion_before_the_statistics() -> None:
+    """tone_fit cannot be answered without it. Until this block existed the
+    wrap-up saw only the transcript and had to guess what kind of call it was,
+    and a guess is the one thing this judgement must not rest on."""
+    dossier, _ = _dossier(_session_with())
+
+    assert "The occasion of this call" in dossier
+    assert "line that has been down since Monday" in dossier
+    assert "Get a repair date" in dossier
+    assert dossier.index("The occasion") < dossier.index("Measured statistics")
+
+
+def test_the_prompt_lists_every_focus_goal_key_it_may_assign(system_prompt: str) -> None:
+    """A key the model has not been shown is a key it will invent, and an
+    invented key is dropped at storage time, so the point silently stops being
+    countable. The catalogue is written out from the same list that seeds the
+    table (`seed_data.FOCUS_GOALS`), so the two cannot drift."""
+    for goal in FOCUS_GOALS:
+        assert f"    {goal['id']}: {goal['title']}" in system_prompt
+
+    assert '"goal": "<one key from the list, or an empty string>"' in system_prompt
+
+
+def test_an_empty_goal_is_offered_as_a_normal_answer(system_prompt: str) -> None:
+    """The rule that keeps the counts clean. A key that nearly fits puts a
+    point into somebody's tally of a weakness they do not have, which is worse
+    than an untagged point."""
+    assert "A4. Write an empty string when nothing on the list fits" in system_prompt
+    assert "Never force a fit" in system_prompt
+
+
+def test_the_goal_may_not_change_what_a_point_says(system_prompt: str) -> None:
+    """The failure that would make this feature actively harmful: a model that
+    reaches for a key first and then writes a point to match it produces
+    feedback about the catalogue rather than about the call."""
+    assert "A5. The goal never changes what the point says" in system_prompt
+    assert "delete the key instead" in system_prompt
+
+
+def test_the_habit_goals_are_ruled_out_in_the_prompt(system_prompt: str) -> None:
+    """Neither is anything one call can show. The storage side enforces it too
+    (`generator._NEVER_ASSIGNED`), because a rule the model can ignore is not a
+    constraint."""
+    assert "Never assign either." in system_prompt
+
+
+def test_the_dossier_withholds_the_success_condition() -> None:
+    """It says what would have ended the call well, which is a result and not
+    an occasion. Handed over, it invites the model to grade the outcome under
+    the heading of tone."""
+    dossier, _ = _dossier(_session_with())
+
+    assert "named engineer" not in dossier
 
 
 def test_prompt_forbids_markup_inside_the_phase_paragraph(system_prompt: str) -> None:
@@ -195,12 +292,18 @@ def _measurement(key: str, name: str, unit: str | None, value: float, detail=Non
 
 def _session_with(*measurements) -> SimpleNamespace:
     # The Scenario is stood in for as well: `_dossier` reads its `reverse` flag
-    # to decide what to call the simulated side (ADR 0070), and a real Session
-    # always has one -- `session.scenario_id` is NOT NULL.
+    # to decide what to call the simulated side (ADR 0070), and its situation
+    # and goal for the tone_fit block. A real Session always has one --
+    # `session.scenario_id` is NOT NULL.
     return SimpleNamespace(
         measurements=list(measurements),
         turns=[],
-        scenario=SimpleNamespace(reverse=False),
+        scenario=SimpleNamespace(
+            reverse=False,
+            description="A customer rings about a line that has been down since Monday.",
+            call_goal="Get a repair date and some acknowledgement of the trouble.",
+            success_condition="A named engineer and a date the customer accepts.",
+        ),
     )
 
 

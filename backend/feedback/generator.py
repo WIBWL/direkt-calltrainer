@@ -6,10 +6,27 @@ judge one against a norm nobody measured (ADR 0051). Its citations are checked
 against the Session, which is what ADR 0004's "traceable" and F-10's "Bezug auf
 konkrete Gesprächsstellen" require.
 
-It writes four things, not three: F-42's phase_language paragraph comes out of
-the same call as the summary and the two lists. One call rather than a second
-one of its own, because the phases are read off the same transcript and a
-second round trip would buy nothing but latency and a second way to fail.
+It writes six things, not three: F-42's phase_language paragraph, the tone_fit
+paragraph and the list of utterances where the partner pushed back all come out
+of the same call as the summary and the two lists. One call rather than more of
+their own, because all of it is read off the same transcript and a second round
+trip would buy nothing but latency and a second way to fail.
+
+The last of them is the only one nobody reads. `pressure_turns` says which
+exchanges were demanding, which is a judgement about what was said and therefore
+the model's to make; what the application does with it is measure the same
+Kennzahlen over those exchanges and over the rest, so that "Souveränität unter
+Druck" (F-62) rests on a measurement instead of an opinion (ADR 0081,
+`backend/feedback/segments.py`).
+
+tone_fit answers the one question the measurements cannot: whether the way the
+trainee sounded suited the occasion. The same lively delivery that carries a
+sales call is the wrong answer to somebody who rang up angry, and no figure
+knows which of the two a call was. It is prose for the reason phase_language is
+(ADR 0056): the right register for a complaint is not the right register for a
+price negotiation, no norm is measured for either, and a number here would be
+the invented threshold ADR 0051 refused. It is also why `_occasion` puts the
+Scenario in front of the model, which nothing in this job used to do.
 
 The wrap-up is all this job produces. It used to draft the follow-up Scenario
 too, once the wrap-up was stored — that now happens only when the User asks for
@@ -25,14 +42,16 @@ import asyncio
 import logging
 import re
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session as DbSession
 
 from backend.clients import llm
 from backend.db import models as db_models
+from backend.db.seed_data import FOCUS_GOALS
 from backend.db.session import session_scope
-from backend.feedback import jobs, metrics
+from backend.feedback import jobs, metrics, segments
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +85,15 @@ def _in_language(texts: dict[str, str], language: str) -> str:
 class _Point(BaseModel):
     text: str
     turn_id: int | None = None
+    # Which of F-62's focus goals the point is about, as a catalogue key. This
+    # is what lets the dashboard count what recurs across a user's trainings
+    # without a second model call over their history.
+    #
+    # Defaulted, and anything the catalogue does not hold is dropped at storage
+    # time rather than rejected here: a point with a good observation and a
+    # made-up key is still a good observation, and losing it would be a worse
+    # trade than losing its tag. `_goal_ids` does the checking.
+    goal: str = ""
 
 
 class _Wrapup(BaseModel):
@@ -82,6 +110,16 @@ class _Wrapup(BaseModel):
     # asks for and the one a small model is likeliest to drop, and losing a
     # whole wrap-up over a missing paragraph would be the wrong trade.
     phase_language: str = ""
+    # Whether the register suited the occasion. Defaulted on the same grounds.
+    tone_fit: str = ""
+    # The partner's utterances where the trainee was under pressure (ADR 0081).
+    # Ids, not prose: this one is not shown to anybody, it decides which
+    # exchanges the segment measurements are computed over.
+    #
+    # Defaulted like the two above, and an empty list is a legitimate answer --
+    # plenty of calls have nobody pushing back in them. An id the material does
+    # not hold is dropped at storage time, exactly as a made-up goal key is.
+    pressure_turns: list[int] = []
     strengths: list[_Point] = []
     improvements: list[_Point] = []
 
@@ -130,6 +168,7 @@ async def _generate(session_id: int) -> None:
 
         with session_scope() as db:
             _store(db, session_id, wrapup, valid_turns)
+            _store_segments(db, session_id, wrapup.pressure_turns)
             jobs.mark(db, session_id, db_models.JOB_DONE)
         logger.info("Feedback stored for session %d (%d points)", session_id, len(wrapup.points))
     except Exception as e:  # pylint: disable=broad-exception-caught
@@ -171,7 +210,8 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
     confusion that would put the feedback on the wrong person.
     """
     reverse = session.scenario.reverse
-    lines = ["Measured statistics for this call (established fact):"]
+    lines = _occasion(session.scenario)
+    lines.append("Measured statistics for this call (established fact):")
     lines += [
         f"    {m.metric_type.name}: {float(m.value):.1f} {m.metric_type.unit or ''}".rstrip()
         for m in session.measurements
@@ -199,6 +239,31 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
         )
         turn_ids.add(turn.turn_id)
     return "\n".join(lines), turn_ids
+
+
+def _occasion(scenario: db_models.Scenario) -> list[str]:
+    """What kind of call this was, for the tone_fit block.
+
+    The Scenario's own prompt fields, which are English already (ADR 0043) and
+    are the same words the simulated caller was briefed with. Nothing is
+    translated or summarised on the way in.
+
+    It is here because the question tone_fit answers cannot be asked without
+    it. Whether a register suited the occasion depends entirely on what the
+    occasion was, and until now the wrap-up saw only the transcript, from which
+    the situation has to be guessed. A guess is exactly what this block must
+    not rest on.
+
+    `success_condition` is deliberately left out. It says what would have ended
+    the call well, which is a result rather than an occasion, and handing it
+    over invites the model to grade the outcome under the heading of tone.
+    """
+    return [
+        "The occasion of this call (established fact, not something to assess):",
+        f"    Situation: {scenario.description}",
+        f"    What the caller wanted: {scenario.call_goal}",
+        "",
+    ]
 
 
 def _loudness_course(session: db_models.Session) -> str | None:
@@ -278,6 +343,50 @@ def _wanted(reverse: bool) -> str:
     """What the summary opens on: the concern the call was about, named from
     whichever side brought it."""
     return "the trainee rang about" if reverse else "the caller wanted"
+
+
+def _goal_ids(db: DbSession) -> dict[str, int]:
+    """Catalogue key to row id, for the tag on each point.
+
+    Read from the table and not from `FOCUS_GOALS`, although the prompt is
+    built from the list: the table is what the foreign key points into, and a
+    goal seeded under a different id, or one deactivated since (ADR 0076),
+    has to resolve to what is actually there.
+
+    Deactivated goals are included on purpose. A point is a statement about a
+    call that happened, and a goal leaving the catalogue does not make the
+    statement untrue; the dashboard decides separately what it still shows.
+
+    The two habit goals are excluded, which is the one place this disagrees
+    with the prompt's own rule rather than trusting it. Neither is anything a
+    single call can show, so a tag on one is always a mistake.
+    """
+    return {
+        goal.key: goal.focus_goal_id
+        for goal in db.query(db_models.FocusGoal)
+        if goal.key not in _NEVER_ASSIGNED
+    }
+
+
+# Goals about the training habit rather than about a call. Rule A6 tells the
+# model not to assign them; this is the same rule where it cannot be ignored.
+_NEVER_ASSIGNED = frozenset({"training_regularity", "training_variety"})
+
+
+def _goal_catalogue() -> str:
+    """The focus goals as the prompt lists them, one key and title per line.
+
+    Built from `seed_data.FOCUS_GOALS`, which is the same list that seeds the
+    table the assignment is stored against. Written out rather than summarised:
+    the model has to pick a key character for character, and a key it has not
+    been shown is a key it will invent.
+
+    The German titles go with them even though the rest of the prompt is
+    English (ADR 0043). They are what tells the model what a key *means*, and
+    translating them here would leave two wordings of the same goal in the
+    system with nothing keeping them in step.
+    """
+    return "".join(f"    {goal['id']}: {goal['title']}\n" for goal in FOCUS_GOALS)
 
 
 def _worked_example(reverse: bool) -> str:
@@ -420,6 +529,34 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
         "words, and no consequence, and it would fit any call ever recorded.\n"
         f"{_worked_example(reverse)}"
         "\n"
+        "# The goal on a point\n"
+        "Every point carries a `goal`: which of the trainee's possible focus "
+        "goals it is about. It is what lets somebody see later that the same "
+        "thing came up in four of their last eight calls, so it decides "
+        "nothing about this wrap-up and everything about whether the point can "
+        "be found again.\n"
+        "Pick exactly one key from this list, copied character for "
+        "character:\n"
+        f"{_goal_catalogue()}"
+        "A1. The key is an identifier. Never translate it, never invent one, "
+        "never write the German title instead.\n"
+        "A2. Pick by what the point is *about*, not by which words appear in "
+        "it. A point about talking over the caller is active_listening even if "
+        "it never uses the word listening.\n"
+        "A3. One key, the closest one. Where two would fit, take the one the "
+        "point spends most of its words on. Do not split a point in two to "
+        "give each half a goal.\n"
+        "A4. Write an empty string when nothing on the list fits. That is a "
+        "normal answer and a better one than a key that nearly fits: a wrong "
+        "key puts this point into somebody's count of a weakness they do not "
+        "have. Never force a fit.\n"
+        "A5. The goal never changes what the point says. Write the point "
+        "first, on its own merits, then label it. If you find yourself "
+        "rewording a point so it matches a key, delete the key instead.\n"
+        "A6. training_regularity and training_variety are about how often and "
+        "how widely somebody trains, which is nothing a single call can show. "
+        "Never assign either.\n"
+        "\n"
         "# The phase_language block\n"
         "A separate piece of feedback, about one thing only: whether the way "
         "the trainee spoke changed with the phase of the call. A service call "
@@ -445,6 +582,63 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
         f"figure against a norm (F2), and never make the {partner} the subject "
         "(M1).\n"
         "\n"
+        "# The tone_fit block\n"
+        "A separate piece of feedback, about one thing only: whether the way "
+        "the trainee sounded suited the occasion this particular call was. "
+        "The occasion is given to you at the top of the material. It is the "
+        "one question the measurements cannot answer, because the same lively "
+        "delivery that carries a sales call is the wrong answer to somebody "
+        "who rang up angry, and no measured figure knows which of the two this "
+        "was.\n"
+        "G1. Start from the occasion, not from the figures. Say in your own "
+        "words what this call asked for in the way of tone, and why that "
+        "follows from the situation rather than from a general rule about "
+        "phone calls.\n"
+        "G2. Then say how the trainee actually sounded, and back it with the "
+        "transcript: what they said, in their own words, with the timestamp "
+        "(P1). Where a given figure supports it you may name that figure, but "
+        "the quotation is what carries the observation and the figure is never "
+        "on its own.\n"
+        "G3. Then say plainly whether the two fit, and where they did not, "
+        "which moment shows it. 'Fitting' is not a grade and there is no scale "
+        "here: you are describing a relation between a situation and a "
+        "delivery, not scoring one against the other.\n"
+        "G4. A call where the tone did suit the occasion is a normal and "
+        "frequent answer. Say so and show why, in the same detail. Do not "
+        "manufacture a mismatch to have something to report.\n"
+        "G5. There is no correct register for a kind of call, and you must not "
+        "imply one exists. Two people can handle the same complaint well "
+        "sounding quite different. What you may say is what this trainee's "
+        "delivery would do to this caller in this situation.\n"
+        "G6. This block is about how it sounded, not about what was said or "
+        "whether the matter was solved. Wording, argument and outcome belong "
+        "in strengths and improvements.\n"
+        "G7. Do not repeat the phase_language block. That one is about a "
+        "change across the call; this one is about the call set against its "
+        "occasion. If the only thing you have to say here is that the register "
+        "moved or did not move, you have not answered this question.\n"
+        "\n"
+        "# The pressure_turns list\n"
+        "Not feedback, and nobody reads it: a list of ids the application uses "
+        "to measure how the trainee spoke while they were under pressure, "
+        "against how they spoke the rest of the time.\n"
+        f"R1. List the id of every {partner} utterance that put the trainee "
+        "under pressure: an objection, a complaint, a refusal, a demand, a "
+        "challenge to something they said, or asking again for something they "
+        "have already asked for and not been given.\n"
+        f"R2. Do not list a {partner} utterance that merely asks something "
+        "neutrally, answers, agrees, greets or says goodbye. A question is not "
+        "pressure by itself.\n"
+        "R3. This describes what the partner did, not how the trainee "
+        "handled it. An utterance goes on the list whether the trainee dealt "
+        "with it well or badly.\n"
+        "R4. An empty list is a normal and frequent answer. A call where "
+        "nobody pushed back has no pressure in it, and inventing some would "
+        "make the application measure two stretches that are the same stretch.\n"
+        "R5. Ids copied character for character from the material, as in O3. "
+        "Never guess one, never count one out yourself, and never list a 'User' "
+        "id.\n"
+        "\n"
         "# Never\n"
         "N1. No score, grade, rating, percentage, or star of any kind, and no "
         "word that works as one ('solid overall', 'a strong call').\n"
@@ -461,10 +655,10 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
         "# Output\n"
         "Answer with a single JSON object and nothing else -- no prose, no "
         "explanation, no markdown fence.\n"
-        "O1. Use exactly these four keys, spelled exactly like this, in this "
-        "order, all four always present: summary, phase_language, "
-        "strengths, improvements. The keys are identifiers, not text: never "
-        "translate them, never add a key.\n"
+        "O1. Use exactly these six keys, spelled exactly like this, in this "
+        "order, all six always present: summary, phase_language, tone_fit, "
+        "pressure_turns, strengths, improvements. The keys are identifiers, "
+        "not text: never translate them, never add a key.\n"
         f"O2. Every value you write is in {language}. The keys stay as they "
         "are.\n"
         "O3. turn_id is the id of the utterance the point concerns, copied "
@@ -476,8 +670,8 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
         "single quotes. Never a straight double quote: forget the backslash "
         "in front of one and the whole answer is unreadable.\n"
         "O5. If no utterances are listed under the transcript heading, write "
-        "a summary saying that there is nothing to review, leave both "
-        "lists empty, and make phase_language an empty string.\n"
+        "a summary saying that there is nothing to review, leave all three "
+        "lists empty, and make phase_language and tone_fit empty strings.\n"
         "O6. phase_language is a single paragraph of four to six sentences of "
         f"plain {language} prose: no headings, no bullet characters, no line "
         "breaks, and no phase name used as a label -- name a phase inside a "
@@ -485,6 +679,11 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
         "each one how the trainee actually sounded and quote the words that "
         "show it, then finish with the single change that would help most, "
         "written out as a sentence they could say aloud.\n"
+        "O7. tone_fit is a single paragraph of three to five sentences of "
+        f"plain {language} prose, following G1 to G3 in that order: what this "
+        "occasion asked for in the way of tone, how the trainee actually "
+        "sounded with a quoted moment, and whether the two fit. No headings, "
+        "no bullet characters, no line breaks.\n"
         "\n"
         "Shape:\n"
         # "what the caller wanted" names the trainee in a reverse and the
@@ -495,20 +694,33 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
         '"phase_language": "one paragraph on how the register moved through '
         'opening, core business and closing, ending in the sentence to say '
         'instead", '
+        '"tone_fit": "one paragraph on whether the way the trainee sounded '
+        'suited this occasion, built from G1, G2 and G3", '
+        f'"pressure_turns": [<ids of the {partner} utterances that put the '
+        'trainee under pressure, built from R1 and R2, empty where nobody '
+        'pushed back>], '
         '"strengths": [{"text": "one thing the trainee did well, built from '
-        'P1 and P2", "turn_id": <id, or null>}], '
+        'P1 and P2", "turn_id": <id, or null>, "goal": "<one key from the '
+        'list, or an empty string>"}], '
         '"improvements": [{"text": "one thing to do differently, built from '
         'P1, P2 and P3, ending in the sentence to say instead", '
-        '"turn_id": <id, or null>}]}\n'
+        '"turn_id": <id, or null>, "goal": "<one key from the list, or an '
+        'empty string>"}]}\n'
         "\n"
         "# Before you answer, check silently\n"
         "Every point quotes this call or a given figure with its timestamp; "
         "every improvement ends in a full sentence to say; no figure appears "
         "that was not given to you; no point would survive being moved to "
         "another call; phase_language covers all three phases or names the one "
-        "the call never reached, and gives the closing the most room.\n"
+        "the call never reached, and gives the closing the most room; tone_fit "
+        "names what this occasion asked for before it says anything about how "
+        "the trainee sounded, and would not fit a call about some other "
+        "matter; every goal is a key off the list or an empty string, and no "
+        f"point was reworded to match one; every id in pressure_turns is a "
+        f"{partner} id from the material and stands for a moment the trainee "
+        "was actually pushed.\n"
         "\n"
-        f"The four keys stay in English. Every value is written in {language}. "
+        f"The six keys stay in English. Every value is written in {language}. "
         "Your entire answer is the JSON object, starting with { and ending "
         "with }."
     )
@@ -604,16 +816,79 @@ def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) 
         # leaves the block out entirely then, which is honest about a call
         # nobody analysed for its phases. An empty paragraph would not be.
         phase_language=_without_turn_markers(wrapup.phase_language) or None,
+        tone_fit=_without_turn_markers(wrapup.tone_fit) or None,
         score=None,  # ADR 0004: qualitative only, no score in the MVP
         created_at=datetime.now(UTC),
     )
+    goal_ids = _goal_ids(db)
     feedback.points = [
         db_models.FeedbackPoint(
             position=index,
             kind=kind,
             text=_without_turn_markers(point.text),
             turn_id=point.turn_id if point.turn_id in turn_ids else None,
+            # Unknown keys become NULL rather than raising. The model is asked
+            # for one of the catalogue's keys and will occasionally invent one,
+            # and a wrap-up is worth more than its tags.
+            focus_goal_id=goal_ids.get(point.goal),
         )
         for index, (kind, point) in enumerate(wrapup.points)
     ]
     db.add(feedback)
+
+
+def _store_segments(db: DbSession, session_id: int, pressure_turns: list[int]) -> None:
+    """Mark the pressing utterances and measure the two stretches (ADR 0081).
+
+    Runs in the same transaction as the wrap-up but behind its own failure
+    boundary: these figures are an addition to a wrap-up, and a Session losing
+    them is a smaller loss than a Session losing the wrap-up they hang off.
+    A raise here would also retry the whole model call, which would be paying
+    for a second opinion to fix an arithmetic problem.
+
+    Idempotent, because `scripts/requeue_feedback.py` re-runs this job over
+    Sessions that already have rows: the previous segment rows go first. The
+    whole-call rows are never touched -- they were written when the call ended
+    and no model opinion has any business overwriting a measurement.
+    """
+    try:
+        session = db.get(db_models.Session, session_id)
+        if session is None:
+            return
+        # Persona rows only, and only ids from this Session: the same rule the
+        # points' `turn_id` follows, and for the same reason -- a reference
+        # that leads somewhere else is worse than none.
+        wanted = set(pressure_turns)
+        pressed_ids = {
+            row.turn_id for row in session.turns
+            if row.turn_id in wanted and row.speaker == db_models.SPEAKER_PERSONA
+        }
+        for row in session.turns:
+            if row.speaker == db_models.SPEAKER_PERSONA:
+                row.pressed = row.turn_id in pressed_ids
+
+        db.query(db_models.Measurement).filter(
+            db_models.Measurement.session_id == session_id,
+            db_models.Measurement.segment != db_models.SEGMENT_CALL,
+        ).delete(synchronize_session=False)
+        db.flush()
+
+        metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType).all()}
+        for segment, values in segments.measure_segments(session, pressed_ids).items():
+            db.add_all([
+                db_models.Measurement(
+                    session_id=session_id,
+                    metric_type_id=metric_ids[m.key],
+                    segment=segment,
+                    value=Decimal(f"{m.value:.4f}"),
+                    detail_json=m.detail,
+                )
+                for m in values
+                if m.key in metric_ids
+            ])
+        logger.info(
+            "Segment measurements for session %d: %d pressing utterance(s)",
+            session_id, len(pressed_ids),
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.exception("Segment measurement failed for session %d", session_id)
