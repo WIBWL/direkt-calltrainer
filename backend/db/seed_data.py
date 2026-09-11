@@ -431,6 +431,15 @@ PERSONAS = [
 # caller's bar does not recognise makes the call unwinnable in a way neither
 # field reveals on its own.
 #
+# "description_label" and "case_facts_label" are the German twins of the two
+# prompt fields the read view shows (ADR 0076). Every Scenario carries its
+# situation and its case *twice*: once in English for the model, once in German
+# for the panel behind the card. Nothing checks that the two say the same thing
+# -- the tests assert only that both exist and differ from the prompt text,
+# because content agreement is not machine-checkable. Change one and forget the
+# other and the panel promises a case the caller does not play, in a way no test
+# run reveals. Write both in the same pass, and read them side by side after.
+#
 # "category" (ADR 0072) is display and filter only, never prompt input: one of
 # `models.SCENARIO_CATEGORIES`. The four refine F-03's three call contexts --
 # operations (short support cases), requirements (consultative project talks),
@@ -444,11 +453,23 @@ PERSONAS = [
 # Scenario at all -- since ADR 0043 the language belongs to the Persona, so
 # "the same call in English" is an English Persona, not a row of its own.
 #
-# Their case figures are invented but internally consistent, and they name no
-# company, person, product or brand: the catalogue's anonymisation rule follows
-# from C-05 (R-40/R-41), which requires the training to run without
-# customer-specific product knowledge, and from ADR 0015, which requires every
-# Persona to be able to carry every case.
+# Every case is concrete and invented: a named product on the vendor's side
+# ("Kontura Flow", "Kontura Archive", "Kontura Connect"), figures, dates, ticket
+# numbers, and third parties on the user's side by name. That is what ADR 0045
+# asks case_facts for -- "product, figures, dates, history" -- and what the
+# original five have always done; the twelve from the catalogue were written
+# abstract by a misreading of the catalogue's anonymisation rule, corrected in
+# its section 1.1. The rule that stands is narrower and unchanged in substance:
+#   * Nothing identifies a real company, product, brand or place.
+#   * Nothing about the *caller* -- no name, no employer, no motive -- so any
+#     Persona can carry any case (ADR 0001, ADR 0015).
+#   * The case brings its own facts, so nothing outside the call has to be
+#     known to play it. That is C-05 (R-40/R-41), and an abstract case serves
+#     it worse: a gap in the facts gets filled from the trainee's own
+#     workplace, which is the customer-specific knowledge C-05 keeps out.
+# The figures are internally consistent within a Scenario and across the
+# library (80 euros per user, 1,600 a day), because a Persona that presses for
+# specifics will surface it if they do not add up.
 SCENARIOS = [
     {
         "id": "cold-call-followup",
@@ -749,71 +770,81 @@ SCENARIOS = [
     },
     # --- Aus dem Szenariokatalog: Profil A, Betrieb und Betreuung ---------
     # S-01. The short end of the duration span C-06/R-03 asks for: one fault,
-    # one deadline, one answer. The eight-day cut-off is what stops "we are
+    # one deadline, one answer. The close on 18 September is what stops "we are
     # looking into it" from being an answer.
     {
         "id": "process-halted-before-deadline",
         "category": "operations",
         "name": "Störung im laufenden Betrieb",
         "short_description": (
-            "Ein eingespielter Ablauf steht seit drei Tagen. Der Stichtag "
-            "rückt näher."
+            "Die Rechnungszuteilung steht seit dem Update. Der Monatsabschluss "
+            "ist in acht Tagen."
         ),
         "briefing": (
             "Sie arbeiten im Support. Sie dürfen die Ursache benennen, einen "
             "Termin zusagen und einen Weg an der Störung vorbei anbieten. Gut "
-            "gelaufen ist das Gespräch, wenn Ihr Gegenüber weiß, ob der Stichtag "
-            "hält, und wenn nicht, was stattdessen gilt."
+            "gelaufen ist das Gespräch, wenn Ihr Gegenüber weiß, ob der "
+            "Monatsabschluss hält, und wenn nicht, was stattdessen gilt."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
-            "support, because a recurring document-driven process has stopped "
-            "and items are no longer being assigned. A cut-off date is coming "
-            "up and the caller does not know whether it can still be met."
+            "support, because the rule set in Kontura Flow that assigns "
+            "incoming invoices to a clerk has stopped assigning them. A "
+            "month-end close is coming up and the caller does not know whether "
+            "it can still be met."
         ),
         "case_facts": (
-            "The process has run unchanged for more than a year. For the past "
-            "three days items have been left unassigned, roughly 30 a day, so "
-            "around 90 are now waiting. The stopgap is assigning each one by "
-            "hand, which takes about two minutes each. The cut-off is in eight "
-            "days, and anything still unassigned by then has to be handled "
-            "outside the process. Nothing was changed on the customer's side "
-            "in that time."
+            "The rule set in Kontura Flow that assigns incoming invoices to a "
+            "clerk has run unchanged for two years. Since version 4.2 was "
+            "installed on the night of 2 September, the nightly run leaves "
+            "every invoice unassigned. About 30 arrive a day and 94 are now "
+            "waiting. Three clerks assign them by hand instead, roughly two "
+            "minutes each. Ticket INC-5120 was opened on 7 September and "
+            "acknowledged, with no update since. The month-end close falls on "
+            "18 September, and whatever is still unassigned by then has to be "
+            "booked by hand into the next period. Nothing was changed on the "
+            "customer side."
         ),
         "description_label": (
-            "Der Kunde ruft im Support an, weil ein wiederkehrender, "
-            "dokumentgetriebener Prozess stehen geblieben ist und keine Vorgänge "
-            "mehr zugeteilt werden. Ein Stichtag rückt näher, und der Anrufer "
-            "weiß nicht, ob er noch zu halten ist."
+            "Der Kunde ruft im Support an, weil das Regelwerk in Kontura Flow, "
+            "das eingehende Rechnungen einem Sachbearbeiter zuteilt, keine mehr "
+            "zuteilt. Der Monatsabschluss rückt näher, und der Anrufer weiß "
+            "nicht, ob er noch zu halten ist."
         ),
         "case_facts_label": (
-            "Der Prozess läuft seit über einem Jahr unverändert. Seit drei Tagen "
-            "bleiben Vorgänge unzugeteilt, etwa 30 am Tag, es warten also rund "
-            "90. Als Behelf wird jeder Vorgang von Hand zugeteilt, was je etwa "
-            "zwei Minuten dauert. Der Stichtag ist in acht Tagen; was bis dahin "
-            "unzugeteilt ist, muss außerhalb des Prozesses bearbeitet werden. Auf "
-            "Kundenseite wurde in dieser Zeit nichts verändert."
+            "Das Regelwerk in Kontura Flow, das eingehende Rechnungen einem "
+            "Sachbearbeiter zuteilt, läuft seit zwei Jahren unverändert. Seit "
+            "der Installation von Version 4.2 in der Nacht auf den 2. September "
+            "bleibt bei jedem nächtlichen Lauf jede Rechnung unzugeteilt. Es "
+            "kommen etwa 30 am Tag, 94 warten inzwischen. Drei Sachbearbeiter "
+            "teilen sie stattdessen von Hand zu, je rund zwei Minuten. Ticket "
+            "INC-5120 wurde am 7. September eröffnet und bestätigt, seitdem kam "
+            "nichts. Der Monatsabschluss ist am 18. September; was bis dahin "
+            "unzugeteilt ist, muss von Hand in die nächste Periode gebucht "
+            "werden. Auf Kundenseite wurde nichts verändert."
         ),
         "call_goal": (
-            "Find out what is causing it and get a date by which the process "
-            "runs again."
+            "Find out what version 4.2 broke and get a date by which the "
+            "invoices are assigned again, in time for the close on 18 September."
         ),
         "success_condition": (
             "a cause and a date are named, or it is said plainly that it will "
-            "not be working before the cut-off, together with what applies "
-            "instead. A promise to look into it is not a result on its own."
+            "not be running before 18 September, together with what applies to "
+            "the invoices left over. A promise to look into it is not a result "
+            "on its own."
         ),
     },
-    # S-02. C-05: the case carries the *shape* of a regulatory deadline, never
-    # its content. Naming a real regulation would make the call unplayable
-    # without domain knowledge, which is what R-40/R-41 rule out.
+    # S-02. C-05 is met by a case that carries its own facts: the changeover is
+    # the vendor's own end-of-life date, so nothing outside the call has to be
+    # known to play it. Naming a real regulation would have needed exactly the
+    # domain knowledge R-40/R-41 rule out.
     {
         "id": "explain-mandatory-change-plainly",
         "category": "requirements",
         "name": "Erklärung für einen fachfremden Kontakt",
         "short_description": (
-            "Eine verpflichtende Umstellung mit fester Frist, erklärt ohne "
-            "Fachbegriffe."
+            "Eine Schnittstelle wird abgeschaltet, mit fester Frist. Erklärt "
+            "ohne Fachbegriffe."
         ),
         "briefing": (
             "Sie arbeiten in der Beratung und sprechen mit jemandem ohne "
@@ -824,41 +855,52 @@ SCENARIOS = [
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
-            "consulting or development, about a mandatory changeover with a "
-            "fixed deadline that affects one of the customer's processes. The "
-            "caller wants to know what it means for them and what they have "
-            "to do about it."
+            "consulting or development, because the Kontura Connect 2 interface "
+            "their order intake runs on is being switched off on a fixed date. "
+            "The caller has no technical background and wants to know what it "
+            "means for them and what they have to do about it."
         ),
         "case_facts": (
-            "The deadline runs out in just under five months. The process "
-            "affected is operated by three people, none of them technical. A "
-            "circular about the changeover went out four weeks ago that nobody "
-            "on the customer's side understood; it named the deadline and "
-            "nothing else. Whether the customer has to change anything at all "
-            "is still open. Nothing has been budgeted for it."
+            "Kontura Connect 2 is switched off on 31 March. The customer's "
+            "order intake runs over it: two buyers drop about 200 orders a week "
+            "into it as CSV files, which are picked up every hour. Moving to "
+            "Connect 3 means the files have to be delivered a different way, "
+            "which the buyers would have to change at their end too. A one-page "
+            "circular went out four weeks ago naming the date, the words "
+            "\"Connect 2\" and little else; nobody on the customer side "
+            "understood it. Three people run the order intake, none of them "
+            "technical. Nothing has been budgeted for it, and the caller does "
+            "not know whether the two buyers have been told."
         ),
         "description_label": (
-            "Der Kunde ruft in Beratung oder Entwicklung an, weil eine "
-            "verpflichtende Umstellung mit festem Stichtag einen seiner Prozesse "
-            "betrifft. Der Anrufer will wissen, was das für ihn bedeutet und was "
-            "er tun muss."
+            "Der Kunde ruft in Beratung oder Entwicklung an, weil die "
+            "Schnittstelle Kontura Connect 2, über die seine Auftragsannahme "
+            "läuft, zu einem festen Termin abgeschaltet wird. Der Anrufer hat "
+            "keinen technischen Hintergrund und will wissen, was das für ihn "
+            "bedeutet und was er tun muss."
         ),
         "case_facts_label": (
-            "Die Frist läuft in knapp fünf Monaten ab. Der betroffene Prozess "
-            "wird von drei Personen bedient, von denen keine technisch ist. Vor "
-            "vier Wochen ging ein Rundschreiben zur Umstellung heraus, das auf "
-            "Kundenseite niemand verstanden hat; es nannte den Stichtag und sonst "
-            "nichts. Ob der Kunde überhaupt etwas ändern muss, ist noch offen. "
-            "Budget ist dafür keines eingeplant."
+            "Kontura Connect 2 wird am 31. März abgeschaltet. Darüber läuft die "
+            "Auftragsannahme des Kunden: Zwei Abnehmer legen dort etwa 200 "
+            "Aufträge pro Woche als CSV-Dateien ab, die stündlich abgeholt "
+            "werden. Der Wechsel auf Connect 3 bedeutet, dass die Dateien anders "
+            "angeliefert werden müssen, was die Abnehmer auf ihrer Seite "
+            "ebenfalls ändern müssten. Vor vier Wochen kam ein einseitiges "
+            "Rundschreiben, das den Termin nannte, die Worte „Connect 2“ und "
+            "sonst wenig; auf Kundenseite hat es niemand verstanden. Die "
+            "Auftragsannahme bedienen drei Personen, keine davon technisch. "
+            "Budget ist dafür nicht eingeplant, und ob die beiden Abnehmer "
+            "informiert sind, weiß der Anrufer nicht."
         ),
         "call_goal": (
-            "Have it explained in plain words what has to be done and what it "
-            "will cost, in words a non-technical person can repeat back."
+            "Have it explained in plain words what has to be done before "
+            "31 March and what it will cost, in words a non-technical person "
+            "can repeat back."
         ),
         "success_condition": (
             "three concrete steps are named that the caller can repeat back in "
             "their own words. A pointer to documentation, or a term that is "
-            "not explained, does not count."
+            "left unexplained, does not count."
         ),
     },
     # S-03. The one case the catalogue records as evidenced from both pilot
@@ -869,8 +911,8 @@ SCENARIOS = [
         "category": "requirements",
         "name": "Anforderungsklärung bei vagem Wunsch",
         "short_description": (
-            "Der Kunde will etwas automatisieren, kann aber weder Auslöser "
-            "noch Zielzustand benennen."
+            "Der Kunde will die Reisekosten automatisieren, kann aber Auslöser "
+            "und Zielzustand nicht benennen."
         ),
         "briefing": (
             "Sie arbeiten in der Beratung. Sie dürfen offen lassen, ob das "
@@ -881,30 +923,42 @@ SCENARIOS = [
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
-            "consulting or development, wanting a recurring manual process "
-            "automated, but cannot say what triggers it or what the finished "
-            "state should look like."
+            "consulting or development, wanting the expense-claim process "
+            "automated with Kontura Flow, but cannot say what starts a claim "
+            "off or what the finished process should look like."
         ),
         "case_facts": (
-            "Two departments handle the process differently and neither knows "
-            "in detail how the other does it. Two earlier attempts at "
-            "automating it, one three years ago and one last year, ended "
-            "without a result; the caller cannot say why. No budget has been "
-            "named. A target date has: this year if at all possible. Roughly "
-            "20 cases a week go through the process."
+            "About 20 expense claims a week go through the process. Sales and "
+            "service handle them differently: in sales an assistant collects the "
+            "paper receipts and types them into a spreadsheet on the shared "
+            "drive, in service every employee fills in that same spreadsheet "
+            "themselves. Neither side knows in detail how the other works. "
+            "Approval is by e-mail, and the assistant spends roughly 25 minutes "
+            "on a claim. Two earlier attempts ended without a result: an outside "
+            "agency three years ago, stopped after about 11,000 euros, and an "
+            "in-house attempt last year. The caller cannot say why either "
+            "stopped. No budget has been named. A target date has: this year if "
+            "at all possible."
         ),
         "description_label": (
-            "Der Kunde ruft in Beratung oder Entwicklung an und möchte einen "
-            "wiederkehrenden manuellen Prozess automatisieren, kann aber weder "
-            "sagen, was ihn auslöst, noch wie das fertige Ergebnis aussehen soll."
+            "Der Kunde ruft in Beratung oder Entwicklung an und möchte die "
+            "Reisekostenabrechnung mit Kontura Flow automatisieren, kann aber "
+            "weder sagen, was eine Abrechnung auslöst, noch wie der fertige "
+            "Ablauf aussehen soll."
         ),
         "case_facts_label": (
-            "Zwei Abteilungen bearbeiten den Prozess unterschiedlich, und keine "
-            "kennt im Detail, wie die andere vorgeht. Zwei frühere Anläufe zur "
-            "Automatisierung, einer vor drei Jahren und einer im letzten Jahr, "
-            "endeten ohne Ergebnis; warum, kann der Anrufer nicht sagen. Ein "
-            "Budget wurde nicht genannt. Ein Zieltermin schon: möglichst noch "
-            "dieses Jahr. Durch den Prozess laufen etwa 20 Fälle pro Woche."
+            "Durch den Prozess laufen etwa 20 Abrechnungen pro Woche. Vertrieb "
+            "und Service machen es unterschiedlich: Im Vertrieb sammelt eine "
+            "Assistenz die Belege auf Papier und tippt sie in eine Tabelle auf "
+            "dem gemeinsamen Laufwerk, im Service füllt jeder Mitarbeiter "
+            "dieselbe Tabelle selbst aus. Keine der beiden Seiten weiß im "
+            "Detail, wie die andere vorgeht. Freigegeben wird per E-Mail, und "
+            "die Assistenz sitzt rund 25 Minuten an einer Abrechnung. Zwei "
+            "frühere Anläufe endeten ohne Ergebnis: eine externe Agentur vor "
+            "drei Jahren, abgebrochen nach etwa 11.000 Euro, und ein interner "
+            "Versuch im letzten Jahr. Warum jeweils, kann der Anrufer nicht "
+            "sagen. Ein Budget wurde nicht genannt. Ein Zieltermin schon: "
+            "möglichst noch dieses Jahr."
         ),
         "call_goal": (
             "Find out whether this is feasible at all and what happens next."
@@ -915,15 +969,15 @@ SCENARIOS = [
         ),
     },
     # S-04. R-07's case: the one customer type quoted verbatim in the pilot
-    # interviews. Consultative, deliberately not a closing call: the money is
-    # half a day of work, and the earlier goodwill job is the whole lever.
+    # interviews. Consultative, deliberately not a closing call: the money is a
+    # day of work, and the goodwill job two years ago is the whole lever.
     {
         "id": "change-outside-contract-scope",
         "category": "pricing",
         "name": "Leistung außerhalb des Vertrags",
         "short_description": (
-            "Eine gewünschte Anpassung ist vom Vertrag nicht gedeckt und wäre "
-            "zu berechnen."
+            "Eine zusätzliche Freigabestufe ist vom Vertrag nicht gedeckt und "
+            "wäre zu berechnen."
         ),
         "briefing": (
             "Sie betreuen den Kunden fachlich und kennen den Vertragsumfang. Sie "
@@ -934,49 +988,59 @@ SCENARIOS = [
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
-            "consulting or account management, about an adjustment that the "
-            "running contract does not cover and that would have to be billed "
-            "as effort."
+            "consulting or account management, about a change to their Kontura "
+            "Flow rules that the running service contract does not cover and "
+            "that would have to be billed as effort."
         ),
         "case_facts": (
-            "The contract covers operation and fault fixing, not extensions. "
-            "The adjustment asked for is about half a day of work, which comes "
-            "to a low four-figure sum at the agreed daily rate. Something "
-            "comparable was done two years ago as a goodwill gesture and never "
-            "billed, which the caller remembers clearly. The contract runs for "
-            "another fourteen months."
+            "The service contract covers operation and fault fixing for Kontura "
+            "Flow at 890 euros a month and runs for another fourteen months; "
+            "extensions are not part of it. What is asked for is a second "
+            "approval step for orders above 5,000 euros, plus one more column in "
+            "the monthly export. That is about a day of work, 1,600 euros at the "
+            "agreed daily rate. Two years ago something comparable, an extra "
+            "field on the delivery-note form, was made as a goodwill gesture and "
+            "never billed. The caller remembers it clearly, down to the "
+            "colleague who did it, a Herr Weidmann."
         ),
         "description_label": (
             "Der Kunde ruft in Beratung oder Kundenbetreuung an, weil er eine "
-            "Anpassung möchte, die der laufende Vertrag nicht abdeckt und die "
-            "nach Aufwand berechnet werden müsste."
+            "Änderung an seinen Kontura-Flow-Regeln möchte, die der laufende "
+            "Servicevertrag nicht abdeckt und die nach Aufwand berechnet werden "
+            "müsste."
         ),
         "case_facts_label": (
-            "Der Vertrag deckt Betrieb und Störungsbehebung ab, keine "
-            "Erweiterungen. Die gewünschte Anpassung ist etwa ein halber Tag "
-            "Arbeit, was zum vereinbarten Tagessatz einen niedrigen vierstelligen "
-            "Betrag ergibt. Etwas Vergleichbares wurde vor zwei Jahren aus Kulanz "
-            "gemacht und nie berechnet, woran sich der Anrufer genau erinnert. "
-            "Der Vertrag läuft noch vierzehn Monate."
+            "Der Servicevertrag deckt Betrieb und Störungsbehebung von Kontura "
+            "Flow für 890 Euro im Monat ab und läuft noch vierzehn Monate; "
+            "Erweiterungen gehören nicht dazu. Gewünscht ist eine zweite "
+            "Freigabestufe für Bestellungen über 5.000 Euro und eine "
+            "zusätzliche Spalte im Monatsexport. Das ist etwa ein Tag Arbeit, "
+            "zum vereinbarten Tagessatz 1.600 Euro. Vor zwei Jahren wurde etwas "
+            "Vergleichbares, ein zusätzliches Feld im Lieferscheinformular, aus "
+            "Kulanz gemacht und nie berechnet. Der Anrufer erinnert sich genau "
+            "daran, bis hin zu dem Kollegen, der es gemacht hat, einem Herrn "
+            "Weidmann."
         ),
         "call_goal": (
-            "Get the adjustment made, without any additional cost."
+            "Get the second approval step made, without any additional cost. "
+            "The change two years ago is the precedent to point at."
         ),
         "success_condition": (
             "either it is agreed at no charge, or the reason for billing it is "
-            "given in a way the caller can repeat back. A bare \"that is not "
-            "covered\", with no reason behind it, is not one."
+            "given in a way the caller can repeat back, and the difference from "
+            "the goodwill change two years ago is addressed. A bare \"that is "
+            "not covered\", with no reason behind it, is not one."
         ),
     },
     # S-05. R-06's emotional case. The five hours of downtime and the silence
-    # since the first report are the facts; how loudly they are carried is the
+    # since ticket INC-5188 are the facts; how loudly they are carried is the
     # Persona's business, never the Scenario's (ADR 0001, ADR 0015).
     {
         "id": "outage-escalation-no-callback",
         "category": "operations",
         "name": "Eskalation nach einem Ausfall",
         "short_description": (
-            "Seit dem Morgen steht eine zentrale Komponente, und seit drei "
+            "Seit dem Morgen lässt sich kein Dokument öffnen, und seit drei "
             "Stunden meldet sich niemand."
         ),
         "briefing": (
@@ -988,44 +1052,52 @@ SCENARIOS = [
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
-            "support or account management, because a central system component "
-            "has been down since this morning and nobody has come back to them "
-            "about it."
+            "support or account management, because Kontura Archive has been "
+            "down since this morning, no stored document can be opened, and "
+            "nobody has come back to them about it."
         ),
         "case_facts": (
-            "The outage has lasted five hours and is still going on as this "
-            "call starts. All of the customer's sites are affected and around "
-            "60 people cannot work normally. A first report was taken three "
-            "hours ago, with a callback promised within the hour, and there "
-            "has been no word since. A comparable outage last happened four "
-            "months ago and took two days to explain."
+            "Kontura Archive stopped answering at 07:40 and is still down as "
+            "this call starts, five hours later. All four of the customer's "
+            "sites are affected and around 60 people cannot work normally: "
+            "nothing that was filed opens, the delivery notes the warehouse "
+            "needs for shipping included. A first report was taken at 09:05 as "
+            "ticket INC-5188, with a callback promised within the hour, and "
+            "there has been no word since. The service contract promises a "
+            "response within two hours on a total outage. The last comparable "
+            "outage was four months ago and took two days to explain."
         ),
         "description_label": (
-            "Der Kunde ruft in Support oder Kundenbetreuung an, weil eine "
-            "zentrale Systemkomponente seit heute Morgen ausgefallen ist und sich "
-            "niemand dazu zurückgemeldet hat."
+            "Der Kunde ruft in Support oder Kundenbetreuung an, weil Kontura "
+            "Archive seit heute Morgen ausgefallen ist, kein abgelegtes Dokument "
+            "mehr geöffnet werden kann und sich niemand dazu zurückgemeldet hat."
         ),
         "case_facts_label": (
-            "Der Ausfall dauert seit fünf Stunden an und besteht zu Beginn dieses "
-            "Anrufs weiter. Betroffen sind alle Standorte des Kunden, rund 60 "
-            "Personen können nicht normal arbeiten. Vor drei Stunden wurde eine "
-            "erste Meldung aufgenommen und ein Rückruf binnen einer Stunde "
-            "zugesagt; seitdem kam nichts. Ein vergleichbarer Ausfall liegt vier "
-            "Monate zurück und brauchte zwei Tage bis zur Erklärung."
+            "Kontura Archive antwortet seit 07:40 Uhr nicht mehr und ist zu "
+            "Beginn dieses Anrufs seit fünf Stunden ausgefallen. Betroffen sind "
+            "alle vier Standorte des Kunden, rund 60 Personen können nicht "
+            "normal arbeiten: Nichts Abgelegtes lässt sich öffnen, auch nicht "
+            "die Lieferscheine, die das Lager zum Versand braucht. Um 09:05 Uhr "
+            "wurde eine erste Meldung als Ticket INC-5188 aufgenommen und ein "
+            "Rückruf binnen einer Stunde zugesagt; seitdem kam nichts. Der "
+            "Servicevertrag sagt bei einem Totalausfall eine Reaktion binnen "
+            "zwei Stunden zu. Der letzte vergleichbare Ausfall liegt vier Monate "
+            "zurück und brauchte zwei Tage bis zur Erklärung."
         ),
         "call_goal": (
-            "Get a time by which it will be working again, and know who is "
-            "taking care of it."
+            "Get a time by which Kontura Archive is back, and a name for who is "
+            "dealing with it."
         ),
         "success_condition": (
-            "a name and a time are given, or it is said openly that neither "
-            "is settled yet, together with a commitment to when it will be."
+            "a name and a time are given, or it is said openly that neither is "
+            "settled yet, together with a commitment to when it will be. A "
+            "second callback promise with no time on it is what already "
+            "happened at 09:05."
         ),
     },
     # S-07. Trains the ground F-54 sits on: the summary at the end of a call.
-    # The one point the caller took away differently is what makes summarising
-    # an act rather than a recital, and it surfaces only if the recap is
-    # specific enough to contradict them.
+    # The test data is the point the caller took away the other way round, and
+    # it surfaces only if the recap is specific enough to contradict them.
     {
         "id": "closing-recap-mismatch",
         "category": "operations",
@@ -1043,41 +1115,51 @@ SCENARIOS = [
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
-            "support or consulting, at the end of a clarification process, to "
-            "go through what was agreed once more out loud before the written "
-            "summary follows."
+            "support or consulting, at the end of the preparation for a Kontura "
+            "Flow go-live, to go through what was agreed once more out loud "
+            "before the written summary follows."
         ),
         "case_facts": (
-            "Four points were discussed earlier: a delivery date two weeks "
-            "out, who supplies the test data, how the handover gets "
-            "documented, and what happens to two items left open from the "
-            "previous call. On the test data the caller understood that it "
-            "would be supplied for them, when what was meant is that they "
-            "supply it, and they will notice that only if the recap is "
+            "Four points were settled earlier: the go-live on 24 September; who "
+            "supplies the test data, 200 delivery notes from last month with the "
+            "customer names taken out; that the handover is recorded on a "
+            "two-page acceptance sheet signed by both sides; and what happens to "
+            "two items left open from the previous call, the second export "
+            "column, which moves to the release on 12 November, and the training "
+            "for six clerks, booked separately at 640 euros. On the test data "
+            "the caller understood that the vendor would pull the 200 notes out "
+            "of the archive, when what was meant is that the customer supplies "
+            "them by 17 September. They will notice that only if the recap is "
             "specific enough to contradict them."
         ),
         "description_label": (
-            "Der Kunde ruft in Support oder Beratung am Ende einer Klärung an, um "
-            "das Vereinbarte vor der schriftlichen Zusammenfassung noch einmal "
-            "laut durchzugehen."
+            "Der Kunde ruft in Support oder Beratung am Ende der Vorbereitung "
+            "einer Inbetriebnahme von Kontura Flow an, um das Vereinbarte vor "
+            "der schriftlichen Zusammenfassung noch einmal laut durchzugehen."
         ),
         "case_facts_label": (
-            "Vier Punkte wurden zuvor besprochen: ein Liefertermin in zwei "
-            "Wochen, wer die Testdaten stellt, wie die Übergabe dokumentiert "
-            "wird, und was mit zwei offenen Punkten aus dem letzten Gespräch "
-            "passiert. Bei den Testdaten hat der Anrufer verstanden, dass sie für "
-            "ihn gestellt werden, gemeint war aber, dass er sie stellt. Auffallen "
-            "wird ihm das nur, wenn die Zusammenfassung konkret genug ist, um ihm "
-            "zu widersprechen."
+            "Vier Punkte wurden zuvor geklärt: die Inbetriebnahme am 24. "
+            "September; wer die Testdaten stellt, 200 Lieferscheine aus dem "
+            "letzten Monat ohne Kundennamen; dass die Übergabe auf einem "
+            "zweiseitigen Abnahmeblatt festgehalten wird, das beide Seiten "
+            "unterschreiben; und was mit zwei offenen Punkten aus dem letzten "
+            "Gespräch passiert, der zweiten Exportspalte, die in das Release am "
+            "12. November rutscht, und der Schulung für sechs Sachbearbeiter, "
+            "die für 640 Euro separat gebucht wird. Bei den Testdaten hat der "
+            "Anrufer verstanden, der Anbieter hole die 200 Lieferscheine aus dem "
+            "Archiv; gemeint war, dass der Kunde sie bis zum 17. September "
+            "stellt. Auffallen wird ihm das nur, wenn die Zusammenfassung "
+            "konkret genug ist, um ihm zu widersprechen."
         ),
         "call_goal": (
             "Be sure both sides mean the same thing before anything is put in "
             "writing."
         ),
         "success_condition": (
-            "the recap covers all four points and the one that was understood "
-            "differently has been noticed and put right. A recap general "
-            "enough for both readings to fit is not a result."
+            "the recap covers all four points, and the test data is named "
+            "clearly enough for the caller to notice they had it the wrong way "
+            "round and put it right. A recap general enough for both readings to "
+            "fit is not a result."
         ),
     },
     # --- Aus dem Szenariokatalog: Profil B, Beratung und Einführung --------
@@ -1092,8 +1174,8 @@ SCENARIOS = [
         "category": "requirements",
         "name": "Prozessaufnahme im Fachbereich",
         "short_description": (
-            "Ein Ablauf, den zwei Personen unterschiedlich ausführen, während "
-            "Anrufer hält beides für dasselbe."
+            "Zwei Personen prüfen den Wareneingang unterschiedlich. Der Anrufer "
+            "hält es für dasselbe."
         ),
         "briefing": (
             "Sie nehmen einen Prozess auf, um ihn später zu modellieren. Sie dürfen "
@@ -1105,40 +1187,53 @@ SCENARIOS = [
         "description": (
             "The customer (the persona) is calling the user, who works in "
             "consulting or requirements analysis, for a first conversation "
-            "about an existing manual process, so that it can be modelled "
-            "later. The caller is one of the people who runs it."
+            "about how incoming goods are checked against delivery notes today, "
+            "so that the process can be modelled in Kontura Flow later. The "
+            "caller is one of the two people who run it."
         ),
         "case_facts": (
-            "The process has roughly eight steps, three of them with special "
-            "cases. It is documented nowhere. Two people carry it out "
-            "differently: one checks an entry against a list before releasing "
-            "it, the other releases it first and corrects afterwards, which is "
-            "why about one entry in ten gets corrected later. The caller "
-            "considers the two variants to be the same thing and describes "
+            "About 120 delivery notes a week come in. The note is scanned at the "
+            "gate into a folder on the shared drive, the quantities are compared "
+            "against the order in the ERP, anything that does not match goes on "
+            "a paper list, and the note is then released for booking. The two "
+            "clerks release differently: one checks the open-order list before "
+            "releasing, the other releases first and corrects afterwards, which "
+            "is why about one entry in ten is corrected later, roughly twelve a "
+            "week. Partial deliveries, deliveries that arrive with no note at "
+            "all and returns are each handled as an exception. The only written "
+            "description is a one-page sheet pinned above one of the two desks, "
+            "dated 2019 and out of date since the ERP was upgraded. The caller "
+            "treats the two ways of releasing as the same thing and describes "
             "both as though they were."
         ),
         "description_label": (
             "Der Kunde ruft in Beratung oder Anforderungsanalyse zu einem ersten "
-            "Gespräch über einen bestehenden manuellen Prozess an, damit er "
-            "später modelliert werden kann. Der Anrufer ist einer der Menschen, "
+            "Gespräch darüber an, wie der Wareneingang heute gegen die "
+            "Lieferscheine geprüft wird, damit der Ablauf später in Kontura Flow "
+            "modelliert werden kann. Der Anrufer ist einer der beiden Menschen, "
             "die ihn ausführen."
         ),
         "case_facts_label": (
-            "Der Prozess hat etwa acht Schritte, drei davon mit Sonderfällen. "
-            "Dokumentiert ist er nirgends. Zwei Personen führen ihn "
-            "unterschiedlich aus: die eine prüft einen Eintrag vor der Freigabe "
-            "gegen eine Liste, die andere gibt zuerst frei und korrigiert "
-            "hinterher, weshalb etwa jeder zehnte Eintrag später korrigiert wird. "
-            "Der Anrufer hält die beiden Varianten für dasselbe und beschreibt "
-            "sie auch so."
+            "Es kommen etwa 120 Lieferscheine pro Woche. Der Schein wird am Tor "
+            "in einen Ordner auf dem gemeinsamen Laufwerk gescannt, die Mengen "
+            "werden gegen die Bestellung im ERP verglichen, was nicht passt, "
+            "kommt auf eine Papierliste, danach wird der Schein zur Buchung "
+            "freigegeben. Die beiden Sachbearbeiter geben unterschiedlich frei: "
+            "Der eine prüft vor der Freigabe die Liste der offenen Bestellungen, "
+            "der andere gibt zuerst frei und korrigiert hinterher, weshalb etwa "
+            "jeder zehnte Eintrag später korrigiert wird, rund zwölf pro Woche. "
+            "Teillieferungen, Lieferungen ganz ohne Schein und Retouren gelten "
+            "jeweils als Sonderfall. Die einzige schriftliche Beschreibung ist "
+            "ein einseitiges Blatt über einem der beiden Schreibtische, datiert "
+            "auf 2019 und seit der ERP-Umstellung überholt. Der Anrufer hält die "
+            "beiden Freigabewege für dasselbe und beschreibt sie auch so."
         ),
         "call_goal": (
-            "Explain how the process works today and find out what happens "
-            "next."
+            "Explain how the check works today and find out what happens next."
         ),
         "success_condition": (
-            "the steps have been played back and the difference between the "
-            "two variants has been named out loud."
+            "the steps have been played back and the difference between the two "
+            "ways of releasing has been named out loud."
         ),
     },
     # S-09. R-12's ground on the Scenario side: three reservations that each
@@ -1149,8 +1244,8 @@ SCENARIOS = [
         "category": "closing",
         "name": "Einwände gegen die Lösungswahl",
         "short_description": (
-            "Drei Vorbehalte gegen den vorgeschlagenen Ansatz, und eine "
-            "Entscheidung in sechs Wochen."
+            "Drei Vorbehalte gegen Kontura Flow, und eine Entscheidung in sechs "
+            "Wochen."
         ),
         "briefing": (
             "Sie beraten zum vorgeschlagenen Ansatz und sitzen selbst nicht in "
@@ -1161,36 +1256,45 @@ SCENARIOS = [
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
-            "consulting or management, with reservations about the proposed "
-            "approach: dependence on a single vendor, limits once the "
-            "requirements get complex, and doubt about whether it will still "
-            "carry in five years."
+            "consulting or management, with reservations about the proposal to "
+            "configure Kontura Flow rather than have something built: "
+            "dependence on a single vendor, limits once the rules get complex, "
+            "and doubt about whether it will still carry in five years."
         ),
         "case_facts": (
-            "An earlier project of the customer's on a comparable approach was "
-            "replaced after two years. The caller was involved in it and "
-            "brings it up, without knowing exactly why it was replaced. A "
-            "decision is due in six weeks and is taken by a group of four, of "
-            "whom the caller is one. Roughly 40 people would work with the "
-            "result day to day."
+            "The offer on the table is 38,400 euros for the first year, 40 users "
+            "at 80 euros a month, plus fourteen days of configuration at 1,600 "
+            "euros a day. The release process it would carry has fourteen rules, "
+            "four of them with exceptions that are decided case by case today. "
+            "The customer bought a workflow tool in 2018 for about 60,000 euros "
+            "and replaced it after two years; the caller was involved in that "
+            "and brings it up, without knowing exactly why it was replaced. The "
+            "decision is taken on 14 November by a steering group of four, of "
+            "whom the caller is one. Around 40 people would work with the result "
+            "every day."
         ),
         "description_label": (
             "Der Kunde ruft in Beratung oder Leitung an und hat Vorbehalte gegen "
-            "den vorgeschlagenen Ansatz: Abhängigkeit von einem einzigen "
-            "Anbieter, Grenzen bei komplexeren Anforderungen und Zweifel, ob das "
-            "in fünf Jahren noch trägt."
+            "den Vorschlag, Kontura Flow zu konfigurieren statt etwas bauen zu "
+            "lassen: Abhängigkeit von einem einzigen Anbieter, Grenzen bei "
+            "komplexeren Regeln und Zweifel, ob das in fünf Jahren noch trägt."
         ),
         "case_facts_label": (
-            "Ein früheres Projekt des Kunden auf einem vergleichbaren Ansatz "
-            "wurde nach zwei Jahren abgelöst. Der Anrufer war daran beteiligt und "
-            "bringt es zur Sprache, ohne genau zu wissen, warum es abgelöst "
-            "wurde. Eine Entscheidung steht in sechs Wochen an und wird von einem "
-            "Gremium aus vier Personen getroffen, zu denen der Anrufer gehört. "
-            "Mit dem Ergebnis würden etwa 40 Personen täglich arbeiten."
+            "Auf dem Tisch liegt ein Angebot über 38.400 Euro für das erste "
+            "Jahr, 40 Nutzer zu je 80 Euro im Monat, dazu vierzehn Tage "
+            "Konfiguration zu 1.600 Euro am Tag. Der Freigabeprozess, den das "
+            "tragen soll, hat vierzehn Regeln, vier davon mit Ausnahmen, die "
+            "heute im Einzelfall entschieden werden. Der Kunde hat 2018 ein "
+            "Workflow-Werkzeug für rund 60.000 Euro gekauft und nach zwei Jahren "
+            "abgelöst; der Anrufer war daran beteiligt und bringt es zur "
+            "Sprache, ohne genau zu wissen, warum es abgelöst wurde. Entschieden "
+            "wird am 14. November von einem Gremium aus vier Personen, zu denen "
+            "der Anrufer gehört. Mit dem Ergebnis würden etwa 40 Personen "
+            "täglich arbeiten."
         ),
         "call_goal": (
-            "Test whether the reservations can be answered, with something "
-            "concrete, not with reassurance."
+            "Test whether the three reservations can be answered with something "
+            "concrete, before the steering group meets on 14 November."
         ),
         "success_condition": (
             "each of the three reservations has either a concrete answer or is "
@@ -1207,7 +1311,7 @@ SCENARIOS = [
         "category": "pricing",
         "name": "Preis- und Konditionsverhandlung",
         "short_description": (
-            "Der Einkauf fordert einen Nachlass und verweist auf ein "
+            "Der Einkauf fordert 15 Prozent und verweist auf ein "
             "Vergleichsangebot."
         ),
         "briefing": (
@@ -1219,33 +1323,42 @@ SCENARIOS = [
         ),
         "description": (
             "The customer's procurement side (the persona) is calling the "
-            "user, who works in sales or management, to ask for a discount, "
-            "citing a competing quote."
+            "user, who works in sales or management, to ask for a discount on "
+            "the Kontura offer, citing a competing quote."
         ),
         "case_facts": (
-            "The quote on the table is a running annual figure in the middle "
-            "five-figure range. The competing quote named is around 20 percent "
-            "below it, but covers a smaller scope: it leaves out the "
-            "migration of existing data and the second year of support, which "
-            "the caller does not volunteer and concedes only if asked what is "
-            "actually in it. The decision is meant to be made this week."
+            "The offer is 52,800 euros a year, 55 users at 80 euros a month for "
+            "Kontura Flow and the Insight Analytics package, plus a one-off "
+            "12,000 euros to migrate the existing documents and 8,400 euros for "
+            "the second year of support. Procurement is asking for 15 percent "
+            "off the annual figure. The competing quote named is 42,000 euros a "
+            "year, around 20 percent under, but it covers less: migrating the "
+            "roughly 60,000 stored documents is not in it, nor is the second "
+            "support year. The caller does not volunteer that and concedes it "
+            "only if asked what the quote actually contains. The decision is "
+            "meant to be made on Friday."
         ),
         "description_label": (
             "Der Einkauf des Kunden ruft in Vertrieb oder Leitung an und fordert "
-            "unter Verweis auf ein Konkurrenzangebot einen Nachlass."
+            "unter Verweis auf ein Konkurrenzangebot einen Nachlass auf das "
+            "Kontura-Angebot."
         ),
         "case_facts_label": (
-            "Das vorliegende Angebot ist eine laufende Jahressumme im mittleren "
-            "fünfstelligen Bereich. Das genannte Konkurrenzangebot liegt rund 20 "
-            "Prozent darunter, deckt aber weniger ab: Die Übernahme der "
-            "bestehenden Daten und das zweite Supportjahr fehlen darin. Von sich "
-            "aus sagt der Anrufer das nicht und räumt es erst ein, wenn er "
-            "gefragt wird, was darin eigentlich enthalten ist. Die Entscheidung "
-            "soll noch diese Woche fallen."
+            "Das Angebot lautet auf 52.800 Euro im Jahr, 55 Nutzer zu je 80 Euro "
+            "im Monat für Kontura Flow und das Paket Insight Analytics, dazu "
+            "einmalig 12.000 Euro für die Übernahme der bestehenden Dokumente "
+            "und 8.400 Euro für das zweite Supportjahr. Der Einkauf fordert 15 "
+            "Prozent auf die Jahressumme. Das genannte Konkurrenzangebot liegt "
+            "bei 42.000 Euro im Jahr, rund 20 Prozent darunter, deckt aber "
+            "weniger ab: Die Übernahme der etwa 60.000 abgelegten Dokumente "
+            "fehlt darin, das zweite Supportjahr ebenfalls. Von sich aus sagt "
+            "der Anrufer das nicht und räumt es erst ein, wenn er gefragt wird, "
+            "was in dem Angebot eigentlich enthalten ist. Entschieden werden "
+            "soll am Freitag."
         ),
         "call_goal": (
-            "Get the price down. The competing quote is the lever, not the "
-            "point."
+            "Get 15 percent off the annual figure. The competing quote is the "
+            "lever, not the point."
         ),
         "success_condition": (
             "a figure is committed to with a date it is valid until, or it is "
@@ -1261,8 +1374,8 @@ SCENARIOS = [
         "category": "requirements",
         "name": "Gespräch mit einer skeptischen IT-Seite",
         "short_description": (
-            "Der Fachbereich ist überzeugt, die IT sieht Steuerbarkeit und "
-            "Betrieb gefährdet."
+            "Der Vertrieb hat Kontura an der IT vorbei aufgesetzt. Die IT ruft "
+            "an."
         ),
         "briefing": (
             "Sie arbeiten in der Beratung und sprechen mit der IT-Seite des "
@@ -1274,31 +1387,37 @@ SCENARIOS = [
         ),
         "description": (
             "The customer's IT side (the persona) is calling the user, who "
-            "works in consulting. The department is convinced by the approach; "
-            "the IT side sees control, security and day-to-day operation at "
-            "risk if departments configure things for themselves."
+            "works in consulting. The sales department is convinced by Kontura "
+            "Flow; the IT side sees control, security and day-to-day operation "
+            "at risk if departments set such things up for themselves."
         ),
         "case_facts": (
-            "The department has already started work in a test environment "
-            "without consulting IT. An internal policy forbids exactly that, "
-            "and the IT side found out about it three weeks in. The IT side is "
-            "not opposed to the approach in principle. It was bypassed, which "
-            "is a different objection and not the one being made out loud. Two "
-            "further departments are waiting to follow."
+            "The sales department started a Kontura cloud trial on 12 August on "
+            "a company credit card, 14 users, 480 euros charged so far. About "
+            "1,200 customer records have been uploaded into it. An internal "
+            "policy requires any outside service to pass an IT review before "
+            "company data goes into it, and the IT side found out about this one "
+            "on 2 September from the credit-card statement. Two more departments "
+            "have asked to follow. The IT side is not opposed to Kontura itself. "
+            "It was bypassed, which is a different objection from the one being "
+            "made out loud."
         ),
         "description_label": (
-            "Die IT-Seite des Kunden ruft in der Beratung an. Der Fachbereich ist "
-            "vom Ansatz überzeugt; die IT-Seite sieht Kontrolle, Sicherheit und "
-            "den täglichen Betrieb gefährdet, wenn Fachbereiche sich selbst etwas "
-            "einrichten."
+            "Die IT-Seite des Kunden ruft in der Beratung an. Der Vertrieb ist "
+            "von Kontura Flow überzeugt; die IT-Seite sieht Kontrolle, "
+            "Sicherheit und den täglichen Betrieb gefährdet, wenn Fachbereiche "
+            "sich so etwas selbst einrichten."
         ),
         "case_facts_label": (
-            "Der Fachbereich hat in einer Testumgebung bereits begonnen, ohne die "
-            "IT zu fragen. Eine interne Richtlinie verbietet genau das, und die "
-            "IT-Seite hat erst nach drei Wochen davon erfahren. Gegen den Ansatz "
-            "an sich ist die IT-Seite nicht. Sie wurde übergangen, was ein "
-            "anderer Einwand ist als der, den sie laut vorbringt. Zwei weitere "
-            "Fachbereiche warten darauf, nachzuziehen."
+            "Der Vertrieb hat am 12. August eine Kontura-Testumgebung in der "
+            "Cloud auf eine Firmenkreditkarte gebucht, 14 Nutzer, bisher 480 "
+            "Euro. Etwa 1.200 Kundendatensätze sind bereits darin. Eine interne "
+            "Richtlinie verlangt für jeden externen Dienst eine IT-Prüfung, "
+            "bevor Firmendaten hineingehen, und die IT-Seite hat am 2. September "
+            "über die Kreditkartenabrechnung davon erfahren. Zwei weitere "
+            "Fachbereiche wollen nachziehen. Gegen Kontura an sich ist die "
+            "IT-Seite nicht. Sie wurde übergangen, was ein anderer Einwand ist "
+            "als der, den sie laut vorbringt."
         ),
         "call_goal": (
             "Settle who decides what from here on, and who runs it once it is "
@@ -1311,54 +1430,69 @@ SCENARIOS = [
         ),
     },
     # S-12. Systementwurf, not evidenced: plausible for the consulting profile
-    # but not recorded in an interview. The third question has no solid answer,
-    # and saying so is the trained behaviour. An uncertain answer delivered
-    # confidently is the failure mode.
+    # but not recorded in an interview. Which of the three questions has no
+    # solid answer is the *user's* knowledge, so it sits in the briefing, not in
+    # the case -- the caller cannot know what the vendor has on record, and a
+    # model told otherwise plays the call omnisciently. Same split as S-13.
     {
         "id": "regulated-environment-questions",
         "category": "requirements",
         "name": "Gespräch im regulierten Umfeld",
         "short_description": (
-            "Drei Fragen zu Datenhaltung und Nachweisen, auf eine gibt es "
+            "Drei Fragen zu Speicherort, Zugriff und Löschung. Auf eine gibt es "
             "keine belastbare Antwort."
         ),
         "briefing": (
             "Sie arbeiten in der Beratung; Ihr Gegenüber schreibt mit und gibt Ihre "
-            "Aussagen an Dritte weiter. Sie dürfen sagen, dass Sie etwas nicht "
-            "belastbar beantworten können, und dürfen eine Antwort nachliefern. Gut "
-            "gelaufen ist das Gespräch, wenn jede Frage entweder beantwortet oder "
-            "ausdrücklich offen ist, mit der Zusage, wer sie bis wann klärt."
+            "Aussagen an Dritte weiter. Zwei der drei Fragen können Sie belastbar "
+            "beantworten: Frankfurt mit Zweitkopie in Hamburg, und zwei benannte "
+            "Administratoren mit 90 Tagen Protokoll. Zur dritten, wie lange ein "
+            "gelöschtes Dokument im Backup wiederherstellbar bleibt, haben Sie "
+            "keine gesicherte Auskunft. Gut gelaufen ist das Gespräch, wenn jede "
+            "Frage entweder beantwortet oder ausdrücklich offen ist, mit der "
+            "Zusage, wer sie bis wann klärt."
         ),
         "description": (
             "The customer (the persona) works in a heavily regulated area and "
-            "is calling the user, who works in consulting, with questions "
-            "about where data is held, who may access it, and what has to be "
-            "evidenced. The caller takes notes and reads commitments back."
+            "is calling the user, who works in consulting, with three questions "
+            "about Kontura Archive: where the documents are held, who on the "
+            "vendor side can open them, and how long a deleted document stays "
+            "recoverable. The caller takes notes and reads commitments back."
         ),
         "case_facts": (
-            "An internal audit is due in three months and this is one of the "
-            "areas it will look at. Of the three questions, two have a solid "
-            "answer on record and a third does not, and whatever is said about "
-            "that one will be quoted in the audit exactly as it was given. The "
-            "caller has to hand their notes to a second person who was not on "
-            "the call."
+            "An internal audit falls on 11 December and the archive is one of "
+            "the areas it looks at. The three questions are: in which data "
+            "centre the documents are held, who on the vendor side can open a "
+            "customer archive and whether that is logged, and how long a deleted "
+            "document stays recoverable in the backup. Whatever is said will be "
+            "quoted in the audit exactly as it was given, and the caller has to "
+            "hand their notes to a second person who was not on the call. The "
+            "archive holds around 60,000 documents. The same three questions "
+            "were asked before the last audit two years ago and only two of them "
+            "came back answered."
         ),
         "description_label": (
-            "Der Kunde arbeitet in einem stark regulierten Umfeld und ruft in der "
-            "Beratung an, mit Fragen dazu, wo Daten liegen, wer darauf zugreifen "
-            "darf und was nachzuweisen ist. Der Anrufer macht sich Notizen und "
-            "liest Zusagen zurück."
+            "Der Kunde arbeitet in einem stark regulierten Umfeld und ruft in "
+            "der Beratung an, mit drei Fragen zu Kontura Archive: wo die "
+            "Dokumente liegen, wer sie auf Anbieterseite öffnen darf und wie "
+            "lange ein gelöschtes Dokument wiederherstellbar bleibt. Der Anrufer "
+            "macht sich Notizen und liest Zusagen zurück."
         ),
         "case_facts_label": (
-            "In drei Monaten steht eine interne Prüfung an, und dieser Bereich "
-            "gehört zu dem, was sie sich ansieht. Von den drei Fragen sind zwei "
-            "belastbar beantwortet und eine nicht, und was zu dieser einen gesagt "
-            "wird, landet genau so in der Prüfung. Der Anrufer muss seine Notizen "
-            "an eine zweite Person weitergeben, die beim Gespräch nicht dabei "
-            "war."
+            "Am 11. Dezember steht eine interne Prüfung an, und das Archiv "
+            "gehört zu dem, was sie sich ansieht. Die drei Fragen lauten: in "
+            "welchem Rechenzentrum die Dokumente liegen, wer auf Anbieterseite "
+            "ein Kundenarchiv öffnen kann und ob das protokolliert wird, und wie "
+            "lange ein gelöschtes Dokument im Backup wiederherstellbar bleibt. "
+            "Was gesagt wird, landet genau so in der Prüfung, und der Anrufer "
+            "muss seine Notizen an eine zweite Person weitergeben, die beim "
+            "Gespräch nicht dabei war. Im Archiv liegen rund 60.000 Dokumente. "
+            "Dieselben drei Fragen wurden vor der letzten Prüfung vor zwei "
+            "Jahren gestellt, und nur zwei davon kamen beantwortet zurück."
         ),
         "call_goal": (
-            "Get an answer for each question that is solid enough to quote."
+            "Get an answer for each of the three questions that is solid enough "
+            "to quote in the audit on 11 December."
         ),
         "success_condition": (
             "every question is either answered or expressly marked as open, "
@@ -1368,59 +1502,65 @@ SCENARIOS = [
     },
     # S-13. Systementwurf on R-06's back. The caller rings to confirm the date,
     # not knowing it has slipped. The case says nothing about it slipping,
-    # because the caller does not know (ADR 0045: these are the caller's facts).
-    # The Kurzbeschreibung is where the trainee learns it, that card being the
-    # only briefing channel there is until ADR 0054 is built.
+    # because the caller does not know (ADR 0045: these are the caller's facts);
+    # the trainee learns it from the briefing, and gets the replacement date
+    # there too, so there is something to offer instead of a bare apology.
     {
         "id": "deadline-correction",
         "category": "operations",
         "name": "Termin- und Erwartungskorrektur",
         "short_description": (
-            "Der Kunde will einen zugesagten Termin bestätigt haben. Halten "
-            "lässt er sich nicht."
+            "Der Kunde will die Inbetriebnahme am 20. September bestätigt "
+            "haben. Halten lässt sie sich nicht."
         ),
         "briefing": (
             "Sie führen das Projekt und wissen, was Ihr Gegenüber noch nicht weiß: "
-            "der zugesagte Termin ist nicht zu halten. Sie dürfen einen neuen "
+            "Der 20. September ist nicht zu halten, zwei der fünf Schnittstellen "
+            "sind offen, realistisch ist Mitte Oktober. Sie dürfen einen neuen "
             "Termin nennen, Teilergebnisse anbieten und Prioritäten verschieben. "
             "Gut gelaufen ist das Gespräch, wenn die Korrektur früh genug ankommt "
-            "und klar ist, was aus dem Anschlusstermin wird, der daran hängt."
+            "und klar ist, was aus den Terminen wird, die daran hängen."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
-            "project management, to have a committed date confirmed, because "
-            "internal appointments have been scheduled behind it."
+            "project management, to have the committed go-live date for their "
+            "Kontura Flow order release confirmed, because internal "
+            "appointments have been scheduled behind it."
         ),
         "case_facts": (
-            "The date was committed to six weeks ago and falls in ten days. "
-            "Two further appointments have been hung on it internally, one of "
-            "them with a third party who was booked eight weeks in advance and "
-            "is hard to move. Nothing has been heard about the state of the "
-            "work since the commitment was made, and the caller has heard "
-            "nothing to suggest it is at risk."
+            "The go-live of the order-release rules was committed on 1 August "
+            "for 20 September. Two things hang on it: training for 22 clerks "
+            "booked for 24 September, and an outside consultant booked for three "
+            "days from 26 September at 1,600 euros a day, who can be cancelled "
+            "free of charge only up to 12 September. Nothing has been heard "
+            "about the state of the work since the commitment was made, and the "
+            "caller has heard nothing to suggest the date is at risk."
         ),
         "description_label": (
-            "Der Kunde ruft im Projektmanagement an, um sich einen zugesagten "
-            "Termin bestätigen zu lassen, weil intern bereits Termine dahinter "
+            "Der Kunde ruft im Projektmanagement an, um sich den zugesagten "
+            "Termin für die Inbetriebnahme seiner Bestellfreigabe in Kontura "
+            "Flow bestätigen zu lassen, weil intern bereits Termine dahinter "
             "geplant wurden."
         ),
         "case_facts_label": (
-            "Der Termin wurde vor sechs Wochen zugesagt und liegt in zehn Tagen. "
-            "Intern hängen zwei weitere Termine daran, einer davon mit einem "
-            "Dritten, der acht Wochen im Voraus gebucht wurde und schwer zu "
-            "verschieben ist. Seit der Zusage kam nichts zum Stand der Arbeiten, "
-            "und der Anrufer hat auch nichts gehört, was auf ein Risiko "
-            "hindeutet."
+            "Die Inbetriebnahme der Bestellfreigabe wurde am 1. August für den "
+            "20. September zugesagt. Zwei Dinge hängen daran: die Schulung für "
+            "22 Sachbearbeiter am 24. September und ein externer Berater, der ab "
+            "dem 26. September für drei Tage zu 1.600 Euro am Tag gebucht ist "
+            "und nur bis zum 12. September kostenfrei abgesagt werden kann. Seit "
+            "der Zusage kam nichts zum Stand der Arbeiten, und der Anrufer hat "
+            "auch nichts gehört, was auf ein Risiko hindeutet."
         ),
         "call_goal": (
-            "Have the date confirmed, and if it does not hold, know what "
-            "applies instead and whether the appointment with the third party "
-            "can still be kept."
+            "Have 20 September confirmed, and if it does not hold, know what "
+            "applies instead and whether the consultant booked from 26 September "
+            "can still be used."
         ),
         "success_condition": (
             "the date is confirmed, or a new one is named together with what "
-            "happens to the appointment that hangs off it. A new date on its "
-            "own leaves the third party unanswered."
+            "happens to the training and the consultant booked behind it. A new "
+            "date on its own leaves the cancellation deadline of 12 September "
+            "unanswered."
         ),
     },
 ]
