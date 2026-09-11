@@ -940,7 +940,7 @@ export default function App() {
 
   if (screen === "analysing") {
     return (
-      <AppLayout step="feedback">
+      <AppLayout step="feedback" onHome={handleRestart}>
         {/* The wrap-up's own poll lives one screen further on, in FeedbackView
             — this one runs its own and hands over the moment it settles. Two
             pollers, but never at the same time, and the second one's first
@@ -952,7 +952,10 @@ export default function App() {
 
   if (screen === "transcript") {
     return (
-      <AppLayout step="feedback">
+      // The brand in the header leaves for the same place the foot's "Zur
+      // Startseite" does, and has to do the same thing to get there: these two
+      // screens are a state under the training route, not a route of their own.
+      <AppLayout step="feedback" onHome={handleRestart}>
         <TranscriptView
           transcript={transcript}
           personaName={personaName}

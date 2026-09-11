@@ -11,6 +11,8 @@ interface AppLayoutProps {
   navigationLocked?: boolean;
   /** Marks the header's account chip as the current page. */
   accountActive?: boolean;
+  /** Passed through to the header — see `onHome` there. */
+  onHome?: () => void;
   /** Per-screen modifier on the page element; the shared `app-page` is added here. */
   pageClassName?: string;
   children: ReactNode;
@@ -22,6 +24,7 @@ export default function AppLayout({
   step,
   navigationLocked,
   accountActive,
+  onHome,
   pageClassName,
   children,
 }: AppLayoutProps) {
@@ -31,6 +34,7 @@ export default function AppLayout({
         activeStep={step}
         navigationLocked={navigationLocked}
         accountActive={accountActive}
+        onHome={onHome}
       />
 
       <main className={cx("app-page", pageClassName)}>{children}</main>

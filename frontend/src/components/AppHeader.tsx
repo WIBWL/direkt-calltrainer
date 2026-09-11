@@ -25,6 +25,14 @@ interface AppHeaderProps {
   navigationLocked?: boolean | undefined;
   /** Marks the account chip as the current page. */
   accountActive?: boolean | undefined;
+  /**
+   * Resets the training flow when the brand is clicked. Every training screen
+   * lives under the one route, so from the feedback screen the brand's link
+   * points at the path already on display: the router renders nothing new and
+   * the click does nothing at all. The screens that are a state rather than a
+   * route hand the reset in here; everywhere else the plain link is right.
+   */
+  onHome?: (() => void) | undefined;
 }
 
 // Keeping the step configuration here avoids duplicating the markup.
@@ -38,6 +46,7 @@ export default function AppHeader({
   activeStep,
   navigationLocked = false,
   accountActive = false,
+  onHome,
 }: AppHeaderProps) {
   const auth = useAuth();
   const account = useAccount();
@@ -64,7 +73,16 @@ export default function AppHeader({
         {navigationLocked ? (
           brand
         ) : (
-          <Link to={ROUTES.training} className="app-brand-link" aria-label="Zum Training">
+          <Link
+            to={ROUTES.training}
+            className="app-brand-link"
+            aria-label="Zum Training"
+            onClick={onHome}
+            // The reset is the whole of the navigation where `onHome` is set,
+            // and the route does not change: pushing the path a second time
+            // would leave a history entry that goes nowhere.
+            replace={Boolean(onHome)}
+          >
             {brand}
           </Link>
         )}
