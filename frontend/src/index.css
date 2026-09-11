@@ -25,6 +25,24 @@
   --color-success: #2e8064;
   --color-danger: #b4453a;
 
+  /* Chart identity hues (F-13, utils/metricGroups.ts). Slots 1, 5 and 7 of the
+     documented categorical palette, in that order, validated as an all-pairs
+     set against a white card: CVD ΔE 13.0, normal-vision ΔE 16.3.
+
+     Identity, never judgement. The hue belongs to a family of Kennzahlen and
+     never moves with a value, and none of the three is red, amber or green --
+     those are spent on ADR 0078's traffic light, and a dashboard that reused
+     one would invite exactly the reading ADR 0065 forbids. */
+  --series-speech: #2a78d6;
+  --series-content: #e87ba4;
+  --series-activity: #4a3aa7;
+  /* The same hues at a fill weight: an area under a line, a band, a hover
+     surface. Alpha rather than a lighter step, so a fill sits on any surface
+     without a second set of values to keep in step. */
+  --series-speech-fill: #2a78d61f;
+  --series-content-fill: #e87ba41f;
+  --series-activity-fill: #4a3aa71f;
+
   /* Shared font families */
   --font-sans: "Hanken Grotesk", Arial, sans-serif;
   --font-mono: "IBM Plex Mono", monospace;
@@ -3717,21 +3735,27 @@ h2 {
   opacity: 0.8;
 }
 
-/* --- The provisional traffic light (F-51) -------------------------------- */
-/* The only colour in this application that says something about a value, and
-   an exception to the rule the rest of it follows: ADR 0004, ADR 0051 and
-   ADR 0065 all refuse to place a figure against a threshold, on the grounds
-   that no threshold here was measured rather than guessed. This one is being
-   trialled, its boundaries are declared heuristics in `interruptions.py`, and
-   it appears on a single Kennzahl of a single call.
+/* --- The traffic light on a classification (ADR 0078) -------------------- */
+/* The only colour in this application that says something about a value. It
+   exists so a reader gets an impression before the reading starts: the wrap-up
+   hands them nine figures at equal weight, and nothing else on that screen says
+   which one is worth their attention first. Colour is seen rather than read,
+   which is the whole property being used here.
 
-   It colours the figure and nothing else. A whole tile in red would shout an
-   orientation that two invented numbers cannot support, and it would drown out
-   the eight neighbouring Kennzahlen that carry no judgement at all.
+   It points, it does not grade. Green means nothing here needs attention today,
+   red means look here first. Two Kennzahlen carry one, F-51's interruptions and
+   F-35's Sprachmelodie, and ADR 0078 holds the seven conditions any further one
+   has to meet.
 
-   Colour is never the only channel: the step is written out underneath, the
-   word "Einschätzung" follows it, the scale sits on the Kennzahl's own page,
-   and the three tints differ in lightness so they survive greyscale. */
+   It colours the classification and nothing else. Never a whole tile, which
+   would shout an orientation the thresholds cannot support and drown out the
+   neighbouring Kennzahlen that carry no reading at all. Never a raw figure
+   either: on F-35 the step is read from the Lebendigkeit while the tile's
+   number is the Umfang, so the colour goes on the word.
+
+   Colour is never the only channel: the step is written out beside it, the word
+   "Einschätzung" follows, the scale it came from sits on the Kennzahl's own
+   page, and the three tints differ in lightness so they survive greyscale. */
 
 .metric-value-green {
   color: var(--color-success);
@@ -3791,15 +3815,36 @@ h2 {
 
 /* --- One Kennzahl's own page --------------------------------------------- */
 
+/* Room between the areas of this page. A Kennzahl's page is figure, scale,
+   note, reading and excerpts stacked in one column, and at the default card
+   rhythm they ran together into one grey block where the eye had nowhere to
+   rest. The space is what says these are separate things. */
+.metric-page .card {
+  margin-top: 2rem;
+  padding: 1.75rem;
+}
+
+.metric-page h1 {
+  margin-bottom: 0.5rem;
+}
+
+.metric-page h2 {
+  margin-top: 2.5rem;
+}
+
+/* The figure is what the page is about, so it carries the weight and the
+   reading sits under it rather than beside it. */
 .metric-page-figure {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: 12px;
-  margin: 0 0 0.75rem;
+  margin: 0 0 1.25rem;
   font-family: var(--font-display);
-  font-size: 2rem;
+  font-size: 2.4rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  line-height: 1.1;
 }
 
 .metric-page-figure .metric-light-label {
@@ -3814,8 +3859,8 @@ h2 {
 .metric-steps {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin: 0 0 0.75rem;
+  gap: 8px;
+  margin: 0 0 1.5rem;
 }
 
 .metric-step {
@@ -3838,30 +3883,40 @@ h2 {
   font-weight: 600;
 }
 
-.metric-step-green {
-  border-left-color: var(--color-success);
-}
-
-.metric-step-yellow {
-  border-left-color: #b57a12;
-}
-
-.metric-step-red {
-  border-left-color: var(--color-danger);
-}
-
-/* The step this call landed on. Weight and a filled ground, never a colour:
-   on the five-step Sprachmelodie scale (F-35) both ends are uncomfortable, so
-   there is no direction a colour could point in. */
+/* The step this call landed on. Weight and a filled ground, so the colour is
+   never the only thing that says which one it was: the three tints differ in
+   lightness, but a reader who sees none of them still sees the mark. */
 .metric-step.is-current {
   border-left-color: var(--color-blue-600);
+  border-left-width: 5px;
+  padding-left: 6px;
   background: var(--color-surface-selected);
   color: var(--color-navy-900);
   font-weight: 600;
 }
 
+/* After `.is-current` and at the same specificity, so a step that carries a
+   light keeps its own colour while it is the current one. Written as a doubled
+   class for exactly that reason; a single class would lose to `.is-current`
+   whatever the order. */
+.metric-step.metric-step-green {
+  border-left-color: var(--color-success);
+}
+
+.metric-step.metric-step-yellow {
+  border-left-color: #b57a12;
+}
+
+.metric-step.metric-step-red {
+  border-left-color: var(--color-danger);
+}
+
+/* Set off by a rule rather than by space alone: it explains the scale above it
+   and would otherwise read as a caption to the whole card. */
 .metric-note {
   margin: 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border-subtle);
   font-size: 0.85rem;
   line-height: 1.55;
   color: var(--color-text-muted);
@@ -3974,54 +4029,174 @@ h2 {
 }
 
 /* --- Sprachmelodie (F-35) ------------------------------------------------- */
-/* The contour and the four factors live on the Kennzahl's own page
-   (`SessionMetricView`); the wrap-up carries the tile like every other. */
+/* The contour and the five figures live on the Kennzahl's own page
+   (`SessionMetricView`); the wrap-up carries the tile like every other.
 
-.factor-heading {
-  margin: 1.5rem 0 0.5rem;
+   The arrangement is deliberate and replaced one that buried its own point: a
+   paragraph of method under every figure meant the sentence a reader acts on
+   sat in the middle of six hundred words about measurement. Now the lead
+   sentence carries the classification, the figures are figures, and the method
+   is behind the "i". Nothing was deleted, only moved. */
+
+/* The one sentence this block is built around. Larger than body text and above
+   the figures, because a reader who stops after it should still leave with the
+   right impression. */
+.melody-lead {
+  margin: 2rem 0 0;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--color-navy-900);
+}
+
+.melody-lead strong {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+/* --- Whether the tone suited the occasion -------------------------------- */
+/* The one thing on this page that is written rather than measured, so it is
+   set apart rather than run in with the figures: its own ground, its own rule
+   above it, and a caveat naming where it came from. A reader has to be able to
+   tell at a glance which parts of this page were counted and which were
+   interpreted. */
+
+.melody-fit {
+  margin: 2rem 0 0;
+  padding: 1.25rem 1.25rem 1rem;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-selected);
+}
+
+.melody-fit h3 {
+  margin: 0 0 0.5rem;
   font-family: var(--font-display);
   font-size: 1rem;
   font-weight: 600;
   color: var(--color-navy-900);
 }
 
-/* --- The factors read off that contour ----------------------------------- */
-
-.factor-list {
+.melody-fit p {
   margin: 0;
-}
-
-.factor + .factor {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--color-border-subtle);
-}
-
-.factor dt {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 4px;
-}
-
-.factor-name {
-  font-weight: 600;
   font-size: 0.95rem;
+  line-height: 1.6;
 }
 
-.factor-value {
+.melody-fit-caveat {
+  margin-top: 0.75rem !important;
+  font-size: 0.8rem !important;
+  line-height: 1.5 !important;
+  color: var(--color-text-muted);
+}
+
+/* Section headings inside this block. Generous above, tight below: the space
+   belongs between the sections, not between a heading and what it names. */
+.melody-heading {
+  margin: 2.5rem 0 1rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+/* --- The five figures, as tiles ------------------------------------------ */
+/* `.metric-grid` and `.metric` on purpose, so these read as the same kind of
+   thing as the tiles in the wrap-up rather than as a second design language.
+   What they add is the icon: on the wrap-up grid the explanation lives on the
+   Kennzahl's own page, and here there is no further page to go to. */
+
+.melody-grid {
+  margin: 0 0 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 16px;
+}
+
+.melody-tile {
+  /* The icon is positioned against this. */
+  position: relative;
+  gap: 4px;
+  /* Room on the right for the icon, so a long value never runs under it. */
+  padding: 14px 46px 14px 16px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+}
+
+/* The figure is what the tile is for, so it gets the size. Everything else on
+   the tile is a label for it: the name above is small caps, the subline below
+   is grey, and the icon is out of the way in the corner. */
+.melody-tile .metric-value {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
-  font-size: 0.95rem;
-  color: var(--color-blue-600);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.15;
 }
 
-.factor dd {
+.melody-tile .metric-subline {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+/* Top right, out of the reading order of the tile itself. Only the summary is
+   taken out of flow: the `details` element stays where it sits in the markup,
+   which is last, so an opened explanation still unfolds under the figure
+   rather than over it. */
+.melody-tile .info-details {
   margin: 0;
+}
+
+.melody-tile .info-summary {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.melody-tile .info-body {
+  margin-top: 12px;
+}
+
+/* An open tile takes the whole row. Three paragraphs in a 150px column is a
+   word per line, which is the failure mode of putting explanations inside grid
+   cells at all; this is the cheap way out of it and needs no state. Where
+   `:has` is unavailable the text is merely narrow, not broken. */
+.melody-tile:has(> .info-details[open]) {
+  grid-column: 1 / -1;
+}
+
+/* --- What a figure says on its own --------------------------------------- */
+/* Only the two that mean something without a norm: a slope has a natural zero,
+   and a speaker compared with themselves needs no reference point. Both stay
+   silent when there is nothing to say, so this list is often one item and
+   sometimes none. */
+
+.melody-notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.melody-notes li {
+  padding-left: 12px;
+  border-left: 2px solid var(--color-border);
   font-size: 0.88rem;
   line-height: 1.55;
   color: var(--color-text-muted);
+}
+
+/* The method, folded away. Small headings so it can be skimmed for the one
+   question the reader came with, which is usually what the colour is worth. */
+.melody-method h4 {
+  margin: 1rem 0 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+.melody-method h4:first-child {
+  margin-top: 0;
 }
 
 /* --- One interruption, in its own words ---------------------------------- */
@@ -4107,13 +4282,43 @@ h2 {
   margin-bottom: 1.25rem;
 }
 
-.progress-activity {
+/* The three counted facts the screen opens with. Figures, because activity is
+   the one thing here that needs no norm to be readable (ADR 0065) and therefore
+   the only thing that can lead. */
+
+.progress-facts {
+  list-style: none;
   margin: 0;
-  font-size: 0.95rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
 }
 
-.progress-activity-span {
+.progress-facts li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.progress-fact-figure {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-navy-900);
+}
+
+.progress-fact-label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9rem;
   color: var(--color-text-muted);
+}
+
+.progress-fact-span {
+  font-size: 0.78rem;
 }
 
 .progress-note {
@@ -4153,16 +4358,24 @@ h2 {
   outline-offset: 2px;
 }
 
+/* Generous, and deliberately so: the complaint the redesign answers was that
+   ten equal boxes read as one undifferentiated block, and the first remedy for
+   that is space rather than decoration. */
 .progress-section {
-  margin-top: 2rem;
+  margin-top: 2.75rem;
 }
 
 .progress-section-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.progress-section-head h2 {
+  margin: 0;
 }
 
 .progress-section-link {
@@ -4195,12 +4408,20 @@ h2 {
 }
 
 .progress-metric-cell {
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 
 .progress-metric-cell:hover {
   border-color: var(--color-blue-300);
   background: var(--color-surface-selected);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px #03253e12;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-metric-cell:hover {
+    transform: none;
+  }
 }
 
 .progress-metric-cell:focus-visible {
@@ -4215,6 +4436,50 @@ h2 {
   font-size: 0.9rem;
   font-weight: 600;
   line-height: 1.3;
+  /* Ink, not the series hue: the palette rules keep text in text colours and
+     let a coloured mark beside it carry the identity. Here that mark is the
+     rule above the name. */
+  color: var(--color-navy-900);
+}
+
+/* A dot in the family's hue beside the heading, once per section rather than
+   once per tile. Under the Sprechweise/Inhalt switch every tile in the grid
+   belongs to the same family, so a mark on each of them repeats the same word
+   six times; the charts inside already carry the hue. */
+.progress-group-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--series, var(--color-blue-600));
+  vertical-align: baseline;
+}
+
+/* The switch sizes to its options instead of stretching across the row: a track
+   running the full width of a wide screen with two labels at its left end reads
+   as an unfinished progress bar. The library's own row is full width by design
+   -- five filters fill it -- so this narrows it here rather than there. */
+.progress-section-head .filter-slider {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+/* Air between the last row of tiles and the sentence under them. */
+.progress-section .progress-note {
+  margin-top: 1rem;
+}
+
+/* Tiles in a row are as tall as the tallest, so the link at the bottom of each
+   lines up instead of floating wherever its text happens to end. */
+.focus-tile {
+  display: flex;
+  flex-direction: column;
+}
+
+.focus-tile .progress-detail-link {
+  margin-top: auto;
+  padding-top: 0.6rem;
 }
 
 /* The number beside the curve, so the tile says something without the chart
@@ -4258,12 +4523,15 @@ h2 {
   margin-top: 0.5rem;
 }
 
-/* Two panels side by side on a wide screen, stacked below it. The activity
-   chart gets the larger share: it is the one thing that says something from the
-   first training onwards. */
+/* Two panels side by side on a wide screen, stacked below it. The calendar
+   column is sized to the calendar rather than to a share of the page: one month
+   of seven columns has a natural width, and a larger share only stretched the
+   card, not the grid in it. Everything left over goes to the variety table,
+   which is the one that runs out of room first (a Persona's name gets clipped
+   otherwise). */
 .progress-columns {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -4274,112 +4542,229 @@ h2 {
   }
 }
 
+/* Each card is as tall as what is in it. Stretching both to the taller one made
+   sense while the left card was a fixed-height bar chart; a calendar over six
+   months is 700px tall, and matching that would draw a border around half a
+   metre of nothing beside it. */
 .progress-columns .card {
   margin: 0;
-  height: 100%;
 }
 
 .progress-columns h2 {
   margin-bottom: 1rem;
 }
 
-/* --- Activity over time -------------------------------------------------- */
-/* Counting what somebody did needs no norm, which is why this is the one chart
-   here that carries no caveat (ADR 0065). */
+/* --- When the user trained ------------------------------------------------ */
+/* Counting what somebody did needs no norm, which is why this is the one block
+   here that carries no caveat (ADR 0065). The shading is magnitude on a single
+   hue, three steps, and the number is printed in the cell -- so the colour is a
+   second reading of what the cell already says, never the only one.
 
-.activity-chart {
+   Derived from --series-activity by mixing it with the surface at 45 % and
+   70 %, validated as an ordinal ramp against a white card: monotone lightness,
+   adjacent gaps over 0.06, light end 2.23:1, one hue. A darker light end than
+   the eye would pick, because the first step has to stay visible against the
+   card at all. */
+
+.calendar {
   margin: 0;
 }
 
-.activity-bars {
+/* The month, and the two arrows that change it. The count sits on the same
+   line, to the right, because it belongs to the month that is named beside it
+   and nowhere else. */
+.calendar-head {
   display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  height: 132px;
-}
-
-.activity-bar-slot {
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+  flex-wrap: wrap;
   align-items: center;
-  height: 100%;
-  gap: 4px;
+  gap: 2px;
+  margin-bottom: 10px;
 }
 
-.activity-bar-count {
-  font-size: 0.7rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
-  line-height: 1;
-  min-height: 0.7rem;
-}
-
-.activity-bar-stack {
-  display: flex;
-  flex-direction: column-reverse;
-  justify-content: flex-start;
-  width: 100%;
-  max-width: 34px;
-  height: 100%;
-}
-
-.activity-bar {
-  display: block;
-  width: 100%;
-  border-radius: 3px 3px 0 0;
-  background: var(--color-blue-600);
-}
-
-/* An abandoned call is a fact, not a fault: the same hue, lighter. Red would
-   turn a note in the history into a mark against the user. */
-.activity-bar-aborted {
-  background: var(--color-blue-300);
-  border-radius: 0;
-}
-
-.activity-bar-stack > .activity-bar:first-child {
-  border-radius: 3px 3px 0 0;
-}
-
-.activity-axis {
-  display: flex;
-  gap: 4px;
-  margin-top: 6px;
-  font-size: 0.7rem;
-  color: var(--color-text-muted);
-}
-
-.activity-axis span {
-  flex: 1 1 0;
+.calendar-title {
   min-width: 0;
-  text-align: center;
+  padding: 0 2px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
   white-space: nowrap;
-  overflow: hidden;
 }
 
-.activity-legend {
+.calendar-total {
+  margin-left: auto;
+  padding-left: 8px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.calendar-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-navy-900);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.calendar-page:hover:not(:disabled) {
+  background: var(--color-background);
+}
+
+/* Kept visible rather than removed: the two arrows are the only thing that says
+   this calendar has other months, and a disabled one still says which end it
+   is. */
+.calendar-page:disabled {
+  color: var(--color-border);
+  cursor: default;
+}
+
+/* Fixed layout, so the seven columns are seven equal shares of the card rather
+   than of the widest number in them. The negative margin takes back the ring of
+   border-spacing around the outside, which would otherwise sit on top of the
+   card's own padding and pull the grid in on both sides. */
+.calendar-month {
+  width: calc(100% + 8px);
+  margin: -4px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 4px;
+}
+
+.calendar-month th {
+  padding: 0 0 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.calendar-month th abbr {
+  text-decoration: none;
+}
+
+.calendar-month td {
+  padding: 0;
+}
+
+.calendar-day {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 32px;
+  border-radius: 9px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  transition: transform 120ms ease;
+}
+
+/* Today, whether or not anything was trained on it: a ring rather than a fill,
+   so it says "you are here" without joining the three-step scale. */
+.calendar-day-today {
+  box-shadow: 0 0 0 1.5px var(--series-activity);
+}
+
+/* A day with nothing on it still shows its date: this is a calendar, and a
+   month with holes in it is not one. Recessive, so the trained days are what
+   the eye lands on. */
+.calendar-step-0 {
+  color: var(--color-text-muted);
+  background: var(--color-background);
+}
+
+.calendar-step-1 {
+  background: color-mix(in srgb, var(--series-activity) 45%, var(--color-surface));
+  color: var(--color-navy-900);
+  font-weight: 600;
+}
+
+.calendar-step-2 {
+  background: color-mix(in srgb, var(--series-activity) 70%, var(--color-surface));
+  color: var(--color-surface);
+  font-weight: 600;
+}
+
+.calendar-step-3 {
+  background: var(--series-activity);
+  color: var(--color-surface);
+  font-weight: 600;
+}
+
+.calendar-day:hover {
+  transform: scale(1.08);
+}
+
+/* Available to a screen reader, invisible on screen: the digit in a cell means
+   a count on a trained day and a date on an empty one, which no marker can
+   convey and which the sentence here states outright. */
+.calendar-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* One line, and only ever one: the scale, or the hovered day in its place. A
+   fixed height, so swapping the two does not move the card's bottom edge. */
+.calendar-legend {
+  display: flex;
+  align-items: center;
+  min-height: 20px;
+  margin-top: 14px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.calendar-legend-scale {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 12px;
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
 }
 
-.activity-key {
+.calendar-legend-label {
+  margin-left: 4px;
+}
+
+.calendar-key {
   display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  background: var(--color-blue-600);
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
 }
 
-.activity-key-aborted {
-  margin-left: 10px;
-  background: var(--color-blue-300);
+.calendar-readout {
+  color: var(--color-navy-900);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar-day {
+    transition: none;
+  }
+
+  .calendar-day:hover {
+    transform: none;
+  }
 }
 
 /* --- What was trained with what ------------------------------------------ */
@@ -4460,6 +4845,15 @@ h2 {
 
 /* --- The chart ----------------------------------------------------------- */
 
+/* The chart takes its hue from `color`, which the component sets per series
+   from the Kennzahl's family (utils/metricGroups.ts). One place decides the
+   colour; every mark below inherits it through currentColor, so a mark can
+   never end up painted from a value. */
+
+.sparkline-wrap {
+  display: block;
+}
+
 .sparkline {
   display: block;
   width: 100%;
@@ -4468,22 +4862,78 @@ h2 {
 }
 
 /* The band is the user's own usual range, not a target. Faint on purpose: it
-   is context for the line, and a strong fill would read as a zone to stay in. */
+   is context for the line, and a strong fill would read as a zone to stay in.
+   Deliberately grey rather than the series hue: it is the only mark here that
+   could be mistaken for a target zone, and colour would push it further that
+   way. */
 .sparkline-band {
-  fill: var(--color-blue-100);
+  fill: var(--color-border-subtle);
+  opacity: 0.3;
+}
+
+/* The area is what makes a flat line read as a shape. It fades out downwards so
+   it stays a backdrop for the line rather than a second mark competing with
+   it. */
+.sparkline-area {
+  fill: currentColor;
+  opacity: 0.12;
 }
 
 .sparkline-line {
   fill: none;
-  stroke: var(--color-blue-600);
-  stroke-width: 1.5;
+  stroke: currentColor;
+  stroke-width: 2;
   stroke-linejoin: round;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
 
 .sparkline-dot {
-  fill: var(--color-blue-600);
+  fill: currentColor;
+  opacity: 0.55;
+  transition: opacity 120ms ease, r 120ms ease;
+}
+
+/* The reading the line under the chart is showing. A ring of surface colour
+   around it so it stays legible where the line runs under it. */
+.sparkline-dot.is-current {
+  opacity: 1;
+  stroke: var(--color-surface);
+  stroke-width: 2;
+  paint-order: stroke;
+}
+
+.sparkline-hit {
+  fill: transparent;
+  cursor: default;
+}
+
+/* The hovered reading, under the chart: which training this point was, which is
+   what the figure printed above the chart does not say. Never a floating box
+   over the marks. */
+.sparkline-readout {
+  margin: 2px 0 0;
+  /* Reserved whether or not it holds text, so a tile does not grow under the
+     pointer and shift the ones after it. */
+  min-height: 1.06rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sparkline-readout-value {
+  font-weight: 600;
+  color: var(--color-navy-900);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sparkline-dot {
+    transition: none;
+  }
 }
 
 /* --- Metric detail ------------------------------------------------------- */
@@ -4523,14 +4973,90 @@ h2 {
   white-space: nowrap;
 }
 
-/* --- The two blocks that are still a preview ----------------------------- */
-/* Visibly an example, or it would read as the user's own data. The dashed
-   border and the muted content are the second signal beside the "Beispiel"
-   chip and the sentence. */
+/* The demanding stretches of a call against the rest (ADR 0081). Reuses the
+   progress table's type and rules so the two read as the same kind of thing.
+   Both value columns are styled identically on purpose: giving "Unter Druck"
+   any emphasis of its own would make it the figure that counts and turn a
+   comparison into a verdict. */
 
-.progress-preview {
-  border-style: dashed;
+.segment-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
 }
+
+.segment-table th {
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.segment-table td {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.segment-table tr:last-child td {
+  border-bottom: none;
+}
+
+.segment-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.segment-training {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+}
+
+/* Quotations from the wrap-ups on the second level, for a Kennzahl and for a
+   focus goal. The sentence leads and the source follows it in small grey type:
+   the reader is here for what was said, and which call it was said in is the
+   footnote that makes it checkable. Deliberately not a table -- these are
+   paragraphs of prose, and a cell of running text is unreadable at any width. */
+
+.goal-statements {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.goal-statement + .goal-statement {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.goal-statement-text {
+  margin: 0 0 0.3rem;
+  line-height: 1.55;
+}
+
+.goal-statement-source {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* The kind is written out, never a colour on its own: a green dot beside a
+   sentence would grade the call, which is what ADR 0065 keeps off this screen.
+   The weight is the whole of the distinction. */
+.goal-statement-kind {
+  font-weight: 600;
+}
+
+/* --- What recurs, and what to practise next (blocks D and E) ------------- */
+/* These two were a dashed, half-transparent example until each feedback point
+   carried the goal it was about (ADR 0080). The example styling is gone with
+   it: the content is the user's own now, and anything that still whispered
+   "placeholder" would undersell it. `progress-preview-note` is the last name
+   left over from that phase; the rest were renamed when the two lists became
+   two cards. */
 
 .progress-preview-note {
   margin: 0 0 1rem;
@@ -4539,54 +5065,247 @@ h2 {
   color: var(--color-text-muted);
 }
 
-.progress-preview-columns {
+/* One card per kind, side by side. Two columns inside a single border read as
+   one table with a gap down the middle, which is what they were; the two lists
+   answer different questions and nothing is ever compared across them. */
+.recurring-columns {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 16px;
-  opacity: 0.55;
+  align-items: start;
 }
 
-.progress-preview-heading {
-  margin: 0 0 0.4rem;
+.recurring-columns .card {
+  margin: 1.5rem 0 0;
+}
+
+.recurring-heading {
+  margin: 0 0 1rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--color-border-subtle);
   font-size: 0.85rem;
   font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--color-text-muted);
 }
 
-.progress-preview-list {
+.recurring-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  font-size: 0.9rem;
 }
 
-.progress-preview-list li {
+.recurring-item {
   display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 4px 0;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 8px;
+  margin: 0 -8px;
+  border-radius: var(--radius-control);
+  transition: background-color 140ms ease;
 }
 
-.progress-preview-count {
-  color: var(--color-text-muted);
+.recurring-item:hover {
+  background: var(--color-surface-selected);
+}
+
+/* Position in the list, which is the order the lists are already in
+   (most-mentioned first) and says nothing else. Not a place and not a grade:
+   the figure beside it is the whole claim. */
+.recurring-rank {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-blue-100);
+  color: var(--color-blue-600);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.recurring-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recurring-goal {
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--color-navy-900);
+}
+
+/* One pip per analysed training, filled where the theme was named. The same
+   navy on both cards: a hue that separated Stärke from Verbesserung would be a
+   good/bad axis, which ADR 0065 keeps off this screen. The headings carry the
+   distinction, exactly as they do in GoalStatements. */
+.recurring-pips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.recurring-pip {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-border);
+}
+
+.recurring-pip.is-named {
+  background: var(--color-blue-600);
+}
+
+.recurring-track {
+  display: block;
+  width: 100%;
+  max-width: 160px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.recurring-track-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-blue-600);
+}
+
+.recurring-count {
+  flex: 0 0 auto;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.progress-preview-practice {
+.recurring-count-of {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+/* Under both cards: it describes the counting, which is the same on either
+   side, and inside one card it looked like a footnote to that card alone. */
+.recurring-note {
+  margin: 1rem 0 0;
+  font-size: 0.82rem;
+}
+
+/* The single practice suggestion. Reason first and small, the thing to play
+   next in the middle and large, the button beside it, the caveat last. That
+   order is the argument: a suggestion whose ground the reader has not seen is
+   an instruction, so the ground comes before the offer. */
+
+.progress-practice-why {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+/* "Vorschlag", at the head of the sentence that gives the ground. It says what
+   kind of thing this block is before the reader has read a word of it, which is
+   the same job the closing caveat does at the other end. */
+.progress-practice-chip {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--color-blue-100);
+  color: var(--color-blue-600);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
+/* The offer itself, lifted off the card so the eye lands on it: the name of the
+   call on the left, the button on the right, wrapping under it when the card
+   gets narrow. */
+.progress-practice-offer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 1.25rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--color-border);
-  opacity: 0.55;
+  gap: 16px 24px;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-choice);
+  background: linear-gradient(
+    135deg,
+    var(--color-blue-100) 0%,
+    var(--color-surface-selected) 65%,
+    var(--color-surface) 100%
+  );
 }
 
-.progress-preview-reason {
-  margin: 0.2rem 0 0;
-  font-size: 0.85rem;
+.progress-practice-text {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.progress-practice-what {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--color-navy-900);
+}
+
+/* What is fixed about the suggestion, as facts rather than as a clause: the
+   partner and the kind of call. Both are consequences of the ground above, so
+   they are stated, not argued. */
+.progress-practice-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  list-style: none;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.progress-practice-facts li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-practice-facts li + li::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-blue-300);
+}
+
+/* `.consent-button` stretches to fill its row; here it sits beside the text and
+   keeps its own width. */
+.progress-practice-start {
+  flex: 0 0 auto;
+  padding-inline: 1.6rem;
+  white-space: nowrap;
+}
+
+.progress-practice-note {
+  margin: 1.25rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 0.82rem;
+  line-height: 1.5;
   color: var(--color-text-muted);
 }
 
@@ -4620,7 +5339,7 @@ h2 {
    of those. */
 
 /* Wider than the consent dialog, which carries four sentences — this one
-   carries fifteen cards, two to a row. The backdrop already scrolls, so a tall
+   carries the whole catalogue, two cards to a row. The backdrop already scrolls, so a tall
    list on a short viewport stays reachable. */
 .focus-dialog {
   width: min(920px, 100%);
@@ -4707,7 +5426,7 @@ h2 {
 }
 
 /* Selected is marked by the border and the fill as well as by the tick: the
-   checkbox alone is a 13px cue on a list of fifteen. */
+   checkbox alone is a 13px cue on a list this long. */
 .focus-goal-selected {
   border-color: var(--color-blue-600);
   background: var(--color-surface-selected);

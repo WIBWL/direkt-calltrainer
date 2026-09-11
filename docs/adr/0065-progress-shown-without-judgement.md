@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Extends ADR 0004 and ADR 0051 to the multi-Session view; constrains ADR 0064's data.
+Accepted, unchanged, and deliberately not amended by ADR 0078. Extends ADR 0004 and ADR 0051 to the multi-Session view; constrains ADR 0064's data. ADR 0078 permits a traffic light on the single-call view and names "it stays on the single call" as one of its seven conditions, precisely so that this ADR is not read as having been loosened along with the other two. No colour on the progress view, none carried across Sessions, none aggregated over a user.
 
 ## Context
 

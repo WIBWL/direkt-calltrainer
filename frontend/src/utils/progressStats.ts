@@ -1,4 +1,4 @@
-import type { SessionSummary } from "../protocol";
+import type { MetricAspect, SessionSummary } from "../protocol";
 
 /**
  * Turning the training history into the series the dashboard draws
@@ -37,6 +37,10 @@ export interface MetricSeries {
   /** The German display name, straight from `metric_type.name`. */
   name: string;
   unit: string | null;
+  /** Which half of the Kennzahlen this one belongs to, from the schema's own
+   *  column. It decides the side of the dashboard's switch and the hue the
+   *  chart is drawn in (`utils/metricGroups`) — identity, never a value. */
+  aspect: MetricAspect | null;
   /** Oldest first, so the chart reads left to right in time. */
   points: SeriesPoint[];
   /** The user's own usual range, or null with too few points to describe one. */
@@ -71,6 +75,7 @@ export function toSeries(sessions: SessionSummary[]): MetricSeries[] {
         key: measurement.key,
         name: measurement.name,
         unit: measurement.unit,
+        aspect: measurement.aspect,
         points: [],
         band: null,
       };
@@ -160,7 +165,7 @@ export function activity(sessions: SessionSummary[]): Activity {
  *  still stored, which after six months is all there is (ADR 0067). */
 export function withinPeriod(sessions: SessionSummary[], days: number | null): SessionSummary[] {
   if (days === null) return sessions;
-  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - days * MS_PER_DAY;
   return sessions.filter((s) => new Date(s.started_at).getTime() >= cutoff);
 }
 
@@ -200,92 +205,140 @@ export function durationSeries(sessions: SessionSummary[]): MetricSeries | null 
     key: "duration",
     name: "Gesprächsdauer",
     unit: "min",
+    // `what`, like the docstring above argues: it describes what happened
+    // rather than how somebody spoke. Written here rather than read off the
+    // wire because this one is the exception that has no `metric_type` row.
+    aspect: "what",
     points,
     band: band(points.map((p) => p.value)),
   };
 }
 
-export interface ActivityBucket {
-  /** Start of the bucket, ISO 8601. */
-  from: string;
-  /** What the axis calls it, already formatted for German readers. */
+/** One day of the calendar, whether or not anything happened on it. */
+export interface ActivityDay {
+  /** Local midnight of the day, ISO 8601. */
+  date: string;
+  /** Day of the month, which is what the cell prints when nothing happened. */
+  dayOfMonth: number;
+  /** Completed trainings on that day. An abandoned call is not counted and not
+   *  marked either: the calendar answers "when did I train", and a call that
+   *  broke off is not an answer to it. */
+  count: number;
+}
+
+/** One month of the calendar, its days padded to whole weeks. */
+export interface ActivityMonth {
+  /** "September 2026", for the heading. */
   label: string;
-  completed: number;
-  aborted: number;
+  year: number;
+  /** 0-11, as `Date` counts them. */
+  month: number;
+  /** Whole weeks, Monday first. `null` pads the first and last week, so a
+   *  month always renders as a rectangle and the weekday columns line up. */
+  weeks: (ActivityDay | null)[][];
+  /** Trainings in this month, for the heading's own count. */
+  total: number;
+}
+
+/** The step a day's cell is shaded at. Three, not seven: at the volume one
+ *  person trains at, a day holds one, two or a handful of calls, and a ramp
+ *  with more steps than the data has values encodes nothing. */
+export type ActivityStep = 0 | 1 | 2 | 3;
+
+export function activityStep(count: number): ActivityStep {
+  if (count <= 0) return 0;
+  if (count === 1) return 1;
+  if (count === 2) return 2;
+  return 3;
 }
 
 /**
- * Trainings per time bucket, for the activity chart.
+ * One calendar month, Monday-first, with each day's trainings on it.
  *
- * Counting is all this does, and counting needs no norm: ADR 0065 names
- * activity figures as explicitly permitted, because they say what the user did
- * rather than how well they did it. Abandoned calls are counted separately and
- * not hidden. That is a fact about the training, not a mark against it, and the
- * history already states it the same way.
+ * A calendar rather than a bar per day: the question this block answers is "when
+ * did I train", and on a calendar the answer includes the shape of a week —
+ * whether the trainings sit on workdays, whether a fortnight went by. A bar
+ * chart has the same numbers and none of that.
  *
- * The bucket width follows the span so the chart keeps a readable number of
- * bars: days for a month, weeks for half a year, months beyond that.
+ * One month at a time, and the month is the caller's to choose. The period
+ * switch above the dashboard says which trainings the Kennzahlen are read over;
+ * a calendar already carries its own range in the grid, so letting the switch
+ * cut months off it would be the same statement twice, the second time as a
+ * missing chunk of a chart.
+ *
+ * Counting what somebody did needs no norm, which is why this is the one block
+ * on the screen that carries no caveat (ADR 0065).
  */
-export function activityBuckets(sessions: SessionSummary[], days: number | null): ActivityBucket[] {
-  if (sessions.length === 0) return [];
+export function activityMonth(
+  sessions: SessionSummary[],
+  year: number,
+  month: number,
+): ActivityMonth {
+  const counts = trainingDays(sessions);
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  // Monday first, because a German week starts there.
+  const lead = (new Date(year, month, 1).getDay() + 6) % 7;
 
-  const times = sessions.map((s) => new Date(s.started_at).getTime()).sort((a, b) => a - b);
-  const firstTime = times[0] ?? Date.now();
-  const spanDays = days ?? Math.max(1, (Date.now() - firstTime) / MS_PER_DAY);
-  const unit: "day" | "week" | "month" =
-    spanDays <= 35 ? "day" : spanDays <= 210 ? "week" : "month";
-
-  const start = startOf(days === null ? new Date(firstTime) : new Date(Date.now() - days * MS_PER_DAY), unit);
-  const buckets: ActivityBucket[] = [];
-  for (let at = new Date(start); at <= new Date(); at = next(at, unit)) {
-    buckets.push({ from: at.toISOString(), label: labelOf(at, unit), completed: 0, aborted: 0 });
+  const cells: (ActivityDay | null)[] = Array(lead).fill(null);
+  let total = 0;
+  for (let day = 1; day <= lastDay; day += 1) {
+    const date = new Date(year, month, day);
+    const count = counts.get(dayKey(date)) ?? 0;
+    total += count;
+    cells.push({ date: date.toISOString(), dayOfMonth: day, count });
   }
-  // A period with no training at all still gets one bucket, so the chart has an
-  // axis rather than collapsing to nothing.
-  if (buckets.length === 0) {
-    buckets.push({
-      from: start.toISOString(),
-      label: labelOf(start, unit),
-      completed: 0,
-      aborted: 0,
-    });
-  }
+  while (cells.length % 7 !== 0) cells.push(null);
 
+  const weeks: (ActivityDay | null)[][] = [];
+  for (let at = 0; at < cells.length; at += 7) weeks.push(cells.slice(at, at + 7));
+
+  return {
+    label: new Date(year, month, 1).toLocaleDateString("de-DE", {
+      month: "long",
+      year: "numeric",
+    }),
+    year,
+    month,
+    weeks,
+    total,
+  };
+}
+
+/** How many completed trainings fell on each day. Abandoned calls are left out
+ *  entirely, here and not in the component, so no view can count them back in. */
+function trainingDays(sessions: SessionSummary[]): Map<string, number> {
+  const counts = new Map<string, number>();
   for (const session of sessions) {
-    const at = startOf(new Date(session.started_at), unit).getTime();
-    const bucket = buckets.find((b) => new Date(b.from).getTime() === at);
-    if (!bucket) continue;
-    if (session.status === "aborted") bucket.aborted += 1;
-    else bucket.completed += 1;
+    if (session.status !== "completed") continue;
+    const key = dayKey(new Date(session.started_at));
+    counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  return buckets;
+  return counts;
 }
 
-function startOf(date: Date, unit: "day" | "week" | "month"): Date {
-  const out = new Date(date);
-  out.setHours(0, 0, 0, 0);
-  if (unit === "week") {
-    // Monday, because a German week starts there and the labels say "KW".
-    const weekday = (out.getDay() + 6) % 7;
-    out.setDate(out.getDate() - weekday);
+/** The month the oldest training falls in, which is as far back as paging makes
+ *  sense: earlier months are empty by definition (ADR 0067 caps them at six
+ *  anyway). Null with nothing stored. */
+export function firstTrainingMonth(
+  sessions: SessionSummary[],
+): { year: number; month: number } | null {
+  let oldest: number | null = null;
+  for (const session of sessions) {
+    if (session.status !== "completed") continue;
+    const at = new Date(session.started_at).getTime();
+    if (Number.isNaN(at)) continue;
+    if (oldest === null || at < oldest) oldest = at;
   }
-  if (unit === "month") out.setDate(1);
-  return out;
+  if (oldest === null) return null;
+  const date = new Date(oldest);
+  return { year: date.getFullYear(), month: date.getMonth() };
 }
 
-function next(date: Date, unit: "day" | "week" | "month"): Date {
-  const out = new Date(date);
-  if (unit === "day") out.setDate(out.getDate() + 1);
-  if (unit === "week") out.setDate(out.getDate() + 7);
-  if (unit === "month") out.setMonth(out.getMonth() + 1);
-  return out;
-}
-
-function labelOf(date: Date, unit: "day" | "week" | "month"): string {
-  if (unit === "month") {
-    return date.toLocaleDateString("de-DE", { month: "short", year: "2-digit" });
-  }
-  return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+/** A day as a key, in local time. Built from the parts rather than from
+ *  `toISOString`, which would shift a late-evening training into the next day
+ *  for anybody east of UTC. */
+function dayKey(date: Date): string {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
 export interface VarietyCell {

@@ -16,6 +16,10 @@ export const ROUTES = {
   /** One Kennzahl over time, the dashboard's second level. A route rather than
    *  a panel, so the view can be linked and Back is the browser's. */
   progressMetric: "/fortschritt/:metricKey",
+  /** One focus goal over time, the same level for the other half of the
+   *  overview. Two segments, so it cannot collide with the Kennzahl above even
+   *  if a metric key ever reads like a word. */
+  progressGoal: "/fortschritt/ziel/:goalKey",
   /** One past training, by the id the listing hands out (ADR 0050). */
   session: "/trainings/:sessionId",
   /** One Kennzahl of one training, in detail (F-51's interruptions today). A
@@ -66,6 +70,11 @@ export function sessionPath(sessionId: string): string {
  *  although a metric key is a slug the backend defines. */
 export function progressMetricPath(metricKey: string): string {
   return `/fortschritt/${encodeURIComponent(metricKey)}`;
+}
+
+/** The detail view of one focus goal. */
+export function progressGoalPath(goalKey: string): string {
+  return `/fortschritt/ziel/${encodeURIComponent(goalKey)}`;
 }
 
 /** One Kennzahl of one training. Both segments encoded, for the reason

@@ -2,9 +2,12 @@ import { Link, useParams } from "react-router-dom";
 
 import { useProgressData } from "../hooks/useProgressData";
 import { ROUTES, sessionPath } from "../routes";
+import { goalsForMetric } from "../utils/focusMetrics";
+import { statementsFor } from "../utils/goalMentions";
 import { MIN_SESSIONS_FOR_SERIES, formatValue, toSeries } from "../utils/progressStats";
 import { formatDate } from "../utils/time";
 import AppLayout from "./AppLayout";
+import GoalStatements from "./GoalStatements";
 import Sparkline from "./Sparkline";
 
 /**
@@ -19,6 +22,11 @@ import Sparkline from "./Sparkline";
  *
  * Every row links into the training it came from. That is the third and last
  * level, and it is the screen that already exists (`PastSessionView`).
+ *
+ * Under the table stands what the wrap-ups wrote about the focus goals this
+ * Kennzahl is evidence for, quoted. Section 7 of the concept asks for it, and
+ * it is the half a chart cannot carry: a figure says what happened, the
+ * sentence says what it was like.
  */
 export default function ProgressMetricView() {
   const { metricKey } = useParams<{ metricKey: string }>();
@@ -58,6 +66,10 @@ export default function ProgressMetricView() {
   // Newest first in the table, oldest first in the chart: a chart reads left to
   // right in time, a list is read from the most recent entry down.
   const rows = [...series.points].reverse();
+  // What the wrap-ups wrote about the goals this Kennzahl stands behind. The
+  // sessions arrive newest first, so the quotations are already in the order
+  // the table is in.
+  const statements = statementsFor(sessions, goalsForMetric(series.key));
 
   return (
     <AppLayout pageClassName="app-page-narrow progress-page">
@@ -126,6 +138,8 @@ export default function ProgressMetricView() {
         Redeanteil in einer Preisverhandlung und einer in einem kurzen Servicefall sind nicht
         dieselbe Beobachtung.
       </p>
+
+      <GoalStatements statements={statements} />
     </AppLayout>
   );
 }
