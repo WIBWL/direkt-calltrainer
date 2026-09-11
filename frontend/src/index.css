@@ -1383,15 +1383,6 @@ h2 {
   color: var(--color-surface);
 }
 
-/* The way back, where it is a choice and not just a retreat. Both tokens carry
-   white text above the 4.5:1 small-text minimum (5.45 and 4.79), so the pair
-   reads by colour *and* by label rather than by colour alone. */
-.editor-confirm-keep {
-  border-color: var(--color-success) !important;
-  background: var(--color-success) !important;
-  color: var(--color-surface);
-}
-
 .setup-page {
   width: min(940px, calc(100% - 32px));
 }
