@@ -84,51 +84,56 @@ export default function ProgressPractice({
 
   if (!suggestion || !personaId) return null;
 
-  // A card in the recurring block's row rather than a section of its own
-  // (see `ProgressRecurring`), headed the way the two lists beside it are.
+  // A band under the recurring block's two lists rather than a section of its
+  // own (see `ProgressRecurring`), headed the way those lists are.
   return (
-    <section className="card recurring-card progress-practice" aria-labelledby="practice-title">
+    <section className="card progress-practice" aria-labelledby="practice-title">
       <h3 className="recurring-heading" id="practice-title">
         Als Nächstes üben
       </h3>
 
-      {/* The ground, then the offer, then the button. That order is the
-          argument: a suggestion whose ground the reader has not seen is an
-          instruction, and this screen has no standing to give one. */}
-      <p className="progress-practice-why">
-        <span className="progress-practice-chip">Vorschlag</span>
-        {goal?.title ?? target.goal} wurde in {target.count} Ihrer Auswertungen als
-        Verbesserungspunkt genannt, zuletzt am {formatDay(source.started_at)} im Gespräch
-        „{source.scenario}“.
-      </p>
+      {/* The ground, then the offer, then the button — left to right across
+          the band rather than stacked. That order is the argument either way:
+          a suggestion whose ground the reader has not seen is an instruction,
+          and this screen has no standing to give one. Reading order is the
+          same as the source order, so the two halves swap under each other on
+          a narrow screen without anything else changing. */}
+      <div className="progress-practice-band">
+        <p className="progress-practice-why">
+          <span className="progress-practice-chip">Vorschlag</span>
+          {goal?.title ?? target.goal} wurde in {target.count} Ihrer Auswertungen als
+          Verbesserungspunkt genannt, zuletzt am {formatDay(source.started_at)} im Gespräch
+          „{source.scenario}“.
+        </p>
 
-      <div className="progress-practice-offer">
-        <div className="progress-practice-text">
-          <p className="progress-practice-what">{suggestion.name}</p>
-          <ul className="progress-practice-facts">
-            <li>mit {source.persona}</li>
-            <li>{suggestion.why}</li>
-          </ul>
+        <div className="progress-practice-offer">
+          <div className="progress-practice-text">
+            <p className="progress-practice-what">{suggestion.name}</p>
+            <ul className="progress-practice-facts">
+              <li>mit {source.persona}</li>
+              <li>{suggestion.why}</li>
+            </ul>
+          </div>
+
+          <button
+            type="button"
+            // `consent-button` is the app's primary button, misnamed after the
+            // screen it first stood on. The `button-primary` that used to be
+            // here is styled nowhere, so this rendered as a bare browser
+            // button.
+            className="consent-button consent-button-primary progress-practice-start"
+            onClick={() => {
+              // The same door the history uses to start a follow-up: the two
+              // screens are separate routes, so the pairing travels as location
+              // state and the training screen consumes it once (see
+              // `TrainingStart`).
+              const start: TrainingStart = { scenarioId: suggestion.id, personaId };
+              navigate(ROUTES.training, { state: { start } });
+            }}
+          >
+            Dieses Training starten
+          </button>
         </div>
-
-        <button
-          type="button"
-          // `consent-button` is the app's primary button, misnamed after the
-          // screen it first stood on. The `button-primary` that used to be
-          // here is styled nowhere, so this rendered as a bare browser
-          // button.
-          className="consent-button consent-button-primary progress-practice-start"
-          onClick={() => {
-            // The same door the history uses to start a follow-up: the two
-            // screens are separate routes, so the pairing travels as location
-            // state and the training screen consumes it once (see
-            // `TrainingStart`).
-            const start: TrainingStart = { scenarioId: suggestion.id, personaId };
-            navigate(ROUTES.training, { state: { start } });
-          }}
-        >
-          Dieses Training starten
-        </button>
       </div>
 
       {/* "Ein Vorschlag, keine Vorgabe" stays in view: it is what keeps the

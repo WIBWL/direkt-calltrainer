@@ -5781,12 +5781,32 @@ a.consent-button {
 }
 
 /* The single practice suggestion. Reason first and small, the thing to play
-   next in the middle and large, the button beside it, the caveat last. That
-   order is the argument: a suggestion whose ground the reader has not seen is
-   an instruction, so the ground comes before the offer. */
+   next beside it and large, the button at its end, the caveat last. That order
+   is the argument: a suggestion whose ground the reader has not seen is an
+   instruction, so the ground comes before the offer.
+
+   Across the full width under the two lists rather than as a third card in
+   their row: the same content in a 450px column ran three times their height,
+   and the row read as lopsided. The ground takes the smaller share -- it is
+   read once, where the offer is what gets pressed. */
+
+.progress-practice-band {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(340px, 1.5fr);
+  gap: 16px 32px;
+  align-items: center;
+}
+
+/* Under each other from the width where the offer's own row (text plus button)
+   starts wrapping: two narrow columns would break both halves at once. */
+@media (max-width: 900px) {
+  .progress-practice-band {
+    grid-template-columns: 1fr;
+  }
+}
 
 .progress-practice-why {
-  margin: 0 0 1rem;
+  margin: 0;
   font-size: 0.9rem;
   line-height: 1.6;
   color: var(--color-text-muted);

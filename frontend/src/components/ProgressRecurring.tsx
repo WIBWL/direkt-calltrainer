@@ -27,12 +27,17 @@ import SectionHeading from "./SectionHeading";
  * screen could do and an empty stretch of page discusses nothing. It is real
  * now, so the placeholder is gone rather than kept alongside.
  *
- * The practice suggestion (block E) is the third card in the same row, beside
- * the improvements it is drawn from. Stacked under this block it read as a
- * separate section at the foot of the page; beside it, the ground and the offer
- * are one glance. It is handed in rather than built here because it has its own
- * data to fetch and its own reasons to render nothing, and the grid simply
- * closes up when it does.
+ * The practice suggestion (block E) follows the two lists as a band across the
+ * full width. It was a third card in their row, which is where it belongs in
+ * the reading — it is drawn from the improvements beside it — but not in the
+ * shape: a paragraph, an offer and a button beside two cards holding two lines
+ * each ran three times their height. Laid out across the width instead, the
+ * ground sits left and the offer right, and the row above it stays even. What
+ * it must not become again is a section of its own at the foot of the page,
+ * which is where it started and where nobody reached it.
+ *
+ * It is handed in rather than built here because it has its own data to fetch
+ * and its own reasons to render nothing, in which case nothing is drawn.
  */
 export default function ProgressRecurring({
   sessions,
@@ -84,7 +89,6 @@ export default function ProgressRecurring({
               total={total}
               empty="Bisher wurde kein Verbesserungspunkt mehrfach genannt."
             />
-            {practice}
           </div>
 
           {/* Under the cards rather than inside one of them: it describes the
@@ -109,6 +113,14 @@ export default function ProgressRecurring({
               mit.
             </p>
           </InfoDetails>
+
+          {/* Under the two lists rather than beside them, and across the full
+              width: a third column held a paragraph, an offer and a button
+              where its neighbours hold two lines each, so it ran three times
+              their height and the row read as lopsided. It still follows
+              directly from what the lists say, which is the adjacency that
+              mattered — the ground and the offer are one glance either way. */}
+          {practice}
         </>
       )}
     </section>

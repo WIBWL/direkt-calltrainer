@@ -28,8 +28,8 @@ Kennzahlen gewachsen war:
   Szenarien, Gesprächspartner) als Karten, der Kalender und das Raster
   Szenario × Gesprächspartner, alle drei über sämtliche gespeicherten Trainings.
   Darunter eine Trennlinie mit dem Zeitraumschalter, und erst unter ihr
-  Fokusziele, das Wiederkehrende mit dem Übungsvorschlag als dritter Karte in
-  derselben Reihe und zuletzt die Kennzahlen. Die Stellung des Schalters sagt
+  Fokusziele, das Wiederkehrende mit dem Übungsvorschlag als Band darunter und
+  zuletzt die Kennzahlen. Die Stellung des Schalters sagt
   damit, was er erreicht: alles darüber zählt jedes Training, alles darunter
   liest die Auswahl. Vorher stand er im Kopf neben den Zahlen, sah aus, als
   gelte er für sie und den Kalender, und der Kalender brauchte eine Erklärung,
@@ -100,6 +100,15 @@ Grafik. Der Kalender liest deshalb alle gespeicherten Trainings, und seit der
 Schalter unter dem Block steht, tun das auch die drei Zahlen und das Raster
 daneben: Ein Teil des Blocks über dem Schalter, der ihm trotzdem folgt, wäre
 genau die Unklarheit, die die neue Stellung beseitigen soll.
+
+Der Übungsvorschlag stand zuerst als dritte Karte in der Reihe der beiden
+Listen. Inhaltlich gehört er dorthin, denn er folgt aus den
+Verbesserungspunkten daneben; von der Form her nicht: Eine Karte mit Absatz,
+Angebot und Knopf lief in einer 450 px breiten Spalte dreimal so hoch wie ihre
+Nachbarn, die zwei Zeilen tragen. Er steht deshalb als Band über die volle
+Breite unter den beiden Listen, Begründung links, Angebot rechts. Was er nicht
+wieder werden darf, ist ein eigener Abschnitt am Seitenfuß — dort hat er
+angefangen, und dort hat ihn niemand erreicht.
 
 Bereich D ist inzwischen echt (`ProgressRecurring.tsx`, Rechenteil
 `utils/goalMentions.ts`). Die Beispielansicht ist entfernt: Seit ADR 0080 trägt
@@ -419,11 +428,16 @@ Aktivitätsteil, dann der Zeitraumschalter, dann B, D mit E und C.
 |  +----------------------+ +----------------------+ +-----------------+ |
 +-----------------------------------------------------------------------+
 |  WAS IN IHREN AUSWERTUNGEN WIEDERKEHRT                                 |
-|  +----------------+ +--------------------+ +------------------------+ |  D
-|  | Als Stärke     | | Als Verbesserung   | | ALS NÄCHSTES ÜBEN      | |  E
-|  | 1 Klare Str. 5 | | 1 Abschluss    4   | | Abschluss nach Übergabe| |
-|  | 2 Ruhiger T. 4 | | 2 Einwände     3   | | mit Thomas Brandt  [>] | |
-|  +----------------+ +--------------------+ +------------------------+ |
+|  +---------------------------+ +---------------------------------+   |  D
+|  | Als Stärke                | | Als Verbesserung                |   |
+|  | 1 Klare Struktur       5  | | 1 Abschluss                 4   |   |
+|  | 2 Ruhiger Ton          4  | | 2 Einwände                  3   |   |
+|  +---------------------------+ +---------------------------------+   |
+|  +-------------------------------------------------------------+     |
+|  | ALS NÄCHSTES ÜBEN                                           |     |  E
+|  | VORSCHLAG Abschluss    | Abschluss nach Übergabe            |     |
+|  | in 4 von 8 genannt     | mit Thomas Brandt  [ Starten ]     |     |
+|  +-------------------------------------------------------------+     |
 +-----------------------------------------------------------------------+
 |  KENNZAHLEN ÜBER DIE ZEIT                                              |
 |  Kennzahl         Zuletzt   Verlauf        Ihr Bereich       Trainings |  C
