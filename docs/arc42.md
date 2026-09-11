@@ -7,7 +7,7 @@
 Im Gegensatz zu klassischen Verkaufstrainern liegt der Fokus nicht auf Abschlussquoten, sondern auf Kommunikation, Klarheit und Wirkung des Sprechenden, ohne dass umfangreiche kundenspezifische Fachkenntnisse vorausgesetzt werden (C-05):
 
 - Kommunikation, Klarheit und Wirkung des Sprechenden
-- Erkennung von Sprechverhalten (Redeanteil, Fragen, Sprechtempo, Wortanzahl, Reaktionszeit, Sprechpausen, Sprechlänge am Stück, Lautstärke, Sprachmelodie, Unterbrechungen — ADR 0051, ADR 0077, ADR 0078; seit ADR 0081 fünf davon zusätzlich getrennt nach fordernden und übrigen Gesprächsabschnitten)
+- Erkennung von Sprechverhalten (Redeanteil, Fragen, Sprechtempo, Wortanzahl, Reaktionszeit, Sprechpausen, Sprechlänge am Stück, Lautstärke, Sprachmelodie, Unterbrechungen, Redefluss, Füllwörter, Wiederholungen, Verzögerungslaute, Gesprächseinstieg — ADR 0051, ADR 0077, ADR 0078, ADR 0083 bis ADR 0086; angezeigt in zwei Hälften nach ADR 0082; seit ADR 0081 fünf davon zusätzlich getrennt nach fordernden und übrigen Gesprächsabschnitten)
 - Vermeidung von überlangen/überkomplexen Erklärungen
 
 Nach jedem Trainingsgespräch erhält der Nutzer ein qualitatives Wrap-up mit konkreten Verbesserungsvorschlägen statt eines reinen Scores.
@@ -360,12 +360,19 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0073 | The Settlement Check Rides on the Per-Turn Nudge | angenommen (verfeinert ADR 0037 und ADR 0038) | Q-01, Q-03 |
 | ADR 0074 | Dialogue Generation May Run on Gemini, Under One Switch and on Two Models | angenommen (kehrt ADR 0040s Entfernung des Gemini-Pfads um, schränkt ADR 0011 auf STT ein) | Q-03, Q-08, C-04 |
 | ADR 0075 | The Caller’s Notes Are Kept Only Where the Model Cannot Read Its Own History | angenommen (schränkt ADR 0071 auf das Gateway ein) | Q-03, Q-08 |
-| ADR 0076 | Focus Goals as a Stored Selection | angenommen, ergänzt (das Ziel zur Lautstärke ist zurückgezogen) | F-62, F-13, C-04 |
+| ADR 0076 | Focus Goals as a Stored Selection | angenommen, ergänzt (das Ziel zur Lautstärke ist zurückgezogen; die Auswahl steuert die Szenario-Empfehlungen) | F-62, F-13, C-04 |
 | ADR 0077 | The Liveliness Reading Moves to the Pitch Variation Quotient | angenommen (ändert ADR 0051s Ausnahme für F-35) | F-35, Q-01, Q-04 |
 | ADR 0078 | A Classification May Carry a Traffic Light | angenommen (ändert ADR 0004 und ADR 0051, lässt ADR 0065 unberührt) | Q-01, Q-04, F-35, F-51 |
 | ADR 0079 | Whether the Tone Suited the Occasion, as Prose | angenommen (folgt ADR 0056s Muster für F-42) | F-09, F-35, F-42, Q-01 |
 | ADR 0080 | Feedback Points Carry a Focus Goal | angenommen (Stufe 2 des Dashboard-Konzepts, eingeschränkt durch ADR 0004 und ADR 0065) | F-13, F-62, F-10 |
 | ADR 0081 | Measurements Over the Demanding Stretches of a Call | angenommen (ändert ADR 0051 in zwei Punkten) | F-62, F-13, F-53, Q-01 |
+| ADR 0082 | The Kennzahlen Are Shown in Two Halves, How and What | angenommen (reine Anzeige, ADR 0051 unberührt) | F-53 |
+| ADR 0083 | Metrics That Read Words Take the Session's Language | angenommen | F-41, F-51, F-08, F-62 |
+| ADR 0084 | Hesitation Sounds Are Estimated From the Pitch Contour; Articulation Is Not Measured | angenommen (Schwellen vorläufig) | F-51, F-38, F-62 |
+| ADR 0085 | A Recording Without Detectable Silence Drops What Rests on Silence | angenommen (präzisiert ADR 0047/0048) | F-51, F-36, F-37 |
+| ADR 0086 | The Opening Turn Is Read as Three Parts, Depending on Who Rang | angenommen (löst ADR 0080s Einordnung des Gesprächseinstiegs ab) | F-63, F-62 |
+| ADR 0087 | What to Play Next Is Chosen From the Library | angenommen | F-64, F-62 |
+| ADR 0088 | Sprachmelodie Is a Tile, and Its Page Carries the Drawing | angenommen (kehrt die Block-Darstellung um) | F-35, F-53 |
 
 Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug; ADR 0017, 0025, 0027 bis 0030, 0039, 0055 und 0057 sind reine Wartbarkeits-, Werkzeug- oder Schemaentscheidungen ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 

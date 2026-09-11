@@ -97,6 +97,13 @@ nav:
       - ADR 0079 - Whether the Tone Suited the Occasion, as Prose: adr/0079-tone-against-the-occasion-as-prose.md
       - ADR 0080 - Feedback Points Carry a Focus Goal: adr/0080-feedback-points-carry-a-focus-goal.md
       - ADR 0081 - Measurements Over the Demanding Stretches of a Call: adr/0081-measurements-over-the-demanding-stretches-of-a-call.md
+      - ADR 0082 - The Kennzahlen Are Shown in Two Halves, How and What: adr/0082-the-kennzahlen-in-two-halves-how-and-what.md
+      - ADR 0083 - Metrics That Read Words Take the Session's Language: adr/0083-metrics-that-read-words-take-the-sessions-language.md
+      - ADR 0084 - Hesitation Sounds Are Estimated From the Pitch Contour; Articulation Is Not Measured: adr/0084-hesitation-sounds-from-the-pitch-contour.md
+      - ADR 0085 - A Recording Without Detectable Silence Drops What Rests on Silence: adr/0085-a-recording-without-silence-drops-what-rests-on-silence.md
+      - ADR 0086 - The Opening Turn Is Read as Three Parts, Depending on Who Rang: adr/0086-the-opening-turn-in-three-parts-by-who-rang.md
+      - ADR 0087 - What to Play Next Is Chosen From the Library: adr/0087-what-to-play-next-is-chosen-from-the-library.md
+      - ADR 0088 - Sprachmelodie Is a Tile, and Its Page Carries the Drawing: adr/0088-sprachmelodie-is-a-tile-its-page-carries-the-drawing.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
   # site is served at the root (mkdocs serve / mkdocs build + static server).
