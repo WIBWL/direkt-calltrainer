@@ -274,7 +274,12 @@ class Persona(_AuthoredContent, Base):
     # column used to serve at once are two columns now.
     role_label: Mapped[str] = mapped_column(String(120))
     role: Mapped[str] = mapped_column(String(120))
-    traits: Mapped[str] = mapped_column(String(120))
+    # Text, not a capped column, and for the same reason `traits_label` below is:
+    # this is prose about a character, and 120 characters was a guess that the
+    # seed outgrew the moment a Persona's role was trimmed to the position alone
+    # and what the role implied moved in here. A cap that silently decides how a
+    # Persona may be described is worse than no cap.
+    traits: Mapped[str] = mapped_column(Text)
     # Display counterpart of `traits`, in the UI language, for the info panel on
     # the selection card. Nullable because it is display-only: a Persona without
     # one is still fully playable, the panel just omits the line. Same split as
