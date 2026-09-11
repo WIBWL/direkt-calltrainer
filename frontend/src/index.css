@@ -24,10 +24,13 @@
   --color-text-muted-secondary: #5f7180;
   --color-success: #2e8064;
   --color-danger: #b4453a;
-  /* The wordmark's "ai". Below 4.5:1 on white on purpose -- WCAG 1.4.3 exempts
-     brand names, so this may be the vivid orange and not a muted one. Do not
-     reuse it for ordinary text. */
-  --color-brand-accent: #ff6a00;
+  /* The accent orange: the wordmark's "ai" and the setup page's step numbers.
+     One token for both, so the two cannot drift apart. 3.38:1 on white, which
+     clears the 3:1 that WCAG 1.4.3 holds large text to (>=24px, or >=18.66px
+     bold) -- the brand name would be exempt from any ratio, the numbers are
+     not. Text set smaller than that needs 4.5:1 and therefore a darker value
+     (#c85100), so check the size before taking this token somewhere new. */
+  --color-brand-accent: #ea6100;
 
   /* Shared font families */
   --font-sans: "Hanken Grotesk", Arial, sans-serif;
@@ -1376,15 +1379,19 @@ h2 {
   margin-bottom: 22px;
 }
 
+/* The number is set like the title beside it, in the same size, weight and line
+   height, and keeps only the monospaced face, so the steps still read as a
+   counted series rather than as a second heading. The colour is the wordmark's
+   orange; at 25px (22px narrow) bold the number is large text, which is the
+   size the token's contrast is chosen for. */
 .setup-section-index {
   flex-shrink: 0;
-  padding-top: 2px;
-  color: var(--color-blue-600);
+  color: var(--color-brand-accent);
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: 25px;
   font-weight: 700;
-  line-height: 1.4;
-  letter-spacing: 0.04em;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
 }
 
 .setup-section-heading-text {
@@ -2073,7 +2080,8 @@ h2 {
     gap: 12px;
   }
 
-  .setup-section-heading-text h2 {
+  .setup-section-heading-text h2,
+  .setup-section-index {
     font-size: 22px;
   }
 
