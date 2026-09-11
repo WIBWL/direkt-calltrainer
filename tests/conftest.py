@@ -253,7 +253,10 @@ class FakeLLM:
             raise OpenAIError("simulated notes failure")
         return self.states.pop(0) if self.states else ""
 
-    def stream_reply(self, messages):
+    # `**_kwargs` so this keeps the real signature: `retries` is passed by the
+    # boot check (clients/health.py) and a fake that rejected it would fail
+    # where the real function works.
+    def stream_reply(self, messages, **_kwargs):
         self.calls.append(messages)
 
         async def _gen():

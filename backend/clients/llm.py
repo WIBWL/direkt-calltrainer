@@ -77,8 +77,17 @@ def _backend_kwargs(
     }
 
 
-async def stream_reply(messages: list[dict[str, str]]) -> AsyncIterator[str]:
-    """Stream the persona's reply as it's generated, one token delta at a time."""
+async def stream_reply(
+    messages: list[dict[str, str]], *, retries: int | None = None
+) -> AsyncIterator[str]:
+    """Stream the persona's reply as it's generated, one token delta at a time.
+
+    `retries` overrides the client's own retry count for this one request, and
+    exists for a single caller: the boot check (`clients/health.py`), which
+    passes 0. The client retries a 429 or a 5xx twice with backoff by default,
+    which is right for a Turn -- a call should survive a blip -- and wrong for a
+    liveness probe, where those attempts run inside the probe's own deadline and
+    a rate-limited model reports as a timeout instead of as a rate limit."""
     # The thinking level goes in the line too: an unsupported one is a bare
     # 400 that names no parameter, so this is what makes the next line
     # readable when it is an error.
@@ -87,7 +96,8 @@ async def stream_reply(messages: list[dict[str, str]]) -> AsyncIterator[str]:
         LLM_MODEL, LLM_REASONING_EFFORT or "off",
     )
     started = time.monotonic()
-    stream = await LLM_CLIENT.chat.completions.create(
+    client = LLM_CLIENT if retries is None else LLM_CLIENT.with_options(max_retries=retries)
+    stream = await client.chat.completions.create(
         model=LLM_MODEL,
         messages=messages,
         stream=True,
@@ -132,6 +142,7 @@ async def complete(
     *,
     max_tokens: int | None = _MAX_FEEDBACK_TOKENS,
     think: bool = False,
+    retries: int | None = None,
 ) -> str:
     """One non-streamed completion — the post-call wrap-up (ADR 0049), the
     document summary for an authored Scenario (F-58) and the follow-up Scenario
@@ -157,11 +168,16 @@ async def complete(
     notes were the exception -- a `complete` by shape, running beside a
     conversation -- and they exist only on the backend where the two models are
     the same name anyway.
+
+    `retries` is the same override `stream_reply` carries, for the same one
+    caller: the boot check, which wants a single attempt so a 429 reports as a
+    429 rather than as its own deadline expiring.
     """
     logger.info(
         "LLM completion (%s, max_tokens=%s, think=%s)...", LLM_FEEDBACK_MODEL, max_tokens, think
     )
-    completion = await LLM_CLIENT.chat.completions.create(
+    client = LLM_CLIENT if retries is None else LLM_CLIENT.with_options(max_retries=retries)
+    completion = await client.chat.completions.create(
         model=LLM_FEEDBACK_MODEL,
         messages=messages,
         **({"max_tokens": max_tokens} if max_tokens is not None else {}),
