@@ -3308,11 +3308,6 @@ h2 {
     margin-top: 2px;
   }
 
-  .feedback-transcript-heading {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
 }
 
 .feedback-meta {
@@ -4906,17 +4901,145 @@ h2 {
   max-width: 62ch;
 }
 
-/* The answer to "what was that about?", on the post-call screen after a
-   Zufallsszenario (F-62). Directly under the title, above the wrap-up, because
-   every line of that already assumes it. */
-.scenario-reveal {
-  margin: 0.6rem 0 0;
-  font-size: 0.95rem;
-  color: var(--text-muted);
+/* --- ... and expanded in place, behind the actions row's toggle ---------- */
+/* A card holding one tile per utterance, rather than a list ruled into rows.
+   Scoped to this card throughout, because the bare `.transcript-line`/
+   `.transcript-time` above are the plainer form a past training's page uses
+   and must not be dragged along with it. */
+
+.feedback-transcript-section {
+  margin-top: 40px;
+  margin-bottom: 32px;
+  padding: 22px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
 }
 
-.scenario-reveal strong {
-  color: var(--navy);
+.feedback-transcript-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+.feedback-transcript-eyebrow {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-blue-600);
+}
+
+.feedback-transcript-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--color-navy-900);
+}
+
+.feedback-transcript-count {
+  flex-shrink: 0;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--color-blue-100);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-blue-600);
+}
+
+/* The card is only the stack; each utterance carries its own ground, so the
+   eye separates them by tile rather than by rule. */
+.feedback-transcript-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: transparent;
+}
+
+.feedback-transcript-card .transcript-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--color-surface-selected);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-navy-900);
+}
+
+/* A pill rather than a bare number: on a tinted tile a muted timestamp in the
+   margin has nothing to sit against. */
+.feedback-transcript-card .transcript-time {
+  flex: 0 0 auto;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 7px;
+  background: var(--color-blue-100);
+  color: var(--color-blue-600);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.feedback-transcript-card .transcript-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--color-blue-600);
+  color: var(--color-surface);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.feedback-transcript-card .transcript-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.feedback-transcript-card .transcript-speaker {
+  margin-bottom: 4px;
+  font-size: 13px;
+  line-height: 1.3;
+  font-weight: 700;
+  color: var(--color-navy-900);
+}
+
+.feedback-transcript-card .transcript-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--color-text-muted-secondary);
+}
+
+/* After the rules above rather than with the page's other breakpoints: these
+   carry the same specificity, so the later of the two wins whatever the
+   viewport says. */
+@media (max-width: 720px) {
+  .feedback-transcript-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .feedback-transcript-card .transcript-line {
+    gap: 10px;
+    padding: 16px;
+  }
 }
 
 /* --- The die, thrown before a Zufallsszenario (F-62) -------------------- */

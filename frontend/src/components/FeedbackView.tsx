@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { ApiError } from "../api";
 import type {
@@ -9,6 +9,17 @@ import type {
   SessionTurn,
 } from "../protocol";
 import { cx } from "../utils/cx";
+import {
+  ASPECT_LABELS,
+  ASPECT_LEADS,
+  formatMetricValue,
+  loudnessCurve,
+  METRIC_ASPECTS,
+  METRIC_DISCLAIMER,
+  metricAspect,
+  metricSubline,
+  withDerived,
+} from "../utils/metrics";
 import { formatOffset } from "../utils/time";
 import { useSessionFeedback } from "../hooks/useSessionFeedback";
 import {
@@ -42,28 +53,6 @@ export interface FollowUpActions {
   onStart: (scenarioId: string, personaId: string) => void;
   onCreated?: (() => void) | undefined;
 }
-
-/** How many decimals a metric reads naturally in. Counts are whole things;
- * seconds and percentages are not. */
-const DECIMALS: Record<string, number> = {
-  questions: 0, word_count: 0, pace: 0, talk_share: 0, phonation_share: 0,
-};
-
-/** The two halves (backend/db/models.py METRIC_ASPECTS), in slider order. */
-const ASPECTS: MetricAspect[] = ["how", "what"];
-
-const ASPECT_LABELS: Record<MetricAspect, string> = {
-  how: "Wie Sie gesprochen haben",
-  what: "Was Sie gesagt haben",
-};
-
-/** One line under the slider saying what the half in view is a reading of. */
-const ASPECT_LEADS: Record<MetricAspect, string> = {
-  how: "Ihre Sprechweise: Tempo, Pausen, Lautstärke und wie schnell Sie geantwortet haben.",
-  what:
-    "Der Zuschnitt des Gesprächs: wie viel Raum Sie eingenommen und wie viel Sie " +
-    "gefragt haben.",
-};
 
 /**
  * How many times the User has to have spoken before the two offers under
@@ -111,6 +100,7 @@ export default function FeedbackView({
   sessionId,
   followUp,
   onReverse,
+  onDetail,
 }: {
   sessionId: string | null;
   /** Omitted where there is nowhere to act on the follow-up (F-60). */
@@ -120,8 +110,18 @@ export default function FeedbackView({
    * screen begins the call itself, the history hands the pairing to the
    * training flow. Omitted where there is nowhere to go with it. */
   onReverse?: (reverse: ReverseScenario) => void;
+  /** Hands the Session on once it has been polled, for a screen that needs the
+   * same wrap-up for something other than rendering it — the post-call screen
+   * puts it in the downloadable report (F-64). Not a second request: this
+   * component is the only one polling, and the file must say exactly what the
+   * page above it says. */
+  onDetail?: (detail: SessionDetail | null) => void;
 }) {
   const { detail, state } = useSessionFeedback(sessionId);
+
+  // In an effect rather than during the render: the owner stores it, and a
+  // parent state update from inside a child's render body is a loop.
+  useEffect(() => onDetail?.(detail), [detail, onDetail]);
 
   if (!detail?.feedback) {
     return (
@@ -213,7 +213,7 @@ export function FeedbackReport({
   sessionId?: string | null | undefined;
   onReverse?: ((reverse: ReverseScenario) => void) | undefined;
 }) {
-  const { feedback, measurements, turns, persona, scenario } = detail;
+  const { feedback, measurements, turns } = detail;
   if (!feedback) return null;
 
   const improvements = feedback.points.filter((p) => p.kind === "improvement");
@@ -243,20 +243,12 @@ export function FeedbackReport({
       <Reverse sessionId={sessionId} onReverse={onReverse} />
     ) : null;
 
-  // First in the report, so that on the post-call screen it lands directly
-  // under the title: which Scenario, against which Persona. It sat below the
-  // transcript for a while — not because it moved, but because the transcript
-  // section was above the report and has since gone.
+  // No meta row here any more: which case, which partner and which side the
+  // User was on describe the *call*, not the wrap-up, and a Session whose
+  // wrap-up never got written still has all three. `FeedbackScreen` shows them
+  // under the title of both screens instead.
   return (
     <>
-      <div className="feedback-meta" aria-label="Trainingsdetails">
-        <span>{scenario}</span>
-        <span className="feedback-meta-separator" aria-hidden="true">
-          ·
-        </span>
-        <span>{persona}</span>
-      </div>
-
       <section className="feedback-section">
         <SectionHeading eyebrow="QUALITATIVE EINORDNUNG" title="Zusammenfassung" />
         <div className="feedback-box">
@@ -374,17 +366,16 @@ export function MetricSection({ measurements }: { measurements: Measurement[] })
   // Opens on the paraverbal half: the one reading the transcript cannot give.
   const [aspect, setAspect] = useState<MetricAspect>("how");
 
-  const derived = sentenceLength(measurements);
-  const all = derived ? [...measurements, derived] : measurements;
+  const all = withDerived(measurements);
 
-  const options: FilterOption<MetricAspect>[] = ASPECTS.map((value) => ({
+  const options: FilterOption<MetricAspect>[] = METRIC_ASPECTS.map((value) => ({
     value,
     label: ASPECT_LABELS[value],
-    count: all.filter((m) => half(m) === value).length,
+    count: all.filter((m) => metricAspect(m) === value).length,
   }));
   // Nothing to switch between when one half is empty: show what there is.
   const split = options.every((option) => option.count > 0);
-  const shown = split ? all.filter((m) => half(m) === aspect) : all;
+  const shown = split ? all.filter((m) => metricAspect(m) === aspect) : all;
 
   if (all.length === 0) return null;
 
@@ -410,35 +401,9 @@ export function MetricSection({ measurements }: { measurements: Measurement[] })
         ))}
       </div>
 
-      <p className="metric-disclaimer">
-        Reine Messwerte, ohne Zielbereich: für diese Nutzergruppe gibt es keinen
-        belegten Normwert, an dem sie zu messen wären.
-      </p>
+      <p className="metric-disclaimer">{METRIC_DISCLAIMER}</p>
     </section>
   );
-}
-
-/** `how` is the closed side; everything else falls to `what`, so an
- * unclassified metric still gets a tile. */
-function half(measurement: Measurement): MetricAspect {
-  return measurement.aspect === "how" ? "how" : "what";
-}
-
-/** F-08's second half, already in `word_count`'s own `detail`: its own tile,
- * because the two answer different questions, but not its own metric_type row
- * — that would store one number twice. */
-function sentenceLength(measurements: Measurement[]): Measurement | null {
-  const words = measurements.find((m) => m.key === "word_count");
-  const value = words?.detail?.["words_per_sentence"];
-  if (typeof value !== "number") return null;
-  return {
-    key: "words_per_sentence",
-    name: "Wörter pro Satz",
-    unit: null,
-    aspect: "what",
-    value,
-    detail: null,
-  };
 }
 
 /** The next call in the same matter, built from the points above (F-60).
@@ -686,9 +651,9 @@ function Metric({ measurement }: { measurement: Measurement }) {
   // Loudness is shown as a course, not a figure: its value is a dB span (95th
   // percentile minus 5th) that reads like a level without being one and that no
   // validated norm places (ADR 0004/0051). Without the curve the tile is empty.
-  const curve = measurement.detail?.curve_db as (number | null)[] | undefined;
   if (measurement.key === "loudness") {
-    if (!curve?.some((value) => value !== null)) return null;
+    const curve = loudnessCurve(measurement);
+    if (!curve) return null;
     return (
       <div className="metric metric-loudness">
         <span className="metric-name">{measurement.name} im Gesprächsverlauf</span>
@@ -697,29 +662,12 @@ function Metric({ measurement }: { measurement: Measurement }) {
     );
   }
 
-  const decimals = DECIMALS[measurement.key] ?? 1;
-  const detail = subline(measurement);
+  const detail = metricSubline(measurement);
   return (
     <div className="metric">
       <span className="metric-name">{measurement.name}</span>
-      <span className="metric-value">
-        {measurement.value.toFixed(decimals)}
-        {measurement.unit && measurement.unit !== "Anzahl"
-          ? ` ${measurement.unit}`
-          : ""}
-      </span>
+      <span className="metric-value">{formatMetricValue(measurement)}</span>
       {detail && <span className="metric-subline">{detail}</span>}
     </div>
   );
-}
-
-/** A second line under a metric's value, where its `detail` refines the same
- * figure rather than standing beside it. Absent for a call whose language has
- * no question words on file. */
-function subline(measurement: Measurement): string | null {
-  if (measurement.key !== "questions") return null;
-  const open = measurement.detail?.["open"];
-  const closed = measurement.detail?.["closed"];
-  if (typeof open !== "number" || typeof closed !== "number") return null;
-  return `davon ${open} offen, ${closed} geschlossen`;
 }

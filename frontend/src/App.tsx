@@ -22,12 +22,12 @@ import ScenarioEditor from "./components/ScenarioEditor";
 import ScenarioInfo from "./components/ScenarioInfo";
 import { useScreenTransition } from "./components/ScreenTransition";
 import SetupView from "./components/SetupView";
-import TranscriptView from "./components/TranscriptView";
+import FeedbackScreen from "./components/FeedbackScreen";
 import { useMicrophoneDevices } from "./hooks/useMicrophoneDevices";
 import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useSessionSocket, type CommittedSession } from "./hooks/useSessionSocket";
 import { useStreamedAudioPlayback } from "./hooks/useStreamedAudioPlayback";
-import type { Persona, TranscriptEntry } from "./protocol";
+import type { Persona, SessionDetail, TranscriptEntry } from "./protocol";
 import ReverseBriefPanel from "./components/ReverseBriefPanel";
 import { ROUTES, type TrainingStart } from "./routes";
 import {
@@ -166,6 +166,11 @@ export default function App() {
   // worker has produced it. Not kept anywhere but here: the wrap-up is
   // reachable for as long as this screen is, and no longer.
   const [endedSessionId, setEndedSessionId] = useState<string | null>(restored?.sessionId ?? null);
+  // The wrap-up once FeedbackView has polled it, for the downloadable report
+  // (F-64): the file carries everything the page shows, and the page's own
+  // poll is the only place that data arrives. Null while it is on its way, and
+  // for a call that was never stored — the file is then the protocol alone.
+  const [endedSessionDetail, setEndedSessionDetail] = useState<SessionDetail | null>(null);
   // Holds a just-received session.ended until playback actually finishes —
   // see the effect below.
   const [pendingEnd, setPendingEnd] = useState<PendingEnd | null>(null);
@@ -226,6 +231,10 @@ export default function App() {
   // A reload restores the post-call screen without a selection to look the
   // name up in, so the stored one stands in.
   const personaName = selectedPersona?.name ?? restored?.personaName ?? "Persona";
+  // The played case, resolved the same way and for the same screen. A
+  // Zufallsszenario needs nothing special: `beginSession` sets `scenarioId` to
+  // the drawn row, so the selection already *is* the case that was played.
+  const scenarioName = selectedScenario?.name ?? restored?.scenarioName ?? null;
 
   // The two lists load independently: either one failing leaves the other
   // usable, and names itself in the error line. A restored wrap-up owns the
@@ -372,12 +381,10 @@ export default function App() {
       sessionId: pendingEnd.sessionId,
       turns: pendingEnd.turns,
       personaName,
+      scenarioName,
       // Kept so a reverse started from this screen after a reload still knows
       // which Persona to put on the other end (ADR 0070).
       personaId,
-      // The reveal is the payoff of a Zufallsszenario (F-62), so it survives a
-      // reload of this screen for the same reason `personaName` does.
-      revealedScenario: secretScenario,
     });
     // Straight to the wrap-up's own waiting screen where one is being written,
     // and straight past it where none is: no stored Session, no wrap-up, and a
@@ -956,14 +963,20 @@ export default function App() {
       // Startseite" does, and has to do the same thing to get there: these two
       // screens are a state under the training route, not a route of their own.
       <AppLayout step="feedback" onHome={handleRestart}>
-        <TranscriptView
+        <FeedbackScreen
           transcript={transcript}
           personaName={personaName}
-          onRestart={handleRestart}
-          revealedScenario={secretScenario ?? restored?.revealedScenario ?? null}
+          scenarioName={scenarioName}
+          detail={endedSessionDetail}
+          actions={
+            <button className="back-to-start-button" type="button" onClick={handleRestart}>
+              Zur Startseite
+            </button>
+          }
           feedback={
             <FeedbackView
               sessionId={endedSessionId}
+              onDetail={setEndedSessionDetail}
               followUp={{
                 onStart: handleStartFollowUp,
                 // The new row is not in this screen's library copy yet, and
