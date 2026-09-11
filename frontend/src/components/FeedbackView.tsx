@@ -678,8 +678,10 @@ function Metric({
   const context = interruptionContext(measurement);
   const detail = subline(measurement);
   // The step this call landed on, in words. Two Kennzahlen carry one: F-51's
-  // traffic light and F-35's five-step reading of the pitch range. Both come
-  // from the backend, beside the thresholds they were read off.
+  // traffic light and F-35's three-step reading. F-35's is read off the pitch
+  // variation quotient in the detail and not off the Umfang this tile shows,
+  // that being the figure with a published boundary behind it. Both come from
+  // the backend, beside the thresholds they were read off.
   const reading = (measurement.detail?.light_label ??
     measurement.detail?.liveliness_label) as string | undefined;
 
@@ -690,9 +692,15 @@ function Metric({
   // orientation. The step is written out underneath, so colour is never the
   // only channel, and the scale it comes from is on the page behind the tile.
   //
-  // F-35's five steps deliberately get the word without the colour: that scale
-  // is uncomfortable at both ends, so there is no direction for a colour to
-  // point in (`intonation.liveliness_steps`).
+  // F-35 carries a light too now (ADR 0077, `intonation.LIGHTS`), and it lands
+  // in the right place without a special case: this tile leads with the *word*
+  // for Sprachmelodie, so the colour sits on the classification, which is what
+  // it was read from. It must never sit on the semitone figure, which is a
+  // different measurement from the one the step came out of.
+  const readingLight = (measurement.detail?.liveliness_light ?? light) as
+    | TrafficLight
+    | undefined;
+
   const figure =
     measurement.value.toFixed(decimals) +
     (measurement.unit && measurement.unit !== "Anzahl" ? ` ${measurement.unit}` : "");
@@ -707,7 +715,7 @@ function Metric({
   const body = (
     <>
       <span className="metric-name">{measurement.name}</span>
-      <span className={`metric-value${light ? ` metric-value-${light}` : ""}`}>
+      <span className={`metric-value${readingLight ? ` metric-value-${readingLight}` : ""}`}>
         {melody && reading ? reading : figure}
       </span>
 
@@ -723,7 +731,10 @@ function Metric({
 
       {reading && !melody && (
         <span className="metric-light-label">
-          {reading} <span className="metric-light-caveat">(Einschätzung)</span>
+          <span className={readingLight ? `metric-value-${readingLight}` : undefined}>
+            {reading}
+          </span>{" "}
+          <span className="metric-light-caveat">(Einschätzung)</span>
         </span>
       )}
     </>

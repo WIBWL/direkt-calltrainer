@@ -4,9 +4,11 @@ import { useStoredSession } from "../hooks/useStoredSession";
 import type { Finding, SessionTurn, TrafficLight } from "../protocol";
 import { ROUTES, sessionPath } from "../routes";
 import { formatOffset } from "../utils/time";
+import { pairFor } from "../utils/segmentStats";
 import AppLayout from "./AppLayout";
 import IntonationReading from "./IntonationReading";
 import MetricScale from "./MetricScale";
+import SegmentComparison from "./SegmentComparison";
 
 /**
  * One Kennzahl of one training, in full (F-51's interruptions today).
@@ -38,7 +40,7 @@ export default function SessionMetricView() {
 
   if (state === "loading") {
     return (
-      <AppLayout pageClassName="app-page-narrow">
+      <AppLayout pageClassName="app-page-narrow metric-page">
         {back}
         <p className="muted">Wird geladen …</p>
       </AppLayout>
@@ -48,7 +50,7 @@ export default function SessionMetricView() {
   const measurement = detail?.measurements.find((m) => m.key === metricKey);
   if (!detail || !measurement) {
     return (
-      <AppLayout pageClassName="app-page-narrow">
+      <AppLayout pageClassName="app-page-narrow metric-page">
         {back}
         <h1>Kennzahl</h1>
         <div className="card">
@@ -59,6 +61,10 @@ export default function SessionMetricView() {
   }
 
   const findings = detail.findings.filter((f) => f.metric_key === metricKey);
+  // The same Kennzahl over the demanding stretches and over the rest, where
+  // this call had any (ADR 0081). Absent on a call nobody pushed back in, and
+  // on every call recorded before the per-utterance facts were kept.
+  const pair = pairFor(detail.segments, metricKey ?? "");
   const steps = detail.metric_scales[metricKey ?? ""] ?? [];
   const note = detail.metric_notes[metricKey ?? ""];
   const light = measurement.detail?.light as TrafficLight | undefined;
@@ -68,9 +74,16 @@ export default function SessionMetricView() {
   const current = (measurement.detail?.liveliness ?? light) as string | undefined;
   const reading = (measurement.detail?.light_label ??
     measurement.detail?.liveliness_label) as string | undefined;
+  // F-51's light belongs to the figure and colours it. F-35's belongs to the
+  // Lebendigkeit, which is a different figure from the Umfang shown here, so it
+  // colours the word and never the number: a green semitone count would be a
+  // colour sitting over something it was not read from (ADR 0077).
+  const readingLight = (measurement.detail?.liveliness_light ?? light) as
+    | TrafficLight
+    | undefined;
 
   return (
-    <AppLayout pageClassName="app-page-narrow">
+    <AppLayout pageClassName="app-page-narrow metric-page">
       {back}
       <h1>{measurement.name}</h1>
       <p className="page-lead">
@@ -84,7 +97,10 @@ export default function SessionMetricView() {
           </span>
           {reading && (
             <span className="metric-light-label">
-              {reading} <span className="metric-light-caveat">(Einschätzung)</span>
+              <span className={readingLight ? `metric-value-${readingLight}` : undefined}>
+                {reading}
+              </span>{" "}
+              <span className="metric-light-caveat">(Einschätzung)</span>
             </span>
           )}
         </p>
@@ -96,8 +112,20 @@ export default function SessionMetricView() {
 
       {metricKey === "intonation" && (
         <div className="card">
-          <IntonationReading measurement={measurement} />
+          <IntonationReading
+            measurement={measurement}
+            toneFit={detail.feedback?.tone_fit ?? null}
+          />
         </div>
+      )}
+
+      {pair && (
+        <>
+          <h2>Unter Druck und sonst</h2>
+          <div className="card">
+            <SegmentComparison pairs={[pair]} />
+          </div>
+        </>
       )}
 
       {findings.length > 0 && (

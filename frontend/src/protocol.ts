@@ -198,6 +198,30 @@ export interface FeedbackPoint {
   kind: "strength" | "improvement";
   text: string;
   turn_id: number | null;
+  /**
+   * Which of F-62's focus goals this point is about, as a catalogue key, or
+   * null where the wrap-up predates the tag or nothing in the catalogue
+   * fitted. Assigned by the wrap-up as it writes the point, which is what
+   * lets the progress view count what recurs across trainings without a
+   * second model call over somebody's history.
+   */
+  goal: string | null;
+}
+
+/**
+ * One tagged point of a wrap-up: what it was about, whether it was a strength
+ * or an improvement, and what was written.
+ *
+ * The text rides along because the progress view's second level has to say
+ * what the wrap-ups wrote about a goal and not only how often (ADR 0064's
+ * amendment). The summary, the phase paragraph and any untagged point stay on
+ * the detail route, so this is still not the wrap-up.
+ */
+export interface FeedbackGoalTag {
+  kind: "strength" | "improvement";
+  goal: string;
+  /** The point as the wrap-up wrote it. Two sentences at most in practice. */
+  text: string;
 }
 
 export interface SessionFeedback {
@@ -211,6 +235,16 @@ export interface SessionFeedback {
    * empty.
    */
   phase_language: string | null;
+  /**
+   * Whether the way the trainee sounded suited the occasion of this call.
+   * Prose for the same reason `phase_language` is (ADR 0056): the right
+   * register for a complaint is not the right register for a price
+   * negotiation, and no norm is measured for either. It answers the one
+   * question the Sprachmelodie figures cannot, which is why it is rendered
+   * there rather than in the wrap-up. NULL where the wrap-up predates the
+   * block or the model left it out; the block is omitted, never shown empty.
+   */
+  tone_fit: string | null;
   points: FeedbackPoint[];
 }
 
@@ -237,22 +271,51 @@ export type TrafficLight = "green" | "yellow" | "red";
 
 /**
  * One step of the scale a reading was taken off — F-51's traffic light and
- * F-35's five-step Sprachmelodie reading are both described this way.
+ * F-35's three-step Sprachmelodie reading are both described this way.
  *
  * `label` and `range` come from the backend rather than being written here on
  * purpose: they belong beside the thresholds they describe, or a recalibration
- * silently leaves the wrong words on the screen. `light` is null for a scale
- * that has no direction — F-35's is uncomfortable at both ends, so no colour
- * can point along it.
+ * silently leaves the wrong words on the screen. That is not hypothetical:
+ * F-35's scale has already been replaced once, and every stored Session picked
+ * the new one up on the next read without a migration.
+ *
+ * `light` may still be null for a scale with no direction; both scales carry one
+ * today (ADR 0077). It is set beside the threshold it belongs to and never
+ * derived in the frontend, and it is never the only channel: the step is
+ * written out in words wherever the colour appears.
  */
 export interface MetricStep {
   /** Machine-readable step name, matched against the measurement's own
    *  reading (`detail.liveliness` / `detail.light`) to mark the current one. */
   step: string;
   label: string;
-  /** Where this step applies, written out, e.g. "7 bis 12 Halbtöne". */
+  /** Where this step applies, written out, e.g. "15 % bis 25 %". */
   range: string;
   light: TrafficLight | null;
+}
+
+/** Which stretch of a call a figure describes (ADR 0081). `call` is the whole
+ *  of it and is what `measurements` carries; these two are the exchanges where
+ *  the partner pushed back, and everything else. */
+export type MeasurementSegment = "pressure" | "rest";
+
+/**
+ * One Kennzahl over one stretch of a call (ADR 0081).
+ *
+ * The two halves of a comparison the user draws themselves. Deliberately no
+ * difference, ratio or verdict travels with them: how big a gap means something
+ * is exactly the norm ADR 0051 refuses to invent, so the wire carries the two
+ * figures and nothing about their relation.
+ *
+ * No `detail`: a segment's loudness curve is a curve like any other and nothing
+ * plots it (ADR 0064's reason, one level down).
+ */
+export interface SegmentMeasurement {
+  segment: MeasurementSegment;
+  key: string;
+  name: string;
+  unit: string | null;
+  value: number;
 }
 
 export interface SessionDetail {
@@ -270,6 +333,11 @@ export interface SessionDetail {
   turns: SessionTurn[];
   /** Statistics for the whole call, not per utterance (ADR 0051). */
   measurements: Measurement[];
+  /** The same Kennzahlen over the demanding stretches and over the rest
+   *  (ADR 0081). Empty where nobody pushed back, where a stretch was too short
+   *  to measure, and for every call recorded before the per-utterance facts
+   *  were kept. */
+  segments: SegmentMeasurement[];
   /** Individual noted moments, ordered by when they happened. */
   findings: Finding[];
   /** The long explanation behind a Kennzahl's "i", by metric key. Served
@@ -304,6 +372,10 @@ export interface SessionSummaryMeasurement {
   key: string;
   name: string;
   unit: string | null;
+  /** Which half of the Kennzahlen this one sits in — the schema's own `aspect`
+   *  (ADR 0064). Display only: it decides which side of the dashboard's
+   *  Sprechweise/Inhalt switch the metric appears on, and nothing else. */
+  aspect: MetricAspect;
   value: number;
   /**
    * Whether the metric is still part of the backend's current inventory.
@@ -338,6 +410,19 @@ export interface SessionSummary {
   /** ISO 8601. NULL where the Session has no recorded end. */
   ended_at: string | null;
   measurements: SessionSummaryMeasurement[];
+  /** The demanding stretches against the rest (ADR 0081), the only data behind
+   *  the focus goal "Souveränität unter Druck". Beside `measurements` and not
+   *  inside it: that list is one entry per metric, and a series built over it
+   *  would splice one training's pressure figure into the next one's line. */
+  segments: SegmentMeasurement[];
+  /**
+   * What this wrap-up's points were about, one entry per tagged point.
+   * Untagged points are absent rather than sent with a null goal: they cannot
+   * be counted, and a row of nulls invites treating "not assigned" as a
+   * category. Empty for a Session with no wrap-up, and for every one written
+   * before the tag existed.
+   */
+  feedback_goals: FeedbackGoalTag[];
 }
 
 // --- What is stored about the caller (GET /api/me/data, ADR 0066) ----------
