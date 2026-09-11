@@ -38,9 +38,10 @@ from backend.scenarios import OriginSession, Scenario
 
 # Fields an authoring caller may set on a Scenario. `description` and the three
 # case fields are prompt input (ADR 0045); `title` / `short_description` are the
-# card. Everything else on the row (ids, ownership, `active`) is set here.
+# card and `briefing` the trainee's own text (ADR 0054). Everything else on the
+# row (ids, ownership, `active`) is set here.
 _SCENARIO_FIELDS = (
-    "title", "short_description",
+    "title", "short_description", "briefing",
     "description", "case_facts", "call_goal", "success_condition",
     "category",
 )
@@ -52,6 +53,7 @@ _NULLABLE_SCENARIO_FIELDS = frozenset({"category"})
 
 
 def _to_persona(row: models.Persona) -> Persona:
+    ordered = sorted(row.objections, key=lambda e: e.position)
     return Persona(
         id=str(row.extern_id),
         name=row.name,
@@ -62,6 +64,8 @@ def _to_persona(row: models.Persona) -> Persona:
             kugelaudio_voice_id=row.kugelaudio_voice_id,
         ),
         role_label=row.role_label,
+        traits_label=row.traits_label,
+        training_goal=row.training_goal,
         role=row.role,
         traits=row.traits,
         behavior=row.behavior,
@@ -69,10 +73,12 @@ def _to_persona(row: models.Persona) -> Persona:
         # only orders what the database returns, so the mapping would depend on
         # how the row was obtained. `position` (ADR 0026) is the authored
         # order, and it is the order the prompt gets.
-        objections=tuple(
-            objection.text
-            for objection in sorted(row.objections, key=lambda e: e.position)
+        objections=tuple(objection.text for objection in ordered),
+        # Same source, same order: the label of objection i is at index i.
+        objection_labels=tuple(
+            objection.text_label or "" for objection in ordered
         ),
+        avatar_url=row.avatar_url,
     )
 
 
@@ -81,8 +87,11 @@ def _to_scenario(row: models.Scenario) -> Scenario:
         id=str(row.extern_id),
         name=row.title,
         short_description=row.short_description,
+        briefing=row.briefing,
         description=row.description,
         case_facts=row.case_facts,
+        description_label=row.description_label,
+        case_facts_label=row.case_facts_label,
         call_goal=row.call_goal,
         success_condition=row.success_condition,
         category=row.category,

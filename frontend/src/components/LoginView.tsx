@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 
 import { ROUTES } from "../routes";
+import AppFooter from "./AppFooter";
+import BrandName from "./BrandName";
 
 interface LoginViewProps {
   errorMessage?: string | undefined;
@@ -15,15 +17,17 @@ export default function LoginView({
     <div className="login-page">
       <header className="login-header">
         <div className="login-brand">
-          <span className="login-brand-mark" aria-hidden="true">
-            <span />
-            <span />
-            <span />
+          <img
+            className="login-brand-logo"
+            src="/logo.png"
+            alt=""
+            aria-hidden="true"
+          />
+
+          <span className="login-brand-name">
+            <BrandName />
           </span>
-
-          <span className="login-brand-name">Calltrainer</span>
         </div>
-
       </header>
 
       <main className="login-main">
@@ -82,14 +86,12 @@ export default function LoginView({
         </section>
 
         <section className="login-card" aria-labelledby="login-title">
-          <div className="login-card-eyebrow">Anmeldung</div>
-
           <h2 id="login-title" className="login-card-title">
-            Willkommen zurück
+            Anmeldung
           </h2>
 
           <p className="login-card-description">
-            Melden Sie sich an, um Ihr nächstes Training zu starten.
+            Melden Sie sich an, um ein Training zu starten.
           </p>
 
           <div className="login-auth-note">
@@ -103,10 +105,10 @@ export default function LoginView({
 
           {errorMessage ? (
             <div className="login-error" role="alert">
-                <strong>Anmeldung fehlgeschlagen</strong>
-                <span>{errorMessage}</span>
+              <strong>Anmeldung fehlgeschlagen</strong>
+              <span>{errorMessage}</span>
             </div>
-        ) : null}
+          ) : null}
 
           <button
             type="button"
@@ -116,11 +118,6 @@ export default function LoginView({
             <span>Jetzt anmelden</span>
             <span aria-hidden="true">→</span>
           </button>
-
-          <p className="login-redirect-hint">
-            Nach erfolgreicher Anmeldung kehren Sie automatisch zum Calltrainer
-            zurück.
-          </p>
 
           <div className="login-divider">
             <span>Sicherer Zugang</span>
@@ -132,6 +129,8 @@ export default function LoginView({
           </p>
         </section>
       </main>
+
+      <AppFooter />
     </div>
   );
 }

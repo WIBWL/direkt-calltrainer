@@ -262,13 +262,28 @@ class Persona(_AuthoredContent, Base):
     # (ADR 0058), though every Persona is a built-in and does carry a slug.
     key: Mapped[str | None] = mapped_column(String(60), unique=True)
     name: Mapped[str] = mapped_column(String(120))
+    # Display field: where this Persona's portrait is served from, e.g.
+    # /personas/andreas-kastner-ceo.webp. A path, not the image: the file is a
+    # frontend build asset like every other one, and the row only says which of
+    # them belongs to this Persona -- so a new Persona still arrives as a seed
+    # change plus a file, with no code to touch. Nullable, and the UI falls back
+    # to the Persona's initials without one.
+    avatar_url: Mapped[str | None] = mapped_column(String(200))
     # Display field: the label on the selection card, in the UI language. The
     # prompt fields below are English (ADR 0043), so the two audiences this one
     # column used to serve at once are two columns now.
     role_label: Mapped[str] = mapped_column(String(120))
     role: Mapped[str] = mapped_column(String(120))
     traits: Mapped[str] = mapped_column(String(120))
+    # Display counterpart of `traits`, in the UI language, for the info panel on
+    # the selection card. Nullable because it is display-only: a Persona without
+    # one is still fully playable, the panel just omits the line. Same split as
+    # role_label/role above.
+    traits_label: Mapped[str | None] = mapped_column(Text)
     behavior: Mapped[str] = mapped_column(Text)
+    # German already, and the only prompt-adjacent column that is: it describes
+    # what the User is meant to practise, not what the Persona does, and the
+    # model never reads it.
     training_goal: Mapped[str] = mapped_column(Text)
     difficulty: Mapped[str] = mapped_column(String(40))
     language_code: Mapped[str] = mapped_column(ForeignKey("language.code"), index=True)
@@ -301,6 +316,11 @@ class PersonaObjection(Base):
     )
     position: Mapped[int] = mapped_column(Integer)
     text: Mapped[str] = mapped_column(Text)
+    # Display counterpart of `text`, in the UI language. `text` is an English
+    # move the model reads (ADR 0043/0045) and must stay that way; this is the
+    # same objection written for a person to read. Nullable, like
+    # `persona.traits_label`.
+    text_label: Mapped[str | None] = mapped_column(Text)
 
     persona: Mapped["Persona"] = relationship(back_populates="objections")
 
@@ -336,8 +356,24 @@ class Scenario(_AuthoredContent, Base):
     # asked for before, which is what ADR 0024's user-authored ones will be.
     description: Mapped[str] = mapped_column(Text)
     case_facts: Mapped[str] = mapped_column(Text)
+    # Display twins of the two above, in the UI language, for the read view
+    # behind a card (ADR 0076). The prompt fields stay English so a Persona's
+    # language decides the call's (ADR 0043); these are the same content
+    # written for a person. Only the seed writes them: an authored Scenario
+    # is already in its author's language, so both are NULL there and the
+    # API falls back to the prompt field itself.
+    description_label: Mapped[str | None] = mapped_column(Text)
+    case_facts_label: Mapped[str | None] = mapped_column(Text)
     call_goal: Mapped[str] = mapped_column(Text)
     success_condition: Mapped[str] = mapped_column(Text)
+    # Display field, in the UI language, addressed to the *trainee* and never
+    # to the model (ADR 0054): the role they answer in, the room they have, and
+    # what counts as a good outcome. It is the counterpart of the four fields
+    # above -- one case from two sides -- and the reason it must stay out of the
+    # prompt is the defect ADR 0045 removed: handing the trainee's objective to
+    # the caller had the caller pursuing it. Empty is allowed; a Scenario
+    # without one briefs nobody, which is where every row stood before ADR 0054.
+    briefing: Mapped[str] = mapped_column(Text, default="")
     # Display/filter field, never read by the prompt (ADR 0072): one of
     # SCENARIO_CATEGORIES, or NULL for a Scenario that was never categorised.
     # The CHECK above is NULL-tolerant, which is what allows that.

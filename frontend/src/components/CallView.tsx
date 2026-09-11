@@ -4,10 +4,14 @@ import type { CallState } from "../protocol";
 import { cx } from "../utils/cx";
 import { formatClock } from "../utils/time";
 import CallAnimation from "./CallAnimation";
+import PersonaAvatar from "./PersonaAvatar";
 
 interface CallViewProps {
   personaName: string;
   personaRole: string;
+  /** The Persona's portrait. Null after a reload, where the selection is gone
+   * and only the stored name is left — the initials stand in then. */
+  personaAvatarUrl: string | null;
   isMicrophoneMuted: boolean;
   callState: CallState;
   audioLevel: number;
@@ -18,18 +22,6 @@ interface CallViewProps {
    * here: this screen stays presentational, and the panel is the same one the
    * mic check already showed. */
   brief?: ReactNode;
-}
-
-/** Initials for the persona avatar, limited to the first two name parts. */
-function getInitials(name: string): string {
-  const initials = name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
-
-  return initials || "?";
 }
 
 /**
@@ -44,6 +36,7 @@ function getInitials(name: string): string {
 export default function CallView({
   personaName,
   personaRole,
+  personaAvatarUrl,
   isMicrophoneMuted,
   callState,
   audioLevel,
@@ -78,9 +71,11 @@ export default function CallView({
       <div className={cx("call-layout", brief ? "call-layout-with-brief" : null)}>
         <section className="call-panel" aria-labelledby="call-persona-name">
           <div className="call-persona">
-            <div className="call-persona-avatar" aria-hidden="true">
-              {getInitials(personaName)}
-            </div>
+            <PersonaAvatar
+              name={personaName}
+              src={personaAvatarUrl}
+              className="call-persona-avatar"
+            />
 
             <div className="call-persona-details">
               {/* The page's heading now that the title above is gone: this

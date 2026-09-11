@@ -15,7 +15,9 @@ import {
   type LibraryFilter,
 } from "./components/LibraryPicker";
 import MicCheck from "./components/MicCheck";
+import PersonaInfo from "./components/PersonaInfo";
 import ScenarioEditor from "./components/ScenarioEditor";
+import ScenarioInfo from "./components/ScenarioInfo";
 import { useScreenTransition } from "./components/ScreenTransition";
 import SetupView from "./components/SetupView";
 import TranscriptView from "./components/TranscriptView";
@@ -117,6 +119,12 @@ export default function App() {
   // The F-03 call context filter (ADR 0072), independent of the origin chips.
   const [scenarioCategory, setScenarioCategory] = useState<CategoryFilter>(DEFAULT_CATEGORY);
   const [editingScenario, setEditingScenario] = useState<EditorState>(null);
+  // The Persona whose read-only info panel is open, or null. Held here for
+  // the same reason the editor's state is: SetupView is presentational.
+  const [infoPersonaId, setInfoPersonaId] = useState<string | null>(null);
+  // The Scenario whose read-only info panel is open, or null. Editing starts
+  // from inside it (ADR 0076), so this opens first and the editor second.
+  const [infoScenarioId, setInfoScenarioId] = useState<string | null>(null);
   // The caller's company (ADR 0060); null = default tenant, no company chip.
   const [tenantName, setTenantName] = useState<string | null>(null);
   // Tracks intentional muting separately from entering or leaving the call screen.
@@ -580,6 +588,26 @@ export default function App() {
     void reloadScenarios(savedId);
   };
 
+  // The card the info panel was opened from. Looked up rather than stored so
+  // a reload of the Persona list cannot leave a stale name in the heading;
+  // if the Persona is gone the panel closes with the list.
+  const infoPersona = personas.find((p) => p.id === infoPersonaId) ?? null;
+  const infoScenario = scenarios.find((s) => s.id === infoScenarioId) ?? null;
+
+  // Reading hands over to writing: the panel closes as the editor opens, so
+  // Cancel in the editor returns to the library rather than to the panel.
+  const handleEditFromInfo = (id: string) => {
+    setInfoScenarioId(null);
+    setEditingScenario({ id });
+  };
+
+  // The panel closes first: it is reading a row that is about to be gone, and
+  // the request behind it would otherwise finish against a 404.
+  const handleDeleteFromInfo = (id: string) => {
+    setInfoScenarioId(null);
+    handleRemoveScenario(id);
+  };
+
   // Rendered over the setup screen and the post-call screen alike: the
   // follow-up (F-60) can be edited from either.
   const scenarioEditor = editingScenario && (
@@ -663,6 +691,7 @@ export default function App() {
           onDevicesRefresh={refreshMicDevices}
           onConfirmed={handleMicConfirmed}
           onCancel={handleCancelMicCheck}
+          briefing={selectedScenario?.briefing}
         />
       </AppLayout>
     );
@@ -702,6 +731,7 @@ export default function App() {
               ? "Nimmt Ihren Anruf entgegen"
               : selectedPersona?.role ?? "Gesprächspartner"
           }
+          personaAvatarUrl={selectedPersona?.avatar_url ?? null}
           isMicrophoneMuted={isMicrophoneMuted}
           callState={displayState}
           audioLevel={playback.audioLevel}
@@ -754,11 +784,11 @@ export default function App() {
         scenarioCategoryCounts={scenarioCategoryCounts}
         tenantName={tenantName}
         onNewScenario={() => setEditingScenario({ id: null })}
-        onEditScenario={(id) => setEditingScenario({ id })}
-        onRemoveScenario={handleRemoveScenario}
+        onShowScenarioInfo={setInfoScenarioId}
         offerRandom={offerRandom}
         personas={personas}
         personaId={personaId}
+        onShowPersonaInfo={setInfoPersonaId}
         selectedScenario={selectedScenario}
         selectedPersona={selectedPersona}
         loadError={loadError}
@@ -768,6 +798,24 @@ export default function App() {
       />
 
       {scenarioEditor}
+
+      {infoPersona && (
+        <PersonaInfo
+          personaId={infoPersona.id}
+          personaName={infoPersona.name}
+          onClose={() => setInfoPersonaId(null)}
+        />
+      )}
+
+      {infoScenario && (
+        <ScenarioInfo
+          scenarioId={infoScenario.id}
+          scenarioName={infoScenario.name}
+          onClose={() => setInfoScenarioId(null)}
+          onEdit={handleEditFromInfo}
+          onDelete={handleDeleteFromInfo}
+        />
+      )}
     </AppLayout>
   );
 }

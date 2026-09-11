@@ -15,6 +15,7 @@ import {
   updateScenario,
   type CategoryChoice,
   type FieldLimits,
+  toDraft,
   type ScenarioDraft,
   type TextField,
   type Visibility,
@@ -52,6 +53,12 @@ const FIELDS: {
     label: "Kurzbeschreibung",
     placeholder: "Ein Satz für die Auswahlkarte",
     required: true,
+  },
+  {
+    key: "briefing",
+    label: "Briefing für die trainierende Person (optional)",
+    placeholder: "Ihre Rolle, Ihr Spielraum, was ein gutes Ergebnis ist.",
+    multiline: true,
   },
   {
     key: "description",
@@ -152,10 +159,11 @@ export default function ScenarioEditor({
     getScenario(scenarioId)
       .then((detail) => {
         if (cancelled) return;
-        const { id: _id, visibility: vis, ...rest } = detail;
-        setDraft(rest);
-        pristine.current = rest;
-        setVisibility(vis);
+        const draft = toDraft(detail);
+        setDraft(draft);
+        pristine.current = draft;
+        // Never "public" here: the editor only opens on an editable row.
+        setVisibility(detail.visibility === "public" ? "private" : detail.visibility);
       })
       .catch((e: unknown) =>
         setError(e instanceof ApiError && e.status === 404

@@ -114,8 +114,8 @@ export default function TranscriptView({
       {feedback}
 
       <div className="feedback-actions">
-        <button className="restart-button" type="button" onClick={onRestart}>
-          Zur Vorbereitung
+        <button className="back-to-start-button" type="button" onClick={onRestart}>
+          Zur Startseite
         </button>
       </div>
     </>

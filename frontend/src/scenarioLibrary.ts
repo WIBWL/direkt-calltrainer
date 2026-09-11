@@ -74,6 +74,10 @@ export interface ScenarioCard {
   id: string;
   name: string;
   short_description: string;
+  /** The trainee's own briefing (ADR 0054): the role they answer in, the room
+   * they have, what a good outcome is. Shown before the call, never sent to the
+   * model. "" for a Scenario whose author left it empty. */
+  briefing: string;
   /** null = uncategorised (ADR 0072). */
   category: ScenarioCategory | null;
   origin: Origin;
@@ -119,11 +123,13 @@ export function drawRandomScenario(scenarios: ScenarioCard[]): ScenarioCard | nu
   return pool[Math.floor(Math.random() * pool.length)] ?? null;
 }
 
-/** The fields a User may author. `name` / `short_description` are the card;
- * the rest is prompt input and may be left empty (ADR 0045). */
+/** The fields a User may author. `name` / `short_description` are the card and
+ * `briefing` the trainee's own text (ADR 0054); the rest is prompt input and may
+ * be left empty (ADR 0045). */
 export interface ScenarioDraft {
   name: string;
   short_description: string;
+  briefing: string;
   description: string;
   case_facts: string;
   call_goal: string;
@@ -137,14 +143,50 @@ export interface ScenarioDraft {
  * choice from a fixed list, so it has no limit to fetch. */
 export type TextField = Exclude<keyof ScenarioDraft, "category">;
 
-export interface ScenarioDetail extends ScenarioDraft {
+/**
+ * One Scenario as `GET /api/scenarios/{id}` returns it (ADR 0076): the read
+ * view the info panel shows, and — where `editable` is true — the row the
+ * editor loads. Not a `ScenarioDraft`: two fields are nullable here.
+ */
+export interface ScenarioDetail {
   id: string;
-  visibility: Visibility;
+  name: string;
+  short_description: string;
+  briefing: string;
+  description: string;
+  case_facts: string;
+  /** null = withheld because this is a built-in, whose caller's intent is
+   * the answer key (ADR 0076). "" = its author left the field empty. */
+  call_goal: string | null;
+  success_condition: string | null;
+  category: CategoryChoice;
+  /** "public" for a built-in. The editor never sees that value: it opens
+   * only where `editable` is true, and those rows are private or tenant. */
+  visibility: Visibility | "public";
+  /** The caller authored this row and may edit it. Decided by the server from
+   * the verified token, never inferred from `origin` here — and false on a
+   * reverse, which its author owns but cannot change (ADR 0070). */
+  editable: boolean;
   /** ADR 0070. `reverse_brief` is null on everything that is not a reverse;
    * on one it is the panel shown during the call. */
   reverse: boolean;
   origin_session: OriginSessionRef | null;
   reverse_brief: ReverseBrief | null;
+}
+
+/** The editor works on strings; a withheld or absent field is an empty one
+ * to it. Only ever called on an `editable` row, where nothing is withheld. */
+export function toDraft(detail: ScenarioDetail): ScenarioDraft {
+  return {
+    name: detail.name,
+    short_description: detail.short_description,
+    briefing: detail.briefing,
+    description: detail.description,
+    case_facts: detail.case_facts,
+    call_goal: detail.call_goal ?? "",
+    success_condition: detail.success_condition ?? "",
+    category: detail.category,
+  };
 }
 
 export type FieldLimits = Record<TextField, number>;
@@ -158,6 +200,7 @@ export type FieldLimits = Record<TextField, number>;
 export const FALLBACK_FIELD_LIMITS: FieldLimits = {
   name: 50,
   short_description: 100,
+  briefing: 600,
   description: 500,
   case_facts: 3000,
   call_goal: 500,
@@ -172,6 +215,7 @@ export const getFieldLimits = () =>
 export const EMPTY_DRAFT: ScenarioDraft = {
   name: "",
   short_description: "",
+  briefing: "",
   description: "",
   case_facts: "",
   call_goal: "",

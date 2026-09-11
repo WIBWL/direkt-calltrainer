@@ -6,14 +6,26 @@ Dieser Katalog beschreibt Trainingsfälle auf fachlicher Ebene, bevor sie als Da
 
 Für jeden Eintrag ist ausgewiesen, **worauf er zurückgeht**: eine Anforderung (`R-xx`), eine Randbedingung (`C-xx`) oder — wenn kein Beleg vorliegt — `Systementwurf`. Das ist dieselbe Konvention wie in der Spalte *Herkunft* des Feature-Katalogs, und sie ist der Grund, warum dieser Katalog überhaupt geführt wird: Ein Trainingsfall ohne Belegkette ist eine Erfindung, und das soll man ihm ansehen.
 
-### 1.1 Anonymisierungsregel
+### 1.1 Anonymisierung und Konkretheit
 
-Der Katalog nennt **keine Unternehmen, Personen, Orte, Produkte, Partner oder Marken**. Die Pilotunternehmen erscheinen ausschließlich als **Tätigkeitsprofile** (Abschnitt 2). Drei Gründe:
+Diese Regel gilt **auf zwei Ebenen verschieden**, und das ist der Kern: Der Katalog beschreibt Falltypen, die Bibliothek instanziiert sie. Ein Falltyp ohne Eigennamen ist richtig; ein Trainingsfall ohne Eigennamen ist blass.
 
-- **C-05 (R-40, R-41):** Das Training soll ohne kundenspezifisches Produkt- und Fachwissen durchführbar sein. Ein Szenario, das ein konkretes Produkt voraussetzt, verletzt genau diese Randbedingung.
-- **ADR 0045:** `case_facts` sind über den *Fall* zu schreiben, nie über den Anrufer und nie über ein benanntes System — sonst ist ein Szenario nicht mehr mit jeder Persona kombinierbar (ADR 0015).
+**Der Katalog** nennt keine Unternehmen, Personen, Orte, Produkte, Partner oder Marken. Die Pilotunternehmen erscheinen ausschließlich als **Tätigkeitsprofile** (Abschnitt 2). Was bleibt, ist die *Tätigkeit*: welcher Art die Arbeit ist, in welchem Verhältnis man zum Gegenüber steht, wie lange Gespräche laufen, worüber gestritten wird. Das trägt die Realitätsnähe, ohne die Pilotunternehmen zu identifizieren.
 
-Was **bleibt**, ist die *Tätigkeit*: welcher Art die Arbeit ist, in welchem Verhältnis man zum Gegenüber steht, wie lange Gespräche laufen, worüber gestritten wird. Das trägt die Realitätsnähe, ohne die Unternehmen zu identifizieren.
+**Die Bibliothek** (`backend/db/seed_data.py`) trägt denselben Fall mit erfundenen Konkreta: ein benanntes Produkt auf der eigenen Seite, Beträge, Datumsangaben, Ticketnummern, Dritte auf Nutzerseite mit Namen. Verboten bleibt genau das, was *identifiziert* oder was den *Anrufer* beschreibt:
+
+| erlaubt und erwünscht | bleibt verboten |
+|---|---|
+| erfundenes Produkt der eigenen Seite samt Version | echte Unternehmen, Produkte, Orte, Marken, Partner |
+| Beträge, Stückzahlen, Fristen, Ticketnummern | Name, Arbeitgeber oder Motiv **des Anrufers** (ADR 0045) |
+| Dritte auf Nutzerseite mit Namen | Fachwissen, das von außen mitgebracht werden muss (C-05) |
+
+Zwei Begründungen, und beide sagen etwas anderes, als frühere Fassungen dieses Abschnitts behauptet haben:
+
+- **C-05 (R-40, R-41)** verlangt, dass das Training **ohne kundenspezifisches Produkt- und Fachwissen** durchführbar ist. Ein Fall, der seine Fakten selbst mitbringt, verlangt genau das nicht — ob das Produkt darin einen Namen trägt, ändert daran nichts. Verboten ist der Fall, der auf *ungenanntes* Wissen verweist. Das **Abstrakte ist hier die größere Gefahr**: „Der Prozess hat etwa acht Schritte" zwingt die Trainingsperson, die Lücke aus ihrem eigenen Arbeitsalltag zu füllen — also mit genau dem kundenspezifischen Wissen, das C-05 heraushalten wollte. C-05 ist erfüllt, weil der Fall geschlossen ist, nicht weil er blass ist.
+- **ADR 0045** sagt das Gegenteil dessen, was ihm hier früher zugeschrieben wurde. Sein Abschnitt *„The Scenario carries the case"* führt das Produkt unter dem auf, was in `case_facts` **hineingehört**: *„the facts of the case: product, figures, dates, history"*. Die Einschränkung, die er macht, betrifft ausschließlich den Anrufer — *„never about the caller: no name, no employer, no personality, no motive"* — und die gilt unverändert weiter, denn sie ist es, die jede Persona jeden Fall tragen lässt (ADR 0015).
+
+> **Zur Korrektur.** Bis Anfang September 2026 stand hier, `case_facts` seien „nie über ein benanntes System" zu schreiben, mit ADR 0045 als Beleg. Dieser Halbsatz steht im ADR nicht; er wurde beim Schreiben dieses Katalogs hinzuinterpretiert und hat die zwölf aus S-01–S-13 abgeleiteten Bibliothekseinträge abstrakter gemacht, als der ADR es verlangt — während die fünf älteren Einträge, die vor dem Katalog entstanden, immer schon Produkte und Beträge nannten. Es wurde hier keine Regel gekippt, sondern eine Fehlzuschreibung zurückgenommen. Ein ADR dazu gibt es deshalb nicht: Er würde eine Kursänderung dokumentieren, die es nie gab.
 
 ---
 
@@ -100,12 +112,12 @@ Anders als der Szenariokatalog ist der Persona-Katalog **dünn belegt**: In beid
 
 | ID | Persona | Haltung und Manier | Herkunft | Belegstärke |
 |---|---|---|---|---|
-| **P-01** | Kostenkritischer Bestandskunde | Nimmt jede Leistung an, solange sie nichts extra kostet. Sobald ein Preis fällt, bricht er ab — nicht laut, sondern endgültig. Verhandelt nicht, er lehnt ab. | **R-07** (SO 4.3, 4.5) | **Direkt belegt.** Der einzige wörtlich beschriebene Kundentyp der gesamten Erhebung. Bisher nicht in der Bibliothek. |
-| **P-02** | Technisch Verantwortlicher | Will die Langfassung, bohrt nach, prüft Sicherheit und Betrieb, stellt geschlossene Kontrollfragen. Entscheidet nicht allein und sagt das auch. | **R-08** (AP 3.5), Detail AP 3.2 | **Direkt belegt.** R-08 nennt Geschäftsführung *und* technische Leitung; nur die erste Hälfte ist umgesetzt. |
-| **P-03** | Fachfremder Ansprechpartner | Ohne technisches Vorwissen. Steigt bei Fachbegriffen sichtbar aus und sagt es. Braucht Bilder statt Begriffe, gibt sich mit einer Definition nicht zufrieden. | **R-16** (AP 2.1) | **Belegt, indirekt.** R-16 ist der Nutzerbedarf; die Persona ist der Hebel, der ihn trainierbar macht. Trägt F-40. |
+| **P-01** | Kostenkritischer Bestandskunde | Nimmt jede Leistung an, solange sie nichts extra kostet. Sobald ein Preis fällt, bricht er ab — nicht laut, sondern endgültig. Verhandelt nicht, er lehnt ab. | **R-07** (SO 4.3, 4.5) | **Direkt belegt.** Der einzige wörtlich beschriebene Kundentyp der gesamten Erhebung. **Vorhanden.** |
+| **P-02** | Technisch Verantwortlicher | Will die Langfassung, bohrt nach, prüft Sicherheit und Betrieb, stellt geschlossene Kontrollfragen. Entscheidet nicht allein und sagt das auch. | **R-08** (AP 3.5), Detail AP 3.2 | **Direkt belegt.** R-08 nennt Geschäftsführung *und* technische Leitung; beide Hälften sind jetzt besetzt. **Vorhanden.** |
+| **P-03** | Fachfremder Ansprechpartner | Ohne technisches Vorwissen. Steigt bei Fachbegriffen sichtbar aus und sagt es. Braucht Bilder statt Begriffe, gibt sich mit einer Definition nicht zufrieden. | **R-16** (AP 2.1) | **Belegt, indirekt.** R-16 ist der Nutzerbedarf; die Persona ist der Hebel, der ihn trainierbar macht. Trägt F-40. **Vorhanden.** |
 | **P-04** | Scheinbar klar, tatsächlich mehrdeutig | Formuliert knapp und selbstsicher, bestätigt Rückfragen zu schnell, meint aber etwas anderes. Das Missverständnis fällt erst spät auf — und dann sichtbar. | **R-17** (SO 3.1, 3.2) | **Belegt, indirekt.** R-17 ist der meistgenannte inhaltliche Schmerzpunkt aus Profil A. Anspruchsvollste Persona des Katalogs. |
 | **P-05** | Anrufer unter Zeitdruck | Akutes Problem, wenig Geduld für Vorreden, beschreibt das Problem unpräzise, drängt auf eine Aussage. Sachlich, aber gereizt. | **R-06** (SO 4.5) + **R-09** | **Abgeleitet.** R-06 fordert emotionale Reaktionen, nennt aber keinen Typ; der Support-Kontext kommt aus R-09. |
-| **P-06** | Wortkarger Gesprächspartner | Antwortet einsilbig, liefert von sich aus nichts. Wer nicht fragt, bekommt nichts — und das Gespräch versandet. | **R-50** (SO-S 1) | **Abgeleitet.** R-50 begründet die Kennzahl *Fragenanteil* mit „die fragende Seite führt". Diese Persona macht das erlebbar statt nur messbar. |
+| **P-06** | Wortkarger Gesprächspartner | Antwortet einsilbig, liefert von sich aus nichts. Wer nicht fragt, bekommt nichts — und das Gespräch versandet. | **R-50** (SO-S 1) | **Abgeleitet.** R-50 begründet die Kennzahl *Fragenanteil* mit „die fragende Seite führt". Diese Persona macht das erlebbar statt nur messbar. **Vorhanden.** |
 | **P-07** | Drängt auf sofortige Zusage | Verlangt eine verbindliche Entscheidung im Gespräch. „Ich frage intern nach" wird nicht akzeptiert — außer mit Termin und Namen. | **R-04** (SO 4.2, AP 3.2) — *offen* | **Interpretation.** Würde eine bisher heimatlose Anforderung schließen, aber nur unter einer Lesart, die rückzufragen ist (Abschnitt 7). |
 | **P-08** | Geschäftsführung, Strategie und Budget | Ungeduldig mit technischen oder ausweichenden Antworten, erfahren im Verhandeln, will Zahl, Datum oder Namen. Eine konkrete Antwort beendet das Thema sofort. | **R-08** (AP 3.5) | **Direkt belegt. Vorhanden.** |
 | **P-09** | Höflich und hartnäckig | Unterbricht nie, wird nie laut, ist aber genauso schwer zufriedenzustellen: dieselbe Frage ein drittes und viertes Mal, freundlich. | *Systementwurf* | **Kein Beleg.** Entstand als Nachweis des Sprachpfads (ADR 0043). Als Kontrast zu P-08 didaktisch wertvoll — gleiche Hartnäckigkeit, andere Tonlage — und deshalb zu behalten, aber ohne nachträglich erfundene R-Nummer. **Vorhanden.** |
@@ -129,6 +141,8 @@ Der eine wörtlich belegte Einwand aus der Erhebung (Profil A, kostenkritischer 
 ---
 
 ## 5 Szenario-Katalog
+
+Die Zeile **Fall** beschreibt hier den *Falltyp*, nicht den ausgelieferten Trainingsfall. Der Eintrag in der Bibliothek trägt denselben Fall mit erfundenen Konkreta — benanntes Produkt, Beträge, Datumsangaben, Ticketnummern. Warum beide Ebenen sich unterscheiden müssen, steht in Abschnitt 1.1.
 
 ### 5.1 Aus Profil A — Betrieb und Betreuung
 

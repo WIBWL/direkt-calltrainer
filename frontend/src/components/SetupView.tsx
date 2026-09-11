@@ -11,6 +11,8 @@ import LibraryPicker, {
   type LibraryItem,
 } from "./LibraryPicker";
 import { cx } from "../utils/cx";
+import PersonaAvatar from "./PersonaAvatar";
+import ScenarioBriefing from "./ScenarioBriefing";
 import SelectionSummary from "./SelectionSummary";
 import SetupSection from "./SetupSection";
 
@@ -35,14 +37,17 @@ interface SetupViewProps {
   scenarioCategoryCounts: Record<CategoryFilter, number>;
   tenantName: string | null;
   onNewScenario: () => void;
-  onEditScenario: (id: string) => void;
-  /** Retire a reverse (ADR 0070); the only affordance it has. */
-  onRemoveScenario: (id: string) => void;
   /** Whether there is anything in the library to draw a Zufallsszenario from
    * (F-62). */
   offerRandom: boolean;
+  /** Open a Scenario's read-only info panel; editing starts there
+   * (ADR 0076). */
+  onShowScenarioInfo: (id: string) => void;
   personas: Persona[];
   personaId: string | null;
+  /** Open the read-only info panel for this Persona. Held in App.tsx
+   * beside the Scenario editor's state, since this component keeps none. */
+  onShowPersonaInfo: (id: string) => void;
   selectedScenario: ScenarioCard | null;
   selectedPersona: Persona | null;
   loadError: string | null;
@@ -69,11 +74,11 @@ export default function SetupView({
   scenarioCategoryCounts,
   tenantName,
   onNewScenario,
-  onEditScenario,
-  onRemoveScenario,
   offerRandom,
+  onShowScenarioInfo,
   personas,
   personaId,
+  onShowPersonaInfo,
   selectedScenario,
   selectedPersona,
   loadError,
@@ -117,15 +122,14 @@ export default function SetupView({
           tenantName={tenantName}
           newLabel="+ Individuelles Szenario"
           onNew={onNewScenario}
-          onEdit={onEditScenario}
-          onRemove={onRemoveScenario}
           offerRandom={offerRandom}
+          onInfo={onShowScenarioInfo}
         />
       </SetupSection>
 
       <SetupSection
         index="02"
-        title="Gesprächspartner auswählen"
+        title="Gesprächspartner wählen"
         description="Jede Persona besitzt eine eigene Sprache, Stimme und Persönlichkeit."
       >
         <div className="persona-grid setup-persona-grid">
@@ -136,8 +140,11 @@ export default function SetupView({
               subtitle={persona.role}
               language={persona.language}
               languageCode={persona.language_code}
+              avatarUrl={persona.avatar_url}
               isSelected={persona.id === personaId}
               onSelect={() => onSelectPersona(persona.id)}
+              onInfo={() => onShowPersonaInfo(persona.id)}
+              infoLabel={`Mehr über ${persona.name}`}
             />
           ))}
         </div>
@@ -151,6 +158,11 @@ export default function SetupView({
           persona={selectedPersona?.name ?? NOT_SELECTED}
           language={selectedPersona?.language ?? NOT_SELECTED}
         />
+
+        {/* The trainee's side of the case (ADR 0054). Here as well as on the
+            microphone check: which Scenario to pick is itself a decision, and
+            the card's one line says only what the caller wants. */}
+        <ScenarioBriefing briefing={selectedScenario?.briefing} />
 
         {/* Said before the call, not after it (ADR 0066). Someone who declined
             storage should learn that this training will leave no record while
@@ -186,40 +198,73 @@ export default function SetupView({
 
 /** One selectable card. The Persona step is a plain grid (Personas are
  * curated, not User-authored); the Scenario step uses LibraryPicker instead,
- * which adds filtering and authoring. */
+ * which adds filtering and authoring.
+ *
+ * The info affordance sits *outside* the card button rather than inside it —
+ * a button cannot be nested in a button — using the same `card-wrap` shell
+ * LibraryPicker puts its "Bearbeiten" link in. Reading about a Persona and
+ * choosing one are separate acts: the "i" does not select the card.
+ *
+ * The portrait sits left of the text, which is why the three lines are wrapped
+ * in an element of their own: the card is a row, and they are its second
+ * column. */
 function ChoiceCard({
   title,
   subtitle,
   language,
   languageCode,
+  avatarUrl,
   isSelected,
   onSelect,
+  onInfo,
+  infoLabel,
 }: {
   title: string;
   subtitle: string;
   language: string;
   /** Which flag goes beside the name; the language stays as text below it. */
   languageCode: string;
+  avatarUrl: string | null;
   isSelected: boolean;
   onSelect: () => void;
+  onInfo: () => void;
+  infoLabel: string;
 }) {
   return (
-    <button
-      type="button"
-      className={cx("persona-card", isSelected && "selected")}
-      aria-pressed={isSelected}
-      onClick={onSelect}
-    >
-      <span className="choice-check" aria-hidden="true">
-        {isSelected ? "✓" : ""}
-      </span>
+    <div className="card-wrap">
+      <button
+        type="button"
+        className={cx("persona-card", isSelected && "selected")}
+        aria-pressed={isSelected}
+        onClick={onSelect}
+      >
+        <span className="choice-check" aria-hidden="true">
+          {isSelected ? "✓" : ""}
+        </span>
 
-      <span className="persona-name-row">
-        <span className="persona-name">{title}</span>
-        <LanguageFlag code={languageCode} />
-      </span>
-      <span className="card-subtitle">{subtitle}</span>
-      <span className="card-meta">{language}</span>
-    </button>
+        <PersonaAvatar name={title} src={avatarUrl} className="persona-card-portrait" />
+
+        <span className="persona-card-body">
+          {/* The flag sits with the name, the portrait beside the whole block:
+              one says who is calling, the other in which language. */}
+          <span className="persona-name-row">
+            <span className="persona-name">{title}</span>
+            <LanguageFlag code={languageCode} />
+          </span>
+          <span className="card-subtitle">{subtitle}</span>
+          <span className="card-meta">{language}</span>
+        </span>
+      </button>
+
+      <button
+        type="button"
+        className="card-info"
+        onClick={onInfo}
+        aria-label={infoLabel}
+        title={infoLabel}
+      >
+        <span aria-hidden="true">i</span>
+      </button>
+    </div>
   );
 }

@@ -81,8 +81,8 @@ async def test_scenarios_come_from_the_database(api_client: httpx.AsyncClient) -
     assert response.status_code == 200
     entry = response.json()[0]
     assert set(entry) == {
-        "id", "name", "short_description", "category", "origin", "shared",
-        "follow_up",
+        "id", "name", "short_description", "briefing", "category", "origin",
+        "shared", "follow_up",
         # ADR 0070: which side of the phone this Scenario puts the User on,
         # and the conversation a reverse replays.
         "reverse", "origin_session",

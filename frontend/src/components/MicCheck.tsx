@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { MicDevice } from "../hooks/useMicrophoneDevices";
 import { useMicrophoneLevel } from "../hooks/useMicrophoneLevel";
-import SetupSection from "./SetupSection";
+import ScenarioBriefing from "./ScenarioBriefing";
 
 const HEARD_THRESHOLD = 0.02;
 
@@ -23,6 +23,11 @@ interface MicCheckProps {
   onDevicesRefresh: () => void;
   onConfirmed: () => void;
   onCancel: () => void;
+  /** The selected Scenario's briefing (ADR 0054), shown above the test. This
+   * screen is where the Session is already committed to and the user is
+   * waiting anyway (ADR 0042), so it costs no extra step — and it is the last
+   * thing read before the call starts. */
+  briefing: string | undefined;
 }
 
 /** Pre-call microphone test: lets the user pick an input device and confirm
@@ -34,6 +39,7 @@ export default function MicCheck({
   onDevicesRefresh,
   onConfirmed,
   onCancel,
+  briefing,
 }: MicCheckProps) {
   const { level, error, start, stop } = useMicrophoneLevel(deviceId);
 
@@ -71,7 +77,7 @@ export default function MicCheck({
   return (
     <>
       <section className="setup-intro mic-check-intro" aria-labelledby="mic-check-page-title">
-        <div className="eyebrow">Mikrofon vorbereiten</div>
+        <div className="eyebrow">Training vorbereiten</div>
 
         <h1 id="mic-check-page-title">Mikrofon testen</h1>
 
@@ -81,11 +87,11 @@ export default function MicCheck({
         </p>
       </section>
 
-      <SetupSection
-        index="01"
-        title="Mikrofon prüfen"
-        description="Sprechen Sie nach dem Start einen kurzen Testsatz."
-      >
+      <ScenarioBriefing briefing={briefing} className="mic-check-briefing" />
+
+      {/* No SetupSection here: this screen has one box and no numbered steps to
+          count off, and the page heading above already names it. */}
+      <section className="setup-section">
         <dl className="mic-device-information">
           <div className="mic-device-information-row">
             <dt>
@@ -199,10 +205,11 @@ export default function MicCheck({
           </div>
         )}
 
-        <button className="cancel-button" type="button" onClick={onCancel}>
-          Abbrechen
-        </button>
-      </SetupSection>
+      </section>
+
+      <button className="back-to-start-button" type="button" onClick={onCancel}>
+        Zur Startseite
+      </button>
     </>
   );
 }

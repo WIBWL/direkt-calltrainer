@@ -87,10 +87,10 @@ interface LibraryPickerProps {
   tenantName: string | null;
   newLabel: string;
   onNew: () => void;
-  onEdit: (id: string) => void;
-  /** Retire a reverse (ADR 0070), which is the only affordance it has in
-   * place of editing. */
-  onRemove: (id: string) => void;
+  /** Open the read-only info panel. Editing is reached from inside it
+   * (ADR 0076), so the card carries no separate edit affordance -- not even
+   * on the caller's own rows, where it used to sit. */
+  onInfo: (id: string) => void;
   /** Offer the Zufallsszenario tile (F-62). Decided by the caller, not here:
    * the tile stands outside both filters, and `items` has already been through
    * them — an empty grid under one chip says nothing about whether there is
@@ -169,15 +169,13 @@ export default function LibraryPicker({
   tenantName,
   newLabel,
   onNew,
-  onEdit,
-  onRemove,
+  onInfo,
   offerRandom = false,
 }: LibraryPickerProps) {
   // Which card is asking to be confirmed, if any. One id rather than a set:
   // asking about a second row answers the first with "no", which is the safe
   // way round and saves a stray confirmation sitting armed on a card the User
   // has moved on from.
-  const [confirmingRemoval, setConfirmingRemoval] = useState<string | null>(null);
   // The grid opens on one row and a half of cards; the rest is behind the tile
   // at the end of it. Collapsed again whenever the filters change, because what
   // "the first five" are has changed with them.
@@ -221,13 +219,13 @@ export default function LibraryPicker({
         </div>
 
         <div className="scenario-library-filter-row">
-          <span className="scenario-library-filter-label">Herkunft</span>
+          <span className="scenario-library-filter-label">Szenariotyp</span>
 
           <FilterSlider
             options={originOptions}
             value={filter}
             onChange={onFilter}
-            label="Szenarien nach Herkunft filtern"
+            label="Szenarien nach Szenariotyp filtern"
           />
         </div>
 
@@ -285,10 +283,11 @@ export default function LibraryPicker({
         {shown.map((item) => (
           <div key={item.id} className="card-wrap">
             <button
+              // The origin's colour stays; the "editable" padding does not,
+              // because the card no longer carries an edit link (ADR 0076).
               className={
                 "persona-card card-origin-" + badgeClass(item) +
-                (item.id === selectedId ? " selected" : "") +
-                (item.origin === "own" ? " editable" : "")
+                (item.id === selectedId ? " selected" : "")
               }
               onClick={() => onSelect(item.id)}
               type="button"
@@ -305,50 +304,19 @@ export default function LibraryPicker({
                   so the badge and the tile it sits on cannot disagree. */}
               <span className="card-badge">{badgeLabel(item, tenantName)}</span>
             </button>
-            {/* A reverse is not editable (ADR 0070) — it copies a case that
-                was played — so the affordance on it is removal instead, and
-                that asks first: it sits where every other card carries
-                "Bearbeiten", one slip away from a row the User cannot get
-                back. Recreating it means going to the training it came from
-                and spending a model call, if that training is even still
-                stored. */}
-            {item.reverse ? (
-              confirmingRemoval === item.id ? (
-                <span className="card-remove-confirm">
-                  <button
-                    type="button"
-                    className="card-edit card-edit-danger"
-                    onClick={() => {
-                      setConfirmingRemoval(null);
-                      onRemove(item.id);
-                    }}
-                  >
-                    Ja, entfernen
-                  </button>
-                  <button
-                    type="button"
-                    className="card-edit"
-                    onClick={() => setConfirmingRemoval(null)}
-                  >
-                    Abbrechen
-                  </button>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className="card-edit"
-                  onClick={() => setConfirmingRemoval(item.id)}
-                >
-                  Entfernen
-                </button>
-              )
-            ) : (
-              item.origin === "own" && (
-                <button type="button" className="card-edit" onClick={() => onEdit(item.id)}>
-                  Bearbeiten
-                </button>
-              )
-            )}
+            {/* Every Scenario is readable (ADR 0076), so the "i" is on every
+                card — unlike the old "Bearbeiten", which was on the caller's
+                own rows only and now lives inside the panel. */}
+            <button
+              type="button"
+              className="card-info"
+              onClick={() => onInfo(item.id)}
+              aria-label={`Mehr über ${item.name}`}
+              title={`Mehr über ${item.name}`}
+            >
+              <span aria-hidden="true">i</span>
+            </button>
+
           </div>
         ))}
       </div>

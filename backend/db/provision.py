@@ -152,19 +152,27 @@ def _seed_personas(db: DbSession) -> int:
             db, Persona, {"key": p["id"]},
             {"name": clean(p["name"]), "role_label": clean(p["role_label"]),
              "role": clean(p["role"]), "traits": clean(p["traits"]),
+             "traits_label": clean(p["traits_label"]),
              "behavior": clean(p["behavior"]),
              "training_goal": clean(p["training_goal"]), "difficulty": p["difficulty"],
-             "active": True, "language_code": p["language_id"],
+             # Defaults to True: a Persona is only seeded inactive while
+             # something it needs to run is still missing -- today a KugelAudio
+             # voice id. Written to the table either way, so filling the id in
+             # and dropping the flag is the whole change.
+             # Not run through `clean()`: a path is not authored prose, and the
+             # sanitiser's business is prompt text (ADR 0059).
+             "avatar_url": p.get("avatar_url"),
+             "active": p.get("active", True), "language_code": p["language_id"],
              "tts_voice": p["tts_voice"],
              "kugelaudio_voice_id": p["kugelaudio_voice_id"],
              # A shipped built-in belongs to nobody and everybody (ADR 0058).
              "created_by": None, "visibility": VISIBILITY_PUBLIC})
         created += was_created
-        _seed_objections(db, row, p["objections"])
+        _seed_objections(db, row, p["objections"], p["objection_labels"])
     return created
 
 
-def _seed_objections(db: DbSession, persona: Persona, objections) -> None:
+def _seed_objections(db: DbSession, persona: Persona, objections, labels) -> None:
     """Bring one Persona's objections to the seed state (R-12, ADR 0045).
 
     Replaced wholesale rather than upserted: the list is what carries meaning,
@@ -177,13 +185,19 @@ def _seed_objections(db: DbSession, persona: Persona, objections) -> None:
     give objections a stable key first, or address them by persona and
     position. The same absence of a natural key that forces the rewrite is
     what makes the ids unusable as a reference.
+
+    `objections` is the English prompt text and `labels` the German display
+    text for the same move, one per objection and in the same order. They
+    are written in a single pass so the two cannot drift apart;
+    `tests/test_persona_scenario_library.py` pins the lengths in the seed.
     """
     db.flush()  # a freshly created Persona needs its id before rows point at it
     db.query(PersonaObjection).filter_by(
         persona_id=persona.persona_id).delete(synchronize_session=False)
-    for index, text in enumerate(objections):
+    for index, (text, label) in enumerate(zip(objections, labels, strict=True)):
         db.add(PersonaObjection(
-            persona_id=persona.persona_id, position=index, text=clean(text)))
+            persona_id=persona.persona_id, position=index,
+            text=clean(text), text_label=clean(label)))
 
 
 def _seed_scenarios(db: DbSession) -> int:
@@ -191,8 +205,11 @@ def _seed_scenarios(db: DbSession) -> int:
         _upsert(db, Scenario, {"key": s["id"]},
                 {"title": clean(s["name"]),
                  "short_description": clean(s["short_description"]),
+                 "briefing": clean(s["briefing"]),
                  "description": clean(s["description"]),
                  "case_facts": clean(s["case_facts"]),
+                 "description_label": clean(s["description_label"]),
+                 "case_facts_label": clean(s["case_facts_label"]),
                  "call_goal": clean(s["call_goal"]),
                  "success_condition": clean(s["success_condition"]),
                  # Not cleaned: a closed vocabulary, not authored prose, and
