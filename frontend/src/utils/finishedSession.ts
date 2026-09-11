@@ -21,6 +21,10 @@ export interface FinishedSession {
    * (ADR 0070) keeps the same voice on the other end of the line. Null after a
    * reload of a Session stored before this field existed. */
   personaId?: string | null;
+  /** The Scenario a Zufallsszenario turned out to be (F-62), so the reveal
+   * on this screen survives a reload the way `personaName` does. Null or
+   * absent for a Scenario the User picked themselves — they know. */
+  revealedScenario?: string | null;
 }
 
 export function loadFinishedSession(): FinishedSession | null {

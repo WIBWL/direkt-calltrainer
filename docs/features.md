@@ -24,6 +24,8 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 | F-34 | Usergesteuertes Szenario | Der Nutzer beschreibt die zu trainierende Gesprächssituation per Freitext. | Funktionale Vollständigkeit | COULD | Systementwurf |
 | F-58 | Szenario aus hochgeladenem Dokument | Aus einem hochgeladenen Dokument erzeugt das System ein sitzungsbezogenes Szenario, um Gespräche mit stärkerem Unternehmensbezug zu üben. | Funktionale Vollständigkeit | SHOULD | R-42 |
 | F-60 | Folgeszenario aus dem Feedback | Aus den Verbesserungspunkten eines abgeschlossenen Gesprächs entwirft das System auf Knopfdruck das nächste Gespräch in derselben Sache – derselbe Fall, zeitlich später –, das genau die dort benannten Punkte verlangt. Es wird als eigenes Szenario gespeichert und lässt sich im Editor ändern. | Funktionale Vollständigkeit | SHOULD | R-22, Systementwurf |
+| F-62 | Zufallsszenario | Der Nutzer startet ein Gespräch, ohne zu wissen, worum es geht: das System zieht eines der verfügbaren Szenarien und nennt es erst nach dem Gespräch. Der Anlass erschließt sich wie bei einem eingehenden Anruf erst im Gespräch selbst. | Funktionale Vollständigkeit | COULD | Systementwurf |
+| F-63 | Anruf annehmen statt starten | Vor einem gewöhnlichen Gespräch klingelt das Telefon: der Nutzer sieht, wer anruft, und nimmt den Anruf an, statt einen Startknopf zu drücken. Das entspricht der Rollenverteilung – die KI ruft an, der Nutzer ist die Seite, die abnimmt. | Benutzbarkeit | COULD | Systementwurf |
 | F-59 | Mandantenbezogene Szenario-Bibliothek | Selbst erstellte Szenarien werden über die Sitzung hinaus mandantenbezogen gespeichert, sodass Kollegen ohne erneute Erfassung damit trainieren. | Funktionale Vollständigkeit | COULD | R-58 |
 
 ## Sprach- und Kommunikationsanalyse
@@ -103,5 +105,5 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 |---|---|
 | MUST | 17 |
 | SHOULD | 11 |
-| COULD | 15 |
-| **Gesamt** | **43** |
+| COULD | 18 |
+| **Gesamt** | **46** |

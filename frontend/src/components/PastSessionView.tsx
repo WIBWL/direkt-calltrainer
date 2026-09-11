@@ -9,6 +9,7 @@ import { formatOffset } from "../utils/time";
 import AppLayout from "./AppLayout";
 import { FeedbackReport, MetricSection } from "./FeedbackView";
 import ScenarioEditor from "./ScenarioEditor";
+import { useScreenTransition } from "./ScreenTransition";
 
 /**
  * One past training, opened from the history (F-48): the wrap-up that was
@@ -34,6 +35,7 @@ export default function PastSessionView() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { detail, state, reload } = useStoredSession(sessionId ?? null);
   const navigate = useNavigate();
+  const { playReverse } = useScreenTransition();
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
@@ -68,7 +70,10 @@ export default function PastSessionView() {
       personaId: detail.persona_id,
       reverse: true,
     };
-    navigate(ROUTES.training, { state: { start } });
+    // The navigation happens behind the card, which is why the transition is
+    // mounted above the router: this page is unmounted by the very cut it
+    // asked for (see ScreenTransition.tsx).
+    playReverse(() => navigate(ROUTES.training, { state: { start } }));
   };
 
   // Back to the history rather than to the now-empty page this was. Replacing

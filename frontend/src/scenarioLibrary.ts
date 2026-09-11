@@ -91,6 +91,34 @@ export interface ScenarioCard {
   origin_session: OriginSessionRef | null;
 }
 
+/** The pick that is not a Scenario: draw one, and do not say which (F-62).
+ *
+ * A sentinel id rather than a flag beside the selection, so the screen still
+ * has exactly one selected value and the summary, the start button and the
+ * picker's own pressed state each need no second case. It cannot collide with
+ * a real Scenario: those ids are the backend's UUIDs (ADR 0050). */
+export const RANDOM_SCENARIO_ID = "__random__";
+
+/** One of the Scenarios the User could have picked by hand, drawn at the moment
+ * the call is committed to.
+ *
+ * A reverse and a follow-up are left out because neither survives being walked
+ * into unprepared: a reverse is played *from* a briefing the User is meant to
+ * read first (ADR 0070), and a follow-up continues a call they are meant to
+ * remember (ADR 0069). Everything else is in — built-in, own and shared alike.
+ *
+ * The draw deliberately ignores both filter rows. Drawing from what is on
+ * screen would be drawing from a category, and a category has already said
+ * what is coming — which is the one thing this is for. */
+export function isDrawable(scenario: ScenarioCard): boolean {
+  return !scenario.reverse && !scenario.follow_up;
+}
+
+export function drawRandomScenario(scenarios: ScenarioCard[]): ScenarioCard | null {
+  const pool = scenarios.filter(isDrawable);
+  return pool[Math.floor(Math.random() * pool.length)] ?? null;
+}
+
 /** The fields a User may author. `name` / `short_description` are the card;
  * the rest is prompt input and may be left empty (ADR 0045). */
 export interface ScenarioDraft {

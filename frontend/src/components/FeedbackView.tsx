@@ -512,8 +512,8 @@ function FollowUp({
         </button>
       </div>
       <p className="follow-up-note">
-        „Starten“ beginnt das Gespräch sofort – mit demselben Gesprächspartner wie in
-        diesem Training, ohne Mikrofoncheck.
+        „Starten“ ruft denselben Gesprächspartner wie in diesem Training an – ohne
+        Mikrofoncheck. Das Gespräch beginnt, sobald Sie den Anruf annehmen.
       </p>
     </section>
   );

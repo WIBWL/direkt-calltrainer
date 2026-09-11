@@ -11,6 +11,7 @@ import Imprint from "./components/legal/Imprint";
 import Notes from "./components/legal/Notes";
 import Privacy from "./components/legal/Privacy";
 import PastSessionView from "./components/PastSessionView";
+import { ScreenTransitionProvider } from "./components/ScreenTransition";
 import ProfileView from "./components/ProfileView";
 import { consumeReturnTo, rememberReturnTo, userManager } from "./auth";
 import { ROUTES } from "./routes";
@@ -67,33 +68,38 @@ createRoot(document.getElementById("root")!).render(
       <AuthProvider userManager={userManager} onSigninCallback={onSigninCallback}>
         <ReturnToRequestedPage />
 
-        <Routes>
-          {/* Public legal pages */}
-          <Route path={ROUTES.imprint} element={<Imprint />} />
-          <Route path={ROUTES.privacy} element={<Privacy />} />
-          <Route path={ROUTES.accessibility} element={<Accessibility />} />
-          <Route path={ROUTES.notes} element={<Notes />} />
+        {/* Above the routes on purpose: a transition outlives the screen that
+            started it, and a reverse started from a past training navigates
+            away mid-animation (see ScreenTransition.tsx). */}
+        <ScreenTransitionProvider>
+          <Routes>
+            {/* Public legal pages */}
+            <Route path={ROUTES.imprint} element={<Imprint />} />
+            <Route path={ROUTES.privacy} element={<Privacy />} />
+            <Route path={ROUTES.accessibility} element={<Accessibility />} />
+            <Route path={ROUTES.notes} element={<Notes />} />
 
-          {/* Everything below requires authentication. */}
-          <Route
-            element={
-              <AuthGate>
-                <Outlet />
-              </AuthGate>
-            }
-          >
-            <Route element={<ConsentGate />}>
-              <Route path={ROUTES.training} element={<App />} />
-              <Route path={ROUTES.profile} element={<ProfileView />} />
-              <Route path={ROUTES.session} element={<PastSessionView />} />
+            {/* Everything below requires authentication. */}
+            <Route
+              element={
+                <AuthGate>
+                  <Outlet />
+                </AuthGate>
+              }
+            >
+              <Route element={<ConsentGate />}>
+                <Route path={ROUTES.training} element={<App />} />
+                <Route path={ROUTES.profile} element={<ProfileView />} />
+                <Route path={ROUTES.session} element={<PastSessionView />} />
 
-              <Route
-                path="*"
-                element={<Navigate to={ROUTES.training} replace />}
-              />
+                <Route
+                  path="*"
+                  element={<Navigate to={ROUTES.training} replace />}
+                />
+              </Route>
             </Route>
-          </Route>
-        </Routes>
+          </Routes>
+        </ScreenTransitionProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,

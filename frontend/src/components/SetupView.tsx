@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useConsentContext } from "../ConsentContext";
 import { ROUTES } from "../routes";
 import type { Persona } from "../protocol";
-import type { ScenarioCard } from "../scenarioLibrary";
+import { RANDOM_SCENARIO_ID, type ScenarioCard } from "../scenarioLibrary";
 import LanguageFlag from "./LanguageFlag";
 import LibraryPicker, {
   type CategoryFilter,
@@ -15,6 +15,11 @@ import SelectionSummary from "./SelectionSummary";
 import SetupSection from "./SetupSection";
 
 const NOT_SELECTED = "Noch nicht ausgewählt";
+
+/** What the summary can honestly say about a case that has not been drawn yet
+ * (F-62). It names the choice that was made without naming its outcome — which
+ * is the whole of what the User is agreeing to here. */
+const RANDOM_SELECTED = "Zufallsszenario – wird beim Start gezogen";
 
 interface SetupViewProps {
   scenarioItems: LibraryItem[];
@@ -33,6 +38,9 @@ interface SetupViewProps {
   onEditScenario: (id: string) => void;
   /** Retire a reverse (ADR 0070); the only affordance it has. */
   onRemoveScenario: (id: string) => void;
+  /** Whether there is anything in the library to draw a Zufallsszenario from
+   * (F-62). */
+  offerRandom: boolean;
   personas: Persona[];
   personaId: string | null;
   selectedScenario: ScenarioCard | null;
@@ -63,6 +71,7 @@ export default function SetupView({
   onNewScenario,
   onEditScenario,
   onRemoveScenario,
+  offerRandom,
   personas,
   personaId,
   selectedScenario,
@@ -73,6 +82,9 @@ export default function SetupView({
   onStart,
 }: SetupViewProps) {
   const { consent } = useConsentContext();
+  // The one selection that resolves to no card: it is drawn on the way into
+  // the call, not here (F-62).
+  const randomPicked = scenarioId === RANDOM_SCENARIO_ID;
 
   return (
     <>
@@ -107,6 +119,7 @@ export default function SetupView({
           onNew={onNewScenario}
           onEdit={onEditScenario}
           onRemove={onRemoveScenario}
+          offerRandom={offerRandom}
         />
       </SetupSection>
 
@@ -132,7 +145,9 @@ export default function SetupView({
 
       <SetupSection index="03" title="Auswahl prüfen" description="Ihre Trainingsauswahl steht fest.">
         <SelectionSummary
-          scenario={selectedScenario?.name ?? NOT_SELECTED}
+          scenario={
+            randomPicked ? RANDOM_SELECTED : selectedScenario?.name ?? NOT_SELECTED
+          }
           persona={selectedPersona?.name ?? NOT_SELECTED}
           language={selectedPersona?.language ?? NOT_SELECTED}
         />
@@ -153,7 +168,7 @@ export default function SetupView({
         <button
           className="start-call-button"
           type="button"
-          disabled={selectedPersona === null || selectedScenario === null}
+          disabled={selectedPersona === null || (selectedScenario === null && !randomPicked)}
           onClick={onStart}
         >
           Weiter zum Mikrofontest

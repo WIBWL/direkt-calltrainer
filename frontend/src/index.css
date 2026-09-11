@@ -645,43 +645,86 @@ h2 {
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  /* Inherited from the card's `card-origin-` class, so a badge and the tile it
+     sits on are the same colour by construction rather than by agreement. The
+     fallbacks only ever apply to a card without an origin, which the picker
+     does not produce. */
+  background: var(--origin-tint, var(--color-blue-100));
+  color: var(--origin-ink, var(--navy));
 }
 
-.card-badge-builtin {
-  background: var(--color-blue-100);
-  color: var(--color-blue-600);
+/* One colour per origin, declared once and read twice: as the tile's gradient
+   and as its badge. Seven kinds, six hues — before this the colour was on the
+   badge alone, and two kinds could share one because the label underneath
+   carried the difference. On a tinted tile the colour is what is read first,
+   so a kind needs its own wherever the difference is one of origin. Own and
+   shared are the exception: same origin, same author, same green.
+
+   `--origin-tint` is a wash rather than a colour: it is the top-left corner of
+   a gradient that is white again two thirds of the way down, so a grid of them
+   is a set of tinted cards and not a paint chart. */
+.card-origin-builtin {
+  --origin-tint: var(--color-blue-100);
+  --origin-ink: var(--color-blue-600);
 }
 
-.card-badge-own {
-  background: #e3f3ec;
-  color: var(--color-success);
+/* Own Scenario, hand-authored or shared with the company — the same green
+   either way, and nothing on the badge to tell them apart but the label. A ring
+   around the shared one made it read as a kind of its own, when it is the same
+   Scenario of the User's with one more place it can be seen from. */
+.card-origin-own,
+.card-origin-shared {
+  --origin-tint: #e3f3ec;
+  --origin-ink: var(--color-success);
 }
 
-.card-badge-tenant {
-  background: #ece3f7;
-  color: #5b3a9c;
-}
-
-/* Written from a Session's feedback rather than by hand (F-60). */
-.card-badge-follow-up {
-  background: var(--color-blue-100);
-  color: var(--navy);
+/* Written from a Session's feedback rather than by hand (F-60). Teal, not the
+   blue it used to share with Standard. */
+.card-origin-follow-up {
+  --origin-tint: #d1edee;
+  --origin-ink: #0d6b6a;
 }
 
 /* A reverse (ADR 0070). Amber rather than a shade of the "own" green: it is
    the caller's row on paper, but what the badge is saying is that the roles
    are the other way round, which is not a degree of ownership. */
-.card-badge-reverse {
-  background: #fdf0dd;
-  color: #8a5200;
+.card-origin-reverse {
+  --origin-tint: #fdf0dd;
+  --origin-ink: #8a5200;
 }
 
-/* Own Scenario that has been shared with the company: reads as "mine" but
-   signals it is out there. */
-.card-badge-shared {
-  background: #e3f3ec;
-  color: var(--color-success);
-  box-shadow: inset 0 0 0 1px #5b3a9c33;
+.card-origin-tenant {
+  --origin-tint: #ece3f7;
+  --origin-ink: #5b3a9c;
+}
+
+/* The Zufallsszenario (F-62). Rose, and not the purple it started on: that is
+   the company's, and a case the User has never seen must not look like one a
+   colleague sent them. */
+.card-origin-random {
+  --origin-tint: #fce7ef;
+  --origin-ink: #9c3a63;
+}
+
+/* The wash itself. Only Scenario cards take it — a Persona card has no origin
+   and keeps the plain white it always had. */
+.scenario-grid .persona-card {
+  background: linear-gradient(
+    160deg,
+    var(--origin-tint, var(--color-surface)) 0%,
+    var(--color-surface) 70%
+  );
+}
+
+/* Selection deepens the wash instead of painting over it: the blue border and
+   the filled check already say which card is picked, and a flat fill would
+   make the selected card the one whose kind has become unreadable. */
+.scenario-grid .persona-card.selected {
+  background: linear-gradient(
+    160deg,
+    var(--origin-tint, var(--color-surface)) 0%,
+    var(--color-surface-selected) 85%
+  );
 }
 
 .card-edit {
@@ -698,26 +741,24 @@ h2 {
   cursor: pointer;
 }
 
-/* The tile that opens the rest of the library. A card in the grid rather than a
-   link under it, so it is read as the last of the choices -- but dashed and
-   unfilled, because it is not one of them: nothing is selected by pressing it.
-   No check circle and no badge, hence the plain padding. */
-.library-more-card {
-  align-items: flex-start;
-  justify-content: center;
-  padding: 1rem;
+/* Set apart from the cases beside it, because it is not one: dashed where they
+   are solid, and solid once it is hovered or picked. Its colour comes from
+   `card-origin-random` like every other card's. It keeps the selected state of
+   an ordinary card — it *is* a selection, just one whose outcome is not known
+   yet.
+
+   The control that opens the rest of the grid is `.library-more`, styled with
+   the training history's `.session-more` further down. */
+.library-random-card {
   border-style: dashed;
-  background: transparent;
-  color: var(--color-blue-600);
 }
 
-.library-more-card .persona-name {
-  color: inherit;
-}
-
-.library-more-card:hover {
+.library-random-card:hover {
   border-style: solid;
-  background: #fff;
+}
+
+.library-random-card.selected {
+  border-style: solid;
 }
 
 /* The removal confirmation takes the place of the "Entfernen" link rather than
@@ -3150,7 +3191,12 @@ h2 {
   border-color: var(--color-blue-600);
 }
 
-.session-more {
+/* "There is more below", in the two places that say it: the training history
+   and the Scenario grid. One rule rather than a copy each — they look alike on
+   purpose, though what they do differs and their labels say so: the history
+   fetches the next page, the grid only unfolds what it already has. */
+.session-more,
+.library-more {
   display: block;
   width: 100%;
   margin-top: 12px;
@@ -3165,7 +3211,8 @@ h2 {
   transition: background 0.2s;
 }
 
-.session-more:hover:not(:disabled) {
+.session-more:hover:not(:disabled),
+.library-more:hover {
   background: var(--color-surface-selected);
 }
 
@@ -4477,3 +4524,694 @@ h2 {
   color: var(--text-muted);
 }
 
+/* The answer to "what was that about?", on the post-call screen after a
+   Zufallsszenario (F-62). Directly under the title, above the wrap-up, because
+   every line of that already assumes it. */
+.scenario-reveal {
+  margin: 0.6rem 0 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.scenario-reveal strong {
+  color: var(--navy);
+}
+
+/* --- The die, thrown before a Zufallsszenario (F-62) -------------------- */
+
+.rolling-page {
+  max-width: 640px;
+}
+
+.rolling-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 2.5rem 1.5rem 3rem;
+  text-align: center;
+}
+
+.rolling-title {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  color: var(--navy);
+}
+
+.rolling-lead {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--text-muted);
+}
+
+/* The stage owns the perspective, so the cube's own transform stays a plain
+   rotation and the keyframes below read as one.
+
+   The height is headroom, not the die: the throw opens 44px above where the
+   die comes to rest, and a box drawn tight around the resting position lets
+   that first frame overlap the heading. So the die sits low in a tall box and
+   the throw happens inside it. */
+.dice-stage {
+  position: relative;
+  width: 96px;
+  height: 176px;
+  margin: 1.2rem 0 1.4rem;
+  perspective: 520px;
+}
+
+.dice {
+  position: absolute;
+  top: 56px;
+  left: 0;
+  width: 96px;
+  height: 96px;
+  transform-style: preserve-3d;
+  animation: dice-tumble var(--roll-ms, 2000ms) cubic-bezier(0.3, 0.1, 0.2, 1) forwards;
+}
+
+.dice-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  gap: 6px;
+  padding: 11px;
+  border-radius: 16px;
+  background: linear-gradient(150deg, #ffffff 0%, #e8f1f8 100%);
+  box-shadow: inset 0 0 0 2px var(--color-border);
+  /* The far faces would otherwise show through the near ones — the cube is
+     translucent nowhere else, so this is what makes it read as solid. */
+  backface-visibility: hidden;
+}
+
+.dice-pip {
+  border-radius: 50%;
+  background: var(--navy);
+}
+
+.dice-pip.is-empty {
+  background: none;
+}
+
+/* 48px = half the cube's edge; every face is the same square pushed out along
+   its own axis. */
+.dice-face-front {
+  transform: translateZ(48px);
+}
+
+.dice-face-back {
+  transform: rotateY(180deg) translateZ(48px);
+}
+
+.dice-face-right {
+  transform: rotateY(90deg) translateZ(48px);
+}
+
+.dice-face-left {
+  transform: rotateY(-90deg) translateZ(48px);
+}
+
+.dice-face-top {
+  transform: rotateX(90deg) translateZ(48px);
+}
+
+.dice-face-bottom {
+  transform: rotateX(-90deg) translateZ(48px);
+}
+
+.dice-shadow {
+  position: absolute;
+  left: 12px;
+  bottom: 0;
+  width: 72px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(3, 37, 62, 0.18);
+  filter: blur(3px);
+  animation: dice-shadow var(--roll-ms, 2000ms) cubic-bezier(0.3, 0.1, 0.2, 1) forwards;
+}
+
+/* Whole turns all the way, so it lands square on the front face rather than at
+   whatever angle the last bounce left it. The two short hops at the end are
+   what make it a thrown object and not a spinning one: it loses height, then
+   settles. */
+@keyframes dice-tumble {
+  0% {
+    transform: translateY(-44px) rotateX(0deg) rotateY(0deg) scale(0.82);
+  }
+  16% {
+    transform: translateY(4px) rotateX(200deg) rotateY(160deg) scale(1);
+  }
+  32% {
+    transform: translateY(-30px) rotateX(380deg) rotateY(320deg) scale(1);
+  }
+  52% {
+    transform: translateY(4px) rotateX(560deg) rotateY(520deg) scale(1);
+  }
+  70% {
+    transform: translateY(-14px) rotateX(672deg) rotateY(648deg) scale(1);
+  }
+  84% {
+    transform: translateY(0) rotateX(720deg) rotateY(720deg) scale(1);
+  }
+  91% {
+    transform: translateY(-5px) rotateX(720deg) rotateY(720deg) scale(1);
+  }
+  100% {
+    transform: translateY(0) rotateX(720deg) rotateY(720deg) scale(1);
+  }
+}
+
+/* Tied to the hops above: the shadow tightens as the die comes down, which is
+   what gives the bounce its height. */
+@keyframes dice-shadow {
+  0% {
+    opacity: 0.05;
+    transform: scale(0.55);
+  }
+  16%,
+  52%,
+  84%,
+  100% {
+    opacity: 0.22;
+    transform: scale(1);
+  }
+  32% {
+    opacity: 0.08;
+    transform: scale(0.7);
+  }
+  70% {
+    opacity: 0.14;
+    transform: scale(0.85);
+  }
+  91% {
+    opacity: 0.18;
+    transform: scale(0.93);
+  }
+}
+
+/* The screen is not shown at all under reduced motion (see App.tsx), so there
+   is nothing to disable here — this only covers a throw already on screen when
+   the setting changes. */
+@media (prefers-reduced-motion: reduce) {
+  .dice,
+  .dice-shadow {
+    animation: none;
+  }
+}
+
+/* --- Screen transitions (F-61, ADR 0070) -------------------------------- */
+
+/* The film cut played when the roles are swapped: the card turns over the
+   screen, the screen changes behind it, the card leaves. Two phases, driven
+   from ScreenTransition.tsx — which also sets --cover-ms/--reveal-ms, so the
+   timers that fire the actual screen change and these animations are the same
+   numbers rather than two copies of them.
+
+   Deliberately above everything and untouchable: a transition the user can
+   click through is a transition that lands them on a half-built screen. */
+.screen-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  pointer-events: all;
+  perspective: 1200px;
+}
+
+/* The palette's navy, kept after a neutral grey was tried against it: the
+   grey is the more conventional "lights down" colour, and the navy is the one
+   that looks like this app doing it. Opaque either way, because the screen
+   changes underneath at the covered frame — a veil you can see through shows
+   the change happening. */
+.screen-transition-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--color-navy-900);
+}
+
+.screen-transition-card {
+  position: relative;
+  width: min(38vh, 34vw);
+  filter: drop-shadow(0 24px 48px rgba(3, 37, 62, 0.55));
+  transform-style: preserve-3d;
+}
+
+.reverse-card {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Cover: the screen darkens to opaque while the card flies in and turns.
+   `forwards` matters on both — the cut happens on the last frame, and a card
+   that snapped back to its start there would be visible for one frame. */
+.screen-transition-cover .screen-transition-scrim {
+  animation: screen-transition-scrim-in var(--cover-ms) cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.screen-transition-cover .screen-transition-card {
+  animation: reverse-card-in var(--cover-ms) cubic-bezier(0.34, 1.2, 0.5, 1) forwards;
+}
+
+/* Reveal: the card keeps turning the same way and leaves towards the viewer,
+   the scrim lifts off the new screen. Same direction of spin as the cover, so
+   the two phases read as one movement interrupted by the cut. */
+.screen-transition-reveal .screen-transition-scrim {
+  animation: screen-transition-scrim-out var(--reveal-ms) cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.screen-transition-reveal .screen-transition-card {
+  animation: reverse-card-out var(--reveal-ms) cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes screen-transition-scrim-in {
+  from {
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes screen-transition-scrim-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Y, not Z: the card turns over the way a card is turned over, so the reverse
+   symbol sweeps through its own edge instead of spinning flat like a wheel.
+   The slight Z tilt keeps it from looking like a closing door. */
+@keyframes reverse-card-in {
+  from {
+    opacity: 0;
+    transform: rotateY(-200deg) rotateZ(-24deg) scale(0.35);
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: rotateY(0deg) rotateZ(0deg) scale(1);
+  }
+}
+
+@keyframes reverse-card-out {
+  from {
+    opacity: 1;
+    transform: rotateY(0deg) rotateZ(0deg) scale(1);
+  }
+  60% {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+    transform: rotateY(200deg) rotateZ(20deg) scale(1.9);
+  }
+}
+
+/* The screen the cut lands on comes up rather than appearing: without it the
+   reveal is a hard edit from an opaque scrim to a finished page. */
+.brief-page .reverse-brief,
+.brief-page .brief-actions {
+  animation: screen-enter 420ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+.brief-page .brief-actions {
+  animation-delay: 90ms;
+}
+
+@keyframes screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* A press should be felt, not just registered. Cheap, applies to every primary
+   action in the app, and the one place a click still says nothing is a button
+   that starts something slow. */
+.follow-up-button:active,
+.follow-up-draft:active,
+.start-call-button:active {
+  transform: scale(0.97);
+}
+
+/* `opacity` is carried over from each button's own rule above: the disabled
+   start button fades rather than snapping, and redeclaring `transition` here
+   would drop that. */
+.follow-up-button,
+.follow-up-draft,
+.start-call-button {
+  transition: background 0.2s, color 0.2s, opacity 0.2s, transform 0.08s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The transition itself is not started at all under reduced motion (see
+     ScreenTransition.tsx) — this covers the entry and the press, which are. */
+  .brief-page .reverse-brief,
+  .brief-page .brief-actions {
+    animation: none;
+  }
+
+  .follow-up-button,
+  .follow-up-draft,
+  .start-call-button {
+    transition: background 0.2s, color 0.2s, opacity 0.2s;
+  }
+
+  .follow-up-button:active,
+  .follow-up-draft:active,
+  .start-call-button:active {
+    transform: none;
+  }
+}
+
+/* --- The phone ringing before an ordinary call (F-63) ------------------- */
+
+.incoming-page {
+  max-width: 640px;
+}
+
+.incoming {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 0 2rem;
+}
+
+/* One grid cell holding both the device and the rings, so the rings inherit
+   the phone's exact box and can be drawn in its shape rather than as circles
+   around something twice as tall as it is wide. */
+.incoming-stage {
+  display: grid;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.incoming-stage > * {
+  grid-area: 1 / 1;
+}
+
+.incoming-rings {
+  position: relative;
+  justify-self: stretch;
+  align-self: stretch;
+}
+
+/* Three rings over the sounding half of the cycle, then nothing: they stop
+   where the figure stops rather than pulsing on through its silence. */
+.incoming-rings span {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--color-blue-300);
+  border-radius: 38px;
+  opacity: 0;
+  animation: incoming-ring var(--ring-cycle, 4400ms) ease-out infinite;
+}
+
+.incoming-rings span:nth-child(2) {
+  animation-delay: 0.5s;
+}
+
+.incoming-rings span:nth-child(3) {
+  animation-delay: 1s;
+}
+
+@keyframes incoming-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  22% {
+    opacity: 0;
+  }
+  30%, 100% {
+    transform: scale(1.28);
+    opacity: 0;
+  }
+}
+
+/* The device. The frame is a gradient rather than a flat grey because a
+   brushed metal edge is most of what makes a rectangle read as a phone; the
+   padding is the frame's thickness and the screen sits inside it. Tilts in the
+   two-then-pause rhythm a phone actually rings in — a constant wobble reads as
+   a loading state, and this one is waiting for a person, not for the network. */
+.incoming-phone {
+  position: relative;
+  width: 214px;
+  padding: 5px;
+  border-radius: 38px;
+  background: linear-gradient(
+    148deg,
+    #b9c0c7 0%,
+    #6f777f 16%,
+    #d3d9de 38%,
+    #7c848c 62%,
+    #aeb6bd 82%,
+    #6f777f 100%
+  );
+  box-shadow: 0 24px 55px rgba(3, 37, 62, 0.38);
+  animation: incoming-shake var(--ring-cycle, 4400ms) ease-in-out infinite;
+}
+
+/* Two bursts and then still, on the figure's own bars: it sounds from 0 to
+   0.8s and again from 1.1 to 1.9s of a 4.4s cycle, which is 0-18% and 25-43%
+   of it. The percentages are why the two only stay together as long as they
+   share `--ring-cycle`. */
+@keyframes incoming-shake {
+  0%, 18%, 25%, 43%, 100% {
+    transform: rotate(0deg);
+  }
+  4.5%, 29.5% {
+    transform: rotate(-2deg);
+  }
+  9%, 34% {
+    transform: rotate(2deg);
+  }
+  13.5%, 38.5% {
+    transform: rotate(-1.4deg);
+  }
+}
+
+/* The keys down the sides, in the frame's own metal. */
+.incoming-key {
+  position: absolute;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #8b939b, #c3cad0, #7f878f);
+}
+
+.incoming-key-silent {
+  left: -3px;
+  top: 74px;
+  height: 20px;
+}
+
+.incoming-key-up {
+  left: -3px;
+  top: 108px;
+  height: 34px;
+}
+
+.incoming-key-down {
+  left: -3px;
+  top: 152px;
+  height: 34px;
+}
+
+.incoming-key-power {
+  right: -3px;
+  top: 124px;
+  height: 48px;
+}
+
+.incoming-screen {
+  position: relative;
+  height: 396px;
+  padding: 2.6rem 0.9rem 1.3rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 33px;
+  overflow: hidden;
+  background: linear-gradient(168deg, #14364f 0%, var(--color-navy-900) 55%, #061a2b 100%);
+  color: var(--color-surface);
+}
+
+/* The pill cut out of the display. Black, not dark blue: it is a hole in the
+   screen, and the one part of the device that is never lit. */
+.incoming-island {
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 82px;
+  height: 24px;
+  border-radius: 999px;
+  background: #000000;
+}
+
+.incoming-avatar {
+  width: 72px;
+  height: 72px;
+  /* Two `auto` margins, here and on the actions below, split the free space:
+     the caller sits in the middle of the display and the buttons stay at its
+     foot, which is where a phone puts them. */
+  margin: auto 0 0.7rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.incoming-caller {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Pushed to the bottom of the display, where a phone puts them. */
+.incoming-actions {
+  display: flex;
+  gap: 2.4rem;
+  margin-top: auto;
+}
+
+.incoming-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.incoming-button {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #fff;
+  transition: transform 0.12s ease-out, filter 0.2s;
+}
+
+.incoming-button:hover {
+  filter: brightness(1.12);
+}
+
+.incoming-button:active {
+  transform: scale(0.94);
+}
+
+.incoming-handset {
+  width: 27px;
+  height: 27px;
+}
+
+.incoming-accept {
+  background: #2fb463;
+  /* The one thing on this screen that has to be pressed, so it is the one
+     thing that keeps moving once the rest has settled. */
+  animation: incoming-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes incoming-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(47, 180, 99, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 15px rgba(47, 180, 99, 0);
+  }
+}
+
+.incoming-decline {
+  background: #e5484d;
+}
+
+.incoming-action-label {
+  font-size: 0.72rem;
+  color: var(--color-blue-300);
+}
+
+.incoming-hint {
+  margin: 1.4rem 0 0;
+  max-width: 34ch;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* A short window is the common case on a laptop once the header and the hint
+   are counted; the device gives up height before anything else does. */
+@media (max-height: 780px) {
+  .incoming-screen {
+    height: 330px;
+    padding-top: 2.3rem;
+  }
+
+  .incoming-avatar {
+    width: 58px;
+    height: 58px;
+    margin: auto 0 0.5rem;
+    font-size: 1.2rem;
+  }
+}
+
+/* The screen stays — it is a decision, not decoration — but nothing on it
+   moves. */
+@media (prefers-reduced-motion: reduce) {
+  .incoming-rings span,
+  .incoming-phone,
+  .incoming-accept {
+    animation: none;
+  }
+
+  .incoming-rings span {
+    opacity: 0.22;
+  }
+
+  .incoming-button {
+    transition: filter 0.2s;
+  }
+
+  .incoming-button:active {
+    transform: none;
+  }
+}
+
+/* The ringtone switch. Quiet and under everything else — it is required to be
+   there (WCAG 1.4.2) rather than something the screen is about. */
+.incoming-mute {
+  margin-top: 1rem;
+  border: none;
+  background: none;
+  padding: 0.3rem 0.5rem;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--color-blue-600);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.incoming-mute:hover {
+  color: var(--navy);
+}
