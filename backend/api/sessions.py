@@ -49,7 +49,7 @@ from backend.api.deps import current_tenant_id
 from backend.auth import AuthContext, require_user
 from backend.db import models as db_models
 from backend.db.session import session_scope
-from backend.feedback import interruptions, intonation
+from backend.feedback import interruptions, intonation, metrics
 from backend.followups import FollowUpError, PlayedCall, draft_follow_up
 from backend.reversals import ReverseError, draft_brief
 
@@ -101,7 +101,15 @@ def list_sessions(
                 # Two more queries per page, not two per row: selectinload
                 # batches them, so the wrap-up flag costs the same at 20 rows
                 # as at one.
-                selectinload(db_models.Session.feedback),
+                #
+                # The points and their goal hang off the same load for the same
+                # reason. `_feedback_goals` walks both, so without this a page
+                # of 20 wrap-ups costs a query per wrap-up plus one per tagged
+                # point -- the shape that looks fine on a developer's three
+                # Sessions and not on six months of them.
+                selectinload(db_models.Session.feedback)
+                .selectinload(db_models.Feedback.points)
+                .selectinload(db_models.FeedbackPoint.focus_goal),
                 selectinload(db_models.Session.jobs),
             )
         )
@@ -152,6 +160,17 @@ def _session_summary(session: db_models.Session) -> dict:
         "status": session.status,
         "has_feedback": session.feedback is not None,
         "feedback_status": _feedback_status(session),
+        # The wrap-up's tagged points: kind, focus-goal key and the sentence
+        # itself. Enough for the dashboard to say "the closing came up as an
+        # improvement in 4 of your last 8 wrap-ups" *and* to show what was
+        # written each time, which is what its second level asks for.
+        #
+        # Here and not on an aggregate route of its own, for the reason the
+        # progress view adds no endpoint at all: a second path to the same
+        # numbers is a second place for them to drift. The summary and the
+        # untagged points stay on the detail route -- this carries what can be
+        # counted, not the wrap-up.
+        "feedback_goals": _feedback_goals(session.feedback),
         # Explicit isoformat rather than leaving it to the serializer: the wire
         # format is part of what the frontend parses, not an incidental
         # property of how this dict happens to be encoded.
@@ -162,6 +181,12 @@ def _session_summary(session: db_models.Session) -> dict:
                 "key": m.metric_type.key,
                 "name": m.metric_type.name,
                 "unit": m.metric_type.unit,
+                # Which half of the Kennzahlen the metric belongs to (ADR 0064's
+                # `aspect`). The detail route has carried it since the post-call
+                # screen split its grid in two; the dashboard needs the same
+                # split, and a copy of the mapping in the frontend would drift
+                # from the column the moment a metric is added.
+                "aspect": m.metric_type.aspect,
                 "value": float(m.value),
                 # Whether this metric is still part of the current inventory
                 # (`backend/feedback/metrics.py`). A Session measured before a
@@ -174,7 +199,16 @@ def _session_summary(session: db_models.Session) -> dict:
                 "active": m.metric_type.active,
             }
             for m in session.measurements
+            # Whole-call rows only. `toSeries` builds one series per metric key
+            # and would splice the pressure figure of one training into the
+            # same line as the whole-call figure of the next.
+            if m.segment == db_models.SEGMENT_CALL
         ],
+        # The demanding stretches against the rest (ADR 0081), which is the
+        # only data behind the focus goal "Souveränität unter Druck" and
+        # therefore has to reach the dashboard rather than stopping at the
+        # single call. Figures only, never their curves.
+        "segments": _segments(session),
     }
 
 
@@ -213,7 +247,19 @@ def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user
             "reverse": session.scenario.reverse,
             "status": _feedback_status(session),
             "turns": [_turn(t) for t in sorted(session.turns, key=lambda t: t.seq_index)],
-            "measurements": [_measurement(m) for m in session.measurements],
+            # The whole call's figures, and only those. The segment rows travel
+            # under their own key rather than in this list: every reader of it
+            # assumes one entry per metric (ADR 0051), and mixing three
+            # Sprechtempo rows in would draw the Kennzahl three times.
+            "measurements": [
+                _measurement(m) for m in session.measurements
+                if m.segment == db_models.SEGMENT_CALL
+            ],
+            # The same Kennzahlen over the demanding stretches and over the
+            # rest (ADR 0081). Empty where nobody pushed back, where the
+            # stretches were too short to measure, and for every call recorded
+            # before the per-utterance facts were kept.
+            "segments": _segments(session),
             # Individual moments that were noted, ordered as they happened. The
             # counterpart to a Measurement: a Measurement is what the whole call
             # amounted to, a Finding is one thing that occurred at one point
@@ -230,6 +276,7 @@ def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user
             "metric_notes": {
                 interruptions.COUNT_KEY: interruptions.EXPLANATION,
                 intonation.RANGE_KEY: intonation.EXPLANATION,
+                metrics.RUN_LENGTH_KEY: metrics.RUN_LENGTH_EXPLANATION,
             },
             # The scales those readings come from, written out. A boundary the
             # user cannot see is a judgement they cannot argue with, and both
@@ -566,6 +613,34 @@ def _follow_up(db: DbSession, session_id: int) -> dict | None:
     }
 
 
+def _feedback_goals(feedback: db_models.Feedback | None) -> list[dict[str, str]]:
+    """The focus goals this wrap-up's points were assigned to, with their kind
+    and the point itself.
+
+    Untagged points are left out rather than sent with a null goal. They cannot
+    be counted, so a caller would have to filter them anyway, and a row of
+    nulls invites somebody to treat "not assigned" as a category of its own.
+
+    Order follows `feedback.points`, which is `position`, so a caller that
+    wants the most prominent point of a kind can take the first. Duplicates are
+    kept: two improvements about the closing in one call are two points, and
+    collapsing them here would decide something the reader should.
+
+    `text` rides along since the progress view's second level, which has to say
+    what the wrap-ups actually wrote about a goal and not only how often they
+    wrote it (docs/dashboard-konzept.md, section 7). ADR 0064's amendment has
+    the reasoning: what that decision keeps off the listing is `detail_json`,
+    a curve per metric per Session, and a tagged point is two sentences.
+    """
+    if feedback is None:
+        return []
+    return [
+        {"kind": point.kind, "goal": point.focus_goal.key, "text": point.text}
+        for point in feedback.points
+        if point.focus_goal is not None
+    ]
+
+
 def _feedback_status(session: db_models.Session) -> str:
     """queued / running / done / failed, from the newest feedback job (ADR 0032).
 
@@ -633,6 +708,33 @@ def _finding(finding: db_models.Finding) -> dict:
     }
 
 
+def _segments(session: db_models.Session) -> list[dict]:
+    """The per-segment figures of one Session (ADR 0081), whole-call rows left
+    out because they are the list beside this one.
+
+    No `detail`, for ADR 0064's reason one level down: the loudness curve of a
+    segment is a curve like any other, nothing plots it, and it would outweigh
+    everything else here. The figure and which stretch it describes is the
+    whole of what the comparison needs.
+
+    Ordered by metric and then segment, so the two halves of a comparison
+    arrive next to each other however the database happened to return them.
+    """
+    return [
+        {
+            "segment": m.segment,
+            "key": m.metric_type.key,
+            "name": m.metric_type.name,
+            "unit": m.metric_type.unit,
+            "value": float(m.value),
+        }
+        for m in sorted(
+            (m for m in session.measurements if m.segment != db_models.SEGMENT_CALL),
+            key=lambda m: (m.metric_type.key, m.segment),
+        )
+    ]
+
+
 def _measurement(measurement: db_models.Measurement) -> dict:
     key = measurement.metric_type.key
     value = float(measurement.value)
@@ -643,19 +745,22 @@ def _measurement(measurement: db_models.Measurement) -> dict:
         # Which half of the Kennzahlen grid this one sits in; display only.
         "aspect": measurement.metric_type.aspect,
         "value": value,
-        "detail": _served_detail(key, value, measurement.detail_json),
+        "detail": _served_detail(key, measurement.detail_json),
     }
 
 
-def _served_detail(key: str, value: float, detail: dict | None) -> dict | None:
+def _served_detail(key: str, detail: dict | None) -> dict | None:
     """The stored facts, plus the reading derived from them at request time.
 
     The split is the point. What the analysis measured is written once and kept
     (ADR 0051); which step of a scale that lands on is a judgement resting on
     thresholds nothing has validated yet, so it is computed here, on every read,
-    from the stored figure. A recalibration then reaches every Session that was
+    from the stored figures. A recalibration then reaches every Session that was
     ever measured -- including the ones whose audio is long gone (ADR 0048) --
     instead of leaving old trainings labelled by a scale that no longer exists.
+    That has now happened once: F-35's reading moved from the Umfang onto the
+    pitch variation quotient, and every stored Session picked up the new scale
+    on the next read, or lost its step where the new input was never measured.
 
     F-51's traffic light predates this and is still stored in its detail; only
     its wording is added here, so the German lives beside the thresholds.
@@ -663,10 +768,22 @@ def _served_detail(key: str, value: float, detail: dict | None) -> dict | None:
     if detail is None:
         return None
     if key == intonation.RANGE_KEY:
-        step = intonation.liveliness(value, detail.get("voiced_ms"))
+        # Off the pitch variation quotient in the detail, not off `value`, which
+        # is the Umfang. The two are different figures and only one of them has
+        # a boundary anybody has published -- see `intonation.liveliness`. A
+        # Session measured before the quotient was computed carries no `pvq` and
+        # gets no step, which is the honest answer rather than a gap.
+        step = intonation.liveliness(detail.get("pvq"), detail.get("voiced_ms"))
         if step is None:
-            return detail  # measured, but on too little speech to be read
-        return {**detail, "liveliness": step.value, "liveliness_label": intonation.LABELS[step]}
+            return detail  # not measured, or on too little speech to be read
+        return {
+            **detail,
+            "liveliness": step.value,
+            "liveliness_label": intonation.LABELS[step],
+            # The colour travels with the word, from beside the threshold that
+            # decided both. The frontend maps no step to any colour of its own.
+            "liveliness_light": intonation.LIGHTS[step],
+        }
     if key == interruptions.COUNT_KEY:
         try:
             light = interruptions.TrafficLight(detail.get("light"))
@@ -685,8 +802,18 @@ def _feedback(feedback: db_models.Feedback | None) -> dict | None:
         # Session, or one whose model answer fell back to narrative only. The
         # frontend drops the block rather than showing an empty one.
         "phase_language": feedback.phase_language,
+        # NULL on the same grounds: a Session whose wrap-up predates the block,
+        # or one the model left it out of. The block is omitted, not emptied.
+        "tone_fit": feedback.tone_fit,
         "points": [
-            {"kind": p.kind, "text": p.text, "turn_id": p.turn_id}
+            {
+                "kind": p.kind,
+                "text": p.text,
+                "turn_id": p.turn_id,
+                # The focus goal this point was assigned to, or null where the
+                # wrap-up predates the tag or nothing in the catalogue fitted.
+                "goal": p.focus_goal.key if p.focus_goal else None,
+            }
             for p in feedback.points
         ],
     }

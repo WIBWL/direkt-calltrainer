@@ -50,8 +50,18 @@ _PITCH_STEP_S = 0.01
 # speaker is what keeps a 116 Hz voice from being read at 483 Hz -- an octave
 # error that a fixed window cannot rule out and that the percentile trim only
 # just caught in the recordings this was checked against.
+#
+# The ceiling is 2.5 and not the 1.5 the procedure was first published with.
+# The two figures are a real disagreement in the literature and not a typo:
+# De Looze (2010) derived 1.5 * q3, and Hirst (2011) reports that on expressive
+# speech that ceiling sits below the speaker's own rises and produces systematic
+# octave *halving* -- the tracker, denied the true frequency, returns half of
+# it. Since this application measures people arguing a case on the telephone,
+# expressive rises are the normal material and the later figure is the one to
+# follow. It costs a little of the protection against octave doubling at the top
+# end, which is why the percentile trim in intonation.py stays where it is.
 _PITCH_FLOOR_FACTOR = 0.75
-_PITCH_CEILING_FACTOR = 1.5
+_PITCH_CEILING_FACTOR = 2.5
 # Below this many voiced frames the first pass has not established anything to
 # narrow the window with, and the second pass is skipped.
 _MIN_FRAMES_FOR_REFINEMENT = 10
@@ -79,6 +89,61 @@ class Pause:
 
     offset_ms: int
     duration_ms: int
+
+
+@dataclass(frozen=True)
+class TurnFacts:
+    """What is kept of one user utterance once its audio is gone (ADR 0081).
+
+    The subset of `TurnAcoustics` a later measurement needs, on the Session's
+    timeline rather than the utterance's, and in a shape that survives a round
+    trip through JSONB. The pitch curve is not part of it: no metric computed
+    per segment reads it, and the Sprachmelodie is a reading over a whole call
+    (F-35).
+
+    Facts and not statistics, which is the whole of why storing them per
+    utterance does not reopen ADR 0051: nothing here is a rate, a share or a
+    figure anybody is shown.
+    """
+
+    speech_ms: int
+    phonation_ms: int
+    # False once any fragment of this utterance failed to measure. Carried
+    # because a figure derived from an incomplete measurement is withheld
+    # rather than estimated, and that decision cannot be made without knowing.
+    complete: bool
+    pauses: tuple[Pause, ...]
+    loudness_db: tuple[float | None, ...]
+
+    def as_json(self) -> dict:
+        """The stored form. Keys are the field names, so the column reads as
+        what it is without a schema beside it."""
+        return {
+            "speech_ms": self.speech_ms,
+            "phonation_ms": self.phonation_ms,
+            "complete": self.complete,
+            "pauses": [
+                {"offset_ms": p.offset_ms, "duration_ms": p.duration_ms}
+                for p in self.pauses
+            ],
+            "loudness_db": list(self.loudness_db),
+        }
+
+    @classmethod
+    def from_json(cls, stored: dict) -> "TurnFacts":
+        """Read a stored row back. Tolerant of a missing key rather than
+        raising: this is read in the worker, where a malformed row should cost
+        one Session its segment figures and not the whole wrap-up."""
+        return cls(
+            speech_ms=int(stored.get("speech_ms") or 0),
+            phonation_ms=int(stored.get("phonation_ms") or 0),
+            complete=bool(stored.get("complete", True)),
+            pauses=tuple(
+                Pause(offset_ms=int(p["offset_ms"]), duration_ms=int(p["duration_ms"]))
+                for p in stored.get("pauses") or []
+            ),
+            loudness_db=tuple(stored.get("loudness_db") or ()),
+        )
 
 
 @dataclass(frozen=True)

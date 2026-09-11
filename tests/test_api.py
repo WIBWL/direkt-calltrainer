@@ -263,6 +263,47 @@ async def test_phase_block_reaches_the_wire_as_phase_language(
     assert body["feedback"]["phase_language"] == expected
 
 
+@pytest.mark.parametrize(
+    "stored, expected",
+    [
+        ("Eine Störungsmeldung verlangt ruhige Sachlichkeit.",
+         "Eine Störungsmeldung verlangt ruhige Sachlichkeit."),
+        (None, None),
+    ],
+    ids=["analysed", "not analysed"],
+)
+async def test_tone_fit_reaches_the_wire_under_its_own_key(
+    api_client: httpx.AsyncClient,
+    db_session: DbSession,
+    stored: str | None,
+    expected: str | None,
+) -> None:
+    """The column is `feedback.tone_fit` and the wire uses the same key
+    (ADR 0057). `IntonationReading.tsx` reads it, not FeedbackView: it answers
+    the question the Sprachmelodie figures raise and cannot settle.
+
+    NULL survives as null rather than becoming an empty string, on the same
+    grounds as the block above: a wrap-up written before this existed came from
+    a prompt that was never given the occasion, so it has no judgement to show
+    and the frontend leaves the block out."""
+    extern_id = uuid.uuid4()
+    _store(extern_id)
+    session_id = db_session.query(Session).one().session_id
+    db_session.add(
+        Feedback(
+            session_id=session_id,
+            summary="Zusammenfassung.",
+            tone_fit=stored,
+            created_at=datetime.now(),
+        )
+    )
+    db_session.commit()
+
+    body = (await api_client.get(f"/api/sessions/{extern_id}")).json()
+
+    assert body["feedback"]["tone_fit"] == expected
+
+
 async def test_feedback_points_reach_the_wire_with_the_schema_vocabulary(
     api_client: httpx.AsyncClient,
     db_session: DbSession,

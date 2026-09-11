@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from backend import auth
 from backend.app import app
-from backend.db.models import AnalysisJob, Feedback, Session
+from backend.db.models import AnalysisJob, Feedback, FeedbackPoint, FocusGoal, Session
 from backend.session.models import Turn
 from tests.conftest import METRIC_KEY, persist
 
@@ -178,6 +178,15 @@ async def test_a_row_carries_what_the_history_list_shows(
         # Which side the User was on (ADR 0070) -- two rows on the same
         # Scenario are otherwise indistinguishable.
         "reverse",
+        # The wrap-up's tagged points: what each was about and how it was
+        # worded. The dashboard counts them across Sessions and shows what was
+        # written (ADR 0064's amendment). The wrap-up as a text -- summary,
+        # phase paragraph, untagged points -- stays on the detail route.
+        "feedback_goals",
+        # The same Kennzahlen over the demanding stretches of the call and over
+        # the rest (ADR 0081). Beside `measurements` and not inside it: every
+        # reader of that list assumes one entry per metric.
+        "segments",
     }
     assert row["persona"] == "Thomas Brandt"
     assert row["scenario"] == "Kündigungsabsicht"
@@ -235,7 +244,7 @@ async def test_the_loudness_curve_stays_out_of_the_listing(
     body = (await api_client.get("/api/sessions")).json()
 
     measurement = body["sessions"][0]["measurements"][0]
-    assert set(measurement) == {"key", "name", "unit", "value", "active"}
+    assert set(measurement) == {"key", "name", "unit", "value", "active", "aspect"}
     assert "detail" not in measurement
 
 
@@ -306,16 +315,77 @@ async def test_a_wrap_up_that_never_arrived_is_not_announced_as_pending(
     assert row["feedback_status"] == "failed"
 
 
-def _write_feedback(db: DbSession) -> None:
-    """Give the stored Session a wrap-up, the way the worker would."""
-    session_id = db.query(Session).one().session_id
-    db.add(
-        Feedback(
-            session_id=session_id,
-            summary="Zusammenfassung.",
-            created_at=datetime.now(UTC),
-        )
+async def test_a_tagged_point_travels_with_its_goal_and_its_text(
+    api_client: httpx.AsyncClient, db_session: DbSession
+) -> None:
+    """ADR 0064's amendment: the progress view's second level has to say what
+    the wrap-ups wrote about a goal, not only how often. Six focus goals have
+    nothing else behind them, so a count nobody can read behind is a number on
+    trust."""
+    persist(turns=MEASURED_TURNS)
+    _write_feedback(db_session, points=[("improvement", "closing", "Kein Termin vereinbart.")])
+
+    row = (await api_client.get("/api/sessions")).json()["sessions"][0]
+
+    assert row["feedback_goals"] == [
+        {"kind": "improvement", "goal": "closing", "text": "Kein Termin vereinbart."}
+    ]
+
+
+async def test_an_untagged_point_stays_out_of_the_listing(
+    api_client: httpx.AsyncClient, db_session: DbSession
+) -> None:
+    """A point the model left unassigned cannot be counted, and sending it with
+    a null goal would invite treating "not assigned" as a category. It is the
+    line that keeps this a list of countable tags rather than the wrap-up."""
+    persist(turns=MEASURED_TURNS)
+    _write_feedback(
+        db_session,
+        points=[("strength", "pace", "Ruhiges Tempo."), ("improvement", None, "Etwas leise.")],
     )
+
+    row = (await api_client.get("/api/sessions")).json()["sessions"][0]
+
+    assert [tag["goal"] for tag in row["feedback_goals"]] == ["pace"]
+    assert "Etwas leise." not in str(row)
+
+
+async def test_the_wrap_up_itself_still_stays_on_the_detail_route(
+    api_client: httpx.AsyncClient, db_session: DbSession
+) -> None:
+    """What the amendment widened is the tagged points and nothing else. The
+    summary is the wrap-up as a text, and a page of summaries is exactly the
+    payload the listing exists not to carry."""
+    persist(turns=MEASURED_TURNS)
+    _write_feedback(db_session, points=[("strength", "pace", "Ruhiges Tempo.")])
+
+    row = (await api_client.get("/api/sessions")).json()["sessions"][0]
+
+    assert "Zusammenfassung." not in str(row)
+    assert "summary" not in row
+
+
+def _write_feedback(
+    db: DbSession, points: list[tuple[str, str | None, str]] | None = None
+) -> None:
+    """Give the stored Session a wrap-up, the way the worker would.
+
+    `points` are (kind, focus-goal key or None, text). The key is resolved
+    against the seeded catalogue rather than invented, for conftest's reason:
+    a made-up key would let a test pass on a goal the real system has retired.
+    """
+    session_id = db.query(Session).one().session_id
+    feedback = Feedback(
+        session_id=session_id,
+        summary="Zusammenfassung.",
+        created_at=datetime.now(UTC),
+    )
+    for position, (kind, goal_key, text) in enumerate(points or []):
+        goal = db.query(FocusGoal).filter_by(key=goal_key).one() if goal_key else None
+        feedback.points.append(
+            FeedbackPoint(position=position, kind=kind, text=text, focus_goal=goal)
+        )
+    db.add(feedback)
     db.commit()
 
 

@@ -76,6 +76,11 @@ def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-a
                 transcript=spoken.text,
                 interrupted=spoken.interrupted,
                 unheard_text=spoken.unheard or None,
+                # The raw facts of this utterance, kept because the audio they
+                # were measured from is discarded when the call ends (ADR 0048)
+                # while which stretch of the call was demanding is decided
+                # afterwards, by the wrap-up (ADR 0081). NULL on a Persona row.
+                acoustics_json=spoken.acoustics.as_json() if spoken.acoustics else None,
             )
             for index, spoken in enumerate(utterances(turns))
         ]

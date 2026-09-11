@@ -16,7 +16,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
-from backend.feedback.acoustics import Pause
+from backend.feedback.acoustics import Pause, TurnFacts
 from backend.feedback.interruptions import Segment
 from backend.feedback.metrics import Conversation
 
@@ -85,6 +85,13 @@ class Utterance:
     # The words that were cut off, for the wrap-up's drill-down. Empty
     # everywhere else.
     unheard: str = ""
+    # The raw paraverbal facts of this utterance, on a user line only (ADR
+    # 0081). Carried through the flattening because the row is written from an
+    # Utterance: without it the facts would stop at `conversation()`, which
+    # folds the whole call into one set and is the only other reader of a Turn.
+    #
+    # None on a Persona line and on a user line with no measurement behind it.
+    acoustics: TurnFacts | None = None
 
 
 def utterances(turns: Sequence[Turn]) -> list[Utterance]:
@@ -105,6 +112,7 @@ def utterances(turns: Sequence[Turn]) -> list[Utterance]:
             spoken.append(Utterance(
                 "user", turn.user_text, turn.user_offset_ms or 0,
                 _span(turn.user_offset_ms, turn.user_end_ms),
+                acoustics=facts(turn),
             ))
         if turn.persona_text:
             text = turn.persona_text
@@ -117,6 +125,25 @@ def utterances(turns: Sequence[Turn]) -> list[Utterance]:
                 unheard=turn.persona_unheard,
             ))
     return spoken
+
+
+def facts(turn: Turn) -> TurnFacts | None:
+    """The raw paraverbal facts of one Turn's user side, or None if there was
+    no measurement behind it (ADR 0081).
+
+    "No measurement" is a Turn with no speaking time and no curve, which is
+    what an unmeasurable recording leaves. `complete` is a different statement
+    and is carried: the Turn *was* measured, and part of it failed.
+    """
+    if not turn.user_speech_ms and not turn.loudness_db and not turn.pauses:
+        return None
+    return TurnFacts(
+        speech_ms=turn.user_speech_ms,
+        phonation_ms=turn.user_phonation_ms,
+        complete=turn.user_acoustics_complete,
+        pauses=tuple(turn.pauses),
+        loudness_db=tuple(turn.loudness_db),
+    )
 
 
 def conversation(turns: Sequence[Turn], language_id: str | None = None) -> Conversation:
@@ -172,6 +199,11 @@ def conversation(turns: Sequence[Turn], language_id: str | None = None) -> Conve
         # where one sentence ended is not recoverable from the flat curve.
         pitch_per_turn=tuple(tuple(turn.pitch_hz) for turn in turns if turn.pitch_hz),
         persona_turns=persona_turns,
+        # Utterances the user actually spoke in, which is the same set
+        # `user_acoustics_complete` is taken over. A run of speech ends at a
+        # pause or at the utterance, so the runs of a call are its pauses plus
+        # these (F-53's Sprechlänge am Stück).
+        user_turns=sum(1 for turn in turns if turn.user_text),
         timeline=timeline(turns),
     )
 
