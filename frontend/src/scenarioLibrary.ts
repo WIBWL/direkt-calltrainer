@@ -305,24 +305,40 @@ export const createFollowUp = (sessionId: string) =>
   apiFetch<FollowUpCard>(`/api/sessions/${sessionId}/follow-up`, { method: "POST" });
 
 export interface DocumentText {
-  /** The LLM's fact list, or (when `summarised` is false) the raw text. */
+  /** The LLM's fact list, or (when `summarised` is false) the raw text. One
+   * list for the whole upload: several documents are condensed together. */
   text: string;
+  /** Pages over the whole batch. */
   pages: number;
+  /** What was read, in the order it was sent — the sanitised file names, so
+   * the editor can say how many documents went in. */
+  documents: { name: string; pages: number }[];
   /** True: the LLM condensed the document. False: the LLM was unreachable and
    * this is the raw extracted text, truncated. */
   summarised: boolean;
 }
 
-/** Extract a text-layer PDF and have the LLM condense it into a fact list, for
- * the Fakten field (F-58). Multipart, so it does not go through apiFetch. */
-export async function extractPdf(file: File): Promise<DocumentText> {
+/** Upload ceilings, mirrored from `backend/documents.py` so the editor can
+ * refuse an oversized drop instead of sending it and waiting. The server
+ * enforces the real thing and answers with its own message, so this is a
+ * courtesy check — keep it in step, but it need not be exact. Same arrangement
+ * as `FALLBACK_FIELD_LIMITS` above. */
+export const MAX_DOCUMENT_MB = 5;
+export const MAX_DOCUMENTS_TOTAL_MB = 20;
+
+/** Extract the text-layer PDFs and have the LLM condense them into one fact
+ * list, for the Fakten field (F-58). Several at once, summarised together:
+ * the field holds one list, and two documents condensed apart would repeat
+ * every fact they share. Multipart, so it does not go through apiFetch. */
+export async function extractPdfs(files: File[]): Promise<DocumentText> {
   const token = await currentAccessToken();
   if (!token) {
     void reauthenticate();
     throw new ApiError(401, "no active session");
   }
   const form = new FormData();
-  form.append("file", file);
+  // Repeated under one name, which is what the route's `list[UploadFile]` reads.
+  for (const file of files) form.append("files", file);
   const response = await fetch("/api/scenarios/document", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },

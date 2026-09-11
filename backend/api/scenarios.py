@@ -11,9 +11,10 @@ open the editor on it. `call_goal` — the caller's intent and the bar that
 settles it — is the answer key to the exercise (ADR 0043/0045) and is withheld
 from a built-in. The *write* routes remain owner-scoped.
 
-`POST /api/scenarios/document` (F-58) is a stateless helper: it extracts an
-uploaded text-layer PDF and has the LLM condense it into a fact list for the
-editor's Fakten field (`backend/documents.py`), storing nothing.
+`POST /api/scenarios/document` (F-58) is a stateless helper: it extracts the
+uploaded text-layer PDFs -- several at once -- and has the LLM condense them
+into one fact list for the editor's Fakten field (`backend/documents.py`),
+storing nothing.
 
 A reverse (ADR 0070) and a follow-up (ADR 0069) are rows of this table too,
 listed and read through the same routes and badged `own` like anything else the
@@ -49,7 +50,11 @@ from backend.db.models import SCENARIO_CATEGORIES, VISIBILITY_TENANT
 from backend.documents import (
     MAX_TEXT,
     DocumentError,
+    ExtractedDocument,
+    document_name,
     extract_pdf_text,
+    merge_document_text,
+    reject_oversize_batch,
     reject_oversize_upload,
     summarise_facts,
 )
@@ -259,23 +264,54 @@ def list_scenarios(
     return sorted(cards, key=_origin_group)
 
 
+async def _read_documents(uploads: list[UploadFile]) -> list[ExtractedDocument]:
+    """Every upload, read and extracted, in the order they were sent.
+
+    One file at a time and checked as it goes: the per-file ceiling against the
+    declared size *before* reading, the total against what has actually arrived
+    *after*. A client that sends no Content-Length therefore still cannot get
+    more than one oversized file past the gate. The first unusable document
+    fails the whole request -- a half-applied batch would leave the User
+    guessing which of their files made it into the field."""
+    if not uploads:
+        raise DocumentError("Es wurde keine Datei ausgewählt.")
+
+    documents: list[ExtractedDocument] = []
+    # Named only when there is more than one: a lone upload needs no label, and
+    # the single-file messages stay the sentences they always were.
+    named = len(uploads) > 1
+    total = 0
+    for upload in uploads:
+        name = document_name(upload.filename)
+        label = name if named else ""
+        reject_oversize_upload(upload.size, label)
+        data = await upload.read()
+        total += len(data)
+        reject_oversize_batch(total)
+        text, pages = extract_pdf_text(data, label)
+        documents.append(ExtractedDocument(name=name, pages=pages, text=text))
+    return documents
+
+
 @router.post("/document")
 async def extract_document(
-    file: UploadFile = File(...),
+    files: list[UploadFile] = File(...),
     _user: AuthContext = Depends(require_user),
 ) -> dict:
-    """Extract the text from an uploaded text-layer PDF and let the LLM condense
-    it into a fact list for the editor's Fakten field (F-58). Stateless: nothing
-    is stored, the client puts the returned text into the field and the User
-    edits it before saving. `summarised` is False when the LLM was unreachable
-    and the raw (truncated) text is returned instead."""
+    """Extract the text from the uploaded text-layer PDFs and let the LLM
+    condense them into one fact list for the editor's Fakten field (F-58).
+
+    Several files are summarised *together*, in one model call: the field holds
+    one list, and two documents condensed apart would repeat every fact they
+    share. Stateless: nothing is stored, the client puts the returned text into
+    the field and the User edits it before saving. `summarised` is False when
+    the LLM was unreachable and the raw (truncated) text is returned instead."""
     try:
-        reject_oversize_upload(file.size)
-        data = await file.read()
-        raw, pages = extract_pdf_text(data)
+        documents = await _read_documents(files)
     except DocumentError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
+    raw = merge_document_text(documents)
     try:
         text = await summarise_facts(raw)
         summarised = True
@@ -283,7 +319,14 @@ async def extract_document(
         logger.warning("Document summary failed; returning raw text", exc_info=True)
         text = clean(raw)[:MAX_TEXT].strip()
         summarised = False
-    return {"text": text, "pages": pages, "summarised": summarised}
+    return {
+        "text": text,
+        # The whole batch, so the client can say what was read without adding up
+        # a list it would otherwise only need for that.
+        "pages": sum(doc.pages for doc in documents),
+        "summarised": summarised,
+        "documents": [{"name": doc.name, "pages": doc.pages} for doc in documents],
+    }
 
 
 # Defined before "/{extern_id}" so the literal path is matched first.
