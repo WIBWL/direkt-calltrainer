@@ -2702,103 +2702,9 @@ h2 {
   margin-top: 14px;
 }
 
-.feedback-transcript-section {
-  margin-top: 40px;
-  margin-bottom: 32px;
-}
-
-.feedback-transcript-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 16px;
-}
-
-.feedback-transcript-eyebrow {
-  margin-bottom: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--color-blue-600);
-}
-
-.feedback-transcript-title {
-  margin: 0;
-  font-size: 24px;
-  line-height: 1.25;
-  font-weight: 700;
-  color: var(--color-navy-900);
-}
-
-.feedback-transcript-count {
-  flex-shrink: 0;
-  padding: 5px 9px;
-  border-radius: 999px;
-  background: var(--color-blue-100);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-blue-600);
-}
-
-.feedback-transcript-card {
-  overflow: hidden;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 16px;
-  background: var(--color-surface);
-}
-
-.feedback-transcript-card .transcript-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  margin: 0;
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--color-border-subtle);
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--color-navy-900);
-}
-
 /* The empty state stands in for a line, so it takes a line's inset. Without
    it the sentence starts at the card's own border, out of column with every
    line the card otherwise holds. */
-.feedback-transcript-card .transcript-empty {
-  margin: 0;
-  padding: 18px 20px;
-  color: var(--color-text-muted-secondary);
-}
-
-.feedback-transcript-card .transcript-line:last-child {
-  border-bottom: 0;
-}
-
-.feedback-transcript-card .transcript-time {
-  flex: 0 0 42px;
-  padding-top: 2px;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted-secondary);
-}
-
-.feedback-transcript-card .transcript-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
-  border-radius: 50%;
-  background: var(--color-blue-100);
-  color: var(--color-navy-900);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.feedback-transcript-card .transcript-content {
-  flex: 1;
-  min-width: 0;
-}
 /* --- Header: brand link and account chip -------------------------------- */
 /* The header grew navigation when the app grew a second page. Both ends of it
    collapse to their non-interactive form during a call, because leaving the
@@ -2913,21 +2819,6 @@ h2 {
   min-width: 0;
 }
 
-.feedback-transcript-card .transcript-speaker {
-  margin-bottom: 4px;
-  font-size: 12px;
-  line-height: 1.3;
-  font-weight: 700;
-  color: var(--color-navy-900);
-}
-
-.feedback-transcript-card .transcript-text {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--color-text-muted-secondary);
-}
-
 .feedback-actions {
   display: flex;
   justify-content: flex-start;
@@ -2967,19 +2858,19 @@ h2 {
     grid-column: auto;
   }
 
+  .feedback-section-head {
+    align-items: flex-start;
+  }
+
+  .feedback-section-aside {
+    margin-top: 2px;
+  }
+
   .feedback-transcript-heading {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .feedback-transcript-card .transcript-line {
-    gap: 10px;
-    padding: 16px;
-  }
-
-  .feedback-transcript-card .transcript-empty {
-    padding: 16px;
-  }
 }
 
 .feedback-meta {
@@ -4555,5 +4446,34 @@ h2 {
   /* The white stripes of one flag and the white card behind it are the same
      colour: without an edge the flag has no left and right side. */
   box-shadow: 0 0 0 1px rgba(3, 37, 62, 0.22);
+}
+
+/* --- The transcript as a file rather than a page section (F-64) --------- */
+
+.transcript-empty {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.transcript-download {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 1.4rem 1.5rem 1.5rem;
+}
+
+.card p.transcript-download-lead,
+.transcript-download-lead {
+  margin: 0 0 0.5rem;
+  max-width: 62ch;
+  color: var(--text-muted);
+}
+
+.transcript-download-note {
+  margin: 0.7rem 0 0;
+  max-width: 62ch;
+  font-size: 0.82rem;
+  color: var(--text-muted);
 }
 
