@@ -5,14 +5,19 @@ import { apiFetch } from "../api";
 import { useStoredSession } from "../hooks/useStoredSession";
 import { ROUTES, type TrainingStart } from "../routes";
 import { type ReverseScenario } from "../scenarioLibrary";
-import { formatOffset } from "../utils/time";
 import AppLayout from "./AppLayout";
+import FeedbackScreen, { transcriptFromTurns } from "./FeedbackScreen";
 import { FeedbackReport, MetricSection } from "./FeedbackView";
 import { useScreenTransition } from "./ScreenTransition";
 
 /**
  * One past training, opened from the history (F-48): the wrap-up that was
  * generated for it at the time, the figures behind it, and the Transcript.
+ *
+ * It is the *same screen* as the one after a call — `FeedbackScreen` renders
+ * both — and differs only in the buttons: "Zurück zum Profil" where the other
+ * has "Zur Startseite", and the deletion under it. Two screens showing one
+ * report kept drifting apart while they were two pieces of markup.
  *
  * Read once, never polled. That is the difference from the post-call screen:
  * there a wrap-up really is on its way (ADR 0019), here whatever the database
@@ -81,7 +86,19 @@ export default function PastSessionView() {
 
   // Still a link, not a button: it navigates, so middle-click and "open in new
   // tab" have to keep working. Only its appearance is the button's.
+  //
+  // Two shapes, because it is used twice on the same screen: above the report,
+  // where a reader who has changed their mind after the first paragraph should
+  // not have to scroll a page of feedback to get back, and again in the
+  // actions row at the foot, where the post-call screen has "Zur Startseite"
+  // and where it has to look like its neighbours. The short screens — not
+  // found, failed, loading — have only the upper one, having no actions row.
   const backLink = (
+    <Link to={ROUTES.profile} className="back-to-start-button">
+      Zurück zum Profil
+    </Link>
+  );
+  const topBackLink = (
     <Link to={ROUTES.profile} className="back-to-start-button page-back-button">
       Zurück zum Profil
     </Link>
@@ -90,7 +107,7 @@ export default function PastSessionView() {
   if (state === "missing") {
     return (
       <AppLayout>
-        {backLink}
+        {topBackLink}
         <h1>Training nicht gefunden</h1>
         <div className="card">
           <p>
@@ -105,7 +122,7 @@ export default function PastSessionView() {
   if (state === "failed") {
     return (
       <AppLayout>
-        {backLink}
+        {topBackLink}
         <h1>Training</h1>
         <div className="card">
           <p>Das Training konnte nicht geladen werden. Bitte versuchen Sie es später erneut.</p>
@@ -117,7 +134,7 @@ export default function PastSessionView() {
   if (state === "loading" || detail === null) {
     return (
       <AppLayout>
-        {backLink}
+        {topBackLink}
         <h1>Training</h1>
         <p className="muted">Wird geladen …</p>
       </AppLayout>
@@ -126,105 +143,86 @@ export default function PastSessionView() {
 
   return (
     <AppLayout>
-      {backLink}
-      <h1>{detail.scenario}</h1>
-      <p className="page-lead">
-        {/* Which side the User was on (ADR 0070) — the transcript below reads
-            very differently depending on it. */}
-        {detail.reverse
-          ? `Rollentausch: Sie riefen an, ${detail.persona} nahm ab`
-          : `Gespräch mit ${detail.persona}`}
-      </p>
+      {topBackLink}
+      <FeedbackScreen
+        transcript={transcriptFromTurns(detail.turns)}
+        personaName={detail.persona}
+        scenarioName={detail.scenario}
+        detail={detail}
+        actions={backLink}
+        feedback={
+          detail.feedback ? (
+            <FeedbackReport
+              detail={detail}
+              // Re-read after one is written, so the card survives a reload of
+              // this page as the row the detail route now carries.
+              followUp={{ onStart: startFollowUp, onCreated: reload }}
+              sessionId={sessionId ?? null}
+              onReverse={startReverse}
+            />
+          ) : (
+            <>
+              <div className="card">
+                <p className="muted">
+                  Zu diesem Gespräch gibt es keine Auswertung. Sie ist damals nicht zustande
+                  gekommen. Das Gesprächsprotokoll und die Zahlen unten sind vollständig.
+                </p>
+              </div>
+              {/* The figures are measured during the call and stored with the
+                  Session (ADR 0047/0048), so they survive a wrap-up that never
+                  got written. Withholding them would hide data that is right
+                  there. */}
+              <MetricSection measurements={detail.measurements} />
+            </>
+          )
+        }
+      >
+        {/* At the bottom, after everything it would destroy. Putting it beside
+            the heading would make it the first thing in reach on a screen the
+            user opened in order to read. */}
+        <section className="session-delete">
+          {confirming ? (
+            <>
+              <p>
+                <strong>Dieses Training löschen?</strong> Gesprächsprotokoll, Kennzahlen und
+                Auswertung werden entfernt. Das lässt sich nicht rückgängig machen.
+              </p>
+              <div className="consent-confirm-actions">
+                <button
+                  type="button"
+                  className="consent-button consent-button-danger"
+                  onClick={() => void remove()}
+                  disabled={deleting}
+                >
+                  {deleting ? "Wird gelöscht …" : "Endgültig löschen"}
+                </button>
+                <button
+                  type="button"
+                  className="consent-button consent-button-secondary"
+                  onClick={() => setConfirming(false)}
+                  disabled={deleting}
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="session-delete-trigger"
+              onClick={() => setConfirming(true)}
+            >
+              Dieses Training löschen
+            </button>
+          )}
 
-      {detail.feedback ? (
-        <FeedbackReport
-          detail={detail}
-          // Re-read after one is written, so the card survives a reload of
-          // this page as the row the detail route now carries.
-          followUp={{ onStart: startFollowUp, onCreated: reload }}
-          sessionId={sessionId ?? null}
-          onReverse={startReverse}
-        />
-      ) : (
-        <>
-          <div className="card">
-            <p className="muted">
-              Zu diesem Gespräch gibt es keine Auswertung. Sie ist damals nicht zustande
-              gekommen. Das Gesprächsprotokoll und die Zahlen unten sind vollständig.
+          {deleteFailed && (
+            <p className="consent-error">
+              Das Training konnte nicht gelöscht werden. Bitte versuchen Sie es erneut.
             </p>
-          </div>
-          {/* The figures are measured during the call and stored with the
-              Session (ADR 0047/0048), so they survive a wrap-up that never
-              got written. Withholding them would hide data that is right
-              there. */}
-          <MetricSection measurements={detail.measurements} />
-        </>
-      )}
-
-      <h2>Gesprächsprotokoll</h2>
-      {detail.turns.length > 0 ? (
-        <div className="card">
-          {detail.turns.map((turn) => (
-            <p className="transcript-line" key={turn.turn_id}>
-              <span className="transcript-time">{formatOffset(turn.start_offset_ms)}</span>
-              <span>
-                <strong>{turn.speaker === "user" ? "Du" : detail.persona}:</strong>{" "}
-                {turn.transcript}
-              </span>
-            </p>
-          ))}
-        </div>
-      ) : (
-        <div className="card">
-          <p className="muted">Für dieses Training wurde kein Gesprächsprotokoll gespeichert.</p>
-        </div>
-      )}
-
-      {/* At the bottom, after everything it would destroy. Putting it beside
-          the heading would make it the first thing in reach on a screen the
-          user opened in order to read. */}
-      <section className="session-delete">
-        {confirming ? (
-          <>
-            <p>
-              <strong>Dieses Training löschen?</strong> Gesprächsprotokoll, Kennzahlen und
-              Auswertung werden entfernt. Das lässt sich nicht rückgängig machen.
-            </p>
-            <div className="consent-confirm-actions">
-              <button
-                type="button"
-                className="consent-button consent-button-danger"
-                onClick={() => void remove()}
-                disabled={deleting}
-              >
-                {deleting ? "Wird gelöscht …" : "Endgültig löschen"}
-              </button>
-              <button
-                type="button"
-                className="consent-button consent-button-secondary"
-                onClick={() => setConfirming(false)}
-                disabled={deleting}
-              >
-                Abbrechen
-              </button>
-            </div>
-          </>
-        ) : (
-          <button
-            type="button"
-            className="session-delete-trigger"
-            onClick={() => setConfirming(true)}
-          >
-            Dieses Training löschen
-          </button>
-        )}
-
-        {deleteFailed && (
-          <p className="consent-error">
-            Das Training konnte nicht gelöscht werden. Bitte versuchen Sie es erneut.
-          </p>
-        )}
-      </section>
+          )}
+        </section>
+      </FeedbackScreen>
     </AppLayout>
   );
 }
