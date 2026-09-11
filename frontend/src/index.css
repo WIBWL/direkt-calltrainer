@@ -594,45 +594,68 @@ h2 {
 }
 
 .setup-persona-grid .persona-card {
-  /* No padding of its own: the portrait is full-bleed to the card's edges and
-     the text below carries its own inset (`.persona-card-body`). `overflow:
-     hidden` is what clips the picture to the card's rounded corners. */
-  justify-content: flex-start;
+  /* A row, unlike the Scenario cards: the portrait sits beside the text, not
+     above it, and reaches the card's top, bottom and left edges — so the card
+     carries no padding of its own and the text brings its own inset.
+     `overflow: hidden` is what rounds the picture's corners with the card's,
+     and `stretch` is what gives it the card's full height. */
+  flex-direction: row;
+  align-items: stretch;
   gap: 0;
+  min-height: 124px;
   padding: 0;
   overflow: hidden;
   border-width: 1.5px;
 }
 
-/* Every Persona image is square with the face in the upper third, so both
-   crops below sit the subject above centre rather than in the middle. */
 .persona-card-portrait {
-  /* Flex only so the initials fallback centres itself; an <img> is unaffected. */
+  /* Flex so the initials fallback centres itself.
+     Width is fixed and the height stretches to the card's, rather than the
+     other way round: in a flex row the main size is resolved before the cross
+     size, so an `aspect-ratio` with a stretched height has nothing to compute
+     from and the slot blows up to its content's width. 93px against the 124px
+     minimum above is the 3:4 the portraits are cropped for; a card whose role
+     runs long grows a little taller than that, which is the right trade — the
+     picture reaching the card's edges matters more here than the exact
+     ratio. */
   display: flex;
-  width: 100%;
-  aspect-ratio: 4 / 3;
   align-items: center;
   justify-content: center;
-  object-fit: cover;
-  object-position: center 18%;
-  font-size: 30px;
+  flex: 0 0 93px;
+  font-size: 24px;
+}
+
+/* And the clamp is what keeps that drift small: three lines of role at most,
+   so one long text cannot stretch every card in its grid row. */
+.setup-persona-grid .card-subtitle {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* The slot is taller than it is wide and the source is square, so `object-fit:
+   cover` already trims the sides. The zoom on top of that is what brings the
+   face up to a size one Persona can be told from another at: unzoomed, the
+   card would show the whole half-body shot in 118px. Every picture is framed
+   the same way — square, subject centred, face in the upper third — which is
+   what lets one origin serve all of them. The two large square slots show the
+   pose whole and need neither: their box matches the source. */
+.persona-card-portrait > img {
+  transform: scale(1.5);
+  transform-origin: center 18%;
 }
 
 .persona-card-body {
+  /* min-width: 0 lets a long role wrap instead of pushing the portrait out.
+     The right inset leaves the check and the "i" their corners. */
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  /* Right inset leaves the "i" button its corner. */
-  padding: 12px 46px 14px 16px;
-}
-
-/* The check sits over the photo, so it needs a ground of its own. Selected
-   still wins: `.persona-card.selected .choice-check` is the more specific
-   selector and comes later. */
-.setup-persona-grid .choice-check {
-  background: rgba(255, 255, 255, 0.92);
-  border-color: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 1px 3px rgba(3, 37, 62, 0.25);
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 14px 44px 14px 14px;
 }
 
 .setup-persona-grid .persona-name {
@@ -744,23 +767,51 @@ h2 {
 
 /* --- Persona info panel (read-only; shares the editor's modal shell) --- */
 
+/* Name, role and language sit beside the portrait rather than under it, so the
+   panel opens on who this is and the sections below carry only what the card
+   did not already say. */
+.persona-info-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 1.4rem;
+}
+
 .persona-info-portrait {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 112px;
-  height: 112px;
-  /* The language line below pulls itself up by 0.5rem against the heading, so
-     the gap that actually shows here is smaller than this value. */
-  margin: 0.35rem 0 1rem;
-  border-radius: 50%;
-  object-fit: cover;
-  object-position: center 15%;
-  font-size: 30px;
+  flex-shrink: 0;
+  width: 160px;
+  height: 160px;
+  border-radius: 14px;
+  font-size: 44px;
 }
 
-/* Shared by all three portrait slots: what an <img> would have covered, the
-   initials get instead. Size, shape and centring stay with the slot. */
+.persona-info-identity {
+  min-width: 0;
+}
+
+.persona-info-role {
+  margin: 0 0 0.3rem;
+  line-height: 1.4;
+}
+
+/* Shared by all three portrait slots. The slot owns size, shape and clipping;
+   the picture inside fills it, which is what lets a slot crop by scaling the
+   picture (see `.persona-card-portrait img`). */
+.persona-avatar {
+  overflow: hidden;
+}
+
+.persona-avatar > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* What an <img> would have covered, the initials get instead. */
 .persona-avatar-fallback {
   background: #eaf5fc;
   color: var(--color-blue-600);
@@ -768,9 +819,24 @@ h2 {
 }
 
 .persona-info-language {
-  margin: -0.5rem 0 1.25rem;
+  margin: 0;
   font-size: 0.85rem;
   color: var(--color-text-muted);
+}
+
+/* The panel is only so wide; below this the two columns stop fitting. */
+@media (max-width: 520px) {
+  .persona-info-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .persona-info-portrait {
+    width: 128px;
+    height: 128px;
+    font-size: 36px;
+  }
 }
 
 .persona-info-sections {
@@ -841,6 +907,10 @@ h2 {
 .editor-panel h2 {
   margin: 0 0 1rem;
   color: var(--color-navy-900);
+}
+
+.persona-info-identity h2 {
+  margin: 0 0 0.35rem;
 }
 
 .editor-fields {
@@ -1353,8 +1423,6 @@ h2 {
   justify-content: center;
   flex-shrink: 0;
   border-radius: 50%;
-  object-fit: cover;
-  object-position: center 15%;
   background: #eaf5fc;
   color: var(--color-blue-600);
   font-size: 40px;

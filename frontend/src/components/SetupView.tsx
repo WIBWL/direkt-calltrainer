@@ -189,9 +189,9 @@ export default function SetupView({
  * LibraryPicker puts its "Bearbeiten" link in. Reading about a Persona and
  * choosing one are separate acts: the "i" does not select the card.
  *
- * The portrait is full-bleed across the top, which is why the text sits in its
- * own padded wrapper instead of the button carrying the padding: the picture
- * has to reach the card's edges, the text must not. */
+ * The portrait sits left of the text, which is why the three lines are wrapped
+ * in an element of their own: the card is a row, and they are its second
+ * column. */
 function ChoiceCard({
   title,
   subtitle,

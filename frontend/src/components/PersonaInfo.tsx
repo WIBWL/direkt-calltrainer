@@ -13,13 +13,14 @@ interface PersonaInfoProps {
   onClose: () => void;
 }
 
-/** Rows in display order. `traits` may be null and `objections` may be empty;
- * an absent field is left out rather than shown as an empty heading. */
+/** Rows in display order. `traits` may be null; an absent field is left out
+ * rather than shown as an empty heading. `role` is not among them — it is part
+ * of the header beside the name, and a second copy under a heading of its own
+ * would put the same sentence on the screen twice. */
 const SECTIONS: {
-  key: "role" | "traits" | "training_goal";
+  key: "traits" | "training_goal";
   label: string;
 }[] = [
-  { key: "role", label: "Rolle" },
   { key: "traits", label: "Persönlichkeit" },
   { key: "training_goal", label: "Was Sie hier trainieren" },
 ];
@@ -89,56 +90,64 @@ export default function PersonaInfo({ personaId, personaName, onClose }: Persona
         aria-labelledby="persona-info-title"
       >
         <div className="editor-scroll">
-          <h2 id="persona-info-title">{detail?.name ?? personaName}</h2>
+          {/* Rendered before the fetch lands too, so the panel opens on the
+              Persona rather than on a blank box: the card the user just
+              clicked knows the name, and the portrait falls back to the
+              initials until the detail arrives. */}
+          <div className="persona-info-header">
+            <PersonaAvatar
+              name={detail?.name ?? personaName}
+              src={detail?.avatar_url}
+              className="persona-info-portrait"
+            />
+
+            <div className="persona-info-identity">
+              <h2 id="persona-info-title">{detail?.name ?? personaName}</h2>
+
+              {detail && (
+                <>
+                  <p className="persona-info-role">{detail.role}</p>
+                  <p className="persona-info-language">Spricht {detail.language}</p>
+                </>
+              )}
+            </div>
+          </div>
 
           {error && <p className="error">{error}</p>}
 
           {!detail && !error && <p>Wird geladen …</p>}
 
           {detail && (
-            <>
-              {/* Under the heading rather than above it: the panel is opened
-                  from a card that already showed the picture, so what is new
-                  here is the text. */}
-              <PersonaAvatar
-                name={detail.name}
-                src={detail.avatar_url}
-                className="persona-info-portrait"
-              />
-
-              <p className="persona-info-language">Spricht {detail.language}</p>
-
-              <div className="persona-info-sections">
-                {SECTIONS.map((section) => {
-                  const value = detail[section.key];
-                  if (!value) return null;
-                  return (
-                    <section className="persona-info-section" key={section.key}>
-                      <h3>{section.label}</h3>
-                      <p>{value}</p>
-                    </section>
-                  );
-                })}
-
-                {detail.objections.length > 0 && (
-                  <section className="persona-info-section">
-                    <h3>Typische Einwände</h3>
-                    {/* R-12 / ADR 0045: tendencies, not a script. Said plainly,
-                        because a user who reads this as a checklist would expect
-                        all of them in every call. */}
-                    <p className="persona-info-hint">
-                      Damit ist im Gespräch zu rechnen, nicht jedes Mal und nicht in
-                      dieser Reihenfolge.
-                    </p>
-                    <ul className="persona-info-objections">
-                      {detail.objections.map((objection) => (
-                        <li key={objection}>{objection}</li>
-                      ))}
-                    </ul>
+            <div className="persona-info-sections">
+              {SECTIONS.map((section) => {
+                const value = detail[section.key];
+                if (!value) return null;
+                return (
+                  <section className="persona-info-section" key={section.key}>
+                    <h3>{section.label}</h3>
+                    <p>{value}</p>
                   </section>
-                )}
-              </div>
-            </>
+                );
+              })}
+
+              {detail.objections.length > 0 && (
+                <section className="persona-info-section">
+                  <h3>Typische Einwände</h3>
+                  {/* R-12 / ADR 0045: tendencies, not a script. Said plainly,
+                      because a user who reads this as a checklist would expect
+                      all of them in every call. */}
+                  <p className="persona-info-hint">
+                    Damit ist im Gespräch zu rechnen, nicht jedes Mal und nicht in
+                    dieser Reihenfolge.
+                  </p>
+                  <ul className="persona-info-objections">
+                    {detail.objections.map((objection) => (
+                      <li key={objection}>{objection}</li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </div>
           )}
 
           <div className="editor-actions">
