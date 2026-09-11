@@ -91,7 +91,7 @@ source of that content, and which imports without a database.
 | Praat measurement against synthetic waveforms: the pitch curve's grid, its unit, and what is refused rather than guessed | F-35, F-37, F-51, ADR 0047, ADR 0048 | `test_acoustics.py` |
 | Pitch contour factors: range vs movement, terminal contours per utterance, development across the call, what is refused, the five-step reading and the seams between the user's turns | F-35, ADR 0004, ADR 0051 | `test_intonation.py` |
 | Overlapping speech: the rule order that keeps a backchannel from counting, terminal overlap, hard vs soft, and the provisional traffic light | F-51, ADR 0035, ADR 0036, ADR 0051 | `test_interruptions.py` |
-| Scenario suggestions: call types and focus goals steer them, voice goals do not, and a suggested Scenario keeps its own origin | F-62, ADR 0072, ADR 0076 | `test_recommendations.py` |
+| Scenario suggestions: call types and focus goals steer them, voice goals do not, a suggested Scenario keeps its own origin, and the offers after a call | F-62, F-64, ADR 0072, ADR 0076 | `test_recommendations.py` |
 | Hesitation sounds read off the pitch contour: a held flat stretch counts, running speech and short vowels do not, and a failed measurement suppresses the figure | F-51, ADR 0048 | `test_hesitations.py` |
 | Async wrap-up job status (queued → running → done/failed), and every path that can strand it | F-09, F-10, ADR 0019, ADR 0032, ADR 0034, ADR 0050 | `test_feedback_job_status.py` |
 | Wrap-up prompt & phase block (F-42), and the thinking-mode call it is asked with | F-09, F-42, F-43, ADR 0004, ADR 0011, ADR 0043, ADR 0049, ADR 0051, ADR 0056 | `test_wrapup_prompt.py` |

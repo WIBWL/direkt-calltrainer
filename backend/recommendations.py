@@ -72,6 +72,88 @@ def recommend(
     return {entry[3]: entry[4] for entry in scored[:MAX_RECOMMENDATIONS]}
 
 
+@dataclass(frozen=True)
+class Partner:
+    """A Persona, as the next-call offers need it."""
+
+    id: str
+    language_id: str
+
+
+@dataclass(frozen=True)
+class NextCall:
+    """One way to go on after a call (F-64), from the library as it stands."""
+
+    kind: str                 # "language": the same Scenario, other language
+    scenario_id: str          # "library": another Scenario, same partner
+    persona_id: str
+    recommendation: Recommendation | None = None
+    unplayed: bool = False
+
+
+@dataclass(frozen=True)
+class Choices:
+    """What the offers after a call are chosen from."""
+
+    candidates: list[Candidate]
+    partners: list[Partner]
+    picks: dict[str, Recommendation]   # the profile's suggestions, best first
+    played_ids: set[str]
+
+
+def next_calls(played: Candidate, persona: Partner, choices: Choices) -> list[NextCall]:
+    """At most two offers, neither needing a model: the same Scenario in the
+    other language, and another Scenario -- the best suggestion not just played,
+    else an unplayed one from the same category.
+    """
+    offers: list[NextCall] = []
+    # Not for a reverse: its briefing is German prose (ADR 0070).
+    other = next(
+        (p for p in choices.partners if p.language_id != persona.language_id), None
+    )
+    if other and not played.reverse:
+        offers.append(NextCall("language", played.id, other.id))
+    choice = _library_choice(played, choices)
+    if choice:
+        scenario_id, why = choice
+        offers.append(NextCall(
+            "library", scenario_id, persona.id, why, scenario_id not in choices.played_ids,
+        ))
+    return offers
+
+
+def _library_choice(
+    played: Candidate, choices: Choices
+) -> tuple[str, Recommendation | None] | None:
+    """The suggestion to offer next, preferring one not yet played."""
+    others = [pick for pick in choices.picks if pick != played.id]
+    fresh = [pick for pick in others if pick not in choices.played_ids]
+    if fresh or others:
+        pick = (fresh or others)[0]
+        return pick, choices.picks[pick]
+
+    def same_kind(c: Candidate) -> bool:
+        return c.id != played.id and not c.reverse and c.category == played.category
+
+    same = next((c for c in choices.candidates
+                 if played.category and same_kind(c) and c.id not in choices.played_ids), None)
+    return (same.id, None) if same else None
+
+
+def next_for_subject(
+    subject: str,
+    played: Candidate,
+    persona: Partner,
+    candidates: list[Candidate],
+    partners: list[Partner],
+) -> list[NextCall]:
+    """`next_calls` over this subject's own profile and history."""
+    return next_calls(played, persona, Choices(
+        candidates, partners,
+        for_subject(subject, candidates), library.played_scenario_ids(subject),
+    ))
+
+
 def for_subject(subject: str, candidates: list[Candidate]) -> dict[str, Recommendation]:
     """`recommend` over this subject's own focus selection and training history."""
     with session_scope() as db:

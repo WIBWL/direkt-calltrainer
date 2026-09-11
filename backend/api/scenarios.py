@@ -218,6 +218,57 @@ def list_scenarios(
     return cards
 
 
+@router.get("/{extern_id}/next")
+def next_calls(
+    extern_id: str,
+    persona: str,
+    user: AuthContext = Depends(require_user),
+    tenant_id: int = Depends(current_tenant_id),
+) -> list[dict]:
+    """What to play after a call on this Scenario with this Persona (F-64).
+
+    Needs no stored Session, so it answers for a call that was not kept too. A
+    Scenario or Persona the caller cannot select is a 404, as everywhere.
+    """
+    cards = sorted(
+        (_card(s, user.sub) for s in library.list_scenarios(user.sub, tenant_id)),
+        key=_origin_group,
+    )
+    by_id = {card["id"]: card for card in cards}
+    people = {p.id: p for p in library.list_personas()}
+    if extern_id not in by_id or persona not in people:
+        raise HTTPException(status_code=404, detail="Unknown scenario or persona")
+
+    def candidate(card: dict) -> recommendations.Candidate:
+        return recommendations.Candidate(card["id"], card["category"], card["reverse"])
+
+    partners = [recommendations.Partner(p.id, p.language_id) for p in people.values()]
+    offers = recommendations.next_for_subject(
+        user.sub,
+        candidate(by_id[extern_id]),
+        recommendations.Partner(persona, people[persona].language_id),
+        [candidate(card) for card in cards],
+        partners,
+    )
+    return [
+        {
+            "kind": offer.kind,
+            "scenario_id": offer.scenario_id,
+            "scenario_name": by_id[offer.scenario_id]["name"],
+            "persona_id": offer.persona_id,
+            "persona_name": people[offer.persona_id].name,
+            "language": people[offer.persona_id].language_name,
+            "recommendation": (
+                {"call_type": offer.recommendation.call_type,
+                 "goals": list(offer.recommendation.goals)}
+                if offer.recommendation else None
+            ),
+            "unplayed": offer.unplayed,
+        }
+        for offer in offers
+    ]
+
+
 @router.post("/document")
 async def extract_document(
     file: UploadFile = File(...),
