@@ -667,6 +667,10 @@ def persist(
     reason: str = "user",
     turns: list[Turn] | None = None,
     persona_key: str = PERSONA_KEY,
+    # Named for the same reason `persona_key` is: a test that runs against the
+    # *seeded* reference data rather than against `reference_data`'s two hand-
+    # written rows has to say which rows the Session points at.
+    scenario_key: str = SCENARIO_KEY,
     subject: str = TEST_AUTH.sub,
     started_at: datetime = SESSION_STARTED,
 ) -> uuid.UUID:
@@ -690,7 +694,7 @@ def persist(
     # which exercises the LookupError path.
     with session_scope() as db:
         prow = db.query(db_models.Persona).filter_by(key=persona_key).one_or_none()
-        srow = db.query(db_models.Scenario).filter_by(key=SCENARIO_KEY).one_or_none()
+        srow = db.query(db_models.Scenario).filter_by(key=scenario_key).one_or_none()
     persona = replace(TEST_PERSONAS[0], id=str(prow.extern_id) if prow else str(uuid.uuid4()))
     scenario = replace(TEST_SCENARIOS[0], id=str(srow.extern_id) if srow else str(uuid.uuid4()))
     extern_id = extern_id or uuid.uuid4()

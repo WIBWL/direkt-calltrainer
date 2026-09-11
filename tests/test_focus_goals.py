@@ -29,6 +29,8 @@ from backend.db.models import (
     FocusGoal,
     FocusSelection,
     FocusSelectionGoal,
+    Persona,
+    Scenario,
 )
 from backend.db.seed_data import FOCUS_GOALS as SEEDED_GOALS
 from backend.session.models import Turn as LiveTurn
@@ -291,7 +293,13 @@ def test_deleting_the_trainings_leaves_the_focus_alone(db_session: DbSession) ->
     """A focus is a setting, not training data: withdrawing consent deletes the
     Sessions (ADR 0066) and must not quietly reset what the user chose to work
     on. `retention_preference` is treated the same way."""
-    persist(turns=TURNS)
+    # This module runs against the *seeded* reference data (`seeded_database`),
+    # not against `reference_data`'s two hand-written rows, so the Session is
+    # pointed at a seeded Persona and Scenario. Adding `reference_data` here
+    # instead would insert the focus catalogue a second time.
+    persona = db_session.query(Persona).filter(Persona.key.isnot(None)).first()
+    scenario = db_session.query(Scenario).filter(Scenario.key.isnot(None)).first()
+    persist(turns=TURNS, persona_key=persona.key, scenario_key=scenario.key)
     focus.set_selection(db_session, TEST_AUTH.sub, ["pace"])
     db_session.commit()
 
