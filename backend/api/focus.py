@@ -64,6 +64,11 @@ def set_focus(choice: FocusChoice, caller: AuthContext = Depends(require_user)) 
 def _state(
     goals: list[focus_service.Goal], selection: focus_service.Selection
 ) -> dict:
+    # A retired goal stays in the stored selection (that is the point of
+    # deactivating rather than deleting) but must not be served: the picker
+    # shows no card for it, so it would silently occupy one of the five slots
+    # and the user would see four ticks and no sixth box to tick.
+    offered = {goal.key for goal in goals}
     return {
         # The limit travels with the payload so the interface enforces the same
         # number the backend does, rather than its own copy of it (ADR 0063).
@@ -71,7 +76,7 @@ def _state(
         "decided": selection.decided,
         "decided_at": selection.decided_at.isoformat() if selection.decided_at else None,
         "decision_required": selection.decision_required,
-        "selected": list(selection.keys),
+        "selected": [key for key in selection.keys if key in offered],
         "groups": focus_service.groups(),
         # `evidence` is not on the wire. It says how far a goal can be measured
         # today, which is planning information for the analysis work rather than

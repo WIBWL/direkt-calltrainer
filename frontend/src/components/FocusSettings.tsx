@@ -8,7 +8,7 @@ import FocusGoalPicker, { toggleGoal } from "./FocusGoalPicker";
  * change it (F-62, ADR 0076).
  *
  * Read-only until the user asks to edit. The section is passed on the way to
- * something else most of the time, and fifteen open checkboxes would make a
+ * something else most of the time, and a dozen open checkboxes would make a
  * page about your account look like a form waiting to be filled in, while a
  * stray click on a checkbox that saved immediately would silently change what
  * the training emphasises.

@@ -7,6 +7,9 @@ Scoped deliberately: this decides what a focus *is* and where it lives. What
 reads one — the wrap-up and the progress dashboard — is a later step and is not
 part of this change.
 
+**Amended:** the catalogue is fourteen goals, not fifteen. "Souveräne
+Lautstärke" is retired — see the last section.
+
 ## Context
 
 The trainer treats every user the same. It measures the same six Kennzahlen,
@@ -167,3 +170,25 @@ whatever reports on a focus may only say what is actually behind that goal, an
 appraisal where there is no measurement yet, and in no case a score. Five of
 the fifteen are `interpretive` or would be reported as one today, which is
 where the work is.
+
+## Amendment: "Souveräne Lautstärke" is retired
+
+The goal carried `evidence: measured`, and that was the mistake. What
+`backend/feedback/acoustics.py` measures is the level of the recording, which is
+the speaker, the microphone, the distance to it and whatever gain the browser
+applied, with no way to separate the four. Two calls by the same person from the
+same room are not comparable if they used a headset once and a laptop the next
+time, and nothing in the application knows which it was. A goal that promised a
+reading of vocal presence would have reported the input device.
+
+So the catalogue drops to fourteen. `position` closes the gap; the row is
+deactivated by the seeding and not deleted, as this ADR already requires, and
+the goal leaves the served selection of anyone who had picked it
+(`api/focus.py`) — the picker has no card for it, so leaving it in would hold
+one of the five slots with nothing on screen to explain it.
+
+Two things deliberately stay. The Kennzahl `loudness` and its course (F-37) keep
+being measured and shown on a single call, where the device is at least constant
+for the length of that call and the curve describes a shape rather than a level.
+And no measurement is invented to replace the goal: the honest alternative would
+need a calibrated input, which a browser does not give.

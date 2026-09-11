@@ -844,29 +844,26 @@ FOCUS_GOALS = [
             "hörbar hervortreten."
         ),
     },
-    {
-        "id": "loudness",
-        "group": "paraverbal",
-        "evidence": "measured",
-        "position": 3,
-        "title": "Souveräne Lautstärke",
-        "caption": (
-            "Gut hörbar und gleichmäßig, ohne zu verhallen oder zu "
-            "übersteuern."
-        ),
-        "info": (
-            "Eine stabile Lautstärke signalisiert Präsenz und Sicherheit. "
-            "Fällt die Stimme am Satzende ab oder schwankt sie stark, wirkt "
-            "das unsicher. Ausgewertet wird Ihr Pegel über das ganze Gespräch "
-            "und damit auch die Stellen, an denen Sie deutlich leiser oder "
-            "lauter werden."
-        ),
-    },
+    # "Souveräne Lautstärke" stood here and is retired: the figure behind it is
+    # the recorded level, which says as much about the microphone and how far
+    # away it sits as about the speaker, so two calls of the same person are not
+    # comparable and a goal would have promised a reading the data cannot give.
+    # The row is deactivated by the seeding, not deleted -- selections reference
+    # it (ADR 0076). The Kennzahl `loudness` itself stays, with the same caveat.
     {
         "id": "articulation",
+        # `interpretive` and not `mixed`: no measurement is planned for this one
+        # any more (docs/dashboard-konzept.md, section 4.2). Indistinctness sits
+        # in the spectral sharpness of the signal, which is the microphone and
+        # the distance to it as much as the speaker -- the argument that retired
+        # the loudness goal, and harder here, because there is no comparison
+        # *within* one recording to fall back on. Whisper normalises swallowed
+        # endings into correct words on top of that, so the transcript does not
+        # carry it either. `mixed` was a promise of a measurement that is not
+        # coming.
         "group": "paraverbal",
-        "evidence": "mixed",
-        "position": 4,
+        "evidence": "interpretive",
+        "position": 3,
         "title": "Deutliche Artikulation",
         "caption": (
             "Klar verständlich sprechen, ohne zu nuscheln oder Endungen zu "
@@ -884,7 +881,7 @@ FOCUS_GOALS = [
         "id": "conciseness",
         "group": "paraverbal",
         "evidence": "measured",
-        "position": 5,
+        "position": 4,
         "title": "Prägnante Sprache",
         "caption": (
             "Auf den Punkt kommen und Füllwörter, Wiederholungen und "
@@ -903,7 +900,7 @@ FOCUS_GOALS = [
         "id": "opening",
         "group": "phases",
         "evidence": "mixed",
-        "position": 6,
+        "position": 5,
         "title": "Souveräner Gesprächseinstieg",
         "caption": (
             "Begrüßung, Vorstellung und Anlass des Gesprächs klar und "
@@ -921,7 +918,7 @@ FOCUS_GOALS = [
         "id": "needs_analysis",
         "group": "phases",
         "evidence": "mixed",
-        "position": 7,
+        "position": 6,
         "title": "Aktive Bedarfsermittlung",
         "caption": "Durch gezielte Fragen herausfinden, was Ihr Kunde wirklich braucht.",
         "info": (
@@ -935,7 +932,7 @@ FOCUS_GOALS = [
         "id": "objection_handling",
         "group": "phases",
         "evidence": "mixed",
-        "position": 8,
+        "position": 7,
         "title": "Sichere Einwandbehandlung",
         "caption": "Auf Bedenken und Einwände ruhig und überzeugend eingehen.",
         "info": (
@@ -949,7 +946,7 @@ FOCUS_GOALS = [
         "id": "closing",
         "group": "phases",
         "evidence": "interpretive",
-        "position": 9,
+        "position": 8,
         "title": "Klarer Gesprächsabschluss",
         "caption": (
             "Ergebnisse zusammenfassen und mit einer klaren nächsten Aktion "
@@ -967,7 +964,7 @@ FOCUS_GOALS = [
         "id": "active_listening",
         "group": "impact",
         "evidence": "mixed",
-        "position": 10,
+        "position": 9,
         "title": "Aktives Zuhören",
         "caption": "Ausreden lassen, aufgreifen und bestätigen, statt zu unterbrechen.",
         "info": (
@@ -983,7 +980,7 @@ FOCUS_GOALS = [
         "id": "empathy",
         "group": "impact",
         "evidence": "interpretive",
-        "position": 11,
+        "position": 10,
         "title": "Empathie und Kundenorientierung",
         "caption": "Die Situation und die Stimmung Ihres Gegenübers erkennen und aufgreifen.",
         "info": (
@@ -997,7 +994,7 @@ FOCUS_GOALS = [
         "id": "composure",
         "group": "impact",
         "evidence": "mixed",
-        "position": 12,
+        "position": 11,
         "title": "Souveränität unter Druck",
         "caption": "Auch bei Gegenwind ruhig, klar und stabil in der Stimme bleiben.",
         "info": (
@@ -1013,7 +1010,7 @@ FOCUS_GOALS = [
         "id": "talk_share",
         "group": "impact",
         "evidence": "measured",
-        "position": 13,
+        "position": 12,
         "title": "Ausgewogener Redeanteil",
         "caption": "Das richtige Verhältnis zwischen selbst sprechen und sprechen lassen.",
         "info": (
@@ -1030,7 +1027,7 @@ FOCUS_GOALS = [
         "id": "training_regularity",
         "group": "habit",
         "evidence": "measured",
-        "position": 14,
+        "position": 13,
         "title": "Regelmäßiges Training",
         "caption": "Dranbleiben und kontinuierlich üben statt in seltenen Schüben.",
         "info": (
@@ -1043,7 +1040,7 @@ FOCUS_GOALS = [
         "id": "training_variety",
         "group": "habit",
         "evidence": "measured",
-        "position": 15,
+        "position": 14,
         "title": "Trainingsvielfalt",
         "caption": "Verschiedene Szenarien und Gesprächspartner bewusst durchspielen.",
         "info": (

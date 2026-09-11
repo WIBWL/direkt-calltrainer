@@ -221,7 +221,7 @@ async def test_changing_the_selection_replaces_it(
 ) -> None:
     """The body is the whole selection, so the previous goals go. Rows left
     behind would be invisible on screen and still count against the limit."""
-    await api_client.put("/api/focus", json={"goals": ["pace", "loudness"]})
+    await api_client.put("/api/focus", json={"goals": ["pace", "intonation"]})
     body = (await api_client.put("/api/focus", json={"goals": ["empathy"]})).json()
 
     assert body["selected"] == ["empathy"]
@@ -252,6 +252,22 @@ def test_a_selection_survives_a_goal_being_retired(db_session: DbSession) -> Non
     assert focus.selection(db_session, TEST_AUTH.sub).keys == ("pace", "empathy")
 
 
+async def test_a_retired_goal_leaves_the_served_selection(
+    api_client: httpx.AsyncClient, db_session: DbSession
+) -> None:
+    """The row above stays; the payload does not carry it. There is no card for
+    it in the picker, so it would hold one of the five slots invisibly — four
+    ticks on screen and no sixth box to tick."""
+    await api_client.put("/api/focus", json={"goals": ["pace", "empathy"]})
+    db_session.query(FocusGoal).filter_by(key="empathy").update({"active": False})
+    db_session.commit()
+
+    body = (await api_client.get("/api/focus")).json()
+
+    assert body["selected"] == ["pace"]
+    assert body["decided"] is True
+
+
 # --- Scope and survival ------------------------------------------------------
 
 
@@ -260,7 +276,7 @@ async def test_one_subject_never_sees_another_subjects_focus(
 ) -> None:
     """The `sub` is part of the query, not a check on the result — there is no
     form of this request that is about somebody else (ADR 0031/0064)."""
-    focus.set_selection(db_session, "somebody-else", ["pace", "loudness"])
+    focus.set_selection(db_session, "somebody-else", ["pace", "intonation"])
     db_session.commit()
 
     body = (await api_client.get("/api/focus")).json()

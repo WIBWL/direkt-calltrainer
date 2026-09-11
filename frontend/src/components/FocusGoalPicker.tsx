@@ -20,7 +20,7 @@ export function toggleGoal(selected: string[], key: string, max: number): string
  *
  * One component for both places it appears — the first-run dialog and the
  * profile section. They differ in what surrounds them and in nothing else, and
- * two copies of a fifteen-card list would drift on the first catalogue change.
+ * two copies of the card list would drift on the first catalogue change.
  *
  * The card is the app's own selection idiom (`.choice-check`, as on a Persona
  * or Scenario card) over a real checkbox: this is a pick-up-to-five, so the
@@ -36,7 +36,7 @@ export function toggleGoal(selected: string[], key: string, max: number): string
  *
  * The cards sit in a responsive grid — two columns in the dialog, one in the
  * narrower profile card — because a title of 15 to 31 characters does not need
- * a full row, and fifteen full rows is what made the first screen long.
+ * a full row, and a full row per goal is what made the first screen long.
  */
 export default function FocusGoalPicker({
   goals,
@@ -126,7 +126,7 @@ export default function FocusGoalPicker({
                           {goal.title}
                         </label>
 
-                        {/* Icon only: the same label fifteen times is noise, and
+                        {/* Icon only: the same label on every card is noise, and
                             naming the goal makes it a better one when read out. */}
                         <InfoDetails label={`Was „${goal.title}“ bedeutet`} iconOnly>
                           <p>{goal.info}</p>
