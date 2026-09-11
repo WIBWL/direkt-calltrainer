@@ -89,10 +89,6 @@ interface LibraryPickerProps {
    * (ADR 0076), so the card carries no separate edit affordance -- not even
    * on the caller's own rows, where it used to sit. */
   onInfo: (id: string) => void;
-  /** Retire a reverse (ADR 0070). It is the one affordance that did not move
-   * into the panel: a reverse cannot be edited, so removal is all it has, and
-   * a delete is not something a read view should offer. */
-  onRemove: (id: string) => void;
 }
 
 /** Whether an item passes the active origin filter. "tenant" = anything shared
@@ -165,13 +161,11 @@ export default function LibraryPicker({
   newLabel,
   onNew,
   onInfo,
-  onRemove,
 }: LibraryPickerProps) {
   // Which card is asking to be confirmed, if any. One id rather than a set:
   // asking about a second row answers the first with "no", which is the safe
   // way round and saves a stray confirmation sitting armed on a card the User
   // has moved on from.
-  const [confirmingRemoval, setConfirmingRemoval] = useState<string | null>(null);
   // The grid opens on one row and a half of cards; the rest is behind the tile
   // at the end of it. Collapsed again whenever the filters change, because what
   // "the first five" are has changed with them.
@@ -276,43 +270,6 @@ export default function LibraryPicker({
               <span aria-hidden="true">i</span>
             </button>
 
-            {/* The exception to that rule. A reverse cannot be edited (ADR
-                0070) — it copies a case that was played — so removal is the
-                only thing it offers, and it asks first: one slip away from a
-                row the User cannot get back. Recreating it means going to the
-                training it came from and spending a model call, if that
-                training is even still stored. It sits bottom left, clear of
-                the "i". */}
-            {item.reverse &&
-              (confirmingRemoval === item.id ? (
-                <span className="card-remove-confirm">
-                  <button
-                    type="button"
-                    className="card-edit card-edit-danger"
-                    onClick={() => {
-                      setConfirmingRemoval(null);
-                      onRemove(item.id);
-                    }}
-                  >
-                    Ja, entfernen
-                  </button>
-                  <button
-                    type="button"
-                    className="card-edit"
-                    onClick={() => setConfirmingRemoval(null)}
-                  >
-                    Abbrechen
-                  </button>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className="card-edit"
-                  onClick={() => setConfirmingRemoval(item.id)}
-                >
-                  Entfernen
-                </button>
-              ))}
           </div>
         ))}
 

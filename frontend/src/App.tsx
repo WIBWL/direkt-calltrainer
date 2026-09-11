@@ -533,6 +533,13 @@ export default function App() {
     setEditingScenario({ id });
   };
 
+  // The panel closes first: it is reading a row that is about to be gone, and
+  // the request behind it would otherwise finish against a 404.
+  const handleDeleteFromInfo = (id: string) => {
+    setInfoScenarioId(null);
+    handleRemoveScenario(id);
+  };
+
   // Rendered over the setup screen and the post-call screen alike: the
   // follow-up (F-60) can be edited from either.
   const scenarioEditor = editingScenario && (
@@ -676,7 +683,6 @@ export default function App() {
         tenantName={tenantName}
         onNewScenario={() => setEditingScenario({ id: null })}
         onShowScenarioInfo={setInfoScenarioId}
-        onRemoveScenario={handleRemoveScenario}
         personas={personas}
         personaId={personaId}
         onShowPersonaInfo={setInfoPersonaId}
@@ -704,6 +710,7 @@ export default function App() {
           scenarioName={infoScenario.name}
           onClose={() => setInfoScenarioId(null)}
           onEdit={handleEditFromInfo}
+          onDelete={handleDeleteFromInfo}
         />
       )}
     </AppLayout>

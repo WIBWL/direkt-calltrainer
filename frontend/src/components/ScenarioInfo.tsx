@@ -18,6 +18,10 @@ interface ScenarioInfoProps {
   /** Switch to the editor on this Scenario. Offered only when the server says
    * the caller may edit it (ADR 0076). */
   onEdit: (id: string) => void;
+  /** Delete this Scenario. Offered only on a reverse (ADR 0070), which is the
+   * one kind that cannot reach the editor, where every other row of the
+   * caller's is deleted. */
+  onDelete: (id: string) => void;
 }
 
 /** The text rows, in the editor's own order so the two panels read the same
@@ -45,12 +49,20 @@ const SECTIONS: { key: keyof ScenarioDetail; label: string }[] = [
  * row the *server* marked `editable`. A built-in serves no `call_goal` and no
  * `success_condition` — the caller's intent is the answer key to the exercise —
  * so those two rows simply do not appear for one.
+ *
+ * A reverse (ADR 0070) is the one row that is the caller's and still not
+ * editable, so the editor — where a Folgeszenario and every other authored row
+ * is deleted — is closed to it. Its "Löschen" is here instead, in the same
+ * corner of the same actions row, asking the same question. Deleting is the
+ * only thing this otherwise read-only panel does, which is why it sits apart
+ * from "Schließen" rather than beside it.
  */
 export default function ScenarioInfo({
   scenarioId,
   scenarioName,
   onClose,
   onEdit,
+  onDelete,
 }: ScenarioInfoProps) {
   const [detail, setDetail] = useState<ScenarioDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -138,6 +150,22 @@ export default function ScenarioInfo({
                 onClick={() => onEdit(detail.id)}
               >
                 Bearbeiten
+              </button>
+            )}
+            {detail?.reverse && (
+              <button
+                type="button"
+                className="editor-delete"
+                onClick={() => {
+                  // The editor's own wording, because it is the same act: one
+                  // slip costs a row that can only be recreated from the
+                  // training it came from, at the price of a model call.
+                  if (window.confirm("Diesen Rollentausch wirklich löschen?")) {
+                    onDelete(detail.id);
+                  }
+                }}
+              >
+                Löschen
               </button>
             )}
             <span className="editor-actions-spacer" />

@@ -912,49 +912,6 @@ h2 {
   background: #fff;
 }
 
-/* ADR 0076 took the card's "Bearbeiten" link away and moved editing into the
-   info panel, but the rule it was styled by is still needed: a reverse cannot
-   be edited (ADR 0070) and carries "Entfernen" in that same place. Bottom
-   left, clear of the "i" in the opposite corner. */
-.card-edit {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  border: 0;
-  background: transparent;
-  padding: 0.1rem 0.3rem;
-  font: inherit;
-  font-size: 0.75rem;
-  color: var(--color-blue-600);
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-/* The removal confirmation takes the place of the "Entfernen" link rather than
-   opening anything: the card must not change size while the question is being
-   asked, or the grid reflows under the pointer that is about to answer it. */
-.card-remove-confirm {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  /* Not 12px: the "i" sits in that corner since ADR 0076, and the two
-     questions must not overlap. */
-  right: 44px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.1rem 0.7rem;
-  align-items: baseline;
-}
-
-.card-remove-confirm .card-edit {
-  position: static;
-  padding-left: 0;
-}
-
-.card-edit-danger {
-  color: var(--color-danger);
-}
-
 /* --- Scenario editor modal --- */
 
 .editor-backdrop {
