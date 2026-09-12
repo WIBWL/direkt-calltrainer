@@ -95,7 +95,7 @@ source of that content, and which imports without a database.
 | Hesitation sounds read off the pitch contour: a held flat stretch counts, running speech and short vowels do not, and a failed measurement suppresses the figure | F-51, ADR 0048, ADR 0084 | `test_hesitations.py` |
 | Async wrap-up job status (queued → running → done/failed), and every path that can strand it | F-09, F-10, ADR 0019, ADR 0032, ADR 0034, ADR 0050 | `test_feedback_job_status.py` |
 | Wrap-up prompt & phase block (F-42), and the thinking-mode call it is asked with | F-09, F-42, F-43, ADR 0004, ADR 0011, ADR 0043, ADR 0049, ADR 0051, ADR 0056 | `test_wrapup_prompt.py` |
-| Documented gaps (current-state guards) | F-13/48, F-53, F-56, ADR 0006/0009 | `test_documented_gaps.py` |
+| Documented gaps (current-state guards) | F-56 | `test_documented_gaps.py` |
 
 ## Not covered here
 
