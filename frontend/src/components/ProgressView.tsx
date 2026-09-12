@@ -8,6 +8,7 @@ import type { FocusGoal, SessionSummary } from "../protocol";
 import { ROUTES, progressGoalPath, progressMetricPath } from "../routes";
 import { backingOf } from "../utils/focusMetrics";
 import { mentionsFor } from "../utils/goalMentions";
+import { showsInOverview } from "../utils/metrics";
 import { segmentTrainings } from "../utils/segmentStats";
 import {
   MIN_SESSIONS_FOR_SERIES,
@@ -32,20 +33,6 @@ import ProgressRecurring from "./ProgressRecurring";
 import SectionHeading from "./SectionHeading";
 import Sparkline from "./Sparkline";
 import VarietyGrid from "./VarietyGrid";
-
-/**
- * Metrics that stay out of the overview, though their own page and the focus
- * goals still reach them.
- *
- * `word_count` grows with the length of the call and with nothing else worth
- * reading across trainings, so its row would repeat the call length beside it
- * in other units. It is still measured and still reachable from the
- * concise-speech goal.
- *
- * The loudness is not here because it never reaches this screen at all:
- * `progressStats.NOT_ACROSS_CALLS` drops it before any series is built.
- */
-const OVERVIEW_HIDDEN = new Set(["word_count"]);
 
 /**
  * Which trainings the screen is read over, counted in trainings (see
@@ -104,7 +91,7 @@ export default function ProgressView() {
   // to the same family: descriptive, and in need of no norm to be readable.
   const duration = durationSeries(inPeriod);
   const series = [...toSeries(inPeriod), ...(duration ? [duration] : [])];
-  const overview = series.filter((s) => !OVERVIEW_HIDDEN.has(s.key));
+  const overview = series.filter((s) => showsInOverview(s.key));
   // Over everything stored, like the calendar they stand beside: the three
   // figures sit above the switch now, so they cannot follow it.
   const counts = activity(sessions);
@@ -387,7 +374,7 @@ function FocusTile({
   const primary = series.find((s) => s.key === backing.metrics[0]);
   const supporting = backing.metrics
     .slice(1)
-    .filter((key) => !OVERVIEW_HIDDEN.has(key))
+    .filter((key) => showsInOverview(key))
     .map((key) => series.find((s) => s.key === key))
     .filter((s): s is MetricSeries => s !== undefined)
     .slice(0, MAX_SUPPORTING);

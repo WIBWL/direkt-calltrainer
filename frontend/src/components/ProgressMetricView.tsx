@@ -4,11 +4,11 @@ import { useProgressData } from "../hooks/useProgressData";
 import { ROUTES, sessionPath } from "../routes";
 import { goalsForMetric } from "../utils/focusMetrics";
 import { statementsFor } from "../utils/goalMentions";
+import { isCount } from "../utils/metrics";
 import {
   MIN_SESSIONS_FOR_SERIES,
   formatPoint,
   formatBand,
-  isCount,
   toSeries,
 } from "../utils/progressStats";
 import { formatDate } from "../utils/time";
@@ -87,7 +87,7 @@ export default function ProgressMetricView() {
         {/* A checklist's unit is a bare denominator, which reads as nothing in
             this sentence; its strip below says what the numbers count. */}
         {/* Nor for a count, whose unit is the bare word "count". */}
-        {series.unit && series.shape === "line" && !isCount(series) && (
+        {series.unit && series.shape === "line" && !isCount(series.unit) && (
           <>, gemessen in {series.unit}</>
         )}
         . Ohne

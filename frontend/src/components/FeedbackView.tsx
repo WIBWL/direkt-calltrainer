@@ -23,6 +23,7 @@ import {
   metricAspect,
   metricParts,
   metricSubline,
+  openHint,
   withDerived,
   type MetricPart,
 } from "../utils/metrics";
@@ -775,19 +776,10 @@ function Metric({
   return (
     <Link className="metric metric-open" to={sessionMetricPath(sessionId, measurement.key)}>
       {body}
-      <span className="metric-open-hint">{OPEN_HINT[measurement.key] ?? "Ansehen"}</span>
+      <span className="metric-open-hint">{openHint(measurement.key)}</span>
     </Link>
   );
 }
-
-/** What the tile promises behind it, per metric. The interruptions page shows
- *  transcript excerpts, the intonation page the contour and what it says, so a
- *  label about individual passages would be wrong for the second — which only
- *  offers a page at all when the block below could not be drawn. */
-const OPEN_HINT: Record<string, string> = {
-  interruptions: "Einzelne Stellen ansehen",
-  intonation: "Diese Kennzahl ansehen",
-};
 
 /**
  * The count set against the call it happened in.

@@ -1,5 +1,12 @@
 import type { MetricAspect, SessionSummary } from "../protocol";
-import { isPartsMetric } from "./metrics";
+import {
+  comparableAcrossCalls,
+  formatValue,
+  isCount,
+  partsTotal as partsTotalOf,
+  seriesShape,
+  type SeriesShape,
+} from "./metrics";
 
 /**
  * Turning the training history into the series the dashboard draws
@@ -36,16 +43,10 @@ export interface SeriesPoint {
 /**
  * How a series may be drawn.
  *
- * `line` is every ordinary metric: a value per training, a course, a band.
- * `parts` is a checklist counted, where the value says how many of a fixed set
- * of parts were recognised (F-63's opening: greeting, name, offer; ADR 0089's
- * closing: recap, next step, goodbye). Drawn as a
- * line with a band around it, that reads as a score climbing towards full
- * marks, which is exactly the reading ADR 0086 kept off the single call's tile
- * by showing the parts rather than "1 von 3". So it gets neither a line nor a
- * band here, only how often each count occurred.
+ * The shape a series is drawn in; decided by `utils/metrics`, which knows
+ * which metrics are checklists.
  */
-export type SeriesShape = "line" | "parts";
+export type { SeriesShape };
 
 export interface MetricSeries {
   key: string;
@@ -74,28 +75,9 @@ export interface MetricSeries {
  *
  * `loudness` is a span in dB of the recording's level, and across calls that
  * level is the microphone, its distance and the browser's gain as much as the
- * speaker -- the reason the focus goal "the retired loudness goal" was retired
- * (ADR 0076's amendment). A course of it over several trainings would draw
- * the headset. Inside one call the device is the same, so the single call's
- * own page keeps its curve and its comparison of two stretches; only the
- * views that set one call beside another leave it out. Exported for
- * `segmentStats`, whose per-training comparison is on the dashboard too.
+ * speaker -- see `comparableAcrossCalls` in `utils/metrics`, which is now the
+ * one place that says so. `segmentStats` asks it the same question.
  */
-export const NOT_ACROSS_CALLS = new Set(["loudness"]);
-
-/**
- * The unit the backend gives a plain count ("Fragen", "Unterbrechungen", …).
- *
- * A count is a whole number of things and is shown as one. It is also shown
- * without the word, since "4 count" says less than "4" beside a column
- * already headed with the metric's name.
- */
-const COUNT_UNIT = "Anzahl";
-
-/** Whether a series counts things, and so reads in whole numbers. */
-export function isCount(series: Pick<MetricSeries, "unit">): boolean {
-  return series.unit === COUNT_UNIT;
-}
 
 export interface Band {
   low: number;
@@ -121,17 +103,17 @@ export function toSeries(sessions: SessionSummary[]): MetricSeries[] {
       // definitions changed with ADR 0051, and splicing two different
       // measurements into one line would be the quiet kind of wrong.
       if (!measurement.active) continue;
-      if (NOT_ACROSS_CALLS.has(measurement.key)) continue;
+      if (!comparableAcrossCalls(measurement.key)) continue;
 
       const series = byKey.get(measurement.key) ?? {
         key: measurement.key,
         name: measurement.name,
         unit: measurement.unit,
         aspect: measurement.aspect,
-        // The same list the single call's tile reads (`utils/metrics`), so a
-        // new checklist metric cannot be a checklist on one screen and a
-        // climbing line on the other.
-        shape: isPartsMetric(measurement.key) ? "parts" : "line",
+        // From the same catalogue the single call's tile reads, so a
+        // checklist cannot be a checklist on one screen and a climbing
+        // line on the other.
+        shape: seriesShape(measurement.key),
         derivation: null,
         points: [],
         band: null,
@@ -166,8 +148,7 @@ export function formatPoint(series: MetricSeries, value: number): string {
     const count = Math.round(value);
     return `${count} ${count === 1 ? "Teil" : "Teile"} erkannt`;
   }
-  if (isCount(series)) return String(Math.round(value));
-  return formatValue(value, series.unit);
+  return formatValue(series.key, value, series.unit);
 }
 
 /**
@@ -180,19 +161,21 @@ export function formatPoint(series: MetricSeries, value: number): string {
  */
 export function formatBand(series: MetricSeries): string | null {
   if (!series.band) return null;
-  if (isCount(series)) {
+  if (isCount(series.unit)) {
     const low = Math.max(0, Math.round(series.band.low));
     const high = Math.max(low, Math.round(series.band.high));
     return low === high ? `meist ${low}` : `${low} bis ${high}`;
   }
-  return `${formatValue(series.band.low, null)} bis ${formatValue(series.band.high, series.unit)}`;
+  return (
+    `${formatValue(series.key, series.band.low, null)} bis ` +
+    `${formatValue(series.key, series.band.high, series.unit)}`
+  );
 }
 
-/** How many parts a checklist metric has, read off its unit ("von 3").
- *  Null where the unit does not say, so no caller has to guess a number. */
+/** How many parts a checklist metric has, from the catalogue rather than
+ *  parsed out of the unit string. Null for a figure. */
 export function partsTotal(series: MetricSeries): number | null {
-  const match = series.unit?.match(/(\d+)/);
-  return match ? Number(match[1]) : null;
+  return partsTotalOf(series.key);
 }
 
 /** In how many trainings every part of a checklist was recognised. A count of
@@ -239,14 +222,11 @@ export function median(values: number[]): number {
     : (sorted[middle] ?? 0);
 }
 
-/** Rounded the way the value is worth reading: a talk share of 46.3 % is 46 %,
- *  a reaction time of 1.84 s is 1.8 s. Chosen by magnitude rather than per
- *  metric, so a new metric needs no entry anywhere. */
-export function formatValue(value: number, unit: string | null): string {
-  const decimals = Math.abs(value) >= 20 ? 0 : 1;
-  const text = value.toFixed(decimals).replace(".", ",");
-  return unit ? `${text} ${unit}` : text;
-}
+/* `formatValue` used to live here, rounding by magnitude rather than per
+   metric -- chosen so that a new metric needed no entry anywhere. That
+   reason no longer holds: `utils/metrics` keeps a required entry per metric
+   regardless, so the rule moved there and the two screens stopped
+   disagreeing about the decimal separator. */
 
 export interface Activity {
   sessions: number;

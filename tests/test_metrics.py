@@ -19,11 +19,16 @@ Covers:
             when the user rang), and its tempo
   F-65      the closing (ADR 0089): a recap, a concrete next step and a goodbye in the
             user's last two turns, the same whoever rang
+  ADR 0082  the frontend's metric catalogue describes exactly the metrics this
+            inventory serves -- see `test_frontend_catalogue_covers_every_metric`
 
 `conversation()` and `measure()` are pure functions over in-memory Turns: no
 database, no audio and no Praat -- the acoustic facts are handed in as the
 numbers `analyze()` would have produced.
 """
+
+import re
+from pathlib import Path
 
 import pytest
 
@@ -770,3 +775,46 @@ def test_the_description_carries_no_figure_and_no_timestamp() -> None:
 def test_a_call_with_almost_no_audible_speech_says_so() -> None:
     """Saying "even" about two samples reports a steadiness never measured."""
     assert "too little" in describe_loudness_course([None] * 40 + [65.0, 66.0])
+
+
+CATALOGUE_TS = (
+    Path(__file__).resolve().parent.parent / "frontend" / "src" / "utils" / "metrics.ts"
+)
+
+
+def _catalogue_keys() -> set[str]:
+    """The keys of the frontend's private metric catalogue.
+
+    Read out of the source rather than executed: there is no Node in the pytest
+    run, and the alternative -- trusting a comment to keep the two lists in step
+    -- is what let six separate lookup tables drift apart in the first place.
+    """
+    text = CATALOGUE_TS.read_text(encoding="utf-8")
+    body = text.split("const CATALOGUE: Record<MetricKey, MetricDescriptor> = {", 1)[1]
+    body = body.split("\n};", 1)[0]
+    return set(re.findall(r"^  ([a-z_]+):", body, re.MULTILINE))
+
+
+def test_frontend_catalogue_covers_every_metric():
+    """Every active metric is described on the frontend, and nothing else is.
+
+    The catalogue carries what a metric looks like on screen -- its decimals,
+    whether it is a checklist, whether it may be set beside another call. Those
+    facts used to live in six tables across seven files, where a new metric
+    simply went unmentioned: it rendered as "4.0", or never reached a focus
+    goal, and nothing failed. Here it fails.
+
+    An inactive metric is deliberately absent: it has no deriver, so it never
+    produces a Measurement for a screen to render.
+    """
+    active = {m.key for m in METRICS if m.active}
+    described = _catalogue_keys()
+
+    assert described - active == set(), (
+        "frontend/src/utils/metrics.ts describes metrics the backend does not "
+        "serve; remove them from CATALOGUE and from MetricKey"
+    )
+    assert active - described == set(), (
+        "frontend/src/utils/metrics.ts is missing metrics the backend serves; "
+        "add them to MetricKey and CATALOGUE"
+    )

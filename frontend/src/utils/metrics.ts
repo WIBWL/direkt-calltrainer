@@ -4,47 +4,167 @@ import type { Measurement, MetricAspect } from "../protocol";
  * How the call's statistics (F-53) are labelled, split and read.
  *
  * Shared rather than owned by the feedback page, because the downloadable
- * report (`utils/feedbackPdf.ts`) carries the same figures: a tile saying
- * "2,4" on screen and "2.4 Sekunden" in the file would be the same measurement
- * reported twice, differently.
+ * report (`utils/feedbackPdf.ts`) and the progress view read the same figures:
+ * a tile saying "2,4" on screen and "2.4 Sekunden" in the file would be the
+ * same measurement reported twice, differently.
  *
  * Never a judgement, only a reading — ADR 0051 declined to invent the norms
  * that would be needed to say whether a figure is good, which is what
  * `METRIC_DISCLAIMER` says wherever they are shown.
  */
 
-/** How many decimals a metric reads naturally in. Counts are whole things;
- * seconds and percentages are not. */
-const DECIMALS: Record<string, number> = {
-  questions: 0, word_count: 0, pace: 0, talk_share: 0, phonation_share: 0, fillers: 0,
-  repetitions: 0, hesitations: 0, opening: 0, closing: 0,
+/**
+ * Every metric the backend measures today, as its own type.
+ *
+ * Hand-written, and pinned to the backend inventory by a test
+ * (`tests/test_metrics.py`): adding a metric there fails the suite until it is
+ * described here. That is the whole point of the union — the catalogue below
+ * is keyed by it, so a missing entry is a compile error rather than a figure
+ * that quietly renders as "4.0" on one screen and vanishes from another.
+ */
+export type MetricKey =
+  | "talk_share"
+  | "questions"
+  | "pace"
+  | "word_count"
+  | "fillers"
+  | "opening"
+  | "closing"
+  | "repetitions"
+  | "hesitations"
+  | "reaction_time"
+  | "pauses"
+  | "phonation_share"
+  | "run_length"
+  | "loudness"
+  | "intonation"
+  | "interruptions";
+
+/** `line` is every ordinary metric: a value per training, a course, a band.
+ * `parts` is a checklist, drawn as marks rather than a line — a course of
+ * 1-3-2-3 over a band reads as a score climbing to full marks, which is the
+ * reading ADR 0086 kept off the single call's tile. */
+export type SeriesShape = "line" | "parts";
+
+interface MetricDescriptor {
+  /**
+   * Whether the figure means anything set beside another call's.
+   *
+   * Required, with no default: it used to be absence from a `NOT_ACROSS_CALLS`
+   * set, so a new metric was silently comparable. The loudness is the one that
+   * is not — its dB span is the microphone and the distance as much as the
+   * speaker (ADR 0076's amendment).
+   */
+  comparableAcrossCalls: boolean;
+  /**
+   * Whether it earns a row in the progress overview.
+   *
+   * Required for the same reason: it used to be absence from a hidden-set.
+   * A metric can be worth measuring and still repeat what the row above it
+   * already said.
+   */
+  inOverview: boolean;
+  /** Decimals the figure reads naturally in. Defaults to none for a count and
+   * one otherwise, which is right for every metric that omits it. */
+  decimals?: number;
+  /**
+   * A checklist's parts, in the order they are usually said (F-63, ADR 0089).
+   *
+   * The tile, the progress view and the PDF all show *which* parts from this
+   * one list: "1 von 3" was not self-explanatory in the first test and read
+   * like a mark (ADR 0004).
+   */
+  parts?: readonly (readonly [key: string, label: string])[];
+  /**
+   * How many parts one call can be credited with — deliberately not
+   * `parts.length`. The opening lists four but checks three: the offer of help
+   * and the concern depend on who rang, so exactly one of them applies. This
+   * number used to be read out of the unit string `"von 3"` with a regex.
+   */
+  partsTotal?: number;
+  /** What the tile's drill-down promises, where it has one. */
+  openHint?: string;
+}
+
+/**
+ * One row per metric, and the only place a metric's display facts live.
+ *
+ * Private on purpose: callers ask the functions below rather than indexing
+ * this, so the table can grow a field without every screen learning about it.
+ */
+const CATALOGUE: Record<MetricKey, MetricDescriptor> = {
+  talk_share: { comparableAcrossCalls: true, inOverview: true, decimals: 0 },
+  questions: { comparableAcrossCalls: true, inOverview: true },
+  pace: { comparableAcrossCalls: true, inOverview: true, decimals: 0 },
+  // Across trainings this repeats the call length in other units. Still
+  // measured, and still reachable from its own page and the concise-speech goal.
+  word_count: { comparableAcrossCalls: true, inOverview: false, decimals: 0 },
+  fillers: { comparableAcrossCalls: true, inOverview: true },
+  opening: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    decimals: 0,
+    parts: [
+      ["greeting", "Begrüßung"],
+      ["name", "Name"],
+      ["offer", "Hilfsangebot"],
+      ["concern", "Anliegen"],
+    ],
+    partsTotal: 3,
+  },
+  closing: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    decimals: 0,
+    parts: [
+      ["recap", "Zusammenfassung"],
+      ["agreement", "Vereinbarung"],
+      ["farewell", "Verabschiedung"],
+    ],
+    partsTotal: 3,
+  },
+  repetitions: { comparableAcrossCalls: true, inOverview: true },
+  hesitations: { comparableAcrossCalls: true, inOverview: true },
+  reaction_time: { comparableAcrossCalls: true, inOverview: true },
+  pauses: { comparableAcrossCalls: true, inOverview: true },
+  phonation_share: { comparableAcrossCalls: true, inOverview: true, decimals: 0 },
+  run_length: { comparableAcrossCalls: true, inOverview: true },
+  // The one metric that is not comparable between calls; see the field above.
+  loudness: { comparableAcrossCalls: false, inOverview: true },
+  intonation: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    openHint: "Diese Kennzahl ansehen",
+  },
+  interruptions: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    openHint: "Einzelne Stellen ansehen",
+  },
 };
 
 /**
- * The checklist metrics and their parts, in the order they are usually
- * said: the opening (F-63, ADR 0086) and the closing (ADR 0089).
+ * What a key the catalogue has never been taught reads as.
  *
- * Their value is how many parts were recognised, and none of the three places
- * that show them leads with that number. "1 von 3" was not self-explanatory in
- * the first test and read like a mark (ADR 0004), so the tile, the progress
- * view and the PDF all show *which* parts, from this one list.
- *
- * The opening's third part depends on who rang, and a stored call carries
- * whichever was checked; the ones stored before the split carry "concern".
+ * Reachable for a renamed metric: the detail route serves a stored Session's
+ * measurements unfiltered, so a call from before ADR 0057's rename still
+ * carries `redeanteil`. It renders plainly rather than crashing. The progress
+ * views never see one — they drop anything the backend marks inactive.
  */
-const METRIC_PARTS: Record<string, [key: string, label: string][]> = {
-  opening: [
-    ["greeting", "Begrüßung"],
-    ["name", "Name"],
-    ["offer", "Hilfsangebot"],
-    ["concern", "Anliegen"],
-  ],
-  closing: [
-    ["recap", "Zusammenfassung"],
-    ["agreement", "Vereinbarung"],
-    ["farewell", "Verabschiedung"],
-  ],
-};
+const UNKNOWN: MetricDescriptor = { comparableAcrossCalls: true, inOverview: true };
+
+/** The unit the backend gives a plain count. Shown without the word, since
+ * "4 Anzahl" says less than "4" beside a name that already has it. */
+const COUNT_UNIT = "Anzahl";
+
+function describe(key: string): MetricDescriptor {
+  return CATALOGUE[key as MetricKey] ?? UNKNOWN;
+}
+
+/** Whether a unit counts things, and so reads in whole numbers. */
+export function isCount(unit: string | null | undefined): boolean {
+  return unit === COUNT_UNIT;
+}
 
 export interface MetricPart {
   key: string;
@@ -55,16 +175,36 @@ export interface MetricPart {
   said: boolean;
 }
 
-/** Whether this metric is a checklist rather than a figure. */
-export function isPartsMetric(key: string): boolean {
-  return key in METRIC_PARTS;
+/** Whether this metric is drawn as a checklist or as a figure over time. */
+export function seriesShape(key: string): SeriesShape {
+  return describe(key).parts ? "parts" : "line";
+}
+
+/** How many parts one call can be credited with, or null for a figure. */
+export function partsTotal(key: string): number | null {
+  return describe(key).partsTotal ?? null;
+}
+
+/** Whether the figure may be set beside another call's (F-13, ADR 0065). */
+export function comparableAcrossCalls(key: string): boolean {
+  return describe(key).comparableAcrossCalls;
+}
+
+/** Whether it earns a row in the progress overview. */
+export function showsInOverview(key: string): boolean {
+  return describe(key).inOverview;
+}
+
+/** What the tile's drill-down promises. */
+export function openHint(key: string): string {
+  return describe(key).openHint ?? "Ansehen";
 }
 
 /** The parts a checklist metric checked, in order, or null for any other
  * metric. Only the parts the detail actually carries: the opening checks
  * either the offer or the concern, never both. */
 export function metricParts(measurement: Measurement): MetricPart[] | null {
-  const parts = METRIC_PARTS[measurement.key];
+  const parts = describe(measurement.key).parts;
   if (!parts) return null;
   const detail = measurement.detail ?? {};
   return parts
@@ -106,13 +246,28 @@ export function withDerived(measurements: Measurement[]): Measurement[] {
   return derived ? [...measurements, derived] : measurements;
 }
 
-/** The figure as it is read out: value at its own precision, and the unit
- * where the unit says something. "count" does not — the name already has it. */
+/**
+ * One figure as it is read out, for every screen that shows one.
+ *
+ * The single rule. There used to be three — this one keyed by metric, one in
+ * `progressStats` keyed by magnitude, and a third parsing the unit string —
+ * and they disagreed: the same reaction time read "1.8 s" on the wrap-up and
+ * "1,8 s" on the progress table. The comma is the German one and the dot was
+ * simply wrong.
+ *
+ * `unit` is passed rather than looked up because the caller sometimes has a
+ * reason to suppress it: the low end of a range carries no unit, the high end
+ * does.
+ */
+export function formatValue(key: string, value: number, unit: string | null): string {
+  const decimals = describe(key).decimals ?? (isCount(unit) ? 0 : 1);
+  const text = value.toFixed(decimals).replace(".", ",");
+  return unit && !isCount(unit) ? `${text} ${unit}` : text;
+}
+
+/** The same rule, for a whole Measurement. */
 export function formatMetricValue(measurement: Measurement): string {
-  const decimals = DECIMALS[measurement.key] ?? 1;
-  const unit =
-    measurement.unit && measurement.unit !== "Anzahl" ? ` ${measurement.unit}` : "";
-  return `${measurement.value.toFixed(decimals)}${unit}`;
+  return formatValue(measurement.key, measurement.value, measurement.unit);
 }
 
 /** A second line under a metric's value, where its `detail` refines the same
