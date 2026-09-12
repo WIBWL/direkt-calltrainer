@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from backend.authored_text import clean
 from backend.db.models import (
+    AuthoredContent,
     FocusGoal,
     Language,
     MetricType,
@@ -124,12 +125,29 @@ def _seed_tenants(db: DbSession) -> int:
 
 
 def _deactivate_missing(db: DbSession, model, seeded_keys: set[str]) -> None:
-    """Sets `active` to False on every row the seed no longer contains."""
-    (
-        db.query(model)
-        .filter(model.key.notin_(seeded_keys), model.active.is_(True))
-        .update({"active": False}, synchronize_session=False)
-    )
+    """Sets `active` to False on every row *the seed created* and no longer contains.
+
+    The scoping is the load-bearing part. Two of the four tables swept here carry
+    `AuthoredContent` (ADR 0058) -- `scenario` and `persona` -- which is exactly
+    the statement that they hold User-owned rows beside the shipped ones: an
+    authored Scenario, a Folgeszenario, a Rollentausch. Reading "not in the seed"
+    as "retired" over those would deactivate every one of them, on a path that
+    runs at every application start.
+
+    It does not today, and the reason is not a rule: an authored row carries no
+    `key`, and `NULL NOT IN (...)` is NULL rather than TRUE in SQL's three-valued
+    logic, so the UPDATE passes it by. Nothing said so and no test covered it, so
+    giving `key` a default or backfilling it -- an ordinary-looking change, two
+    tables away from this one -- would empty every User's library on the next
+    boot, with no error and nothing failing. `created_by IS NULL` is the rule
+    ADR 0058 actually states for "shipped", so that is what this asks, and the
+    mixin that lets a table hold User rows is the same thing that takes them out
+    of the sweep. A fifth table inherits the protection by inheriting the mixin.
+    """
+    query = db.query(model).filter(model.key.notin_(seeded_keys), model.active.is_(True))
+    if issubclass(model, AuthoredContent):
+        query = query.filter(model.created_by.is_(None))
+    query.update({"active": False}, synchronize_session=False)
 
 
 def inventory(db: DbSession) -> dict[str, int]:

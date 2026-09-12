@@ -230,7 +230,7 @@ def _brief_only_on_a_reverse() -> CheckConstraint:
     )
 
 
-class _AuthoredContent:
+class AuthoredContent:
     """The columns shared by the `scenario` table and, for schema symmetry, the
     `persona` table. A mixin so the set is defined once and cannot drift between
     the two.
@@ -289,11 +289,11 @@ class Tenant(Base):
     name: Mapped[str] = mapped_column(String(120))
 
 
-class Persona(_AuthoredContent, Base):
+class Persona(AuthoredContent, Base):
     """The simulated conversation partner. This table — not `backend/personas.py`
     — is the source of truth (ADR 0041); that module only seeds it.
 
-    Personas are curated, not User-authored (ADR 0058) — the `_AuthoredContent`
+    Personas are curated, not User-authored (ADR 0058) — the `AuthoredContent`
     columns are here only for schema symmetry with `scenario` and never get a
     non-default value. A Persona has exactly one Language and one voice per TTS
     backend (ADR 0043).
@@ -381,7 +381,7 @@ class PersonaObjection(Base):
     persona: Mapped["Persona"] = relationship(back_populates="objections")
 
 
-class Scenario(_AuthoredContent, Base):
+class Scenario(AuthoredContent, Base):
     """The situational context of a Session. Like Persona, this table is the
     source of truth and `backend/scenarios.py` only seeds it (ADR 0041)."""
 

@@ -162,3 +162,70 @@ def test_seed_deactivates_metric_types_it_no_longer_contains(migrated_database: 
         engine.dispose()
 
     assert still_there is False, "Renamed metric type should be deactivated"
+
+
+# --- The sweep must not reach User-owned rows (ADR 0058) ---------------------
+#
+# `scenario` holds authored Scenarios, Folgeszenarien and Rollentausch rows
+# beside the shipped ones, and the seed runs at every application start. The
+# three tests below pin the two halves of that: the sweep still retires a
+# built-in, and it does not touch a row somebody wrote.
+
+_AUTHORED_SCENARIO = (
+    "INSERT INTO scenario (key, extern_id, title, short_description, description,"
+    " case_facts, call_goal, briefing, active, reverse, visibility,"
+    " created_by, created_at, updated_at)"
+    " VALUES (:key, gen_random_uuid(), 'Eigenes', 'Kurz', 'Lang', 'Fakten', 'Ziel',"
+    " '', true, false, 'private', :created_by, now(), now())"
+)
+
+
+def _seed_twice_with(database_url: str, key, created_by: str | None) -> bool:
+    """Insert one scenario row, re-run the seed, and report whether it survived."""
+    _run_seed(database_url)
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(_AUTHORED_SCENARIO), {"key": key, "created_by": created_by})
+
+        _run_seed(database_url)
+
+        with engine.connect() as conn:
+            return conn.execute(
+                text("SELECT active FROM scenario WHERE title = 'Eigenes'")
+            ).scalar_one()
+    finally:
+        engine.dispose()
+
+
+def test_seed_deactivates_a_built_in_scenario_it_no_longer_contains(
+    migrated_database: str,
+) -> None:
+    """The sweep still does its job. Here so that the two tests below cannot be
+    satisfied by simply switching it off for this table."""
+    assert _seed_twice_with(migrated_database, "retired-scenario", None) is False
+
+
+def test_seed_leaves_an_authored_scenario_alone(migrated_database: str) -> None:
+    """A Scenario a User wrote is not a retired built-in, and the seed has no
+    opinion about it (ADR 0058)."""
+    assert _seed_twice_with(migrated_database, None, "keycloak-sub-1") is True
+
+
+def test_seed_leaves_an_authored_scenario_alone_even_when_it_has_a_key(
+    migrated_database: str,
+) -> None:
+    """The one that bites.
+
+    An authored row carries no `key` today, so the sweep passes it by through
+    SQL's three-valued logic alone -- `NULL NOT IN (...)` is NULL, not TRUE --
+    and the previous test would pass with no guard in `_deactivate_missing` at
+    all. Give `scenario.key` a default or backfill it, two tables away from the
+    sweep, and every User's library would be deactivated on the next boot with
+    no error and nothing failing.
+
+    So this one states the rule the sweep is supposed to follow -- the seed
+    retires what the seed created, and authorship is what says so -- rather than
+    the accident that currently enforces it.
+    """
+    assert _seed_twice_with(migrated_database, "user-picked-a-key", "keycloak-sub-1") is True

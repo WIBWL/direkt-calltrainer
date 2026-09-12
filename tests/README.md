@@ -96,6 +96,7 @@ source of that content, and which imports without a database.
 | Async wrap-up job status (queued → running → done/failed), and every path that can strand it | F-09, F-10, ADR 0019, ADR 0032, ADR 0034, ADR 0050 | `test_feedback_job_status.py` |
 | Wrap-up prompt & phase block (F-42), and the thinking-mode call it is asked with | F-09, F-42, F-43, ADR 0004, ADR 0011, ADR 0043, ADR 0049, ADR 0051, ADR 0056 | `test_wrapup_prompt.py` |
 | Documented gaps (current-state guards) | F-56 | `test_documented_gaps.py` |
+| The seed sweep reaches only rows the seed created: a retired built-in is deactivated, an authored Scenario is not, with or without a `key` | ADR 0041, ADR 0057, ADR 0058 | `test_seed.py` |
 | What a stored Measurement says beyond its figure: the keys resolve, a scale sits beside its explanation, and no step is carried by colour alone | F-35, F-51, F-53, ADR 0051, ADR 0063, ADR 0078 | `test_metric_readings.py` |
 | The live call may not depend on the analysis of a finished one: no `backend.feedback` import but `acoustics`, and no ORM | ADR 0033, ADR 0034, ADR 0049 | `test_module_dependencies.py` |
 
