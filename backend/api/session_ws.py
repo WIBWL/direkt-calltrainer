@@ -26,13 +26,13 @@ from backend.feedback import jobs
 from backend.personas import Persona
 from backend.scenarios import Scenario
 from backend.session import persistence
+from backend.feedback.calls import utterances
 from backend.session.models import (
     AudioChunk,
     Failed,
     StateChanged,
     TurnCompleted,
     TurnEvent,
-    utterances,
 )
 from backend.session.orchestrator import SessionOrchestrator
 

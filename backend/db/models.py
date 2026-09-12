@@ -69,7 +69,7 @@ STATUS_ABORTED = "aborted"
 SESSION_STATUSES = (STATUS_COMPLETED, STATUS_ABORTED)
 
 # Turn.speaker. One row per utterance, so each row names exactly one speaker;
-# backend/session/models.py's utterances() is what produces them.
+# backend/feedback/calls.py's utterances() is what produces them.
 SPEAKER_USER = "user"
 SPEAKER_PERSONA = "persona"
 SPEAKERS = (SPEAKER_USER, SPEAKER_PERSONA)

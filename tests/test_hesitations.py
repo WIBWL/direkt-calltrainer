@@ -13,7 +13,8 @@ import math
 
 from backend.feedback.hesitations import Hold, holds
 from backend.feedback.metrics import measure
-from backend.session.models import Turn, conversation
+from backend.feedback.calls import conversation
+from backend.session.models import Turn
 
 _VOICE_HZ = 120.0
 

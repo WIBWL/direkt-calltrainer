@@ -35,7 +35,8 @@ import pytest
 from backend.db.models import METRIC_ASPECTS
 from backend.feedback.acoustics import Pause
 from backend.feedback.metrics import METRICS, describe_loudness_course, measure
-from backend.session.models import Turn, conversation
+from backend.feedback.calls import conversation
+from backend.session.models import Turn
 
 # A recording that ran 4 s and held 2 s of speech: the two figures these tests
 # keep apart.

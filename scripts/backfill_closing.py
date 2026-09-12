@@ -61,7 +61,7 @@ _LABELS = {"recap": "Zusammenfassung", "agreement": "Vereinbarung", "farewell": 
 def _user_texts(session: db_models.Session) -> list[str]:
     """The user's utterances in the order they were said.
 
-    One row per speaker per exchange (`session.models.utterances`), which is the
+    One row per speaker per exchange (`feedback.calls.utterances`), which is the
     same unit `Conversation.user_turns` counts in the live path, so the window of
     two means the same two utterances here as it would have then.
     """

@@ -26,8 +26,8 @@ from statistics import fmean
 
 from backend.db.models import ASPECT_HOW, ASPECT_WHAT
 from backend.feedback import hesitations, intonation
-from backend.feedback.acoustics import Pause
-from backend.feedback.interruptions import Segment, classify
+from backend.feedback.calls import Conversation
+from backend.feedback.interruptions import classify
 from backend.session.language_packs import LANGUAGE_PACKS, LanguagePack
 
 _MS_PER_MINUTE = 60_000
@@ -89,59 +89,6 @@ LOUDNESS_INTERVAL_MS = 100
 # speaking time, 25 KB for a long call, all of it in `detail_json`, which the
 # listing route does not serve.
 PITCH_INTERVAL_MS = 50
-
-
-@dataclass(frozen=True)
-class Conversation:  # pylint: disable=too-many-instance-attributes  # a record of measured facts, one field per fact
-    """One finished call, reduced to the facts the statistics are derived from.
-
-    Assembled by backend/session/models.py, which owns the Turn timeline and
-    keeps the machine's latency out of both speakers' windows (ADR 0051).
-    """
-
-    user_text: str = ""
-    # For the metrics that read words rather than milliseconds. None means
-    # they report what they can without a vocabulary.
-    language_id: str | None = None
-    # A reverse (ADR 0070): the user rang. Decides the opening's third part.
-    reverse: bool = False
-    # How long the user's audio ran, and how much of that was speech rather
-    # than silence. Only the first is comparable with `persona_speech_ms`.
-    user_speech_ms: int = 0
-    user_phonation_ms: int = 0
-    # False when a Turn's measurement failed, leaving both figures short by an
-    # unknown amount (ADR 0048).
-    user_acoustics_complete: bool = True
-    # Only ever a denominator, for the user's share of the speaking time.
-    persona_speech_ms: int = 0
-    # One entry per exchange: how long the user took to start replying,
-    # counted from the moment the Persona stopped speaking.
-    reactions_ms: tuple[int, ...] = ()
-    # Silent stretches inside the user's own speech, on the Session's timeline.
-    pauses: tuple[Pause, ...] = ()
-    # The user's loudness across the whole call, at acoustics.py's fixed rate.
-    loudness_db: tuple[float | None, ...] = ()
-    # The user's fundamental frequency at acoustics.py's 10 ms grid, None where
-    # the frame was unvoiced (F-35). Finer than the loudness curve on purpose:
-    # a 100 ms grid aliases the movement that intonation lives in.
-    pitch_hz: tuple[float | None, ...] = ()
-    # The same frames grouped by utterance, which the terminal contours need:
-    # "how did this sentence end" has no answer on a contour with the sentence
-    # boundaries taken out.
-    pitch_per_turn: tuple[tuple[float | None, ...], ...] = ()
-    # The user's turns in order, as (text, phonation ms): the opening is the
-    # first of them, and its tempo is read against the rest. How many there are
-    # is also F-53's denominator -- a run of speech is bounded by a pause inside
-    # an utterance or by the utterance itself, so the runs of a call are its
-    # pauses plus these.
-    user_turns: tuple[tuple[str, int], ...] = ()
-    # How many Persona replies there were, which is what the interruption rate
-    # divides by.
-    persona_turns: int = 0
-    # The bare segments the overlap classification of F-51 runs on. Empty for a
-    # call whose sides were never measured, in which case no overlap can be
-    # established either way.
-    timeline: tuple[Segment, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -748,7 +695,7 @@ def describe_loudness_course(curve: Sequence[float | None]) -> str:
     """F-37's curve as one sentence for the wrap-up prompt.
 
     Positions are thirds of the user's *own speaking time*, never a timestamp:
-    session/models.py concatenates their Turns and inserts nothing for the
+    `calls.conversation` concatenates their Turns and inserts nothing for the
     Persona's, so this clock and the transcript's do not agree.
     """
     audible = sorted(value for value in curve if value is not None)

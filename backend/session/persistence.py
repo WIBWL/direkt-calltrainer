@@ -4,7 +4,7 @@ One transaction, once, after the call has ended -- never from inside the live
 turn loop, which must not be able to fail because of the database.
 
 This is the seam between the in-memory Session and the schema: it takes the two
-readings of a finished Session that backend/session/models.py produces -- the
+readings of a finished Session that backend/feedback/calls.py produces -- the
 utterances on their timeline, and the call folded into the facts its statistics
 come from -- and writes them as rows.
 """
@@ -24,9 +24,10 @@ from sqlalchemy.orm import Session as DbSession
 from backend.db import models as db_models
 from backend.db.session import session_scope
 from backend.feedback import interruptions, metrics
+from backend.feedback.calls import Conversation, conversation, utterances
 from backend.personas import Persona
 from backend.scenarios import Scenario
-from backend.session.models import Turn, conversation, utterances
+from backend.session.models import Turn
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,7 @@ def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-a
 
 
 def _write_analysis(
-    db: DbSession, session: db_models.Session, call: metrics.Conversation
+    db: DbSession, session: db_models.Session, call: Conversation
 ) -> None:
     """Attach the Session's Measurement and Finding rows.
 

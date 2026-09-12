@@ -96,6 +96,7 @@ source of that content, and which imports without a database.
 | Async wrap-up job status (queued → running → done/failed), and every path that can strand it | F-09, F-10, ADR 0019, ADR 0032, ADR 0034, ADR 0050 | `test_feedback_job_status.py` |
 | Wrap-up prompt & phase block (F-42), and the thinking-mode call it is asked with | F-09, F-42, F-43, ADR 0004, ADR 0011, ADR 0043, ADR 0049, ADR 0051, ADR 0056 | `test_wrapup_prompt.py` |
 | Documented gaps (current-state guards) | F-56 | `test_documented_gaps.py` |
+| The live call may not depend on the analysis of a finished one: no `backend.feedback` import but `acoustics`, and no ORM | ADR 0033, ADR 0034, ADR 0049 | `test_module_dependencies.py` |
 
 ## Not covered here
 

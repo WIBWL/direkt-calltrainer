@@ -20,7 +20,8 @@ import asyncio
 
 import pytest
 
-from backend.session.models import AudioChunk, StateChanged, TurnCompleted, utterances
+from backend.feedback.calls import utterances
+from backend.session.models import AudioChunk, StateChanged, TurnCompleted
 from backend.session.nudges import INTERRUPTED_MARK, strip_interrupted_mark
 from backend.session.orchestrator import SessionOrchestrator
 from tests.conftest import collect

@@ -22,7 +22,8 @@ import pytest
 
 from backend.feedback import intonation
 from backend.feedback.acoustics import AcousticsError, analyze
-from backend.feedback.metrics import Conversation, measure
+from backend.feedback.calls import Conversation
+from backend.feedback.metrics import measure
 
 SAMPLE_RATE = 16_000  # what the client sends (frontend/src/utils/wav.ts)
 

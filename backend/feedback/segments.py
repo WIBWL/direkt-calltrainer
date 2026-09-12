@@ -35,7 +35,8 @@ import logging
 from backend.db import models as db_models
 from backend.feedback import metrics
 from backend.feedback.acoustics import TurnFacts
-from backend.session.models import Turn, conversation
+from backend.feedback.calls import conversation
+from backend.session.models import Turn
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,7 @@ def _turns_from_rows(
     """Rebuild the in-memory exchanges from the stored utterances, each paired
     with whether it belongs to a pressing stretch.
 
-    The inverse of `session/models.py::utterances`, and only as much of one as
+    The inverse of `calls.utterances`, and only as much of one as
     the metrics above need: the Persona's line gives its window, the user's
     gives its window and its stored facts. A Persona line opens an exchange and
     the user's answer closes it, which is how the call was spoken and how the

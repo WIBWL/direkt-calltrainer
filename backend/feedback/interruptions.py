@@ -180,10 +180,10 @@ class Kind(str, Enum):
 class Segment:
     """One utterance on the Session's timeline, as this module needs it.
 
-    Its own type rather than the session layer's `Utterance`: that one carries
-    the transcript and lives in a module which imports from this package, so
-    reaching for it would close an import cycle. This is also exactly the four
-    fields the classification reads, which keeps the test fixtures honest.
+    Its own type rather than `calls.Utterance`: that one carries the transcript
+    and lives in a module which imports this one, so reaching for it would
+    close an import cycle. This is also exactly the four fields the
+    classification reads, which keeps the test fixtures honest.
     """
 
     speaker: str          # "user" or "persona"
