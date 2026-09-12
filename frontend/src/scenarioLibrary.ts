@@ -100,12 +100,13 @@ export interface ScenarioCard {
    * which `origin` still reports as "own". */
   shared: boolean;
   /** Drafted from one of the caller's Sessions (F-60, ADR 0069). Its own
-   * category in the picker; `origin` stays "own", so it is edited and shared
-   * like anything else they own. */
+   * category in the picker; `origin` stays "own", but it is neither edited nor
+   * shared — it sits exactly at the wrap-up's improvement point, and an edited
+   * one is no longer that exercise. */
   follow_up: boolean;
   /** A reverse of one finished Session (F-61, ADR 0070). Also `origin: "own"`,
-   * and also its own category — but unlike a follow-up it is neither edited
-   * nor shared, because it copies a case that was actually played. */
+   * and also its own category, and likewise neither edited nor shared: it
+   * copies a case that was actually played. */
   reverse: boolean;
   origin_session: OriginSessionRef | null;
   /** Set on the few the listing suggests; null for every other card. */

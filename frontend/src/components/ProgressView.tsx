@@ -229,9 +229,8 @@ export default function ProgressView() {
         </span>
       </div>
 
-      {/* No "nothing in this period" branch any more: counted in trainings,
-          the selection is never empty while anything is stored, and the case
-          of nothing stored returned above. */}
+      {/* No empty-period branch: counted in trainings, the selection is never
+          empty while anything is stored, and nothing stored returned above. */}
       {goals.length > 0 ? (
         <FocusSection
           goals={goals}
@@ -503,10 +502,10 @@ function SegmentBody({ sessions }: { sessions: SessionSummary[] }) {
  * A goal that has no measurement of its own, answered by what the wrap-ups
  * said about it.
  *
- * Six of the fourteen goals are like this, and four of them always will be:
- * whether a close was clear is in what was said, and no acoustic figure will
- * ever reach it. Counting the mentions is the honest substitute, and the
- * wording keeps it a count of statements rather than a verdict.
+ * Three of the fourteen goals are like this (`utils/focusMetrics.ts`): whether
+ * an objection was handled or empathy shown is in what was said, and no
+ * acoustic figure reaches it. Counting the mentions is the honest substitute,
+ * and the wording keeps it a count of statements rather than a verdict.
  *
  * No threshold here, unlike the recurring block, which needs two mentions
  * before it calls something a pattern. On a tile the user picked themselves,

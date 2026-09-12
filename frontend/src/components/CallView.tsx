@@ -19,9 +19,10 @@ interface CallViewProps {
   error: string | null;
   onToggleMicrophone: () => void;
   onEndCall: () => void;
-  /** The reverse briefing (ADR 0070), or null. Passed in rather than fetched
-   * here: this screen stays presentational, and the panel is the same one the
-   * mic check already showed. */
+  /** The panel beside the call — a reverse's briefing (ADR 0070) or an
+   * ordinary call's facts — or null. Passed in rather than fetched here: this
+   * screen stays presentational, and the panel is the one the briefing screen
+   * already showed. */
   brief?: ReactNode;
 }
 
@@ -77,11 +78,9 @@ export default function CallView({
 
   return (
     <>
-      {/* No heading above the panel, and none of what used to be in it: the
-          Scenario's name, the Persona's and the language stood over the call
-          as a page title, which is a caption on a phone call. What is on the
-          other end of the line is in the panel itself, and it is the only
-          thing on this screen. It also means a random Scenario's case cannot
+      {/* No heading above the panel and no Scenario name anywhere: a page
+          title over a phone call is a caption, and the person on the line is
+          in the panel itself. It also means a random Scenario's case cannot
           leak here by construction rather than by a condition (F-62). */}
 
       {/* One column, or two once there is a briefing to keep in view: reading
@@ -96,8 +95,8 @@ export default function CallView({
             />
 
             <div className="call-persona-details">
-              {/* The page's heading now that the title above is gone: this
-                  screen is about the person on the line. */}
+              {/* The page's heading: this screen is about the person on the
+                  line. */}
               <h1 id="call-persona-name">{personaName}</h1>
               <p>{personaRole}</p>
             </div>

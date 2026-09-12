@@ -10,8 +10,15 @@ import IntonationReading from "./IntonationReading";
 import MetricScale from "./MetricScale";
 import SegmentComparison from "./SegmentComparison";
 
+/** Counts read without decimals, everything else with one. The unit follows,
+ *  except for "count", which the figure already is. */
+function formatFigure(value: number, unit: string | null): string {
+  const text = unit === "Anzahl" ? value.toFixed(0) : value.toFixed(1);
+  return unit && unit !== "Anzahl" ? `${text} ${unit}` : text;
+}
+
 /**
- * One metric of one training, in full (F-51's interruptions today).
+ * One metric of one training, in full (F-51's interruptions, F-35's intonation).
  *
  * Its own page rather than a panel inside the wrap-up. The excerpts run to
  * several lines each, a call with four interruptions would push everything
@@ -21,13 +28,6 @@ import SegmentComparison from "./SegmentComparison";
  * Reads the Session once and never polls, like `PastSessionView`: whatever the
  * database holds for a finished call is final.
  */
-/** Counts read without decimals, everything else with one. The unit follows,
- *  except for "count", which the figure already is. */
-function formatFigure(value: number, unit: string | null): string {
-  const text = unit === "Anzahl" ? value.toFixed(0) : value.toFixed(1);
-  return unit && unit !== "Anzahl" ? `${text} ${unit}` : text;
-}
-
 export default function SessionMetricView() {
   const { sessionId, metricKey } = useParams<{ sessionId: string; metricKey: string }>();
   const { detail, state } = useStoredSession(sessionId ?? null);

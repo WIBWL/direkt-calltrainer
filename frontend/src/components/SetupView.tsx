@@ -215,7 +215,7 @@ export default function SetupView({
  *
  * The info affordance sits *outside* the card button rather than inside it —
  * a button cannot be nested in a button — using the same `card-wrap` shell
- * LibraryPicker puts its edit link in. Reading about a Persona and
+ * LibraryPicker puts its "i" in. Reading about a Persona and
  * choosing one are separate acts: the "i" does not select the card.
  *
  * The portrait sits left of the text, which is why the three lines are wrapped

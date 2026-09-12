@@ -40,12 +40,8 @@ export interface SeriesPoint {
   persona: string;
 }
 
-/**
- * How a series may be drawn.
- *
- * The shape a series is drawn in; decided by `utils/metrics`, which knows
- * which metrics are checklists.
- */
+/** How a series is drawn; decided by `utils/metrics`, which knows which
+ * metrics are checklists. */
 export type { SeriesShape };
 
 export interface MetricSeries {
@@ -67,17 +63,6 @@ export interface MetricSeries {
    *  and always null for a `parts` series. */
   band: Band | null;
 }
-
-
-/**
- * metrics that are never read across trainings, on any view of this
- * dashboard.
- *
- * `loudness` is a span in dB of the recording's level, and across calls that
- * level is the microphone, its distance and the browser's gain as much as the
- * speaker -- see `comparableAcrossCalls` in `utils/metrics`, which is now the
- * one place that says so. `segmentStats` asks it the same question.
- */
 
 export interface Band {
   low: number;
@@ -221,12 +206,6 @@ export function median(values: number[]): number {
     ? ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2
     : (sorted[middle] ?? 0);
 }
-
-/* `formatValue` used to live here, rounding by magnitude rather than per
-   metric -- chosen so that a new metric needed no entry anywhere. That
-   reason no longer holds: `utils/metrics` keeps a required entry per metric
-   regardless, so the rule moved there and the two screens stopped
-   disagreeing about the decimal separator. */
 
 export interface Activity {
   sessions: number;

@@ -1,8 +1,8 @@
 /**
  * The app's URLs, in one place.
  *
- * Worth a module even at two entries: the path is written in the route table,
- * in every link, and in the post-login return — a typo in any one of them is a
+ * Each path is written in the route table, in every link, and in the
+ * post-login return — a typo in any one of them is a
  * silent redirect to the fallback rather than an error, which is exactly the
  * kind of bug that survives review.
  */

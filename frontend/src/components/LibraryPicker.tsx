@@ -119,13 +119,12 @@ interface LibraryPickerProps {
   newLabel: string;
   onNew: () => void;
   /** Open the read-only info panel. Editing is reached from inside it
-   * (ADR 0062), so the card carries no separate edit affordance -- not even
-   * on the caller's own rows, where it used to sit. */
+   * (ADR 0062), so the card carries no separate edit affordance. */
   onInfo: (id: string) => void;
-  /** Offer the random Scenario tile (F-62). Decided by the caller, not here,
-   * because the tile draws from what these filters show and `items` is that
-   * set *after* the two `slice`s below have had it — the caller is the one
-   * place that still knows how many drawable rows there really are. */
+  /** Offer the random Scenario tile (F-62). Decided by the caller, not here:
+   * the tile draws only from the drawable rows among what these filters show
+   * (`isDrawable`), and `items` does not say which those are — the caller holds
+   * the cards that do. */
   offerRandom?: boolean;
 }
 
@@ -179,12 +178,13 @@ function badgeLabel(item: LibraryItem, tenantName: string | null): string {
 }
 
 /**
- * The Scenario selection grid: two filter rows, a "new" button, badged cards,
- * and an edit affordance on the caller's own rows (ADR 0058 / 0060 / 0064 /
+ * The Scenario selection grid: two filter rows, a "new" button, and badged
+ * cards with an "i" that opens the info panel (ADR 0058 / 0060 / 0062 /
  * 0069).
  *
  * The rows are independent and combine. Level 1 says where a Scenario comes
- * from (all, built-in, hand-authored, follow-up, or the caller's company),
+ * from (suggested, all, built-in, hand-authored, the caller's company,
+ * follow-up or reverse),
  * level 2 says what kind of call it is. Both are the same component, so they
  * are the same size by construction.
  */
@@ -205,13 +205,9 @@ export default function LibraryPicker({
   onInfo,
   offerRandom = false,
 }: LibraryPickerProps) {
-  // Which card is asking to be confirmed, if any. One id rather than a set:
-  // asking about a second row answers the first with "no", which is the safe
-  // way round and saves a stray confirmation sitting armed on a card the User
-  // has moved on from.
-  // The grid opens on one row and a half of cards; the rest is behind the tile
-  // at the end of it. Collapsed again whenever the filters change, because what
-  // "the first five" are has changed with them.
+  // The grid opens on `COLLAPSED_TILES`; the rest is behind the button under
+  // it. Collapsed again whenever the filters change, because which rows come
+  // first has changed with them.
   const [expanded, setExpanded] = useState(false);
   useEffect(() => setExpanded(false), [filter, category]);
 
@@ -335,8 +331,6 @@ export default function LibraryPicker({
         {shown.map((item) => (
           <div key={item.id} className="card-wrap">
             <button
-              // The origin's colour stays; the "editable" padding does not,
-              // because the card no longer carries an edit link (ADR 0062).
               className={
                 "persona-card card-origin-" + badgeClass(item) +
                 (item.id === selectedId ? " selected" : "")
@@ -362,8 +356,7 @@ export default function LibraryPicker({
               <span className="card-badge">{badgeLabel(item, tenantName)}</span>
             </button>
             {/* Every Scenario is readable (ADR 0062), so the "i" is on every
-                card — unlike the old edit link, which was on the caller's
-                own rows only and now lives inside the panel. */}
+                card. */}
             <button
               type="button"
               className="card-info"

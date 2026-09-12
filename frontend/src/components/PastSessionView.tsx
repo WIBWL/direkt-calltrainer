@@ -70,8 +70,8 @@ export default function PastSessionView() {
   // the entry means Back does not return to a training that no longer exists.
   const remove = async () => {
     // Unreachable without one — the delete sits under a loaded report — but the
-    // route param is optional, and the old template literal would have asked
-    // the server to delete `undefined` rather than refusing here.
+    // route param is optional, and without this guard the request would go to
+    // `/api/sessions/undefined`.
     if (!sessionId) return;
     setDeleting(true);
     setDeleteFailed(false);

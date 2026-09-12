@@ -6,7 +6,6 @@ import { cx } from "../utils/cx";
 import { useAccount } from "../hooks/useAccount";
 import BrandName from "./BrandName";
 
-// The header uses the current screen to highlight the matching training step.
 export type TrainingStep = "prepare" | "call" | "feedback";
 
 // `| undefined` is spelled out on each optional prop because the project builds
@@ -39,7 +38,6 @@ interface AppHeaderProps {
   onHome?: (() => void) | undefined;
 }
 
-// Keeping the step configuration here avoids duplicating the markup.
 const trainingSteps: { id: TrainingStep; label: string }[] = [
   { id: "prepare", label: "Vorbereiten" },
   { id: "call", label: "Gespräch" },

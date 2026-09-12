@@ -12,7 +12,7 @@ import type { ScenarioCategory } from "./scenarioLibrary";
  * from this value (see CallAnimation). Usually driven by the server's `state`
  * message, but the client also sets it directly: optimistically on barge-in
  * (ADR 0035, useSessionSocket's sendInterrupt) and held at "speaking" while
- * trailing audio is still playing out (App.tsx's displayState). */
+ * trailing audio is still playing out (useBargeIn's displayState). */
 export type CallState = "listening" | "thinking" | "speaking";
 
 /** One line of the post-call transcript, placed on the Session's timeline.
@@ -85,12 +85,11 @@ export interface TurnAudioMetaMessage {
   turn_seq: number;
   mime_type: string;
   /**
-   * How long the user actually spoke, in milliseconds, as measured by the VAD.
+   * How long the user spoke, in milliseconds, as measured by the VAD.
    *
-   * The server only ever receives the finished recording and cannot derive
-   * this itself, but it needs it for speaking rate (F-36), talk-time share
-   * (F-24) and fluency (F-51). Optional so the backend can ship ahead of the
-   * client: a Turn without it is still stored, just without speaking-rate data.
+   * Currently neither sent by `useSessionSocket` nor read by the server: the
+   * speaking time behind speaking rate, talk share and fluency comes from the
+   * server's own measurement of the recording (ADR 0047/0048).
    */
   duration_ms?: number;
 }

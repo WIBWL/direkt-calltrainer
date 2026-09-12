@@ -26,10 +26,8 @@ export type FeedbackState = "loading" | "ready" | "failed" | "missing";
  * early. Reading it goes through `sessions.getSession`, which is where that
  * answer is turned into a null.
  *
- * The wrap-up is the only thing it waits for. It used to keep polling past it
- * for the follow-up Scenario the worker wrote next (ADR 0069) — that is asked
- * for by the User now, and answered by its own request, so there is nothing
- * left arriving after this settles.
+ * The wrap-up is the only thing it waits for: the follow-up Scenario is asked
+ * for by the User and answered by its own request (ADR 0069's amendment).
  */
 export function useSessionFeedback(sessionId: string | null) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);

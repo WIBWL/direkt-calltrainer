@@ -97,10 +97,10 @@ const NOTICE: Record<string, string> = {
  * hands — so the figures here are the evidence behind the text, never a score.
  * Each one describes the whole call rather than a single utterance (ADR 0051).
  *
- * The phase block (F-42) sits below the figures on purpose: it is the one part
- * of the wrap-up that is about a change over the call rather than about a
- * moment or a total, so it reads as a closing observation rather than as
- * another statistic.
+ * The phase block (F-42) sits between the points and the figures on purpose: it
+ * is the one part of the wrap-up that is about a change over the call rather
+ * than about a moment or a total, so it closes the narrative before the
+ * statistics begin rather than reading as another one of them.
  *
  * Owns the polling itself, so it is only running while this screen is mounted.
  */
@@ -440,8 +440,9 @@ const INTONATION_KEY = "intonation";
  * card renders both — what the create route answers and what a later reload
  * brings are one shape.
  *
- * Starting goes straight into the call, against the Persona this training was
- * played with: the exercise follows from that conversation, so re-picking a
+ * Starting skips the microphone check and lands on the case screen, against
+ * the Persona this training was played with: the exercise follows from that
+ * conversation, so re-picking a
  * partner would be a step with only one sensible answer. The Scenario stays an
  * ordinary row in the library, so a different partner is a matter of starting
  * it from the setup screen instead. */

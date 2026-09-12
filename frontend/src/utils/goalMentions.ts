@@ -85,7 +85,7 @@ function rank(sessions: SessionSummary[], kind: "strength" | "improvement"): Goa
  *
  * The dashboard counts mentions; this is what was counted. A frequency with no
  * way to read behind it asks the user to take a number on trust, and for the
- * six goals with no measurement the sentences are the whole of what exists
+ * goals with no measurement the sentences are the whole of what exists
  * (ADR 0064's amendment put them on the listing for this).
  *
  * It stays a quotation and never becomes an input: nothing here summarises,
@@ -133,8 +133,8 @@ export function statementsFor(
 /**
  * How often one goal was named, over all trainings that could have named it.
  *
- * For the focus tiles (block B), where the six goals with no measurement of
- * their own finally have something to show. No threshold here, unlike the
+ * For the focus tiles (block B), where the goals with no measurement of their
+ * own have something to show. No threshold here, unlike the
  * block above: on a tile the user picked themselves, "once so far" is a
  * legitimate answer to "how is this going", where in a list of recurring
  * themes it would be noise.

@@ -78,7 +78,7 @@ const ORIGIN_FILTERS: LibraryFilter[] = [
 
 /** What the selection screen opens on (ADR 0072): everything, on both rows.
  * Opening on a shortlist, which this once did, hides the User's own Scenarios
- * behind a filter they have to know to press — and `COLLAPSED_CARDS` caps what
+ * behind a filter they have to know to press — and `LibraryPicker`'s `COLLAPSED_TILES` caps what
  * is on screen anyway, so the unfiltered row is a first page of the library
  * rather than a wall of it. */
 const DEFAULT_ORIGIN: LibraryFilter = "all";
@@ -578,8 +578,8 @@ export default function App() {
       setScenarioCategory("all");
       void reloadScenarios();
       // Seeded from the answer that just came back, so the briefing screen has
-      // something to show immediately rather than one request later; the effect
-      // below refetches it and lands on the same content.
+      // something to show immediately rather than one request later; the
+      // reverse-brief effect above refetches it and lands on the same content.
       setReverseBrief(reverse.reverse_brief);
       // Behind the card, so the wrap-up is gone and the briefing is there by
       // the time anything is visible again (F-61, ADR 0070).
@@ -608,15 +608,12 @@ export default function App() {
     advance("callAccepted");
   }, [playback, socket.sendActivate, advance]);
 
-  // The microphone check's own button. A random Scenario gets the die in
-  // between (F-62); everything else goes straight through. Under reduced
-  // motion the screen is skipped rather than shown still: the animation is the
-  // whole of what it has to say, and without it it is two seconds of nothing.
-  // Where this leads is `trainingFlow`'s to decide: a reverse to its briefing
-  // behind the card turn, a drawn Scenario to the die, a case with nothing in
-  // it straight to the phone, everything else to the case screen. The button
-  // above asks the same function what its own label should say, so the two
-  // cannot disagree about it.
+  // The microphone check's own button. Where it leads is `trainingFlow`'s to
+  // decide: a reverse to its briefing behind the card turn, a drawn Scenario to
+  // the die (skipped under reduced motion, where it would be three seconds of
+  // nothing), a case with nothing in it straight to the phone, everything else
+  // to the case screen. The check's label asks the same function through
+  // `briefingFollows` when the screen renders, so the two cannot disagree.
   const handleMicConfirmed = useCallback(() => {
     advance("micConfirmed");
   }, [advance]);

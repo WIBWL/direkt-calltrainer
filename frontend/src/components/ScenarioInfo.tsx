@@ -45,7 +45,7 @@ const SECTIONS: { key: keyof ScenarioDetail; label: string }[] = [
  * Reading comes before writing for every Scenario (ADR 0062): the card carries
  * no edit affordance, and the edit button appears here instead, only on a row
  * the *server* marked `editable`. The panel shows the case as the trainee may
- * know it going in — the situation, their briefing and the facts — and nothing
+ * know it going in — their briefing and the facts — and nothing
  * of what the caller is after. The teaser is left out too: it is the card this
  * panel was opened from.
  *
