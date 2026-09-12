@@ -106,6 +106,9 @@ nav:
       - ADR 0087 - What to Play Next Is Chosen From the Library: adr/0087-what-to-play-next-is-chosen-from-the-library.md
       - ADR 0088 - Intonation Is a Tile, and Its Page Carries the Drawing: adr/0088-intonation-is-a-tile-its-page-carries-the-drawing.md
       - ADR 0089 - The Closing Is Read as Three Parts, in the User's Last Two Turns: adr/0089-the-closing-is-read-as-three-parts-in-the-last-two-turns.md
+      - ADR 0090 - The Live Call Does Not Depend on the Analysis of a Finished One: adr/0090-the-live-call-does-not-depend-on-the-analysis-of-a-finished-one.md
+      - ADR 0091 - A Measurement Is Stored; a Reading Is Derived on Every Read: adr/0091-a-measurement-is-stored-a-reading-is-derived-on-every-read.md
+      - ADR 0092 - One Stylesheet, Not One per Component: adr/0092-one-stylesheet-not-one-per-component.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
   # site is served at the root (mkdocs serve / mkdocs build + static server).
