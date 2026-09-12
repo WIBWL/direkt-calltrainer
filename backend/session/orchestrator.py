@@ -287,6 +287,8 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         # it. Every refresh for one Turn therefore starts from the same base.
         self._state_base = ""
         self._state_turn: int | None = None
+        # Whether `session.activate` has already rebased the clock. See there.
+        self._playback_started = False
         # Only its first name is used, to spot the persona re-introducing
         # itself ("hier ist Thomas ...") a second time (ADR 0038).
         self._first_name = persona.name.split()[0].lower() if persona.name else ""
@@ -323,6 +325,14 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
     def start_playback(self) -> None:
         """The client has begun playing the opening line; t=0 is now.
 
+        Ignored after the first time. `session.activate` is a client message
+        and both receive loops pass it straight through, so a second one --
+        a reconnect, a replay, a client that sends it twice -- would rebase the
+        session clock in the middle of a call while the Turns already written
+        kept their older, larger offsets. Every offset, reaction time, pause
+        and overlap after that is wrong, and wrong in a way that still looks
+        plausible (ADR 0051).
+
         Until this point the clock has been measuring the server's own head
         start. The opening Turn is generated as soon as the socket connects,
         which is well before the user asks for it (ADR 0042), so everything
@@ -331,6 +341,10 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         user's first reaction time, and the Transcript's timestamps start
         counting from a moment nobody was in the call yet.
         """
+        if self._playback_started:
+            logger.info("Ignoring a second session.activate; the clock is already running")
+            return
+        self._playback_started = True
         # The audio synthesized so far begins playing now, so the timeline is
         # shifted to put its first chunk at zero. Spacing is preserved rather
         # than each window being zeroed: only the opening Turn can be here

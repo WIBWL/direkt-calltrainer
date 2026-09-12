@@ -152,9 +152,10 @@ async def test_a_session_is_not_stored_without_consent(
     """The one that matters. Persisting is guarded at the point of writing, so
     a subject who never agreed leaves no stored record of their call.
 
-    Driven through `_record`, the WebSocket layer's own write path, rather than
-    through `persist_session` — the guard lives in the caller, and a test that
-    called the writer directly would pass while the guard did nothing.
+    Driven through `_record`, the WebSocket layer's own write path. The guard
+    itself has since moved *into* `persist_session`, so that it commits with
+    the write it authorises (see the test below); this one stays because the
+    path the live call actually takes has to be the one under test.
 
     `app_database` is requested for its effect and not its value, and it is
     load-bearing: without it `session_scope()` cannot reach a database at all,
@@ -168,6 +169,28 @@ async def test_a_session_is_not_stored_without_consent(
         uuid.uuid4(), TEST_AUTH.sub, _persona(), _scenario(), _orchestrator(), _started(), "user",
     )
 
+    assert db_session.query(Session).count() == 0
+
+
+def test_the_writer_itself_refuses_without_consent(
+    app_database: str, db_session: DbSession  # pylint: disable=unused-argument
+) -> None:
+    """The guard sits inside the write transaction, not in front of it.
+
+    Asked from outside, the answer was already some milliseconds old when the
+    INSERT it authorised committed -- long enough for a withdrawal in another
+    tab to record itself and delete every Session that existed *at that
+    moment*, leaving this one behind with no deletion path ever to reach it
+    (ADR 0066). So `persist_session` asks for itself, under the same advisory
+    lock the withdrawal takes, and answers None rather than writing.
+    """
+    from backend.session import persistence  # pylint: disable=import-outside-toplevel
+
+    written = persistence.persist_session(
+        uuid.uuid4(), TEST_AUTH.sub, _persona(), _scenario(), TURNS, _started(), "user",
+    )
+
+    assert written is None
     assert db_session.query(Session).count() == 0
 
 

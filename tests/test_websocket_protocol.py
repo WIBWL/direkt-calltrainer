@@ -15,6 +15,7 @@ Client rejects TestClient's `app=` kwarg), so the ASGI-level helpers are
 driven directly through a fake WebSocket.
 """
 
+import asyncio
 import json
 
 import pytest
@@ -257,3 +258,108 @@ def test_a_disconnected_session_is_stored_as_aborted():
     `completed` -- the one distinction ADR 0034's amendment rests on."""
     assert persistence._STATUS["disconnected"] == db_models.STATUS_ABORTED
     assert persistence._STATUS["user"] == db_models.STATUS_COMPLETED
+
+
+class FrameWebSocket:
+    """A socket that speaks uvicorn's ASGI message shape rather than the
+    suite's convenience one.
+
+    `FakeWebSocket` hands objects back from `receive_json` and re-encodes for
+    `receive_text`, so it can only ever produce well-formed input. The real
+    thing carries exactly one of "text" or "bytes", and reading the wrong one
+    is a KeyError -- which is how a binary frame in a text position used to
+    tear the whole handler down.
+    """
+
+    def __init__(self, frame):
+        self.frame = frame
+        self.closed = None
+
+    async def receive_text(self):
+        return self.frame["text"]
+
+    async def receive_bytes(self):
+        return self.frame["bytes"]
+
+    async def receive_json(self):
+        return json.loads(self.frame["text"])
+
+    async def close(self, code=1000, reason=""):
+        self.closed = (code, reason)
+
+
+@pytest.mark.parametrize(
+    "frame",
+    [{"text": "42"}, {"text": "[1, 2]"}, {"text": "\"a string\""},
+     {"text": "{not json"}, {"bytes": b"\x00\x01"}],
+    ids=["scalar", "array", "string", "unparseable", "binary-frame"],
+)
+async def test_only_a_json_object_counts_as_a_control_message(frame):
+    """Everything else answers None and is skipped.
+
+    A scalar and an array parse cleanly and then have no `.get()`; a binary
+    frame is a KeyError before that. Mid-call each of them used to leave the
+    handler on an unhandled exception: no `_record`, no `session.ended`, the
+    training gone without even an `aborted` row to show for it.
+    """
+    assert await session_ws._receive_json(FrameWebSocket(frame)) is None
+
+
+async def test_a_text_frame_where_the_audio_blob_belongs_is_not_a_crash():
+    """`turn.audio.meta` promises a binary frame next. A client out of step
+    sends text; the turn is skipped, the Session goes on."""
+    assert await session_ws._receive_bytes(FrameWebSocket({"text": "oops"})) is None
+
+
+async def test_a_handshake_that_is_not_json_closes_the_socket(fake_library):  # noqa: ARG001
+    """Reachable before anything is authenticated, so it must not be an
+    unhandled exception either."""
+    ws = FrameWebSocket({"bytes": b"\x00"})
+    assert await session_ws._handshake(ws) is None
+    assert ws.closed[0] == 1002
+
+
+async def test_a_disconnect_during_a_turn_still_tears_the_turn_down():
+    """The teardown runs before the disconnect travels on.
+
+    `control_task.result()` re-raises here, and it used to do so before the
+    cancel and the `aclose` below it. The forwarder then outlived the handler:
+    it went on driving the turn generator, which appends to and pops from
+    `orchestrator.turns` -- the very list `_record` reads from a worker thread
+    to write the Session (ADR 0034's amendment). The generator also stayed
+    parked inside the TTS stream, whose `finally` is what drops the pooled
+    KugelAudio socket, so that was left to the garbage collector instead
+    (ADR 0044's amendment).
+    """
+    closed = asyncio.Event()
+    forwarded = []
+
+    async def events():
+        try:
+            for i in range(10_000):
+                await asyncio.sleep(0)
+                yield AudioChunk(turn_seq=1, chunk_seq=i, audio=b"pcm")
+        finally:
+            closed.set()
+
+    class Dropping(FakeWebSocket):
+        async def receive_text(self):
+            await asyncio.sleep(0.01)  # let the forwarder get going first
+            raise WebSocketDisconnect(code=1006)
+
+        async def send_json(self, data):
+            forwarded.append(data)
+
+        async def send_bytes(self, data):
+            forwarded.append(data)
+
+    turn = events()
+    with pytest.raises(WebSocketDisconnect):
+        await session_ws._run_turn_interruptible(
+            Dropping(), turn, lambda: None, lambda _ms: None
+        )
+
+    assert closed.is_set(), "the turn generator was closed"
+    sent_by_then = len(forwarded)
+    await asyncio.sleep(0.05)
+    assert len(forwarded) == sent_by_then, "and nothing kept forwarding behind it"

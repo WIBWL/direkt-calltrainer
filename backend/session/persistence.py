@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session as DbSession
 
 # Imported as a module, not by name: `db.Session`/`db.Turn` keep the schema's
 # entities visibly distinct from the identically named in-memory ones.
+from backend import consent
 from backend.db import models as db_models
 from backend.db.session import session_scope
 from backend.feedback import interruptions, metrics
@@ -51,17 +52,30 @@ def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-a
     turns: Sequence[Turn],
     started_at: datetime,
     reason: str,
-) -> int:
-    """Write the Session, its Turns and its measurements. Returns session_id.
+) -> int | None:
+    """Write the Session, its Turns and its measurements. Returns session_id,
+    or None where storage consent was refused and nothing was written.
 
     `subject_id` is the Keycloak `sub` from the handshake (ADR 0009): the
     Session belongs to the account that placed the call, not to a placeholder
     (ADR 0031).
 
+    The consent check lives *inside* this transaction (ADR 0066). Asked from
+    outside it, the answer was true and the INSERT that relied on it committed
+    some milliseconds later -- long enough for a withdrawal in another tab to
+    record itself and delete every Session that existed at that moment, leaving
+    this one behind with no deletion path ever to reach it again. Here the
+    answer and the write commit together, and `lock_subject` holds the
+    withdrawal off until they do.
+
     Synchronous by design: the caller dispatches it off the event loop once the
     call is over (ADR 0034), so nothing here has to be async-aware.
     """
     with session_scope() as db:
+        consent.lock_subject(db, subject_id)
+        if not consent.allows_storage(subject_id, db=db):
+            logger.info("Session not stored: no storage consent for this subject")
+            return None
         session = db_models.Session(
             extern_id=extern_id,
             subject_id=subject_id,

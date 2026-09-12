@@ -686,7 +686,16 @@ def persist(  # pylint: disable=too-many-arguments
     """
     # Imported here, not at module scope: importing the write path pulls in
     # the feedback stack, which a collection-time import should not need.
+    from backend import consent  # pylint: disable=import-outside-toplevel
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
+
+    # The write path refuses without it (ADR 0066), and it checks inside its own
+    # transaction, so it cannot be granted from a test's `db_session`. A stored
+    # Session always has a decision behind it in reality; a test that wants the
+    # refusal asks for it explicitly (tests/test_consent.py).
+    with session_scope() as db:
+        if not consent.allows_storage(subject, db=db):
+            consent.record_decision(db, subject, granted=True)
 
     # The value object the write path receives carries the row's `extern_id` as
     # `.id` since ADR 0058, so resolve it from the reference row the fixture
