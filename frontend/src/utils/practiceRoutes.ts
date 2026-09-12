@@ -3,20 +3,18 @@ import type { ScenarioCategory } from "../scenarioLibrary";
 /**
  * Which kind of call a focus goal is practised in.
  *
- * Editorial, not computed. There is nothing in the data that says objection
- * handling is best practised on a pricing call; that is a judgement about the
- * subject matter, and it is written down here so it can be argued with rather
- * than buried in a model call. Section 5.E of the dashboard concept sets it
- * out, and this is that table.
+ * Editorial, not computed. Nothing in the data says objection handling is best
+ * practised on a pricing call — that is a judgement about the subject matter,
+ * written down here so it can be argued with rather than buried in a model
+ * call (dashboard concept, section 5.E).
  *
- * `null` means the goal does not bind to a kind of call at all. Speaking rate
- * or articulation can be worked on in any conversation, so the suggestion is
- * simply a Scenario the user has not played yet, which also widens their
- * practice (F-62's Trainingsvielfalt) instead of narrowing it.
+ * `null` means the goal binds to no kind of call: speaking rate or articulation
+ * can be worked on in any conversation, so the suggestion is simply an unplayed
+ * Scenario, which widens their practice rather than narrowing it.
  *
- * A goal absent from this table gets no suggestion. That is deliberate rather
- * than a default: adding a goal to the catalogue should force somebody to
- * decide what it is practised in, not quietly inherit "any scenario".
+ * A goal absent from this table gets no suggestion — deliberate rather than a
+ * default, so adding a catalogue goal forces somebody to decide what it is
+ * practised in instead of quietly inheriting "any scenario".
  */
 export const PRACTICE_CATEGORY: Record<string, ScenarioCategory | null> = {
   // Phases of a call bind to the kind of call they belong to.

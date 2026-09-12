@@ -11,10 +11,10 @@ import { CATEGORIES, CATEGORY_LABELS, RANDOM_SCENARIO_ID } from "../scenarioLibr
 import FilterSlider, { type FilterOption } from "./FilterSlider";
 
 /** Level 1, the origin of a Scenario: who it comes from. "followUp" is the
- * Folgeszenario drafted from a training (ADR 0069) and "reverse" the Rollentausch of one
+ * follow-up drafted from a training (ADR 0069) and "reverse" the Reverse of one
  * finished Session (ADR 0070). Both are `origin: "own"` on the wire and options
- * of their own here — "Individuell" means hand-authored, and nothing else. Not
- * to be confused with the level-2 CategoryFilter below. */
+ * of their own here — the hand-authored option means exactly that, and nothing
+ * else. Not to be confused with the level-2 CategoryFilter below. */
 export type LibraryFilter =
   | "recommended" | "all" | "standard" | "own" | "followUp" | "reverse" | "tenant";
 
@@ -64,7 +64,7 @@ export interface LibraryItem {
   /** F-03 call context, or null for an uncategorised Scenario (ADR 0072). */
   category: ScenarioCategory | null;
   /** Written from a Session's feedback (F-60) rather than by hand. Own, but its
-   * own origin — "Individuell" means hand-authored. */
+   * own origin — the hand-authored option means exactly that. */
   followUp: boolean;
   /** A reverse of one finished Session (ADR 0070). */
   reverse: boolean;
@@ -74,8 +74,8 @@ export interface LibraryItem {
   recommendation: ScenarioRecommendation | null;
 }
 
-/** Why a card is suggested, in one line: "Passt zu Ihren Gesprächen · Übt
- *  „Sichere Einwandbehandlung"". */
+/** Why a card is suggested, in one line: that it matches the call types the
+ *  User picked, and which of their focus goals it practises. */
 export function recommendationReason(
   recommendation: ScenarioRecommendation,
   goalTitle: (key: string) => string,
@@ -88,8 +88,8 @@ export function recommendationReason(
   return parts.join(" · ");
 }
 
-/** "Gespräch vom 3. September mit Anna Beck" — which conversation a reverse
- * replays, so two reverses of the same Scenario are told apart. */
+/** Dates the call a reverse replays and names its Persona, so two reverses of
+ * the same Scenario are told apart. */
 function reverseSubtitle(item: LibraryItem): string {
   if (!item.originSession) return "Ursprungsgespräch gelöscht";
   const when = new Date(item.originSession.started_at).toLocaleDateString("de-DE", {
@@ -122,7 +122,7 @@ interface LibraryPickerProps {
    * (ADR 0076), so the card carries no separate edit affordance -- not even
    * on the caller's own rows, where it used to sit. */
   onInfo: (id: string) => void;
-  /** Offer the Zufallsszenario tile (F-62). Decided by the caller, not here,
+  /** Offer the random Scenario tile (F-62). Decided by the caller, not here,
    * because the tile draws from what these filters show and `items` is that
    * set *after* the two `slice`s below have had it — the caller is the one
    * place that still knows how many drawable rows there really are. */
@@ -132,9 +132,9 @@ interface LibraryPickerProps {
 /** Whether an item passes the active origin filter. "tenant" = anything shared
  * with the company, the author's own shared Scenarios included.
  *
- * A reverse is `origin: "own"` on the wire but is deliberately *not* under
- * "Individuell": that option means what the User wrote, and a reverse is a
- * copy of a call they had. Every Scenario sits under exactly one of the
+ * A reverse is `origin: "own"` on the wire but is deliberately *not* under the
+ * hand-authored option: that option means what the User wrote, and a reverse is
+ * a copy of a call they had. Every Scenario sits under exactly one of the
  * origin options proper; "tenant" and "recommended" are views across them. */
 export function matchesFilter(item: LibraryItem, filter: LibraryFilter): boolean {
   // A view over the cards, like the company option: a suggested Scenario stays
@@ -144,8 +144,8 @@ export function matchesFilter(item: LibraryItem, filter: LibraryFilter): boolean
   if (filter === "standard") return item.origin === "builtin";
   if (filter === "followUp") return item.followUp;
   if (filter === "reverse") return item.reverse;
-  // "Individuell" is what is left of `own` once the two kinds the system wrote
-  // itself are taken out.
+  // The hand-authored option is what is left of `own` once the two kinds the
+  // system wrote itself are taken out.
   if (filter === "own") return item.origin === "own" && !item.followUp && !item.reverse;
   return item.shared;
 }
@@ -159,8 +159,7 @@ export function matchesCategory(item: LibraryItem, category: CategoryFilter): bo
 
 /** The card's origin, which is also the suffix of its `card-origin-` class —
  * the one that carries the colour of both the tile and its badge. Not the
- * level-2
- * category — the prop of that name is the thematic filter.
+ * level-2 category — the prop of that name is the thematic filter.
  *
  * The two kinds the system wrote itself come first: both are `origin: "own"`,
  * and that is the distinction the badge is making. */
@@ -185,9 +184,9 @@ function badgeLabel(item: LibraryItem, tenantName: string | null): string {
  * 0069).
  *
  * The rows are independent and combine. Level 1 says where a Scenario comes
- * from (Alle / Standard / Individuell / Folgeszenario / <Unternehmen>), level 2
- * says what kind of call it is. Both are the same component, so they are the
- * same size by construction.
+ * from (all, built-in, hand-authored, follow-up, or the caller's company),
+ * level 2 says what kind of call it is. Both are the same component, so they
+ * are the same size by construction.
  */
 export default function LibraryPicker({
   items,
@@ -297,10 +296,10 @@ export default function LibraryPicker({
 
       {items.length === 0 && !offerRandom && (
         // Only when the grid is genuinely bare. The pool is drawn from this
-        // same filtered set, so an empty `items` already implies no tile —
-        // the second condition is there because this line saying "kein
-        // Szenario" above a visible card is exactly what got it removed once
-        // before, and that must not come back through a changed caller.
+        // same filtered set, so an empty `items` already implies no tile — the
+        // second condition is there because this line claiming an empty library
+        // above a visible card is exactly what got it removed once before, and
+        // that must not come back through a changed caller.
         <p className="library-empty">Zu dieser Auswahl gibt es kein Szenario.</p>
       )}
 
@@ -363,7 +362,7 @@ export default function LibraryPicker({
               <span className="card-badge">{badgeLabel(item, tenantName)}</span>
             </button>
             {/* Every Scenario is readable (ADR 0076), so the "i" is on every
-                card — unlike the old "Bearbeiten", which was on the caller's
+                card — unlike the old edit link, which was on the caller's
                 own rows only and now lives inside the panel. */}
             <button
               type="button"

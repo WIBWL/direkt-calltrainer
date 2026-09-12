@@ -16,27 +16,21 @@ import InfoDetails from "./InfoDetails";
  * end in a click, and a stack of options is the same screen again with the
  * decision handed back to the reader.
  *
- * It always names where it comes from. "Weil der Abschluss in drei Ihrer
- * Auswertungen genannt wurde" is what makes this a suggestion; the same button
- * without that sentence is an instruction, and this screen has no standing to
- * give one (ADR 0004, ADR 0065).
+ * It always names where it comes from — naming the goal and how many wrap-ups
+ * raised it is what makes this a suggestion; the same button without that
+ * sentence is an instruction, and this screen has no standing to give one
+ * (ADR 0004, ADR 0065).
  *
- * Three routes, in the order section 5.E of the concept sets out:
+ * Three routes, in the order section 5.E of the concept sets out: the follow-up
+ * (F-60) written from the training where the point was last named, else a
+ * Scenario of the kind that goal is practised in (`PRACTICE_CATEGORY`, an
+ * editorial table, unplayed preferred), else — for goals binding to no kind of
+ * call — any unplayed one.
  *
- *   1. A follow-up Scenario (F-60) written from the very training where the
- *      point was last named. The best possible hit and no new logic: the case
- *      is the one the point was about.
- *   2. Otherwise a Scenario of the kind the goal is practised in
- *      (`PRACTICE_CATEGORY`, an editorial table), preferring one not played
- *      yet.
- *   3. For goals that bind to no kind of call, any Scenario not played yet,
- *      which widens their practice rather than narrowing it.
- *
- * The partner is the Persona from the training where the point was last named.
- * Not chosen and not varied: keeping the same voice is what makes the next call
- * an exercise on the point rather than a different call altogether. The wire
- * carries no difficulty on a Persona, so "a more demanding partner" is not
- * something this could pick even if it should.
+ * The partner is the Persona from that same training, not chosen and not
+ * varied: holding the voice constant is what makes the next call an exercise on
+ * the point. The wire carries no difficulty on a Persona, so "a more demanding
+ * partner" is not something this could pick even if it should.
  */
 export default function ProgressPractice({
   sessions,
@@ -136,9 +130,9 @@ export default function ProgressPractice({
         </div>
       </div>
 
-      {/* "Ein Vorschlag, keine Vorgabe" stays in view: it is what keeps the
-          button above from reading as an instruction. How the suggestion was
-          put together is background and sits behind the "i". */}
+      {/* The line calling this a suggestion and not an instruction stays in
+          view: it is what keeps the button above from reading as an order. How
+          the suggestion was put together is background and sits behind the "i". */}
       <p className="progress-practice-note">
         Ein Vorschlag, keine Vorgabe. Über die Startseite können Sie jederzeit etwas anderes
         wählen.

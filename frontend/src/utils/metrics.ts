@@ -21,7 +21,7 @@ const DECIMALS: Record<string, number> = {
 };
 
 /**
- * The checklist Kennzahlen and their parts, in the order they are usually
+ * The checklist metrics and their parts, in the order they are usually
  * said: the opening (F-63, ADR 0086) and the closing (ADR 0089).
  *
  * Their value is how many parts were recognised, and none of the three places
@@ -51,17 +51,17 @@ export interface MetricPart {
   label: string;
   /** Recognised. The absence of a match is not proof of an absence — a bare
    * name or a recap worded some other way slips past the patterns — so the
-   * other state is "nicht erkannt", never "fehlt". */
+   * other state reads "not recognised", never "missing". */
   said: boolean;
 }
 
-/** Whether this Kennzahl is a checklist rather than a figure. */
+/** Whether this metric is a checklist rather than a figure. */
 export function isPartsMetric(key: string): boolean {
   return key in METRIC_PARTS;
 }
 
-/** The parts a checklist Kennzahl checked, in order, or null for any other
- * Kennzahl. Only the parts the detail actually carries: the opening checks
+/** The parts a checklist metric checked, in order, or null for any other
+ * metric. Only the parts the detail actually carries: the opening checks
  * either the offer or the concern, never both. */
 export function metricParts(measurement: Measurement): MetricPart[] | null {
   const parts = METRIC_PARTS[measurement.key];
@@ -107,7 +107,7 @@ export function withDerived(measurements: Measurement[]): Measurement[] {
 }
 
 /** The figure as it is read out: value at its own precision, and the unit
- * where the unit says something. "Anzahl" does not — the name already has it. */
+ * where the unit says something. "count" does not — the name already has it. */
 export function formatMetricValue(measurement: Measurement): string {
   const decimals = DECIMALS[measurement.key] ?? 1;
   const unit =

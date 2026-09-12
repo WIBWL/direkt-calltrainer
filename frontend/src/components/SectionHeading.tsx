@@ -12,7 +12,7 @@ import { cx } from "../utils/cx";
  * two blocks of the same kind looked like two different kinds of thing.
  *
  * A box may still hold a title of its own, but only for an *item* inside a
- * section: the two offers under "Nächste Schritte" are each a thing you can
+ * section: the two offers in the next-steps block are each a thing you can
  * pick, not a section of the page.
  *
  * Its own module because two screens use it: the wrap-up and the progress

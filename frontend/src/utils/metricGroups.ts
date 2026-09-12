@@ -1,33 +1,27 @@
 import type { MetricAspect } from "../protocol";
 
 /**
- * Which family a Kennzahl belongs to, and the colour that says so (F-13).
+ * Which family a metric belongs to, and the colour that says so (F-13).
  *
- * **Colour here is identity, never judgement.** ADR 0065 rules out any colour on
- * this screen that means good or bad; it does not rule out colour that means
- * "these belong together". The whole of the distinction is two rules, and both
- * are structural rather than a matter of care:
+ * **Colour here is identity, never judgement.** ADR 0065 rules out colour that
+ * means good or bad, not colour that means "these belong together". Two
+ * structural rules hold the line:
  *
- * 1. **The hue hangs off the metric, not off its value.** Nothing in this module
- *    takes a number. A value can therefore never change a colour, which is what
- *    a traffic light does.
- * 2. **Red, amber and green do not appear.** Not because they would be ugly, but
- *    because this application already spent them: ADR 0078's traffic light uses
- *    exactly those three on the single-call view, so reusing one here as an
- *    identity hue would collide with a reserved meaning and invite the reading
- *    the rule above forbids.
+ * 1. **The hue hangs off the metric, not its value.** Nothing here takes a
+ *    number, so a value can never move a colour — which is what a traffic light
+ *    does.
+ * 2. **Red, amber and green do not appear.** ADR 0078's traffic light already
+ *    spent those three on the single-call view; reusing one as an identity hue
+ *    would collide with a reserved meaning.
  *
- * The three hues are slots 1, 5 and 7 of the documented categorical palette,
- * kept in that order. Validated as an all-pairs set against a white card
- * surface: CVD ΔE 13.0 (protan) against a target of 8, normal-vision ΔE 16.3
- * against a floor of 15. Magenta falls below the 3:1 contrast line at 2.69,
- * which the palette rules permit where the value is readable another way — here
- * every tile prints its figure as text and the detail level repeats the series
- * as a table, so the colour is never the only carrier.
+ * Slots 1, 5 and 7 of the documented categorical palette, validated as an
+ * all-pairs set against a white card: CVD ΔE 13.0 against a target of 8,
+ * normal-vision ΔE 16.3 against a floor of 15. Magenta sits at 2.69 against the
+ * 3:1 line, which the palette permits where the value is readable another way —
+ * every tile prints its figure and the detail level repeats it as a table.
  *
- * Three and not ten. A hue per Kennzahl would put eight colours on one screen,
- * where adjacent pairs stop being distinguishable under a colour vision
- * deficiency, and the hue would then encode nothing but variety.
+ * Three and not ten: a hue per metric would be eight colours on one screen,
+ * where adjacent pairs stop being separable under a colour vision deficiency.
  */
 
 export type MetricGroup = "speech" | "content" | "activity";
@@ -53,7 +47,7 @@ export const GROUPS: Record<MetricGroup, GroupStyle> = {
 };
 
 /**
- * The family of one Kennzahl, from the `aspect` the schema already stores.
+ * The family of one metric, from the `aspect` the schema already stores.
  *
  * Read off the wire rather than mapped here: `metric_type.aspect` is assigned in
  * `backend/feedback/metrics.py` and travels with every measurement, so a metric
@@ -64,7 +58,7 @@ export function groupOf(aspect: MetricAspect | null | undefined): MetricGroup {
   return aspect === "what" ? "content" : "speech";
 }
 
-/** The hue of one Kennzahl, for a chart mark. */
+/** The hue of one metric, for a chart mark. */
 export function colorOf(aspect: MetricAspect | null | undefined): string {
   return GROUPS[groupOf(aspect)].color;
 }

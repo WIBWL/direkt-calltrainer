@@ -4,8 +4,8 @@ import type { MetricStep } from "../protocol";
 /**
  * The scale a reading was taken off, with this call's step marked.
  *
- * Two Kennzahlen carry a reading — F-51's traffic light and F-35's three-step
- * Sprachmelodie — and both are judgements on thresholds nothing has validated
+ * Two metrics carry a reading — F-51's traffic light and F-35's three-step
+ * intonation — and both are judgements on thresholds nothing has validated
  * for this population (ADR 0004/0051). Showing the whole scale is what keeps
  * that arguable: a boundary the reader cannot see is a verdict they cannot
  * disagree with.

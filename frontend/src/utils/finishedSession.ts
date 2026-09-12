@@ -23,7 +23,7 @@ export interface FinishedSession {
   personaId?: string | null;
   /** The case that was played, for the same reason `personaName` is here:
    * after a reload this screen has no Scenario selection left to look it up
-   * in, and the Gesprächsprotokoll names it (F-64). */
+   * in, and the Transcript names it (F-64). */
   scenarioName?: string | null;
 }
 

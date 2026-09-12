@@ -15,25 +15,22 @@ import { useScreenTransition } from "./ScreenTransition";
  * generated for it at the time, the figures behind it, and the Transcript.
  *
  * It is the *same screen* as the one after a call — `FeedbackScreen` renders
- * both — and differs only in the buttons: "Zurück zum Profil" where the other
- * has "Zur Startseite", and the deletion under it. Two screens showing one
- * report kept drifting apart while they were two pieces of markup.
+ * both — and differs only in the buttons: back to the profile where the other
+ * goes home, and the deletion under it. Two screens showing one report kept
+ * drifting apart while they were two pieces of markup.
  *
- * Read once, never polled. That is the difference from the post-call screen:
- * there a wrap-up really is on its way (ADR 0019), here whatever the database
- * holds is final. Polling a days-old Session would spend a minute claiming
- * something was being created and then call it a failure — which is what this
- * screen used to do.
+ * Read once, never polled — the difference from the post-call screen, where a
+ * wrap-up really is on its way (ADR 0019). Here whatever the database holds is
+ * final, and polling a days-old Session spent a minute claiming one was being
+ * created before calling it a failure, which is what this screen used to do.
  *
- * A Session belonging to someone else answers 404 exactly like one that never
- * existed (ADR 0031/0050), so a guessed URL lands on the same screen as a stale
- * bookmark and neither learns anything from it.
+ * Someone else's Session answers 404 exactly like one that never existed
+ * (ADR 0031/0050), so a guessed URL and a stale bookmark land alike.
  *
- * Both Scenarios a finished training can produce are offered here exactly as
- * they are after the call: the follow-up (F-60) and the reverse (F-61). Each
- * is written when the User asks for it rather than in the background, which is
- * what makes them offerable about a training read weeks later just as well as
- * about one that has just ended.
+ * Both Scenarios a finished training can produce are offered here as they are
+ * after the call — the follow-up (F-60) and the reverse (F-61) — each written
+ * on request rather than in the background, which is what makes them offerable
+ * about a training read weeks later.
  */
 export default function PastSessionView() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -90,7 +87,7 @@ export default function PastSessionView() {
   // Two shapes, because it is used twice on the same screen: above the report,
   // where a reader who has changed their mind after the first paragraph should
   // not have to scroll a page of feedback to get back, and again in the
-  // actions row at the foot, where the post-call screen has "Zur Startseite"
+  // actions row at the foot, where the post-call screen has its home button
   // and where it has to look like its neighbours. The short screens — not
   // found, failed, loading — have only the upper one, having no actions row.
   const backLink = (

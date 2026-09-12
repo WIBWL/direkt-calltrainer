@@ -1,22 +1,20 @@
 /**
  * The trainee's own side of the case (ADR 0054).
  *
- * Everything else a Session knows about the case is addressed to the caller:
- * the four prompt fields brief the model that plays it, and the selection card
- * says one line about the situation. This is the only text written to whoever
- * picks up the phone — the role they answer in, the room they have, and what
- * counts as a good outcome.
+ * Everything else a Session knows about the case addresses the caller: the four
+ * prompt fields brief the model that plays it. This is the only text written to
+ * whoever picks up the phone — the role they answer in, the room they have, and
+ * what counts as a good outcome.
  *
- * Rendered in two places, which is why it is a component rather than markup in
- * one of them: on the setup screen as soon as a Scenario is picked (it is part
- * of choosing one), and again on the screen between the microphone check and
- * the ringing phone, where it sits above the facts of the case and is the last
- * thing read before the call starts. It used to sit on the check itself, which
- * put the case on the same screen as a level meter.
+ * A component rather than markup because it is rendered twice: on the setup
+ * screen as soon as a Scenario is picked, and again between the microphone
+ * check and the ringing phone, where it is the last thing read before the call.
+ * It used to sit on the check itself, which put the case on the same screen as
+ * a level meter.
  *
- * Renders nothing for a Scenario without one. Every built-in carries a
- * briefing, but a Scenario authored before the field existed does not, and an
- * empty panel with a heading is worse than no panel.
+ * Renders nothing for a Scenario without one — a Scenario authored before the
+ * field existed has none, and an empty panel with a heading is worse than no
+ * panel.
  */
 export default function ScenarioBriefing({
   briefing,

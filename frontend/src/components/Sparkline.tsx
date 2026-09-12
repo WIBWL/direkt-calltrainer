@@ -6,29 +6,23 @@ import { formatPoint } from "../utils/progressStats";
 import { formatDate } from "../utils/time";
 
 /**
- * One Kennzahl over the trainings in the period (F-13,
+ * One metric over the trainings in the period (F-13,
  * docs/dashboard-konzept.md).
  *
- * What it draws and what it deliberately does not: the user's own values as a
- * line over their own usual range, which is their median widened by their own
- * spread. No target band, no colour that means good or bad, no arrow, no
- * regression line. A trend line through nine points from nine different
- * Scenarios would assert a direction the data cannot carry, and ADR 0065 rules
- * exactly that out for this view.
+ * The user's own values as a line over their own usual range (median widened by
+ * their own spread). No target band, no colour meaning good or bad, no arrow,
+ * no regression line: a trend through nine points from nine different Scenarios
+ * would assert a direction the data cannot carry, which ADR 0065 rules out for
+ * this view.
  *
- * The colour is the Kennzahl's family and never its value (`utils/metricGroups`),
- * which is the whole of what makes colour admissible here at all.
+ * Colour is the metric's family and never its value (`utils/metricGroups`),
+ * which is the whole of what makes colour admissible here.
  *
- * Three things carry the liveliness the flat version lacked, and none of them
- * says anything the line did not: a soft fill under the line so the shape reads
- * as a shape, a filled marker on the point being read, and a hover layer.
+ * Inline SVG, like LoudnessCourse: a band, a line and a few dots do not warrant
+ * shipping a charting library.
  *
- * Inline SVG, like LoudnessCourse: a band, a line and a few dots do not need a
- * charting library, and the alternative would ship one for this.
- *
- * The accessible name carries the numbers, so the chart is not the only place
- * the information exists, and the hover is an addition to that rather than a
- * replacement: the detail view repeats every point as a real table.
+ * The accessible name carries the numbers, and the hover adds to that rather
+ * than replacing it — the detail view repeats every point as a real table.
  */
 export default function Sparkline({
   series,

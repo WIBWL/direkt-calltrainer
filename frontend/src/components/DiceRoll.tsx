@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 
 /**
- * The die thrown between the microphone check and a Zufallsszenario's call
+ * The die thrown between the microphone check and a random Scenario's call
  * (F-62).
  *
  * Theatre, and deliberately so: the Scenario was drawn the moment the User

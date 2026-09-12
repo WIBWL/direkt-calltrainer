@@ -2,30 +2,29 @@ import { useState } from "react";
 
 import type { Variety } from "../utils/progressStats";
 
-/** How many Scenarios the grid shows before "Mehr anzeigen". Five: enough to
+/** How many Scenarios the grid shows before the show-more button. Five: enough to
  *  say where the training has gone, few enough that the card stays about as
  *  tall as the month calendar beside it. */
 const COLLAPSED_ROWS = 5;
 
 /**
- * Which Scenario the user played against which Persona (F-13, focus goal
- * "Trainingsvielfalt").
+ * Which Scenario the user played against which Persona (F-13, the
+ * training-variety focus goal).
  *
  * A real table, not a drawing: the rows and columns carry names, screen readers
  * get the header association for free, and the same markup is the accessible
  * form of the information. The shading of a cell only repeats its number.
  *
- * It shows played combinations only. The concept flagged the risk that a full
- * library grid with empty cells reads as a list of homework, and it does: what
- * somebody has not trained yet is not a deficit, and nobody set them that task.
- * What this says instead is where their training has been concentrated, which
- * is the question the variety goal actually asks.
+ * Played combinations only: a full library grid with empty cells reads as a
+ * list of homework, and what somebody has not trained yet is not a deficit.
+ * What this says instead is where their training has concentrated, which is
+ * what the variety goal asks.
  *
- * Rows and columns come most played first (`progressStats.variety`), and the
- * rows are cut after `COLLAPSED_ROWS` with a button under the table for the
- * rest -- the same "there is more below" the training history and the Scenario
- * grid use. With a dozen Scenarios played the card had grown into the longest
- * thing on the page, beside a calendar a third of its height.
+ * Rows and columns come most played first (`progressStats.variety`), cut after
+ * `COLLAPSED_ROWS` with a show-more button under the table — the same idiom the
+ * training history and the Scenario grid use. With a dozen Scenarios played the
+ * card had become the longest thing on the page, beside a calendar a third of
+ * its height.
  */
 export default function VarietyGrid({ variety }: { variety: Variety }) {
   const [expanded, setExpanded] = useState(false);

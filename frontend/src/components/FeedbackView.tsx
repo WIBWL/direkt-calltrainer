@@ -39,10 +39,10 @@ import InfoDetails from "./InfoDetails";
 import LoudnessCourse from "./LoudnessCourse";
 import SectionHeading from "./SectionHeading";
 
-/** What a screen can do with the follow-up Scenario (F-60): open it in the
- * start it as the next call. That belongs to whoever owns the screen, so it is
- * passed in — the post-call screen starts the call itself, the history hands
- * the pairing to the training flow.
+/** What a screen can do with the follow-up Scenario (F-60): start it as the
+ * next call. That belongs to whoever owns the screen, so it is passed in — the
+ * post-call screen starts the call itself, the history hands the pairing to the
+ * training flow.
  *
  * There is no edit beside it: a follow-up is the exercise one reading of the
  * wrap-up produced (ADR 0069), and the write routes refuse it the way they
@@ -55,15 +55,15 @@ import SectionHeading from "./SectionHeading";
  * `onCreated` fires once the User has asked for one and it has been written
  * (ADR 0069's amendment). The card renders from the answer either way; this is
  * for the screen's own copy of the library, which does not hold the new row
- * yet and is what "Starten" reads its names off. */
+ * yet and is what the start button reads its names off. */
 export interface FollowUpActions {
   onStart: (scenarioId: string, personaId: string) => void;
   onCreated?: (() => void) | undefined;
 }
 
 /**
- * How many times the User has to have spoken before the two offers under
- * "Nächste Schritte" appear at all.
+ * How many times the User has to have spoken before the two offers in the
+ * next-steps section appear at all.
  *
  * Both build a new exercise out of *this* call: the follow-up carries the case
  * forward from where it ended (ADR 0069), the reverse replays it from the other
@@ -262,8 +262,8 @@ export function FeedbackReport({
           and whichever is left then takes the full width on its own.
 
           The next-call offers (F-64) sit under that row, inside the same
-          section: they are one more thing to pick, which is what an item under
-          "Nächste Schritte" is. Where neither offer above exists they stand on
+          section: they are one more thing to pick, which is what an item in
+          the next-steps block is. Where neither offer above exists they stand on
           their own instead. `next` is an element even when it renders nothing,
           so it cannot decide whether the heading appears, and a heading over an
           empty section is worse than no heading. */}
@@ -358,9 +358,9 @@ export function MetricSection({
   /** Individual moments noted during the call, e.g. F-51's interruptions.
    *  Used here only to decide which tiles have a page worth opening. */
   findings?: Finding[];
-  /** The long explanation behind a Kennzahl's "i", by metric key. */
+  /** The long explanation behind a metric's "i", by metric key. */
   notes?: Record<string, string>;
-  /** The Session these figures belong to, for the per-Kennzahl page. Null on a
+  /** The Session these figures belong to, for the per-metric page. Null on a
    *  call that was never stored, where there is nothing to link to. */
   sessionId?: string | null;
 }) {
@@ -413,7 +413,7 @@ export function MetricSection({
       </div>
 
       {/* The second sentence exists because the first one is contradicted a
-          few pixels above it: two Kennzahlen now carry a word beside their
+          few pixels above it: two metrics now carry a word beside their
           figure. Rather than quietly dropping the claim, the exception is
           named and bounded — it is what the reader is looking at. It stays out
           of the shared `METRIC_DISCLAIMER` because the PDF prints the figures
@@ -427,7 +427,7 @@ export function MetricSection({
   );
 }
 
-/** The one Kennzahl whose unit a reader cannot place. Matches
+/** The one metric whose unit a reader cannot place. Matches
  *  `intonation.RANGE_KEY` on the backend. */
 const INTONATION_KEY = "intonation";
 
@@ -439,7 +439,7 @@ const INTONATION_KEY = "intonation";
  * card renders both — what the create route answers and what a later reload
  * brings are one shape.
  *
- * "Starten" goes straight into the call, against the Persona this training was
+ * Starting goes straight into the call, against the Persona this training was
  * played with: the exercise follows from that conversation, so re-picking a
  * partner would be a step with only one sensible answer. The Scenario stays an
  * ordinary row in the library, so a different partner is a matter of starting
@@ -533,11 +533,11 @@ function FollowUp({
   );
 }
 
-/** "Rollen tauschen" (F-61, ADR 0070): the same call from the other side.
+/** The Reverse offer (F-61, ADR 0070): the same call from the other side.
  *
- * Two presses, not one, and the same two the follow-up beside it takes:
- * *Rollen tauschen* writes the Scenario, *Starten* begins the call — the same
- * word the follow-up beside it uses, because it is the same second press.
+ * Two presses, not one, and the same two the follow-up beside it takes: the
+ * first writes the Scenario, the second begins the call — labelled with the
+ * same word the follow-up uses, because it is the same second press.
  * Preparing it takes a model call and the better part of a minute, so the
  * button that starts a conversation must not be the one that was pressed
  * before there was anything to start — and the User gets to read what came
@@ -680,7 +680,7 @@ function Metric({
   measurement: Measurement;
   /** Null on a call that was never stored, where there is no page to open. */
   sessionId: string | null;
-  /** Whether this Kennzahl has a page worth opening. */
+  /** Whether this metric has a page worth opening. */
   detailed: boolean;
 }) {
   // Loudness is shown as a course, not a figure: its value is a dB span (95th
@@ -700,9 +700,9 @@ function Metric({
   const light = measurement.detail?.light as TrafficLight | undefined;
   const context = interruptionContext(measurement);
   const detail = metricSubline(measurement);
-  // The step this call landed on, in words. Two Kennzahlen carry one: F-51's
+  // The step this call landed on, in words. Two metrics carry one: F-51's
   // traffic light and F-35's three-step reading. F-35's is read off the pitch
-  // variation quotient in the detail and not off the Umfang this tile shows,
+  // variation quotient in the detail and not off the range this tile shows,
   // that being the figure with a published boundary behind it. Both come from
   // the backend, beside the thresholds they were read off.
   const reading = (measurement.detail?.light_label ??
@@ -717,7 +717,7 @@ function Metric({
   //
   // F-35 carries a light too now (ADR 0077, `intonation.LIGHTS`), and it lands
   // in the right place without a special case: this tile leads with the *word*
-  // for Sprachmelodie, so the colour sits on the classification, which is what
+  // for intonation, so the colour sits on the classification, which is what
   // it was read from. It must never sit on the semitone figure, which is a
   // different measurement from the one the step came out of.
   const readingLight = (measurement.detail?.liveliness_light ?? light) as
@@ -726,9 +726,9 @@ function Metric({
 
   const figure = formatMetricValue(measurement);
 
-  // Sprachmelodie is the one Kennzahl whose unit a reader cannot place, so the
+  // Intonation is the one metric whose unit a reader cannot place, so the
   // reading leads and the semitones stand under it. Since ADR 0077 the reading
-  // comes from the pitch variation quotient and the figure is the Umfang, so the
+  // comes from the pitch variation quotient and the figure is the range, so the
   // figure is the measurement shown beside the reading rather than its evidence.
   // It is never dropped: without it only the part resting on thresholds would be
   // left, which is the wrong half to keep (ADR 0004/0051, ADR 0088). Every other
@@ -780,10 +780,10 @@ function Metric({
   );
 }
 
-/** What the tile promises behind it, per Kennzahl. The interruptions page shows
- *  transcript excerpts, the intonation page the contour and what it says —
- *  "Einzelne Stellen" would be wrong for the second, and the second only offers
- *  a page at all when the block below could not be drawn. */
+/** What the tile promises behind it, per metric. The interruptions page shows
+ *  transcript excerpts, the intonation page the contour and what it says, so a
+ *  label about individual passages would be wrong for the second — which only
+ *  offers a page at all when the block below could not be drawn. */
 const OPEN_HINT: Record<string, string> = {
   interruptions: "Einzelne Stellen ansehen",
   intonation: "Diese Kennzahl ansehen",
@@ -819,10 +819,10 @@ function interruptionContext(measurement: Measurement): string | null {
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
-/** A checklist Kennzahl's headline — the opening's (F-63) or the closing's
+/** A checklist metric's headline — the opening's (F-63) or the closing's
  *  (ADR 0089): its parts, each marked, in place of a count that reads like a
- *  grade. "nicht erkannt" for the screen reader, never "fehlt": a bare name or
- *  a recap worded some other way slips past the patterns. */
+ *  grade. The screen reader hears "not recognised", never "missing": a bare
+ *  name or a recap worded some other way slips past the patterns. */
 function MetricParts({ parts }: { parts: MetricPart[] }) {
   return (
     <span className="metric-parts">

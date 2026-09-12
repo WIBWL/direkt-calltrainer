@@ -11,7 +11,7 @@ import MetricScale from "./MetricScale";
 import SegmentComparison from "./SegmentComparison";
 
 /**
- * One Kennzahl of one training, in full (F-51's interruptions today).
+ * One metric of one training, in full (F-51's interruptions today).
  *
  * Its own page rather than a panel inside the wrap-up. The excerpts run to
  * several lines each, a call with four interruptions would push everything
@@ -22,7 +22,7 @@ import SegmentComparison from "./SegmentComparison";
  * database holds for a finished call is final.
  */
 /** Counts read without decimals, everything else with one. The unit follows,
- *  except for "Anzahl", which the figure already is. */
+ *  except for "count", which the figure already is. */
 function formatFigure(value: number, unit: string | null): string {
   const text = unit === "Anzahl" ? value.toFixed(0) : value.toFixed(1);
   return unit && unit !== "Anzahl" ? `${text} ${unit}` : text;
@@ -61,7 +61,7 @@ export default function SessionMetricView() {
   }
 
   const findings = detail.findings.filter((f) => f.metric_key === metricKey);
-  // The same Kennzahl over the demanding stretches and over the rest, where
+  // The same metric over the demanding stretches and over the rest, where
   // this call had any (ADR 0081). Absent on a call nobody pushed back in, and
   // on every call recorded before the per-utterance facts were kept.
   const pair = pairFor(detail.segments, metricKey ?? "");
@@ -75,7 +75,7 @@ export default function SessionMetricView() {
   const reading = (measurement.detail?.light_label ??
     measurement.detail?.liveliness_label) as string | undefined;
   // F-51's light belongs to the figure and colours it. F-35's belongs to the
-  // Lebendigkeit, which is a different figure from the Umfang shown here, so it
+  // liveliness, which is a different figure from the range shown here, so it
   // colours the word and never the number: a green semitone count would be a
   // colour sitting over something it was not read from (ADR 0077).
   const readingLight = (measurement.detail?.liveliness_light ?? light) as

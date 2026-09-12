@@ -8,21 +8,21 @@ import { formatDate } from "../utils/time";
  * What the wrap-ups wrote about a goal, quoted, newest training first.
  *
  * The dashboard's second level owes the reader this. Block D counts mentions
- * and a focus tile says "in 4 von 8 Auswertungen genannt", which is a number
- * the user has no way to check unless the sentences behind it are reachable;
+ * and a focus tile reports how many wrap-ups mentioned a goal, which is a
+ * number the user cannot check unless the sentences behind it are reachable;
  * and for the six goals with no measurement of their own the sentences are the
  * whole of what exists (docs/dashboard-konzept.md, section 7).
  *
- * Deliberately a quotation and nothing else. No summary across the entries, no
- * "is getting better", no count in a heading that would read as a score — the
- * counting happens on the overview, under wording ADR 0080 settled, and
- * repeating it here in a second form would be a second claim. Each entry says
- * which training it came from and links into it, because a sentence about a
- * call is only readable next to the call.
+ * Deliberately a quotation and nothing else: no summary across entries, no "is
+ * getting better", no count in a heading that would read as a score. The
+ * counting happens on the overview under wording ADR 0080 settled, and a second
+ * form of it here would be a second claim. Each entry names the training it
+ * came from and links into it, since a sentence about a call is only readable
+ * next to the call.
  *
- * Strength and improvement are both shown and labelled. Showing only the
- * improvements would turn a record of what was said into a list of faults,
- * which is exactly the reading ADR 0004 and ADR 0065 refuse.
+ * Strength and improvement are both shown and labelled: only the improvements
+ * would turn a record of what was said into a list of faults, which is the
+ * reading ADR 0004 and ADR 0065 refuse.
  */
 export default function GoalStatements({
   statements,

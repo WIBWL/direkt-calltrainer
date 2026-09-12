@@ -15,25 +15,21 @@ import SegmentComparison from "./SegmentComparison";
 
 /**
  * One focus goal across the trainings, the dashboard's second level for the
- * other half of the overview (docs/dashboard-konzept.md, section 7: "Detail
- * einer Kennzahl *oder eines Fokusziels*").
+ * other half of the overview (docs/dashboard-konzept.md, section 7, which puts
+ * a metric and a Focus Goal on the same level here).
  *
- * The tiles in block B were a dead end until this existed, and for the six
- * goals with no measurement they were the *only* thing on the screen about
- * that goal: a bare "in 4 von 8 Auswertungen genannt", with no way to see what
- * those four wrap-ups had said. A count the reader cannot check is worse than
- * no count, because it looks like a measurement.
+ * The tiles in block B were a dead end until this existed, and for the goals
+ * with no measurement they were the *only* thing on screen about that goal — a
+ * bare count with no way to see what was said. A count the reader cannot check
+ * is worse than none, because it looks like a measurement.
  *
- * So this page is, in order: what the goal is, how often it was named and out
- * of how many, and then every sentence, quoted, each linking into its call.
- * Where a Kennzahl stands behind the goal, it links there rather than drawing
- * the chart a second time — one chart, one page, or the two start disagreeing
- * about what "in this period" means.
+ * So, in order: what the goal is, how often it was named and out of how many,
+ * then every sentence quoted and linking into its call. Where a metric stands
+ * behind the goal it links there rather than redrawing the chart — one chart,
+ * one page, or the two start disagreeing about what "in this period" means.
  *
- * No verdict anywhere on it. The wording is ADR 0080's throughout ("genannt",
- * a count over a named denominator, never a percentage and never a direction),
- * because this is the page where a frequency is most likely to be read as a
- * grade.
+ * No verdict anywhere. The wording is ADR 0080's throughout, because this is
+ * the page where a frequency is most likely to be read as a grade.
  */
 export default function ProgressGoalView() {
   const { goalKey } = useParams<{ goalKey: string }>();
@@ -75,7 +71,7 @@ export default function ProgressGoalView() {
   const { strengths, improvements, total } = mentionsFor(sessions, goalKey);
   const statements = statementsFor(sessions, [goalKey]);
   const backing = backingOf(goalKey);
-  // Only a series that actually has points: linking to an empty Kennzahl page
+  // Only a series that actually has points: linking to an empty metric page
   // promises a chart that is not there.
   const measured = toSeries(sessions).filter((series) =>
     backing.metrics.includes(series.key),
@@ -146,7 +142,7 @@ export default function ProgressGoalView() {
 }
 
 /**
- * The comparison behind "Souveränität unter Druck", one block per training
+ * The comparison behind "composure under pressure", one block per training
  * (ADR 0081).
  *
  * Per training and not aggregated across them. Averaging the pressure figures

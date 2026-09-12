@@ -34,13 +34,13 @@ import Sparkline from "./Sparkline";
 import VarietyGrid from "./VarietyGrid";
 
 /**
- * Kennzahlen that stay out of the overview, though their own page and the
- * focus goals still reach them.
+ * Metrics that stay out of the overview, though their own page and the focus
+ * goals still reach them.
  *
  * `word_count` grows with the length of the call and with nothing else worth
- * reading across trainings, so its row would repeat the Gesprächsdauer beside
- * it in other units. It is still measured and still listed under "Prägnante
- * Sprache".
+ * reading across trainings, so its row would repeat the call length beside it
+ * in other units. It is still measured and still reachable from the
+ * concise-speech goal.
  *
  * The loudness is not here because it never reaches this screen at all:
  * `progressStats.NOT_ACROSS_CALLS` drops it before any series is built.
@@ -51,10 +51,10 @@ const OVERVIEW_HIDDEN = new Set(["word_count"]);
  * Which trainings the screen is read over, counted in trainings (see
  * `progressStats.latest` for why not in days).
  *
- * It used to be 30 days, six months and "Gesamt". Six months is the retention
+ * It used to be 30 days, six months and everything. Six months is the retention
  * limit (ADR 0067), so the second and third said the same thing on almost
- * every account, and the first was empty for anybody who trains in bursts.
- * "Alle" is still everything stored and nothing older.
+ * every account, and the first was empty for anybody who trains in bursts. The
+ * widest option is still everything stored and nothing older.
  */
 const PERIODS = [
   { key: "5", label: "Letzte 5", count: 5 },
@@ -67,43 +67,27 @@ type PeriodKey = (typeof PERIODS)[number]["key"];
 /**
  * The progress dashboard (F-13, docs/dashboard-konzept.md).
  *
- * Top to bottom: what I did (three counted figures, the calendar and the
- * variety grid, over every stored training), then the period switch, then
- * where am I going (the focus goals), what next (what the wrap-ups keep coming
- * back to, with the one thing to practise beside it) and how am I going (every
- * Kennzahl over time). The last three are Hattie & Timperley's feed up, feed
- * forward and feed back, read over the trainings the switch selects; the order
- * keeps the one block that leads back into training high rather than last,
- * because a dashboard whose only way out is at the bottom of its longest page
- * ends in looking (Zimmerman's reflection phase has to hand over to planning,
- * dashboard-konzept.md section 3).
+ * Top to bottom: what I did (the counted figures, calendar and variety grid,
+ * over every stored training), the period switch, then Hattie & Timperley's
+ * feed up, feed forward and feed back — focus goals, what the wrap-ups keep
+ * returning to with the one thing to practise beside it, and every metric over
+ * time — read over the trainings the switch selects. The block that leads back
+ * into training stays high: a dashboard whose only way out is at the foot of
+ * its longest page ends in looking (dashboard-konzept.md section 3).
  *
- * The activity block has moved twice. It opened the page in the pilot, when it
- * was the only thing with anything in it; it went to the foot as context once
- * the rest filled up; and it is back at the top, now with the switch placed
- * *under* it. That placement is the point: everything above the switch counts
- * every stored training, everything below is read over the selection, and the
- * page says so by where the control stands rather than by a caveat.
+ * The switch sits *under* the activity block deliberately: everything above it
+ * counts every stored training, everything below is read over the selection, so
+ * placement says what would otherwise need a caveat.
  *
- * The recurring themes and the suggestion used to be a labelled placeholder;
- * they became real once each feedback point carried the focus goal it was
- * about (ADR 0080) -- `ProgressRecurring` counts what recurs,
- * `ProgressPractice` turns the most frequent improvement into a single
- * suggestion with a button, and the two now share one row.
+ * Nothing here is evaluated — no target band, no colour meaning good, no arrow,
+ * no aggregate score (ADR 0065), because nobody has established what a good
+ * talk share or speaking pace is for this population. The figures were measured
+ * when each call ended (ADR 0051); this view only groups them and describes
+ * their spread.
  *
- * Everything numeric on this screen was measured when a call ended and stored
- * with the Session (ADR 0051); this view groups those values and describes
- * their spread. It evaluates none of them: no target band, no colour meaning
- * good, no arrow, no aggregate score. ADR 0065 rules those out for this screen
- * specifically, and the reason is that nobody has established what a good
- * Redeanteil or a good Sprechtempo is for this population. What the user gets
- * instead is their own behaviour made visible, with the interpretation left to
- * them and to the qualitative wrap-ups.
- *
- * The screen is read-only and about one account. There is deliberately no
- * comparison with colleagues, although the tenant model (ADR 0060) would make
- * one possible: a trainer that ranks employees against each other is a
- * different product with a different legal footing.
+ * Read-only and about one account. No comparison with colleagues, though the
+ * tenant model (ADR 0060) would allow it: ranking employees against each other
+ * is a different product with a different legal footing.
  */
 export default function ProgressView() {
   const { sessions, state, truncated, total } = useProgressData();
@@ -115,7 +99,7 @@ export default function ProgressView() {
 
   const count = PERIODS.find((p) => p.key === period)?.count ?? null;
   const inPeriod = latest(sessions, count);
-  // The call length rides along with the measured Kennzahlen. It is derived
+  // The call length rides along with the measured metrics. It is derived
   // from the two timestamps rather than measured from the audio, but it belongs
   // to the same family: descriptive, and in need of no norm to be readable.
   const duration = durationSeries(inPeriod);
@@ -145,7 +129,7 @@ export default function ProgressView() {
   }
 
   // Nothing stored and nothing being stored: the dashboard cannot fill up on
-  // its own, and saying "noch keine Trainings" would send the user off to train
+  // its own, and reporting an empty history would send the user off to train
   // when the reason is a setting.
   if (sessions.length === 0 && consent && !consent.allows_storage) {
     return (
@@ -379,7 +363,7 @@ function FocusSection({
  * One focus goal.
  *
  * Four shapes, because the honest answer differs per goal (see
- * `utils/focusMetrics.ts`): Kennzahlen with their course, a comparison of two
+ * `utils/focusMetrics.ts`): metrics with their course, a comparison of two
  * stretches of a call, an activity figure, or what the wrap-ups said where
  * there is no measurement. The last is deliberately not hidden. A tile that
  * quietly disappears would let the user believe the goal is being tracked.
@@ -430,9 +414,9 @@ function FocusTile({
       )}
 
       {/* One drill-down per tile, and it is the goal's own page rather than a
-          Kennzahl's: a tile stands for a goal, and the goals with no
+          metric's: a tile stands for a goal, and the goals with no
           measurement need the level most. That page links on to the chart
-          where there is one, and the Kennzahlen table below still reaches the
+          where there is one, and the metrics table below still reaches the
           charts in one click. Activity goals have none -- what answers them is
           the calendar and the variety grid on this very screen. */}
       {backing.kind !== "activity" && (
@@ -444,17 +428,17 @@ function FocusTile({
   );
 }
 
-/** How many of a goal's further Kennzahlen stand on its tile under the first.
+/** How many of a goal's further metrics stand on its tile under the first.
  *  Two: `pace` and `active_listening` name three between them, which together
  *  are the goal, and a third line would turn the tile into the table below. */
 const MAX_SUPPORTING = 2;
 
 /**
- * The goal's other Kennzahlen, one line each: name, the last value, a small
+ * The goal's other metrics, one line each: name, the last value, a small
  * course.
  *
- * The first Kennzahl alone told half the story. Sprechtempo, Sprechpausen and
- * Sprechlänge am Stück are together the rhythm of somebody's speaking, and each
+ * The first metric alone told half the story. speaking pace, pauses and
+ * run length are together the rhythm of somebody's speaking, and each
  * can look unchanged while the rhythm moves (`focusMetrics.FOCUS_BACKING`). So
  * the tile carries the rest too, smaller, in the same hue and on the same
  * terms: no band, no colour for a value, the figure printed beside the line.
@@ -500,7 +484,7 @@ function regularityText(sessions: SessionSummary[]): string {
  * rest of the call.
  *
  * A count of trainings and nothing else here. The comparison itself is two
- * figures per Kennzahl per training, which is a table and not a tile, so it
+ * figures per metric per training, which is a table and not a tile, so it
  * lives one level down; and any single number this tile could show instead --
  * an average gap, a "stability" -- would be the composite ADR 0051 refuses.
  */
@@ -648,7 +632,7 @@ function MetricBody({ series, sessionCount }: { series: MetricSeries; sessionCou
 /**
  * What stands where the focus goals would be when none are set.
  *
- * Not an empty box and not a nag. The three Kennzahlen that moved most across
+ * Not an empty box and not a nag. The three metrics that moved most across
  * the period are the ones where there is something to look at, so they earn the
  * space; the invitation to pick goals sits beside them as an offer. Choosing
  * goals is voluntary (F-62) and a screen that withholds content until you do
@@ -659,7 +643,7 @@ function OverviewSection({ series }: { series: MetricSeries[] }) {
     .filter((s) => s.points.length >= MIN_SESSIONS_FOR_SERIES && s.band)
     .map((s) => ({
       series: s,
-      // Relative spread, so a Redeanteil in percent and a Reaktionszeit in
+      // Relative spread, so a talk share in percent and a reaction time in
       // seconds can be compared at all.
       spread: s.band ? (s.band.high - s.band.low) / (Math.abs(s.band.median) || 1) : 0,
     }))

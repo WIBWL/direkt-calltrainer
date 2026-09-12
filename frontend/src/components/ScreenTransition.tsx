@@ -16,19 +16,16 @@ import ReverseCard from "./ReverseCard";
  * The film cut between two screens: something covers the screen, the screen
  * changes behind it, the cover leaves.
  *
- * It lives above the router (see `main.tsx`) and not in whoever triggers it,
- * because the thing that triggers it is usually the thing that disappears —
- * a reverse started from a past training navigates to another route, and an
- * overlay rendered by that page would be unmounted halfway through its own
- * animation. Mounted once at the top, it plays out regardless of what the cut
- * did underneath it.
+ * Lives above the router (see `main.tsx`) rather than in whoever triggers it,
+ * because the trigger is usually the thing that disappears: a reverse started
+ * from a past training navigates away, and an overlay rendered by that page
+ * would unmount halfway through its own animation. Mounted once at the top, it
+ * plays out regardless of what the cut did underneath.
  *
- * Two of them. The reverse (F-61, ADR 0070) turns a card over, and is not
- * decoration for its own sake: the roles swapping is the one thing about that
- * feature a user has to understand before the call starts, and a card turning
- * over says it in a way the button's label cannot. The plain fade is the same
- * mechanism with nothing on it, for a cut that only wants the screen to go
- * dark and come back.
+ * Two of them. The reverse (F-61, ADR 0070) turns a card over, not as
+ * decoration: the roles swapping is the one thing a user must understand before
+ * the call starts, and a turning card says it in a way the button label cannot.
+ * The plain fade is the same mechanism with nothing on it.
  */
 
 /** How long each phase runs, by what is being played. The card needs the time

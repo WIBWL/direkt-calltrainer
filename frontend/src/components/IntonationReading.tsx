@@ -8,27 +8,24 @@ import PitchContour from "./PitchContour";
  * What a speaker's pitch contour says about their delivery (F-35).
  *
  * The layout: the contour, one sentence with the coloured classification in it,
- * then the five figures as tiles in the same grid the Kennzahlen use. Each tile
+ * then the five figures as tiles in the same grid the metrics use. Each tile
  * carries its own "i" with what it measures and what it is worth. Below them
  * the one or two readings that mean something without a norm.
  *
- * The method used to sit in a paragraph under every figure, which put the one
- * sentence a reader acts on in the middle of six hundred words about
- * measurement. Nothing was deleted, only moved behind the icons.
+ * The method used to sit under every figure, which buried the one sentence a
+ * reader acts on in six hundred words about measurement. Nothing was deleted,
+ * only moved behind the icons.
  *
- * Where this is allowed to interpret, and where it is not:
+ * Only the liveliness carries a classification and a traffic light, being the
+ * only figure with a published boundary (Hincks 2005, measured against human
+ * ratings). ADR 0078 holds the conditions a light comes with; ADR 0077 records
+ * why the reading sits there and not on the range, whose old five-step scale
+ * had nothing behind its derivation.
  *
- * The Lebendigkeit carries the classification and the traffic light, and it is
- * the only figure here that carries either, because it is the only one with a
- * published boundary (Hincks 2005, measured against human liveliness ratings).
- * ADR 0078 holds the conditions that come with a light; ADR 0077 records why
- * the reading sits on this figure and not on the Umfang, whose old five-step
- * scale had nothing behind its derivation.
- *
- * The endings and the development need no norm at all: a slope rises or falls
- * regardless of whose voice it is, and a speaker compared with themselves has
- * no reference point to invent. The wording still stops at the observation and
- * leaves the question of whether it was intended to the person who was there.
+ * The endings and the development need no norm: a slope rises or falls whoever
+ * is speaking, and a speaker compared with themselves has no reference point to
+ * invent. The wording stops at the observation and leaves whether it was
+ * intended to the person who was there.
  */
 
 /** Below this a change between the first and last third is wobble, not a
@@ -77,7 +74,7 @@ export default function IntonationReading({
   const bandHigh = detail.band_high_st as number | undefined;
   // Absent for a Session measured before the reading moved onto this figure
   // (ADR 0077). The step and the colour are then absent too, and the block says
-  // so rather than reinstating the withdrawn scale from the Umfang.
+  // so rather than reinstating the withdrawn scale from the range.
   const pvq = detail.pvq as number | null | undefined;
   const pvqWindows = (detail.pvq_windows as number | null | undefined) ?? 0;
   const label = detail.liveliness_label as string | undefined;
@@ -272,11 +269,11 @@ export default function IntonationReading({
 }
 
 /**
- * One figure as a tile, in the same grid the Kennzahlen use.
+ * One figure as a tile, in the same grid the metrics use.
  *
  * The shape is `.metric` deliberately, so these read as the same kind of thing
  * as the tiles in the wrap-up rather than as a second design. What they add is
- * the icon: on the wrap-up grid the explanation lives on the Kennzahl's own
+ * the icon: on the wrap-up grid the explanation lives on the metric's own
  * page, and here there is no further page to go to.
  */
 function Tile({

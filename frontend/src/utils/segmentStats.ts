@@ -4,8 +4,8 @@ import { NOT_ACROSS_CALLS } from "./progressStats";
 /**
  * The demanding stretches of a call against the rest of it (ADR 0081).
  *
- * The data behind F-62's "Souveränität unter Druck", which until now had none:
- * every Kennzahl described a whole call, and a whole call contains both
+ * The data behind F-62's "composure under pressure", which until now had none:
+ * every metric described a whole call, and a whole call contains both
  * stretches averaged into each other. The wrap-up marks which exchanges were
  * demanding, the backend measures the two stretches separately, and this pairs
  * them up for display.
@@ -17,7 +17,7 @@ import { NOT_ACROSS_CALLS } from "./progressStats";
  * wearing a different name.
  */
 
-/** One Kennzahl's two figures for one training. */
+/** One metric's two figures for one training. */
 export interface SegmentPair {
   key: string;
   name: string;
@@ -48,7 +48,7 @@ export function pairsOf(segments: SegmentMeasurement[]): SegmentPair[] {
   return [...byKey.values()];
 }
 
-/** One training's pair for one Kennzahl, or null where that call has none. */
+/** One training's pair for one metric, or null where that call has none. */
 export function pairFor(
   segments: SegmentMeasurement[],
   metricKey: string,
@@ -75,7 +75,7 @@ export interface SegmentTraining {
  * gone). All three are the same answer on screen: this call has no comparison,
  * which is not a gap in the data but a fact about the call.
  *
- * The dashboard's own list, so the Kennzahlen it never reads across trainings
+ * The dashboard's own list, so the metrics it never reads across trainings
  * (`NOT_ACROSS_CALLS`, the loudness) are left out here too. Within one call the
  * comparison would still be sound -- same microphone on both sides -- and the
  * single call's own page keeps it through `pairFor`; but a column of dB spans

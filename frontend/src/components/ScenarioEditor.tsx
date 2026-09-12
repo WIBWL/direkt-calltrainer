@@ -90,7 +90,7 @@ const FIELDS: {
   },
 ];
 
-/** Seconds as m:ss, for the "PDFs werden ausgewertet …" counter. */
+/** Seconds as m:ss, for the document-upload progress counter. */
 const formatElapsed = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 const MB = 1024 * 1024;
@@ -119,7 +119,7 @@ export default function ScenarioEditor({
   const [pdfElapsed, setPdfElapsed] = useState(0);
   const [pdfNote, setPdfNote] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  // The Fakten field's own id: its label sits outside it now, above the row it
+  // The facts field's own id: its label sits outside it now, above the row it
   // shares with the drop zone, so the two are tied by htmlFor rather than by
   // nesting — a <label> around both would hand a click on the zone to the
   // textarea.

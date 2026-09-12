@@ -132,7 +132,7 @@ function SessionRow({
         type="button"
         className="session-row-delete"
         // The label names the training, because a screen reader meets a
-        // column of otherwise identical "Löschen" buttons.
+        // column of otherwise identical delete buttons.
         aria-label={`Training „${session.scenario}“ vom ${when} löschen`}
         title="Training löschen"
         aria-expanded={confirming}
@@ -198,7 +198,7 @@ function TrashIcon() {
  * What the row promises when it is clicked.
  *
  * Three states, not two: a Session that ended a moment ago genuinely has a
- * wrap-up on its way (ADR 0019), and labelling that "kein Feedback" would be
+ * wrap-up on its way (ADR 0019), and labelling that as having none would be
  * wrong for as long as it takes the worker to run. A job that failed, by
  * contrast, will not produce anything later — saying so is the whole point,
  * because the screen used to imply the opposite.

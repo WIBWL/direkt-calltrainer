@@ -192,7 +192,7 @@ export interface Measurement {
   key: string;
   name: string;
   unit: string | null;
-  /** Which half of the Kennzahlen this one sits in. NULL only for a metric
+  /** Which half of the metrics this one sits in. NULL only for a metric
    * the inventory has retired. */
   aspect: MetricAspect | null;
   value: number;
@@ -264,7 +264,7 @@ export interface SessionFeedback {
    * Prose for the same reason `phase_language` is (ADR 0056): the right
    * register for a complaint is not the right register for a price
    * negotiation, and no norm is measured for either. It answers the one
-   * question the Sprachmelodie figures cannot, which is why it is rendered
+   * question the intonation figures cannot, which is why it is rendered
    * there rather than in the wrap-up. NULL where the wrap-up predates the
    * block or the model left it out; the block is omitted, never shown empty.
    */
@@ -284,7 +284,7 @@ export interface Finding {
   /** Milliseconds into the call, so the entry can be placed on the transcript. */
   offset_ms: number | null;
   description: string;
-  /** The Kennzahl this moment belongs to, or null if it stands alone. */
+  /** The metric this moment belongs to, or null if it stands alone. */
   metric_key: string | null;
 }
 
@@ -295,7 +295,7 @@ export type TrafficLight = "green" | "yellow" | "red";
 
 /**
  * One step of the scale a reading was taken off — F-51's traffic light and
- * F-35's three-step Sprachmelodie reading are both described this way.
+ * F-35's three-step intonation reading are both described this way.
  *
  * `label` and `range` come from the backend rather than being written here on
  * purpose: they belong beside the thresholds they describe, or a recalibration
@@ -324,7 +324,7 @@ export interface MetricStep {
 export type MeasurementSegment = "pressure" | "rest";
 
 /**
- * One Kennzahl over one stretch of a call (ADR 0081).
+ * One metric over one stretch of a call (ADR 0081).
  *
  * The two halves of a comparison the user draws themselves. Deliberately no
  * difference, ratio or verdict travels with them: how big a gap means something
@@ -357,14 +357,14 @@ export interface SessionDetail {
   turns: SessionTurn[];
   /** Statistics for the whole call, not per utterance (ADR 0051). */
   measurements: Measurement[];
-  /** The same Kennzahlen over the demanding stretches and over the rest
+  /** The same metrics over the demanding stretches and over the rest
    *  (ADR 0081). Empty where nobody pushed back, where a stretch was too short
    *  to measure, and for every call recorded before the per-utterance facts
    *  were kept. */
   segments: SegmentMeasurement[];
   /** Individual noted moments, ordered by when they happened. */
   findings: Finding[];
-  /** The long explanation behind a Kennzahl's "i", by metric key. Served
+  /** The long explanation behind a metric's "i", by metric key. Served
    *  rather than bundled, so the text and the thresholds it explains are
    *  edited in one place (ADR 0063's arrangement for the field limits). */
   metric_notes: Record<string, string>;
@@ -396,9 +396,9 @@ export interface SessionSummaryMeasurement {
   key: string;
   name: string;
   unit: string | null;
-  /** Which half of the Kennzahlen this one sits in — the schema's own `aspect`
+  /** Which half of the metrics this one sits in — the schema's own `aspect`
    *  (ADR 0064). Display only: it decides which side of the dashboard's
-   *  Sprechweise/Inhalt switch the metric appears on, and nothing else. */
+   *  delivery/content switch the metric appears on, and nothing else. */
   aspect: MetricAspect;
   value: number;
   /**
@@ -435,7 +435,7 @@ export interface SessionSummary {
   ended_at: string | null;
   measurements: SessionSummaryMeasurement[];
   /** The demanding stretches against the rest (ADR 0081), the only data behind
-   *  the focus goal "Souveränität unter Druck". Beside `measurements` and not
+   *  the focus goal "composure under pressure". Beside `measurements` and not
    *  inside it: that list is one entry per metric, and a series built over it
    *  would splice one training's pressure figure into the next one's line. */
   segments: SegmentMeasurement[];

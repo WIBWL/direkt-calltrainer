@@ -10,21 +10,15 @@ import ScenarioBriefing from "./ScenarioBriefing";
  * argument that the situation comes up in the call anyway. What stays withheld
  * is `call_goal`, which is the answer key.
  *
- * Two variants, like `ReverseBriefPanel`:
+ * Two variants, like `ReverseBriefPanel`: "prepare" is the screen between the
+ * microphone check and the ringing phone and carries both halves; "call" sits
+ * beside the state animation and carries the *facts* alone, since what one
+ * reaches back for mid-call is a number, a date or a name.
  *
- *  * "prepare" is the screen between the microphone check and the ringing
- *    phone. It carries both halves, because that is the screen on which the
- *    case is read.
- *  * "call" sits beside the state animation and carries the *facts* alone —
- *    the thing one reaches back for mid-call is a number, a date or a name,
- *    and the briefing has been read by then.
- *
- * The "call" variant is the same deliberate exception to ADR 0033 that
- * ADR 0070 takes for a reverse, and on the same ground: this text says nothing
- * about the conversation in progress, it is fixed before the call starts, and
- * it is never the Persona's lines. It is *not* shown for a Zufallsszenario —
- * there the whole exercise is not knowing (F-62), and the caller doing the
- * telling is the point.
+ * The "call" variant is the same deliberate exception to ADR 0033 that ADR 0070
+ * takes for a reverse: the text says nothing about the conversation in
+ * progress, is fixed before the call, and is never the Persona's lines. Not
+ * shown for a random Scenario — there not knowing is the exercise (F-62).
  */
 export default function CaseBriefPanel({
   briefing,

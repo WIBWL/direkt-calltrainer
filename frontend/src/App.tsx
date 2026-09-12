@@ -89,15 +89,15 @@ const ORIGIN_FILTERS: LibraryFilter[] = [
 ];
 
 /** What the selection screen opens on (ADR 0072): everything, on both rows.
- * Opening on a shortlist (Standard + Betrieb & Störung, which this was) hides
- * the User's own Scenarios behind a filter they have to know to press — and
- * what is on screen is capped by `COLLAPSED_CARDS` anyway, so "Alle" is a
- * first page of the library rather than a wall of it. */
+ * Opening on a shortlist, which this once did, hides the User's own Scenarios
+ * behind a filter they have to know to press — and `COLLAPSED_CARDS` caps what
+ * is on screen anyway, so the unfiltered row is a first page of the library
+ * rather than a wall of it. */
 const DEFAULT_ORIGIN: LibraryFilter = "all";
 const DEFAULT_CATEGORY: CategoryFilter = "all";
 
 /** Where the screen opens: on the suggestions where there are any (F-62), with
- * the category row on "Alle" -- suggestions spread over the categories, and one
+ * the category row unfiltered — suggestions spread over the categories, and one
  * of them alone would often leave nothing. Otherwise the defaults above. */
 function startingFilters(scenarios: ScenarioCard[]): [LibraryFilter, CategoryFilter] {
   return scenarios.some((s) => s.recommendation)
@@ -121,7 +121,7 @@ const toLibraryItem = (s: ScenarioCard) => ({
   recommendation: s.recommendation,
 });
 
-/** The Scenario to start on: the Zufallsszenario (F-62), which is the one tile
+/** The Scenario to start on: the random Scenario (F-62), which is the one tile
  * that stands outside both filters and is therefore always on screen. It is
  * also the only opening selection that cannot be the wrong one — every other
  * default silently proposes a case the User did not choose.
@@ -188,7 +188,7 @@ export default function App() {
   // see the effect below.
   const [pendingEnd, setPendingEnd] = useState<PendingEnd | null>(null);
   // The committed Session: set when the user actually commits to one (the
-  // "Session starten" click), never by the selection itself — see ADR 0042.
+  // start-the-session press), never by the selection itself — see ADR 0042.
   // Nothing connects on its own, which is also what keeps a persistently
   // failing backend from looping: a failed Session is only ever retried by
   // another deliberate click, never automatically.
@@ -209,7 +209,7 @@ export default function App() {
   // it is fetched once per committed Session rather than once per screen.
   const [reverseBrief, setReverseBrief] = useState<ReverseBrief | null>(null);
   // The drawn Scenario's name while it is still a secret (F-62): set only for
-  // a Zufallsszenario, and the one thing the call screen must not show. Null
+  // a random Scenario, and the one thing the call screen must not show. Null
   // means the User picked the case themselves and knows what it is.
   const [secretScenario, setSecretScenario] = useState<string | null>(null);
 
@@ -232,7 +232,7 @@ export default function App() {
 
   const selectedPersona = personas.find((persona) => persona.id === personaId) ?? null;
   const selectedScenario = scenarios.find((scenario) => scenario.id === scenarioId) ?? null;
-  // What a Zufallsszenario would be drawn from (F-62): what the two filter
+  // What a random Scenario would be drawn from (F-62): what the two filter
   // rows currently show, minus the two kinds nobody should be walked into
   // unprepared. Held as Scenario *cards* rather than library items because the
   // draw hands its result to `beginSession`, which wants the row.
@@ -256,7 +256,7 @@ export default function App() {
   // name up in, so the stored one stands in.
   const personaName = selectedPersona?.name ?? restored?.personaName ?? "Persona";
   // The played case, resolved the same way and for the same screen. A
-  // Zufallsszenario needs nothing special: `beginSession` sets `scenarioId` to
+  // random Scenario needs nothing special: `beginSession` sets `scenarioId` to
   // the drawn row, so the selection already *is* the case that was played.
   const scenarioName = selectedScenario?.name ?? restored?.scenarioName ?? null;
 
@@ -347,7 +347,7 @@ export default function App() {
   // deliberately withholds the case (ADR 0045) and only the detail route
   // serves it — the same text the info panel behind a card's "i" shows.
   //
-  // Withheld for a Zufallsszenario, which is the one case the User is meant
+  // Withheld for a random Scenario, which is the one case the User is meant
   // to walk into unread (F-62), and for a reverse, which has a briefing of
   // its own and would otherwise be given two.
   //
@@ -495,8 +495,8 @@ export default function App() {
   }, [isMicrophoneMuted, screen, vad.startListening, vad.stopListening]);
 
   // The one way into a call: commit to a pairing and go to the microphone
-  // check. Taken by the setup screen's button and by the follow-up's "Starten"
-  // alike, so the second one is the same act as the first and not a shortcut
+  // check. Taken by the setup screen's button and by the follow-up's start
+  // button alike, so the second is the same act as the first and not a shortcut
   // past it. The stored finished Session goes here rather than in whoever
   // called: once a new call is committed to, the previous wrap-up must not come
   // back on the next reload.
@@ -517,7 +517,7 @@ export default function App() {
       // conversation and nothing else, and it is skipped.
       //
       // What is not skipped is the case: a reverse gets the briefing it has to
-      // argue from, and everything else the screen with its own Ausgangslage
+      // argue from, and everything else the screen with its own Briefing
       // on it — the same one the microphone check leads to. A follow-up used to
       // go from the wrap-up straight to the ringing phone, which was the one
       // way into a call that never showed the User what they were walking
@@ -533,7 +533,7 @@ export default function App() {
   const handleStartSession = useCallback(() => {
     if (personaId === null || scenarioId === null) return;
 
-    // The Zufallsszenario (F-62) is drawn here and nowhere earlier: selecting
+    // The random Scenario (F-62) is drawn here and nowhere earlier: selecting
     // the tile is not yet a case, and a draw made on selection would be a
     // different one each time the User changed their mind about the Persona.
     if (scenarioId === RANDOM_SCENARIO_ID) {
@@ -557,7 +557,7 @@ export default function App() {
   // Persona, the new Scenario, no detour through the setup screen. Taken by the
   // card's second button, once the Scenario exists and the User has read what
   // it is — the first one only wrote it. Goes through the same `beginSession`
-  // as the follow-up's "Starten", which lands it on the briefing screen rather
+  // as the follow-up's start button, which lands it on the briefing screen rather
   // than in the call. The library is reloaded so the row is there when the User
   // comes back to it, and the filter follows it, so it is not hidden behind
   // whichever chip happened to be active.
@@ -599,7 +599,7 @@ export default function App() {
     setScreen("call");
   }, [playback, socket.sendActivate]);
 
-  // The microphone check's own button. A Zufallsszenario gets the die in
+  // The microphone check's own button. A random Scenario gets the die in
   // between (F-62); everything else goes straight through. Under reduced
   // motion the screen is skipped rather than shown still: the animation is the
   // whole of what it has to say, and without it it is two seconds of nothing.
@@ -611,12 +611,12 @@ export default function App() {
     // that screen's own button — nothing is activated here.
     //
     // The two branches cannot both apply: a reverse is never drawn, because
-    // reverses are not in the Zufallsszenario's pool.
+    // reverses are not in the random Scenario's pool.
     if (committed?.reverse) {
       playReverse(() => setScreen("brief"));
       return;
     }
-    // A Zufallsszenario is dealt its case first and goes straight to the die:
+    // A random Scenario is dealt its case first and goes straight to the die:
     // the fade belongs between the throw and the call, not in front of the
     // throw, so the cut it covers is the one into the ringing phone (F-63).
     // It skips the case screen below for the reason it reveals nothing else:
@@ -734,8 +734,9 @@ export default function App() {
   // By name, not by origin group: the grid badges every card with where it
   // comes from, so grouping by that said the same thing twice and left no way
   // to find a Scenario one already knows the name of. `localeCompare` with an
-  // explicit locale, because the sort has to put Ä where A is and not after Z.
-  // The Zufallsszenario is not in here — the picker draws it in a fixed first
+  // explicit locale, because an umlaut has to sort with its base letter rather
+  // than after Z.
+  // The random Scenario is not in here — the picker draws it in a fixed first
   // place ahead of this list.
   const visibleScenarios = useMemo(
     () =>
@@ -761,12 +762,12 @@ export default function App() {
     ]),
   ) as Record<CategoryFilter, number>;
 
-  // "Auswahl prüfen" must never name a case that is not on the screen above it
-  // — the rule the opening selection already follows. A filter change can
-  // break it two ways: the Zufallsszenario tile stops being offered, or the
+  // The selection summary must never name a case that is not on the screen
+  // above it — the rule the opening selection already follows. A filter change
+  // can break it two ways: the random Scenario tile stops being offered, or the
   // card that was picked is filtered away. Either way the selection falls back
   // to the tile, which is where the screen opens; only with nothing left to
-  // fall back to does it become "noch nicht ausgewählt". Falling back rather
+  // fall back to does the summary report nothing selected. Falling back rather
   // than clearing is the point: clearing left the summary empty even after the
   // User filtered their way back to a library full of cases.
   useEffect(() => {
@@ -831,7 +832,7 @@ export default function App() {
       // An ordinary call keeps its facts in view the same way, which is the
       // same exception to ADR 0033 for the same reason: fixed before the call,
       // never the Persona's lines. The case is already null for a
-      // Zufallsszenario, so nothing is revealed there.
+      // random Scenario, so nothing is revealed there.
       return (
         <CaseBriefPanel
           briefing={selectedScenario?.briefing}
@@ -942,7 +943,7 @@ export default function App() {
   if (screen === "mic-check") {
     // The same three branches `handleMicConfirmed` takes, in the same order,
     // reduced to the one question the button's label asks: is a briefing the
-    // next screen? A Zufallsszenario reads nothing (F-62), and a Scenario with
+    // next screen? A random Scenario reads nothing (F-62), and a Scenario with
     // neither a briefing nor facts has no screen to stop on. The case is
     // still being fetched for a moment after the commit, so a Scenario carried
     // by its facts alone can flip the label once, early, while nobody has
@@ -1031,8 +1032,8 @@ export default function App() {
 
   if (screen === "transcript") {
     return (
-      // The brand in the header leaves for the same place the foot's "Zur
-      // Startseite" does, and has to do the same thing to get there: these two
+      // The brand in the header leaves for the same place the home button at
+      // the foot does, and has to do the same thing to get there: these two
       // screens are a state under the training route, not a route of their own.
       <AppLayout step="feedback" onHome={handleRestart}>
         <FeedbackScreen

@@ -6,7 +6,7 @@ import { recommendationReason } from "./LibraryPicker";
  * What to play next (F-64): Scenarios that already exist, one press to start.
  *
  * Unlike the follow-up and the reverse beside it, nothing is written first, so
- * "Starten" begins the call at once — skipping the microphone check, which was
+ * starting begins the call at once — skipping the microphone check, which was
  * in use seconds ago. Each offer names its reason.
  */
 export default function NextCalls({

@@ -4,27 +4,24 @@ import LegalPage from "../LegalPage";
  * The privacy statement, based on https://efre-direkt.de/privacy/ and adapted
  * to what the Calltrainer actually processes.
  *
- * What was kept from the original, because it is about the responsible body
- * rather than about a website: the controller, the data protection officer,
- * the legal bases, the data subject rights, the supervisory authority and the
- * TLS paragraph.
+ * Kept from the original, being about the responsible body rather than a
+ * website: the controller, the data protection officer, the legal bases, the
+ * data subject rights, the supervisory authority and the TLS paragraph.
  *
- * What was removed, because the Calltrainer does not do it: the Hetzner
- * hosting, the contact form and Web3Forms, the pretix event registration, the
- * DFN newsletter, the analytics paragraph and the tracking-cookie paragraph.
- * Leaving those in would have described processing that does not happen, which
- * is worse than saying nothing: it makes the whole document untrustworthy.
+ * Removed, because this application does not do it: the contact form and
+ * Web3Forms, the event registration, the newsletter, analytics and tracking
+ * cookies. Describing processing that does not happen is worse than saying
+ * nothing — it makes the whole document untrustworthy.
  *
- * What was added, because it does happen and the original could not know about
- * it: the login through Keycloak, the speech leaving the browser for the DiReKT
- * gateway and KugelAudio, the consent-gated storage, the six-month retention,
- * the account settings that are stored alongside the trainings without being
- * part of them (the focus goals of ADR 0076 and the retention switch), and the
- * rights that are exercisable in the app itself.
+ * Added, because it does happen: the Keycloak login, the speech leaving the
+ * browser for the DiReKT gateway and KugelAudio, the consent-gated storage, the
+ * six-month retention, the account settings stored alongside the trainings
+ * without being part of them (ADR 0076's focus goals and the retention switch),
+ * and the rights exercisable in the app itself.
  *
- * The two gaps the first draft carried are filled: the hoster is Hetzner in
- * Gunzenhausen, and KugelAudio's seat, DPA and sub-processors come from the
- * Auftragsverarbeitungsvertrag dated 23.01.2026. Everything stated about
+ * Both gaps of the first draft are filled: the hoster is Hetzner in
+ * Gunzenhausen, and KugelAudio's seat, data processing agreement and
+ * sub-processors come from the agreement dated 23.01.2026. Everything about
  * KugelAudio is attributed to the provider rather than asserted as our own
  * observation, because that is what it is.
  *

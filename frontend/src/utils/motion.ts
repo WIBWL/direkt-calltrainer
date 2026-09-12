@@ -6,7 +6,7 @@
  * mid-animation should not cut that animation short.
  *
  * One place because two screens ask — the reverse's card cut (F-61) and the
- * Zufallsszenario's die (F-62) — and because the query string is the kind of
+ * random Scenario's die (F-62) — and because the query string is the kind of
  * thing that is quietly mistyped in a copy, where it fails open: a mistyped
  * media query matches nothing, so the motion plays and nobody notices.
  */

@@ -15,26 +15,23 @@ import SectionHeading from "./SectionHeading";
 import Sparkline from "./Sparkline";
 
 /**
- * Every Kennzahl over time, one row each (block C of the dashboard).
+ * Every metric over time, one row each (block C of the dashboard).
  *
- * A table and not a grid of tiles, because the tiles stopped working the moment
- * the inventory grew. The concept sized the grid for nine Kennzahlen and put a
- * switch over it so five or six showed at a time; there are sixteen now, the
- * switch showed nine and seven, and the wall it was built against was back. A
- * row per Kennzahl fits all of them on one screen at the app's full width,
- * every sparkline the same size and on the same axis position, which is what
- * lets the eye compare them (Tufte's sparkline table). The switch goes with it:
- * nothing is hidden any more, so there is nothing to switch to.
+ * A table and not a grid of tiles: the concept sized that grid for nine metrics
+ * behind a switch, there are sixteen now, and the wall it was built against was
+ * back. A row per metric fits all of them on one screen at full width, every
+ * sparkline the same size and on the same axis position, which is what lets the
+ * eye compare them (Tufte's sparkline table). The switch goes with it — nothing
+ * is hidden, so there is nothing to switch to.
  *
- * The two families stay, as row groups with a heading in their hue rather than
- * as two halves behind a control. Colour is still identity and never a value
- * (`utils/metricGroups`): the hue hangs off the group, and the table cells never
- * see one.
+ * The two families stay as row groups headed in their hue rather than halves
+ * behind a control. Colour is identity and never a value
+ * (`utils/metricGroups`): the hue hangs off the group, and the cells never see
+ * one.
  *
- * It is also the better accessible form. A screen reader moves through a real
- * table by row and column and hears which Kennzahl a figure belongs to; sixteen
- * links each wrapping a drawing gave it sixteen images with a number in the
- * name.
+ * Also the better accessible form: a screen reader moves through a real table
+ * by row and column and hears which metric a figure belongs to, where sixteen
+ * links wrapping drawings gave it sixteen images with a number in the name.
  */
 export default function ProgressMetricTable({ series }: { series: MetricSeries[] }) {
   if (series.length === 0) {
@@ -55,7 +52,7 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
     );
   }
 
-  // Sprechweise first, as the post-call screen opens on it: the reading the
+  // Delivery first, as the post-call screen opens on it: the reading the
   // transcript cannot give. Within a group the order is the backend's own
   // inventory order, which is the order the series arrive in.
   const groups: MetricGroup[] = ["speech", "content"];
@@ -114,9 +111,9 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
         </div>
       </div>
 
-      {/* The one sentence that must be read with the column headed "Ihr
-          üblicher Bereich" stays in view, since that heading alone could pass
-          for a target. The rest is how the table was made. */}
+      {/* The one sentence that must be read with the usual-range column stays
+          in view, since that heading alone could pass for a target. The rest is
+          how the table was made. */}
       <p className="muted progress-note">
         Der übliche Bereich ist aus Ihren eigenen Trainings gerechnet und ist kein Ziel.
       </p>
@@ -148,7 +145,7 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
 }
 
 /**
- * One Kennzahl.
+ * One metric.
  *
  * The name is the link, so the row has one real control for the keyboard and
  * the screen reader. The rest of the row takes a click too, as a convenience

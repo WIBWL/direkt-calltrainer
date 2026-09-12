@@ -9,17 +9,17 @@ import type { SessionSummary } from "../protocol";
  * of statements**, never a measurement of a person, which is the distinction
  * that keeps this inside ADR 0004 and ADR 0065.
  *
- * Two decisions worth stating, because both change the number:
+ * Two decisions that change the number:
  *
- * **Counted per training, not per point.** Two improvements about the closing
- * in one call are one call that mentioned the closing. Counting points would
- * let a single wordy wrap-up look like a pattern.
+ * **Counted per training, not per point** — two improvements about the closing
+ * in one call are one call that mentioned it. Counting points would let a
+ * single wordy wrap-up look like a pattern.
  *
- * **The denominator is the trainings that could have mentioned it**, meaning
- * those whose wrap-up carries any assignment at all. A training with no
- * wrap-up never had an opinion, and one written before the assignment existed
- * had no way to record it; leaving either in the denominator would quietly
- * shrink every fraction. The interface says which number it is dividing by.
+ * **The denominator is the trainings that could have mentioned it**, i.e. those
+ * whose wrap-up carries any assignment. A training with no wrap-up never had an
+ * opinion, and one written before the assignment existed could not record it;
+ * leaving either in would quietly shrink every fraction. The interface says
+ * which number it divides by.
  */
 export interface GoalMentions {
   goal: string;
@@ -106,7 +106,7 @@ export interface GoalStatement {
 /**
  * Everything the wrap-ups wrote about these goals, newest training first.
  *
- * Several goals at once because a Kennzahl can stand behind more than one, and
+ * Several goals at once because a metric can stand behind more than one, and
  * the order within a training is the wrap-up's own (`position`), which the
  * listing preserves.
  */

@@ -1,45 +1,25 @@
 /**
- * The F0 contour of a call, drawn the way phonetics draws it (F-35).
+ * The F0 contour of a call, drawn the way phonetics draws it (F-35). Six
+ * conventions, each a decision rather than a style:
  *
- * Six conventions, each of which is a decision and not a style:
- *
- * **Semitones on the vertical axis, relative to the speaker's own median.**
- * Hertz is a linear scale and pitch perception is not: 20 Hz is a large step
- * for a low voice and a small one for a high voice, so a Hertz axis draws the
- * same intonation differently for two speakers. A semitone axis anchored at the
- * speaker's median is the standard normalisation and makes the picture about
- * the delivery rather than about the voice.
- *
- * **The horizontal axis is speaking time, not call time.** The curve holds the
- * user's frames only; what the Persona said is not in the data at all, so no
- * stretch of this plot stands for someone else talking. Where one of the user's
- * turns ends and the next begins there is a dashed mark instead of a gap — the
- * seam is a fact worth seeing, an empty stretch would only be dead space.
- *
- * **Unvoiced stretches are bridged, but drawn as bridges.** Roughly half of
- * speech carries no pitch: consonants, breaths, the pauses inside a sentence.
- * Leaving them as holes broke the line into confetti and made the contour
- * unreadable at a glance; interpolating them silently would draw movement that
- * was never measured, which is the commonest way an F0 plot lies. So the line
- * runs through and the bridged pieces are dotted and faint: continuous to
- * follow, visibly not the same claim as the measured stretches. A bridge never
- * crosses a seam — the voice did not travel from the end of one turn to the
- * start of the next, the Persona spoke in between.
- *
- * **Never more points than there are pixels.** A call with two minutes of
- * speaking time arrives as some 2400 points for 676 units of width. Drawn one
- * for one, three of them share a column and the line grows hair that is
- * rendering noise, not intonation. Above that density the curve is condensed by
- * taking each column's median, which keeps the shape, the gaps and the seams.
- *
- * **The band is the speaker's own 5th to 95th percentile**, measured at both
- * ends rather than assumed symmetric around the median, and it is not a target.
- * It is there so the eye can see which excursions were unusual *for this
- * speaker*, the only comparison available without a norm nobody has measured
- * (ADR 0051).
- *
- * **No colour carries meaning.** One hue throughout, as everywhere else in this
- * application except the single trialled traffic light.
+ * - **Semitones, relative to the speaker's own median.** Hertz is linear and
+ *   pitch perception is not, so a Hertz axis draws the same intonation
+ *   differently for a low and a high voice.
+ * - **The horizontal axis is speaking time, not call time.** The curve holds
+ *   the user's frames only, so no stretch of it stands for the Persona talking.
+ *   Turn boundaries are dashed marks rather than gaps: the seam is a fact, dead
+ *   space is not.
+ * - **Unvoiced stretches are bridged, but drawn as bridges** — dotted and
+ *   faint, and never across a seam. Holes broke the line into confetti; a
+ *   silent interpolation would draw movement nobody measured, which is the
+ *   commonest way an F0 plot lies.
+ * - **Never more points than pixels.** Two minutes of speech is ~2400 points
+ *   over 676 units; drawn one for one the line grows hair that is rendering
+ *   noise. Above that density each column is reduced to its median.
+ * - **The band is the speaker's own 5th-95th percentile**, measured at both
+ *   ends rather than assumed symmetric, and it is not a target — it is the only
+ *   comparison available without a norm nobody has measured (ADR 0051).
+ * - **No colour carries meaning.** One hue throughout.
  */
 
 const WIDTH = 720;

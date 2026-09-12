@@ -29,36 +29,29 @@ import {
 import { formatOffset } from "./time";
 
 /**
- * The whole Gesprächsfeedback as a PDF, built in the browser (F-64).
+ * The whole feedback document as a PDF, built in the browser (F-64).
  *
- * It began as the Gesprächsprotokoll alone and now carries everything the
- * feedback page shows, in the page's own order — Zusammenfassung, Stärken,
- * Verbesserungen, phasengerechte Sprache, Kennzahlen — with the transcript
- * last. The transcript comes last for the same reason it is collapsed on the
- * screen: it is read closely or not at all, and a document that opens with it
- * buries everything that comments on it.
+ * Carries everything the feedback page shows, in the page's own order —
+ * summary, strengths, improvements, phase-appropriate register, metrics — with
+ * the transcript last, for the same reason it is collapsed on screen: it is
+ * read closely or not at all, and a document opening with it buries everything
+ * that comments on it.
  *
- * What is deliberately *not* in here is "Nächste Schritte": those two offers
- * write a new Scenario when pressed, and a sheet of paper cannot press them.
+ * The next-steps block is deliberately absent: those two offers write a new
+ * Scenario when pressed, and a sheet of paper cannot press them.
  *
- * In the browser and not on the server for one reason that decides it: a
- * training run without consent is never stored (ADR 0066), and that call still
- * shows its transcript. A server route could only serve the calls that were
- * kept, so the one case where the download is the *only* copy is the one case
- * it could not serve. Here the text is already in memory either way, and the
- * spoken content never leaves the machine to become a file.
+ * Built in the browser and not on the server for the one reason that decides
+ * it: a training run without consent is never stored (ADR 0066) and still shows
+ * its transcript, so the one case where this download is the *only* copy is the
+ * one case a server route could not serve.
  *
- * jsPDF is loaded on the press rather than with the app, and so are the fonts:
- * together they are the largest thing the frontend can pull, and most
- * trainings end without anyone wanting a file.
+ * jsPDF and the fonts are fetched on the press — together the largest thing the
+ * frontend can pull, and most trainings end without anyone wanting a file.
  *
- * The document is set in the app's own faces — Hanken Grotesk for the text,
- * Schibsted Grotesk for the titles — rather than in the viewer's Helvetica, so
- * a printed report looks like the thing it came out of. Both are under the
- * SIL Open Font License, which permits embedding. They are converted from the
- * bundled woff2 and subsetted to the Latin range plus the marks German text
- * uses; a character outside that subset has no glyph and would come out blank,
- * which is what `drawable` guards against.
+ * Set in the app's own faces (Hanken Grotesk, Schibsted Grotesk for titles)
+ * rather than the viewer's Helvetica, both OFL and therefore embeddable. They
+ * are subsetted to Latin plus the marks German uses; a character outside that
+ * subset would come out blank, which is what `drawable` guards against.
  */
 
 /** A4 in millimetres, which is also the unit the document is built in. */
@@ -524,7 +517,7 @@ export async function buildFeedbackPdf({
         doc.text(drawable(measurement.name.toUpperCase()), left, top + 4);
         doc.setCharSpace(0);
 
-        // A checklist Kennzahl (the opening, the closing) names its parts in
+        // A checklist metric (the opening, the closing) names its parts in
         // words, as its tile does, rather than printing how many were
         // recognised: "2" alone in display type is the mark ADR 0086 kept off
         // the screen. Smaller than a figure, because it is a list of words. The

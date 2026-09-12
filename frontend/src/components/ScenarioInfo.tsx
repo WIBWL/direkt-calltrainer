@@ -42,20 +42,18 @@ const SECTIONS: { key: keyof ScenarioDetail; label: string }[] = [
  * the same field order as the editor — so the panel a user reads and the form
  * they then edit are recognisably the same thing.
  *
- * Reading comes before writing for every Scenario (ADR 0076): the card has no
- * edit affordance any more, and "Bearbeiten" appears here instead, only on a
- * row the *server* marked `editable`. What the panel shows is the case as the
- * trainee may know it going in — the situation, their own briefing and the
- * facts — and nothing of what the caller is after. The teaser is not among
- * them either: it is the card this panel was opened from, and repeating it
- * under the same title says nothing the reader has not just read.
+ * Reading comes before writing for every Scenario (ADR 0076): the card carries
+ * no edit affordance, and the edit button appears here instead, only on a row
+ * the *server* marked `editable`. The panel shows the case as the trainee may
+ * know it going in — the situation, their briefing and the facts — and nothing
+ * of what the caller is after. The teaser is left out too: it is the card this
+ * panel was opened from.
  *
- * A reverse (ADR 0070) and a follow-up (ADR 0069) are the rows that are the
- * caller's and still not editable, so the editor — where every hand-authored
- * row is deleted — is closed to both. Their "Löschen" is here instead, in the
- * same corner of the same actions row, asking the same question of each.
- * Deleting is the only thing this otherwise read-only panel does, which is why
- * it sits apart from "Schließen" rather than beside it.
+ * A reverse (ADR 0070) and a follow-up (ADR 0069) are the caller's own rows and
+ * still not editable, so the editor — where every hand-authored row is deleted
+ * — is closed to both. Their delete control is here instead, in the same corner
+ * of the same actions row, and sits apart from the close button because it is
+ * the only thing this otherwise read-only panel does.
  */
 export default function ScenarioInfo({
   scenarioId,
@@ -173,11 +171,12 @@ export default function ScenarioInfo({
         </div>
       </div>
 
-      {/* The whole phrase per kind, not a noun slotted into one sentence: der
-          Rollentausch and das Folgeszenario do not take the same article. It
-          asks at all because one slip costs a row that can only be recreated
-          from the training it came from, at the price of a model call — if
-          that training is even still stored. */}
+      {/* The whole phrase per kind, not a noun slotted into one sentence: the
+          two kinds take different articles in the UI language, so a shared
+          frame would be ungrammatical for one of them. It asks at all because
+          one slip costs a row that can only be recreated from the training it
+          came from, at the price of a model call — if that training is even
+          still stored. */}
       {confirmingDelete && detail && (
         <ConfirmDialog
           title={

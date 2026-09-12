@@ -9,11 +9,11 @@ import FocusProfilePicker from "./FocusProfilePicker";
  *
  * Two things have to be true of this screen or it does harm. Picking nothing
  * must be a real option, offered as plainly as picking something, which is why
- * "Ohne Fokus fortfahren" sits beside the save button and not below it as an
- * afterthought. And it must be clear that a focus *adds* emphasis rather than
- * switching the rest off, because a user who believes they are turning ten
- * goals off will pick none out of caution and the feature will have cost them
- * something.
+ * the continue-without-a-focus button sits beside the save button and not below
+ * it as an afterthought. And it must be clear that a focus *adds* emphasis
+ * rather than switching the rest off, because a user who believes they are
+ * turning ten goals off will pick none out of caution and the feature will
+ * have cost them something.
  *
  * Fifteen cards is a lot for a first screen, which is why the captions carry
  * the meaning and the paragraphs sit behind an "i". Whoever wants to decide in

@@ -22,21 +22,20 @@ export function toggleGoal(selected: string[], key: string, max: number): string
  * profile section. They differ in what surrounds them and in nothing else, and
  * two copies of the card list would drift on the first catalogue change.
  *
- * The card is the app's own selection idiom (`.choice-check`, as on a Persona
- * or Scenario card) over a real checkbox: this is a pick-up-to-five, so the
- * input stays and only its rendering changes. The circle carries the pick's
- * position rather than a tick, which is what ties a card to a slot in the
- * dialog's tally.
+ * The card is the app's own selection idiom (`.choice-check`) over a real
+ * checkbox: this is a pick-up-to-five, so the input stays and only its
+ * rendering changes. The circle carries the pick's position rather than a tick,
+ * tying a card to a slot in the dialog's tally.
  *
- * The limit is enforced by disabling what cannot be picked rather than by
- * refusing the click afterwards: a checkbox that turns out not to have worked
- * is worse than one that says why it is unavailable. Already-ticked cards stay
- * enabled at the limit, so the way out is always to untick something. Locked
- * cards go quiet rather than faint — ten faded cards in a grid read as broken.
+ * The limit disables what cannot be picked rather than refusing the click
+ * afterwards — a checkbox that turns out not to have worked is worse than one
+ * that says why. Ticked cards stay enabled at the limit, so the way out is
+ * always to untick something; locked cards go quiet rather than faint, since
+ * ten faded cards in a grid read as broken.
  *
- * The cards sit in a responsive grid — two columns in the dialog, one in the
- * narrower profile card — because a title of 15 to 31 characters does not need
- * a full row, and a full row per goal is what made the first screen long.
+ * A responsive grid, two columns in the dialog and one in the narrower profile
+ * card: a title of 15 to 31 characters does not need a full row, and a row per
+ * goal is what made the first screen long.
  */
 export default function FocusGoalPicker({
   goals,

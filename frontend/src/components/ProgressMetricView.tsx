@@ -18,12 +18,12 @@ import PartsStrip, { partsSummary } from "./PartsStrip";
 import Sparkline from "./Sparkline";
 
 /**
- * One Kennzahl across the trainings, the dashboard's second level
+ * One metric across the trainings, the dashboard's second level
  * (docs/dashboard-konzept.md, section 7).
  *
  * The table is not a fallback for the chart, it is the other half of it. Which
  * Scenario and which Persona a value came from is what makes it readable at
- * all: a Redeanteil of 62 % in a support call and one in a price negotiation
+ * all: a talk share of 62 % in a support call and one in a price negotiation
  * are not the same observation, and the chart cannot say which is which. It is
  * also the accessible alternative, so nothing here exists only as a drawing.
  *
@@ -31,7 +31,7 @@ import Sparkline from "./Sparkline";
  * level, and it is the screen that already exists (`PastSessionView`).
  *
  * Under the table stands what the wrap-ups wrote about the focus goals this
- * Kennzahl is evidence for, quoted. Section 7 of the concept asks for it, and
+ * metric is evidence for, quoted. Section 7 of the concept asks for it, and
  * it is the half a chart cannot carry: a figure says what happened, the
  * sentence says what it was like.
  */
@@ -73,7 +73,7 @@ export default function ProgressMetricView() {
   // Newest first in the table, oldest first in the chart: a chart reads left to
   // right in time, a list is read from the most recent entry down.
   const rows = [...series.points].reverse();
-  // What the wrap-ups wrote about the goals this Kennzahl stands behind. The
+  // What the wrap-ups wrote about the goals this metric stands behind. The
   // sessions arrive newest first, so the quotations are already in the order
   // the table is in.
   const statements = statementsFor(sessions, goalsForMetric(series.key));
@@ -84,9 +84,9 @@ export default function ProgressMetricView() {
       <h1>{series.name}</h1>
       <p className="page-lead">
         {series.points.length} {series.points.length === 1 ? "Training" : "Trainings"}
-        {/* A checklist's unit is "von 3", which as "gemessen in von 3" says
-            nothing; its strip below says what the numbers count. */}
-        {/* Nor for a count, whose unit is the bare word "Anzahl". */}
+        {/* A checklist's unit is a bare denominator, which reads as nothing in
+            this sentence; its strip below says what the numbers count. */}
+        {/* Nor for a count, whose unit is the bare word "count". */}
         {series.unit && series.shape === "line" && !isCount(series) && (
           <>, gemessen in {series.unit}</>
         )}

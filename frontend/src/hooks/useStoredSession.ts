@@ -10,20 +10,19 @@ export type StoredSessionState = "loading" | "ready" | "missing" | "failed";
 /**
  * One stored Session, read once.
  *
- * The counterpart to `useSessionFeedback`, and the difference is the whole
- * point: that hook polls, because it runs the moment a call ends, when the
- * wrap-up genuinely is still being generated (ADR 0019). Opened from the
- * history days later, nothing is in flight — whatever the database holds is
- * the final answer, and polling for it would only spend a minute implying that
- * something is on its way.
+ * The counterpart to `useSessionFeedback`, and the difference is the point:
+ * that hook polls because it runs the moment a call ends, when a wrap-up
+ * genuinely is being generated (ADR 0019). Opened from the history days later
+ * nothing is in flight, and polling would only spend a minute implying
+ * otherwise.
  *
  * A Session without a wrap-up is therefore `ready` here, not an error: the
- * Transcript and the figures are still there, and the caller says plainly that
- * the narrative is not.
+ * Transcript and figures are still there, and the caller says plainly that the
+ * narrative is not.
  *
- * `reload` is the one thing that reads it a second time: the caller can edit
- * the follow-up Scenario this Session produced (F-60), and the card shown here
- * would otherwise keep the title it had before that edit.
+ * `reload` is the one thing that reads it twice: the caller can edit the
+ * follow-up this Session produced (F-60), and the card would otherwise keep its
+ * pre-edit title.
  */
 export function useStoredSession(sessionId: string | null) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);

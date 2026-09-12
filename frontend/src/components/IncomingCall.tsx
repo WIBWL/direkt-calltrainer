@@ -7,32 +7,23 @@ import PersonaAvatar from "./PersonaAvatar";
  * The phone ringing between the microphone check and an ordinary call (F-63).
  *
  * The call has to be *accepted*, not merely arrived at: in an ordinary Session
- * the Persona is the one who rang (`_casting` in `session/prompting.py` — it
- * has a concern and the user is the support or sales side it reached), so
- * picking up is what the user actually does, and the screen that says so is
- * the last thing before they have to say hello.
+ * the Persona is the one who rang (`_casting` in `session/prompting.py`), so
+ * picking up is what the user actually does.
  *
- * It is also the only screen between the check and the call where nothing is
- * happening yet: the Session is connected and the opening line is generated
- * and waiting (ADR 0042), held back until `session.activate`. Accepting is
- * what sends it. So the wait is real rather than staged — the Persona is
- * genuinely on the line.
+ * The wait on it is real rather than staged: the Session is connected and the
+ * opening line generated and held back until `session.activate` (ADR 0042),
+ * which accepting is what sends.
  *
- * Not shown for a reverse (ADR 0070): there the user is the caller, and a
- * screen asking them to take an incoming call would have the roles the wrong
- * way round on the one feature that is about roles.
+ * Not shown for a reverse (ADR 0070): there the user is the caller, and asking
+ * them to take an incoming call would have the roles the wrong way round on the
+ * one feature that is about roles.
  *
- * The ringtone can be switched off, and the switch is not a nicety: sound that
- * starts by itself and runs longer than three seconds has to be stoppable
- * (WCAG 2.1 SC 1.4.2), and this project publishes an accessibility statement.
- * The choice is remembered, because someone who turns it off in an open-plan
- * office does not want to turn it off again before every call.
- *
- * It is the phone's own silent switch rather than a link under the device —
- * the place a person already reaches for, and one fewer thing beside a screen
- * that is meant to read as a phone and not as a page about one. The hit area
- * is much larger than the sliver it draws, because the sliver is 3px wide and
- * a target has to be 24px (WCAG 2.5.8).
+ * The ringtone switch is not a nicety: sound that starts by itself and runs
+ * past three seconds has to be stoppable (WCAG 1.4.2). The choice is
+ * remembered — someone who turns it off in an open-plan office should not have
+ * to again before every call. It is the phone's own silent switch rather than a
+ * link, the place a person already reaches for; its hit area is far larger than
+ * the 3px sliver it draws, since a target has to be 24px (WCAG 2.5.8).
  */
 
 /** Where the ringtone preference lives. Per browser, per person, and of no

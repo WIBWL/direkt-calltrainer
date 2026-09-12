@@ -22,9 +22,9 @@ const NOT_SELECTED = "Noch nicht ausgewählt";
 /** What the summary says about a case that has not been drawn yet (F-62): the
  * choice that was made, and not its outcome, because there is none yet — plus
  * the category it will be drawn from, which is the one thing about it that is
- * already settled. Under "Alle" the word stands alone: "Zufallsszenario Alle"
- * would name a filter rather than a subject, and with no category chosen there
- * is nothing to narrow. */
+ * already settled. With no category chosen the word stands alone: pairing it
+ * with the unfiltered row would name a filter rather than a subject, and there
+ * would be nothing to narrow. */
 function randomSelectedLabel(category: CategoryFilter): string {
   return category === "all"
     ? "Zufallsszenario"
@@ -46,7 +46,7 @@ interface SetupViewProps {
   showRecommended: boolean;
   tenantName: string | null;
   onNewScenario: () => void;
-  /** Whether there is anything in the library to draw a Zufallsszenario from
+  /** Whether there is anything in the library to draw a random Scenario from
    * (F-62). */
   offerRandom: boolean;
   /** Open a Scenario's read-only info panel; editing starts there
@@ -215,7 +215,7 @@ export default function SetupView({
  *
  * The info affordance sits *outside* the card button rather than inside it —
  * a button cannot be nested in a button — using the same `card-wrap` shell
- * LibraryPicker puts its "Bearbeiten" link in. Reading about a Persona and
+ * LibraryPicker puts its edit link in. Reading about a Persona and
  * choosing one are separate acts: the "i" does not select the card.
  *
  * The portrait sits left of the text, which is why the three lines are wrapped

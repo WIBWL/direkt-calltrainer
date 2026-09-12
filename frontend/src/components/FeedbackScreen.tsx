@@ -9,7 +9,7 @@ interface FeedbackScreenProps {
   transcript: TranscriptEntry[];
   personaName: string;
   /** The case that was played, named in the meta row under the title — which
-   * is where a Zufallsszenario (F-62) is revealed like any other case too —
+   * is where a random Scenario (F-62) is revealed like any other case too —
    * and in the PDF. */
   scenarioName?: string | null;
   /** The rendered wrap-up: `FeedbackReport`, or whatever the screen says in
@@ -21,9 +21,9 @@ interface FeedbackScreenProps {
    * generated, and for a call that was never stored (ADR 0066) — the download
    * is then the protocol alone, and says so. */
   detail?: SessionDetail | null;
-  /** What leads away from this screen, first in the actions row: "Zur
-   * Startseite" after a call, "Zurück zum Profil" in the history. The one
-   * thing the two screens are allowed to differ in. */
+  /** What leads away from this screen, first in the actions row: home after a
+   * call, back to the profile in the history. The one thing the two screens
+   * are allowed to differ in. */
   actions?: ReactNode;
   /** Anything that belongs *under* the transcript — the history's delete. */
   children?: ReactNode;
@@ -31,26 +31,21 @@ interface FeedbackScreenProps {
 
 /**
  * The feedback screen: the wrap-up, the whole of it as a file to take away
- * (F-64), and the Gesprächsprotokoll either inside that file or read here.
+ * (F-64), and the Transcript either inside that file or read here.
  *
- * Used by both screens that show a wrap-up — the one after a call and the one
- * a past training opens from the profile — so that they cannot drift apart.
- * They did: the same report sat under two different titles, and the history's
- * transcript was a plain list where the post-call screen had a panel that
- * opens. What still differs is the buttons in the actions row, which is what
- * `actions` and `children` are for, and nothing else.
+ * Used by both screens that show a wrap-up — after a call, and a past training
+ * opened from the profile — so they cannot drift apart. They did: one report
+ * under two titles, with the history's transcript a plain list where the
+ * post-call screen had a panel that opens. Only the actions row still differs,
+ * which is what `actions` and `children` are for.
  *
  * The download is the *feedback*, not the log: everything the page shows, in
- * the page's own order, with the transcript last (see `utils/feedbackPdf.ts`).
- * It began as the protocol alone, which was the smaller half of what a User
- * would want to keep — and for a training run without consent the file is the
- * only copy of any of it (ADR 0066).
+ * its order, transcript last (`utils/feedbackPdf.ts`). For a training run
+ * without consent that file is the only copy of any of it (ADR 0066).
  *
- * The log itself stays a document rather than a page section: it is read
- * closely or not at all, and printed out in full it pushed everything that
- * comments on it off the screen. So it is *collapsed* beside the download: a
- * question about one line is not worth a file, and a file the User has to open
- * to check a detail is a detour.
+ * The transcript stays collapsed beside the download rather than printed in
+ * full, which pushed everything commenting on it off the screen — a question
+ * about one line is not worth a file, and a file to check a detail is a detour.
  *
  * The server flattens the exchanges, so the ordering lives in one place rather
  * than being reconstructed here (ADR 0051).
@@ -74,8 +69,8 @@ export default function FeedbackScreen({
 
   // What the file is called on the button, and what it will hold: without a
   // wrap-up there is no feedback to download, only the protocol. The two
-  // labels rather than one that is sometimes a promise — a User who presses
-  // "Gesprächsfeedback herunterladen" and gets a bare transcript was misled.
+  // labels rather than one that is sometimes a promise — a User who presses a
+  // button offering feedback and gets a bare transcript was misled.
   const complete = Boolean(detail?.feedback);
 
   const download = async () => {

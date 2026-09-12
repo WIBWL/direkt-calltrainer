@@ -2,7 +2,7 @@ import { completeParts, partsTotal, type MetricSeries } from "../utils/progressS
 import { formatDate } from "../utils/time";
 
 /**
- * A checklist Kennzahl across the trainings: how many parts were recognised in
+ * A checklist metric across the trainings: how many parts were recognised in
  * each, one mark per training, oldest first (F-63's opening, see
  * `SeriesShape`).
  *
@@ -18,8 +18,8 @@ import { formatDate } from "../utils/time";
  */
 export default function PartsStrip({ series }: { series: MetricSeries }) {
   // One image with the numbers in its name, the way the Sparkline is: a list of
-  // bare digits would be read out as "Liste, 7 Einträge, 3, 2, …" with nothing
-  // to say what they count.
+  // bare digits would be read out as a list of entries and their values, with
+  // nothing to say what they count.
   return (
     <span
       className="parts-strip"

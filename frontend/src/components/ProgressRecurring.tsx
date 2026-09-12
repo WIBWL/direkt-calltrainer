@@ -16,25 +16,16 @@ import SectionHeading from "./SectionHeading";
  * of 8" is a frequency of statements, not a measurement of a person and not a
  * mark across trainings, which is what keeps it inside ADR 0004 and ADR 0065.
  *
- * That distinction is fragile in the reading even when it is sound in the
- * data, so the wording carries it: "genannt" throughout, never "war" or
- * "ist"; a count over a named denominator, never a percentage; and no
- * ordering language beyond most-mentioned first.
+ * That distinction is fragile in the reading even when sound in the data, so
+ * the wording carries it: the verb is always "mentioned", never "was" or "is";
+ * a count over a named denominator, never a percentage; and no ordering
+ * language beyond most-mentioned first.
  *
- * This replaces a labelled placeholder. Until the assignment existed the area
- * was laid out with invented entries and a "Beispiel" chip, because inventing
- * a plausible weakness under somebody's own name is the worst thing this
- * screen could do and an empty stretch of page discusses nothing. It is real
- * now, so the placeholder is gone rather than kept alongside.
- *
- * The practice suggestion (block E) follows the two lists as a band across the
- * full width. It was a third card in their row, which is where it belongs in
- * the reading — it is drawn from the improvements beside it — but not in the
- * shape: a paragraph, an offer and a button beside two cards holding two lines
- * each ran three times their height. Laid out across the width instead, the
- * ground sits left and the offer right, and the row above it stays even. What
- * it must not become again is a section of its own at the foot of the page,
- * which is where it started and where nobody reached it.
+ * The practice suggestion (block E) follows the two lists as a full-width band.
+ * As a third card in their row it ran three times their height — a paragraph,
+ * an offer and a button beside two cards of two lines each. What it must not
+ * become again is a section of its own at the foot of the page, which is where
+ * it started and where nobody reached it.
  *
  * It is handed in rather than built here because it has its own data to fetch
  * and its own reasons to render nothing, in which case nothing is drawn.

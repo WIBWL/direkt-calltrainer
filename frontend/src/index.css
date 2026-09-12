@@ -33,7 +33,7 @@
      documented categorical palette, in that order, validated as an all-pairs
      set against a white card: CVD ΔE 13.0, normal-vision ΔE 16.3.
 
-     Identity, never judgement. The hue belongs to a family of Kennzahlen and
+     Identity, never judgement. The hue belongs to a family of metrics and
      never moves with a value, and none of the three is red, amber or green --
      those are spent on ADR 0078's traffic light, and a dashboard that reused
      one would invite exactly the reading ADR 0065 forbids. */
@@ -552,7 +552,7 @@ h2 {
   }
 }
 
-/* Shown only where the grid is genuinely bare — the Zufallsszenario tile is
+/* Shown only where the grid is genuinely bare — the random Scenario tile is
    drawn from the same filtered set, so when there is nothing to list there is
    nothing to draw either and the grid really is empty. */
 .library-empty {
@@ -828,7 +828,7 @@ h2 {
   --origin-ink: #5b3a9c;
 }
 
-/* The Zufallsszenario (F-62). Rose, and not the purple it started on: that is
+/* The random Scenario (F-62). Rose, and not the purple it started on: that is
    the company's, and a case the User has never seen must not look like one a
    colleague sent them. */
 .card-origin-random {
@@ -862,7 +862,7 @@ h2 {
    it, so the two sit in one column down the card's right gutter -- the gutter
    both grids' padding already keeps clear of text. Round and quiet: it must
    read as an aside to the choice, not as a second way of making it. It replaced
-   the Scenario card's "Bearbeiten" link, which moved into the panel (ADR 0076),
+   the Scenario card's edit link, which moved into the panel (ADR 0076),
    so a card carries one secondary affordance rather than two. */
 /* The button keeps its 24px box and the ring inside it is drawn on the span,
    so the affordance can be quieter than its target: the "i" is the smaller of
@@ -1156,9 +1156,10 @@ h2 {
 
 /* --- PDF upload in the scenario editor (F-58) --- */
 
-/* --- Fakten des Falls: type them, or drop the documents in (F-58) ------- */
+/* --- Case facts: type them, or drop the documents in (F-58) ------------ */
 /* The two ways to fill one field, side by side and the same size, with the
-   "oder" between them saying they are alternatives and not a sequence. Tall on
+   conjunction between them saying they are alternatives and not a sequence.
+   Tall on
    purpose: a drop target the height of a button is hard to hit with a dragged
    file, and the textarea beside it has to match or the row looks broken. */
 
@@ -1347,11 +1348,11 @@ h2 {
   color: var(--color-danger);
 }
 
-/* "Bearbeiten" in the read-only info panel (ADR 0076). Filled in the same dark
-   blue as the "Weiter zum Mikrofontest" button, and hovering to the same
-   lighter blue: it is the one action that leads somewhere from a panel that
-   otherwise only closes. Shape comes from `.editor-actions button` so it lines
-   up with "Schließen" beside it; only the colour is its own. */
+/* The edit button in the read-only info panel (ADR 0076). Filled in the same
+   dark blue as the button that leads on to the microphone check, and hovering
+   to the same lighter blue: it is the one action that leads somewhere from a
+   panel that otherwise only closes. Shape comes from `.editor-actions button`
+   so it lines up with the close button beside it; only the colour is its own. */
 .editor-edit {
   border-color: var(--navy) !important;
   background: var(--navy) !important;
@@ -2410,8 +2411,8 @@ h2 {
 
 /* Reads as the consequence of the points above it: the same card, marked by an
    accent rather than a competing colour. */
-/* The two things a finished training offers next: the Folgeszenario (F-60) and
-   the Rollentausch (F-61). One card shape with a heading each, so that they
+/* The two things a finished training offers next: the follow-up Scenario (F-60) and
+   the Reverse (F-61). One card shape with a heading each, so that they
    read as two named offers rather than as two paragraphs someone appended
    under the feedback. The accent colour is the only difference. */
 
@@ -2790,9 +2791,8 @@ h2 {
 
 /* --- One type scale for the three pre-call panels ----------------------- */
 
-/* "Ihre Ausgangslage" (ADR 0054), "Fakten des Falls" and a reverse's "Ihre
-   Unterlagen" are read one under the other on the same screen, and the first
-   two always are. Their label and their prose are therefore one declaration
+/* The Briefing (ADR 0054), the case facts and a reverse's own brief are read
+   one under the other on the same screen, and the first two always are. Their label and their prose are therefore one declaration
    each rather than three copies: they had drifted to two different scales, and
    two blocks of the same kind set differently read as two kinds of thing.
    Only what genuinely differs — the colour, the spacing, the `pre-line` on the
@@ -2851,7 +2851,7 @@ h2 {
    a white box below. Half of them used to carry the heading inside the box,
    which made two blocks of the same kind look like two different kinds of
    thing. A box may still hold a title, but only for an *item* within a
-   section — the two offers under "Nächste Schritte" are things you can pick,
+   section — the two offers in the next-steps block are things you can pick,
    not sections of the page. */
 .feedback-section {
   margin-bottom: 28px;
@@ -3856,8 +3856,8 @@ h2 {
   transition: background 0.2s, border-color 0.2s, opacity 0.2s;
 }
 
-/* A link wearing the button's clothes ("Fokusziele wählen", "Training
-   starten"). An `<a>` is inline, and an inline box's vertical padding takes up
+/* A link wearing the button's clothes — picking focus goals, starting a
+   training. An `<a>` is inline, and an inline box's vertical padding takes up
    no line height: it paints over the line above instead, which is how the
    button came to sit on top of the sentence it answers. `inline-flex` makes the
    padding count, and the underline a link would carry does not belong on a
@@ -4021,18 +4021,18 @@ a.consent-button {
    which is the whole property being used here.
 
    It points, it does not grade. Green means nothing here needs attention today,
-   red means look here first. Two Kennzahlen carry one, F-51's interruptions and
-   F-35's Sprachmelodie, and ADR 0078 holds the seven conditions any further one
+   red means look here first. Two metrics carry one, F-51's interruptions and
+   F-35's intonation, and ADR 0078 holds the seven conditions any further one
    has to meet.
 
    It colours the classification and nothing else. Never a whole tile, which
    would shout an orientation the thresholds cannot support and drown out the
-   neighbouring Kennzahlen that carry no reading at all. Never a raw figure
-   either: on F-35 the step is read from the Lebendigkeit while the tile's
-   number is the Umfang, so the colour goes on the word.
+   neighbouring metrics that carry no reading at all. Never a raw figure
+   either: on F-35 the step is read from the liveliness while the tile's
+   number is the range, so the colour goes on the word.
 
    Colour is never the only channel: the step is written out beside it, the word
-   "Einschätzung" follows, the scale it came from sits on the Kennzahl's own
+   "assessment" follows, the scale it came from sits on the metric's own
    page, and the three tints differ in lightness so they survive greyscale. */
 
 .metric-value-green {
@@ -4067,7 +4067,7 @@ a.consent-button {
   color: var(--color-text-muted);
 }
 
-/* A Kennzahl with a page behind it. The tile keeps its shape and gains only a
+/* A metric with a page behind it. The tile keeps its shape and gains only a
    hover and the line that says there is more. */
 .metric-open {
   text-decoration: none;
@@ -4091,9 +4091,9 @@ a.consent-button {
   color: var(--color-blue-600);
 }
 
-/* --- One Kennzahl's own page --------------------------------------------- */
+/* --- One metric's own page --------------------------------------------- */
 
-/* Room between the areas of this page. A Kennzahl's page is figure, scale,
+/* Room between the areas of this page. A metric's page is figure, scale,
    note, reading and excerpts stacked in one column, and at the default card
    rhythm they ran together into one grey block where the eye had nowhere to
    rest. The space is what says these are separate things. */
@@ -4306,8 +4306,8 @@ a.consent-button {
   color: var(--color-text-muted);
 }
 
-/* --- Sprachmelodie (F-35) ------------------------------------------------- */
-/* The contour and the five figures live on the Kennzahl's own page
+/* --- intonation (F-35) ------------------------------------------------- */
+/* The contour and the five figures live on the metric's own page
    (`SessionMetricView`); the wrap-up carries the tile like every other.
 
    The arrangement is deliberate and replaced one that buried its own point: a
@@ -4380,7 +4380,7 @@ a.consent-button {
 /* `.metric-grid` and `.metric` on purpose, so these read as the same kind of
    thing as the tiles in the wrap-up rather than as a second design language.
    What they add is the icon: on the wrap-up grid the explanation lives on the
-   Kennzahl's own page, and here there is no further page to go to. */
+   metric's own page, and here there is no further page to go to. */
 
 .melody-grid {
   margin: 0 0 2rem;
@@ -4544,7 +4544,7 @@ a.consent-button {
 /* One rule governs everything below: nothing here may encode a judgement.
    No red, no green, no arrows. A value is drawn in the same blue whether it
    is high or low, because nobody has established which of the two is better
-   for these Kennzahlen (ADR 0051, ADR 0065). */
+   for these metrics (ADR 0051, ADR 0065). */
 
 .progress-page h2 {
   font-size: 1.05rem;
@@ -4807,7 +4807,7 @@ a.consent-button {
   vertical-align: baseline;
 }
 
-/* --- Kennzahlen over time, one row each (block C) ------------------------- */
+/* --- metrics over time, one row each (block C) ------------------------- */
 /* A sparkline table: every row the same height and every course the same
    width, which is what makes sixteen of them comparable at a glance. No colour
    in any cell depends on a value; the hue is the group's and sits on the
@@ -4943,7 +4943,7 @@ a.consent-button {
   color: var(--color-text-muted);
 }
 
-/* A checklist Kennzahl across the trainings: one mark per training with the
+/* A checklist metric across the trainings: one mark per training with the
    count in it. Every mark alike, whatever it holds -- shading by count would be
    a colour meaning "more is better" (ADR 0065), and the number is the reading. */
 .parts-strip {
@@ -4971,7 +4971,7 @@ a.consent-button {
   margin: 0.2rem 0 0.1rem;
 }
 
-/* A goal's further Kennzahlen under its first: smaller, one line each, the
+/* A goal's further metrics under its first: smaller, one line each, the
    figure beside a thin course. Separated by a rule so they read as supporting
    the figure above rather than as a second headline. */
 .focus-supporting {
@@ -5422,7 +5422,7 @@ a.consent-button {
 /* --- The chart ----------------------------------------------------------- */
 
 /* The chart takes its hue from `color`, which the component sets per series
-   from the Kennzahl's family (utils/metricGroups.ts). One place decides the
+   from the metric's family (utils/metricGroups.ts). One place decides the
    colour; every mark below inherits it through currentColor, so a mark can
    never end up painted from a value. */
 
@@ -5551,9 +5551,9 @@ a.consent-button {
 
 /* The demanding stretches of a call against the rest (ADR 0081). Reuses the
    progress table's type and rules so the two read as the same kind of thing.
-   Both value columns are styled identically on purpose: giving "Unter Druck"
-   any emphasis of its own would make it the figure that counts and turn a
-   comparison into a verdict. */
+   Both value columns are styled identically on purpose: giving the
+   under-pressure column any emphasis of its own would make it the figure that
+   counts and turn a comparison into a verdict. */
 
 .segment-table {
   width: 100%;
@@ -5590,7 +5590,7 @@ a.consent-button {
   font-size: 0.9rem;
 }
 
-/* Quotations from the wrap-ups on the second level, for a Kennzahl and for a
+/* Quotations from the wrap-ups on the second level, for a metric and for a
    focus goal. The sentence leads and the source follows it in small grey type:
    the reader is here for what was said, and which call it was said in is the
    footnote that makes it checkable. Deliberately not a table -- these are
@@ -5721,7 +5721,7 @@ a.consent-button {
 }
 
 /* One pip per analysed training, filled where the theme was named. The same
-   navy on both cards: a hue that separated Stärke from Verbesserung would be a
+   navy on both cards: a hue that separated strength from improvement would be a
    good/bad axis, which ADR 0065 keeps off this screen. The headings carry the
    distinction, exactly as they do in GoalStatements. */
 .recurring-pips {
@@ -5812,7 +5812,7 @@ a.consent-button {
   color: var(--color-text-muted);
 }
 
-/* "Vorschlag", at the head of the sentence that gives the ground. It says what
+/* The chip at the head of the sentence that gives the ground. It says what
    kind of thing this block is before the reader has read a word of it, which is
    the same job the closing caveat does at the other end. */
 .progress-practice-chip {
@@ -7524,7 +7524,7 @@ a.consent-button {
   }
 }
 
-/* --- The die, thrown before a Zufallsszenario (F-62) -------------------- */
+/* --- The die, thrown before a random Scenario (F-62) -------------------- */
 
 .rolling-page {
   max-width: 640px;
@@ -8329,7 +8329,7 @@ a.consent-button {
 
 
 
-/* --- "Feedback wird erstellt" (the wait after the call) ------------------ */
+/* --- The wait after the call, while the wrap-up is written -------------- */
 
 /* The wrap-up is written in the worker (ADR 0049), so hanging up is followed
    by a real wait. It gets a screen rather than a grey line on the finished

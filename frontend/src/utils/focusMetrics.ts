@@ -1,5 +1,5 @@
 /**
- * Which measured Kennzahlen stand behind a focus goal (F-62, F-13).
+ * Which measured metrics stand behind a focus goal (F-62, F-13).
  *
  * The dashboard has to show something per picked goal, and the honest answer
  * differs per goal: eight of the fourteen have a measured series today, one is
@@ -9,12 +9,11 @@
  * which of the four it is instead of rendering an empty box or inventing a
  * figure.
  *
- * A frontend map and not a database column, deliberately. It is a display
- * decision about which chart belongs on which tile; a column would make it look
- * like a property of the goal and would have to be migrated every time a metric
- * is added. When the wrap-up starts tagging its points with a goal key (the
- * concept's stage 2), the text-only goals gain their content from that, not
- * from here.
+ * A frontend map and not a database column, deliberately: it is a display
+ * decision about which chart belongs on which tile. A column would make it look
+ * like a property of the goal and would need migrating every time a metric is
+ * added. Once the wrap-up tags its points with a goal key (the concept's stage
+ * 2), the text-only goals take their content from that rather than from here.
  */
 
 /** What a focus goal can be backed by on the dashboard today.
@@ -43,7 +42,7 @@ const NO_MEASUREMENT_PLANNED =
   "gesagt werden kann, steht in den Auswertungen Ihrer einzelnen Gespräche.";
 
 export const FOCUS_BACKING: Record<string, FocusBacking> = {
-  // Sprechtempo, Sprechpausen and how long a stretch of speech runs between
+  // speaking pace, pauses and how long a stretch of speech runs between
   // them. The three together are the rhythm of somebody's speaking; each on
   // its own can look unchanged while the rhythm moves.
   pace: { kind: "metric", metrics: ["pace", "pauses", "run_length"] },
@@ -67,7 +66,7 @@ export const FOCUS_BACKING: Record<string, FocusBacking> = {
   training_regularity: { kind: "activity", metrics: [] },
   training_variety: { kind: "activity", metrics: [] },
   // The one goal answered by a comparison rather than by a figure: the same
-  // Kennzahlen over the stretches where the other side pushed back and over the
+  // metrics over the stretches where the other side pushed back and over the
   // rest of the call (ADR 0081). The order is the order they are worth reading
   // in, and it is also the order `segments.SEGMENT_METRIC_KEYS` writes them.
   composure: {
@@ -94,17 +93,17 @@ export function backingOf(goalKey: string): FocusBacking {
 }
 
 /**
- * The focus goals a Kennzahl stands behind, read backwards out of the map
+ * The focus goals a metric stands behind, read backwards out of the map
  * above.
  *
- * For the Kennzahl's own page, which shows what the wrap-ups wrote about the
+ * For the metric's own page, which shows what the wrap-ups wrote about the
  * goals it is evidence for. Derived rather than written out a second time: two
  * hand-kept directions of the same relation drift on the first edit.
  *
  * Only the *primary* metric counts, `metrics[0]`. A goal lists every figure
- * worth looking at beside it — `active_listening` names Reaktionszeit as well
+ * worth looking at beside it — `active_listening` names reaction time as well
  * as Unterbrechungen — but a sentence about listening does not belong under
- * every one of them, and Reaktionszeit would collect statements from three
+ * every one of them, and reaction time would collect statements from three
  * goals it is only a supporting figure for.
  */
 export function goalsForMetric(metricKey: string): string[] {

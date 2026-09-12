@@ -16,17 +16,15 @@ const FocusContext = createContext<FocusContextValue | null>(null);
  * Holds the training focus for the whole app and asks for it once (F-62,
  * ADR 0076).
  *
- * One fetch, one source of truth — the same arrangement `ConsentProvider` has,
- * and for the same reason: the first-run dialog and the profile section describe
- * the same selection, and two copies of it drift the moment one is saved.
+ * One fetch, one source of truth — the arrangement `ConsentProvider` has, for
+ * the same reason: the first-run dialog and the profile section describe one
+ * selection, and two copies drift the moment one is saved.
  *
- * Sits *inside* the consent gate, so the two first-run questions are asked in
- * order rather than on top of each other, and the legally required one comes
- * first. Unlike consent, this one is not a gate in any strong sense: "Ohne Fokus
- * fortfahren" is a full answer that costs the user nothing, which is what makes
- * it acceptable to ask before the app appears at all.
+ * Sits *inside* the consent gate, so the two first-run questions come in order
+ * with the legally required one first. Unlike consent this is no strong gate:
+ * continuing without a focus is a full answer that costs the user nothing.
  *
- * It never blocks on a *failed* load. A picked focus changes what the app
+ * Never blocks on a *failed* load. A picked focus changes what the app
  * emphasises, not whether it works, so a network blip must not put a dialog in
  * front of someone who answered months ago.
  */

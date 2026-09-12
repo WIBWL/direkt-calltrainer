@@ -24,8 +24,9 @@ interface MicCheckProps {
   onCancel: () => void;
   /** Whether the check leads to a briefing screen rather than into the call
    * (ADR 0070's reverse, and any Scenario with a briefing or facts to read).
-   * The button has to name the step it actually takes: "Gespräch starten" on a
-   * button that opens a page of text is a promise the next screen breaks. */
+   * The button has to name the step it actually takes: a start-the-call label
+   * on a button that opens a page of text is a promise the next screen breaks.
+   */
   briefingFollows: boolean;
 }
 
@@ -89,9 +90,9 @@ export default function MicCheck({
       {/* No SetupSection here: this screen has one box and no numbered steps to
           count off, and the page heading above already names it. */}
       <section className="setup-section">
-        {/* No visible label over it: the page is called "Mikrofon testen" and
-            the control's own value names the device, so the word only said
-            again what stood under it. The <dl> went with the label — a
+        {/* No visible label over it: the page heading already says this is the
+            microphone test and the control's own value names the device, so the
+            word only repeated what stood under it. The <dl> went with it — a
             description list with nothing to describe is markup for a pairing
             that no longer exists — and the accessible name moved onto the
             <select>, so it is gone from the screen and not from the screen

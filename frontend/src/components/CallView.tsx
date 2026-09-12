@@ -81,7 +81,7 @@ export default function CallView({
           Scenario's name, the Persona's and the language stood over the call
           as a page title, which is a caption on a phone call. What is on the
           other end of the line is in the panel itself, and it is the only
-          thing on this screen. It also means a Zufallsszenario's case cannot
+          thing on this screen. It also means a random Scenario's case cannot
           leak here by construction rather than by a condition (F-62). */}
 
       {/* One column, or two once there is a briefing to keep in view: reading

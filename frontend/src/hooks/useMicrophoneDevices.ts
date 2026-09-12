@@ -32,7 +32,8 @@ export function useMicrophoneDevices() {
           .map((d) => ({ deviceId: d.deviceId, label: stripHardwareId(d.label) })),
       );
     } catch {
-      // Unsupported or blocked -- the picker just falls back to "Standardmikrofon".
+      // Unsupported or blocked -- the picker falls back to the default-device
+      // label.
     }
   }, []);
 

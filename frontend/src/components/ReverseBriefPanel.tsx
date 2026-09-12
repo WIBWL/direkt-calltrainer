@@ -6,22 +6,19 @@ import type { ReverseBrief } from "../scenarioLibrary";
  * What the User holds while playing a reverse (F-61, ADR 0070): the briefing
  * the Persona had for the original call, plus the goals to get through it with.
  *
- * This is the one deliberate exception to ADR 0033's "no text during the live
- * call, only a state animation". That rule exists so the trainee listens
- * instead of reading a transcript of what was just said; this text says nothing
- * about the conversation in progress. It is fixed before the call starts, it is
- * the User's own briefing, and without it the exercise is not possible at all —
- * you cannot argue a case you have not been told.
+ * The one deliberate exception to ADR 0033's "no text during the live call".
+ * That rule exists so the trainee listens instead of reading back what was just
+ * said; this text says nothing about the conversation in progress, is fixed
+ * before the call, and without it the exercise is impossible — you cannot argue
+ * a case you have not been told.
  *
- * During the call it sits *beside* the state animation rather than under it, so
- * that checking a goal off never scrolls the call off the screen. On a narrow
- * screen the two stack, which is the one case where scrolling is unavoidable.
+ * It sits *beside* the state animation rather than under it, so ticking a goal
+ * off never scrolls the call away; on a narrow screen the two stack.
  *
- * The goals are the call's agenda — the concrete things to raise, ask and come
- * away with — and they tick off. Purely local, stored nowhere: it is a place to
- * keep your finger while talking, not a record of anything, and a "progress"
- * that outlived the call would be a score by the back door (ADR 0004). Which is
- * also why the counter says how many are done and never how well.
+ * The goals are the call's agenda and tick off locally, stored nowhere: a place
+ * to keep your finger while talking, not a record. Progress that outlived the
+ * call would be a score by the back door (ADR 0004), which is also why the
+ * counter says how many are done and never how well.
  */
 export default function ReverseBriefPanel({
   brief,

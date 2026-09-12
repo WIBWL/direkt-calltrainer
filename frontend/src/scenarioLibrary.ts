@@ -23,7 +23,7 @@ export type ScenarioCategory = "operations" | "requirements" | "pricing" | "clos
 
 /** "" = no category. Only reachable for a Scenario authored before the column
  * existed, or one whose author left the field empty; such a row is listed under
- * "Alle" and under no category. */
+ * the unfiltered row and under no category. */
 export type CategoryChoice = ScenarioCategory | "";
 
 /** Display order and labels, in one place: the filter slider and the editor's
@@ -249,7 +249,7 @@ export const EMPTY_DRAFT: ScenarioDraft = {
 };
 
 /** The caller's tenant (ADR 0060), or `{name: null}` for the default tenant.
- * Drives the "<Unternehmen>" filter chip and badge in the Scenario library. */
+ * Drives the company filter chip and badge in the Scenario library. */
 export const getTenant = () =>
   apiFetch<{ name: string | null }>("/api/tenant");
 
@@ -357,7 +357,7 @@ export const MAX_DOCUMENT_MB = 5;
 export const MAX_DOCUMENTS_TOTAL_MB = 20;
 
 /** Extract the text-layer PDFs and have the LLM condense them into one fact
- * list, for the Fakten field (F-58). Several at once, summarised together:
+ * list, for the facts field (F-58). Several at once, summarised together:
  * the field holds one list, and two documents condensed apart would repeat
  * every fact they share. Multipart, so it does not go through apiFetch. */
 export async function extractPdfs(files: File[]): Promise<DocumentText> {

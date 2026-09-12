@@ -54,8 +54,8 @@ export function useAccount(): Account {
 
   return {
     displayName,
-    // Initials come from the name, not from the fallback label: "AN" for
-    // "Angemeldet" would look like a person's initials and be wrong.
+    // Initials come from the name, not from the fallback label: initials taken
+    // from a generic signed-in label would look like a person's and be wrong.
     initials: asString(fullName) || username ? initialsFrom(displayName) : "?",
     username,
     email: asString(claims?.email),

@@ -4,7 +4,7 @@ import LegalPage from "../LegalPage";
  * The accessibility statement of the EFRE DiReKT project, reproduced from
  * https://efre-direkt.de/accessibility/.
  *
- * One deliberate change, in "Geltungsbereich": the original names
+ * One deliberate change, in the scope section: the original names
  * efre-direkt.de and then excludes the university's other web offerings. Copied
  * unaltered it would have said, on this page, that it does not apply to this
  * page. The scope sentence therefore names the Calltrainer as well. Everything

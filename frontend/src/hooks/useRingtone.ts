@@ -4,20 +4,19 @@ import { useEffect } from "react";
  * The ringtone on the incoming-call screen (F-63).
  *
  * Synthesised rather than played from a file: a recorded ringtone is someone
- * else's, and the one this needs is two soft notes — cheaper to make than to
- * license, and it can be kept genuinely quiet, which a normalised sample
- * cannot.
+ * else's, and two soft notes are cheaper to make than to license — and can be
+ * kept genuinely quiet, which a normalised sample cannot.
  *
- * It is deliberately not a telephone bell. A real ring is an alarm; it is
- * built to be heard through a wall and it makes people tense before a call
- * they are already nervous about. This is a bell-like two-note motif — a
- * rising fourth, sine tones with one quiet harmonic, a fast attack and a long
- * decay — at a level you could talk over.
+ * Deliberately not a telephone bell. A real ring is an alarm built to be heard
+ * through a wall, and it makes people tense before a call they are already
+ * nervous about. This is a bell-like two-note motif — a rising fourth, sine
+ * tones with one quiet harmonic, fast attack and long decay — at a level you
+ * could talk over.
  *
- * The phone on screen shakes and pulses on the same cycle, which it takes
- * from `RINGTONE_CYCLE_MS` below: the two bursts of vibration are the two bars
- * of the figure, and the still half is its silence. A phone buzzing out of
- * time with its own ringtone is worse than one that does not buzz at all.
+ * The phone shakes and pulses on the same cycle, taken from
+ * `RINGTONE_CYCLE_MS`: the two bursts of vibration are the figure's two bars
+ * and the still half its silence. A phone buzzing out of time with its own
+ * ringtone is worse than one that does not buzz at all.
  */
 
 /** One note: when it is struck inside the cycle, and at what pitch. */

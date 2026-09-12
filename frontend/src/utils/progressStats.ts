@@ -36,7 +36,7 @@ export interface SeriesPoint {
 /**
  * How a series may be drawn.
  *
- * `line` is every ordinary Kennzahl: a value per training, a course, a band.
+ * `line` is every ordinary metric: a value per training, a course, a band.
  * `parts` is a checklist counted, where the value says how many of a fixed set
  * of parts were recognised (F-63's opening: greeting, name, offer; ADR 0089's
  * closing: recap, next step, goodbye). Drawn as a
@@ -52,7 +52,7 @@ export interface MetricSeries {
   /** The German display name, straight from `metric_type.name`. */
   name: string;
   unit: string | null;
-  /** Which half of the Kennzahlen this one belongs to, from the schema's own
+  /** Which half of the metrics this one belongs to, from the schema's own
    *  column. It decides the group the row sits in and the hue the chart is
    *  drawn in (`utils/metricGroups`) — identity, never a value. */
   aspect: MetricAspect | null;
@@ -69,12 +69,12 @@ export interface MetricSeries {
 
 
 /**
- * Kennzahlen that are never read across trainings, on any view of this
+ * metrics that are never read across trainings, on any view of this
  * dashboard.
  *
  * `loudness` is a span in dB of the recording's level, and across calls that
  * level is the microphone, its distance and the browser's gain as much as the
- * speaker -- the reason the focus goal "Souveräne Lautstärke" was retired
+ * speaker -- the reason the focus goal "the retired loudness goal" was retired
  * (ADR 0076's amendment). A course of it over several trainings would draw
  * the headset. Inside one call the device is the same, so the single call's
  * own page keeps its curve and its comparison of two stretches; only the
@@ -87,8 +87,8 @@ export const NOT_ACROSS_CALLS = new Set(["loudness"]);
  * The unit the backend gives a plain count ("Fragen", "Unterbrechungen", …).
  *
  * A count is a whole number of things and is shown as one. It is also shown
- * without the word, since "4 Anzahl" says less than "4" beside a column
- * already headed with the Kennzahl's name.
+ * without the word, since "4 count" says less than "4" beside a column
+ * already headed with the metric's name.
  */
 const COUNT_UNIT = "Anzahl";
 
@@ -117,7 +117,7 @@ export function toSeries(sessions: SessionSummary[]): MetricSeries[] {
       // Retired metric types are left out. A Session measured before a metric
       // was renamed points at the old row, which carries the same display name
       // as the new one, so keeping both would draw two charts called
-      // "Redeanteil" side by side. Merging them is not an option either: the
+      // "talk share" side by side. Merging them is not an option either: the
       // definitions changed with ADR 0051, and splicing two different
       // measurements into one line would be the quiet kind of wrong.
       if (!measurement.active) continue;
@@ -129,7 +129,7 @@ export function toSeries(sessions: SessionSummary[]): MetricSeries[] {
         unit: measurement.unit,
         aspect: measurement.aspect,
         // The same list the single call's tile reads (`utils/metrics`), so a
-        // new checklist Kennzahl cannot be a checklist on one screen and a
+        // new checklist metric cannot be a checklist on one screen and a
         // climbing line on the other.
         shape: isPartsMetric(measurement.key) ? "parts" : "line",
         derivation: null,
@@ -156,7 +156,7 @@ export function toSeries(sessions: SessionSummary[]): MetricSeries[] {
 /**
  * One value of a series as the reader should see it.
  *
- * The same as `formatValue` for an ordinary Kennzahl. A checklist is written
+ * The same as `formatValue` for an ordinary metric. A checklist is written
  * out as how many parts were recognised, never as "2 von 3": that fraction is
  * what reads as a grade, and "erkannt" keeps it a detection, which is all it
  * is -- a bare name slips past the patterns (F-63).
@@ -188,7 +188,7 @@ export function formatBand(series: MetricSeries): string | null {
   return `${formatValue(series.band.low, null)} bis ${formatValue(series.band.high, series.unit)}`;
 }
 
-/** How many parts a checklist Kennzahl has, read off its unit ("von 3").
+/** How many parts a checklist metric has, read off its unit ("von 3").
  *  Null where the unit does not say, so no caller has to guess a number. */
 export function partsTotal(series: MetricSeries): number | null {
   const match = series.unit?.match(/(\d+)/);
@@ -197,7 +197,8 @@ export function partsTotal(series: MetricSeries): number | null {
 
 /** In how many trainings every part of a checklist was recognised. A count of
  *  trainings over a named denominator, the same kind of statement as the
- *  recurring block's "in 4 von 8 genannt", never a share or a direction. */
+ *  recurring block's count over a named denominator, never a share or a
+ *  direction. */
 export function completeParts(series: MetricSeries): number | null {
   const total = partsTotal(series);
   if (total === null) return null;
@@ -238,8 +239,8 @@ export function median(values: number[]): number {
     : (sorted[middle] ?? 0);
 }
 
-/** Rounded the way the value is worth reading: a Redeanteil of 46.3 % is 46 %,
- *  a Reaktionszeit of 1.84 s is 1.8 s. Chosen by magnitude rather than per
+/** Rounded the way the value is worth reading: a talk share of 46.3 % is 46 %,
+ *  a reaction time of 1.84 s is 1.8 s. Chosen by magnitude rather than per
  *  metric, so a new metric needs no entry anywhere. */
 export function formatValue(value: number, unit: string | null): string {
   const decimals = Math.abs(value) >= 20 ? 0 : 1;
@@ -276,7 +277,7 @@ export function activity(sessions: SessionSummary[]): Activity {
  * three calls before an appointment, then nothing for a month -- finds a
  * 30-day window empty half the time, and an empty dashboard teaches that there
  * is nothing here; "the last five" is never empty while anything is stored,
- * and it is also the unit the Kennzahlen are read in, one point per training.
+ * and it is also the unit the metrics are read in, one point per training.
  * The history arrives newest first (ADR 0064), so this is a slice. `null`
  * means everything still stored, which is at most six months (ADR 0067).
  */
@@ -299,7 +300,7 @@ export function durationMinutes(session: SessionSummary): number | null {
   return (ended - started) / 60000;
 }
 
-/** The call lengths as a series, so they can be drawn like any Kennzahl. */
+/** The call lengths as a series, so they can be drawn like any metric. */
 export function durationSeries(sessions: SessionSummary[]): MetricSeries | null {
   const points: SeriesPoint[] = [];
   for (const session of [...sessions].reverse()) {
@@ -376,7 +377,7 @@ export function activityStep(count: number): ActivityStep {
  * chart has the same numbers and none of that.
  *
  * One month at a time, and the month is the caller's to choose. The period
- * switch, which stands below the calendar, says which trainings the Kennzahlen
+ * switch, which stands below the calendar, says which trainings the metrics
  * are read over;
  * a calendar already carries its own range in the grid, so letting the switch
  * cut months off it would be the same statement twice, the second time as a
@@ -497,7 +498,7 @@ export function variety(sessions: SessionSummary[]): Variety {
  * The distinct names along one side of the grid, most played first.
  *
  * Frequency first because the grid is cut after a few rows (`VarietyGrid`), and
- * what the reader should see before "Mehr anzeigen" is where their training has
+ * what the reader should see before the show-more button is where their training has
  * actually gone. Alphabetical on a tie, so the order does not shuffle between
  * two loads of the same data.
  */
