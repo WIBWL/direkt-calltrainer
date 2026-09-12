@@ -30,12 +30,12 @@ down_revision: Union[str, None] = "e4a9c07b2f31"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-IX_SESSION_SUBJECT = op.f("ix_session_subject_id")
-
 
 def upgrade() -> None:
-    op.create_index(IX_SESSION_SUBJECT, "session", ["subject_id"], unique=False)
+    op.create_index(
+        op.f("ix_session_subject_id"), "session", ["subject_id"], unique=False
+    )
 
 
 def downgrade() -> None:
-    op.drop_index(IX_SESSION_SUBJECT, table_name="session")
+    op.drop_index(op.f("ix_session_subject_id"), table_name="session")

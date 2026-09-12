@@ -62,7 +62,13 @@ from backend.tenants import ResolvedTenant
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/scenarios")
+# The requirement sits on the router, as it does on the other five: every
+# route below needs a verified caller, and a tenth one added later would
+# otherwise be reachable unauthenticated with nothing to say so -- no test
+# fails, no warning, and the browser works. The routes that take a `user`
+# parameter still do, because they *use* it; only the two that named one
+# purely to force the check have lost it.
+router = APIRouter(prefix="/api/scenarios", dependencies=[Depends(require_user)])
 
 
 def _limited(field: str, *, required: bool):
@@ -359,10 +365,7 @@ async def _read_documents(uploads: list[UploadFile]) -> list[ExtractedDocument]:
 
 
 @router.post("/document")
-async def extract_document(
-    files: list[UploadFile] = File(...),
-    _user: AuthContext = Depends(require_user),
-) -> dict:
+async def extract_document(files: list[UploadFile] = File(...)) -> dict:
     """Extract the text from the uploaded text-layer PDFs and let the LLM
     condense them into one fact list for the editor's Fakten field (F-58).
 
@@ -396,7 +399,7 @@ async def extract_document(
 
 # Defined before "/{extern_id}" so the literal path is matched first.
 @router.get("/field-limits")
-def field_limits(_user: AuthContext = Depends(require_user)) -> dict[str, int]:
+def field_limits() -> dict[str, int]:
     """The maximum length the API enforces for each authorable Scenario field.
     The editor caps its inputs from here, so its limits are the same source that
     validates them rather than a hand-kept mirror that drifts (ADR 0063). Keyed

@@ -491,7 +491,7 @@ class Scenario(AuthoredContent, Base):
     # (`backend/reversals.py`). NULL on every other row, which the CHECK above
     # enforces. Never part of any prompt -- a briefing the Persona could read
     # would be a briefing the Persona could act on.
-    reverse_brief: Mapped[dict | None] = mapped_column(JSONB)
+    reverse_brief: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
 
     # `foreign_keys` because there are now three edges between these tables --
     # this one, the provenance column above, and the reverse's origin below.
@@ -682,7 +682,7 @@ class Turn(Base):
     # reader (`feedback/segments.py` folds it straight back into the in-memory
     # `Turn` the derivations already take), and its shape follows what
     # `acoustics.py` measures, which is where it belongs.
-    acoustics_json: Mapped[dict | None] = mapped_column(JSONB)
+    acoustics_json: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
     # True on a Persona utterance the wrap-up marked as pressing: an objection,
     # a demand, a question the trainee was under pressure to answer (ADR 0081).
     # NULL means nobody has judged this row -- no wrap-up yet, a failed one, or
@@ -735,7 +735,7 @@ class Measurement(Base):
     # One of MEASUREMENT_SEGMENTS. Python-side default like every other one in
     # this schema, so a row written from psql has to name it.
     segment: Mapped[str] = mapped_column(String(20), default=SEGMENT_CALL)
-    detail_json: Mapped[dict | None] = mapped_column(JSONB)  # e.g. the metric's course over the call
+    detail_json: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))  # e.g. the metric's course over the call
 
     session: Mapped["Session"] = relationship(back_populates="measurements")
     metric_type: Mapped["MetricType"] = relationship(back_populates="measurements")

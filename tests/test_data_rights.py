@@ -24,9 +24,9 @@ import httpx
 import pytest
 from sqlalchemy.orm import Session as DbSession
 
-from backend.db.models import Feedback, FeedbackPoint, Session, Turn
+from backend.db.models import Feedback, FeedbackPoint, Scenario, Session, Turn
 from backend.session.models import Turn as LiveTurn
-from tests.conftest import persist
+from tests.conftest import TEST_AUTH, persist
 
 pytestmark = pytest.mark.usefixtures("reference_data")
 
@@ -125,6 +125,56 @@ async def test_export_carries_everything_that_was_stored(
     assert exported["feedback"]["phase_language"] == "Warm, dann sachlich."
     assert len(exported["feedback"]["points"]) == 2
     assert exported["measurements"][0]["value"] > 0
+
+
+async def test_the_export_reaches_past_the_sessions(
+    api_client: httpx.AsyncClient, db_session: DbSession
+) -> None:
+    """Three things are filed under the subject and are not a training, and the
+    export omitted all three until a review looked for them.
+
+    The test above is the one that should have caught it and did not: it asserts
+    completeness *within* a Session -- every Turn, every point -- and a whole
+    branch missing from the document passes it untouched. Article 15 is about
+    the personal data, not about the trainings, so the focus a subject picked,
+    the retention setting they changed and a Scenario they wrote all belong in
+    their copy.
+    """
+    persist(turns=TURNS)
+    await api_client.put("/api/focus", json={"goals": ["pace"], "role": "sales",
+                                             "categories": ["pricing"]})
+    await api_client.post("/api/me/retention", json={"auto_delete": False})
+    db_session.add(Scenario(
+        key=None, title="Selbst verfasst", short_description="kurz",
+        description="lang", case_facts="Fakten", call_goal="Ziel", briefing="",
+        active=True, visibility="private", created_by=TEST_AUTH.sub, reverse=False,
+    ))
+    db_session.commit()
+
+    body = (await api_client.get("/api/me/export")).json()
+
+    assert body["focus"]["goals"] == ["pace"]
+    assert body["focus"]["role"] == "sales"
+    assert body["focus"]["call_types"] == ["pricing"]
+    assert body["retention"]["auto_delete"] is False
+    assert [s["title"] for s in body["scenarios"]] == ["Selbst verfasst"]
+    assert body["scenarios"][0]["kind"] == "authored"
+
+
+async def test_the_export_tells_the_three_segments_of_a_metric_apart(
+    api_client: httpx.AsyncClient, db_session: DbSession  # pylint: disable=unused-argument
+) -> None:
+    """Since ADR 0081 one metric can hold three rows for one call -- the whole
+    call, the demanding stretches and the rest. Without `segment` they arrive as
+    the same key three times with different numbers and nothing to read them by.
+    """
+    persist(turns=TURNS)
+
+    body = (await api_client.get("/api/me/export")).json()
+
+    measurements = body["sessions"][0]["measurements"]
+    assert measurements, "the call should have been measured at all"
+    assert all("segment" in m for m in measurements)
 
 
 async def test_export_is_a_download_not_a_page(api_client: httpx.AsyncClient) -> None:

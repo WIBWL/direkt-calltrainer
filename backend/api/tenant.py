@@ -13,7 +13,8 @@ from fastapi import APIRouter, Depends
 from backend.auth import AuthContext, require_user
 from backend.tenants import resolve_tenant
 
-router = APIRouter(prefix="/api/tenant")
+# On the router, like the other five (see api/scenarios.py for why).
+router = APIRouter(prefix="/api/tenant", dependencies=[Depends(require_user)])
 
 
 @router.get("")

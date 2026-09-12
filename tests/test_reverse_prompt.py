@@ -208,10 +208,21 @@ def test_the_opening_forbids_guessing_at_the_case():
 
 
 def test_the_ordinary_opening_is_unchanged():
-    """Same guard as on the casting: the default argument must keep meaning
-    what it meant."""
-    assert opening_instruction(GERMAN) == opening_instruction(GERMAN, reverse=False)
-    assert GERMAN.opening_examples in opening_instruction(GERMAN)
+    """Same guard as on the casting: nothing the reverse needs may reach a call
+    that is not one.
+
+    The first assertion used to compare `opening_instruction(GERMAN)` with
+    `opening_instruction(GERMAN, reverse=False)`, which is the same call written
+    twice and true whatever either returns — it would have passed with the
+    reversed text in both. What the default has to keep *meaning* is that the
+    Persona opens with a reason for calling, so that is what is checked here:
+    the calling examples are in it, the answering ones are not.
+    """
+    ordinary = opening_instruction(GERMAN)
+
+    assert GERMAN.opening_examples in ordinary
+    assert GERMAN.answering_examples not in ordinary
+    assert ordinary == opening_instruction(GERMAN, reverse=False)
 
 
 def test_every_language_pack_can_answer_a_phone():

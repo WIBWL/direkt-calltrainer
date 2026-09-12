@@ -2,7 +2,27 @@
 
 ## Status
 
-Accepted
+Accepted. **Revised** — the decision below is not the one first accepted, and
+the difference is worth naming because a reader otherwise takes the current text
+for the original reasoning.
+
+What changed: how much of an interrupted reply counts as heard. The first
+version worked at the level of a *synthesized chunk* and gave a near-full
+allowance — a chunk played almost to its end counted as heard in full, on the
+argument that cutting in a second before a ~5 s sentence ended would otherwise
+score the whole sentence as unheard, commit nothing, and reopen the Turn over
+something the user had plainly heard. That is now done **per word**: the
+fraction of the sentence's audio that played maps to a fraction of its
+characters and back to the nearest word boundary, so three words into a long
+sentence leaves three words in the transcript. The fixed grace of
+`BARGE_IN_GRACE_MS` is what survives of the old allowance, and it is still
+biased toward keeping slightly more than was strictly heard.
+
+The superseded paragraphs were deleted rather than struck through when the text
+was rewritten, which is why this note exists: the *decision* moved, and an ADR
+that reads as though it always said the current thing is no longer a record of
+anything. Nothing else here changed — what the guards protect against, and why
+the history keeps only what was heard, are as first written.
 
 ## Context
 

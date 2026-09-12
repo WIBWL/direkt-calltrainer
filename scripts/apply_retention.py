@@ -36,7 +36,7 @@ load_dotenv()
 # pylint: disable=wrong-import-position
 # The sys.path insert above has to run before the backend is importable, and
 # load_dotenv() before it reads the environment -- so these cannot move up.
-from backend import retention  # noqa: E402
+from backend import deletion, retention  # noqa: E402
 from backend.db import models as db_models  # noqa: E402
 from backend.db.session import session_scope  # noqa: E402
 from backend.logging_config import configure_logging  # noqa: E402
@@ -72,6 +72,13 @@ def main() -> int:
             (str(s.extern_id), s.started_at, retention.auto_delete_enabled(db, s.subject_id))
             for s in expired
         ]
+        # The reverse Scenarios that go with them (ADR 0070 as amended). Read
+        # here for the same reason `deletion.reverses_of` reads them before the
+        # delete: `origin_session_id` is `ON DELETE SET NULL`, so afterwards
+        # nothing ties the two together. Counted for the report only -- the
+        # sweep below does its own reading and its own deciding.
+        due_sessions = [s for s in expired if retention.auto_delete_enabled(db, s.subject_id)]
+        reverses = len(deletion.reverses_of(db, due_sessions))
 
     if not rows:
         logger.info("Nothing is past the retention period.")
@@ -82,8 +89,16 @@ def main() -> int:
                     extern_id, started.date(), "due" if swept else "kept (sweep suspended)")
 
     due = sum(1 for _, _, swept in rows if swept)
+    if reverses:
+        # Named rather than left to the Session count: a dry run that does not
+        # say everything --apply does is not a dry run. Some of these may
+        # survive this pass -- `delete_unreferenced_reverses` leaves any row a
+        # Session that has not expired is still played on -- so this is the
+        # upper bound, which is the honest direction for a warning.
+        logger.info("  plus up to %d reverse scenario(s) built from those calls.", reverses)
     if not args.apply:
-        logger.info("Dry run: %d of %d would be deleted. Re-run with --apply.", due, len(rows))
+        logger.info("Dry run: %d of %d session(s) would be deleted. Re-run with --apply.",
+                    due, len(rows))
         return 0
 
     with session_scope() as db:

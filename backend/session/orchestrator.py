@@ -610,7 +610,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
                     return
                 turn.persona_text = ""  # retry from scratch
 
-    async def _stream_reply_with_regeneration(
+    async def _stream_reply_with_regeneration(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         turn: Turn,
         messages: list[dict[str, str]],
@@ -654,7 +654,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
                 progress.suppressed = 0
                 progress.first_suppressed = None
 
-    async def _generate_reply(
+    async def _generate_reply(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         turn: Turn,
         messages: list[dict[str, str]],

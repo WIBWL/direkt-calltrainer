@@ -16,7 +16,9 @@ Nothing about the call was broken. Steady background noise is ordinary in the pl
 
 ## Decision
 
-**When fewer than 10% of a call's loudness frames are silent, the recording is taken to have no detectable silence, and the four figures that rest on it are left out.** `pauses`, `phonation_share`, `pace` and `loudness` return nothing for that call. The metrics read from pitch (intonation, Verzögerungslaute — noise has no pitch), talk share (recording length, not phonation), reaction time and every text metric are unaffected.
+**When fewer than 10% of a call's loudness frames are silent, the recording is taken to have no detectable silence, and the figures that rest on it are left out.** `pauses`, `phonation_share`, `pace`, `loudness` and `run_length` return nothing for that call. The metrics read from pitch (intonation, Verzögerungslaute — noise has no pitch), talk share (recording length, not phonation), reaction time and every text metric are unaffected.
+
+**Amended:** `run_length` (the mean length of runs) was not on this list when the rule was written — the metric was added days later and nobody connected it. It belongs here more than any of the other four: *both* terms of its division come off the same split, so a recording the threshold could not separate inflates the numerator (noise counted as phonation) *and* shrinks the denominator (almost no pause found), and the two errors compound instead of cancelling. It carries neither a step nor a colour, so there was nothing on screen for a wrong value to contradict. The backfill script had been safe all along by accident: `scripts/backfill_run_length.py` gates on a stored `phonation_share` row, which is exactly what this rule withholds — so the figure was protected when reconstructed later and unprotected when measured live.
 
 Absent rather than wrong: a figure shown for such a call would be indistinguishable from a measured one, which is what ADR 0051 refuses. The cut-off sits far from anything ordinary — the lowest silent share of any earlier stored call is 37%, the noisy one 0.6% — so a real speaker who simply paused little does not trip it.
 

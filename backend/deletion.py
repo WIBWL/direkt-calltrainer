@@ -14,10 +14,14 @@ construction: those foreign keys carry no `ondelete` at all. The one Scenario
 that belongs to a Session — the follow-up drafted from its feedback (ADR 0069)
 — is deactivated rather than deleted, for the reason `retire_follow_ups` gives.
 
-One exception, and only on the withdrawal path: a reverse Scenario (ADR 0070)
-is content about the subject's own call rather than reference data, so
-`delete_subject_sessions` removes those rows too. Deleting a *single* training
-does not — see `_delete_reverses` for why the two differ.
+One exception: a reverse Scenario (ADR 0070) is content about the subject's own
+call rather than reference data — it carries a briefing written from that call's
+wrap-up — so it is removed rather than left standing. Two of the three paths do
+that: the withdrawal (`delete_subject_sessions`) and the retention sweep, which
+reaches it through `reverses_of` plus `delete_unreferenced_reverses`. Deleting a
+*single* training deliberately does not, and the profile screen says so: there a
+person is deciding about that one training and can remove the reverse herself,
+where the other two paths run with nobody deciding anything.
 
 What this module does *not* do is claim to be a complete erasure. Two limits
 are known and named rather than papered over: backups are not reached (there is
@@ -58,6 +62,70 @@ def retire_follow_ups(db: DbSession, sessions: list[db_models.Session]) -> None:
     db.query(db_models.Scenario).filter(
         db_models.Scenario.derived_from_session_id.in_(session_ids)
     ).update({"active": False}, synchronize_session=False)
+
+
+def reverses_of(db: DbSession, sessions: list[db_models.Session]) -> list[int]:
+    """The reverse Scenarios replaying these Sessions, by primary key.
+
+    Has to be read *before* the Sessions go: `origin_session_id` carries
+    `ON DELETE SET NULL` (ADR 0070), so the moment they are deleted nothing
+    connects the two any more and the reverse looks like any other row.
+
+    Split from the delete below because the retention sweep needs the two halves
+    on either side of its own delete, and because what can go is not decided
+    here — see `delete_unreferenced_reverses`.
+    """
+    session_ids = [session.session_id for session in sessions]
+    if not session_ids:
+        return []
+    return [
+        row.scenario_id
+        for row in db.query(db_models.Scenario)
+        .filter(db_models.Scenario.origin_session_id.in_(session_ids))
+        .all()
+    ]
+
+
+def delete_unreferenced_reverses(db: DbSession, scenario_ids: list[int]) -> int:
+    """Delete those of `scenario_ids` no Session points at any more.
+
+    The retention counterpart of `_delete_reverses` (ADR 0070's addendum). The
+    withdrawal can delete every reverse outright because it has just removed all
+    of that subject's Sessions; the sweep removes only the *expired* ones, so a
+    reverse played more recently than its origin still has a live
+    `session.scenario_id` pointing at it — and that column carries no `ondelete`
+    at all (ADR 0052), so deleting the row would be refused and would take the
+    whole sweep down with it.
+
+    Those rows are left for a later run rather than special-cased: once the
+    younger Session expires too, nothing references the reverse and it goes. A
+    reverse somebody keeps playing therefore outlives the period, which is the
+    right answer -- it is in use, not merely lying around.
+
+    Hard-deleted, not deactivated, for the reason `_delete_reverses` gives: the
+    briefing is written from that person's own wrap-up, and deactivation keeps
+    the text.
+    """
+    if not scenario_ids:
+        return 0
+    still_played = {
+        scenario_id
+        for (scenario_id,) in db.query(db_models.Session.scenario_id)
+        .filter(db_models.Session.scenario_id.in_(scenario_ids))
+        .distinct()
+    }
+    doomed = [
+        db.get(db_models.Scenario, scenario_id)
+        for scenario_id in scenario_ids
+        if scenario_id not in still_played
+    ]
+    for scenario in doomed:
+        if scenario is not None:
+            db.delete(scenario)
+    db.flush()
+    if doomed:
+        logger.info("Deleted %d expired reverse scenario(s)", len(doomed))
+    return len(doomed)
 
 
 def delete_subject_sessions(db: DbSession, subject_id: str) -> int:

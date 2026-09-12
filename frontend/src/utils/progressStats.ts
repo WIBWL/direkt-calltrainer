@@ -461,7 +461,7 @@ export interface Variety {
 export function variety(sessions: SessionSummary[]): Variety {
   const counts = new Map<string, VarietyCell>();
   for (const session of sessions) {
-    const id = `${session.scenario} ${session.persona}`;
+    const id = `${session.scenario}\0${session.persona}`;
     const cell = counts.get(id) ?? { scenario: session.scenario, persona: session.persona, count: 0 };
     cell.count += 1;
     counts.set(id, cell);

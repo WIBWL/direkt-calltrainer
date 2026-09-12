@@ -99,9 +99,24 @@ labels the Persona's turns `Agent` rather than `Caller` and states that the
 trainee was the caller; the measurements are untouched, being symmetric and
 about the User's half either way. As an addendum to ADR 0066/0067: withdrawing
 consent hard-deletes the subject's reverse rows after their Sessions are gone,
-because the briefing is derived from their own feedback, while deleting a
-single training and the retention sweep leave the row standing and let the
-foreign key null itself.
+because the briefing is derived from their own feedback.
+
+**Amended.** The retention sweep now does the same, and the line runs between
+the paths where somebody is deciding about that row and the paths where nobody
+is. A withdrawal and the six-month expiry both run with no one present: there
+is no act to keep the briefing on, and after the sweep the call it was written
+from no longer exists, so what survives is a text about how a person argued
+with its source destroyed. Deleting a *single* training is different — the User
+is there, acting deliberately, is told in the profile screen that the reverse
+stays, and can remove it herself — so that path is deliberately left as it was.
+
+The sweep cannot simply call the withdrawal's delete: it removes only the
+*expired* Sessions, and a reverse played more recently than its origin still
+has a live `session.scenario_id` pointing at it, which carries no `ondelete`
+(ADR 0052) — the delete would be refused and would take every subject's sweep
+down with it. `deletion.delete_unreferenced_reverses` therefore removes only
+what nothing points at and leaves the rest for a later run, so a reverse
+somebody keeps playing outlives the period because it is in use.
 
 ## Consequences
 
@@ -113,9 +128,10 @@ circular foreign key between `session` and `scenario`, a second opening
 instruction and casting paragraph to keep in step with the first (a guard test
 pins the non-reverse prompt byte-identical), and two live-force ADRs carrying
 a documented exception each. The deletion asymmetry — reverse rows die with a
-consent withdrawal but survive a single deletion — is defensible but has to be
-stated in the profile screen's wording, or "your trainings are deleted" stops
-being true in the direction users care about.
+consent withdrawal and with the six-month expiry, but survive a single deletion
+— is defensible but has to be stated, or "your trainings are deleted" stops
+being true in the direction users care about. It is: in the profile screen's
+wording for the single deletion, and in the privacy statement for all three.
 
 The briefing is a translation the model performs, so it can be wrong about a
 case the User is about to argue. It is generated once and stored rather than

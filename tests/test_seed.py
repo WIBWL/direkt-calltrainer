@@ -1,4 +1,7 @@
-"""The seed runs on every application start (backend/db/provision.py, called
+"""The reference tables the application seeds itself (ADR 0041, ADR 0057,
+ADR 0058, ADR 0076).
+
+The seed runs on every application start (backend/db/provision.py, called
 from the lifespan handler), so running it twice must not change anything the
 first run produced.
 

@@ -4,8 +4,8 @@ Covers:
   F-61      the User rings and the Persona answers, from one played Session
   ADR 0070  a Scenario row with a marker, copying the case verbatim; one per
             Session; the briefing is stored and never reaches a prompt; a
-            reverse is neither editable nor shareable; consent withdrawal
-            takes it, a single deletion and the retention sweep do not
+            reverse is neither editable nor shareable; consent withdrawal and
+            the six-month sweep take it, a single deletion does not
   ADR 0043  suspended here on purpose -- the played case reaches the client
   ADR 0051  the measured statistics are not input
   ADR 0059  the briefing is cleaned like any text written into the table
@@ -716,15 +716,21 @@ async def test_withdrawing_consent_leaves_an_authored_scenario_alone(
     assert db_session.query(Scenario).filter_by(created_by="test-subject").count() == 1
 
 
-async def test_the_retention_sweep_leaves_the_reverse_standing(
+async def test_the_retention_sweep_takes_the_reverse_with_it(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The other half of ADR 0070's deletion rule, and the half nothing else
-    would notice: the six-month sweep (ADR 0067) removes the Session but not
-    the reverse made from it, which is the same treatment a single deletion
-    gives and the opposite of a withdrawal. The Scenario is what the User
-    selected it as -- an exercise -- not a record of the call that is expiring.
+    would notice: the six-month sweep (ADR 0067) removes the reverse along with
+    the Session it replays.
+
+    This test asserted the opposite until ADR 0070 was amended. The reason it
+    changed: the briefing is written from that call's own wrap-up, and once the
+    call has expired what survives is a text about how a person argued with its
+    source destroyed. The line now runs between the paths where somebody is
+    deciding about that row -- a single deletion, where the User is present,
+    is told the reverse stays and can remove it herself -- and the two that run
+    with nobody there, the withdrawal and this sweep.
     """
     _give_the_scenario_a_case(db_session)
     old = datetime.now(UTC) - retention.RETENTION - timedelta(days=1)
@@ -737,9 +743,7 @@ async def test_the_retention_sweep_leaves_the_reverse_standing(
 
     db_session.expire_all()
     assert db_session.query(Session).count() == 0
-    row = _reverse_row(db_session)
-    assert row.active is True
-    assert row.origin_session_id is None
+    assert db_session.query(Scenario).filter_by(reverse=True).count() == 0
 
 
 def test_the_consent_module_is_untouched_by_this(reference_data) -> None:

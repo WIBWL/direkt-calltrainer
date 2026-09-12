@@ -10,7 +10,7 @@ After a call the screen offered two ways on, and both *write* something: the fol
 
 What was missing is the plainest next step — another call from what is already there. Either the same Scenario again in a different form, or a different one worth playing next. A User finishing a call has just learned something, and the moment to start the next one is now, not after browsing the library.
 
-Two facts about the library shape what can be offered. There are exactly two Personas, one German and one English, so "the same Scenario with another partner" and "the same Scenario in the other language" are the same offer. And the suggestions of ADR 0076's amendment — from role, call types and focus goals — already rank the whole library for this User.
+Two facts about the library shape what can be offered. There were exactly two Personas when this was written, one German and one English, so "the same Scenario with another partner" and "the same Scenario in the other language" were the same offer. *(Since then the seed holds six, four German and two English. The decision below is unaffected — it offers the other-language Persona, and there being more than one to choose from does not change what the offer means. Recorded here rather than edited away, because the premise is what the reasoning rests on.)* And the suggestions of ADR 0076's amendment — from role, call types and focus goals — already rank the whole library for this User.
 
 ## Decision
 

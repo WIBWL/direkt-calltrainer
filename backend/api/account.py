@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from backend.api._loading import SESSION_SUBTREE
 from backend import consent as consent_service
+from backend import focus as focus_service
 from backend import retention
 from backend.auth import AuthContext, require_user
 from backend.db import models as db_models
@@ -102,6 +103,15 @@ def export_data(caller: AuthContext = Depends(require_user)) -> JSONResponse:
             # that it is a pseudonym rather than an anonymisation.
             "subject_id": caller.sub,
             "consent": _consent(db, caller.sub),
+            # Everything else filed under this subject, and the reason each is
+            # here rather than only in the overview: Article 15 is about the
+            # personal data, not about the trainings. A settings row, a focus
+            # the subject picked and a Scenario they wrote are all stored
+            # against their `sub`, and an export that quietly stops at the
+            # Sessions is the failure this route's own test warns about.
+            "retention": _retention(db, caller.sub),
+            "focus": _focus(db, caller.sub),
+            "scenarios": _authored_scenarios(db, caller.sub),
             "sessions": [_session(s) for s in sessions],
         }
 
@@ -196,6 +206,11 @@ def _session(session: db_models.Session) -> dict:
                 "name": m.metric_type.name,
                 "unit": m.metric_type.unit,
                 "value": float(m.value),
+                # Which stretch of the call this figure describes (ADR 0081).
+                # Without it the three rows a metric can have -- whole call,
+                # under pressure, the rest -- arrive as three identical keys
+                # with different numbers and nothing to tell them apart.
+                "segment": m.segment,
                 # Included here although the listing drops it (ADR 0064): this
                 # is the subject's own copy of their data, so completeness
                 # outweighs payload size, which is the opposite trade.
@@ -203,8 +218,76 @@ def _session(session: db_models.Session) -> dict:
             }
             for m in session.measurements
         ],
+        # One row per event that occurred in the call (F-51), not a judgement
+        # against a threshold -- and stored against this Session, so the
+        # subject's copy has to carry them.
+        "findings": [
+            {
+                "category": f.category,
+                "offset_ms": f.offset_ms,
+                "description": f.description,
+            }
+            for f in sorted(session.findings, key=lambda f: f.offset_ms or 0)
+        ],
         "feedback": _feedback(session.feedback),
     }
+
+
+def _focus(db: DbSession, subject_id: str) -> dict:
+    """The training focus the subject picked (F-62).
+
+    A setting rather than training data, which is why no deletion path touches
+    it -- and exactly why it has to be in here: nothing else in the export or
+    in the profile would tell the subject it is stored at all.
+    """
+    selection = focus_service.selection(db, subject_id)
+    return {
+        "decided": selection.decided,
+        "decided_at": _iso(selection.decided_at),
+        "goals": list(selection.keys),
+        "role": selection.role,
+        "call_types": list(selection.categories),
+    }
+
+
+def _authored_scenarios(db: DbSession, subject_id: str) -> list[dict]:
+    """The Scenarios this subject wrote, including the two kinds derived from
+    their own calls (ADR 0058/0069/0070).
+
+    Deactivated rows are included: a Scenario retired from the library is still
+    stored under this subject, and an export that showed only the live ones
+    would understate what is held. `reverse_brief` comes along because it is
+    the one field here written *about* the subject rather than by them -- prose
+    a model produced from their own wrap-up.
+    """
+    rows = (
+        db.query(db_models.Scenario)
+        .filter_by(created_by=subject_id)
+        .order_by(db_models.Scenario.created_at)
+        .all()
+    )
+    return [
+        {
+            "scenario_id": str(row.extern_id),
+            "title": row.title,
+            "short_description": row.short_description,
+            "description": row.description,
+            "case_facts": row.case_facts,
+            "call_goal": row.call_goal,
+            "briefing": row.briefing,
+            "category": row.category,
+            "visibility": row.visibility,
+            "active": row.active,
+            # Which of the three kinds this is, without exposing the internal
+            # ids the provenance columns hold.
+            "kind": ("reverse" if row.reverse
+                     else "follow_up" if row.derived_from_session_id is not None
+                     else "authored"),
+            "reverse_brief": row.reverse_brief,
+            "created_at": _iso(row.created_at),
+        }
+        for row in rows
+    ]
 
 
 def _feedback(feedback: db_models.Feedback | None) -> dict | None:

@@ -517,7 +517,15 @@ def _run_length(call: Conversation) -> Measurement | None:
     read against this speaker's own other calls, which is all ADR 0051 allows
     anyway, and it is exactly why no step was put on it.
     """
-    if not call.user_acoustics_complete or not call.user_turns:
+    # `_silence_found` for the same reason `_pauses` and `_phonation_share`
+    # carry it (ADR 0085), and with more at stake than either: *both* terms of
+    # the division come off that split, and a recording the threshold could not
+    # split gets them wrong in the same direction -- the noise counts as
+    # phonation, so the numerator grows, and almost no pause is found, so the
+    # denominator shrinks. The figure then comes out several times too high and
+    # says so to nobody, having neither a step nor a colour to look wrong in.
+    if (not call.user_acoustics_complete or not call.user_turns or
+            not _silence_found(call)):
         return None
     runs = len(call.user_turns) + len(call.pauses)
     if not call.user_phonation_ms:

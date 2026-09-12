@@ -381,9 +381,23 @@ export default function Privacy() {
           und keine Trainingshistorie.
         </p>
         <p>
+          Aus einem gespeicherten Gespräch können Sie zwei Übungen erzeugen lassen, die als
+          eigenes Szenario in Ihrer Bibliothek abgelegt werden: ein <em>Folgeszenario</em>, das
+          den Fall fortschreibt, und einen <em>Rollentausch</em>, der dasselbe Gespräch mit
+          vertauschten Rollen wiederholt. Der Rollentausch enthält dabei eine
+          Ausgangsinformation, die aus Ihrer persönlichen Auswertung dieses Gesprächs
+          geschrieben wurde.
+        </p>
+        <p>
           <strong>Aufbewahrungsdauer:</strong> Gespeicherte Trainings werden sechs Monate nach
           dem Gespräch automatisch gelöscht. Sie können diese automatische Löschung in Ihrem
-          Profil aussetzen, wenn Sie Ihre Trainings länger behalten möchten.
+          Profil aussetzen, wenn Sie Ihre Trainings länger behalten möchten. Ein Rollentausch
+          wird zusammen mit dem Gespräch gelöscht, aus dem er stammt — ebenso beim Widerruf
+          Ihrer Einwilligung. Löschen Sie dagegen ein <em>einzelnes</em> Training, bleibt ein
+          daraus erstellter Rollentausch als Übung bestehen, damit Sie ihn weiter nutzen können;
+          Sie können ihn jederzeit selbst aus Ihrer Bibliothek entfernen. Ein Folgeszenario wird in
+          allen drei Fällen aus Ihrer Bibliothek entfernt; der Text selbst bleibt gespeichert,
+          weil ein späteres Training darauf aufgebaut sein kann und lesbar bleiben muss.
         </p>
         <p>
           Rechtsgrundlage ist Ihre Einwilligung nach Art. 6 Abs. 1 lit. a DSGVO.

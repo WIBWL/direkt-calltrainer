@@ -8,6 +8,7 @@ until someone lost data they had asked to keep.
 Time is injected rather than waited for: `sweep(db, now=...)` places the
 boundary, so the tests are about the rule and not about the clock.
 """
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -15,7 +16,8 @@ import pytest
 from sqlalchemy.orm import Session as DbSession
 
 from backend import retention
-from backend.db.models import Feedback, RetentionPreference, Session, Turn
+from backend.db.models import (Feedback, RetentionPreference, Scenario, Session,
+                               STATUS_COMPLETED, Turn)
 from backend.session.models import Turn as LiveTurn
 from tests.conftest import TEST_AUTH, persist
 
@@ -227,3 +229,79 @@ async def test_the_retention_route_needs_a_token(api_client: httpx.AsyncClient) 
     response = await api_client.post("/api/me/retention", json={"auto_delete": False})
 
     assert response.status_code == 401
+
+
+def _reverse_of(db: DbSession, session_id: int) -> int:
+    """A reverse Scenario replaying that Session, shaped as reversals.py writes
+    one: no key, private, and a briefing derived from the call's own wrap-up."""
+    row = Scenario(
+        key=None,
+        title="Rollentausch",
+        short_description="kurz",
+        description="lang",
+        case_facts="Fakten",
+        call_goal="Ziel",
+        briefing="",
+        active=True,
+        visibility="private",
+        created_by=TEST_AUTH.sub,
+        reverse=True,
+        origin_session_id=session_id,
+        reverse_brief={"goals": []},
+    )
+    db.add(row)
+    db.flush()
+    return row.scenario_id
+
+
+def test_an_expired_session_takes_its_reverse_with_it(
+    db_session: DbSession, app_database: str  # pylint: disable=unused-argument
+) -> None:
+    """A reverse carries a briefing written from that call's own wrap-up, so it
+    expires with the call (ADR 0070's addendum to ADR 0067).
+
+    Without this the six-month promise was incomplete in the direction users
+    care about: transcript, measurements and feedback went, and a text about how
+    the person had argued stayed behind with its origin nulled out.
+    """
+    extern_id = persist(turns=TURNS, started_at=LONG_EXPIRED)
+    origin = db_session.query(Session).filter_by(extern_id=extern_id).one()
+    reverse_id = _reverse_of(db_session, origin.session_id)
+
+    removed = retention.sweep(db_session, now=NOW)
+
+    assert removed == 1
+    assert db_session.get(Scenario, reverse_id) is None
+
+
+def test_a_reverse_someone_still_plays_survives_the_sweep(
+    db_session: DbSession, app_database: str  # pylint: disable=unused-argument
+) -> None:
+    """The origin expires, a younger Session played on the reverse does not.
+
+    `session.scenario_id` carries no `ondelete` (ADR 0052), so deleting the row
+    here would be refused and would take the whole sweep down with it — every
+    subject's, not just this one's. The row is left for a later run instead: it
+    goes when the younger Session expires too, and a reverse somebody keeps
+    playing outlives the period because it is in use.
+    """
+    extern_id = persist(turns=TURNS, started_at=LONG_EXPIRED)
+    origin = db_session.query(Session).filter_by(extern_id=extern_id).one()
+    reverse_id = _reverse_of(db_session, origin.session_id)
+    db_session.add(
+        Session(
+            extern_id=uuid.uuid4(),
+            subject_id=TEST_AUTH.sub,
+            persona_id=origin.persona_id,
+            scenario_id=reverse_id,
+            language_code=origin.language_code,
+            status=STATUS_COMPLETED,
+            started_at=JUST_INSIDE,
+        )
+    )
+    db_session.flush()
+
+    removed = retention.sweep(db_session, now=NOW)
+
+    assert removed == 1, "only the expired origin should go"
+    assert db_session.get(Scenario, reverse_id) is not None

@@ -234,15 +234,22 @@ def test_stammering_does_not_repeat_itself() -> None:
 
 
 def test_a_recording_without_silence_drops_what_rests_on_silence() -> None:
-    """A noise floor above the threshold leaves nothing silent: pauses, phonation share,
-    pace and the loudness span would report the noise as speech. Talk share
-    rests on the recording's length and stays."""
+    """A noise floor above the threshold leaves nothing silent: pauses, phonation
+    share, pace, the loudness span and the mean length of runs would report the
+    noise as speech. Talk share rests on the recording's length and stays.
+
+    `run_length` was added to this list after the fact. It divides phonation by
+    the number of runs, and a call the threshold could not split gets both terms
+    wrong the same way -- too much phonation over too few pauses -- so it was the
+    figure this rule missed by the widest margin while looking like a bare
+    number nobody would question."""
     turns = _measured_call()
     turns[1].loudness_db = [60.0] * 100
 
     keys = set(_by_key(turns))
 
-    assert not {"pauses", "phonation_share", "pace", "loudness"} & keys
+    assert not {"pauses", "phonation_share", "pace", "loudness",
+                "run_length"} & keys
     assert "talk_share" in keys
 
 
@@ -251,7 +258,7 @@ def test_ordinary_silence_keeps_them() -> None:
     turns = _measured_call()
     turns[1].loudness_db = [60.0, None] * 50
 
-    assert {"phonation_share", "pace", "loudness"} <= set(_by_key(turns))
+    assert {"phonation_share", "pace", "loudness", "run_length"} <= set(_by_key(turns))
 
 
 def _opening_of(*said: tuple[str, int], language_id: str | None = "de", reverse=False):
