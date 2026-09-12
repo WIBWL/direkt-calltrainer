@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { ApiError, apiFetch } from "../api";
 import type { SessionDetail } from "../protocol";
+import { getSession } from "../sessions";
 
 const POLL_INTERVAL_MS = 2000;
 // Must not be shorter than the backend's JOB_TIMEOUT_S (backend/feedback/
@@ -21,11 +21,10 @@ export type FeedbackState = "loading" | "ready" | "failed" | "missing";
  * Polls the finished Session until its Feedback settles (ADR 0019 generates it
  * asynchronously, so it does not exist yet when the call ends).
  *
- * The backend writes the Session before it sends session.ended, so a 404 here
- * is conclusive — the write failed — rather than the client being early.
- *
- * Goes through apiFetch: the route needs the same bearer token as the rest of
- * /api (ADR 0009).
+ * The backend writes the Session before it sends session.ended, so an absent
+ * Session here is conclusive — the write failed — rather than the client being
+ * early. Reading it goes through `sessions.getSession`, which is where that
+ * answer is turned into a null.
  *
  * The wrap-up is the only thing it waits for. It used to keep polling past it
  * for the follow-up Scenario the worker wrote next (ADR 0069) — that is asked
@@ -51,15 +50,18 @@ export function useSessionFeedback(sessionId: string | null) {
 
     const poll = async () => {
       try {
-        const data = await apiFetch<SessionDetail>(`/api/sessions/${sessionId}`);
+        const data = await getSession(sessionId);
         if (cancelled) return;
+        // Conclusive, so stop polling: the backend writes the Session before it
+        // sends session.ended, and the route answers the same for absent and
+        // not-yours (ADR 0031/0050).
+        if (data === null) return setState("missing");
         errors = 0;
         setDetail(data);
         if (data.feedback) return setState("ready");
         if (data.status === "failed") return setState("failed");
       } catch (e) {
         if (cancelled) return;
-        if (e instanceof ApiError && e.status === 404) return setState("missing");
         console.debug("[feedback] poll failed", e);
         if (++errors >= MAX_CONSECUTIVE_ERRORS) return setState("failed");
       }

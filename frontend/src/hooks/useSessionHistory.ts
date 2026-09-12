@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { apiFetch } from "../api";
-import type { SessionHistoryPage, SessionSummary } from "../protocol";
+import type { SessionSummary } from "../protocol";
+import { listSessions } from "../sessions";
 
 /** How many rows one request fetches — the `limit` sent to the server and the
  * stride its `offset` counts in. Not what the screen shows: that is capped
@@ -57,9 +57,7 @@ export function useSessionHistory() {
 
     void (async () => {
       try {
-        const page = await apiFetch<SessionHistoryPage>(
-          `/api/sessions?limit=${PAGE_SIZE}&offset=${offset}`,
-        );
+        const page = await listSessions(PAGE_SIZE, offset);
         if (cancelled) return;
         setTotal(page.total);
         // Replace on the first page, append after — and de-duplicate by id,

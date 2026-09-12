@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { apiFetch } from "../api";
 import { useStoredSession } from "../hooks/useStoredSession";
 import { ROUTES, type TrainingStart } from "../routes";
 import { type ReverseScenario } from "../scenarioLibrary";
+import { deleteSession } from "../sessions";
 import AppLayout from "./AppLayout";
 import FeedbackScreen, { transcriptFromTurns } from "./FeedbackScreen";
 import { FeedbackReport, MetricSection } from "./FeedbackView";
@@ -69,10 +69,14 @@ export default function PastSessionView() {
   // Back to the history rather than to the now-empty page this was. Replacing
   // the entry means Back does not return to a training that no longer exists.
   const remove = async () => {
+    // Unreachable without one — the delete sits under a loaded report — but the
+    // route param is optional, and the old template literal would have asked
+    // the server to delete `undefined` rather than refusing here.
+    if (!sessionId) return;
     setDeleting(true);
     setDeleteFailed(false);
     try {
-      await apiFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+      await deleteSession(sessionId);
       navigate(ROUTES.profile, { replace: true });
     } catch (e) {
       console.debug("[delete session] failed", e);

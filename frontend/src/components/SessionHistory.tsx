@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { apiFetch } from "../api";
 import { useSessionHistory } from "../hooks/useSessionHistory";
 import type { SessionSummary } from "../protocol";
+import { deleteSession } from "../sessions";
 import { formatClock, formatDateTime } from "../utils/time";
 import { sessionPath } from "../routes";
 
@@ -86,7 +86,7 @@ function SessionRow({
     setDeleting(true);
     setFailed(false);
     try {
-      await apiFetch(`/api/sessions/${session.session_id}`, { method: "DELETE" });
+      await deleteSession(session.session_id);
       onDeleted(); // the row goes with it, so no state to reset afterwards
     } catch (e) {
       console.debug("[delete session] failed", e);

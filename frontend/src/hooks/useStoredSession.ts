@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { ApiError, apiFetch } from "../api";
 import type { SessionDetail } from "../protocol";
+import { getSession } from "../sessions";
 
-/** "missing" is a 404 — no such Session, or not the caller's (ADR 0031/0050),
- *  which are deliberately the same answer. */
+/** "missing" is what `sessions.getSession` reports as null — no such Session,
+ *  or not the caller's (ADR 0031/0050), which are deliberately the same
+ *  answer. */
 export type StoredSessionState = "loading" | "ready" | "missing" | "failed";
 
 /**
@@ -44,14 +45,15 @@ export function useStoredSession(sessionId: string | null) {
 
     void (async () => {
       try {
-        const data = await apiFetch<SessionDetail>(`/api/sessions/${sessionId}`);
+        const data = await getSession(sessionId);
         if (cancelled) return;
+        if (data === null) return setState("missing");
         setDetail(data);
         setState("ready");
       } catch (e) {
         if (cancelled) return;
         console.debug("[stored session] load failed", e);
-        setState(e instanceof ApiError && e.status === 404 ? "missing" : "failed");
+        setState("failed");
       }
     })();
 
