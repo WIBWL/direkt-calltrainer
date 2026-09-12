@@ -26,7 +26,7 @@ import {
   metricSubline,
   withDerived,
 } from "./metrics";
-import { formatOffset } from "./time";
+import { formatLongDate, formatOffset } from "./time";
 
 /**
  * The whole feedback document as a PDF, built in the browser (F-64).
@@ -201,14 +201,6 @@ async function useAppFonts(doc: {
   faces.forEach(([, file, name, style], i) => {
     doc.addFileToVFS(file, loaded[i]!);
     doc.addFont(file, name, style);
-  });
-}
-
-function formatDate(date: Date): string {
-  return date.toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
   });
 }
 
@@ -394,7 +386,7 @@ export async function buildFeedbackPdf({
     // under it, the Persona included.
     ...(scenarioName ? ([["Szenario", scenarioName]] as [string, string][]) : []),
     ["Gesprächspartner", personaName],
-    ["Datum", formatDate(date)],
+    ["Datum", formatLongDate(date.toISOString()) ?? ""],
     ["Beiträge", String(transcript.length)],
   ];
   for (const [label, value] of facts) {

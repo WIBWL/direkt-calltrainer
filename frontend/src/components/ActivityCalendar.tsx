@@ -4,6 +4,7 @@ import type { SessionSummary } from "../protocol";
 import {
   activityMonth,
   activityStep,
+  dayKey,
   firstTrainingMonth,
   type ActivityDay,
 } from "../utils/progressStats";
@@ -58,7 +59,7 @@ export default function ActivityCalendar({ sessions }: { sessions: SessionSummar
   const at = shown.year * 12 + shown.month;
   const hasPrevious = earliest !== null && at > earliest.year * 12 + earliest.month;
   const hasNext = at < today.getFullYear() * 12 + today.getMonth();
-  const todayKey = dayId(today);
+  const todayKey = dayKey(today);
 
   const step = (by: number) => {
     // The readout names a day of the month on screen; paging away from it would
@@ -125,7 +126,7 @@ export default function ActivityCalendar({ sessions }: { sessions: SessionSummar
                     <Day
                       day={day}
                       weekday={WEEKDAY_NAMES[weekday] ?? ""}
-                      isToday={dayId(new Date(day.date)) === todayKey}
+                      isToday={dayKey(new Date(day.date)) === todayKey}
                       onEnter={() => setActive(day)}
                       onLeave={() => setActive(null)}
                     />
@@ -204,10 +205,4 @@ function Day({
 function describe(day: ActivityDay): string {
   if (day.count === 0) return "kein Training";
   return `${day.count} ${day.count === 1 ? "Training" : "Trainings"}`;
-}
-
-/** A day as a key, in local time — the same construction the counts are keyed
- *  by, so "is this cell today" cannot answer differently than the shading. */
-function dayId(date: Date): string {
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }

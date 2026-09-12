@@ -235,7 +235,6 @@ export default function ProgressView() {
         <FocusSection
           goals={goals}
           series={series}
-          sessionCount={inPeriod.length}
           sessions={inPeriod}
           allSessions={sessions}
         />
@@ -302,15 +301,12 @@ function pickedGoals(catalogue: FocusGoal[], selected: string[]): FocusGoal[] {
 function FocusSection({
   goals,
   series,
-  sessionCount,
   sessions,
   allSessions,
 }: {
   goals: FocusGoal[];
   series: MetricSeries[];
-  sessionCount: number;
-  /** For the goals with no measurement of their own, which are answered by how
-   *  often the wrap-ups named them. */
+  /** The trainings the switch selected. */
   sessions: SessionSummary[];
   /** Everything stored, whatever the switch says (see `FocusTile`). */
   allSessions: SessionSummary[];
@@ -334,7 +330,6 @@ function FocusSection({
             <FocusTile
               goal={goal}
               series={series}
-              sessionCount={sessionCount}
               sessions={sessions}
               allSessions={allSessions}
             />
@@ -357,13 +352,12 @@ function FocusSection({
 function FocusTile({
   goal,
   series,
-  sessionCount,
   sessions,
   allSessions,
 }: {
   goal: FocusGoal;
   series: MetricSeries[];
-  sessionCount: number;
+  /** The trainings the switch selected. */
   sessions: SessionSummary[];
   /** Every stored training, for the regularity goal, which is about the
    *  calendar and not about the trainings the switch selected. */
@@ -384,7 +378,7 @@ function FocusTile({
 
       {backing.kind === "metric" && primary ? (
         <>
-          <MetricBody series={primary} sessionCount={sessionCount} />
+          <MetricBody series={primary} sessionCount={sessions.length} />
           {supporting.length > 0 && <SupportingMetrics series={supporting} />}
         </>
       ) : backing.kind === "segment" ? (

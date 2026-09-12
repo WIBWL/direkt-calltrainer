@@ -3,7 +3,7 @@ import {
   comparableAcrossCalls,
   formatValue,
   isCount,
-  partsTotal as partsTotalOf,
+  partsTotal,
   seriesShape,
   type SeriesShape,
 } from "./metrics";
@@ -157,18 +157,12 @@ export function formatBand(series: MetricSeries): string | null {
   );
 }
 
-/** How many parts a checklist metric has, from the catalogue rather than
- *  parsed out of the unit string. Null for a figure. */
-export function partsTotal(series: MetricSeries): number | null {
-  return partsTotalOf(series.key);
-}
-
 /** In how many trainings every part of a checklist was recognised. A count of
  *  trainings over a named denominator, the same kind of statement as the
  *  recurring block's count over a named denominator, never a share or a
  *  direction. */
 export function completeParts(series: MetricSeries): number | null {
-  const total = partsTotal(series);
+  const total = partsTotal(series.key);
   if (total === null) return null;
   return series.points.filter((p) => Math.round(p.value) >= total).length;
 }
@@ -244,31 +238,33 @@ export function latest(sessions: SessionSummary[], count: number | null): Sessio
   return count === null ? sessions : sessions.slice(0, count);
 }
 
-/** How long the call ran, in minutes, or null where it has no recorded end.
+/** How long the call ran, in milliseconds, or null where it has no recorded end
+ * — which a Session cut short by a pipeline failure legitimately may not.
  *
  * Derived from the two timestamps rather than measured, which is why it is not
  * a Measurement: it belongs to the same family as the activity figures, it
  * describes what happened rather than how it was spoken, and it needs no norm
- * to be worth showing.
+ * to be worth showing. The history's rows show the same length as mm:ss.
  */
-export function durationMinutes(session: SessionSummary): number | null {
+export function callDurationMs(session: SessionSummary): number | null {
   if (!session.ended_at) return null;
   const started = new Date(session.started_at).getTime();
   const ended = new Date(session.ended_at).getTime();
   if (Number.isNaN(started) || Number.isNaN(ended) || ended < started) return null;
-  return (ended - started) / 60000;
+  return ended - started;
 }
 
-/** The call lengths as a series, so they can be drawn like any metric. */
+/** The call lengths as a series, in minutes, so they can be drawn like any
+ *  metric. */
 export function durationSeries(sessions: SessionSummary[]): MetricSeries | null {
   const points: SeriesPoint[] = [];
   for (const session of [...sessions].reverse()) {
-    const minutes = durationMinutes(session);
-    if (minutes === null) continue;
+    const ms = callDurationMs(session);
+    if (ms === null) continue;
     points.push({
       sessionId: session.session_id,
       at: session.started_at,
-      value: minutes,
+      value: ms / 60000,
       scenario: session.scenario,
       persona: session.persona,
     });
@@ -412,8 +408,9 @@ export function firstTrainingMonth(
 
 /** A day as a key, in local time. Built from the parts rather than from
  *  `toISOString`, which would shift a late-evening training into the next day
- *  for anybody east of UTC. */
-function dayKey(date: Date): string {
+ *  for anybody east of UTC. The calendar marks today with the same key, so
+ *  "is this cell today" cannot answer differently than the shading. */
+export function dayKey(date: Date): string {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 

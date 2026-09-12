@@ -3,6 +3,7 @@ import { useId, useState, type ReactNode } from "react";
 import { useAccount } from "../hooks/useAccount";
 import type { SessionDetail, SessionTurn, TranscriptEntry } from "../protocol";
 import { downloadFeedbackPdf } from "../utils/feedbackPdf";
+import { initialsOf } from "../utils/initials";
 import { formatOffset } from "../utils/time";
 
 interface FeedbackScreenProps {
@@ -185,15 +186,7 @@ export default function FeedbackScreen({
 
                 {/* Decorative: the name is spelled out beside it. */}
                 <span className="transcript-avatar" aria-hidden="true">
-                  {entry.speaker === "user"
-                    ? account.initials
-                    : personaName
-                        .trim()
-                        .split(/\s+/)
-                        .filter(Boolean)
-                        .map((part) => part.charAt(0).toUpperCase())
-                        .slice(0, 2)
-                        .join("")}
+                  {entry.speaker === "user" ? account.initials : initialsOf(personaName)}
                 </span>
 
                 <div className="transcript-content">

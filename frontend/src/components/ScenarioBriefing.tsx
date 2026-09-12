@@ -9,25 +9,16 @@
  * A component rather than markup because it is rendered twice: on the setup
  * screen as soon as a Scenario is picked, and again between the microphone
  * check and the ringing phone, where it is the last thing read before the call.
- * It used to sit on the check itself, which put the case on the same screen as
- * a level meter.
  *
  * Renders nothing for a Scenario without one — a Scenario authored before the
  * field existed has none, and an empty panel with a heading is worse than no
  * panel.
  */
-export default function ScenarioBriefing({
-  briefing,
-  className,
-}: {
-  briefing: string | undefined;
-  /** Lets the two call sites space it against what sits above them. */
-  className?: string;
-}) {
+export default function ScenarioBriefing({ briefing }: { briefing: string | undefined }) {
   if (!briefing) return null;
 
   return (
-    <section className={className ? `scenario-briefing ${className}` : "scenario-briefing"}>
+    <section className="scenario-briefing">
       <h3 className="scenario-briefing-title">Ihre Ausgangslage</h3>
       <p className="scenario-briefing-body">{briefing}</p>
     </section>

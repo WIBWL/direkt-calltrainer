@@ -7,6 +7,7 @@ import { ROUTES, type TrainingStart } from "../routes";
 import { listScenarios, type ScenarioCard } from "../scenarioLibrary";
 import { mentionSummary } from "../utils/goalMentions";
 import { PRACTICE_CATEGORY, PRACTICE_REASON } from "../utils/practiceRoutes";
+import { formatDayMonth } from "../utils/time";
 import InfoDetails from "./InfoDetails";
 
 /**
@@ -96,7 +97,7 @@ export default function ProgressPractice({
         <p className="progress-practice-why">
           <span className="progress-practice-chip">Vorschlag</span>
           {goal?.title ?? target.goal} wurde in {target.count} Ihrer Auswertungen als
-          Verbesserungspunkt genannt, zuletzt am {formatDay(source.started_at)} im Gespräch
+          Verbesserungspunkt genannt, zuletzt am {formatDayMonth(source.started_at) ?? source.started_at} im Gespräch
           „{source.scenario}“.
         </p>
 
@@ -199,13 +200,4 @@ function pickScenario(
     ? `eines der ${PRACTICE_REASON[category] ?? "passenden Gespräche"}`
     : "ein Gespräch, das Sie noch nicht geführt haben";
   return { id: chosen.id, name: chosen.name, why };
-}
-
-/** The day a training happened, for the sentence that says where the
- *  suggestion comes from. */
-function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "long",
-  });
 }
