@@ -1,5 +1,5 @@
-"""The same Kennzahlen over the demanding stretches of a call and over the rest
-(F-62 "Souveränität unter Druck", ADR 0081).
+"""The same metrics over the demanding stretches of a call and over the rest
+(F-62 "composure under pressure", ADR 0081).
 
 Three things have to hold together for this to mean anything, and each is a
 quiet failure on its own:
@@ -161,7 +161,7 @@ def test_an_unmeasured_utterance_stores_no_facts(
 def test_the_marked_exchanges_become_their_own_measurements(
     db_session: DbSession, app_database: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The whole point: two sets of the same Kennzahlen, one for the stretches
+    """The whole point: two sets of the same metrics, one for the stretches
     the partner pushed in and one for the rest."""
     persist(turns=_call(pressing={1, 2, 3, 4}))
     session_id = db_session.query(Session).one().session_id
@@ -181,10 +181,10 @@ def test_the_marked_exchanges_become_their_own_measurements(
 
 
 def test_the_segment_metrics_are_the_ones_that_stay_defined_on_a_part() -> None:
-    """Not every Kennzahl survives being computed over a stretch. A count is
-    smaller on a shorter stretch by construction; Reaktionszeit is measured
+    """Not every metric survives being computed over a stretch. A count is
+    smaller on a shorter stretch by construction; reaction time is measured
     from the previous partner line, which at a boundary lies in the other
-    stretch; the Sprachmelodie needs more voiced speech than a stretch usually
+    stretch; the intonation needs more voiced speech than a stretch usually
     holds (F-35). Pinned here so adding a metric to the inventory is a decision
     about this list rather than a silent inclusion."""
     assert set(segments.SEGMENT_METRIC_KEYS) == {
@@ -393,7 +393,7 @@ async def test_the_detail_route_keeps_the_two_lists_apart(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Every reader of `measurements` assumes one entry per metric (ADR 0051).
-    Three Sprechtempo rows in that list would draw the Kennzahl three times."""
+    Three speaking pace rows in that list would draw the metric three times."""
     extern_id = persist(turns=_call(pressing={1, 2, 3, 4}))
     session_id = db_session.query(Session).one().session_id
     _stub_model(monkeypatch, _reply(_persona_turn_ids(db_session)[:4]))

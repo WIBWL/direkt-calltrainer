@@ -70,8 +70,8 @@ entire sharing interaction for R-58 — no redemption codes, no recipient lists,
 no invitations. A colleague sees it on their next load. Cross-tenant share links
 stay a phase-3 possibility.
 
-The setup screen shows four Scenario filters — **Alle / Standard / Eigene /
-`<company name>`** — and badges each card. `GET /api/unternehmen` gives the
+The setup screen shows four Scenario filters — **all, built-in, the caller's
+own, and `<company name>`** — and badges each card. `GET /api/unternehmen` gives the
 client the resolved company name (`null` for the `default` tenant, which hides
 the company chip); the name is never something the client sends.
 

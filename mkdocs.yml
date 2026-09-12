@@ -72,12 +72,13 @@ nav:
       - ADR 0053 - Deterministic Constraint Names and Database-Enforced Vocabularies: adr/0053-named-constraints-and-database-enforced-vocabularies.md
       - ADR 0054 - The Scenario Briefs the Trainee: adr/0054-scenario-briefing-for-the-trainee.md
       - ADR 0055 - One Log File for the Whole Run: adr/0055-log-file-kept-for-the-whole-run.md
-      - ADR 0056 - Phasengerechte Sprache Is a Paragraph, Not a Metric: adr/0056-phase-appropriate-language-as-prose.md
+      - ADR 0056 - Phase-Appropriate Language Is a Paragraph, Not a Metric: adr/0056-phase-appropriate-language-as-prose.md
       - ADR 0057 - English Wire Vocabulary: adr/0057-english-wire-vocabulary.md
       - ADR 0058 - User-Authored Scenarios: adr/0058-user-authored-scenarios.md
       - ADR 0059 - User-Authored Scenario Text Is Information, Not Instructions: adr/0059-user-authored-prompt-content.md
       - ADR 0060 - Tenant Model and Company Sharing for Authored Scenarios: adr/0060-tenant-model-and-visibility.md
       - ADR 0061 - English Wire Vocabulary for the Scenario Library: adr/0061-english-wire-vocabulary-for-the-scenario-library.md
+      - ADR 0062 - A Scenario Read View, Withholding the Caller's Intent: adr/0062-scenario-read-view-withholds-the-callers-intent.md
       - ADR 0063 - Scenario Field Limits Served From One Source: adr/0063-scenario-field-limits-from-one-source.md
       - ADR 0064 - A Per-User Session History, With Ownership as the Query: adr/0064-per-user-session-history-endpoint.md
       - ADR 0065 - Progress Is Shown Without Being Judged: adr/0065-progress-shown-without-judgement.md
@@ -97,13 +98,13 @@ nav:
       - ADR 0079 - Whether the Tone Suited the Occasion, as Prose: adr/0079-tone-against-the-occasion-as-prose.md
       - ADR 0080 - Feedback Points Carry a Focus Goal: adr/0080-feedback-points-carry-a-focus-goal.md
       - ADR 0081 - Measurements Over the Demanding Stretches of a Call: adr/0081-measurements-over-the-demanding-stretches-of-a-call.md
-      - ADR 0082 - The Kennzahlen Are Shown in Two Halves, How and What: adr/0082-the-kennzahlen-in-two-halves-how-and-what.md
+      - ADR 0082 - The Metrics Are Shown in Two Halves, How and What: adr/0082-the-metrics-in-two-halves-how-and-what.md
       - ADR 0083 - Metrics That Read Words Take the Session's Language: adr/0083-metrics-that-read-words-take-the-sessions-language.md
       - ADR 0084 - Hesitation Sounds Are Estimated From the Pitch Contour; Articulation Is Not Measured: adr/0084-hesitation-sounds-from-the-pitch-contour.md
       - ADR 0085 - A Recording Without Detectable Silence Drops What Rests on Silence: adr/0085-a-recording-without-silence-drops-what-rests-on-silence.md
       - ADR 0086 - The Opening Turn Is Read as Three Parts, Depending on Who Rang: adr/0086-the-opening-turn-in-three-parts-by-who-rang.md
       - ADR 0087 - What to Play Next Is Chosen From the Library: adr/0087-what-to-play-next-is-chosen-from-the-library.md
-      - ADR 0088 - Sprachmelodie Is a Tile, and Its Page Carries the Drawing: adr/0088-sprachmelodie-is-a-tile-its-page-carries-the-drawing.md
+      - ADR 0088 - Intonation Is a Tile, and Its Page Carries the Drawing: adr/0088-intonation-is-a-tile-its-page-carries-the-drawing.md
       - ADR 0089 - The Closing Is Read as Three Parts, in the User's Last Two Turns: adr/0089-the-closing-is-read-as-three-parts-in-the-last-two-turns.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs

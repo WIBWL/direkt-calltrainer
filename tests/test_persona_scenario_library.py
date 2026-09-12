@@ -335,7 +335,7 @@ def test_every_objection_has_exactly_one_german_label(entry):
 
 @pytest.mark.parametrize("entry", SEED.SCENARIOS, ids=lambda e: e["id"])
 def test_seeded_scenario_carries_german_display_text(entry):
-    """ADR 0076: the read view behind a card shows the situation and the facts
+    """ADR 0062: the read view behind a card shows the situation and the facts
     of the case. Those two columns are English prompt text (ADR 0043), so a
     built-in needs a display twin for each -- without one the panel would show
     a German user an English case."""

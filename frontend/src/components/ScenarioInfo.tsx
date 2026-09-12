@@ -12,7 +12,7 @@ interface ScenarioInfoProps {
   scenarioName: string;
   onClose: () => void;
   /** Switch to the editor on this Scenario. Offered only when the server says
-   * the caller may edit it (ADR 0076). */
+   * the caller may edit it (ADR 0062). */
   onEdit: (id: string) => void;
   /** Delete this Scenario. Offered on the two kinds built from a Session —
    * a reverse (ADR 0070) and a follow-up (ADR 0069) — which are the rows that
@@ -42,7 +42,7 @@ const SECTIONS: { key: keyof ScenarioDetail; label: string }[] = [
  * the same field order as the editor — so the panel a user reads and the form
  * they then edit are recognisably the same thing.
  *
- * Reading comes before writing for every Scenario (ADR 0076): the card carries
+ * Reading comes before writing for every Scenario (ADR 0062): the card carries
  * no edit affordance, and the edit button appears here instead, only on a row
  * the *server* marked `editable`. The panel shows the case as the trainee may
  * know it going in — the situation, their briefing and the facts — and nothing

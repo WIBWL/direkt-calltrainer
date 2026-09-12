@@ -52,7 +52,7 @@ class Scenario:
     case_facts: str = ""
     call_goal: str = ""
     # Display: the same situation and case facts in the UI language, for the
-    # read view behind a card (ADR 0076). None on an authored Scenario, which
+    # read view behind a card (ADR 0062). None on an authored Scenario, which
     # is already written in its author's language.
     description_label: str | None = None
     case_facts_label: str | None = None

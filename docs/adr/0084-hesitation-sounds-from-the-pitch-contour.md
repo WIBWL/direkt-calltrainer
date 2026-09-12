@@ -38,6 +38,6 @@ None of these is built. The goal stays a text-only goal in the progress view, wh
 
 Hesitation sounds are counted at all, where before their absence from the transcript made them invisible. The count is an estimate and should be read as one.
 
-Redefluss (`phonation_share`, ADR 0085) counts a held "äh" as speech, so a call full of them reads as especially fluent. Subtracting the detected holds from the phonation time would correct that; it is not done yet.
+phonation share (`phonation_share`, ADR 0085) counts a held "äh" as speech, so a call full of them reads as especially fluent. Subtracting the detected holds from the phonation time would correct that; it is not done yet.
 
 Real recordings — the same sentence said with and without "ähm", mumbled and clear — are what the thresholds need and what an articulation measure would have to be chosen by. Until then both stay as recorded here. If the Whisper prompt works on the gateway, the hesitation sounds can be counted exactly from the transcript and this detector becomes the fallback.

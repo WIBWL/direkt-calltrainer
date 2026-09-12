@@ -6,9 +6,9 @@ and how its value is derived. Adding a metric is one entry here, not a change
 spread over a seed and an analysis path.
 
 Every metric describes the whole call, not one utterance (ADR 0051): the
-inventory follows F-53's list of Kennzahlen -- Redeanteil, Fragen, Sprechtempo,
-Wortanzahl, Reaktionszeit, Pausen -- plus the loudness curve of F-37. The Prio
-column of docs/features.md drives `active`; an inactive metric carries no
+inventory follows F-53's list of metrics -- talk share, questions, speaking
+pace, word count, reaction time, pauses -- plus the loudness curve of F-37. The
+priority column of docs/features.md drives `active`; an inactive metric carries no
 `derive` and produces nothing, so the MVP's scope stays unambiguous.
 
 This module knows nothing about Praat. It turns the numbers acoustics.py
@@ -37,7 +37,7 @@ _MS_PER_SECOND = 1000
 # on the string rather than each spelling it out.
 RUN_LENGTH_KEY = "run_length"
 
-# The text behind that Kennzahl's "i", kept beside the derivation it explains.
+# The text behind that metric's "i", kept beside the derivation it explains.
 # Plain German, no dashes: it is read by somebody who has just finished a call.
 RUN_LENGTH_EXPLANATION = (
     "Gemessen wird, wie lange Sie am Stück sprechen, bevor Sie absetzen. Ihre "
@@ -153,7 +153,7 @@ class Measurement:
     detail: dict | None = None
 
 
-# A deriver sees the whole call and returns its metric's Messung -- or None
+# A deriver sees the whole call and returns its metric's measurement -- or None
 # when the call gave it nothing to measure.
 Deriver = Callable[[Conversation], "Measurement | None"]
 
@@ -165,7 +165,7 @@ class MetricDef:
     key: str
     name: str
     unit: str | None
-    # ASPECT_HOW or ASPECT_WHAT: which half of the Kennzahlen grid this one
+    # ASPECT_HOW or ASPECT_WHAT: which half of the metrics grid this one
     # sits in. A display grouping -- it never reaches the wrap-up prompt.
     aspect: str
     feature_id: str
@@ -442,7 +442,7 @@ def _pace(call: Conversation) -> Measurement | None:
     thinks in. The gaps between utterances are excluded, so this says how fast
     they talk rather than how much of the call they filled.
 
-    F-36 also asks for the rate "relativ zum Gesprächspartner". That partner is
+    F-36 also asks for the rate relative to the conversation partner. That one is
     a synthesized voice reading at whatever rate the TTS model was configured
     for, so the comparison would measure a setting, not the user; it is left
     out until the partner is a person.
@@ -613,7 +613,7 @@ def _intonation(call: Conversation) -> Measurement | None:
     who closes their sentences from one who ends every one of them on a rise.
     `backend/feedback/intonation.py` derives them and says why each was chosen.
 
-    The value stays the range in semitones, so the Kennzahl keeps one number the
+    The value stays the range in semitones, so the metric keeps one number the
     way every other one does; the factors ride in the detail.
 
     Semitones and not Hertz, and this is the point of the unit. A range of 40 Hz
@@ -659,7 +659,7 @@ def _intonation(call: Conversation) -> Measurement | None:
             "band_high_st": shape.band_high_st,
             "movement_st_per_s": shape.movement_st_per_s,
             # The pitch variation quotient and the number of ten-second windows
-            # it was averaged over. The reading on this Kennzahl is taken off
+            # it was averaged over. The reading on this metric is taken off
             # this figure and off nothing else -- it is the only one of the five
             # with a published boundary behind it (Hincks 2005). Stored rather
             # than derived at read time, unlike the step itself: it is a
@@ -860,12 +860,12 @@ def _keep_furthest(
 # --- Inventory ------------------------------------------------------------
 
 METRICS: tuple[MetricDef, ...] = (
-    # Active -- F-53's Kennzahlen, plus F-37's loudness curve. No metric
+    # Active -- F-53's metrics, plus F-37's loudness curve. No metric
     # carries a target range: there is no validated norm for this population,
     # and a made-up threshold is a score in disguise (ADR 0004/0051).
     #
     # `aspect` splits them into the two halves the screen shows one at a time.
-    # Redeanteil is `what` despite coming from durations: it describes the
+    # talk share is `what` despite coming from durations: it describes the
     # shape of the exchange, not the delivery.
     MetricDef("talk_share", "Redeanteil", "%", ASPECT_WHAT, "F-24", True, _talk_share),
     MetricDef("questions", "Fragen an den Gesprächspartner", "Anzahl", ASPECT_WHAT, "F-41",

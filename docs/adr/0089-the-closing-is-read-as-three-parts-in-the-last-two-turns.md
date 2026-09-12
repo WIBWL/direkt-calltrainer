@@ -36,7 +36,7 @@ ADR 0086 splits the opening's third part by who called, because the called side 
 
 ### The tile shows the parts, not the count
 
-As for the opening, and now from one shared list (`utils/metrics.ts`): the tile, the progress view and the downloadable report all read `metricParts`, so a new checklist Kennzahl cannot be a checklist on one screen and a climbing line on another. "2" in display type is the mark ADR 0086 kept off the screen, and the PDF used to print exactly that for the opening — it now names the parts in words there too, the fonts carrying no check mark.
+As for the opening, and now from one shared list (`utils/metrics.ts`): the tile, the progress view and the downloadable report all read `metricParts`, so a new checklist metric cannot be a checklist on one screen and a climbing line on another. "2" in display type is the mark ADR 0086 kept off the screen, and the PDF used to print exactly that for the opening — it now names the parts in words there too, the fonts carrying no check mark.
 
 "Nicht erkannt", never "fehlt". A recap worded some other way slips past the patterns, and the tile says what the check did rather than what the user did. The stored detail carries `turns_read`, so the screen can say where it looked with the backend's own number (ADR 0063's pattern) rather than a copy of it.
 
@@ -50,6 +50,6 @@ The goal is backed in the progress view by this metric, drawn as one mark per tr
 
 The patterns will miss real closings, and they were written from how German and English service calls usually end rather than tested against a corpus. Every miss shows as "nicht erkannt".
 
-Because the parts come from words alone, they **can** be computed for Sessions stored earlier — `scripts/backfill_closing.py [--apply]`, the third metric that reaches backwards after F-51's interruptions and F-53's Sprechlänge am Stück. ADR 0048 does not bite: nothing here needs the recording. A backfilled row carries `backfilled: true`, as the run-length one does.
+Because the parts come from words alone, they **can** be computed for Sessions stored earlier — `scripts/backfill_closing.py [--apply]`, the third metric that reaches backwards after F-51's interruptions and F-53's run length. ADR 0048 does not bite: nothing here needs the recording. A backfilled row carries `backfilled: true`, as the run-length one does.
 
 The wrap-up's dossier gains one line ("Gesprächsabschluss: 2.0 von 3"), like every other Measurement. It is a fact handed to the model, not an instruction: the prompt's rule against judging a figure against a norm is unchanged (ADR 0049, ADR 0051).

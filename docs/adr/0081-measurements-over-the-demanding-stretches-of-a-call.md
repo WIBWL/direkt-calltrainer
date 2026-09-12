@@ -20,7 +20,7 @@ Three obstacles sat in the way, and the shape of this decision is the shape of t
 
 ## Decision
 
-**The same Kennzahlen are measured a second and a third time, over the exchanges where the partner pushed back and over the remainder.** `measurement.segment` says which of the three a row describes: `call`, `pressure`, `rest`.
+**The same metrics are measured a second and a third time, over the exchanges where the partner pushed back and over the remainder.** `measurement.segment` says which of the three a row describes: `call`, `pressure`, `rest`.
 
 ### The wrap-up marks the stretches
 
@@ -45,9 +45,9 @@ They are measured when the call ends and they stay. A model's opinion about whic
 
 ### Which metrics, and the second amendment
 
-Five: Redeanteil, Sprechtempo, Sprechpausen, Sprechlänge am Stück, Lautstärke. The ones that stay defined on a part of a call.
+Five: talk share, speaking pace, pauses, run length, loudness. The ones that stay defined on a part of a call.
 
-Left out on purpose: Reaktionszeit is measured from the end of the *previous* partner line, which at a segment boundary lies in the other segment, so the figure would quietly describe the boundary. Fragen and Wortanzahl are counts, and a count over a shorter stretch is a smaller number by construction. The Sprachmelodie needs more voiced speech under it than a stretch usually holds (F-35, ADR 0077).
+Left out on purpose: reaction time is measured from the end of the *previous* partner line, which at a segment boundary lies in the other segment, so the figure would quietly describe the boundary. questions and word count are counts, and a count over a shorter stretch is a smaller number by construction. The intonation needs more voiced speech under it than a stretch usually holds (F-35, ADR 0077).
 
 Loudness is in it, and this is the second amendment. The figure is a *range within one recording*, and within one call the microphone and the distance to it are constant, so comparing one stretch against another is valid even though the absolute level says nothing — the very reason the focus goal about loudness was retired (ADR 0076's amendment). What is compared here is never a level.
 

@@ -11,8 +11,8 @@ it has been measured.
 
 That makes this the second metric in the project that can reach backwards, after
 the interruptions of F-51, and for the same underlying reason: it is a property
-of when somebody spoke rather than of how they sounded. Sprechtempo, Lautstärke
-and Sprachmelodie can never be recomputed for a past Session.
+of when somebody spoke rather than of how they sounded. Speaking pace, loudness
+and intonation can never be recomputed for a past Session.
 
 Runs against the database in `.env`, so a host shell will do; nothing here needs
 Redis or a model.

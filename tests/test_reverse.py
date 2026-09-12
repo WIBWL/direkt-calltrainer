@@ -394,7 +394,7 @@ async def test_the_reverse_is_offered_in_the_library_under_its_own_flag(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The card is what the "Rollentausch" filter runs on, and what tells the
+    """The card is what the "Reverse" filter runs on, and what tells the
     User which conversation it replays."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
@@ -420,7 +420,7 @@ async def test_the_detail_route_serves_the_briefing(
     exception to ADR 0043 -- for a case the User has already heard played.
 
     The case comes back in the display language, not in the English the prompt
-    reads: `_detail` prefers the twin (ADR 0076), and a reverse of a built-in
+    reads: `_detail` prefers the twin (ADR 0062), and a reverse of a built-in
     only has one because `_insert_reverse` copies it along with the field it
     belongs to. It did not, once, and the info panel read the case out in
     English -- which this line is here to catch.

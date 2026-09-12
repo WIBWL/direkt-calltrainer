@@ -98,7 +98,7 @@ class TurnFacts:
     The subset of `TurnAcoustics` a later measurement needs, on the Session's
     timeline rather than the utterance's, and in a shape that survives a round
     trip through JSONB. The pitch curve is not part of it: no metric computed
-    per segment reads it, and the Sprachmelodie is a reading over a whole call
+    per segment reads it, and the intonation is a reading over a whole call
     (F-35).
 
     Facts and not statistics, which is the whole of why storing them per

@@ -22,7 +22,7 @@ whether it did.
 Nothing measured can close that gap. There is no distribution of appropriate
 liveliness per kind of call, and there will not be one from this pilot: it would
 need a norm per Scenario category, and ADR 0051 refused a single norm for the
-Kennzahlen on the grounds that none was measured. A per-category norm would be
+metrics on the grounds that none was measured. A per-category norm would be
 the same invention four times over.
 
 There is, however, an existing answer to exactly this shape of problem. F-42
@@ -85,7 +85,7 @@ or whether the matter was solved; and it must not restate `phase_language`,
 which is about a change *across* the call where this is the call set against its
 occasion.
 
-### It is rendered on the Sprachmelodie page, not in the wrap-up
+### It is rendered on the intonation page, not in the wrap-up
 
 It answers the question that page raises and cannot settle, and it sits directly
 under the classification whose caveat it resolves. Putting it in the wrap-up

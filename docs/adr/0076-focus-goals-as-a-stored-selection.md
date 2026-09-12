@@ -15,7 +15,7 @@ and the setup screen reads it to suggest Scenarios. See the amendment at the end
 
 ## Context
 
-The trainer treats every user the same. It measures the same six Kennzahlen,
+The trainer treats every user the same. It measures the same six metrics,
 the wrap-up weighs the same aspects, and the setup screen offers the same
 seventeen Scenarios regardless of what the person in front of it is trying to
 get better at. Someone who knows their weak point is the close gets the same
@@ -190,7 +190,7 @@ the goal leaves the served selection of anyone who had picked it
 (`api/focus.py`) — the picker has no card for it, so leaving it in would hold
 one of the five slots with nothing on screen to explain it.
 
-Two things deliberately stay. The Kennzahl `loudness` and its course (F-37) keep
+Two things deliberately stay. The metric `loudness` and its course (F-37) keep
 being measured and shown on a single call, where the device is at least constant
 for the length of that call and the curve describes a shape rather than a level.
 And no measurement is invented to replace the goal: the honest alternative would
@@ -250,7 +250,8 @@ views across them.
 
 Where there are suggestions, the screen opens on them with the category row on
 "Alle", since one category alone would often leave nothing. ADR 0072's opening
-selection, Standard with Betrieb & Störung, is the fallback where there are none.
+selection, built-in with the operations category, is the fallback where there
+are none.
 
 ### The evidence obligation is untouched
 

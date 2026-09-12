@@ -325,7 +325,7 @@ def test_the_dossier_describes_loudness_instead_of_quoting_its_span() -> None:
 
 
 def test_the_other_statistics_still_reach_the_model_as_figures() -> None:
-    """Only loudness is described: every other Kennzahl has a unit the model
+    """Only loudness is described: every other metric has a unit the model
     can state plainly, and ADR 0049 wants it explaining those."""
     dossier, _ = _dossier(_session_with(
         _measurement("pace", "Sprechtempo", "WPM", 132.0),

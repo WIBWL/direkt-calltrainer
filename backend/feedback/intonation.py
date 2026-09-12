@@ -14,9 +14,9 @@ So the contour is described by five figures, and each one is chosen because it
 is (a) readable off the contour without inventing a norm and (b) something a
 speaker can actually do differently tomorrow:
 
-    Umfang        how far the voice ranges, 5th to 95th percentile in semitones
+    range        how far the voice ranges, 5th to 95th percentile in semitones
     Bewegung      how much it moves per second of speech, semitones per second
-    Lebendigkeit  the pitch variation quotient: SD/mean of F0 per 10 s window
+    liveliness  the pitch variation quotient: SD/mean of F0 per 10 s window
     Satzenden     whether utterances end falling, rising or level
     Verlauf       whether the range widens or narrows across the call
 
@@ -29,9 +29,9 @@ it is, and the floor below which a movement is not heard as a movement at all is
 a measured perceptual threshold rather than a chosen one -- see TERMINAL_FLAT_ST
 and the glissando threshold it comes from.
 
-Lebendigkeit is the only figure here with published boundaries behind it, and
+liveliness is the only figure here with published boundaries behind it, and
 that is why the reading at the foot of this module rests on it and no longer on
-the Umfang. Hincks (2005) measured the pitch variation quotient against human
+the range. Hincks (2005) measured the pitch variation quotient against human
 liveliness ratings and reports where monotone ends and lively begins. Those
 boundaries were established on 18 Swedish students presenting in L2 English in a
 classroom, which is neither this population nor this channel; the module carries
@@ -162,14 +162,14 @@ RANGE_KEY = "intonation"
 # Where the pitch variation quotient is read as monotone or lively.
 #
 # Worth stating plainly, because the rest of this module is careful not to:
-# THIS IS A JUDGEMENT, and ADR 0004/0051 rule judgements out for the Kennzahlen
+# THIS IS A JUDGEMENT, and ADR 0004/0051 rule judgements out for the metrics
 # on the grounds that no threshold is validated for this population. It exists
 # because it was asked for, it is confined to the single-call view, and it is
 # removable by deleting this block, `liveliness`, `liveliness_steps` and the
 # two places that call them.
 #
 # What changed, and why it is worth recording here rather than only in the
-# history: this reading used to sit on the Umfang, on five steps whose
+# history: this reading used to sit on the range, on five steps whose
 # boundaries were derived by taking the F0 standard deviations usually quoted
 # for speech and converting them to a 5th-to-95th-percentile span through a
 # factor of about 3.3. A literature review of that derivation found nothing
@@ -183,7 +183,7 @@ RANGE_KEY = "intonation"
 # against the liveliness ratings of human listeners, with the mean of 9 such
 # windows correlating at r = 0.83 with those ratings. So the reading moves onto
 # the figure that has the evidence and off the one that does not, while the
-# Umfang stays what it always was -- the Kennzahl's headline number, reported
+# range stays what it always was -- the metric's headline number, reported
 # without a verdict.
 #
 # The caveat that remains, and it is not small: those boundaries come from 18
@@ -697,7 +697,7 @@ def liveliness(pvq: float | None, voiced_ms: int | None = None) -> Liveliness | 
     the figure was measured under the same rules either way.
 
     On the quotient and on nothing else, which is a change from reading it off
-    the Umfang, and the reason is that the Umfang has no published boundary and
+    the range, and the reason is that the range has no published boundary and
     this does. The other four figures stay what they were: reported beside the
     step, uninterpreted, each of them saying something the step cannot. In
     particular the movement figure is the better discriminator in principle -- a
@@ -707,7 +707,7 @@ def liveliness(pvq: float | None, voiced_ms: int | None = None) -> Liveliness | 
 
     A Session measured before the quotient existed passes None here and gets no
     step. That is deliberate: the old five-step reading was withdrawn because
-    its derivation did not hold up, and back-filling it from the stored Umfang
+    its derivation did not hold up, and back-filling it from the stored range
     would be reinstating it under a new name.
     """
     if pvq is None:

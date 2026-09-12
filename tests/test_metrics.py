@@ -1,16 +1,16 @@
 """The Session's statistics, derived from a finished call.
 
 Covers:
-  F-24  Redeanteil, and the unit it is a share *of*
-  F-36  Sprechtempo, and the unit it is a rate *over*
-  F-53  Reaktionszeit: only from Turns whose start was actually measured
+  F-24  talk share, and the unit it is a share *of*
+  F-36  speaking pace, and the unit it is a rate *over*
+  F-53  reaction time: only from Turns whose start was actually measured
   F-37  the loudness curve, and the words the wrap-up gets instead of its
         dB span
   ADR 0047/0048  a Turn's acoustics are measured inline and never load-bearing,
                  so a failed measurement stays visible downstream
   ADR 0051  no figure the user could take for measured when it was not
-  F-53      every metric belongs to one half of the Kennzahlen slider (ADR 0082)
-  F-51      Redefluss: how much of the recording was speech
+  F-53      every metric belongs to one half of the metrics slider (ADR 0082)
+  F-51      phonation share: how much of the recording was speech
   F-41      open and closed questions, split off the same question marks
   F-51      lexical fillers, counted from the transcript per language (ADR 0083)
   F-08      passages said again word for word, one repeated sentence counting once
@@ -228,7 +228,7 @@ def test_stammering_does_not_repeat_itself() -> None:
 
 
 def test_a_recording_without_silence_drops_what_rests_on_silence() -> None:
-    """A noise floor above the threshold leaves nothing silent: pauses, Redefluss,
+    """A noise floor above the threshold leaves nothing silent: pauses, phonation share,
     pace and the loudness span would report the noise as speech. Talk share
     rests on the recording's length and stays."""
     turns = _measured_call()

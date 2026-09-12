@@ -55,8 +55,8 @@ class Turn:  # pylint: disable=too-many-instance-attributes
     # several fragments, needs no special case once the Session is folded up.
     #
     # How long the recording ran, and how much of that was speech rather than
-    # silence. Redeanteil divides by the first (the Persona's side is audio
-    # duration too), Sprechtempo by the second.
+    # silence. talk share divides by the first (the Persona's side is audio
+    # duration too), speaking pace by the second.
     user_speech_ms: int = 0
     user_phonation_ms: int = 0
     # False once any fragment of this Turn failed to measure: its words still

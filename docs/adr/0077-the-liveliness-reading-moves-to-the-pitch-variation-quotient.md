@@ -8,12 +8,12 @@ introduced with it. No migration: the reading was never stored.
 ## Context
 
 F-35 reports the shape of a speaker's pitch across a call. Four figures describe
-it, and one of them — the Umfang, the 5th-to-95th-percentile span in semitones —
+it, and one of them — the range, the 5th-to-95th-percentile span in semitones —
 carried a five-step reading: *stark monoton / monoton / ausgewogen / lebendig /
 überzeichnet*, at 4, 7, 12 and 18 semitones.
 
 That reading was the deliberate exception to ADR 0004/0051, which rule out
-judging a Kennzahl against a threshold on the grounds that none is validated for
+judging a metric against a threshold on the grounds that none is validated for
 this population. It was asked for explicitly, and the boundaries were defended
 as follows: the F0 standard deviations usually reported for speech are around
 1 semitone for monotone delivery, 2 to 3 for conversation and 4 and above for
@@ -32,7 +32,7 @@ what follows from them.
 
 ## Decision
 
-### The reading moves off the Umfang and onto the pitch variation quotient
+### The reading moves off the range and onto the pitch variation quotient
 
 Hincks (2005) measured the pitch variation quotient — the standard deviation of
 F0 over its mean, in Hertz, computed per 10-second window of speech and then
@@ -44,7 +44,7 @@ So the reading sits on the figure with the evidence. Three steps and not five,
 because three is what Hincks reports; inventing a fourth boundary to sit between
 them would put back exactly what this change removes.
 
-The Umfang stays the Kennzahl's headline number and loses its verdict. It is
+The range stays the metric's headline number and loses its verdict. It is
 still the right thing to report — it is what the contour drawing shows and what
 the metric's unit is in — and there is still no published figure saying where a
 narrow span ends and a wide one begins.
@@ -101,14 +101,14 @@ colours are stated plainly, per ADR 0078's sixth condition.
   instead of leaving the colour to imply something harsher.
 
 **The colour goes on the classification, never on the semitone figure.** The
-step is read from the pitch variation quotient and the Kennzahl's number is the
-Umfang, so colouring the number would put a colour over a measurement it was not
+step is read from the pitch variation quotient and the metric's number is the
+range, so colouring the number would put a colour over a measurement it was not
 read from. On the wrap-up tile this needs no special case: that tile already
-leads with the word for Sprachmelodie and keeps the semitones in its subline.
+leads with the word for intonation and keeps the semitones in its subline.
 The light travels as `liveliness_light` beside `liveliness_label`, from the same
 place the threshold lives; nothing in the frontend maps a step to a colour.
 
-### The block on the Kennzahl's page is rebuilt around it
+### The block on the metric's page is rebuilt around it
 
 The old layout put a paragraph of method under every figure, which meant the one
 sentence a reader acts on sat in the middle of six hundred words about
@@ -166,7 +166,7 @@ rather than a convention behind them.
 derived on read (`api/sessions.py::_served_detail`), which is what let the scale
 be replaced without a migration — but it now needs a figure those Sessions do
 not carry, and the audio to compute it from is gone (ADR 0048). Reading the step
-off the stored Umfang instead would reinstate the withdrawn scale under a new
+off the stored range instead would reinstate the withdrawn scale under a new
 name. The block says so and shows four figures instead of five.
 
 **The endings counts shift, and it cannot be checked against stored data.** The
@@ -177,7 +177,7 @@ worth eyeballing on the first real calls after it ships.
 
 **The second light is what turned an exception into a pattern.** ADR
 0004/0051/0065 had been left unchanged for the first one on the argument that it
-was a single trial on a single Kennzahl, and that argument does not survive
+was a single trial on a single metric, and that argument does not survive
 being made twice. Rather than leave the written rule contradicted by the
 application twice over, **ADR 0078** settles what an honest use of colour is and
 under what conditions. A third light is now a question of whether it meets those

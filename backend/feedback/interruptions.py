@@ -100,7 +100,7 @@ EXPLANATION = (
 class TrafficLight(str, Enum):
     """The three-step reading of the count.
 
-    Governed by ADR 0078, which says what a light on a Kennzahl may claim and
+    Governed by ADR 0078, which says what a light on a metric may claim and
     under which conditions. This one was built before that ADR existed and was
     described here as an unrecorded exception; it is now one of two instances of
     a written pattern, and it meets the conditions: the colour sits on a named

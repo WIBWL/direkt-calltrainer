@@ -37,7 +37,7 @@ def _store(extern_id: uuid.UUID) -> None:
         turns=[
             Turn(seq=1, persona_text="Brandt hier.",
                  persona_offset_ms=0, persona_end_ms=1500),
-            # Both durations: Sprechtempo, the one metric type the reference
+            # Both durations: speaking pace, the one metric type the reference
             # fixture seeds, is a rate over phonation.
             Turn(seq=2,
                  user_text="Guten Tag!", user_offset_ms=1800, user_end_ms=2700,
@@ -228,7 +228,7 @@ async def test_measurements_reach_the_wire_with_the_schema_vocabulary(
     assert set(measurement) == {"key", "name", "unit", "aspect", "value", "detail"}
     assert measurement["key"] == METRIC_KEY
     assert measurement["value"] > 0
-    # The grouping the Kennzahlen slider switches on.
+    # The grouping the metrics slider switches on.
     assert measurement["aspect"] == "how"
 
 
@@ -288,7 +288,7 @@ async def test_tone_fit_reaches_the_wire_under_its_own_key(
 ) -> None:
     """The column is `feedback.tone_fit` and the wire uses the same key
     (ADR 0057). `IntonationReading.tsx` reads it, not FeedbackView: it answers
-    the question the Sprachmelodie figures raise and cannot settle.
+    the question the intonation figures raise and cannot settle.
 
     NULL survives as null rather than becoming an empty string, on the same
     grounds as the block above: a wrap-up written before this existed came from

@@ -50,7 +50,7 @@ interface SetupViewProps {
    * (F-62). */
   offerRandom: boolean;
   /** Open a Scenario's read-only info panel; editing starts there
-   * (ADR 0076). */
+   * (ADR 0062). */
   onShowScenarioInfo: (id: string) => void;
   personas: Persona[];
   personaId: string | null;

@@ -15,8 +15,8 @@ trip would buy nothing but latency and a second way to fail.
 The last of them is the only one nobody reads. `pressure_turns` says which
 exchanges were demanding, which is a judgement about what was said and therefore
 the model's to make; what the application does with it is measure the same
-Kennzahlen over those exchanges and over the rest, so that "Souveränität unter
-Druck" (F-62) rests on a measurement instead of an opinion (ADR 0081,
+metrics over those exchanges and over the rest, so that composure under
+pressure (F-62) rests on a measurement instead of an opinion (ADR 0081,
 `backend/feedback/segments.py`).
 
 tone_fit answers the one question the measurements cannot: whether the way the

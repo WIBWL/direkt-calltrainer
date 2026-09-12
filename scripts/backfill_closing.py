@@ -1,4 +1,4 @@
-"""Compute the Gesprächsabschluss for Sessions stored before it existed (ADR 0089).
+"""Compute the call closing for Sessions stored before it existed (ADR 0089).
 
     python scripts/backfill_closing.py            # show what would change
     python scripts/backfill_closing.py --apply    # write it

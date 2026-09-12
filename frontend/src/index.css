@@ -862,7 +862,7 @@ h2 {
    it, so the two sit in one column down the card's right gutter -- the gutter
    both grids' padding already keeps clear of text. Round and quiet: it must
    read as an aside to the choice, not as a second way of making it. It replaced
-   the Scenario card's edit link, which moved into the panel (ADR 0076),
+   the Scenario card's edit link, which moved into the panel (ADR 0062),
    so a card carries one secondary affordance rather than two. */
 /* The button keeps its 24px box and the ring inside it is drawn on the span,
    so the affordance can be quieter than its target: the "i" is the smaller of
@@ -1348,7 +1348,7 @@ h2 {
   color: var(--color-danger);
 }
 
-/* The edit button in the read-only info panel (ADR 0076). Filled in the same
+/* The edit button in the read-only info panel (ADR 0062). Filled in the same
    dark blue as the button that leads on to the microphone check, and hovering
    to the same lighter blue: it is the one action that leads somewhere from a
    panel that otherwise only closes. Shape comes from `.editor-actions button`

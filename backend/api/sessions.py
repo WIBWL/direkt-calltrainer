@@ -189,7 +189,7 @@ def _session_summary(session: db_models.Session) -> dict:
                 "key": m.metric_type.key,
                 "name": m.metric_type.name,
                 "unit": m.metric_type.unit,
-                # Which half of the Kennzahlen the metric belongs to (ADR 0064's
+                # Which half of the metrics the metric belongs to (ADR 0064's
                 # `aspect`). The detail route has carried it since the post-call
                 # screen split its grid in two; the dashboard needs the same
                 # split, and a copy of the mapping in the frontend would drift
@@ -213,7 +213,7 @@ def _session_summary(session: db_models.Session) -> dict:
             if m.segment == db_models.SEGMENT_CALL
         ],
         # The demanding stretches against the rest (ADR 0081), which is the
-        # only data behind the focus goal "Souveränität unter Druck" and
+        # only data behind the focus goal "composure under pressure" and
         # therefore has to reach the dashboard rather than stopping at the
         # single call. Figures only, never their curves.
         "segments": _segments(session),
@@ -252,12 +252,12 @@ def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user
             # The whole call's figures, and only those. The segment rows travel
             # under their own key rather than in this list: every reader of it
             # assumes one entry per metric (ADR 0051), and mixing three
-            # Sprechtempo rows in would draw the Kennzahl three times.
+            # speaking pace rows in would draw the metric three times.
             "measurements": [
                 _measurement(m) for m in session.measurements
                 if m.segment == db_models.SEGMENT_CALL
             ],
-            # The same Kennzahlen over the demanding stretches and over the
+            # The same metrics over the demanding stretches and over the
             # rest (ADR 0081). Empty where nobody pushed back, where the
             # stretches were too short to measure, and for every call recorded
             # before the per-utterance facts were kept.
@@ -270,7 +270,7 @@ def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user
             "findings": [
                 _finding(f) for f in sorted(session.findings, key=lambda f: f.offset_ms or 0)
             ],
-            # The long explanation behind a Kennzahl's "i", by metric key.
+            # The long explanation behind a metric's "i", by metric key.
             # Read from the Python constant at request time rather than stored
             # with the Session or copied into the frontend: it explains the
             # thresholds it sits next to, and the two have to be edited
@@ -701,7 +701,7 @@ def _finding(finding: db_models.Finding) -> dict:
         "offset_ms": finding.offset_ms,
         "description": finding.description,
         # Which figure this moment belongs to, so the interface can show it
-        # beside the right Kennzahl. NULL for a Finding that stands alone.
+        # beside the right metric. NULL for a Finding that stands alone.
         "metric_key": finding.metric_type.key if finding.metric_type else None,
     }
 
@@ -740,7 +740,7 @@ def _measurement(measurement: db_models.Measurement) -> dict:
         "key": key,
         "name": measurement.metric_type.name,
         "unit": measurement.metric_type.unit,
-        # Which half of the Kennzahlen grid this one sits in; display only.
+        # Which half of the metrics grid this one sits in; display only.
         "aspect": measurement.metric_type.aspect,
         "value": value,
         "detail": _served_detail(key, measurement.detail_json),
@@ -756,7 +756,7 @@ def _served_detail(key: str, detail: dict | None) -> dict | None:
     from the stored figures. A recalibration then reaches every Session that was
     ever measured -- including the ones whose audio is long gone (ADR 0048) --
     instead of leaving old trainings labelled by a scale that no longer exists.
-    That has now happened once: F-35's reading moved from the Umfang onto the
+    That has now happened once: F-35's reading moved from the range onto the
     pitch variation quotient, and every stored Session picked up the new scale
     on the next read, or lost its step where the new input was never measured.
 
@@ -767,7 +767,7 @@ def _served_detail(key: str, detail: dict | None) -> dict | None:
         return None
     if key == intonation.RANGE_KEY:
         # Off the pitch variation quotient in the detail, not off `value`, which
-        # is the Umfang. The two are different figures and only one of them has
+        # is the range. The two are different figures and only one of them has
         # a boundary anybody has published -- see `intonation.liveliness`. A
         # Session measured before the quotient was computed carries no `pvq` and
         # gets no step, which is the honest answer rather than a gap.

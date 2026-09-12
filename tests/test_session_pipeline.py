@@ -132,8 +132,8 @@ async def test_transcript_is_assembled_across_turns_at_the_end(orch, fake_pipeli
 
 async def test_a_measured_turn_records_both_its_durations(orch, fake_pipeline, monkeypatch):
     """ADR 0047/0048. A recording that ran 1.5 s and held 0.9 s of speech puts
-    both figures on the Turn, in their own fields: Redeanteil divides by the
-    first, Sprechtempo by the second."""
+    both figures on the Turn, in their own fields: talk share divides by the
+    first, speaking pace by the second."""
     monkeypatch.setattr(
         "backend.session.orchestrator.analyze",
         # Every field named, including the empty curves: TurnAcoustics carries

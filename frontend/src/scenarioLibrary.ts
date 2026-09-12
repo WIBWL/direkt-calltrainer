@@ -168,7 +168,7 @@ export interface ScenarioDraft {
 export type TextField = Exclude<keyof ScenarioDraft, "category">;
 
 /**
- * One Scenario as `GET /api/scenarios/{id}` returns it (ADR 0076): the read
+ * One Scenario as `GET /api/scenarios/{id}` returns it (ADR 0062): the read
  * view the info panel shows, and — where `editable` is true — the row the
  * editor loads. Not a `ScenarioDraft`: two fields are nullable here.
  */
@@ -181,7 +181,7 @@ export interface ScenarioDetail {
   case_facts: string;
   /** What the caller wants and the bar that settles it, in one field.
    * null = withheld because this is a built-in, whose caller's intent is the
-   * answer key (ADR 0076). "" = its author left the field empty. */
+   * answer key (ADR 0062). "" = its author left the field empty. */
   call_goal: string | null;
   category: CategoryChoice;
   /** "public" for a built-in. The editor never sees that value: it opens

@@ -15,7 +15,7 @@ and S-14 is not a Scenario at all, because since ADR 0043 the language belongs
 to the Persona, so "the same call in English" is an English Persona.
 
 At seventeen cards the selection screen no longer reads at a glance, and the
-four filters it has (Alle / Standard / Individuell / `<Unternehmen>`, ADR 0060)
+four filters it has (all, built-in, hand-authored, company; ADR 0060)
 do not help: they answer *whose* Scenario this is, and every one of the
 seventeen answers that the same way. What a user picking a training case wants
 to narrow by is the kind of call. A five-minute support fault is a different
@@ -124,9 +124,8 @@ knowingly.
 Two rows on the selection screen, both the same component (`FilterSlider`), so
 the second cannot end up smaller than the first by drifting apart:
 
-- **Level 1, origin:** Alle / Standard / Individuell / Folgegespräch /
-  `<Unternehmen>`
-- **Level 2, thematic category:** Alle / Betrieb & Störung / Beratung &
+- **Level 1, origin:** all, built-in, hand-authored, follow-up, company
+- **Level 2, thematic category:** all / operations / requirements &
   Anforderung / Preis & Kondition / Abschluss & Einwand
 
 The rows are independent and combine. Each option shows how many Scenarios it

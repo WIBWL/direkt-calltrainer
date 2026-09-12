@@ -319,7 +319,7 @@ def test_a_call_too_short_for_one_window_is_still_measured() -> None:
 # because the numbers are established for this population -- they are not -- but
 # so that changing one is a deliberate act with a test to update.
 #
-# The reading used to sit on the Umfang, on five steps derived here by
+# The reading used to sit on the range, on five steps derived here by
 # converting quoted F0 standard deviations to a percentile span. A literature
 # review found nothing behind either half of that derivation, so it moved to the
 # figure Hincks measured against human liveliness ratings.
@@ -418,7 +418,7 @@ def test_the_step_is_derived_when_the_session_is_read() -> None:
 def test_a_session_measured_before_the_quotient_gets_no_step() -> None:
     """The reading moved onto a figure those Sessions do not carry, and their
     audio is gone (ADR 0048) so it cannot be measured now. Reading the step off
-    the Umfang instead would reinstate the scale the review withdrew."""
+    the range instead would reinstate the scale the review withdrew."""
     served = _served_detail(RANGE_KEY, {"median_hz": 120.0})
 
     assert served == {"median_hz": 120.0}
@@ -482,7 +482,7 @@ def test_the_band_is_measured_at_both_ends_and_not_assumed_symmetric() -> None:
 
     assert shape.band_low_st is not None and shape.band_high_st is not None
     assert shape.band_high_st > abs(shape.band_low_st)
-    # ... and the two ends still add up to the figure the Kennzahl reports.
+    # ... and the two ends still add up to the figure the metric reports.
     assert shape.band_high_st - shape.band_low_st == pytest.approx(shape.range_st, abs=0.05)
 
 

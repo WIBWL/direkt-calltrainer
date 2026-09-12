@@ -27,7 +27,7 @@ reaches it. Their tiles on the dashboard said "no measurement yet" and would
 have gone on saying it forever, while the wrap-ups had in fact been writing
 about all six all along without anything recording which was which.
 
-Adding more Kennzahlen would not have fixed either problem. This is not a
+Adding more metrics would not have fixed either problem. This is not a
 measurement gap.
 
 ## Decision

@@ -119,7 +119,7 @@ interface LibraryPickerProps {
   newLabel: string;
   onNew: () => void;
   /** Open the read-only info panel. Editing is reached from inside it
-   * (ADR 0076), so the card carries no separate edit affordance -- not even
+   * (ADR 0062), so the card carries no separate edit affordance -- not even
    * on the caller's own rows, where it used to sit. */
   onInfo: (id: string) => void;
   /** Offer the random Scenario tile (F-62). Decided by the caller, not here,
@@ -336,7 +336,7 @@ export default function LibraryPicker({
           <div key={item.id} className="card-wrap">
             <button
               // The origin's colour stays; the "editable" padding does not,
-              // because the card no longer carries an edit link (ADR 0076).
+              // because the card no longer carries an edit link (ADR 0062).
               className={
                 "persona-card card-origin-" + badgeClass(item) +
                 (item.id === selectedId ? " selected" : "")
@@ -361,7 +361,7 @@ export default function LibraryPicker({
                   so the badge and the tile it sits on cannot disagree. */}
               <span className="card-badge">{badgeLabel(item, tenantName)}</span>
             </button>
-            {/* Every Scenario is readable (ADR 0076), so the "i" is on every
+            {/* Every Scenario is readable (ADR 0062), so the "i" is on every
                 card — unlike the old edit link, which was on the caller's
                 own rows only and now lives inside the panel. */}
             <button

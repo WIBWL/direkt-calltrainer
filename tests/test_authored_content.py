@@ -94,7 +94,7 @@ async def test_another_user_never_sees_my_private_scenario(client, as_user):
     as_user(BOB)
     listed = (await client.get("/api/scenarios")).json()
     assert new_id not in {s["id"] for s in listed}
-    # ... and cannot reach it directly either, not even to read. ADR 0076
+    # ... and cannot reach it directly either, not even to read. ADR 0062
     # opened the detail route to everything the caller may *select*; a
     # stranger's private row is not that, and the 404 is the same answer an
     # unknown id gets (ADR 0031/0050).
@@ -125,7 +125,7 @@ async def test_deleting_a_scenario_drops_it_from_the_list(client, as_user):
 
 
 async def test_a_built_in_is_readable_but_not_editable(client, as_user):
-    """ADR 0076: the info panel reads any Scenario the caller may select.
+    """ADR 0062: the info panel reads any Scenario the caller may select.
     A built-in is not theirs to write, and `editable` is what says so --
     the route no longer answers 404 to make the point."""
     as_user(ALICE)
@@ -142,7 +142,7 @@ async def test_a_built_in_is_readable_but_not_editable(client, as_user):
 
 
 async def test_a_built_in_withholds_the_callers_intent(client, as_user):
-    """ADR 0076: `description` and `case_facts` are the situation and come
+    """ADR 0062: `description` and `case_facts` are the situation and come
     up in the call anyway; `call_goal` is what the caller wants and the bar
     that ends the exercise. Reading that in advance would hand the trainee the
     answer, so a built-in serves it as None -- None rather than "", so
@@ -237,7 +237,7 @@ async def test_sharing_makes_it_visible_to_a_colleague_not_to_other_companies(
     assert mine["shared"] is True
 
     # The colleague now sees it, badged as a company Scenario, and can start a
-    # call with it. Since ADR 0076 they can read it in full as well -- sharing
+    # call with it. Since ADR 0062 they can read it in full as well -- sharing
     # a case with the company while making it illegible to the company is not
     # a policy anyone chose -- but they still cannot edit it.
     as_user(BOB_SOLOX)

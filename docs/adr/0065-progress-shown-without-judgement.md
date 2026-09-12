@@ -6,17 +6,17 @@ Accepted, unchanged, and deliberately not amended by ADR 0078. Extends ADR 0004 
 
 ## Context
 
-ADR 0064 makes a user's Sessions readable as a series, which is what F-13 (Aufzeichnung des Fortschritts) asks for. The obvious next step is a view that plots the Kennzahlen over time — and the obvious way to draw that view is the one this project has twice decided against.
+ADR 0064 makes a user's Sessions readable as a series, which is what F-13 (Aufzeichnung des Fortschritts) asks for. The obvious next step is a view that plots the metrics over time — and the obvious way to draw that view is the one this project has twice decided against.
 
 ADR 0004 rejected reducing performance to a score, on the pilot stakeholder's explicit request. ADR 0051 went further for the per-Session statistics: no metric carries a target range, because none is validated for this population, and "an invented threshold is a score in disguise". The wrap-up prompt enforces it in writing (`generator.py`: no score, grade, rating, percentage or star, and no judging a figure against a norm).
 
-A progress view puts that under quiet pressure in a way a single Session never did. A line going up asserts a direction whether or not anyone chose to assert one. A green band asserts a target. Even an arrow and the word "besser" asserts that more questions, or a higher Redeanteil, or a faster Sprechtempo, is an improvement — and nobody has established that for this population. The risk is not that someone argues for a score; it is that the score arrives as a styling decision, made by whoever draws the chart, without the discussion ADR 0004 had.
+A progress view puts that under quiet pressure in a way a single Session never did. A line going up asserts a direction whether or not anyone chose to assert one. A green band asserts a target. Even an arrow and the word "besser" asserts that more questions, or a higher talk share, or a faster speaking pace, is an improvement — and nobody has established that for this population. The risk is not that someone argues for a score; it is that the score arrives as a styling decision, made by whoever draws the chart, without the discussion ADR 0004 had.
 
 ## Decision
 
 The progress view shows the user their own values over time and does not evaluate them.
 
-Permitted, and the substance of F-13: the course of each Kennzahl across Sessions, plotted plainly; the descriptive history of F-48 (when, which Scenario, which Persona, how long, completed or aborted); and activity figures such as how many trainings were done in a period. Activity needs no norm — it counts what the user did, not how well.
+Permitted, and the substance of F-13: the course of each metric across Sessions, plotted plainly; the descriptive history of F-48 (when, which Scenario, which Persona, how long, completed or aborted); and activity figures such as how many trainings were done in a period. Activity needs no norm — it counts what the user did, not how well.
 
 Not permitted without a further, explicit decision: target ranges or bands; arrows, deltas or labels asserting improvement or decline; ranking against other users; and any aggregate score over Sessions. `metric_type` has no target column and gains none — the absence is the mechanism, not an oversight, exactly as in ADR 0051.
 

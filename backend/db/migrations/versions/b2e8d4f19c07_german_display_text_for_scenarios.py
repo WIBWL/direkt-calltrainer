@@ -1,7 +1,7 @@
 """German display text for the Scenario read view
 
 Display twins of `scenario.description` and `scenario.case_facts`, the same
-split ADR 0076 already relies on for `persona.traits_label`: the prompt fields
+split ADR 0062 already relies on for `persona.traits_label`: the prompt fields
 stay English so a Persona's language alone decides the call's (ADR 0043), and
 the read view behind a card shows the same content in the UI language.
 

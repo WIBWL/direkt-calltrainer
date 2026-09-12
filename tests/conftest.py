@@ -760,7 +760,7 @@ def asked(calls, index: int = 0) -> str:
     return "\n".join(message["content"] for message in calls[index][0])
 
 
-# One finished exchange with both speech durations filled in. Sprechtempo, the
+# One finished exchange with both speech durations filled in. speaking pace, the
 # one metric the reference fixture seeds, is a rate over phonation -- without
 # them nothing is measured and a Session carries no statistics at all. What a
 # test needs when it wants a Session that looks real and does not care what was

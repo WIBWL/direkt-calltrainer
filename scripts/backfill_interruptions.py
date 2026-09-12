@@ -6,7 +6,7 @@
 Possible at all because the *timeline* is persisted, unlike the audio: a Turn
 row carries its speaker, its offset and its duration, which is everything
 `interruptions.classify` reads. That makes this metric unusual in this project.
-Sprechtempo or Lautstärke can never be recomputed for a past Session, because
+Speaking pace or loudness can never be recomputed for a past Session, because
 ADR 0048 discards the recording the moment it has been measured; an overlap can,
 because it is a property of when people spoke rather than of how they sounded.
 

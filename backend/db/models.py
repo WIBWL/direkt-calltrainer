@@ -83,7 +83,7 @@ POINT_KINDS = (POINT_STRENGTH, POINT_IMPROVEMENT)
 #
 # `call` is the whole conversation and is what ADR 0051 has always written; the
 # other two split it by whether the simulated caller was pressing at that point,
-# so that F-62's "Souveränität unter Druck" has something behind it other than
+# so that F-62's "composure under pressure" has something behind it other than
 # an opinion. A row is about exactly one of the three.
 #
 # A value and not a NULL for the whole call, deliberately: Postgres does not
@@ -188,7 +188,7 @@ ROLE_OTHER = "other"
 TRAINING_ROLES = (ROLE_SALES, ROLE_SERVICE, ROLE_SUPPORT, ROLE_CONSULTING, ROLE_OTHER)
 
 
-# MetricType.aspect: which half of the Kennzahlen a metric belongs to -- `how`
+# MetricType.aspect: which half of the metrics a metric belongs to -- `how`
 # is the paraverbal side, `what` the verbal one. Display only, like
 # `scenario.category`; backend/feedback/metrics.py assigns one per metric.
 ASPECT_HOW = "how"
@@ -413,7 +413,7 @@ class Scenario(_AuthoredContent, Base):
     description: Mapped[str] = mapped_column(Text)
     case_facts: Mapped[str] = mapped_column(Text)
     # Display twins of the two above, in the UI language, for the read view
-    # behind a card (ADR 0076). The prompt fields stay English so a Persona's
+    # behind a card (ADR 0062). The prompt fields stay English so a Persona's
     # language decides the call's (ADR 0043); these are the same content
     # written for a person. Only the seed writes them: an authored Scenario
     # is already in its author's language, so both are NULL there and the
@@ -697,15 +697,15 @@ class Turn(Base):
 class Measurement(Base):
     """One metric measured over one stretch of the Session (ADR 0051, ADR 0081).
 
-    Not per Turn: none of the Kennzahlen (Redeanteil, Fragen, Sprechtempo,
-    Wortanzahl, Reaktionszeit, Sprechpausen) is meaningful for a single
+    Not per Turn: none of the metrics (talk share, questions, speaking pace,
+    word count, reaction time, pauses) is meaningful for a single
     utterance, and the frame of reference of every figure shown is a stretch of
     conversation.
 
     `segment` says which stretch. `call` is the whole of it and is the only
     value ADR 0051 knew; `pressure` and `rest` are the same metric over the
     exchanges the wrap-up marked as demanding and over the remainder, which is
-    what gives "Souveränität unter Druck" a measurement instead of an opinion.
+    what gives "composure under pressure" a measurement instead of an opinion.
     Exactly one row per Session, metric and segment.
     """
 

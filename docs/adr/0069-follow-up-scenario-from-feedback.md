@@ -25,7 +25,7 @@ would look into it, where a date was asked for", goes back to the setup screen,
 and picks the same list of Scenarios they picked from last time — none of which
 is built around that.
 
-The feature asked for is a *Folgeszenario*: the next call, aimed at the weakness
+The feature asked for is a *follow-up Scenario*: the next call, aimed at the weakness
 the last one exposed. Four things had to be decided.
 
 **Where the exercise comes from.** The Scenario authoring surface already exists
@@ -123,7 +123,8 @@ hand-authored row and every built-in. It carries three things at once.
   beside `origin: "own"` rather than a new `origin` value — the pattern `shared`
   already uses (ADR 0060) — so the edit affordance and the badge logic stay keyed
   on `origin === "own"`. The setup screen gets a fourth filter chip,
-  *Folgeszenario*, and *Individuell* now means hand-authored. Scenarios are
+  *follow-up Scenario*, and the hand-authored option now means exactly that.
+  Scenarios are
   ordered by category and, within one, by `created_at`.
 * **A lifecycle tied to the training it came from.** A follow-up goes when its
   source Session goes: one training deleted, consent withdrawn (ADR 0066), or the

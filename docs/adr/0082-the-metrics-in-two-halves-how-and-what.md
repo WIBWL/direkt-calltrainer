@@ -1,12 +1,12 @@
-# ADR 0082: The Kennzahlen Are Shown in Two Halves, How and What
+# ADR 0082: The Metrics Are Shown in Two Halves, How and What
 
 ## Status
 
-Accepted. Introduces `metric_type.aspect` (migration `b6d24f7a91e5`) and the slider above the Kennzahlen grid on the post-call screen and a stored training. A display decision: nothing in the analysis, the wrap-up prompt or the progress view reads the column. ADR 0051 stands untouched — every figure still describes the whole call (or, since ADR 0081, one of its two stretches) and none carries a target range.
+Accepted. Introduces `metric_type.aspect` (migration `b6d24f7a91e5`) and the slider above the metrics grid on the post-call screen and a stored training. A display decision: nothing in the analysis, the wrap-up prompt or the progress view reads the column. ADR 0051 stands untouched — every figure still describes the whole call (or, since ADR 0081, one of its two stretches) and none carries a target range.
 
 ## Context
 
-The Kennzahlen grid started as six tiles (F-53) and grew. By the time this was decided it held Redeanteil, Fragen, Sprechtempo, Wortanzahl, Reaktionszeit, Sprechpausen, Lautstärke and Sprachmelodie, with more on the way (ADR 0083, ADR 0084, ADR 0086). A grid that long reads as a wall of numbers, and a wall of numbers invites the one reading this application works hardest to prevent: scanning for the good and the bad ones (ADR 0004).
+The metrics grid started as six tiles (F-53) and grew. By the time this was decided it held talk share, questions, speaking pace, word count, reaction time, pauses, loudness and intonation, with more on the way (ADR 0083, ADR 0084, ADR 0086). A grid that long reads as a wall of numbers, and a wall of numbers invites the one reading this application works hardest to prevent: scanning for the good and the bad ones (ADR 0004).
 
 The figures are not all the same kind of thing. Some describe the delivery — how fast, how loud, how much the pitch moved, how long before an answer. Others describe the exchange — how much room the user took, how many questions they asked, how many words they used. Communication training has long names for the two (paraverbal and verbal, or implicit and explicit feedback), and a user reading "Sprechtempo" next to "Fragen an den Gesprächspartner" is being asked to switch between two questions without being told they are two.
 
@@ -24,7 +24,7 @@ The column is nullable, and the migration backfills the rows that existed. Nulla
 
 ### Where the borderline metrics go
 
-**Redeanteil is `what`**, although it is computed from durations. It describes the shape of the exchange — who held the floor — not the delivery of any sentence. Reaktionszeit is `how`: it is timing, and timing is delivery. Sprachmelodie is `how`, and so is everything the audio alone measures.
+**talk share is `what`**, although it is computed from durations. It describes the shape of the exchange — who held the floor — not the delivery of any sentence. reaction time is `how`: it is timing, and timing is delivery. intonation is `how`, and so is everything the audio alone measures.
 
 **Wörter pro Satz is its own tile but not its own metric.** `_word_count` has always carried the average sentence length in its detail (F-08's second half). It is shown as a tile in the `what` half, built by the frontend from that detail, because a second `metric_type` row would store one number twice and let the copies drift.
 

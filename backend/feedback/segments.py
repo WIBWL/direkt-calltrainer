@@ -1,5 +1,5 @@
-"""The same Kennzahlen over the demanding stretches of a call and over the rest
-(F-62 "Souveränität unter Druck", ADR 0081).
+"""The same metrics over the demanding stretches of a call and over the rest
+(F-62 "composure under pressure", ADR 0081).
 
 The goal asks a comparative question: does the way somebody speaks hold up when
 the other side pushes back. Nothing in the application could answer it, because
@@ -20,7 +20,7 @@ module:
 * **The derivations.** None are written here. A segment is a *slice of the same
   call*, so `conversation()` folds it exactly as it folds the whole, and the
   metric functions in `metrics.py` run unchanged. Anything else would be a
-  second definition of Sprechtempo, differing from the first by accident.
+  second definition of speaking pace, differing from the first by accident.
 
 What is deliberately absent: any figure comparing the two. No difference, no
 ratio, no "held up well". The two numbers are put side by side and the reader

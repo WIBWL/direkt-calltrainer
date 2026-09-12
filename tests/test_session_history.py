@@ -189,7 +189,7 @@ async def test_a_row_carries_what_the_history_list_shows(
         # written (ADR 0064's amendment). The wrap-up as a text -- summary,
         # phase paragraph, untagged points -- stays on the detail route.
         "feedback_goals",
-        # The same Kennzahlen over the demanding stretches of the call and over
+        # The same metrics over the demanding stretches of the call and over
         # the rest (ADR 0081). Beside `measurements` and not inside it: every
         # reader of that list assumes one entry per metric.
         "segments",

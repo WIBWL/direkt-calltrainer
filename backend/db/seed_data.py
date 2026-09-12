@@ -445,7 +445,7 @@ PERSONAS = [
 # field reveals on its own.
 #
 # "description_label" and "case_facts_label" are the German twins of the two
-# prompt fields the read view shows (ADR 0076). Every Scenario carries its
+# prompt fields the read view shows (ADR 0062). Every Scenario carries its
 # situation and its case *twice*: once in English for the model, once in German
 # for the panel behind the card. Nothing checks that the two say the same thing
 # -- the tests assert only that both exist and differ from the prompt text,
@@ -585,7 +585,7 @@ SCENARIOS = [
             "back can be a result too."
         ),
     },
-    # --- Beschwerde und Eskalation (Nutzer sitzt im Support) -------------
+    # --- Complaints and escalation (the User is on the support side) -----
     # Dense, interlocking figures on purpose (the case density decided for the
     # library): the availability guarantee, the two April outages and the
     # service credit only add up to a lever if the numbers actually work out,
@@ -650,7 +650,7 @@ SCENARIOS = [
             "outage."
         ),
     },
-    # --- Terminvereinbarung und Ausbau (Nutzer sitzt im Vertrieb) ---------
+    # --- Appointments and expansion (the User is on the sales side) -------
     # Deliberately the shortest case in the library: one decision, one date,
     # a clear point at which the call is done. That makes it the scenario
     # where an unreliable [CALL_END] shows up soonest.
@@ -707,7 +707,7 @@ SCENARIOS = [
             "over is only a result if a date comes with it."
         ),
     },
-    # --- Abschluss nach Übergabe (Nutzer sitzt im Vertrieb) ---------------
+    # --- Closing after handover (the User is on the sales side) -----------
     # The point of this one is the information gap: the Persona holds facts
     # from a call the user was not on and has no notes for. It trains asking
     # over agreeing, which is why `description` says outright that the user
@@ -771,7 +771,7 @@ SCENARIOS = [
             "a date comes with it."
         ),
     },
-    # --- Aus dem Szenariokatalog: Profil A, Betrieb und Betreuung ---------
+    # --- From the scenario catalogue: profile A, operations and support ---
     # S-01. The short end of the duration span C-06/R-03 asks for: one fault,
     # one deadline, one answer. The close on 18 September is what stops "we are
     # looking into it" from being an answer.
@@ -1153,7 +1153,7 @@ SCENARIOS = [
             "recap general enough for both readings to fit is not a result."
         ),
     },
-    # --- Aus dem Szenariokatalog: Profil B, Beratung und Einführung --------
+    # --- From the scenario catalogue: profile B, advice and onboarding ----
     # The catalogue marks these as proposals: they are derived from the pilot's
     # activity profile, not from a recorded call. The cases are sound to train
     # against, but they have not been checked back with the customer.
@@ -1618,12 +1618,12 @@ FOCUS_GOALS = [
             "hörbar hervortreten."
         ),
     },
-    # "Souveräne Lautstärke" stood here and is retired: the figure behind it is
+    # "the retired loudness goal" stood here and is retired: the figure behind it is
     # the recorded level, which says as much about the microphone and how far
     # away it sits as about the speaker, so two calls of the same person are not
     # comparable and a goal would have promised a reading the data cannot give.
     # The row is deactivated by the seeding, not deleted -- selections reference
-    # it (ADR 0076). The Kennzahl `loudness` itself stays, with the same caveat.
+    # it (ADR 0076). The metric `loudness` itself stays, with the same caveat.
     {
         "id": "articulation",
         # `interpretive` and not `mixed`: no measurement is planned for this one
@@ -1720,7 +1720,7 @@ FOCUS_GOALS = [
         "id": "closing",
         # `mixed` since ADR 0089, like the opening: whether the last two turns
         # sum up, agree a next step and say goodbye is counted from the
-        # transcript (the Kennzahl `closing`); whether the close was *clear* --
+        # transcript (the metric `closing`); whether the close was *clear* --
         # the right things summed up, a step the other side will actually take
         # -- is still only the wrap-up's to say.
         "group": "phases",

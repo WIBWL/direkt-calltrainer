@@ -5,7 +5,7 @@ see, each badged `builtin` (a shipped built-in), `own` (one they authored) or
 `tenant` (shared by a colleague), and `follow_up` where the worker wrote it from
 one of their own Sessions (ADR 0069). The list carries card fields only.
 
-`GET /api/scenarios/{id}` is the read view behind that list (ADR 0076): any
+`GET /api/scenarios/{id}` is the read view behind that list (ADR 0062): any
 Scenario the caller may select, with `editable` saying whether they may also
 open the editor on it. `call_goal` — the caller's intent and the bar that
 settles it — is the answer key to the exercise (ADR 0043/0045) and is withheld
@@ -192,7 +192,7 @@ def _origin_group(card: dict) -> int:
 
 
 def _detail(scenario, subject: str) -> dict:
-    """One Scenario as the client reads it (ADR 0076).
+    """One Scenario as the client reads it (ADR 0062).
 
     Two audiences, one payload: the editor, which opens only on a row the
     caller owns, and the read-only info panel, which opens on any row they
@@ -222,7 +222,7 @@ def _detail(scenario, subject: str) -> dict:
         "short_description": scenario.short_description,
         "briefing": scenario.briefing,
         # The display twin where there is one, the field itself otherwise
-        # (ADR 0076). A built-in's prompt text is English (ADR 0043) and the
+        # (ADR 0062). A built-in's prompt text is English (ADR 0043) and the
         # seed carries a German twin for it; an authored Scenario has no twin
         # because its author already wrote it in their own language. Same wire
         # name either way: the client shows one text and never both.
@@ -247,7 +247,7 @@ def _detail(scenario, subject: str) -> dict:
         ),
         "reverse": scenario.reverse,
         # Beside `reverse` and for the same reason the panel needs it: these
-        # two are the rows whose only action is "Löschen".
+        # two are the rows whose only action is deletion.
         "follow_up": scenario.follow_up,
         "origin_session": _origin_session(scenario.origin_session),
         # The German briefing the User reads during a reverse call; null on
@@ -413,7 +413,7 @@ def get_scenario(
     tenant_id: int = Depends(current_tenant_id),
 ) -> dict:
     """One Scenario the caller may select, for the info panel and — where
-    `editable` says so — for the editor (ADR 0076).
+    `editable` says so — for the editor (ADR 0062).
 
     Scoped by `library.get_scenario`, which serves built-ins, rows shared
     with the caller's company, and their own. Another User's private row is

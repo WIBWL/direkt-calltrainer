@@ -8,14 +8,14 @@ interruptions light and by ADR 0077.
 
 ## Context
 
-Two Kennzahlen now show a coloured step: F-51's interruptions and F-35's
-Sprachmelodie. Both were built as exceptions. Both were described in the code
+Two metrics now show a coloured step: F-51's interruptions and F-35's
+intonation. Both were built as exceptions. Both were described in the code
 and in their ADRs as contradicting ADR 0004, ADR 0051 and ADR 0065, tolerated
 because somebody asked for them, and removable in a few lines.
 
 That framing has stopped being true and it was never quite right.
 
-It has stopped being true because there are two of them, on the two Kennzahlen a
+It has stopped being true because there are two of them, on the two metrics a
 reader most often opens, and a rule that is broken twice on purpose is not a
 rule with two exceptions. It is an unwritten rule plus an out-of-date written
 one, and the written one is what the next person reads.
@@ -53,7 +53,7 @@ replaces no prose. ADR 0004 already permits a supplementary numeric score that
 never replaces the qualitative feedback, which is a weaker constraint than the
 one this project has been applying to itself.
 
-**ADR 0051** ruled out target ranges on the Kennzahlen because none was
+**ADR 0051** ruled out target ranges on the metrics because none was
 validated for this population, and stated that an invented threshold is a score
 in disguise. This objection stands and is the sharp one. It is aimed at a silent
 band drawn behind a raw figure, where the user is shown a number, shown a
@@ -70,14 +70,14 @@ that produced a *named step*, which is what a classification is.
 
 ## Decision
 
-A Kennzahl's classification may carry a traffic light on the single-call view,
+A metric's classification may carry a traffic light on the single-call view,
 under all of the following. These are conditions, not guidance; a light that
 fails one of them is not permitted.
 
 **1. The colour attaches to a classification, never to a raw figure.** If there
 is no named step there is no colour. F-35 shows this at its plainest: the step
-is read from the pitch variation quotient while the Kennzahl's number is the
-Umfang, so the colour goes on the word and the semitone figure stays black. A
+is read from the pitch variation quotient while the metric's number is the
+range, so the colour goes on the word and the semitone figure stays black. A
 colour over a number it was not read from is the thing ADR 0051 forbids,
 whatever it is called.
 
@@ -124,7 +124,7 @@ They direct attention. They do not grade.
 
 This is the reading that makes a light compatible with ADR 0004 rather than
 merely tolerated beside it. A pointer is not a mark. It is also the reading the
-wording on both Kennzahlen already follows, and it is now the reading any future
+wording on both metrics already follows, and it is now the reading any future
 one has to follow.
 
 ### What stays forbidden
@@ -159,7 +159,7 @@ orientation that is roughly right, which is better than the uniform grey that
 gave them no orientation at all.
 
 **ADR 0051's central claim survives intact and should not be read as softened.**
-No Kennzahl carries a target range, `metric_type` still has no target column, no
+No metric carries a target range, `metric_type` still has no target column, no
 `Finding` row is written from a threshold, and the wrap-up prompt still forbids
 the model from judging a figure against a norm of its own. This ADR changes
 where a *visible* boundary may be shown, not whether an invisible one may be

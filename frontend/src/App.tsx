@@ -159,7 +159,7 @@ export default function App() {
   // the same reason the editor's state is: SetupView is presentational.
   const [infoPersonaId, setInfoPersonaId] = useState<string | null>(null);
   // The Scenario whose read-only info panel is open, or null. Editing starts
-  // from inside it (ADR 0076), so this opens first and the editor second.
+  // from inside it (ADR 0062), so this opens first and the editor second.
   const [infoScenarioId, setInfoScenarioId] = useState<string | null>(null);
   // The caller's company (ADR 0060); null = default tenant, no company chip.
   const [tenantName, setTenantName] = useState<string | null>(null);
