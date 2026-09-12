@@ -560,10 +560,14 @@ class Session(Base):
     # client when the socket opens, long before this row is written.
     extern_id: Mapped[uuid.UUID] = mapped_column(Uuid, unique=True, default=uuid.uuid4)
     # The caller's Keycloak "sub" claim (ADR 0009/0031), taken from the
-    # WebSocket handshake. Indexed although it is not a foreign key -- the one
-    # such column in the schema. ADR 0052 left it unindexed while nothing
-    # queried it; the Session history reads by this column and nothing else
-    # (F-13/F-48), which is the condition ADR 0028 named for revisiting.
+    # WebSocket handshake. Indexed although it is not a foreign key. ADR 0052
+    # left it unindexed while nothing queried it; the Session history reads by
+    # this column and nothing else (F-13/F-48), which is the condition ADR 0028
+    # named for revisiting. Three columns stand in that exception today, each
+    # for a named read path and none on suspicion: this one, `consent.subject_id`
+    # (the newest decision per subject) and `AuthoredContent.created_by` (a
+    # User's own Scenarios). Keep the list here complete -- a rule with an
+    # unmaintained exception list stops being checkable.
     subject_id: Mapped[str] = mapped_column(String(64), index=True)
     persona_id: Mapped[int] = mapped_column(ForeignKey("persona.persona_id"), index=True)
     scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id"), index=True)
@@ -631,8 +635,10 @@ class Turn(Base):
     )
 
     turn_id: Mapped[int] = mapped_column(primary_key=True)
+    # No `index=True`: the unique constraint below leads with this column, so
+    # it already indexes it (ADR 0052, as at `scenario.origin_session_id`).
     session_id: Mapped[int] = mapped_column(
-        ForeignKey("session.session_id", ondelete="CASCADE"), index=True
+        ForeignKey("session.session_id", ondelete="CASCADE")
     )
     # SPEAKER_USER or SPEAKER_PERSONA, see the constants above.
     speaker: Mapped[str] = mapped_column(String(10))
@@ -725,8 +731,9 @@ class Measurement(Base):
     )
 
     measurement_id: Mapped[int] = mapped_column(primary_key=True)
+    # Covered by the unique constraint above, which leads with it (ADR 0052).
     session_id: Mapped[int] = mapped_column(
-        ForeignKey("session.session_id", ondelete="CASCADE"), index=True
+        ForeignKey("session.session_id", ondelete="CASCADE")
     )
     metric_type_id: Mapped[int] = mapped_column(
         ForeignKey("metric_type.metric_type_id"), index=True
@@ -1028,8 +1035,9 @@ class FocusSelectionGoal(Base):
     __table_args__ = (UniqueConstraint("selection_id", "focus_goal_id"),)
 
     selection_goal_id: Mapped[int] = mapped_column(primary_key=True)
+    # Covered by the unique constraint above, which leads with it (ADR 0052).
     selection_id: Mapped[int] = mapped_column(
-        ForeignKey("focus_selection.selection_id", ondelete="CASCADE"), index=True
+        ForeignKey("focus_selection.selection_id", ondelete="CASCADE")
     )
     focus_goal_id: Mapped[int] = mapped_column(
         ForeignKey("focus_goal.focus_goal_id"), index=True
@@ -1053,8 +1061,9 @@ class FocusSelectionCategory(Base):
     )
 
     selection_category_id: Mapped[int] = mapped_column(primary_key=True)
+    # Covered by the unique constraint above, which leads with it (ADR 0052).
     selection_id: Mapped[int] = mapped_column(
-        ForeignKey("focus_selection.selection_id", ondelete="CASCADE"), index=True
+        ForeignKey("focus_selection.selection_id", ondelete="CASCADE")
     )
     category: Mapped[str] = mapped_column(String(20))
 

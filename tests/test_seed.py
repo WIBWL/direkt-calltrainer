@@ -14,6 +14,7 @@ import os
 import subprocess
 import sys
 
+import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
@@ -232,3 +233,63 @@ def test_seed_leaves_an_authored_scenario_alone_even_when_it_has_a_key(
     the accident that currently enforces it.
     """
     assert _seed_twice_with(migrated_database, "user-picked-a-key", "keycloak-sub-1") is True
+
+
+# --- The other half of the sweep: bringing a row back ------------------------
+#
+# `_deactivate_missing` writes `active = False`, and the upsert has to write it
+# back, or a table is swept one way only. `_seed_scenarios` was the one of the
+# four that left the column out of its values, so a built-in that had dropped
+# out of SCENARIOS once -- a shorter branch, a key renamed and renamed back --
+# stayed invisible after it returned: the upsert found the row by `key`,
+# refreshed its text and left `active` False. No error, no log line, and
+# nothing short of SQL to repair it.
+
+_SWEPT_TABLES = [
+    ("persona", "persona_id"),
+    ("scenario", "scenario_id"),
+    ("focus_goal", "focus_goal_id"),
+    ("metric_type", "metric_type_id"),
+]
+
+
+@pytest.mark.parametrize("table, primary_key", _SWEPT_TABLES)
+def test_seed_brings_a_deactivated_row_back(
+    migrated_database: str, table: str, primary_key: str
+) -> None:
+    """The module docstring of backend/db/provision.py promises every seeded
+    record is "created or brought back to the seed state". All four swept
+    tables, so adding a fifth cannot quietly repeat this.
+
+    The row is picked rather than named: any row the seed owns (`key` is not
+    NULL) and seeds as active. That keeps the test off the seed's content, which
+    changes, and on the one thing that must not -- a Scenario seeded active is
+    active after the next start, whatever happened to it in between.
+    """
+    _run_seed(migrated_database)
+    engine = create_engine(migrated_database)
+    try:
+        with engine.begin() as conn:
+            row_id = conn.execute(
+                text(f"SELECT {primary_key} FROM {table}"
+                     f" WHERE active AND key IS NOT NULL"
+                     f" ORDER BY {primary_key} LIMIT 1")
+            ).scalar_one()
+            conn.execute(
+                text(f"UPDATE {table} SET active = false"
+                     f" WHERE {primary_key} = :row_id"),
+                {"row_id": row_id},
+            )
+
+        _run_seed(migrated_database)
+
+        with engine.connect() as conn:
+            active = conn.execute(
+                text(f"SELECT active FROM {table}"
+                     f" WHERE {primary_key} = :row_id"),
+                {"row_id": row_id},
+            ).scalar_one()
+    finally:
+        engine.dispose()
+
+    assert active is True, f"{table} is deactivated one way only"

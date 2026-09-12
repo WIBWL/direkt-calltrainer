@@ -254,6 +254,14 @@ def _seed_scenarios(db: DbSession) -> int:
                  # Not cleaned: a closed vocabulary, not authored prose, and
                  # the CHECK constraint is what validates it (ADR 0072).
                  "category": s["category"],
+                 # Written on every run, like the three other swept tables.
+                 # Without it `_deactivate_missing` is one-way: a built-in that
+                 # dropped out of SCENARIOS once (a shorter branch, a renamed
+                 # key) stays invisible after it comes back, because the upsert
+                 # matches on `key` and leaves `active` False. Only rows the
+                 # seed owns are reached here -- an authored one carries no
+                 # `key` -- so this cannot revive a Scenario a User deleted.
+                 "active": True,
                  "created_by": None, "visibility": VISIBILITY_PUBLIC})[1]
         for s in SCENARIOS
     )
