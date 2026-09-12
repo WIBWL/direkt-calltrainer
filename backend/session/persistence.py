@@ -32,9 +32,13 @@ from backend.session.models import Turn
 logger = logging.getLogger(__name__)
 
 # How a Session ended, in the wire protocol's vocabulary -> in the schema's.
+# "disconnected" is a call nobody ended: stored, because the training happened,
+# but never as completed -- the history and the activity calendar count a
+# finished training, and walking away is not one (ADR 0034's amendment).
 _STATUS = {
     "user": db_models.STATUS_COMPLETED,
     "completed": db_models.STATUS_COMPLETED,
+    "disconnected": db_models.STATUS_ABORTED,
     "error": db_models.STATUS_ABORTED,
 }
 

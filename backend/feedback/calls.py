@@ -190,10 +190,17 @@ def conversation(
         pauses.extend(turn.pauses)
         loudness.extend(turn.loudness_db)
         pitch.extend(turn.pitch_hz)
-        persona_ms += _span(turn.persona_offset_ms, turn.persona_end_ms) or 0
-        persona_stopped = turn.persona_end_ms or persona_stopped
+        # Gated on the text like `persona_turns` and `utterances()`, not
+        # counted unconditionally: a reply the user talked over before hearing
+        # any of it is dropped from the history and the Transcript (ADR 0035),
+        # and its dispatched audio must not stay behind in the one figure that
+        # is the denominator of Redeanteil. The window of a *trimmed* reply is
+        # cut back to the played position where it is trimmed, so what is
+        # counted here is heard speech in both cases.
         if turn.persona_text:
+            persona_ms += _span(turn.persona_offset_ms, turn.persona_end_ms) or 0
             persona_turns += 1
+        persona_stopped = turn.persona_end_ms or persona_stopped
 
     return Conversation(
         user_text=" ".join(turn.user_text for turn in turns if turn.user_text),

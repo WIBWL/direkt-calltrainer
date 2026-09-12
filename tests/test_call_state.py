@@ -168,3 +168,80 @@ async def test_without_notes_no_summarisation_request_is_made(
 
     assert fake_pipeline.llm.state_calls == [], "nothing is spent filling notes nothing reads"
     assert orch._state == ""
+
+
+def _summarising_llm(monkeypatch, fake_pipeline):
+    """Point the notes refresh at a summariser that behaves like a real one: it
+    carries forward everything it was handed, notes and exchange alike.
+
+    The canned `states` the other tests use cannot show this defect. Those
+    strings never contain the Persona's words, so an assertion that the unheard
+    part stayed out of the notes holds however the notes were built -- it is
+    the fake that guarantees it, not the code under test.
+    """
+    async def summarise(messages, **_kwargs):
+        fake_pipeline.llm.state_calls.append(messages)
+        return "\n".join(m["content"] for m in messages)
+
+    monkeypatch.setattr("backend.clients.llm.complete", summarise)
+
+
+async def test_a_trimmed_reply_is_summarised_from_the_notes_that_predate_it(
+    persona, scenario, fake_pipeline, monkeypatch
+):
+    """A re-refresh after a barge-in starts from the notes as they stood
+    *before* this exchange, never from the current ones.
+
+    Notes are rewritten from the previous notes rather than from the history
+    (ADR 0075), so by the time the barge-in lands the first refresh may already
+    have absorbed the unheard sentence -- and nothing in a second pass built on
+    that text could contradict it. ADR 0071 promises the notes never record
+    words the user did not hear; that holds only if the second pass starts
+    from before them.
+    """
+    monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 10000)
+    _summarising_llm(monkeypatch, fake_pipeline)
+
+    orch = SessionOrchestrator(persona, scenario)
+    await _run(orch, fake_pipeline, 1)
+    full = PERSONA[0]
+    assert full in orch._state, "the notes absorbed the whole reply before the barge-in"
+
+    orch.note_late_barge_in(2000)  # a few words in
+    await orch.flush_state()
+
+    heard = orch.turns[0].persona_text
+    assert full.startswith(heard) and heard != full
+    unheard = full[len(heard):].strip()
+    assert unheard and unheard not in orch._state, "the unheard tail is out of the notes"
+    assert heard in orch._state, "and what was heard is in them"
+
+
+async def test_a_reply_nobody_heard_leaves_the_notes_as_they_were(
+    persona, scenario, fake_pipeline, monkeypatch
+):
+    """The barge-in dropped the reply whole: the exchange never happened, so the
+    notes go back to what they said before it.
+
+    The refresh for that exchange is already in flight when the interrupt lands
+    and was started with the full reply. Left alone it finished, wrote the
+    Persona's words into the notes, and no second refresh ever followed --
+    there was no longer an exchange to summarise.
+    """
+    monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 10000)
+    _summarising_llm(monkeypatch, fake_pipeline)
+
+    orch = SessionOrchestrator(persona, scenario)
+    await _run(orch, fake_pipeline, 2)
+    before = orch._state
+    assert PERSONA[1] in before
+
+    fake_pipeline.stt.transcripts = [USER[2]]
+    fake_pipeline.llm.replies = [PERSONA[2]]
+    await collect(orch.run_turn(b"c", "turn.webm", "audio/webm"))
+    orch.note_late_barge_in(0)  # nothing played at all
+    await orch.flush_state()
+
+    assert orch.turns[-1].persona_text == "", "the reply was dropped"
+    assert PERSONA[2] not in orch._state, "and it is not in the notes either"
+    assert orch._state == before, "which are exactly the notes from before it"

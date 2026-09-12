@@ -143,6 +143,25 @@ class _ReplyProgress:  # pylint: disable=too-many-instance-attributes  # one rep
         # Set per attempt by _stream_reply_with_regeneration.
         self.filters = _NO_FILTERS
 
+    def heard_checkpoints(self) -> list[tuple[int, str, str]]:
+        """`checkpoints` plus the chunk still being synthesized, if any.
+
+        A checkpoint is written only when a chunk is *fully* synthesized, but
+        its audio goes out sub-chunk by sub-chunk as KugelAudio produces it
+        (ADR 0044) -- so the client is already playing the opening sentence
+        while that sentence has no checkpoint. Measured against the finished
+        ones alone, a barge-in there found nothing heard and the whole reply
+        was dropped, where ADR 0035 asks for the word-prefix of the sentence
+        the user cut off. The pending entry ends at the audio actually
+        dispatched, which is the honest span to measure a prefix against.
+        """
+        done = self.checkpoints[-1][1] if self.checkpoints else ""
+        spoken = self.spoken_text.strip()
+        pending = spoken[len(done):].strip()
+        if not pending:
+            return self.checkpoints
+        return [*self.checkpoints, (self.audio_ms, spoken, pending)]
+
 
 def _strip_end_marker(text_chunk: str, progress: _ReplyProgress) -> str:
     """Cut the chunk at the `[CALL_END]` marker and flag `progress.ends_call`.
@@ -156,6 +175,27 @@ def _strip_end_marker(text_chunk: str, progress: _ReplyProgress) -> str:
         return text_chunk
     progress.ends_call = True
     return text_chunk[:match.start()].strip()
+
+
+def _empty_reply_is_an_ending(turn: Turn, progress: _ReplyProgress) -> bool:
+    """Whether a reply that spoke no words is a caller hanging up rather than a
+    failed completion. Both ways it is end the call, and `_generate_reply`
+    speaks the fallback sign-off, since nothing was said.
+
+    The marker and nothing else: alone, or first in the chunk, which drags the
+    rest of it along (`_strip_end_marker`). Taking it at its word is what
+    ADR 0037 asks for on a Turn the closing nudge sent; answering a goodbye
+    with a pipeline error was the alternative, and it stored the Session as
+    aborted. Or the guards emptied the reply: a caller with nothing left to
+    say (ADR 0038)."""
+    if progress.ends_call:
+        logger.info("Turn %d reply was the end marker alone; ending the call", turn.seq)
+        return True
+    if progress.suppressed:
+        logger.info("Turn %d reply was nothing but repeats; ending the call", turn.seq)
+        progress.ends_call = True
+        return True
+    return False
 
 
 # The small model occasionally slips a stray CJK / Hangul character into a
@@ -238,6 +278,15 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         # to the next reply; empty until the first exchange has completed.
         self._state = ""
         self._state_task: asyncio.Task[None] | None = None
+        # The notes as they stood *before* the exchange currently being
+        # summarised, and the Turn that exchange belongs to. Notes are
+        # rewritten from the previous notes rather than from the history
+        # (ADR 0075), so a barge-in that trims or drops a reply cannot be
+        # corrected by summarising again from the polluted text: the unheard
+        # sentence is already inside it and has no source left to contradict
+        # it. Every refresh for one Turn therefore starts from the same base.
+        self._state_base = ""
+        self._state_turn: int | None = None
         # Only its first name is used, to spot the persona re-introducing
         # itself ("hier ist Thomas ...") a second time (ADR 0038).
         self._first_name = persona.name.split()[0].lower() if persona.name else ""
@@ -365,8 +414,11 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         acoustics = asyncio.create_task(asyncio.to_thread(analyze, audio_bytes))
         # The audio arrives once the user has stopped talking, so this marks
         # the utterance's end; attach_measurements walks it back to its start.
+        # Written onto the Turn only once the transcript proves somebody spoke:
+        # a phantom pops a fresh Turn but leaves a reopened one standing, and
+        # its user window would then end at a cough, stretching the utterance
+        # that F-51 reads off the timeline by the whole dead time before it.
         ended_ms = self._elapsed_ms()
-        turn.user_end_ms = ended_ms
         try:
             yield StateChanged(state="thinking")
 
@@ -386,6 +438,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
                 yield StateChanged(state="listening")
                 return
 
+            turn.user_end_ms = ended_ms
             # A still-open turn from a barge-in gets the new text appended
             # onto its question instead of starting a fresh turn.
             if reopening and turn.user_text:
@@ -525,18 +578,49 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             return
         if not turn.user_text or not turn.persona_text:
             return
+        if self._state_turn != turn.seq:
+            # First refresh for this exchange: today's notes are its base.
+            self._state_base = self._state
+            self._state_turn = turn.seq
         if self._state_task is not None and not self._state_task.done():
             self._state_task.cancel()
         self._state_task = asyncio.create_task(self._refresh_state(turn.user_text, turn.persona_text))
 
+    def _discard_state_refresh(self, turn: Turn) -> None:
+        """The reply was dropped whole (nothing of it was heard): no refresh may
+        land for it, and the notes go back to what they said before it.
+
+        Without this the one request already in flight carried the full reply,
+        finished after the barge-in and wrote a sentence into the notes that the
+        user never heard -- with no second refresh to follow it, because the
+        exchange no longer exists."""
+        if not CALL_STATE_NOTES or self._state_turn != turn.seq:
+            return
+        if self._state_task is not None and not self._state_task.done():
+            self._state_task.cancel()
+        self._state = self._state_base
+        self._state_turn = None
+
     async def _refresh_state(self, user_text: str, persona_text: str) -> None:
         """One summarisation call; a failure keeps the previous notes, since
-        stale notes beat none and the call must not depend on this leg."""
-        messages = build_state_prompt(self._state, user_text, persona_text, self._persona, self._scenario)
+        stale notes beat none and the call must not depend on this leg.
+
+        Summarised from `_state_base`, not from `_state`: on a re-run for the
+        same exchange the latter may already hold the unheard part of the reply
+        this run exists to take back out."""
+        messages = build_state_prompt(
+            self._state_base, user_text, persona_text, self._persona, self._scenario
+        )
         try:
             notes = await llm.complete(messages, max_tokens=STATE_MAX_TOKENS)
         except (OpenAIError, TimeoutError, OSError) as e:
             logger.warning("Call-state notes not refreshed: %s", e)
+            return
+        except Exception:  # pylint: disable=broad-except  # a background task nobody awaits
+            # Anything else would be swallowed until the garbage collector
+            # reports it as an unretrieved task exception, long after the call
+            # (ADR 0055). The notes are optional; the log line is not.
+            logger.exception("Call-state notes refresh raised")
             return
         if notes.strip():
             self._state = notes.strip()
@@ -582,13 +666,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
                             return
                 if turn.persona_text.strip():
                     return
-                if progress.suppressed:
-                    # The model produced text, and all of it was a repeat -- of
-                    # the user's line or of its own -- that the guards took out.
-                    # That is a caller with nothing left to say, not a failed
-                    # completion: end with the sign-off rather than an error.
-                    logger.info("Turn %d reply was nothing but repeats; ending the call", turn.seq)
-                    progress.ends_call = True
+                if _empty_reply_is_an_ending(turn, progress):
                     return
 
                 # A completion can finish cleanly without producing any usable text.
@@ -724,7 +802,13 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             # didn't, so it can't be trusted to have included one. said_goodbye
             # is deliberately absent from this list -- it *is* the goodbye, and
             # appending the fallback line would say it twice.
-            if repeated_reply or restates or (progress.ends_call and not force_end_call):
+            #
+            # `not spoke` covers the endings with no words at all: a reply that
+            # was the marker alone, or one the guards emptied entirely. The
+            # closing-intent path excludes itself above on the ground that the
+            # reply *is* the goodbye, which is wrong when there is no reply --
+            # the call then ended in silence.
+            if not spoke or repeated_reply or restates or (progress.ends_call and not force_end_call):
                 async for event in self._speak_fallback_closing(turn, progress):
                     yield event
         yield TurnCompleted(turn_seq=turn.seq, ends_call=ends_call)
@@ -859,12 +943,14 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         last = self._messages[-1] if self._messages else {}
         if last.get("role") != "assistant" or last.get("content") != turn.persona_text:
             return
-        heard = heard_text(progress.checkpoints, progress.spoken_text, played_ms)
+        heard = heard_text(progress.heard_checkpoints(), progress.spoken_text, played_ms)
         if not heard:
             # Nothing heard: drop the reply, keep the turn open to continue it.
             turn.persona_text = ""
             self._messages.pop()
             self._reopen_turn = turn
+            self._trim_persona_window(turn, played_ms)
+            self._discard_state_refresh(turn)
             return
         if len(heard) >= len(turn.persona_text):
             return  # heard all of it, or a stale re-entry -- nothing to trim
@@ -876,7 +962,23 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         # words themselves are exactly the Transcript's, still in step.
         self._messages[-1]["content"] = f"{heard}{INTERRUPTED_MARK}"
         self._reopen_turn = None
+        self._trim_persona_window(turn, played_ms)
         self._schedule_state_refresh(turn)  # the notes must not know the unheard part
+
+    @staticmethod
+    def _trim_persona_window(turn: Turn, played_ms: int | None) -> None:
+        """Cut the Persona's speaking window back to what the client played.
+
+        The window is modelled from audio *dispatched* (`_note_persona_audio`),
+        which after a barge-in runs past anything anybody heard -- by the whole
+        reply where none of it was played. F-53's Redeanteil is the share of
+        that time, so leaving it would report speech the user never got. Only
+        ever shrinks, and only with a position to shrink to."""
+        if played_ms is None or turn.persona_offset_ms is None or turn.persona_end_ms is None:
+            return
+        turn.persona_end_ms = max(
+            turn.persona_offset_ms, min(turn.persona_end_ms, turn.persona_offset_ms + played_ms)
+        )
 
     def _finalize_interrupted(self, turn: Turn, progress: _ReplyProgress) -> None:
         """Barge-in cleanup (ADR 0035). Commit only what the client played --
@@ -895,7 +997,8 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         if not progress.spoke_yet:
             turn.persona_text = ""
             return
-        heard = heard_text(progress.checkpoints, progress.spoken_text, played_ms)
+        heard = heard_text(progress.heard_checkpoints(), progress.spoken_text, played_ms)
+        self._trim_persona_window(turn, played_ms)
         if heard:
             turn.persona_unheard = _unheard(progress.spoken_text, heard)
             turn.persona_text = heard
@@ -1027,30 +1130,51 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         picked back up): the model is re-asked once with the nudge that names
         what it did, and no audio goes out."""
         first_chunk = True
-        async for text_chunk in sentence_chunks(llm.stream_reply(messages)):
-            if first_chunk:
-                text_chunk = self._guard_opening(turn, text_chunk, progress)
-                # An echo is often the whole first chunk (one sentence, past the
-                # first-chunk floor), so the opening checks stay armed until a
-                # chunk with words in it has been seen.
-                first_chunk = not text_chunk.strip()
+        # aclosing for the same reason the inner loop has it: this generator is
+        # left early on the end marker and on a Failed leg, and the HTTP stream
+        # underneath then stays open until the garbage collector gets to it. No
+        # data is at stake here -- each completion is its own response, unlike
+        # the pooled TTS socket of ADR 0044's amendment -- only a connection
+        # held for nothing.
+        async with contextlib.aclosing(sentence_chunks(llm.stream_reply(messages))) as reply:
+            async for text_chunk in reply:
+                guarding = first_chunk
+                if guarding:
+                    # Scrubbed before the guards read it, not after: the model
+                    # copies the cut-off dash back from the history verbatim,
+                    # while `_repeats_earlier_opening` compares against history
+                    # lines that have had it removed. The dash alone made the
+                    # two look different, and the copied "Ich will--" that
+                    # ADR 0038's amendment was built for walked past the guard.
+                    text_chunk = strip_interrupted_mark(text_chunk)
+                    text_chunk = self._guard_opening(turn, text_chunk, progress)
 
-            text_chunk = self._clean_chunk(turn, text_chunk, progress)
+                text_chunk = self._clean_chunk(turn, text_chunk, progress)
 
-            if text_chunk:
-                # aclosing, not a bare loop: closing this generator on a
-                # barge-in must close _speak, and with it the KugelAudio
-                # stream, *now* -- left to the garbage collector, the pooled
-                # socket is reset only later, maybe after the next chunk
-                # already went out on it (ADR 0044 amendment).
-                async with contextlib.aclosing(self._speak(turn, text_chunk, progress)) as spoken:
-                    async for event in spoken:
-                        yield event
-                        if isinstance(event, Failed):
-                            return
+                if guarding:
+                    # An echo is often the whole first chunk (one sentence, past
+                    # the first-chunk floor), so the opening checks stay armed
+                    # until a chunk with words in it has been seen. Read *after*
+                    # the scrub, not before it: a chunk the filters empty is not
+                    # a chunk the user heard, and disarming on it let the first
+                    # spoken chunk -- a re-greeting, an echo -- past
+                    # `_guard_opening` entirely.
+                    first_chunk = not text_chunk.strip()
 
-            if progress.ends_call:
-                break  # nothing meaningful should follow the marker
+                if text_chunk:
+                    # aclosing, not a bare loop: closing this generator on a
+                    # barge-in must close _speak, and with it the KugelAudio
+                    # stream, *now* -- left to the garbage collector, the pooled
+                    # socket is reset only later, maybe after the next chunk
+                    # already went out on it (ADR 0044 amendment).
+                    async with contextlib.aclosing(self._speak(turn, text_chunk, progress)) as spoken:
+                        async for event in spoken:
+                            yield event
+                            if isinstance(event, Failed):
+                                return
+
+                if progress.ends_call:
+                    break  # nothing meaningful should follow the marker
 
         if progress.filters.guard and progress.first_suppressed is not None and not progress.spoke_yet:
             raise _RegenerateReply(*progress.first_suppressed)

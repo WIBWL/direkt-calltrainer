@@ -21,6 +21,8 @@ import pytest
 from fastapi import WebSocketDisconnect
 
 from backend.api import session_ws
+from backend.db import models as db_models
+from backend.session import persistence
 from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted
 from tests.conftest import TEST_AUTH, TEST_PERSONAS, TEST_SCENARIOS
 
@@ -227,3 +229,31 @@ async def test_a_barge_in_over_the_goodbye_ends_the_session_instead_of_reviving_
 
     assert reason == "completed"
     assert orch.turns_run == 1, "no further Turn on a finished call"
+
+
+async def test_a_disconnect_mid_call_is_not_read_as_the_user_ending_it():
+    """A dropped connection reaches `session_ws` as `WebSocketDisconnect`.
+
+    `_receive_json` used to swallow it and answer None, which `_run_session`
+    reads as "the user pressed end call" -- so a walked-away call was stored
+    with the same status as a finished one and counted as a training in the
+    history and the activity calendar. It is stored, because the training
+    happened, but as `aborted` (ADR 0034's amendment).
+    """
+    ws = FakeWebSocket([_DISCONNECT])
+    with pytest.raises(WebSocketDisconnect):
+        await session_ws._receive_json(ws)
+
+
+async def test_a_malformed_control_message_is_still_not_a_disconnect():
+    """The other half of the same call: unparseable input answers None as
+    before, so only a real disconnect travels up as an exception."""
+    ws = FakeWebSocket(["{not json at all"])
+    assert await session_ws._receive_json(ws) is None
+
+
+def test_a_disconnected_session_is_stored_as_aborted():
+    """The wire word for it maps onto the schema's `aborted`, never
+    `completed` -- the one distinction ADR 0034's amendment rests on."""
+    assert persistence._STATUS["disconnected"] == db_models.STATUS_ABORTED
+    assert persistence._STATUS["user"] == db_models.STATUS_COMPLETED

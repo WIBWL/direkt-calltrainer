@@ -83,8 +83,16 @@ async def session_ws(websocket: WebSocket) -> None:
                 # and "user" carry over unchanged.
                 reason = "error" if outcome == "failed" else outcome
         except WebSocketDisconnect:
-            logger.info("Client disconnected")
-            return
+            # Nobody ended this call: the tab was closed, or the connection
+            # dropped. The training still happened and its Turns are in memory,
+            # so it is stored -- as `aborted`, never as `completed` (ADR 0034's
+            # amendment). ADR 0034 originally discarded it; that threw away ten
+            # minutes of training for a network blip, and storing it as
+            # completed instead -- which is what the swallowed disconnect in
+            # `_receive_json` actually did -- counted a walked-away call as a
+            # finished one in the history and the activity calendar.
+            logger.info("Client disconnected; storing the Session as aborted")
+            reason = "disconnected"
 
         # Flattened by the same function the persisted Turn rows come from, so
         # the log the user sees cannot disagree with the one that was stored --
@@ -104,8 +112,9 @@ async def session_ws(websocket: WebSocket) -> None:
         except (WebSocketDisconnect, RuntimeError):
             # The client can drop before this final send; Starlette then raises
             # RuntimeError ("send after close"), not WebSocketDisconnect. The
-            # transcript is lost with the connection — the accepted trade in
-            # ADR 0034 (a mid-call disconnect leaves no record).
+            # transcript is lost with the connection, but the Session itself is
+            # not: `_record` above has already written it (ADR 0034's
+            # amendment), so it is readable from the history.
             logger.info("Client disconnected before session.ended could be sent")
             return
         logger.info("Session ended (%s)", reason)
@@ -261,9 +270,6 @@ async def _run_session(
             continue
 
         audio_bytes = await _receive_bytes(websocket)
-        if audio_bytes is None:
-            return "user"
-
         turn = orchestrator.run_turn(audio_bytes, "turn.webm", envelope.get("mime_type"))
         outcome = await _run_turn_interruptible(
             websocket, turn, orchestrator.start_playback, orchestrator.note_barge_in
@@ -387,20 +393,20 @@ async def _forward_turn_events(
 
 
 async def _receive_json(websocket: WebSocket) -> dict | None:
-    """Receives one JSON control message, or None on disconnect/malformed input."""
-    try:
-        raw = await websocket.receive_text()
-    except WebSocketDisconnect:
-        return None
+    """Receives one JSON control message, or None on malformed input.
+
+    A disconnect is *not* caught here. Swallowing it made the caller read a
+    dropped connection as the user pressing "end call", and the Session was
+    stored as completed -- the one thing ADR 0034 says it must not be. It now
+    travels up to `session_ws`, which is the only place that knows how a call
+    that nobody ended is stored."""
+    raw = await websocket.receive_text()
     try:
         return json.loads(raw)
     except (json.JSONDecodeError, TypeError):
         return None
 
 
-async def _receive_bytes(websocket: WebSocket) -> bytes | None:
-    """Receives one binary audio frame, or None on disconnect/malformed input."""
-    try:
-        return await websocket.receive_bytes()
-    except WebSocketDisconnect:
-        return None
+async def _receive_bytes(websocket: WebSocket) -> bytes:
+    """Receives one binary audio frame. A disconnect propagates, as above."""
+    return await websocket.receive_bytes()

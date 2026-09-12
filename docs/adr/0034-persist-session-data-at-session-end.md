@@ -39,3 +39,15 @@ Because no audio is persisted, any analysis that needs the waveform — the para
 The MVP now has a retained-data DSGVO surface where ADR 0023 deliberately had none. A retention period and a working deletion path become open obligations rather than deferred ones, and they are not satisfied today. The mechanism now exists — the foreign keys cascade in the database, so a Session and its whole subtree can be removed by a single statement, and a test covers both that path and the ORM one — but nothing yet decides how long a Session is kept or offers a User the button to delete it. Risk RI-02 grows accordingly rather than shrinking.
 
 Finally, storing Sessions does not by itself make per-user history possible. With `subject_id` unenforced and no identity behind it (ADR 0031), F-13 and F-48 remain out of reach until ADR 0009's authentication lands; what this decision buys for them is that the data will already be there when it does.
+
+## Amendment, 2026-09-12: a call nobody ended is stored as aborted
+
+The rule above says a Session that ends because the client disconnected is not persisted. A review of the live path found that it was persisted, and worse, as **completed**: `_receive_json` caught `WebSocketDisconnect` and answered `None`, which the receive loop reads as the user pressing *Gespräch beenden*. A closed tab produced the same row as a finished training, so it counted in the history and in the progress view's activity calendar, which is explicitly a count of trainings somebody carried through.
+
+Restoring the original rule was one of two ways out. We take the other: the disconnect now travels up as an exception to the one place that knows how a call ended, and the Session is stored with `session.status = 'aborted'`.
+
+The reason is that the original rule charges the wrong party. The training did happen — the Turns are in memory, the measurements are attached, the transcript is complete up to the moment the connection went — and discarding it treats a network blip, a closed laptop or a browser update as if the user had never trained. The status vocabulary already carries the distinction the calendar needs: `completed` against `aborted`, with every cross-Session view counting the former. Storing the call and marking it for what it was says more than throwing it away, and it says it in the schema rather than in a comment.
+
+What does not change: the write still happens once, after the call, off the event loop, and it still cannot affect the live path. What the user loses on a disconnect is the `session.ended` message and with it the transcript in the browser — the connection it would travel on is gone — but the Session itself is readable from the history afterwards, which it was not before.
+
+`session.status` is therefore the only place this distinction lives. Anything that counts trainings reads `completed`; anything that lists them shows both.

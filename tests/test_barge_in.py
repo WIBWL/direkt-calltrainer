@@ -20,8 +20,8 @@ import asyncio
 
 import pytest
 
-from backend.feedback.calls import utterances
-from backend.session.models import AudioChunk, StateChanged, TurnCompleted
+from backend.feedback.calls import conversation, utterances
+from backend.session.models import AudioChunk, StateChanged, Turn, TurnCompleted
 from backend.session.nudges import INTERRUPTED_MARK, strip_interrupted_mark
 from backend.session.orchestrator import SessionOrchestrator
 from tests.conftest import collect
@@ -130,28 +130,40 @@ async def test_interrupt_commits_only_what_played_through(persona, scenario, fak
     assert orch._reopen_turn is None
 
 
-async def test_interrupt_before_a_full_utterance_was_heard_reopens_the_turn(
+async def test_interrupt_inside_the_first_sentence_keeps_the_words_that_played(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """Audio started but the client played less than one full utterance -> treat
-    it like the no-audio case: discard the reply, keep the turn open."""
+    """A cut inside the very first sentence keeps its word-prefix like any
+    other cut (ADR 0035), rather than discarding the reply.
+
+    That sentence carries no checkpoint yet: a checkpoint is written per
+    *finished* chunk, while its audio goes out sub-chunk by sub-chunk as
+    KugelAudio produces it (ADR 0044) -- so the client is already playing a
+    sentence the server has not finished synthesizing. Measured against the
+    finished chunks alone this cut found nothing heard at all and dropped a
+    reply the user was listening to, leaving the Turn open and the next
+    utterance appended onto a question that had already been answered.
+
+    The reopened-Turn case that remains is a cut before any audio at all, which
+    `test_interrupt_before_any_audio_reopens_the_same_turn` covers.
+    """
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
-    fake_pipeline.stt.transcripts = ["Erste Haelfte.", "Und der Rest."]
-    fake_pipeline.llm.replies = ["Ein ganzer Satz den der Nutzer fast sofort abschneidet.", "Die echte Antwort."]
+    reply = "Ein ganzer Satz den der Nutzer fast sofort abschneidet."
+    fake_pipeline.stt.transcripts = ["Erste Haelfte."]
+    fake_pipeline.llm.replies = [reply]
 
     orch = SessionOrchestrator(persona, scenario)
     gen = orch.run_turn(b"a", "turn.webm", "audio/webm")
     await _drain_until(gen, lambda e: isinstance(e, AudioChunk))
-    orch.note_barge_in(120)  # a fraction of a second -> nothing heard in full
+    orch.note_barge_in(120)
     await gen.aclose()
 
-    assert orch.turns[0].persona_text == ""
-    assert orch._reopen_turn is orch.turns[0], "nothing was heard, so the turn stays open"
-
-    events = await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
-    assert len(orch.turns) == 1, "the continuation reuses the same turn"
-    assert orch.turns[0].user_text == "Erste Haelfte. Und der Rest."
-    assert any(isinstance(e, AudioChunk) for e in events)
+    heard = orch.turns[0].persona_text
+    assert heard, "the words that played are kept, not thrown away"
+    assert reply.startswith(heard), "and they are a word-prefix of the sentence"
+    assert len(heard) < len(reply), "not the whole sentence -- it was cut off"
+    assert orch.turns[0].persona_interrupted
+    assert orch._reopen_turn is None, "something was heard, so the Turn is closed"
 
 
 async def test_a_sentence_heard_almost_to_its_end_keeps_almost_all_of_it(
@@ -512,3 +524,45 @@ async def test_new_or_reopened_turn_bookkeeping(persona, scenario):
     t2, reopening2 = orch._new_or_reopened_turn()
     assert reopening2 is True and t2 is t1, "still-open turn is reused"
     assert orch.turns == [t1], "no second turn was appended"
+
+
+def test_a_reply_nobody_heard_is_not_counted_as_persona_speech(persona):
+    """A discarded reply leaves the measured speaking time with the Transcript.
+
+    The Persona's window is modelled from audio *dispatched* -- the server
+    never learns when the client finished playing -- so after a barge-in it
+    runs past anything anybody heard, by the whole reply where none of it
+    played. `persona_speech_ms` is the denominator of F-53's Redeanteil, and
+    the same reply was being counted once as speaking time while the Turn
+    count, the timeline and the Transcript all left it out (ADR 0035).
+
+    Stated over the folded Turn rather than through a call, because the two
+    halves of this hold independently: the window is cut back where a played
+    position is known, and a Turn with no Persona line is not counted whether
+    or not it was.
+    """
+    dropped = Turn(seq=1, user_text="Erste Haelfte der Frage.", persona_text="",
+                   persona_offset_ms=1000, persona_end_ms=101000)
+
+    folded = conversation([dropped], persona.language_id)
+
+    assert folded.persona_turns == 0
+    assert folded.persona_speech_ms == 0, "no line, no speaking time"
+
+
+async def test_a_trimmed_reply_counts_only_the_speech_that_played(
+    persona, scenario, fake_pipeline, monkeypatch
+):
+    """The same rule where the reply survives as a fragment: the window is cut
+    back to the played position, not left at the end of the dispatched audio."""
+    monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 100000)
+    fake_pipeline.stt.transcripts = ["Erste Haelfte der Frage."]
+    fake_pipeline.llm.replies = ["Es geht um die Exportfunktion, die seit elf Tagen nicht geht."]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+    orch.note_late_barge_in(20000)  # 20s of the 100s dispatched
+
+    assert orch.turns[0].persona_text, "part of it was heard and is kept"
+    folded = conversation(orch.turns, persona.language_id)
+    assert folded.persona_speech_ms == 20000, "the played span, not the dispatched one"
