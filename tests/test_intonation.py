@@ -11,7 +11,7 @@ the second one flat, which is backwards for a listener.
 """
 import pytest
 
-from backend.api.sessions import _served_detail
+from backend.feedback.readings import served_detail
 from backend.feedback.intonation import (
     GLISSANDO_ST_S2,
     LABELS,
@@ -404,7 +404,7 @@ def test_the_step_is_derived_when_the_session_is_read() -> None:
     migration and without leaving old trainings labelled by one that no longer
     exists.
     """
-    served = _served_detail(RANGE_KEY, {"median_hz": 120.0, "pvq": 0.18})
+    served = served_detail(RANGE_KEY, {"median_hz": 120.0, "pvq": 0.18})
 
     assert served == {
         "median_hz": 120.0,
@@ -419,7 +419,7 @@ def test_a_session_measured_before_the_quotient_gets_no_step() -> None:
     """The reading moved onto a figure those Sessions do not carry, and their
     audio is gone (ADR 0048) so it cannot be measured now. Reading the step off
     the range instead would reinstate the scale the review withdrew."""
-    served = _served_detail(RANGE_KEY, {"median_hz": 120.0})
+    served = served_detail(RANGE_KEY, {"median_hz": 120.0})
 
     assert served == {"median_hz": 120.0}
 
@@ -428,7 +428,7 @@ def test_serving_leaves_a_detail_that_was_never_measured_alone() -> None:
     """A Session stored before the pitch curve existed carries no detail at
     all. There is nothing to read a step off, and inventing one would put a
     word on a training that was never measured."""
-    assert _served_detail(RANGE_KEY, None) is None
+    assert served_detail(RANGE_KEY, None) is None
 
 
 # --- Where one utterance ends and the next begins ---------------------------

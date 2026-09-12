@@ -57,7 +57,7 @@ from backend.api.deps import current_tenant_id
 from backend.auth import AuthContext, require_user
 from backend.db import models as db_models
 from backend.db.session import session_scope
-from backend.feedback import interruptions, intonation, metrics
+from backend.feedback import readings
 from backend.followups import FollowUpError, PlayedCall, draft_follow_up
 from backend.reversals import ReverseError, draft_brief
 
@@ -270,23 +270,13 @@ def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user
             "findings": [
                 _finding(f) for f in sorted(session.findings, key=lambda f: f.offset_ms or 0)
             ],
-            # The long explanation behind a metric's "i", by metric key.
-            # Read from the Python constant at request time rather than stored
-            # with the Session or copied into the frontend: it explains the
-            # thresholds it sits next to, and the two have to be edited
-            # together (the arrangement ADR 0063 chose for the field limits).
-            "metric_notes": {
-                interruptions.COUNT_KEY: interruptions.EXPLANATION,
-                intonation.RANGE_KEY: intonation.EXPLANATION,
-                metrics.RUN_LENGTH_KEY: metrics.RUN_LENGTH_EXPLANATION,
-            },
-            # The scales those readings come from, written out. A boundary the
-            # user cannot see is a judgement they cannot argue with, and both
-            # sets of boundaries are working values (see the two modules).
-            "metric_scales": {
-                interruptions.COUNT_KEY: interruptions.light_steps(),
-                intonation.RANGE_KEY: intonation.liveliness_steps(),
-            },
+            # What each metric says beyond its figure -- the text behind its
+            # "i", and the scale a coloured step was read off. Which metrics
+            # have either is `backend/feedback/readings.py`'s business and not
+            # this route's: a list of metric keys in an HTTP module is one a
+            # new metric is silently missing from.
+            "metric_notes": readings.notes(),
+            "metric_scales": readings.scales(),
             "feedback": _feedback(session.feedback),
             "follow_up": _follow_up(db, session.session_id),
         }
@@ -743,52 +733,8 @@ def _measurement(measurement: db_models.Measurement) -> dict:
         # Which half of the metrics grid this one sits in; display only.
         "aspect": measurement.metric_type.aspect,
         "value": value,
-        "detail": _served_detail(key, measurement.detail_json),
+        "detail": readings.served_detail(key, measurement.detail_json),
     }
-
-
-def _served_detail(key: str, detail: dict | None) -> dict | None:
-    """The stored facts, plus the reading derived from them at request time.
-
-    The split is the point. What the analysis measured is written once and kept
-    (ADR 0051); which step of a scale that lands on is a judgement resting on
-    thresholds nothing has validated yet, so it is computed here, on every read,
-    from the stored figures. A recalibration then reaches every Session that was
-    ever measured -- including the ones whose audio is long gone (ADR 0048) --
-    instead of leaving old trainings labelled by a scale that no longer exists.
-    That has now happened once: F-35's reading moved from the range onto the
-    pitch variation quotient, and every stored Session picked up the new scale
-    on the next read, or lost its step where the new input was never measured.
-
-    F-51's traffic light predates this and is still stored in its detail; only
-    its wording is added here, so the German lives beside the thresholds.
-    """
-    if detail is None:
-        return None
-    if key == intonation.RANGE_KEY:
-        # Off the pitch variation quotient in the detail, not off `value`, which
-        # is the range. The two are different figures and only one of them has
-        # a boundary anybody has published -- see `intonation.liveliness`. A
-        # Session measured before the quotient was computed carries no `pvq` and
-        # gets no step, which is the honest answer rather than a gap.
-        step = intonation.liveliness(detail.get("pvq"), detail.get("voiced_ms"))
-        if step is None:
-            return detail  # not measured, or on too little speech to be read
-        return {
-            **detail,
-            "liveliness": step.value,
-            "liveliness_label": intonation.LABELS[step],
-            # The colour travels with the word, from beside the threshold that
-            # decided both. The frontend maps no step to any colour of its own.
-            "liveliness_light": intonation.LIGHTS[step],
-        }
-    if key == interruptions.COUNT_KEY:
-        try:
-            light = interruptions.TrafficLight(detail.get("light"))
-        except ValueError:
-            return detail  # measured before the light existed, or a value since retired
-        return {**detail, "light_label": interruptions.LABELS[light]}
-    return detail
 
 
 def _feedback(feedback: db_models.Feedback | None) -> dict | None:
