@@ -480,3 +480,53 @@ def test_every_seeded_portrait_is_a_file_that_exists(entry):
     Vite build, which is the directory the backend serves."""
     served = _PORTRAIT_DIR / pathlib.PurePosixPath(entry["avatar_url"]).name
     assert served.is_file(), f"{entry['id']}: no portrait at {entry['avatar_url']}"
+
+
+# --- the seed fits the columns it is written into -----------------------
+#
+# Nothing above this point would catch a seed value that is simply too long
+# for its column: the seed is a dict of strings and every assertion here reads
+# it as one. The database is the only thing that enforces a length, and it
+# does so at provisioning -- inside one transaction, so the first over-long
+# value drops *every* seeded row and the app answers /api/scenarios with a 500
+# (which is how `persona.traits` outgrew varchar(120) and took the whole
+# library down with it). These two tests put that failure here instead, where
+# it costs a test run rather than a deployment.
+#
+# Seed field -> column, mirroring `provision._seed_personas` /
+# `_seed_scenarios`. Only the fields that land in a column with a length are
+# worth listing; a Text column has no limit to check.
+_PERSONA_COLUMNS = {
+    "id": "key", "name": "name", "role_label": "role_label", "role": "role",
+    "traits": "traits", "avatar_url": "avatar_url", "difficulty": "difficulty",
+    "language_id": "language_code", "tts_voice": "tts_voice",
+}
+_SCENARIO_COLUMNS = {
+    "id": "key", "name": "title", "short_description": "short_description",
+    "briefing": "briefing", "description": "description",
+    "case_facts": "case_facts", "call_goal": "call_goal",
+    "category": "category",
+}
+
+
+def _too_long(model, field_to_column, entry):
+    """Every seeded value that is longer than its column allows."""
+    for field, column in field_to_column.items():
+        value = entry.get(field)
+        limit = getattr(model.__table__.c[column].type, "length", None)
+        if value is None or limit is None:
+            continue
+        if len(value) > limit:
+            yield f"{field} -> {model.__tablename__}.{column}: {len(value)} > {limit}"
+
+
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_seeded_persona_fits_the_columns_it_is_written_into(entry):
+    over = list(_too_long(models.Persona, _PERSONA_COLUMNS, entry))
+    assert not over, f"{entry['id']}: " + "; ".join(over)
+
+
+@pytest.mark.parametrize("entry", SEED.SCENARIOS, ids=lambda e: e["id"])
+def test_seeded_scenario_fits_the_columns_it_is_written_into(entry):
+    over = list(_too_long(models.Scenario, _SCENARIO_COLUMNS, entry))
+    assert not over, f"{entry['id']}: " + "; ".join(over)

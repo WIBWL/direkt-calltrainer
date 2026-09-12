@@ -31,8 +31,12 @@ tables, so provision.py writes them straight through without mapping.
 # Two kinds of text per entry (ADR 0043): "role_label" is the label shown on
 # the selection card and is written in the UI language; "role"/"traits"/
 # "behavior" are read only by the model and are English, so that the language
-# the Persona speaks is decided by language_id alone. The two role fields are
-# twins and say the same thing in two languages.
+# the Persona speaks is decided by language_id alone. The two role fields name
+# the same position in two languages, but the label is the shorter of the two:
+# it is read beside the Persona's name, on a screen that is already about
+# calling a customer, so it carries the title alone. Whose company it is, how
+# big it is and how long the contract has run are context the model needs and
+# the card does not -- they stay in "role".
 #
 # A role is the position and nothing else -- a job title and where it is held.
 # Everything descriptive belongs to the character (ADR 0045): a focus, a remit,
@@ -68,7 +72,7 @@ PERSONAS = [
         "id": "andreas-kastner-ceo",
         "avatar_url": "/personas/andreas-kastner-ceo.webp",
         "name": "Andreas Kastner",
-        "role_label": "Geschäftsführer eines mittelständischen Unternehmens",
+        "role_label": "Geschäftsführer",
         "role": "Managing director of a mid-sized company",
         "traits": (
             "matter-of-fact, time-conscious, focused on strategy and budget, "
@@ -125,10 +129,10 @@ PERSONAS = [
         ],
     },
     {
-        "id": "patricia-johnson-marketing",
-        "avatar_url": "/personas/patricia-johnson-marketing.webp",
-        "name": "Patricia Johnson",
-        "role_label": "Marketing-Managerin bei einem Kundenunternehmen",
+        "id": "phoebe-johnson-marketing",
+        "avatar_url": "/personas/phoebe-johnson-marketing.webp",
+        "name": "Phoebe Johnson",
+        "role_label": "Marketing-Managerin",
         "role": "Marketing manager at a company that is a customer of the user's",
         "traits": (
             "very polite, courteous, calm and composed, never pushy, easy and "
@@ -189,7 +193,7 @@ PERSONAS = [
         "id": "patrick-lohberg-it-lead",
         "avatar_url": "/personas/patrick-lohberg-it-lead.webp",
         "name": "Patrick Lohberg",
-        "role_label": "IT-Leitung eines mittelständischen Unternehmens",
+        "role_label": "IT-Leitung",
         "role": "IT lead at a mid-sized company",
         "traits": (
             "thorough, sceptical of summaries, precise with words, unhurried, "
@@ -246,7 +250,7 @@ PERSONAS = [
         "id": "kerstin-kaser-clerk",
         "avatar_url": "/personas/kerstin-kaser-clerk.webp",
         "name": "Kerstin Kaser",
-        "role_label": "Sachbearbeiterin in einem Kundenunternehmen",
+        "role_label": "Sachbearbeiterin",
         "role": "clerk at a customer company",
         "traits": (
             "reserved, brief, not unfriendly, gives away nothing unasked, "
@@ -300,7 +304,7 @@ PERSONAS = [
         "id": "marcel-kropp-cost-critical",
         "avatar_url": "/personas/marcel-kropp-cost-critical.webp",
         "name": "Marcel Kropp",
-        "role_label": "Bestandskunde mit laufendem Vertrag",
+        "role_label": "Bestandskunde",
         "role": "long-standing customer of the company the user works for",
         "traits": (
             "friendly while nothing costs extra, blunt about money, no "
@@ -356,7 +360,7 @@ PERSONAS = [
         "id": "floyd-jenkins-non-technical",
         "avatar_url": "/personas/floyd-jenkins-non-technical.webp",
         "name": "Floyd Jenkins",
-        "role_label": "Anwender im Fachbereich eines Kundenunternehmens",
+        "role_label": "Anwender im Fachbereich",
         "role": "employee in a department at a customer company",
         "traits": (
             "willing, unembarrassed about not knowing, quickly lost in jargon, "
