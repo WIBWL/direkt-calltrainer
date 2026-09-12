@@ -109,6 +109,11 @@ nav:
       - ADR 0090 - The Live Call Does Not Depend on the Analysis of a Finished One: adr/0090-the-live-call-does-not-depend-on-the-analysis-of-a-finished-one.md
       - ADR 0091 - A Measurement Is Stored; a Reading Is Derived on Every Read: adr/0091-a-measurement-is-stored-a-reading-is-derived-on-every-read.md
       - ADR 0092 - One Stylesheet, Not One per Component: adr/0092-one-stylesheet-not-one-per-component.md
+      - ADR 0093 - The Feedback PDF Is Built in the Browser: adr/0093-the-feedback-pdf-is-built-in-the-browser.md
+      - ADR 0094 - The Frontend Is Checked by a Strict Compiler, a Narrow Test Suite and the Hook Rules: adr/0094-frontend-checks-strict-compiler-narrow-tests-hook-lint.md
+      - ADR 0095 - On the Progress View, Colour Names a Family and Never a Value: adr/0095-on-the-progress-view-colour-names-a-family-never-a-value.md
+      - ADR 0096 - The Training Flow Is One Transition Table: adr/0096-the-training-flow-is-one-transition-table.md
+      - ADR 0097 - Motion Yields to the System Setting, Sound Can Be Stopped, Charts Carry Their Numbers in Text: adr/0097-motion-yields-sound-can-be-stopped-charts-carry-their-numbers.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
   # site is served at the root (mkdocs serve / mkdocs build + static server).
