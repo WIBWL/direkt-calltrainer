@@ -25,6 +25,7 @@ import SetupView from "./components/SetupView";
 import FeedbackScreen from "./components/FeedbackScreen";
 import { useMicrophoneDevices } from "./hooks/useMicrophoneDevices";
 import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
+import { useBargeIn } from "./hooks/useBargeIn";
 import { useSessionSocket, type CommittedSession } from "./hooks/useSessionSocket";
 import { useNextCalls } from "./hooks/useNextCalls";
 import NextCalls from "./components/NextCalls";
@@ -476,39 +477,13 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- playback is stable-shaped; only isPlaying/pendingEnd should retrigger this
   }, [pendingEnd, playback.isPlaying]);
 
-  // The server sends state:"listening" the moment the Turn completes, but
-  // the Persona's last audio chunk(s) can still be playing out locally —
-  // hold the displayed state at "speaking" until playback actually finishes.
-  const displayState =
-    socket.callState === "listening" && playback.isPlaying ? "speaking" : socket.callState;
+  // What the call screen shows, and the two acts that cut a reply short. All
+  // three belong together: both callbacks branch on the same merged state, and
+  // the line that carries ADR 0035's guarantee -- the played position reaching
+  // the server -- is one call inside it rather than one line here.
+  const { displayState, bargeIn, endCall } = useBargeIn(socket, playback);
 
-  // useMicrophoneVAD wires onSpeechStart into MicVAD only once (see its
-  // initRef guard), so handleBargeIn below must read fresh state via a ref.
-  const displayStateRef = useRef(displayState);
-  displayStateRef.current = displayState;
-
-  // Barge-in trigger (see useMicrophoneVAD for the actual filtering).
-  // Stable ([]) so startListening/stopListening below don't churn either.
-  const handleBargeIn = useCallback(() => {
-    if (displayStateRef.current === "listening") return;
-    socket.sendInterrupt(playback.interrupt());
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment above
-  }, []);
-
-  // Ending the call while the persona is still talking is a barge-in too:
-  // report the played position first so the transcript keeps only the part of
-  // that last reply the user actually heard (ADR 0035), then end. Reads
-  // displayStateRef, not playback.isPlaying, for the same reason handleBargeIn
-  // does — this callback is created once and must see fresh state.
-  const handleEndCall = useCallback(() => {
-    if (displayStateRef.current !== "listening") {
-      socket.sendInterrupt(playback.interrupt());
-    }
-    socket.endSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment above
-  }, []);
-
-  const vad = useMicrophoneVAD(handleBargeIn, socket.sendTurnAudio, micDeviceId);
+  const vad = useMicrophoneVAD(bargeIn, socket.sendTurnAudio, micDeviceId);
 
   useEffect(() => {
     vad.preload();
@@ -1016,7 +991,7 @@ export default function App() {
           audioLevel={playback.audioLevel}
           error={socket.error ?? vad.micError}
           onToggleMicrophone={handleToggleMicrophone}
-          onEndCall={handleEndCall}
+          onEndCall={endCall}
           brief={brief}
         />
       </AppLayout>
