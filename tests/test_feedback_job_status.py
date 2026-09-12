@@ -15,6 +15,12 @@ Postgres has to be running (`docker compose up -d db`); without it the database
 fixtures skip.
 """
 
+# pylint: disable=duplicate-code
+# Fixture data is repeated per test module on purpose: a test carrying its own
+# Turns shows what it ran against when it fails, and sharing them would let a
+# change made for one test quietly alter another.
+
+
 import json
 import uuid
 from datetime import UTC, datetime, timedelta

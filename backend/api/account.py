@@ -11,6 +11,13 @@ Both are scoped by the caller's own `sub` in the query itself, like the history
 there is none to authorise or refuse.
 """
 
+# pylint: disable=duplicate-code
+# `_feedback` here and in the sibling route look alike and are not the same: the
+# export serves `created_at` and plain points, the detail route `turn_id` and the
+# focus goal. Two wire contracts -- merging them would need a flag, and a
+# serializer with a flag is worse than two honest ones.
+
+
 from __future__ import annotations
 
 import logging
@@ -20,8 +27,9 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import func
-from sqlalchemy.orm import Session as DbSession, selectinload
+from sqlalchemy.orm import Session as DbSession
 
+from backend.api._loading import SESSION_SUBTREE
 from backend import consent as consent_service
 from backend import retention
 from backend.auth import AuthContext, require_user
@@ -83,15 +91,7 @@ def export_data(caller: AuthContext = Depends(require_user)) -> JSONResponse:
         sessions = (
             db.query(db_models.Session)
             .filter_by(subject_id=caller.sub)
-            .options(
-                selectinload(db_models.Session.turns),
-                selectinload(db_models.Session.measurements)
-                .selectinload(db_models.Measurement.metric_type),
-                selectinload(db_models.Session.feedback)
-                .selectinload(db_models.Feedback.points),
-                selectinload(db_models.Session.persona),
-                selectinload(db_models.Session.scenario),
-            )
+            .options(*SESSION_SUBTREE)
             .order_by(db_models.Session.started_at.asc())
             .all()
         )

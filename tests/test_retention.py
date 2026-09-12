@@ -204,6 +204,7 @@ async def test_the_overview_reports_the_period(api_client: httpx.AsyncClient) ->
 async def test_the_switch_travels_over_the_wire(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
+    """The preference is readable and writable over the API."""
     persist(turns=TURNS, started_at=datetime(2026, 8, 1, tzinfo=UTC))
 
     off = await api_client.post("/api/me/retention", json={"auto_delete": False})

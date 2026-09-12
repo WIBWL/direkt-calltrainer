@@ -15,6 +15,12 @@ and it is decided differently depending on where the forwarding task happened
 to be suspended when the interrupt arrived. These two tests are the same
 barge-in twice, distinguished only by that.
 """
+
+# pylint: disable=duplicate-code
+# Fixture data is repeated per test module on purpose: a test carrying its own
+# Turns shows what it ran against when it fails, and sharing them would let a
+# change made for one test quietly alter another.
+
 from __future__ import annotations
 
 import asyncio

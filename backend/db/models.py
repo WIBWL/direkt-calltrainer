@@ -31,6 +31,11 @@ sequentially scans every child table looking for rows to reject — exactly the
 delete path ADR 0034 promises. It is the same default Django and Rails apply,
 and the write cost is irrelevant at this volume.
 """
+
+# pylint: disable=too-many-lines
+# One module on purpose: the Alembic migrations and the ER diagram are both
+# generated from these classes, so splitting them would put the schema's single
+# source of truth in two files (ADR 0026).
 from __future__ import annotations
 
 import uuid

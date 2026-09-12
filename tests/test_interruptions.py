@@ -168,7 +168,7 @@ def test_a_call_the_user_never_cut_into_counts_zero() -> None:
     out."""
     report = classify((_persona(0, 4_000), _user(5_000)))
 
-    assert report.hard == ()
+    assert not report.hard
     assert report.light is TrafficLight.GREEN
 
 

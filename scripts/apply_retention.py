@@ -33,6 +33,9 @@ sys.path.insert(0, PROJECT_ROOT)
 load_dotenv()
 
 # After load_dotenv(): importing the backend reads the environment.
+# pylint: disable=wrong-import-position
+# The sys.path insert above has to run before the backend is importable, and
+# load_dotenv() before it reads the environment -- so these cannot move up.
 from backend import retention  # noqa: E402
 from backend.db import models as db_models  # noqa: E402
 from backend.db.session import session_scope  # noqa: E402

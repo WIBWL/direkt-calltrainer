@@ -16,6 +16,12 @@ here rather than in the deletion tests because it is a property of this feature
 — nothing in `deletion.py` mentions focus, and this test is what would notice
 if something did.
 """
+
+# pylint: disable=duplicate-code
+# Fixture data is repeated per test module on purpose: a test carrying its own
+# Turns shows what it ran against when it fails, and sharing them would let a
+# change made for one test quietly alter another.
+
 import httpx
 import pytest
 from sqlalchemy.orm import Session as DbSession

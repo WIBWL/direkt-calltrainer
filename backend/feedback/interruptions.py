@@ -344,6 +344,20 @@ def _overlapped(user: Segment, persona: list[Segment]) -> Segment | None:
     return inside[-1] if inside else None
 
 
+def finding_description(event: Event) -> str:
+    """The Finding's text for one hard interruption.
+
+    Here rather than at the two call sites -- `session.persistence` writes it
+    when a call ends and `scripts/backfill_interruptions.py` writes it for
+    Sessions recorded earlier. Reworded in one place, the two would disagree
+    about calls that are otherwise the same.
+    """
+    return (
+        f"Sie haben zu sprechen begonnen, während Ihr Gegenüber noch "
+        f"{round(event.remaining_ms / 1000, 1)} Sekunden zu sagen hatte."
+    )
+
+
 def _kind(user: Segment, persona: Segment, remaining_ms: int) -> Kind:
     """Which of the four an overlap is. Order matters; see `classify`."""
     # 1. A short utterance the Persona did not lose anything over. The user was

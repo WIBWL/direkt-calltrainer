@@ -133,10 +133,7 @@ def _write_analysis(
             metric_type_id=metric_ids.get(interruptions.COUNT_KEY),
             category=interruptions.FINDING_CATEGORY,
             offset_ms=event.offset_ms,
-            description=(
-                f"Sie haben zu sprechen begonnen, während Ihr Gegenüber noch "
-                f"{round(event.remaining_ms / 1000, 1)} Sekunden zu sagen hatte."
-            ),
+            description=interruptions.finding_description(event),
         )
         for event in interruptions.classify(call.timeline).hard
     ]

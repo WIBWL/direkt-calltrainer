@@ -9,6 +9,12 @@ The wire matches the schema (ADR 0057): the keys below are what
 frontend/src/protocol.ts declares, and they are the ORM's own column names
 passed straight through, so they are asserted verbatim here.
 """
+
+# pylint: disable=duplicate-code
+# Fixture data is repeated per test module on purpose: a test carrying its own
+# Turns shows what it ran against when it fails, and sharing them would let a
+# change made for one test quietly alter another.
+
 import uuid
 from datetime import datetime
 

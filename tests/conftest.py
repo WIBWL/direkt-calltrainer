@@ -661,7 +661,7 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
     )
 
 
-def persist(
+def persist(  # pylint: disable=too-many-arguments
     *,
     extern_id: uuid.UUID | None = None,
     reason: str = "user",

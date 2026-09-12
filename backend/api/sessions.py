@@ -32,6 +32,13 @@ English column values straight through to frontend/src/protocol.ts, with no
 translation step.
 """
 
+# pylint: disable=duplicate-code
+# `_feedback` here and in the sibling route look alike and are not the same: the
+# export serves `created_at` and plain points, the detail route `turn_id` and the
+# focus goal. Two wire contracts -- merging them would need a flag, and a
+# serializer with a flag is worse than two honest ones.
+
+
 from __future__ import annotations
 
 import asyncio
@@ -45,6 +52,7 @@ from openai import OpenAIError
 from sqlalchemy.orm import Session as DbSession, selectinload
 
 from backend import deletion, library
+from backend.api._loading import SESSION_SUBTREE
 from backend.api.deps import current_tenant_id
 from backend.auth import AuthContext, require_user
 from backend.db import models as db_models
@@ -220,14 +228,8 @@ def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user
             db.query(db_models.Session)
             .filter_by(extern_id=extern_id)
             .options(
-                selectinload(db_models.Session.turns),
-                selectinload(db_models.Session.measurements)
-                .selectinload(db_models.Measurement.metric_type),
-                selectinload(db_models.Session.feedback)
-                .selectinload(db_models.Feedback.points),
+                *SESSION_SUBTREE,
                 selectinload(db_models.Session.jobs),
-                selectinload(db_models.Session.persona),
-                selectinload(db_models.Session.scenario),
                 selectinload(db_models.Session.findings),
             )
             .one_or_none()

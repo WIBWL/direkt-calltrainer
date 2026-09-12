@@ -22,6 +22,12 @@ what the seed *wrote* — which is exactly what makes comparing against them a
 meaningful assertion rather than a tautology.
 """
 
+# pylint: disable=duplicate-code
+# Fixture data is repeated per test module on purpose: a test carrying its own
+# Turns shows what it ran against when it fails, and sharing them would let a
+# change made for one test quietly alter another.
+
+
 import uuid
 
 import httpx

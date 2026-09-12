@@ -9,6 +9,12 @@ the check is made when the Session is written rather than when it starts, so a
 withdrawal *during* a call still takes effect; and it fails closed, so a
 database that cannot answer the question does not get the benefit of the doubt.
 """
+
+# pylint: disable=duplicate-code
+# Fixture data is repeated per test module on purpose: a test carrying its own
+# Turns shows what it ran against when it fails, and sharing them would let a
+# change made for one test quietly alter another.
+
 import uuid
 from datetime import UTC, datetime
 

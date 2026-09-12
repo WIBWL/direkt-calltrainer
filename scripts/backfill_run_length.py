@@ -21,9 +21,14 @@ Idempotent. Sessions that already carry the figure are skipped, so a second run
 reports nothing and changes nothing.
 """
 
+# pylint: disable=duplicate-code
+# What is left once `_backfill_cli` took the command line is this module's own
+# entry point: `main()` delegating, and the `if __name__` guard. A script
+# cannot share its own entry point.
+
+
 from __future__ import annotations
 
-import argparse
 import logging
 import os
 import sys
@@ -37,10 +42,13 @@ sys.path.insert(0, PROJECT_ROOT)
 load_dotenv()
 
 # After load_dotenv(): importing the backend reads the environment.
+# pylint: disable=wrong-import-position
+# The sys.path insert above has to run before the backend is importable, and
+# load_dotenv() before it reads the environment -- so these cannot move up.
 from backend.db import models as db_models  # noqa: E402
 from backend.db.session import session_scope  # noqa: E402
 from backend.feedback import metrics  # noqa: E402
-from backend.logging_config import configure_logging  # noqa: E402
+from scripts import _backfill_cli  # noqa: E402
 
 logger = logging.getLogger("backfill_run_length")
 
@@ -122,18 +130,7 @@ def backfill(apply: bool) -> int:
 
 def main() -> int:
     """CLI entry point. Returns the process exit code."""
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--apply", action="store_true",
-                        help="write the figures; without it, only report")
-    args = parser.parse_args()
-    configure_logging()
-
-    written = backfill(args.apply)
-    if args.apply:
-        logger.info("%d Session(s) nachgerechnet", written)
-    else:
-        logger.info("Probelauf, nichts geschrieben. Mit --apply ausführen.")
-    return 0
+    return _backfill_cli.run(backfill, __doc__.splitlines()[0], logger)
 
 
 if __name__ == "__main__":

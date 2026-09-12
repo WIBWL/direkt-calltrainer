@@ -11,6 +11,12 @@ What the listing deliberately does *not* carry is checked too. `detail_json`
 would drag the whole loudness curve of every Session into a list view, and the
 wrap-up would give `status` a second meaning on the same resource (ADR 0057).
 """
+
+# pylint: disable=duplicate-code
+# Fixture data is repeated per test module on purpose: a test carrying its own
+# Turns shows what it ran against when it fails, and sharing them would let a
+# change made for one test quietly alter another.
+
 import uuid
 from datetime import UTC, datetime
 

@@ -10,6 +10,12 @@ is worse than none — it answers the question wrongly rather than not at all, s
 the test asserts against what was actually stored rather than a fixed list of
 keys that would go stale the moment a column is added.
 """
+
+# pylint: disable=duplicate-code
+# Fixture data is repeated per test module on purpose: a test carrying its own
+# Turns shows what it ran against when it fails, and sharing them would let a
+# change made for one test quietly alter another.
+
 import json
 import uuid
 from datetime import UTC, datetime
