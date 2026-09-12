@@ -50,8 +50,13 @@ export default function ProgressPractice({
   // unconditionally with null when there is no candidate, which the hook takes.
   const { detail } = useStoredSession(source?.session_id ?? null);
 
+  // Keyed on whether there is a target rather than on the target object, which
+  // `mentionSummary` rebuilds on every render: as a dependency it would re-run
+  // this after every response and fetch the library in a loop. Which goal it is
+  // does not change what is fetched.
+  const hasTarget = target !== null;
   useEffect(() => {
-    if (!target) return;
+    if (!hasTarget) return;
     let cancelled = false;
     listScenarios()
       .then((cards) => !cancelled && setLibrary(cards))
@@ -82,7 +87,7 @@ export default function ProgressPractice({
   // A band under the recurring block's two lists rather than a section of its
   // own (see `ProgressRecurring`), headed the way those lists are.
   return (
-    <section className="card progress-practice" aria-labelledby="practice-title">
+    <section className="card" aria-labelledby="practice-title">
       <h3 className="recurring-heading" id="practice-title">
         Als Nächstes üben
       </h3>
