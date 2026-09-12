@@ -1,18 +1,20 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 import { ApiError } from "../api";
+import type { FeedbackState } from "../hooks/useSessionFeedback";
 import type {
   FeedbackPoint,
   Finding,
+  FollowUpCard,
   Measurement,
   MetricAspect,
   SessionDetail,
   SessionTurn,
-  TrafficLight,
 } from "../protocol";
-import { Link } from "react-router-dom";
-
 import { sessionMetricPath } from "../routes";
+import { createFollowUp, createReverse, type ReverseScenario } from "../scenarioLibrary";
+import { cx } from "../utils/cx";
 import {
   ASPECT_LABELS,
   ASPECT_LEADS,
@@ -22,19 +24,13 @@ import {
   METRIC_DISCLAIMER,
   metricAspect,
   metricParts,
+  metricReading,
   metricSubline,
   openHint,
   withDerived,
   type MetricPart,
 } from "../utils/metrics";
 import { formatOffset } from "../utils/time";
-import { useSessionFeedback } from "../hooks/useSessionFeedback";
-import {
-  createFollowUp,
-  createReverse,
-  type FollowUpCard,
-  type ReverseScenario,
-} from "../scenarioLibrary";
 import FilterSlider, { type FilterOption } from "./FilterSlider";
 import InfoDetails from "./InfoDetails";
 import LoudnessCourse from "./LoudnessCourse";
@@ -102,16 +98,22 @@ const NOTICE: Record<string, string> = {
  * than about a moment or a total, so it closes the narrative before the
  * statistics begin rather than reading as another one of them.
  *
- * Owns the polling itself, so it is only running while this screen is mounted.
+ * The Session is polled in `App`, once for this screen and the waiting screen
+ * before it, and handed in with the poll's state: the downloadable report reads
+ * the same `detail`, so the file cannot say anything the page above it does
+ * not.
  */
 export default function FeedbackView({
-  sessionId,
+  detail,
+  state,
   followUp,
   onReverse,
   next,
-  onDetail,
 }: {
-  sessionId: string | null;
+  /** The polled Session. Null while it has not arrived, and for a call that
+   * was never stored. */
+  detail: SessionDetail | null;
+  state: FeedbackState;
   /** Omitted where there is nowhere to act on the follow-up (F-60). */
   followUp?: FollowUpActions;
   /** Create and start the reverse of this Session (F-61, ADR 0070). Like
@@ -122,19 +124,7 @@ export default function FeedbackView({
   /** What to play next (F-64). Shown without a wrap-up too: it needs no
    *  stored Session, so a call that was not kept still gets it. */
   next?: ReactNode;
-  /** Hands the Session on once it has been polled, for a screen that needs the
-   * same wrap-up for something other than rendering it — the post-call screen
-   * puts it in the downloadable report (F-64). Not a second request: this
-   * component is the only one polling, and the file must say exactly what the
-   * page above it says. */
-  onDetail?: (detail: SessionDetail | null) => void;
 }) {
-  const { detail, state } = useSessionFeedback(sessionId);
-
-  // In an effect rather than during the render: the owner stores it, and a
-  // parent state update from inside a child's render body is a loop.
-  useEffect(() => onDetail?.(detail), [detail, onDetail]);
-
   if (!detail?.feedback) {
     return (
       <>
@@ -146,22 +136,16 @@ export default function FeedbackView({
     );
   }
   return (
-    <FeedbackReport
-      detail={detail}
-      followUp={followUp}
-      sessionId={sessionId}
-      onReverse={onReverse}
-      next={next}
-    />
+    <FeedbackReport detail={detail} followUp={followUp} onReverse={onReverse} next={next} />
   );
 }
 
 /**
  * The wrap-up itself, given data that has already been fetched.
  *
- * Split from the component above so a screen that already holds a
- * `SessionDetail` — the history's detail page, which needs the Transcript from
- * the same response — can render the report without asking for it again.
+ * Split from the component above so the history's detail page, which reads the
+ * Session once and needs the Transcript from the same response, can render the
+ * report without the post-call notices.
  *
  * Renders nothing when the Session carries no wrap-up. What to say instead is
  * the caller's to decide, because the honest sentence differs: on the post-call
@@ -175,13 +159,11 @@ export default function FeedbackView({
 export function FeedbackReport({
   detail,
   followUp,
-  sessionId,
   onReverse,
   next,
 }: {
   detail: SessionDetail;
   followUp?: FollowUpActions | undefined;
-  sessionId?: string | null | undefined;
   onReverse?: ((reverse: ReverseScenario) => void) | undefined;
   next?: ReactNode;
 }) {
@@ -203,7 +185,7 @@ export function FeedbackReport({
       <FollowUp
         scenario={detail.follow_up}
         personaId={detail.persona_id}
-        sessionId={sessionId}
+        sessionId={detail.session_id}
         {...followUp}
       />
     ) : null;
@@ -211,8 +193,8 @@ export function FeedbackReport({
   // it is available for any call that was actually conducted — except a reverse
   // itself, which is already the other way round (ADR 0070).
   const reverseOffer =
-    onReverse && longEnough && sessionId && !detail.reverse ? (
-      <Reverse sessionId={sessionId} onReverse={onReverse} />
+    onReverse && longEnough && !detail.reverse ? (
+      <Reverse sessionId={detail.session_id} onReverse={onReverse} />
     ) : null;
 
   // No meta row here any more: which case, which partner and which side the
@@ -299,7 +281,7 @@ function PhaseLanguage({ text }: { text: string }) {
       <SectionHeading eyebrow="GESPRÄCHSFÜHRUNG" title="Phasengerechte Sprache" />
 
       <div className="feedback-box">
-          <p className="feedback-phase-text">{text}</p>
+        <p className="feedback-phase-text">{text}</p>
 
         <p className="feedback-phase-note">
           Warm einsteigen, sachlich am Anliegen arbeiten, warm abschließen.
@@ -432,6 +414,121 @@ export function MetricSection({
  *  `intonation.RANGE_KEY` on the backend. */
 const INTONATION_KEY = "intonation";
 
+/**
+ * One press that writes a Scenario out of this Session — the follow-up and the
+ * reverse alike (ADR 0069, ADR 0070): the request, whether it is running, what
+ * it wrote, and what went wrong.
+ *
+ * The backend's `detail` is written for the user, so it is shown as it is;
+ * `fallback` stands in where there is none. `run` resolves to what was written,
+ * or null when it failed, so a caller can act on success without a second
+ * piece of state.
+ */
+function useCreate<T>(create: () => Promise<T>, fallback: string) {
+  const [created, setCreated] = useState<T | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async (): Promise<T | null> => {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await create();
+      setCreated(result);
+      return result;
+    } catch (e: unknown) {
+      setError(e instanceof ApiError && e.detail ? e.detail : fallback);
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return { created, busy, error, run };
+}
+
+/** The frame both offers share, before and after their Scenario is written:
+ *  eyebrow, title, one lead paragraph, and whatever the offer is right now. */
+function NextStepCard({
+  eyebrow,
+  title,
+  lead,
+  className,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  lead: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className={cx("card next-step", className)}>
+      <div className="next-step-eyebrow">{eyebrow}</div>
+      <h2 className="next-step-title">{title}</h2>
+      <p className="next-step-lead">{lead}</p>
+      {children}
+    </section>
+  );
+}
+
+/** The first press: the button that writes the Scenario, and what to say while
+ *  that runs or after it failed. */
+function CreateButton({
+  label,
+  busyLabel,
+  busyNote,
+  busy,
+  error,
+  onClick,
+}: {
+  label: string;
+  busyLabel: string;
+  busyNote: string;
+  busy: boolean;
+  error: string | null;
+  onClick: () => void;
+}) {
+  return (
+    <>
+      <button type="button" className="follow-up-button" disabled={busy} onClick={onClick}>
+        {busy ? busyLabel : label}
+      </button>
+      {busy && <p className="follow-up-note">{busyNote}</p>}
+      {error && <p className="follow-up-error">{error}</p>}
+    </>
+  );
+}
+
+/** The second press: the written Scenario, named, and the button that starts
+ *  it. The button sits in its own row wrapper — that is where the space above
+ *  it comes from, so both offers are spaced alike without the number being
+ *  written twice. */
+function StartCreated({
+  name,
+  teaser,
+  note,
+  onStart,
+}: {
+  name: string;
+  teaser: string;
+  note: string;
+  onStart: () => void;
+}) {
+  return (
+    <>
+      <p className="follow-up-name">{name}</p>
+      <p className="follow-up-teaser">{teaser}</p>
+      <div className="follow-up-actions">
+        <button type="button" className="follow-up-button" onClick={onStart}>
+          Starten
+        </button>
+      </div>
+      <p className="follow-up-note">{note}</p>
+    </>
+  );
+}
+
 /** The next call in the same matter, built from the points above (F-60).
  *
  * Asked for, not written unbidden (ADR 0069's amendment): the User presses the
@@ -442,10 +539,9 @@ const INTONATION_KEY = "intonation";
  *
  * Starting skips the microphone check and lands on the case screen, against
  * the Persona this training was played with: the exercise follows from that
- * conversation, so re-picking a
- * partner would be a step with only one sensible answer. The Scenario stays an
- * ordinary row in the library, so a different partner is a matter of starting
- * it from the setup screen instead. */
+ * conversation, so re-picking a partner would be a step with only one sensible
+ * answer. The Scenario stays an ordinary row in the library, so a different
+ * partner is a matter of starting it from the setup screen instead. */
 function FollowUp({
   scenario,
   personaId,
@@ -453,85 +549,55 @@ function FollowUp({
   onStart,
   onCreated,
 }: {
-  scenario: SessionDetail["follow_up"];
+  scenario: FollowUpCard | null;
   personaId: string;
-  sessionId: string | null | undefined;
+  sessionId: string;
 } & FollowUpActions) {
+  const create = useCreate(
+    () => createFollowUp(sessionId),
+    "Das Folgeszenario konnte nicht erstellt werden.",
+  );
   // What the create route just wrote, so the card appears without waiting for
   // a refetch. `scenario` wins: on a reload it is the same row, and on the
   // history's page it is the only source.
-  const [created, setCreated] = useState<FollowUpCard | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const card = scenario ?? created;
-
-  const handleClick = async () => {
-    if (!sessionId) return;
-    setBusy(true);
-    setError(null);
-    try {
-      setCreated(await createFollowUp(sessionId));
-      onCreated?.();
-    } catch (e: unknown) {
-      // The backend's `detail` is written for the user, so show it as it is.
-      setError(
-        e instanceof ApiError && e.detail
-          ? e.detail
-          : "Das Folgeszenario konnte nicht erstellt werden.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
+  const card = scenario ?? create.created;
 
   if (!card) {
-    if (!sessionId) return null;
     return (
-      <section className="card next-step">
-        <div className="next-step-eyebrow">WEITER ÜBEN</div>
-        <h2 className="next-step-title">Folgeszenario</h2>
-        <p className="next-step-lead">
-          Daraus lässt sich Ihr nächstes Gespräch bauen: derselbe Fall, einige Zeit
-          später – diesmal so, dass genau das nötig ist, was hier gefehlt hat.
-        </p>
-        <button type="button" className="follow-up-button" disabled={busy} onClick={handleClick}>
-          {busy ? "Folgeszenario wird gebaut …" : "Folgeszenario erstellen"}
-        </button>
-        {busy && (
-          <p className="follow-up-note">
-            Die Übung wird gerade geschrieben – das dauert einen Moment.
-          </p>
-        )}
-        {error && <p className="follow-up-error">{error}</p>}
-      </section>
+      <NextStepCard
+        eyebrow="WEITER ÜBEN"
+        title="Folgeszenario"
+        lead="Daraus lässt sich Ihr nächstes Gespräch bauen: derselbe Fall, einige Zeit später – diesmal so, dass genau das nötig ist, was hier gefehlt hat."
+      >
+        <CreateButton
+          label="Folgeszenario erstellen"
+          busyLabel="Folgeszenario wird gebaut …"
+          busyNote="Die Übung wird gerade geschrieben – das dauert einen Moment."
+          busy={create.busy}
+          error={create.error}
+          onClick={() =>
+            void create.run().then((written) => {
+              if (written) onCreated?.();
+            })
+          }
+        />
+      </NextStepCard>
     );
   }
 
   return (
-    <section className="card next-step">
-      <div className="next-step-eyebrow">WEITER ÜBEN</div>
-      <h2 className="next-step-title">Folgeszenario</h2>
-      <p className="next-step-lead">
-        Daraus ist Ihr nächstes Gespräch entstanden: derselbe Fall, einige Zeit
-        später – diesmal so, dass genau das nötig ist, was hier gefehlt hat. Es liegt
-        unter „Folgeszenario“ in Ihrer Auswahl.
-      </p>
-      <p className="follow-up-name">{card.name}</p>
-      <p className="follow-up-teaser">{card.short_description}</p>
-      <div className="follow-up-actions">
-        <button
-          type="button"
-          className="follow-up-button"
-          onClick={() => onStart(card.id, personaId)}
-        >
-          Starten
-        </button>
-      </div>
-      <p className="follow-up-note">
-        „Starten“ ruft denselben Gesprächspartner wie in diesem Training an – ohne
-        Mikrofoncheck. Das Gespräch beginnt, sobald Sie den Anruf annehmen.
-      </p>
-    </section>
+    <NextStepCard
+      eyebrow="WEITER ÜBEN"
+      title="Folgeszenario"
+      lead="Daraus ist Ihr nächstes Gespräch entstanden: derselbe Fall, einige Zeit später – diesmal so, dass genau das nötig ist, was hier gefehlt hat. Es liegt unter „Folgeszenario“ in Ihrer Auswahl."
+    >
+      <StartCreated
+        name={card.name}
+        teaser={card.short_description}
+        onStart={() => onStart(card.id, personaId)}
+        note="„Starten“ ruft denselben Gesprächspartner wie in diesem Training an – ohne Mikrofoncheck. Das Gespräch beginnt, sobald Sie den Anruf annehmen."
+      />
+    </NextStepCard>
   );
 }
 
@@ -553,78 +619,46 @@ function Reverse({
   sessionId: string;
   onReverse: (reverse: ReverseScenario) => void;
 }) {
-  const [created, setCreated] = useState<ReverseScenario | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleClick = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      setCreated(await createReverse(sessionId));
-    } catch (e: unknown) {
-      // The backend's `detail` is written for the user, so show it as it is.
-      setError(
-        e instanceof ApiError && e.detail
-          ? e.detail
-          : "Der Rollentausch konnte nicht vorbereitet werden.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
+  const create = useCreate(
+    () => createReverse(sessionId),
+    "Der Rollentausch konnte nicht vorbereitet werden.",
+  );
+  const created = create.created;
 
   if (created) {
     return (
-      <section className="card next-step reverse-offer">
-        <div className="next-step-eyebrow">PERSPEKTIVE WECHSELN</div>
-        <h2 className="next-step-title">Rollentausch</h2>
-        <p className="next-step-lead">
-          Ihr Rollentausch ist vorbereitet. Sie bekommen vor dem Gespräch die Unterlagen
-          zu sehen, die die KI eben hatte.
-        </p>
-        <p className="follow-up-name">{created.name}</p>
-        <p className="follow-up-teaser">{created.short_description}</p>
-        {/* In the same row wrapper the follow-up's button sits in, rather
-            than bare under the teaser: that is where the 0.9rem above it comes
-            from, and sharing the wrapper is what keeps the two offers spaced
-            alike without the number being written twice. */}
-        <div className="follow-up-actions">
-          <button
-            type="button"
-            className="follow-up-button"
-            onClick={() => onReverse(created)}
-          >
-            Starten
-          </button>
-        </div>
-        <p className="follow-up-note">
-          Sie rufen an, die KI nimmt ab — mit demselben Gesprächspartner wie in diesem
-          Training.
-        </p>
-      </section>
+      <NextStepCard
+        eyebrow="PERSPEKTIVE WECHSELN"
+        title="Rollentausch"
+        className="reverse-offer"
+        lead="Ihr Rollentausch ist vorbereitet. Sie bekommen vor dem Gespräch die Unterlagen zu sehen, die die KI eben hatte."
+      >
+        <StartCreated
+          name={created.name}
+          teaser={created.short_description}
+          onStart={() => onReverse(created)}
+          note="Sie rufen an, die KI nimmt ab — mit demselben Gesprächspartner wie in diesem Training."
+        />
+      </NextStepCard>
     );
   }
 
   return (
-    <section className="card next-step reverse-offer">
-      <div className="next-step-eyebrow">PERSPEKTIVE WECHSELN</div>
-      <h2 className="next-step-title">Rollentausch</h2>
-      <p className="next-step-lead">
-        Erleben Sie dasselbe Gespräch von der anderen Seite: Sie rufen an, die KI nimmt
-        ab. Was die KI eben wusste, sehen währenddessen Sie.
-      </p>
-      <button type="button" className="follow-up-button" disabled={busy} onClick={handleClick}>
-        {busy ? "Rollentausch wird vorbereitet …" : "Rollen tauschen"}
-      </button>
-      {busy && (
-        <p className="follow-up-note">
-          Ihre Unterlagen für das Gespräch werden zusammengestellt — das dauert einen
-          Moment.
-        </p>
-      )}
-      {error && <p className="follow-up-error">{error}</p>}
-    </section>
+    <NextStepCard
+      eyebrow="PERSPEKTIVE WECHSELN"
+      title="Rollentausch"
+      className="reverse-offer"
+      lead="Erleben Sie dasselbe Gespräch von der anderen Seite: Sie rufen an, die KI nimmt ab. Was die KI eben wusste, sehen währenddessen Sie."
+    >
+      <CreateButton
+        label="Rollen tauschen"
+        busyLabel="Rollentausch wird vorbereitet …"
+        busyNote="Ihre Unterlagen für das Gespräch werden zusammengestellt — das dauert einen Moment."
+        busy={create.busy}
+        error={create.error}
+        onClick={() => void create.run()}
+      />
+    </NextStepCard>
   );
 }
 
@@ -699,17 +733,11 @@ function Metric({
     );
   }
 
-  const light = measurement.detail?.light as TrafficLight | undefined;
   const context = interruptionContext(measurement);
   const detail = metricSubline(measurement);
-  // The step this call landed on, in words. Two metrics carry one: F-51's
-  // traffic light and F-35's three-step reading. F-35's is read off the pitch
-  // variation quotient in the detail and not off the range this tile shows,
-  // that being the figure with a published boundary behind it. Both come from
-  // the backend, beside the thresholds they were read off.
-  const reading = (measurement.detail?.light_label ??
-    measurement.detail?.liveliness_label) as string | undefined;
-
+  // The step this call landed on, in words, and its colour. Two metrics carry
+  // one: F-51's traffic light and F-35's three-step reading (`metricReading`).
+  //
   // The traffic light colours the figure and nothing else. It is the only
   // colour in this application that says something about a value, the two
   // thresholds behind it are working values that nothing has validated (see
@@ -717,14 +745,12 @@ function Metric({
   // orientation. The step is written out underneath, so colour is never the
   // only channel, and the scale it comes from is on the page behind the tile.
   //
-  // F-35 carries a light too now (ADR 0077, `intonation.LIGHTS`), and it lands
-  // in the right place without a special case: this tile leads with the *word*
-  // for intonation, so the colour sits on the classification, which is what
-  // it was read from. It must never sit on the semitone figure, which is a
-  // different measurement from the one the step came out of.
-  const readingLight = (measurement.detail?.liveliness_light ?? light) as
-    | TrafficLight
-    | undefined;
+  // F-35's light lands in the right place without a special case: this tile
+  // leads with the *word* for intonation, so the colour sits on the
+  // classification, which is what it was read from. It must never sit on the
+  // semitone figure, which is a different measurement from the one the step
+  // came out of.
+  const { label: reading, readingLight } = metricReading(measurement);
 
   const figure = formatMetricValue(measurement);
 
@@ -828,4 +854,3 @@ function MetricParts({ parts }: { parts: MetricPart[] }) {
     </span>
   );
 }
-

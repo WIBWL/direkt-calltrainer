@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 
-import { useSessionFeedback } from "../hooks/useSessionFeedback";
+import type { FeedbackState } from "../hooks/useSessionFeedback";
 
 /** The bars of the waveform being read, as a share of the scene's height.
  * Uneven on purpose: an even row is a loading indicator, an uneven one is a
@@ -33,8 +33,8 @@ const CAPTIONS = [
  * is the right patience for a block on a page and the wrong one for a screen
  * that holds nothing else: a wrap-up that takes that long is one the User
  * should be reading their transcript instead of waiting for. The poll is not
- * lost by moving on — the post-call screen starts its own, and the wrap-up
- * appears there when it lands.
+ * lost by moving on — it carries on behind the post-call screen, and the
+ * wrap-up appears there when it lands.
  */
 const WAIT_LIMIT_MS = 120_000;
 
@@ -55,15 +55,16 @@ const WAIT_LIMIT_MS = 120_000;
  * see App.tsx, which only enters this screen with a `sessionId` in hand.
  */
 export default function FeedbackWaiting({
-  sessionId,
+  state,
   onDone,
 }: {
-  sessionId: string | null;
+  /** Where the wrap-up's poll stands. `App` runs it once for this screen and
+   * the post-call screen together. */
+  state: FeedbackState;
   /** Move on to the post-call screen — because the wrap-up has settled, one
    * way or the other, or because the User would rather read the transcript. */
   onDone: () => void;
 }) {
-  const { state } = useSessionFeedback(sessionId);
   const [caption, setCaption] = useState(0);
 
   // "loading" is the only state that is still waiting for something: a wrap-up

@@ -35,6 +35,9 @@ export function useSessionFeedback(sessionId: string | null) {
 
   useEffect(() => {
     if (sessionId === null) {
+      // Cleared as well: the hook lives in `App` across calls, and a call that
+      // was not stored must not show the previous call's wrap-up.
+      setDetail(null);
       setState("missing");
       return;
     }

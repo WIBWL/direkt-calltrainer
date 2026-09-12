@@ -7,15 +7,9 @@ import CallView from "./components/CallView";
 import CaseBriefPanel from "./components/CaseBriefPanel";
 import DiceRoll from "./components/DiceRoll";
 import IncomingCall from "./components/IncomingCall";
+import BriefScreen from "./components/BriefScreen";
 import FeedbackView from "./components/FeedbackView";
 import FeedbackWaiting from "./components/FeedbackWaiting";
-import {
-  CATEGORY_FILTERS,
-  matchesCategory,
-  matchesFilter,
-  type CategoryFilter,
-  type LibraryFilter,
-} from "./components/LibraryPicker";
 import MicCheck from "./components/MicCheck";
 import PersonaInfo from "./components/PersonaInfo";
 import ScenarioEditor from "./components/ScenarioEditor";
@@ -30,7 +24,8 @@ import { useSessionSocket, type CommittedSession } from "./hooks/useSessionSocke
 import { useNextCalls } from "./hooks/useNextCalls";
 import NextCalls from "./components/NextCalls";
 import { useStreamedAudioPlayback } from "./hooks/useStreamedAudioPlayback";
-import type { Persona, SessionDetail, TranscriptEntry } from "./protocol";
+import { useSessionFeedback } from "./hooks/useSessionFeedback";
+import type { Persona, TranscriptEntry } from "./protocol";
 import ReverseBriefPanel from "./components/ReverseBriefPanel";
 import { ROUTES, type TrainingStart } from "./routes";
 import {
@@ -41,13 +36,19 @@ import {
   type Screen,
 } from "./trainingFlow";
 import {
+  CATEGORY_FILTERS,
   deleteScenario,
   drawRandomScenario,
   getScenario,
   getTenant,
   isDrawable,
+  LIBRARY_FILTERS,
   listScenarios,
+  matchesCategory,
+  matchesFilter,
   RANDOM_SCENARIO_ID,
+  type CategoryFilter,
+  type LibraryFilter,
   type ReverseBrief,
   type ReverseScenario,
   type ScenarioCard,
@@ -70,12 +71,6 @@ interface PendingEnd {
 /** null = closed; { id: null } = new; { id } = editing that row. */
 type EditorState = { id: string | null } | null;
 
-/** Every level 1 value, including "tenant": counting it costs nothing when the
- * caller has no company, and the picker decides whether to offer the option. */
-const ORIGIN_FILTERS: LibraryFilter[] = [
-  "recommended", "all", "standard", "own", "tenant", "followUp", "reverse",
-];
-
 /** What the selection screen opens on (ADR 0072): everything, on both rows.
  * Opening on a shortlist, which this once did, hides the User's own Scenarios
  * behind a filter they have to know to press — and `LibraryPicker`'s `COLLAPSED_TILES` caps what
@@ -93,22 +88,6 @@ function startingFilters(scenarios: ScenarioCard[]): [LibraryFilter, CategoryFil
     : [DEFAULT_ORIGIN, DEFAULT_CATEGORY];
 }
 
-/** The card as the picker takes it. Its own function because the first
- * selection is made against the same filters the picker applies, before there
- * is a rendered list to read one off. */
-const toLibraryItem = (s: ScenarioCard) => ({
-  id: s.id,
-  name: s.name,
-  subtitle: s.short_description,
-  origin: s.origin,
-  shared: s.shared,
-  category: s.category,
-  followUp: s.follow_up,
-  reverse: s.reverse,
-  originSession: s.origin_session,
-  recommendation: s.recommendation,
-});
-
 /** The Scenario to start on: the random Scenario (F-62), which is the one tile
  * that stands outside both filters and is therefore always on screen. It is
  * also the only opening selection that cannot be the wrong one — every other
@@ -121,11 +100,10 @@ const toLibraryItem = (s: ScenarioCard) => ({
 function firstSelectable(scenarios: ScenarioCard[]): string | null {
   if (scenarios.some(isDrawable)) return RANDOM_SCENARIO_ID;
   const [origin, category] = startingFilters(scenarios);
-  const items = scenarios.map(toLibraryItem);
-  const visible = items.find(
-    (item) => matchesFilter(item, origin) && matchesCategory(item, category),
+  const visible = scenarios.find(
+    (s) => matchesFilter(s, origin) && matchesCategory(s, category),
   );
-  return (visible ?? items[0])?.id ?? null;
+  return (visible ?? scenarios[0])?.id ?? null;
 }
 
 /**
@@ -167,11 +145,16 @@ export default function App() {
   // worker has produced it. Not kept anywhere but here: the wrap-up is
   // reachable for as long as this screen is, and no longer.
   const [endedSessionId, setEndedSessionId] = useState<string | null>(restored?.sessionId ?? null);
-  // The wrap-up once FeedbackView has polled it, for the downloadable report
-  // (F-64): the file carries everything the page shows, and the page's own
-  // poll is the only place that data arrives. Null while it is on its way, and
-  // for a call that was never stored — the file is then the protocol alone.
-  const [endedSessionDetail, setEndedSessionDetail] = useState<SessionDetail | null>(null);
+  // The wrap-up, polled once for the two screens that show it: the waiting
+  // screen hands over when it settles, the post-call screen renders it, and the
+  // downloadable report (F-64) reads the same `detail`, so the file carries
+  // exactly what the page shows. Polled only while one of those screens is up,
+  // so nothing keeps asking once the User has moved on. Null while it is on its
+  // way, and for a call that was never stored — the file is then the protocol
+  // alone.
+  const { detail: endedSessionDetail, state: feedbackState } = useSessionFeedback(
+    screen === "analysing" || screen === "transcript" ? endedSessionId : null,
+  );
   // Holds a just-received session.ended until playback actually finishes —
   // see the effect below.
   const [pendingEnd, setPendingEnd] = useState<PendingEnd | null>(null);
@@ -222,18 +205,15 @@ export default function App() {
   const selectedScenario = scenarios.find((scenario) => scenario.id === scenarioId) ?? null;
   // What a random Scenario would be drawn from (F-62): what the two filter
   // rows currently show, minus the two kinds nobody should be walked into
-  // unprepared. Held as Scenario *cards* rather than library items because the
-  // draw hands its result to `beginSession`, which wants the row.
+  // unprepared.
   const drawPool = useMemo(
     () =>
-      scenarios.filter((s) => {
-        const item = toLibraryItem(s);
-        return (
+      scenarios.filter(
+        (s) =>
           isDrawable(s) &&
-          matchesFilter(item, scenarioFilter) &&
-          matchesCategory(item, scenarioCategory)
-        );
-      }),
+          matchesFilter(s, scenarioFilter) &&
+          matchesCategory(s, scenarioCategory),
+      ),
     [scenarios, scenarioFilter, scenarioCategory],
   );
   // No pool, no tile: an offer to draw where there is nothing to draw from is
@@ -398,16 +378,30 @@ export default function App() {
     [playFade, playReverse],
   );
 
+  // One request for whichever half the committed Scenario has: the case of an
+  // ordinary call (see the note on `committedCase` above), or the briefing of a
+  // reverse (ADR 0070). Both come from the detail route — the reverse's case is
+  // only ever served there, for the caller's own rows, which is what keeps the
+  // exception to ADR 0043 down to the one Session the User actually played.
+  //
+  // `handleReverse` has already put the briefing in place for a reverse it
+  // just created, so this runs for one too and overwrites it with the same
+  // content — which is why a failure must leave the existing value alone
+  // rather than clearing it.
   useEffect(() => {
-    if (!committed || committed.reverse || secretScenario !== null) {
-      setCommittedCase(null);
-      return undefined;
-    }
+    setCommittedCase(null);
+    if (!committed?.reverse) setReverseBrief(null);
+    // Nothing to fetch for a random Scenario, whose case is withheld (F-62).
+    if (!committed || (!committed.reverse && secretScenario !== null)) return undefined;
+
     let cancelled = false;
     getScenario(committed.scenarioId)
       .then((detail) => {
-        if (!cancelled) {
+        if (cancelled) return;
+        if (!committed.reverse) {
           setCommittedCase({ briefing: detail.briefing, facts: detail.case_facts });
+        } else if (detail.reverse_brief) {
+          setReverseBrief(detail.reverse_brief);
         }
       })
       .catch(() => {
@@ -417,33 +411,6 @@ export default function App() {
       cancelled = true;
     };
   }, [committed, secretScenario]);
-
-  // The briefing for a committed reverse (ADR 0070). Fetched here rather than
-  // carried on the card: the case is only ever served on the detail route, for
-  // the caller's own rows, which is what keeps the exception to ADR 0043 down
-  // to the one Session the User actually played.
-  //
-  // `handleReverse` has already put the briefing in place for a reverse it
-  // just created, so this only really runs when one is picked from the library
-  // — but it runs then too, and overwrites with the same content, which is why
-  // a failure must leave the existing value alone rather than clearing it.
-  useEffect(() => {
-    if (!committed?.reverse) {
-      setReverseBrief(null);
-      return;
-    }
-    let cancelled = false;
-    getScenario(committed.scenarioId)
-      .then((detail) => {
-        if (!cancelled && detail.reverse_brief) setReverseBrief(detail.reverse_brief);
-      })
-      .catch(() => {
-        // The call is the point; it runs with or without the panel.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [committed]);
 
   useEffect(() => {
     if (pendingEnd === null) return;
@@ -579,7 +546,7 @@ export default function App() {
       void reloadScenarios();
       // Seeded from the answer that just came back, so the briefing screen has
       // something to show immediately rather than one request later; the
-      // reverse-brief effect above refetches it and lands on the same content.
+      // effect above refetches it and lands on the same content.
       setReverseBrief(reverse.reverse_brief);
       // Behind the card, so the wrap-up is gone and the briefing is there by
       // the time anything is visible again (F-61, ADR 0070).
@@ -704,38 +671,34 @@ export default function App() {
 
   // Memoised because the effect below depends on the visible set, and a fresh
   // array every render would re-run it every render.
-  const scenarioItems = useMemo(() => scenarios.map(toLibraryItem), [scenarios]);
-  // One level applied at a time, for the counts below: each row's numbers are
-  // read against the *other* row's selection (ADR 0072), so neither of these
-  // is the visible set — that is both of them at once, further down.
+  //
   // By name, not by origin group: the grid badges every card with where it
   // comes from, so grouping by that said the same thing twice and left no way
   // to find a Scenario one already knows the name of. `localeCompare` with an
   // explicit locale, because an umlaut has to sort with its base letter rather
-  // than after Z.
-  // The random Scenario is not in here — the picker draws it in a fixed first
-  // place ahead of this list.
+  // than after Z. The random Scenario is not in here — the picker draws it in a
+  // fixed first place ahead of this list.
   const visibleScenarios = useMemo(
     () =>
-      scenarioItems
+      scenarios
         .filter((s) => matchesFilter(s, scenarioFilter) && matchesCategory(s, scenarioCategory))
         .sort((a, b) => a.name.localeCompare(b.name, "de")),
-    [scenarioItems, scenarioFilter, scenarioCategory],
+    [scenarios, scenarioFilter, scenarioCategory],
   );
-  // Each row is counted against the *other* row's selection, never its own, so
-  // an option's number is what picking it would actually yield.
+  // Each row is counted against the *other* row's selection, never its own
+  // (ADR 0072), so an option's number is what picking it would actually yield.
+  // Every level 1 value is counted, "tenant" included: that costs nothing when
+  // the caller has no company, and the picker decides whether to offer it.
   const scenarioOriginCounts = Object.fromEntries(
-    ORIGIN_FILTERS.map((f) => [
+    LIBRARY_FILTERS.map((f) => [
       f,
-      scenarioItems.filter((s) => matchesCategory(s, scenarioCategory) && matchesFilter(s, f))
-        .length,
+      scenarios.filter((s) => matchesCategory(s, scenarioCategory) && matchesFilter(s, f)).length,
     ]),
   ) as Record<LibraryFilter, number>;
   const scenarioCategoryCounts = Object.fromEntries(
     CATEGORY_FILTERS.map((c) => [
       c,
-      scenarioItems.filter((s) => matchesFilter(s, scenarioFilter) && matchesCategory(s, c))
-        .length,
+      scenarios.filter((s) => matchesFilter(s, scenarioFilter) && matchesCategory(s, c)).length,
     ]),
   ) as Record<CategoryFilter, number>;
 
@@ -836,35 +799,18 @@ export default function App() {
   // come after it.
   if (screen === "brief") {
     return (
-      <AppLayout step="prepare" navigationLocked pageClassName="brief-page">
+      <BriefScreen onContinue={handleConfirmed} onLeave={handleCancelMicCheck}>
         {briefPanel("prepare")}
-        <div className="brief-actions">
-          <button type="button" className="start-call-button" onClick={handleConfirmed}>
-            Los geht's
-          </button>
-        </div>
-        {/* Same door out as the microphone check's, and the same button in the
-            same place: for a reverse this screen *replaces* that one, so
-            leaving must not read as a different act. Leaving drops the
-            committed Session rather than holding its connection open. */}
-        <button
-          type="button"
-          className="back-to-start-button"
-          onClick={handleCancelMicCheck}
-        >
-          Zur Startseite
-        </button>
-      </AppLayout>
+      </BriefScreen>
     );
   }
 
   // The ordinary call's own pre-call screen: the briefing and the facts, then
-  // the button that rings the phone. Built like the reverse's — same page
-  // class, same entrance, same way out — because it is the same moment in the
-  // flow: the last thing read before someone has to speak.
+  // the button that rings the phone. The same `BriefScreen` as the reverse's,
+  // because it is the same moment in the flow.
   if (screen === "case-brief") {
     return (
-      <AppLayout step="prepare" navigationLocked pageClassName="brief-page">
+      <BriefScreen onContinue={() => advance("caseRead")} onLeave={handleCancelMicCheck}>
         {committedCase === null ? (
           // The reverse's briefing screen says the same thing in the same
           // place while its own text is in flight. Reached with the case
@@ -881,23 +827,7 @@ export default function App() {
             variant="prepare"
           />
         )}
-        <div className="brief-actions">
-          <button
-            type="button"
-            className="start-call-button"
-            onClick={() => advance("caseRead")}
-          >
-            Los geht's
-          </button>
-        </div>
-        <button
-          type="button"
-          className="back-to-start-button"
-          onClick={handleCancelMicCheck}
-        >
-          Zur Startseite
-        </button>
-      </AppLayout>
+      </BriefScreen>
     );
   }
 
@@ -998,11 +928,7 @@ export default function App() {
   if (screen === "analysing") {
     return (
       <AppLayout step="feedback" onHome={handleRestart}>
-        {/* The wrap-up's own poll lives one screen further on, in FeedbackView
-            — this one runs its own and hands over the moment it settles. Two
-            pollers, but never at the same time, and the second one's first
-            request finds the answer already written. */}
-        <FeedbackWaiting sessionId={endedSessionId} onDone={handleAnalysed} />
+        <FeedbackWaiting state={feedbackState} onDone={handleAnalysed} />
       </AppLayout>
     );
   }
@@ -1025,8 +951,8 @@ export default function App() {
           }
           feedback={
             <FeedbackView
-              sessionId={endedSessionId}
-              onDetail={setEndedSessionDetail}
+              detail={endedSessionDetail}
+              state={feedbackState}
               followUp={{
                 onStart: handleStartFollowUp,
                 // The new row is not in this screen's library copy yet, and
