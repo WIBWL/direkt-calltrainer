@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { apiFetch } from "../api";
-import { currentAccessToken } from "../auth";
+import { apiFetch, authorizedFetch } from "../api";
 import type { DataOverviewPayload, RetentionState } from "../protocol";
 import { formatDate } from "../utils/time";
 import RetentionSettings from "./RetentionSettings";
@@ -107,14 +106,7 @@ async function download(
   setFailed(false);
   let url: string | null = null;
   try {
-    const token = await currentAccessToken();
-    if (!token) throw new Error("no active session");
-
-    const response = await fetch("/api/me/export", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) throw new Error(`export failed: ${response.status}`);
-
+    const response = await authorizedFetch("/api/me/export");
     const blob = await response.blob();
     url = URL.createObjectURL(blob);
     const link = document.createElement("a");

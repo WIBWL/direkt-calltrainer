@@ -36,14 +36,19 @@ export async function reauthenticate(): Promise<void> {
 }
 
 /**
- * Authenticated JSON request. `path` is a same-origin absolute path ("/api/…"):
- * the backend serves this SPA, so there is no separate API host (see CLAUDE.md).
- * The bearer token is read from the live OIDC session at call time (see auth.ts),
- * so a rotated token is picked up automatically and callers never pass one.
- * A server 401 (we had a token, it was rejected) triggers a re-login redirect.
+ * Authenticated request, answered with the raw response. `path` is a same-origin
+ * absolute path ("/api/…"): the backend serves this SPA, so there is no separate
+ * API host (see CLAUDE.md). The bearer token is read from the live OIDC session
+ * at call time (see auth.ts), so a rotated token is picked up automatically and
+ * callers never pass one. A server 401 (we had a token, it was rejected)
+ * triggers a re-login redirect; any other non-2xx throws an `ApiError`.
  * Mirrors direkt-dataplatform's api.ts.
+ *
+ * The one place a request is authorised, so a JSON call, an upload and a
+ * download cannot handle an expired session three different ways. Use
+ * `apiFetch` for JSON; this is for the answers that are not.
  */
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export async function authorizedFetch(path: string, init?: RequestInit): Promise<Response> {
   const token = await currentAccessToken();
   if (!token) {
     void reauthenticate();
@@ -52,7 +57,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const response = await fetch(path, {
     ...init,
     headers: {
-      ...(init?.body === undefined ? {} : { "Content-Type": "application/json" }),
+      // Only a string body is JSON here: a FormData body has to set its own
+      // multipart content type, boundary included.
+      ...(typeof init?.body === "string" ? { "Content-Type": "application/json" } : {}),
       Authorization: `Bearer ${token}`,
       ...init?.headers,
     },
@@ -65,6 +72,12 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     const body = (await response.json().catch(() => undefined)) as { detail?: unknown } | undefined;
     throw new ApiError(response.status, typeof body?.detail === "string" ? body.detail : undefined);
   }
+  return response;
+}
+
+/** Authenticated JSON request (see `authorizedFetch`). */
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await authorizedFetch(path, init);
   return (response.status === 204 ? null : await response.json()) as T;
 }
 
