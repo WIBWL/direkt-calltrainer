@@ -186,12 +186,12 @@ export default function ProgressView() {
             </li>
           </ul>
 
-          <div className="card progress-activity-card">
+          <div className="card">
             <h3 className="progress-card-title">Wann Sie trainiert haben</h3>
             <ActivityCalendar sessions={sessions} />
           </div>
 
-          <div className="card progress-variety-card">
+          <div className="card">
             <h3 className="progress-card-title">Womit Sie trainiert haben</h3>
             <VarietyGrid variety={variety(sessions)} />
             <p className="focus-tile-note">
@@ -435,7 +435,7 @@ function SupportingMetrics({ series }: { series: MetricSeries[] }) {
               {last ? formatPoint(s, last.value) : "–"}
             </span>
             {s.shape === "line" && s.points.length >= MIN_SESSIONS_FOR_SERIES && (
-              <span className="focus-supporting-course">
+              <span>
                 <Sparkline series={s} height={22} showDots={false} interactive={false} />
               </span>
             )}

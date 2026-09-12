@@ -2426,6 +2426,20 @@ h2 {
   color: var(--text-muted);
 }
 
+/* A request that failed: writing a follow-up or a reverse under its offer, or
+   building the PDF under the actions row. The message is written for the user
+   (often the backend's own `detail`), so it is said in the danger colour and
+   otherwise set like the note beside it. */
+p.follow-up-error {
+  color: var(--color-danger);
+}
+
+.card p.follow-up-error {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-danger);
+}
+
 /* --- Reverse: the roles swapped (F-61, ADR 0070) ------------------------ */
 
 /* The offer under the feedback. Same card as the follow-up, other accent, so
