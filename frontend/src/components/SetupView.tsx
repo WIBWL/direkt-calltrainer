@@ -3,14 +3,15 @@ import { Link } from "react-router-dom";
 import { useConsentContext } from "../ConsentContext";
 import { ROUTES } from "../routes";
 import type { Persona } from "../protocol";
-import { RANDOM_SCENARIO_ID, type ScenarioCard } from "../scenarioLibrary";
-import LanguageFlag from "./LanguageFlag";
-import LibraryPicker, {
+import {
   CATEGORY_FILTER_LABELS,
+  RANDOM_SCENARIO_ID,
   type CategoryFilter,
   type LibraryFilter,
-  type LibraryItem,
-} from "./LibraryPicker";
+  type ScenarioCard,
+} from "../scenarioLibrary";
+import LanguageFlag from "./LanguageFlag";
+import LibraryPicker from "./LibraryPicker";
 import { cx } from "../utils/cx";
 import PersonaAvatar from "./PersonaAvatar";
 import ScenarioBriefing from "./ScenarioBriefing";
@@ -32,7 +33,7 @@ function randomSelectedLabel(category: CategoryFilter): string {
 }
 
 interface SetupViewProps {
-  scenarioItems: LibraryItem[];
+  scenarioItems: ScenarioCard[];
   scenarioId: string | null;
   scenarioFilter: LibraryFilter;
   onScenarioFilter: (f: LibraryFilter) => void;

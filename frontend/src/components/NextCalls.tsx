@@ -1,6 +1,5 @@
 import { useFocusContext } from "../FocusContext";
-import type { NextCallOffer } from "../scenarioLibrary";
-import { recommendationReason } from "./LibraryPicker";
+import { recommendationReason, type NextCallOffer } from "../scenarioLibrary";
 
 /**
  * What to play next (F-64): Scenarios that already exist, one press to start.

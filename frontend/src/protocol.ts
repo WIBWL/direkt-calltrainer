@@ -378,7 +378,15 @@ export interface SessionDetail {
    * wrap-up named no improvement points to build one from, or the User has
    * since deleted it. The card only; the editor loads the rest by id.
    */
-  follow_up: { id: string; name: string; short_description: string } | null;
+  follow_up: FollowUpCard | null;
+}
+
+/** The card of a follow-up Scenario — what both the create route and the
+ * Session detail route hand back for one (F-60, ADR 0069). */
+export interface FollowUpCard {
+  id: string;
+  name: string;
+  short_description: string;
 }
 
 // --- Session history (GET /api/sessions, ADR 0064) -------------------------

@@ -7,9 +7,8 @@
  * extended to this surface by ADR 0061); the card field `name` is the one that
  * differs from its column (`title`).
  */
-import { apiFetch, ApiError, reauthenticate } from "./api";
-import { currentAccessToken } from "./auth";
-import type { SessionDetail } from "./protocol";
+import { apiFetch } from "./api";
+import type { FollowUpCard } from "./protocol";
 
 /** builtin = shipped built-in, own = the caller authored it (ADR 0058),
  * tenant = a colleague shared it with the caller's company (ADR 0060). */
@@ -147,6 +146,80 @@ export function isDrawable(scenario: ScenarioCard): boolean {
 export function drawRandomScenario(pool: ScenarioCard[]): ScenarioCard | null {
   const drawable = pool.filter(isDrawable);
   return drawable[Math.floor(Math.random() * drawable.length)] ?? null;
+}
+
+/**
+ * Level 1 of the library filter: where a Scenario comes from (ADR 0072), in
+ * the order the chips are shown. The suggestions first where there are any,
+ * then everything, then what ships, what the User wrote, what their company
+ * shared, and last the two the system builds out of a finished training, which
+ * exist only once there has been one — the order the kinds are met in, not the
+ * order of the grid, which is alphabetical.
+ *
+ * "followUp" (ADR 0069) and "reverse" (ADR 0070) are both `origin: "own"` on
+ * the wire and options of their own here, so the hand-authored option means
+ * exactly that and nothing else. "recommended" and "tenant" are views across
+ * the others; every Scenario sits under exactly one of the rest.
+ */
+export const LIBRARY_FILTERS = [
+  "recommended",
+  "all",
+  "standard",
+  "own",
+  "tenant",
+  "followUp",
+  "reverse",
+] as const;
+
+export type LibraryFilter = (typeof LIBRARY_FILTERS)[number];
+
+/** Level 2, the thematic category (ADR 0072). */
+export type CategoryFilter = "all" | ScenarioCategory;
+
+export const CATEGORY_FILTERS: CategoryFilter[] = ["all", ...CATEGORIES];
+
+export const CATEGORY_FILTER_LABELS: Record<CategoryFilter, string> = {
+  all: "Alle",
+  ...CATEGORY_LABELS,
+};
+
+/** Whether a card passes the active origin filter. The grid, the counts on the
+ * chips and the random Scenario's pool all ask this one function, so an option
+ * cannot count one set and show another. */
+export function matchesFilter(card: ScenarioCard, filter: LibraryFilter): boolean {
+  // A view over the cards: a suggested Scenario stays under its own origin too.
+  if (filter === "recommended") return card.recommendation !== null;
+  if (filter === "all") return true;
+  if (filter === "standard") return card.origin === "builtin";
+  if (filter === "followUp") return card.follow_up;
+  if (filter === "reverse") return card.reverse;
+  // The hand-authored option is what is left of `own` once the two kinds the
+  // system wrote itself are taken out.
+  if (filter === "own") return card.origin === "own" && !card.follow_up && !card.reverse;
+  // "tenant": anything shared with the company, the author's own shared
+  // Scenarios included.
+  return card.shared;
+}
+
+/** Whether a card passes the active category filter. An uncategorised Scenario
+ * matches only "all": there is no category it belongs to, and filing it under
+ * one nobody chose would be a guess (ADR 0072). */
+export function matchesCategory(card: ScenarioCard, category: CategoryFilter): boolean {
+  return category === "all" || card.category === category;
+}
+
+/** Why a card is suggested, in one line: that it matches the call types the
+ *  User picked, and which of their focus goals it practises. */
+export function recommendationReason(
+  recommendation: ScenarioRecommendation,
+  goalTitle: (key: string) => string,
+): string {
+  const parts: string[] = [];
+  if (recommendation.call_type) parts.push("Passt zu Ihren Gesprächen");
+  if (recommendation.goals.length > 0) {
+    parts.push("Übt " + recommendation.goals.map((g) => `„${goalTitle(g)}“`).join(", "));
+  }
+  return parts.join(" · ");
 }
 
 /** The fields a User may author. `name` / `short_description` are the card and
@@ -321,10 +394,6 @@ export interface ReverseScenario {
 export const createReverse = (sessionId: string) =>
   apiFetch<ReverseScenario>(`/api/sessions/${sessionId}/reverse`, { method: "POST" });
 
-/** The card of a follow-up Scenario — what both the create route and the
- * Session detail route hand back for one (F-60, ADR 0069). */
-export type FollowUpCard = NonNullable<SessionDetail["follow_up"]>;
-
 /** Draft (or find) the follow-up Scenario for a finished Session: the next
  * exercise, built from what its wrap-up asked the User to work on (F-60,
  * ADR 0069). Asked for rather than written unbidden, exactly like the reverse
@@ -360,28 +429,11 @@ export const MAX_DOCUMENTS_TOTAL_MB = 20;
 /** Extract the text-layer PDFs and have the LLM condense them into one fact
  * list, for the facts field (F-58). Several at once, summarised together:
  * the field holds one list, and two documents condensed apart would repeat
- * every fact they share. Multipart, so it does not go through apiFetch. */
-export async function extractPdfs(files: File[]): Promise<DocumentText> {
-  const token = await currentAccessToken();
-  if (!token) {
-    void reauthenticate();
-    throw new ApiError(401, "no active session");
-  }
+ * every fact they share. Multipart: `apiFetch` leaves the content type of a
+ * form body to the browser. */
+export function extractPdfs(files: File[]): Promise<DocumentText> {
   const form = new FormData();
   // Repeated under one name, which is what the route's `list[UploadFile]` reads.
   for (const file of files) form.append("files", file);
-  const response = await fetch("/api/scenarios/document", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
-  });
-  if (response.status === 401) {
-    void reauthenticate();
-    throw new ApiError(401, "session invalid — re-authenticating");
-  }
-  if (!response.ok) {
-    const body = (await response.json().catch(() => undefined)) as { detail?: unknown } | undefined;
-    throw new ApiError(response.status, typeof body?.detail === "string" ? body.detail : undefined);
-  }
-  return (await response.json()) as DocumentText;
+  return apiFetch<DocumentText>("/api/scenarios/document", { method: "POST", body: form });
 }
