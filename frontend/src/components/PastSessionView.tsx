@@ -3,9 +3,9 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { useStoredSession } from "../hooks/useStoredSession";
 import { ROUTES, type TrainingStart } from "../routes";
-import { type ReverseScenario } from "../scenarioLibrary";
-import { deleteSession } from "../sessions";
+import type { ReverseScenario } from "../scenarioLibrary";
 import AppLayout from "./AppLayout";
+import DeleteSessionPrompt, { useSessionDeletion } from "./DeleteSessionPrompt";
 import FeedbackScreen, { transcriptFromTurns } from "./FeedbackScreen";
 import { FeedbackReport, MetricSection } from "./FeedbackView";
 import { useScreenTransition } from "./ScreenTransition";
@@ -38,8 +38,12 @@ export default function PastSessionView() {
   const navigate = useNavigate();
   const { playReverse } = useScreenTransition();
   const [confirming, setConfirming] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteFailed, setDeleteFailed] = useState(false);
+  // Back to the history rather than to the now-empty page this was. Replacing
+  // the entry means Back does not return to a training that no longer exists.
+  const deletion = useSessionDeletion(sessionId, () =>
+    navigate(ROUTES.profile, { replace: true }),
+  );
+
   // Starting the follow-up belongs to the training flow, which is another
   // route — so hand it the pairing and go (see TrainingStart). The Persona is
   // the one this training was played with, not a fresh choice.
@@ -64,25 +68,6 @@ export default function PastSessionView() {
     // mounted above the router: this page is unmounted by the very cut it
     // asked for (see ScreenTransition.tsx).
     playReverse(() => navigate(ROUTES.training, { state: { start } }));
-  };
-
-  // Back to the history rather than to the now-empty page this was. Replacing
-  // the entry means Back does not return to a training that no longer exists.
-  const remove = async () => {
-    // Unreachable without one — the delete sits under a loaded report — but the
-    // route param is optional, and without this guard the request would go to
-    // `/api/sessions/undefined`.
-    if (!sessionId) return;
-    setDeleting(true);
-    setDeleteFailed(false);
-    try {
-      await deleteSession(sessionId);
-      navigate(ROUTES.profile, { replace: true });
-    } catch (e) {
-      console.debug("[delete session] failed", e);
-      setDeleteFailed(true);
-      setDeleting(false);
-    }
   };
 
   // Still a link, not a button: it navigates, so middle-click and "open in new
@@ -158,7 +143,6 @@ export default function PastSessionView() {
               // Re-read after one is written, so the card survives a reload of
               // this page as the row the detail route now carries.
               followUp={{ onStart: startFollowUp, onCreated: reload }}
-              sessionId={sessionId ?? null}
               onReverse={startReverse}
             />
           ) : (
@@ -188,30 +172,13 @@ export default function PastSessionView() {
             user opened in order to read. */}
         <section className="session-delete">
           {confirming ? (
-            <>
-              <p>
-                <strong>Dieses Training löschen?</strong> Gesprächsprotokoll, Kennzahlen und
-                Auswertung werden entfernt. Das lässt sich nicht rückgängig machen.
-              </p>
-              <div className="consent-confirm-actions">
-                <button
-                  type="button"
-                  className="consent-button consent-button-danger"
-                  onClick={() => void remove()}
-                  disabled={deleting}
-                >
-                  {deleting ? "Wird gelöscht …" : "Endgültig löschen"}
-                </button>
-                <button
-                  type="button"
-                  className="consent-button consent-button-secondary"
-                  onClick={() => setConfirming(false)}
-                  disabled={deleting}
-                >
-                  Abbrechen
-                </button>
-              </div>
-            </>
+            <DeleteSessionPrompt
+              deleting={deletion.deleting}
+              failed={deletion.failed}
+              onConfirm={() => void deletion.remove()}
+              onCancel={() => setConfirming(false)}
+              actionsClassName="consent-confirm-actions"
+            />
           ) : (
             <button
               type="button"
@@ -220,12 +187,6 @@ export default function PastSessionView() {
             >
               Dieses Training löschen
             </button>
-          )}
-
-          {deleteFailed && (
-            <p className="consent-error">
-              Das Training konnte nicht gelöscht werden. Bitte versuchen Sie es erneut.
-            </p>
           )}
         </section>
       </FeedbackScreen>

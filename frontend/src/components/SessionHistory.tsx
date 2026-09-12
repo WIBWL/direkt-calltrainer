@@ -3,9 +3,10 @@ import { Link } from "react-router-dom";
 
 import { useSessionHistory } from "../hooks/useSessionHistory";
 import type { SessionSummary } from "../protocol";
-import { deleteSession } from "../sessions";
-import { formatClock, formatDateTime } from "../utils/time";
 import { sessionPath } from "../routes";
+import { callDurationMs } from "../utils/progressStats";
+import { formatClock, formatDateTime } from "../utils/time";
+import DeleteSessionPrompt, { useSessionDeletion } from "./DeleteSessionPrompt";
 
 /**
  * The user's past trainings (F-48), each one a row that opens the wrap-up that
@@ -79,21 +80,7 @@ function SessionRow({
   const duration = callDuration(session);
   const feedback = feedbackChip(session);
   const [confirming, setConfirming] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  const remove = async () => {
-    setDeleting(true);
-    setFailed(false);
-    try {
-      await deleteSession(session.session_id);
-      onDeleted(); // the row goes with it, so no state to reset afterwards
-    } catch (e) {
-      console.debug("[delete session] failed", e);
-      setFailed(true);
-      setDeleting(false);
-    }
-  };
+  const deletion = useSessionDeletion(session.session_id, onDeleted);
 
   const when = formatDateTime(session.started_at) ?? session.started_at;
 
@@ -138,41 +125,20 @@ function SessionRow({
         aria-expanded={confirming}
         // A toggle rather than a one-way trigger, and never disabled: a button
         // that disables itself on click drops keyboard focus to nowhere.
-        onClick={() => !deleting && setConfirming((open) => !open)}
+        onClick={() => !deletion.deleting && setConfirming((open) => !open)}
       >
         <TrashIcon />
       </button>
 
       {confirming && (
-        <div className="session-row-confirm">
-          <p>
-            <strong>Dieses Training löschen?</strong> Gesprächsprotokoll, Kennzahlen und
-            Auswertung werden entfernt. Das lässt sich nicht rückgängig machen.
-          </p>
-          <div className="session-row-confirm-actions">
-            <button
-              type="button"
-              className="consent-button consent-button-danger"
-              onClick={() => void remove()}
-              disabled={deleting}
-            >
-              {deleting ? "Wird gelöscht …" : "Endgültig löschen"}
-            </button>
-            <button
-              type="button"
-              className="cancel-button"
-              onClick={() => setConfirming(false)}
-              disabled={deleting}
-            >
-              Abbrechen
-            </button>
-          </div>
-          {failed && (
-            <p className="consent-error">
-              Das Training konnte nicht gelöscht werden. Bitte versuchen Sie es erneut.
-            </p>
-          )}
-        </div>
+        <DeleteSessionPrompt
+          deleting={deletion.deleting}
+          failed={deletion.failed}
+          onConfirm={() => void deletion.remove()}
+          onCancel={() => setConfirming(false)}
+          className="session-row-confirm"
+          actionsClassName="session-row-confirm-actions"
+        />
       )}
     </div>
   );
@@ -213,12 +179,8 @@ function feedbackChip(session: SessionSummary): { label: string; tone: string } 
   return { label: "kein Feedback verfügbar", tone: "chip-absent" };
 }
 
-/** How long the call ran, as mm:ss. Null where it has no recorded end, which
- *  a Session cut short by a pipeline failure legitimately may not. */
+/** How long the call ran, as mm:ss, or null where it has no recorded end. */
 function callDuration(session: SessionSummary): string | null {
-  if (!session.ended_at) return null;
-  const started = new Date(session.started_at).getTime();
-  const ended = new Date(session.ended_at).getTime();
-  if (Number.isNaN(started) || Number.isNaN(ended) || ended < started) return null;
-  return formatClock((ended - started) / 1000);
+  const ms = callDurationMs(session);
+  return ms === null ? null : formatClock(ms / 1000);
 }
