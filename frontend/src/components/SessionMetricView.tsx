@@ -1,8 +1,9 @@
 import { Link, useParams } from "react-router-dom";
 
 import { useStoredSession } from "../hooks/useStoredSession";
-import type { Finding, SessionTurn, TrafficLight } from "../protocol";
+import type { Finding, SessionTurn } from "../protocol";
 import { ROUTES, sessionPath } from "../routes";
+import { metricReading } from "../utils/metrics";
 import { formatOffset } from "../utils/time";
 import { pairFor } from "../utils/segmentStats";
 import AppLayout from "./AppLayout";
@@ -67,20 +68,16 @@ export default function SessionMetricView() {
   const pair = pairFor(detail.segments, metricKey ?? "");
   const steps = detail.metric_scales[metricKey ?? ""] ?? [];
   const note = detail.metric_notes[metricKey ?? ""];
-  const light = measurement.detail?.light as TrafficLight | undefined;
-  // Which step of the scale this call landed on, and how it is said. Both come
-  // from the backend beside the thresholds they belong to, so a recalibration
-  // cannot leave a stale word behind here (`api/sessions.py::_served_detail`).
-  const current = (measurement.detail?.liveliness ?? light) as string | undefined;
-  const reading = (measurement.detail?.light_label ??
-    measurement.detail?.liveliness_label) as string | undefined;
-  // F-51's light belongs to the figure and colours it. F-35's belongs to the
-  // liveliness, which is a different figure from the range shown here, so it
-  // colours the word and never the number: a green semitone count would be a
-  // colour sitting over something it was not read from (ADR 0077).
-  const readingLight = (measurement.detail?.liveliness_light ?? light) as
-    | TrafficLight
-    | undefined;
+  // Which step of the scale this call landed on, how it is said and how it is
+  // coloured, all served beside the thresholds they belong to. F-51's light
+  // colours the figure; F-35's only the word, since the range shown here is not
+  // what its step was read from (ADR 0077).
+  const {
+    label: reading,
+    step: current,
+    figureLight: light,
+    readingLight,
+  } = metricReading(measurement);
 
   return (
     <AppLayout pageClassName="app-page-narrow metric-page">

@@ -1,4 +1,4 @@
-import type { Measurement, MetricAspect } from "../protocol";
+import type { Measurement, MetricAspect, TrafficLight } from "../protocol";
 
 /**
  * How the call's statistics (F-53) are labelled, split and read.
@@ -210,6 +210,39 @@ export function metricParts(measurement: Measurement): MetricPart[] | null {
   return parts
     .filter(([key]) => key in detail)
     .map(([key, label]) => ({ key, label, said: detail[key] === true }));
+}
+
+/**
+ * The reading a metric carries beside its figure, where it carries one —
+ * F-51's traffic light and F-35's three-step liveliness (ADR 0077, ADR 0078).
+ *
+ * Every part is served by the backend beside the threshold it was read off
+ * (`api/sessions.py::_served_detail`), so a recalibration cannot leave a stale
+ * word or colour on screen; this only says where in `detail` each one sits,
+ * once for the tile and the metric's own page.
+ */
+export interface MetricReading {
+  /** The step in words, e.g. "lebendig". */
+  label: string | undefined;
+  /** The step's machine name, to mark it on the scale (`MetricScale`). */
+  step: string | undefined;
+  /** The colour of the figure itself. F-51's only: F-35's step is read off the
+   * liveliness, not off the range its figure shows, and a green semitone count
+   * would be a colour over something it was not read from. */
+  figureLight: TrafficLight | undefined;
+  /** The colour of the step in words. */
+  readingLight: TrafficLight | undefined;
+}
+
+export function metricReading(measurement: Measurement): MetricReading {
+  const detail = measurement.detail ?? {};
+  const light = detail["light"] as TrafficLight | undefined;
+  return {
+    label: (detail["light_label"] ?? detail["liveliness_label"]) as string | undefined,
+    step: (detail["liveliness"] ?? light) as string | undefined,
+    figureLight: light,
+    readingLight: (detail["liveliness_light"] ?? light) as TrafficLight | undefined,
+  };
 }
 
 /** The two halves (backend/db/models.py METRIC_ASPECTS), in slider order. */
