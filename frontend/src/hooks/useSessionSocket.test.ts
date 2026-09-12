@@ -8,7 +8,7 @@ vi.mock("../auth", () => ({
   currentAccessToken: () => Promise.resolve("test-token"),
 }));
 
-const SESSION: CommittedSession = { personaId: "p1", scenarioId: "s1" };
+const SESSION: CommittedSession = { personaId: "p1", scenarioId: "s1", reverse: false };
 
 /** Render the hook and take the socket through open + handshake + the server
  * announcing it has started speaking, so a binary frame next is "live" audio. */

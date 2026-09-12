@@ -33,6 +33,13 @@ import type { Persona, SessionDetail, TranscriptEntry } from "./protocol";
 import ReverseBriefPanel from "./components/ReverseBriefPanel";
 import { ROUTES, type TrainingStart } from "./routes";
 import {
+  briefingFollows,
+  nextScreen,
+  type FlowContext,
+  type FlowEvent,
+  type Screen,
+} from "./trainingFlow";
+import {
   deleteScenario,
   drawRandomScenario,
   getScenario,
@@ -47,26 +54,6 @@ import {
 import { loadFinishedSession, saveFinishedSession } from "./utils/finishedSession";
 import { prefersReducedMotion } from "./utils/motion";
 
-/** "brief" is the reverse's own pre-call screen (ADR 0070): the briefing on
- * its own, and a button to start. It stands where the microphone check stands
- * for an ordinary call — the Session is committed and pre-warming behind it
- * (ADR 0042) — and it exists because walking into a reverse is walking into a
- * case you have to argue, which takes a minute's reading first. */
-type Screen =
-  | "setup"
-  | "mic-check"
-  // The trainee's own briefing and the facts of the case, between the check
-  // and the ringing phone. The reverse's equivalent is "brief".
-  | "case-brief"
-  | "brief"
-  | "rolling"
-  | "incoming"
-  | "call"
-  // The wait for the wrap-up, which is written in the worker (ADR 0049) and is
-  // therefore not there the moment the call ends. Skipped where nothing is on
-  // the way: a Session that was not stored has no wrap-up coming (ADR 0066).
-  | "analysing"
-  | "transcript";
 
 /** How long the die is on screen before the call begins (F-62). Long enough to
  * read as a throw and land, short enough not to become a wait — the Session is
@@ -363,6 +350,53 @@ export default function App() {
     { briefing: string; facts: string } | null
   >(null);
 
+  // What the flow routes on, refreshed every render and read only from event
+  // handlers — which is what lets `advance` keep one identity for the life of
+  // the component. That matters: `handleAnalysed` is a dependency of the
+  // waiting screen's own patience timer, and a new identity would restart it.
+  const flowRef = useRef<FlowContext>({
+    reverse: false,
+    drawn: false,
+    committedCase: null,
+    reducedMotion: false,
+    skipMicCheck: false,
+    stored: false,
+  });
+  flowRef.current = {
+    reverse: committed?.reverse === true,
+    drawn: secretScenario !== null,
+    committedCase,
+    // Asked at the moment of the transition rather than per render: it is a
+    // media query, and only the throw depends on it.
+    reducedMotion: false,
+    skipMicCheck: false,
+    stored: false,
+  };
+
+  /**
+   * The only way the screen changes.
+   *
+   * Every destination comes from `trainingFlow.nextScreen`, so the machine is
+   * the table there and not the sum of the call sites. `overrides` carries the
+   * facts a handler knows and the render does not — whether this commit skips
+   * the microphone check, whether the call that just ended was stored — which
+   * are arguments rather than state at the moment they are needed.
+   */
+  const advance = useCallback(
+    (event: FlowEvent, overrides: Partial<FlowContext> = {}) => {
+      const context = {
+        ...flowRef.current,
+        reducedMotion: prefersReducedMotion(),
+        ...overrides,
+      };
+      const { screen: next, cut } = nextScreen(context, event);
+      if (cut === "fade") playFade(() => setScreen(next));
+      else if (cut === "reverse") playReverse(() => setScreen(next));
+      else setScreen(next);
+    },
+    [playFade, playReverse],
+  );
+
   useEffect(() => {
     if (!committed || committed.reverse || secretScenario !== null) {
       setCommittedCase(null);
@@ -431,7 +465,7 @@ export default function App() {
     // Straight to the wrap-up's own waiting screen where one is being written,
     // and straight past it where none is: no stored Session, no wrap-up, and a
     // wait for something that is not coming (ADR 0066).
-    setScreen(pendingEnd.sessionId ? "analysing" : "transcript");
+    advance("callEnded", { stored: pendingEnd.sessionId !== null });
     if (committed) {
       setLastPlayed({ scenarioId: committed.scenarioId, personaId: committed.personaId });
     }
@@ -524,7 +558,7 @@ export default function App() {
       // into. From there the ringing phone (F-63) is one further press:
       // nothing goes straight into a conversation, and the last press before
       // someone has to speak is always their own.
-      setScreen(skipMicCheck ? (reverse ? "brief" : "case-brief") : "mic-check");
+      advance("sessionCommitted", { reverse, skipMicCheck });
       if (skipMicCheck) setIsMicrophoneMuted(false);
     },
     [],
@@ -596,50 +630,21 @@ export default function App() {
     setIsMicrophoneMuted(false);
     playback.activate();
     socket.sendActivate();
-    setScreen("call");
-  }, [playback, socket.sendActivate]);
+    advance("callAccepted");
+  }, [playback, socket.sendActivate, advance]);
 
   // The microphone check's own button. A random Scenario gets the die in
   // between (F-62); everything else goes straight through. Under reduced
   // motion the screen is skipped rather than shown still: the animation is the
   // whole of what it has to say, and without it it is two seconds of nothing.
+  // Where this leads is `trainingFlow`'s to decide: a reverse to its briefing
+  // behind the card turn, a drawn Scenario to the die, a case with nothing in
+  // it straight to the phone, everything else to the case screen. The button
+  // above asks the same function what its own label should say, so the two
+  // cannot disagree about it.
   const handleMicConfirmed = useCallback(() => {
-    // A reverse does not go from here into the call: it goes to its briefing,
-    // behind the card turn (F-61). That is the same screen the offer under a
-    // wrap-up leads to, reached the same way, so the two arrive at an
-    // identical place from opposite ends of the app. The call itself starts on
-    // that screen's own button — nothing is activated here.
-    //
-    // The two branches cannot both apply: a reverse is never drawn, because
-    // reverses are not in the random Scenario's pool.
-    if (committed?.reverse) {
-      playReverse(() => setScreen("brief"));
-      return;
-    }
-    // A random Scenario is dealt its case first and goes straight to the die:
-    // the fade belongs between the throw and the call, not in front of the
-    // throw, so the cut it covers is the one into the ringing phone (F-63).
-    // It skips the case screen below for the reason it reveals nothing else:
-    // there is a case, and the User is meant to meet it in the call.
-    if (secretScenario !== null) {
-      if (!prefersReducedMotion()) {
-        setScreen("rolling");
-        return;
-      }
-      playFade(() => setScreen("incoming"));
-      return;
-    }
-    // Everything else reads its case first. Nothing to read means nothing to
-    // stop for: a Scenario with neither a briefing nor facts would otherwise
-    // get an empty screen and a button. The case has had the whole microphone
-    // check to arrive, so the answer is known here — and where it is not, the
-    // screen decides for itself a moment later (see below).
-    if (committedCase && !committedCase.briefing && !committedCase.facts) {
-      playFade(() => setScreen("incoming"));
-      return;
-    }
-    setScreen("case-brief");
-  }, [committed, committedCase, secretScenario, playReverse, playFade]);
+    advance("micConfirmed");
+  }, [advance]);
 
   // The same question asked once more, for the way in that cannot answer it at
   // the door: a follow-up commits and lands on this screen before its case has
@@ -648,25 +653,25 @@ export default function App() {
   useEffect(() => {
     if (screen !== "case-brief" || committedCase === null) return;
     if (committedCase.briefing || committedCase.facts) return;
-    playFade(() => setScreen("incoming"));
-  }, [screen, committedCase, playFade]);
+    advance("caseArrivedEmpty");
+  }, [screen, committedCase, advance]);
 
   // The throw ends where every ordinary call now begins: at the ringing phone,
   // through the same fade an ordinary call gets. Nothing can cancel it, so the
   // timer is the whole of the screen's logic.
   useEffect(() => {
     if (screen !== "rolling") return undefined;
-    const timer = window.setTimeout(() => playFade(() => setScreen("incoming")), ROLL_MS);
+    const timer = window.setTimeout(() => advance("rollFinished"), ROLL_MS);
     return () => window.clearTimeout(timer);
-  }, [screen, playFade]);
+  }, [screen, advance]);
 
   // Abandoning the microphone check drops the Session that was committed to
   // — the opening line generated for it is already spent, but there is no
   // point holding the connection (and the server-side Session) open for it.
   const handleCancelMicCheck = useCallback(() => {
     setCommitted(null);
-    setScreen("setup");
-  }, []);
+    advance("micCheckCancelled");
+  }, [advance]);
 
   // The effect above owns VAD pause/resume; the button only changes UI state.
   const handleToggleMicrophone = useCallback(() => {
@@ -676,15 +681,15 @@ export default function App() {
   // The wrap-up has settled, or the User would rather not wait for it. Stable,
   // because the waiting screen hangs its own patience limit off it.
   const handleAnalysed = useCallback(() => {
-    setScreen("transcript");
-  }, []);
+    advance("analysed");
+  }, [advance]);
 
   // Clears the stored finished Session too, so the wrap-up does not come
   // back when the next Session ends (ADR 0042 handles the reconnect side).
   const handleRestart = useCallback(() => {
     saveFinishedSession(null);
-    setScreen("setup");
-  }, []);
+    advance("restarted");
+  }, [advance]);
 
   // Starts a Scenario written out of a finished training as the next call,
   // against the Persona that training was played with: the follow-up (F-60)
@@ -908,7 +913,7 @@ export default function App() {
           <button
             type="button"
             className="start-call-button"
-            onClick={() => playFade(() => setScreen("incoming"))}
+            onClick={() => advance("caseRead")}
           >
             Los geht's
           </button>
@@ -941,16 +946,16 @@ export default function App() {
   }
 
   if (screen === "mic-check") {
-    // The same three branches `handleMicConfirmed` takes, in the same order,
-    // reduced to the one question the button's label asks: is a briefing the
-    // next screen? A random Scenario reads nothing (F-62), and a Scenario with
-    // neither a briefing nor facts has no screen to stop on. The case is
-    // still being fetched for a moment after the commit, so a Scenario carried
-    // by its facts alone can flip the label once, early, while nobody has
-    // spoken into the meter yet.
-    const briefingFollows =
-      committed?.reverse === true ||
-      (secretScenario === null && Boolean(selectedScenario?.briefing || committedCase?.facts));
+    // Asked of the same function the button's press goes through, so the label
+    // cannot promise a call and deliver a page of text. It used to be a second
+    // expression reading a *different* source — the card's briefing where the
+    // router read the committed case's — and the two disagreed for a Scenario
+    // carrying facts but no card briefing. The label may flip once while the
+    // case is still in flight; it is no longer ever wrong.
+    const nextIsBriefing = briefingFollows({
+      ...flowRef.current,
+      reducedMotion: prefersReducedMotion(),
+    });
     return (
       <AppLayout step="prepare" navigationLocked pageClassName="mic-check-page">
         <MicCheck
@@ -960,7 +965,7 @@ export default function App() {
           onDevicesRefresh={refreshMicDevices}
           onConfirmed={handleMicConfirmed}
           onCancel={handleCancelMicCheck}
-          briefingFollows={briefingFollows}
+          briefingFollows={nextIsBriefing}
         />
       </AppLayout>
     );

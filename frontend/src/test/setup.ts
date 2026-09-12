@@ -200,7 +200,9 @@ export class FakeWebSocket {
 }
 
 export function latestSocket(): FakeWebSocket {
-  const socket = FakeWebSocket.instances.at(-1);
+  // Indexed rather than `.at(-1)`, which is ES2022 and would mean widening
+  // `lib` for the production build as well.
+  const socket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
   if (!socket) throw new Error("no FakeWebSocket was constructed");
   return socket;
 }
