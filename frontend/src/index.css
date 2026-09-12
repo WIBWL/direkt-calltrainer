@@ -151,57 +151,11 @@ body {
   flex-shrink: 0;
 }
 
-.app-brand-mark {
-  width: 38px;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  border-radius: 12px;
-  background: var(--color-navy-900);
-}
-
-.app-brand-mark span {
-  width: 3px;
-  height: 12px;
-  border-radius: 2px;
-  background: var(--color-surface);
-}
-
 .app-brand-name {
   font-family: var(--font-display);
   font-size: 16px;
   font-weight: 600;
   color: var(--color-navy-900);
-}
-
-.app-header-user {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex-shrink: 0;
-}
-
-.app-header-username {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-navy-900);
-}
-
-.app-header-auth {
-  border: 1px solid var(--color-blue-300);
-  background: var(--color-surface);
-  color: var(--color-blue-600);
-  border-radius: 999px;
-  padding: 0.35rem 0.9rem;
-  font: inherit;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-
-.app-header-auth:hover {
-  border-color: var(--color-blue-600);
 }
 
 .training-progress {
@@ -459,14 +413,6 @@ h2 {
    options stay ordinary buttons in a radiogroup, so the interaction is a click
    or an arrow key, not a drag. */
 
-.library-filters {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-  margin-bottom: 0.9rem;
-}
-
 .filter-slider {
   position: relative;
   display: inline-flex;
@@ -559,14 +505,6 @@ h2 {
   margin: 0 0 1rem;
   color: var(--color-text-muted);
   font-size: 0.9rem;
-}
-
-.library-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
 }
 
 .library-new-button {
@@ -1118,11 +1056,6 @@ h2 {
 
 .editor-field-count.is-full {
   color: var(--color-danger);
-}
-
-.editor-field-hint {
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
 }
 
 .editor-field input,
@@ -2287,23 +2220,6 @@ h2 {
 }
 /* Marks a point as a strength or an improvement. Colour alone never carries
    the meaning -- the two lists have their own headings. */
-.bullet {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 10px;
-  vertical-align: middle;
-}
-
-.bullet.success {
-  background: var(--success);
-}
-
-.bullet.danger {
-  background: var(--danger);
-}
-
 /* The call's statistics (F-53). A grid, not a row: every figure describes the
    whole conversation, so they read as one block rather than as a sequence. */
 .metric-grid {
@@ -3453,17 +3369,8 @@ h2 {
   margin-top: 0.9rem;
 }
 
-.profile-paragraph {
-  line-height: 1.5;
-}
-
 /* A section describing something that does not exist yet. Deliberately not
    styled as a warning — nothing is wrong, it is simply not built. */
-.profile-pending {
-  border-style: dashed;
-  background: transparent;
-}
-
 @media (max-width: 560px) {
   .profile-identity {
     flex-wrap: wrap;
@@ -4466,17 +4373,6 @@ a.consent-button {
 
 /* The method, folded away. Small headings so it can be skimmed for the one
    question the reader came with, which is usually what the colour is worth. */
-.melody-method h4 {
-  margin: 1rem 0 0.25rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-navy-900);
-}
-
-.melody-method h4:first-child {
-  margin-top: 0;
-}
-
 /* --- One interruption, in its own words ---------------------------------- */
 
 .interruptions {
@@ -6573,27 +6469,6 @@ a.consent-button {
 
 /* Marks the draft, and the two facts still to be filled in. Loud on purpose:
    an unreviewed privacy statement must not be mistakable for a final one. */
-.legal-review-note {
-  margin-bottom: 2rem;
-  padding: 14px 16px;
-  border: 1px dashed var(--color-danger);
-  border-radius: var(--radius-control);
-  background: #fdf4f3;
-}
-
-.legal-review-note p {
-  margin: 0;
-  line-height: 1.5;
-}
-
-.legal-open {
-  background: #fdf0c8;
-  padding: 1px 6px;
-  border-radius: 4px;
-  color: var(--color-navy-900);
-  font-size: 0.9em;
-}
-
 /* The date a legal document was last revised, and the one-line opener on the
    notes page. Both sit above the body and set it up rather than joining it. */
 .legal-date {
@@ -6649,36 +6524,6 @@ a.consent-button {
   height: 58px;
   object-fit: contain;
   flex-shrink: 0;
-}
-
-.login-brand-mark {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  border-radius: 11px;
-  background: var(--color-navy-900);
-}
-
-.login-brand-mark span {
-  display: block;
-  width: 3px;
-  border-radius: 3px;
-  background: var(--color-surface);
-}
-
-.login-brand-mark span:nth-child(1) {
-  height: 10px;
-}
-
-.login-brand-mark span:nth-child(2) {
-  height: 16px;
-}
-
-.login-brand-mark span:nth-child(3) {
-  height: 12px;
 }
 
 .login-brand-name {
