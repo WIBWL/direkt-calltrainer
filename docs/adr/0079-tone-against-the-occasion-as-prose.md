@@ -132,3 +132,13 @@ arrangement the rest of that prompt already uses for the same reason. Whether a
 4B model actually holds all seven is not something the tests can answer; they
 pin what it was asked, which is the line `tests/README.md` draws for every
 prompt test in this suite.
+
+## Amendment, 2026-09-13: the occasion block is the situation alone
+
+This ADR withholds `success_condition` from the dossier, on the ground that what would have ended the call well is a result rather than an occasion, and that handing it over invites the model to grade the outcome under the heading of tone. The block was built to match: the Scenario's `description` and its `call_goal`, and a test asserting the criterion stayed out.
+
+Migration `3ce81b27af40` then merged `success_condition` into `call_goal`, and the seeded goals now read "... The matter is settled when someone names what is wrong and when it will be fixed". So the criterion arrived in the dossier under *What the caller wanted*, in every wrap-up of every built-in Scenario. The test kept passing because it asserted against a `success_condition` attribute that the ORM object no longer has and `_dossier` therefore never reads — green for the one reason that makes a test worthless.
+
+The two halves cannot be told apart again inside one column of authored prose, so the occasion block is now the **situation alone**. That is what the question needs: whether a register suited the occasion depends on what the occasion was, not on what would have counted as winning. `call_goal` keeps every other job it has — it briefs the simulated caller, it drives the settlement check (ADR 0073) — and it simply no longer goes into this block.
+
+The test now reads the criterion off the Scenario the fixture actually carries, in the merged form the seed produces.

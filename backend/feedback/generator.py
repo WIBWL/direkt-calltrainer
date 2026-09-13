@@ -116,10 +116,15 @@ class _Wrapup(BaseModel):
     # Ids, not prose: this one is not shown to anybody, it decides which
     # exchanges the segment measurements are computed over.
     #
-    # Defaulted like the two above, and an empty list is a legitimate answer --
-    # plenty of calls have nobody pushing back in them. An id the material does
-    # not hold is dropped at storage time, exactly as a made-up goal key is.
-    pressure_turns: list[int] = []
+    # `None` is "nobody judged": the key was absent, or the whole reply failed
+    # to validate and this is the narrative-only fallback. An empty *list* is
+    # the other thing entirely -- the model looked and found nobody pushing
+    # back, which plenty of calls are. `turn.pressed` keeps the same
+    # distinction, NULL against False, and writing False for a call nobody
+    # judged is how `scripts/inspect_pressure_segments.py` lost the one
+    # difference it exists to show. An id the material does not hold is dropped
+    # at storage time, exactly as a made-up goal key is.
+    pressure_turns: list[int] | None = None
     strengths: list[_Point] = []
     improvements: list[_Point] = []
 
@@ -212,10 +217,17 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
     reverse = session.scenario.reverse
     lines = _occasion(session.scenario)
     lines.append("Measured statistics for this call (established fact):")
+    # Whole-call rows only. Since ADR 0081 a Session also carries measurements
+    # over the demanding stretches and over the rest, and the block this feeds
+    # is headed "for this call" while rule M3 tells the model to treat what is
+    # in it as established fact. Unfiltered, a regenerated wrap-up read the
+    # same metric three times with three different values -- the segment rows
+    # are written by the previous run and are still there on the next one.
     lines += [
         f"    {m.metric_type.name}: {float(m.value):.1f} {m.metric_type.unit or ''}".rstrip()
         for m in session.measurements
-        if m.metric_type.key != metrics.LOUDNESS_KEY
+        if m.metric_type.key != metrics.LOUDNESS_KEY and
+        m.segment == db_models.SEGMENT_CALL
     ]
     course = _loudness_course(session)
     if course:
@@ -254,14 +266,25 @@ def _occasion(scenario: db_models.Scenario) -> list[str]:
     the situation has to be guessed. A guess is exactly what this block must
     not rest on.
 
-    `success_condition` is deliberately left out. It says what would have ended
-    the call well, which is a result rather than an occasion, and handing it
-    over invites the model to grade the outcome under the heading of tone.
+    The situation and nothing else. ADR 0079 withholds `success_condition` --
+    what would have ended the call well is a result rather than an occasion, and
+    handing it over invites the model to grade the outcome under the heading of
+    tone. That used to be a separate column, and this block passed `call_goal`
+    beside the situation on the grounds that wanting something is part of an
+    occasion.
+
+    Migration `3ce81b27af40` merged the two columns, and the seeded goals now
+    read "... The matter is settled when someone names what is wrong and when it
+    will be fixed" -- so the criterion arrived in the dossier under "What the
+    caller wanted", and the guarantee was being made in a docstring while the
+    prompt broke it. The halves cannot be told apart again in one column of
+    authored prose, so what goes in is the situation, which is what the question
+    actually needs: whether a register suited the occasion depends on what the
+    occasion was, not on what would have counted as winning.
     """
     return [
         "The occasion of this call (established fact, not something to assess):",
         f"    Situation: {scenario.description}",
-        f"    What the caller wanted: {scenario.call_goal}",
         "",
     ]
 
@@ -273,9 +296,15 @@ def _loudness_course(session: db_models.Session) -> str | None:
     number, the wrap-up quotes it as a level -- above a chart that deliberately
     shows none. What goes in instead is what that chart says, from the same
     curve and the same parameters, so text and picture cannot contradict.
+
+    The whole call's row, like the figures above it: the segment rows carry a
+    `curve_db` of their own, and taking the first match described the pressing
+    stretch's curve as the course of the whole conversation.
     """
     for measurement in session.measurements:
         if measurement.metric_type.key != metrics.LOUDNESS_KEY:
+            continue
+        if measurement.segment != db_models.SEGMENT_CALL:
             continue
         curve = (measurement.detail_json or {}).get("curve_db")
         if curve:
@@ -757,9 +786,36 @@ async def _ask(dossier: str, language: str, reverse: bool = False) -> _Wrapup:
 
 
 def _unfenced_text(raw: str, language: str) -> str:
-    """The model's prose, for the fallback: readable even though it isn't JSON."""
+    """The model's prose, for the fallback: readable even though it isn't JSON.
+
+    Prose is the whole condition. ADR 0049's degraded path is "a summary with no
+    evidence links" -- the paragraphs the model wrote, minus the structure -- and
+    an answer that failed to validate is very often not prose at all but JSON
+    that was cut off in the token budget or carried a field of the wrong type.
+    Stored raw, that reached the User as their summary, in the history and in
+    the PDF, and `scripts/requeue_feedback.py` skips any Session that already
+    has a Feedback row, so it could never be replaced.
+
+    So a reply that still looks like JSON is refused here and the fixed sentence
+    stands in. That sentence says no feedback could be written, which is true,
+    where a brace and a quoted key says nothing the User can read.
+    """
     stripped = llm.without_fenced_blocks(raw).strip()
-    return stripped or _in_language(_NO_WRAPUP, language)
+    if not stripped or _looks_like_json(stripped):
+        return _in_language(_NO_WRAPUP, language)
+    return stripped
+
+
+def _looks_like_json(text: str) -> bool:
+    """Whether this is the model's failed structure rather than its prose.
+
+    Deliberately crude: an opening brace or bracket, or one of the keys the
+    schema asks for quoted as JSON quotes it. A summary that happens to mention
+    a brace does not start with one, and no German paragraph opens with
+    `"summary":`."""
+    if text[:1] in ("{", "["):
+        return True
+    return any(f'"{field}"' in text[:200] for field in _Wrapup.model_fields)
 
 
 # --- Storage --------------------------------------------------------------
@@ -837,7 +893,7 @@ def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) 
     db.add(feedback)
 
 
-def _store_segments(db: DbSession, session_id: int, pressure_turns: list[int]) -> None:
+def _store_segments(db: DbSession, session_id: int, pressure_turns: list[int] | None) -> None:
     """Mark the pressing utterances and measure the two stretches (ADR 0081).
 
     Runs in the same transaction as the wrap-up but behind its own failure
@@ -846,58 +902,79 @@ def _store_segments(db: DbSession, session_id: int, pressure_turns: list[int]) -
     A raise here would also retry the whole model call, which would be paying
     for a second opinion to fix an arithmetic problem.
 
+    The boundary is a **savepoint**, not just an `except`. Catching a Python
+    error is enough for a Python error, and the delete, the flush and the
+    metric-type read here are SQL: after one of those fails, Postgres has
+    aborted the transaction and every later statement raises
+    `InFailedSqlTransaction` -- so the swallowed error would take the wrap-up,
+    the job status and the commit with it, which is exactly backwards. Rolling
+    back to the savepoint leaves the transaction usable and the wrap-up intact.
+
     Idempotent, because `scripts/requeue_feedback.py` re-runs this job over
     Sessions that already have rows: the previous segment rows go first. The
     whole-call rows are never touched -- they were written when the call ended
     and no model opinion has any business overwriting a measurement.
     """
+    if pressure_turns is None:
+        # Nobody judged this call: the key was missing, or the reply never
+        # validated. Leaving `turn.pressed` NULL is what says so -- writing
+        # False everywhere would record the opposite finding, "judged, nobody
+        # pushed", which is a claim the model never made.
+        logger.info("Session %d: no pressure judgement in the wrap-up; leaving the rows unmarked", session_id)
+        return
     try:
-        session = db.get(db_models.Session, session_id)
-        if session is None:
-            return
-        # Persona rows only, and only ids from this Session: the same rule the
-        # points' `turn_id` follows, and for the same reason -- a reference
-        # that leads somewhere else is worse than none.
-        wanted = set(pressure_turns)
-        pressed_ids = {
-            row.turn_id for row in session.turns
-            if row.turn_id in wanted and row.speaker == db_models.SPEAKER_PERSONA
-        }
-        # Measure before anything is written. The other way round -- flags set,
-        # rows deleted, then measured -- is not the rewrite ADR 0081 promises: a
-        # measurement that throws is caught below and the wrap-up is kept, but
-        # the delete and the flags have already committed with it. A re-queue of
-        # a Session that had good segment rows then leaves it with none, and
-        # with Persona rows marked `pressed` that nothing measures. Nothing here
-        # touches `row.pressed`; it reads the id set it is handed.
-        measured = segments.measure_segments(session, pressed_ids)
-
-        for row in session.turns:
-            if row.speaker == db_models.SPEAKER_PERSONA:
-                row.pressed = row.turn_id in pressed_ids
-
-        db.query(db_models.Measurement).filter(
-            db_models.Measurement.session_id == session_id,
-            db_models.Measurement.segment != db_models.SEGMENT_CALL,
-        ).delete(synchronize_session=False)
-        db.flush()
-
-        metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType).all()}
-        for segment, values in measured.items():
-            db.add_all([
-                db_models.Measurement(
-                    session_id=session_id,
-                    metric_type_id=metric_ids[m.key],
-                    segment=segment,
-                    value=Decimal(f"{m.value:.4f}"),
-                    detail_json=m.detail,
-                )
-                for m in values
-                if m.key in metric_ids
-            ])
-        logger.info(
-            "Segment measurements for session %d: %d pressing utterance(s)",
-            session_id, len(pressed_ids),
-        )
+        with db.begin_nested():
+            _write_segments(db, session_id, pressure_turns)
     except Exception:  # pylint: disable=broad-exception-caught
         logger.exception("Segment measurement failed for session %d", session_id)
+
+
+def _write_segments(db: DbSession, session_id: int, pressure_turns: list[int]) -> None:
+    """The body of `_store_segments`, inside its savepoint. See there."""
+    session = db.get(db_models.Session, session_id)
+    if session is None:
+        return
+    # Persona rows only, and only ids from this Session: the same rule the
+    # points' `turn_id` follows, and for the same reason -- a reference
+    # that leads somewhere else is worse than none.
+    wanted = set(pressure_turns)
+    pressed_ids = {
+        row.turn_id for row in session.turns
+        if row.turn_id in wanted and row.speaker == db_models.SPEAKER_PERSONA
+    }
+    # Measure before anything is written. The other way round -- flags set,
+    # rows deleted, then measured -- is not the rewrite ADR 0081 promises: a
+    # measurement that throws is caught below and the wrap-up is kept, but
+    # the delete and the flags have already committed with it. A re-queue of
+    # a Session that had good segment rows then leaves it with none, and
+    # with Persona rows marked `pressed` that nothing measures. Nothing here
+    # touches `row.pressed`; it reads the id set it is handed.
+    measured = segments.measure_segments(session, pressed_ids)
+
+    for row in session.turns:
+        if row.speaker == db_models.SPEAKER_PERSONA:
+            row.pressed = row.turn_id in pressed_ids
+
+    db.query(db_models.Measurement).filter(
+        db_models.Measurement.session_id == session_id,
+        db_models.Measurement.segment != db_models.SEGMENT_CALL,
+    ).delete(synchronize_session=False)
+    db.flush()
+
+    metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType).all()}
+    for segment, values in measured.items():
+        db.add_all([
+            db_models.Measurement(
+                session_id=session_id,
+                metric_type_id=metric_ids[m.key],
+                segment=segment,
+                value=Decimal(f"{m.value:.4f}"),
+                detail_json=m.detail,
+            )
+            for m in values
+            if m.key in metric_ids
+        ])
+    logger.info(
+        "Segment measurements for session %d: %d pressing utterance(s)",
+        session_id, len(pressed_ids),
+    )

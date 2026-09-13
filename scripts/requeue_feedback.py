@@ -20,8 +20,11 @@ network -- compose.yaml deliberately does not publish it to the host -- so the
 reporting half of this script works from a host shell and the `--apply` half
 does not.
 
-Safe to run twice: a Session that already has a wrap-up is never selected, so a
-second run after a successful one does nothing.
+Safe to run twice: a Session that already has a wrap-up is never selected, and
+neither is one whose job may still be working -- `queued` or `running` inside
+JOB_TIMEOUT_S, the same window `api/sessions.py` believes a running job for. It
+did select those, so a wrap-up two minutes into its model call was queued a
+second time and the two runs raced for the same Session.
 """
 
 from __future__ import annotations
@@ -30,6 +33,7 @@ import argparse
 import logging
 import os
 import sys
+from datetime import UTC, datetime
 
 from dotenv import load_dotenv
 
@@ -55,6 +59,29 @@ logger = logging.getLogger(__name__)
 RETRYABLE = (db_models.JOB_QUEUED, db_models.JOB_RUNNING, db_models.JOB_FAILED)
 
 
+def _still_working(job) -> bool:
+    """Whether this job may simply not be finished yet.
+
+    The read side already answers this question -- `api/sessions.py` believes a
+    `running` job only inside JOB_TIMEOUT_S -- and this script did not, so a
+    wrap-up that was two minutes into its model call was queued a second time.
+    Two jobs then write the same Session, and the loser hits the unique
+    constraint on `feedback.session_id` and is recorded as failed, for a
+    Session that has a wrap-up. The docstring's "safe to run twice" was true
+    only of Sessions that had already finished one.
+
+    Queued counts as working for the same reason: the job is in Redis and a
+    worker will take it.
+    """
+    from backend.feedback.queue import JOB_TIMEOUT_S  # pylint: disable=import-outside-toplevel
+
+    if job.status not in (db_models.JOB_QUEUED, db_models.JOB_RUNNING):
+        return False
+    if job.updated_at is None:
+        return False
+    return (datetime.now(UTC) - job.updated_at).total_seconds() < JOB_TIMEOUT_S
+
+
 def _candidates(db) -> list[tuple[int, str, int]]:
     """(session_id, extern_id, turn count) for every Session worth retrying.
 
@@ -73,7 +100,7 @@ def _candidates(db) -> list[tuple[int, str, int]]:
         newest = max(jobs, key=lambda j: j.job_id) if jobs else None
         # No job row at all also qualifies: api/sessions.py reads that as
         # "failed", so the Session is in the same dead end.
-        if newest is None or newest.status in RETRYABLE:
+        if newest is None or (newest.status in RETRYABLE and not _still_working(newest)):
             found.append((session.session_id, str(session.extern_id), len(session.turns)))
     return found
 
