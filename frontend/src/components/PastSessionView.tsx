@@ -177,7 +177,6 @@ export default function PastSessionView() {
               failed={deletion.failed}
               onConfirm={() => void deletion.remove()}
               onCancel={() => setConfirming(false)}
-              actionsClassName="consent-confirm-actions"
             />
           ) : (
             <button

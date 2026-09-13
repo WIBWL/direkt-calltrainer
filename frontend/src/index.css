@@ -3627,18 +3627,39 @@ p.follow-up-error {
   border-color: var(--color-blue-600);
 }
 
+/* The bin, and the check and cross that replace it. The box widens from one
+   button to two while the bin slides out to the right, clipped at the box's
+   edge so it leaves rather than fades, and the two answers come in from the
+   left a moment after. Every button stays mounted; `visibility` hides the ones
+   not in play, and flips only at the end of a hiding transition (its own delay)
+   so the slide is still seen. */
+.session-row-actions {
+  position: relative;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  margin-right: 10px;
+  overflow: hidden;
+  transition: width 0.25s ease;
+}
+
+.session-row-actions.is-confirming {
+  width: 68px;
+}
+
 /* Quiet until the row is pointed at or the button itself focused: a delete
    sitting in full colour on every line would be the loudest thing on a screen
    whose purpose is reading. It stays reachable by keyboard regardless — only
    the colour is held back, never the button. */
 .session-row-delete {
-  flex: 0 0 auto;
+  position: absolute;
+  top: 0;
+  right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 32px;
-  margin-right: 10px;
   border: none;
   border-radius: 50%;
   background: none;
@@ -3646,7 +3667,100 @@ p.follow-up-error {
   color: var(--color-text-muted);
   cursor: pointer;
   opacity: 0.55;
-  transition: color 0.15s, background 0.15s, opacity 0.15s;
+  transition: color 0.15s, background 0.15s, opacity 0.15s, transform 0.25s ease,
+    visibility 0s;
+}
+
+.is-confirming .session-row-delete {
+  transform: translateX(110%);
+  visibility: hidden;
+  transition: color 0.15s, background 0.15s, opacity 0.15s, transform 0.25s ease,
+    visibility 0s linear 0.25s;
+}
+
+.session-row-yes,
+.session-row-no {
+  position: absolute;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-14px);
+  transition: transform 0.2s ease, opacity 0.15s, background 0.15s,
+    visibility 0s linear 0.2s;
+}
+
+.session-row-yes {
+  right: 36px;
+  background: var(--color-danger);
+  color: var(--color-surface);
+}
+
+.session-row-no {
+  right: 0;
+  background: var(--color-surface-selected);
+  color: var(--color-navy-900);
+}
+
+.is-confirming .session-row-yes,
+.is-confirming .session-row-no {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: transform 0.25s ease 0.08s, opacity 0.2s 0.08s, background 0.15s,
+    visibility 0s;
+}
+
+/* The cross a beat after the check, so the two read as arriving in order. */
+.is-confirming .session-row-no {
+  transition-delay: 0.14s, 0.14s, 0s, 0s;
+}
+
+.session-row-yes:hover {
+  background: #9a3a30;
+}
+
+.session-row-no:hover {
+  background: var(--color-border);
+}
+
+.session-row-yes[aria-busy="true"] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Inset, because the box clips anything drawn outside the buttons. */
+.session-row-yes:focus-visible,
+.session-row-no:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: -2px;
+}
+
+.session-row-error {
+  flex: 0 0 100%;
+  margin: 0;
+  padding: 0 1.5rem 12px;
+  font-size: 0.85rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-row-actions,
+  .session-row-delete,
+  .is-confirming .session-row-delete,
+  .session-row-yes,
+  .session-row-no,
+  .is-confirming .session-row-yes,
+  .is-confirming .session-row-no {
+    transition: none;
+  }
 }
 
 .session-item:hover .session-row-delete,
@@ -3663,47 +3777,6 @@ p.follow-up-error {
 .session-row-delete:focus-visible {
   outline: 2px solid var(--color-blue-600);
   outline-offset: -2px;
-}
-
-/* Open confirmation: the bin stays in reach (clicking it again closes) and
-   shows which row the question below belongs to. */
-.session-row-delete[aria-expanded="true"] {
-  color: var(--color-danger);
-  opacity: 1;
-}
-
-/* Spans the full row underneath it, so the question and its answer are not
-   squeezed into the space the bin occupied. The side padding is the row's own,
-   so the question starts where the row's text does. */
-.session-row-confirm {
-  flex: 0 0 100%;
-  padding: 0 1.5rem 14px;
-}
-
-.session-row-confirm p {
-  margin: 0 0 0.75rem;
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
-.session-row-confirm-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.session-row-confirm .consent-button {
-  flex: 0 0 auto;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-}
-
-.session-row-confirm .cancel-button {
-  display: inline-block;
-  width: auto;
-  margin-top: 0;
-  padding: 0.5rem 0;
-  font-size: 0.9rem;
 }
 
 /* "There is more below", in the two places that say it: the training history

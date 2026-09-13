@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useSessionHistory } from "../hooks/useSessionHistory";
 import type { SessionSummary } from "../protocol";
 import { sessionPath } from "../routes";
+import { cx } from "../utils/cx";
 import { callDurationMs } from "../utils/progressStats";
 import { formatClock, formatDateTime } from "../utils/time";
-import DeleteSessionPrompt, { useSessionDeletion } from "./DeleteSessionPrompt";
+import { useSessionDeletion } from "./DeleteSessionPrompt";
 
 /**
  * The user's past trainings (F-48), each one a row that opens the wrap-up that
@@ -81,8 +82,25 @@ function SessionRow({
   const feedback = feedbackChip(session);
   const [confirming, setConfirming] = useState(false);
   const deletion = useSessionDeletion(session.session_id, onDeleted);
+  const binRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const wasConfirming = useRef(false);
 
   const when = formatDateTime(session.started_at) ?? session.started_at;
+
+  // Focus follows the control that just took the place of the one pressed:
+  // the bin is hidden once the check and the cross are in, and a focused
+  // element that turns invisible drops the keyboard to the top of the page.
+  // The cross rather than the check, so that a second Enter cannot delete.
+  useEffect(() => {
+    if (confirming) cancelRef.current?.focus();
+    else if (wasConfirming.current) binRef.current?.focus();
+    wasConfirming.current = confirming;
+  }, [confirming]);
+
+  const cancel = () => {
+    if (!deletion.deleting) setConfirming(false);
+  };
 
   return (
     <div className="session-item">
@@ -115,30 +133,62 @@ function SessionRow({
 
       {/* Outside the Link, not inside it: a button nested in an anchor is
           invalid markup and clicking it would navigate as well as delete. */}
-      <button
-        type="button"
-        className="session-row-delete"
-        // The label names the training, because a screen reader meets a
-        // column of otherwise identical delete buttons.
-        aria-label={`Training „${session.scenario}“ vom ${when} löschen`}
-        title="Training löschen"
-        aria-expanded={confirming}
-        // A toggle rather than a one-way trigger, and never disabled: a button
-        // that disables itself on click drops keyboard focus to nowhere.
-        onClick={() => !deletion.deleting && setConfirming((open) => !open)}
+      {/* The bin slides out to the right and a check and a cross take its
+          place: the question is asked where the button was, without a panel
+          opening under the row and pushing the rest of the list down. All
+          three stay mounted and are hidden by `visibility`, which is what lets
+          the bin animate out rather than vanish, and what keeps whichever is
+          hidden out of the tab order. */}
+      <div
+        className={cx("session-row-actions", confirming && "is-confirming")}
+        role="group"
+        aria-label={`Training „${session.scenario}“ vom ${when}`}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && confirming) cancel();
+        }}
       >
-        <TrashIcon />
-      </button>
+        <button
+          ref={binRef}
+          type="button"
+          className="session-row-delete"
+          // The label names the training, because a screen reader meets a
+          // column of otherwise identical delete buttons.
+          aria-label={`Training „${session.scenario}“ vom ${when} löschen`}
+          title="Training löschen"
+          onClick={() => setConfirming(true)}
+        >
+          <TrashIcon />
+        </button>
 
-      {confirming && (
-        <DeleteSessionPrompt
-          deleting={deletion.deleting}
-          failed={deletion.failed}
-          onConfirm={() => void deletion.remove()}
-          onCancel={() => setConfirming(false)}
-          className="session-row-confirm"
-          actionsClassName="session-row-confirm-actions"
-        />
+        <button
+          type="button"
+          className="session-row-yes"
+          aria-label={`Endgültig löschen: Gesprächsprotokoll, Kennzahlen und Auswertung werden entfernt`}
+          title="Endgültig löschen"
+          // Never `disabled` while the request runs: a disabled button drops
+          // the focus it is holding.
+          aria-busy={deletion.deleting}
+          onClick={() => !deletion.deleting && void deletion.remove()}
+        >
+          <CheckIcon />
+        </button>
+
+        <button
+          ref={cancelRef}
+          type="button"
+          className="session-row-no"
+          aria-label="Abbrechen"
+          title="Abbrechen"
+          onClick={cancel}
+        >
+          <CrossIcon />
+        </button>
+      </div>
+
+      {deletion.failed && (
+        <p className="session-row-error consent-error" role="alert">
+          Das Training konnte nicht gelöscht werden. Bitte versuchen Sie es erneut.
+        </p>
       )}
     </div>
   );
@@ -155,6 +205,35 @@ function TrashIcon() {
         strokeWidth="1.2"
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false">
+      <path
+        d="M3.2 8.4 6.5 11.5 12.8 4.8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CrossIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false">
+      <path
+        d="M4.5 4.5l7 7M11.5 4.5l-7 7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
       />
     </svg>
   );

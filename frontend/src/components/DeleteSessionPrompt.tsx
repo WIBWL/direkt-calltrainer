@@ -37,33 +37,30 @@ export function useSessionDeletion(sessionId: string | undefined, onDeleted: () 
 }
 
 /**
- * The question, once it is open. It says what goes with the training, because
- * the deletion is final and reaches the wrap-up and the figures too.
+ * The question on a training's own page, once it is open. It says what goes
+ * with the training, because the deletion is final and reaches the wrap-up and
+ * the figures too. The history asks the same thing with a check and a cross in
+ * place of its bin (`SessionHistory`), where a paragraph per row would push the
+ * list apart.
  */
 export default function DeleteSessionPrompt({
   deleting,
   failed,
   onConfirm,
   onCancel,
-  className,
-  actionsClassName,
 }: {
   deleting: boolean;
   failed: boolean;
   onConfirm: () => void;
   onCancel: () => void;
-  /** The two places lay it out differently: under a row, or at the foot of a
-   *  page. */
-  className?: string;
-  actionsClassName: string;
 }) {
   return (
-    <div className={className}>
+    <>
       <p>
         <strong>Dieses Training löschen?</strong> Gesprächsprotokoll, Kennzahlen und
         Auswertung werden entfernt. Das lässt sich nicht rückgängig machen.
       </p>
-      <div className={actionsClassName}>
+      <div className="consent-confirm-actions">
         <button
           type="button"
           className="consent-button consent-button-danger"
@@ -72,7 +69,12 @@ export default function DeleteSessionPrompt({
         >
           {deleting ? "Wird gelöscht …" : "Endgültig löschen"}
         </button>
-        <button type="button" className="cancel-button" onClick={onCancel} disabled={deleting}>
+        <button
+          type="button"
+          className="consent-button consent-button-secondary"
+          onClick={onCancel}
+          disabled={deleting}
+        >
           Abbrechen
         </button>
       </div>
@@ -81,6 +83,6 @@ export default function DeleteSessionPrompt({
           Das Training konnte nicht gelöscht werden. Bitte versuchen Sie es erneut.
         </p>
       )}
-    </div>
+    </>
   );
 }
