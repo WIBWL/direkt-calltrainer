@@ -363,3 +363,40 @@ async def test_a_disconnect_during_a_turn_still_tears_the_turn_down():
     sent_by_then = len(forwarded)
     await asyncio.sleep(0.05)
     assert len(forwarded) == sent_by_then, "and nothing kept forwarding behind it"
+
+
+async def test_a_forwarder_that_already_failed_still_closes_the_turn():
+    """The teardown closes the generator however the forwarder ended.
+
+    A disconnect usually surfaces on the *send* side, so by the time the
+    teardown runs the forwarder has already finished with a RuntimeError.
+    `await forward_task` re-raises it, and the close that follows was simply
+    skipped -- the generator chain was left to the event loop's own
+    finalisation, which closes each one from a task nobody awaits and logs six
+    `aclose(): asynchronous generator is already running` errors per tab close
+    (seen live). The exception still has to travel: it is what tells
+    `session_ws` the client is gone, and therefore what stores the Session as
+    aborted rather than completed.
+    """
+    closed = asyncio.Event()
+
+    async def events():
+        try:
+            while True:
+                await asyncio.sleep(0)
+                yield AudioChunk(turn_seq=1, chunk_seq=1, audio=b"pcm")
+        finally:
+            closed.set()
+
+    async def already_failed():
+        raise RuntimeError("Unexpected ASGI message 'websocket.send'")
+
+    forwarder = asyncio.create_task(already_failed())
+    await asyncio.sleep(0)
+    turn = events()
+    await turn.__anext__()  # park it at a yield, as a live turn would be
+
+    with pytest.raises(RuntimeError):
+        await session_ws._tear_down_turn(forwarder, turn)
+
+    assert closed.is_set(), "the turn generator was closed all the same"

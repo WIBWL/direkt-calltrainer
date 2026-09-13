@@ -421,11 +421,25 @@ async def _tear_down_turn(forward_task: asyncio.Task, events: AsyncIterator[Turn
     suspended in, which while a reply is being generated is the turn generator
     itself. Where it was suspended in a socket send instead, the cancel unwinds
     only the forwarder and leaves the generator parked at its yield, which is
-    what `aclose` is for."""
+    what `aclose` is for.
+
+    The `finally` is load-bearing. A forwarder that has *already failed* -- a
+    send into a socket the client dropped, which is the ordinary way a
+    disconnect surfaces -- re-raises its own exception out of `await
+    forward_task`, and the close below was then never reached. The generator
+    chain was left to the event loop's own finalisation instead, which closes
+    each of them from a task nobody awaits: six `Task exception was never
+    retrieved` lines per disconnect, every one of them
+    `aclose(): asynchronous generator is already running`. Nothing was damaged
+    by it -- the TTS stream still reset -- but ERROR-level noise on a path that
+    runs whenever somebody closes a tab is exactly what stops a log from being
+    read (ADR 0055)."""
     forward_task.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await forward_task
-    await events.aclose()
+    try:
+        with contextlib.suppress(asyncio.CancelledError):
+            await forward_task
+    finally:
+        await events.aclose()
 
 
 async def _wait_for_control_message(
