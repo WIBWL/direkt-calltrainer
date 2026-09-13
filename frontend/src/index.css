@@ -4715,24 +4715,10 @@ a.consent-button {
   margin-top: 2.75rem;
 }
 
-.progress-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 1rem;
-}
-
-.progress-section-head h2 {
-  margin: 0;
-}
-
 /* The same distance from every section heading to what it heads. A `.card`
    brings a 1.5rem top margin of its own, so the sections led by a card sat
    2.5rem under their heading and the ones led by tiles 1rem, and the page read
    as unevenly spaced without anyone being able to say why. */
-.progress-section-head + .card,
 .progress-section .feedback-section-head + .card {
   margin-top: 0;
 }
