@@ -27,8 +27,6 @@ interface AppHeaderProps {
   accountActive?: boolean | undefined;
   /** Marks the account chip and its Fortschritt entry as the current page (F-13). */
   progressActive?: boolean | undefined;
-  /** Widens the header bar to a wide page's measure, so the two align. */
-  wide?: boolean | undefined;
   /**
    * Resets the training flow when the brand is clicked. Every training screen
    * lives under the one route, so from the feedback screen the brand's link
@@ -50,7 +48,6 @@ export default function AppHeader({
   navigationLocked = false,
   accountActive = false,
   progressActive = false,
-  wide = false,
   onHome,
 }: AppHeaderProps) {
   const auth = useAuth();
@@ -74,7 +71,7 @@ export default function AppHeader({
 
   return (
     <header className="app-header">
-      <div className={cx("app-header-inner", wide && "is-wide")}>
+      <div className="app-header-inner">
         {navigationLocked ? (
           brand
         ) : (

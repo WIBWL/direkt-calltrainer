@@ -261,7 +261,7 @@ export default function ProgressView() {
  *  instead of each repeating them. */
 function Frame({ children }: { children: ReactNode }) {
   return (
-    <AppLayout wide progressActive pageClassName="app-page-wide progress-page">
+    <AppLayout progressActive pageClassName="app-page-wide progress-page">
       <h1>Ihr Fortschritt</h1>
       {/* What the page is, first, and that nothing on it is a grade, in one
           sentence -- that half cannot move behind the "i": a reader who is not

@@ -100,9 +100,8 @@ body {
 /* A dashboard is a comparison, and a comparison needs room: the small
    multiples only earn their name when several fit on one row. Four fifths of
    the window rather than all of it, so the page keeps a margin and does not
-   read as an unframed sheet of data. The header takes the same measure on
-   these screens (`.app-header-inner.is-wide`) so brand and account chip line
-   up with the content instead of sitting inside it. */
+   read as an unframed sheet of data. The header deliberately keeps its usual
+   measure here, so it does not change width from one screen to the next. */
 .app-page-wide {
   width: 80%;
   max-width: none;
@@ -114,10 +113,6 @@ body {
   height: 76px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.app-header-inner.is-wide {
-  width: 80%;
 }
 
 .app-header-inner {

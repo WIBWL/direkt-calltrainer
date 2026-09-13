@@ -13,9 +13,6 @@ interface AppLayoutProps {
   accountActive?: boolean;
   /** Marks the header's progress link as the current page. */
   progressActive?: boolean;
-  /** Widens the header to the same measure as a wide page, so brand and account
-   *  chip line up with the content instead of sitting inside it. */
-  wide?: boolean;
   /** Passed through to the header — see `onHome` there. */
   onHome?: () => void;
   /** Per-screen modifier on the page element; the shared `app-page` is added here. */
@@ -30,7 +27,6 @@ export default function AppLayout({
   navigationLocked,
   accountActive,
   progressActive,
-  wide,
   onHome,
   pageClassName,
   children,
@@ -42,7 +38,6 @@ export default function AppLayout({
         navigationLocked={navigationLocked}
         accountActive={accountActive}
         progressActive={progressActive}
-        wide={wide}
         onHome={onHome}
       />
 
