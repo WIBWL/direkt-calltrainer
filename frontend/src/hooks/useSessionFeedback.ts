@@ -17,6 +17,13 @@ const MAX_CONSECUTIVE_ERRORS = 3;
  * failure from a wrap-up that could not be generated. */
 export type FeedbackState = "loading" | "ready" | "failed" | "missing";
 
+/** A poll's answer, labelled with the Session it is an answer about. */
+interface Result {
+  sessionId: string | null;
+  detail: SessionDetail | null;
+  state: FeedbackState;
+}
+
 /**
  * Polls the finished Session until its Feedback settles (ADR 0019 generates it
  * asynchronously, so it does not exist yet when the call ends).
@@ -30,24 +37,21 @@ export type FeedbackState = "loading" | "ready" | "failed" | "missing";
  * for by the User and answered by its own request (ADR 0069's amendment).
  */
 export function useSessionFeedback(sessionId: string | null) {
-  const [detail, setDetail] = useState<SessionDetail | null>(null);
-  const [state, setState] = useState<FeedbackState>("loading");
+  const [result, setResult] = useState<Result>(() => ({
+    sessionId,
+    detail: null,
+    state: sessionId === null ? "missing" : "loading",
+  }));
 
   useEffect(() => {
-    if (sessionId === null) {
-      // Cleared as well: the hook lives in `App` across calls, and a call that
-      // was not stored must not show the previous call's wrap-up.
-      setDetail(null);
-      setState("missing");
-      return;
-    }
+    if (sessionId === null) return undefined;
 
     let cancelled = false;
     let timer: number | undefined;
     let errors = 0;
+    let latest: SessionDetail | null = null;
     const deadline = Date.now() + POLL_TIMEOUT_MS;
-    setState("loading");
-    setDetail(null);
+    const settle = (state: FeedbackState) => setResult({ sessionId, detail: latest, state });
 
     const poll = async () => {
       try {
@@ -56,17 +60,18 @@ export function useSessionFeedback(sessionId: string | null) {
         // Conclusive, so stop polling: the backend writes the Session before it
         // sends session.ended, and the route answers the same for absent and
         // not-yours (ADR 0031/0050).
-        if (data === null) return setState("missing");
+        if (data === null) return settle("missing");
         errors = 0;
-        setDetail(data);
-        if (data.feedback) return setState("ready");
-        if (data.status === "failed") return setState("failed");
+        latest = data;
+        if (data.feedback) return settle("ready");
+        if (data.status === "failed") return settle("failed");
+        settle("loading");
       } catch (e) {
         if (cancelled) return;
         console.debug("[feedback] poll failed", e);
-        if (++errors >= MAX_CONSECUTIVE_ERRORS) return setState("failed");
+        if (++errors >= MAX_CONSECUTIVE_ERRORS) return settle("failed");
       }
-      if (Date.now() >= deadline) return setState("failed");
+      if (Date.now() >= deadline) return settle("failed");
       timer = window.setTimeout(poll, POLL_INTERVAL_MS);
     };
 
@@ -77,5 +82,17 @@ export function useSessionFeedback(sessionId: string | null) {
     };
   }, [sessionId]);
 
-  return { detail, state };
+  // The render that hands in a new id comes *before* the effect that starts
+  // polling it, and a screen mounted in that same render runs its own effects
+  // first. So an answer about the previous id — during a call the id is null,
+  // which reads "missing" — must never be passed off as one about this id: the
+  // waiting screen took exactly that for a settled wrap-up and moved on before
+  // it was ever seen. Derived here rather than reset in the effect, which would
+  // be one render too late.
+  if (result.sessionId !== sessionId) {
+    return sessionId === null
+      ? { detail: null, state: "missing" as const }
+      : { detail: null, state: "loading" as const };
+  }
+  return { detail: result.detail, state: result.state };
 }
