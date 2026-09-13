@@ -48,6 +48,13 @@ DIREKT_API_KEY = _required_env("DIREKT_API_KEY")
 # is far longer than any leg here actually takes -- the slowest measured
 # first-token time is 3 s (ADR 0074) -- and short enough that a wedged backend
 # surfaces as a failed Turn while the user is still in the call.
+#
+# "Between chunks" is why the wrap-up does not use it: that request is not
+# streamed, so the *whole* document has to arrive inside the budget, and 4000
+# tokens plus a thinking trace on a 4B model is minutes. `llm.complete` passes
+# its own, longer one per request (`_FEEDBACK_TIMEOUT_S`) -- nothing is waiting
+# on it, and cutting a wrap-up off at two minutes would be this constant
+# breaking the thing it was added to protect.
 TIMEOUT = httpx.Timeout(120.0, connect=5.0)
 
 CLIENT = AsyncOpenAI(base_url=f"{DIREKT_URL}/v1", api_key=DIREKT_API_KEY, timeout=TIMEOUT)

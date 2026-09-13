@@ -136,6 +136,19 @@ async def stream_reply(
 # RQ job timeout.
 _MAX_FEEDBACK_TOKENS = 4000
 
+# And its own read timeout, longer than the client-wide TIMEOUT the live path
+# runs on. That one bounds the wait *between* streamed chunks; this call is not
+# streamed, so the whole document has to arrive inside it -- 4000 tokens plus a
+# thinking trace, which on the gateway's 4B model is minutes rather than
+# seconds. Under the shared 120 s the wrap-up would have been cut off on a busy
+# gateway and reported as a timeout, which is the opposite of what putting a
+# timeout there was for.
+#
+# Below `queue.JOB_TIMEOUT_S` (300 s) on purpose, and not imported from it: this
+# module must not depend on the queue. The request should give up inside the job
+# so the failure is recorded as one, rather than be killed with it.
+_FEEDBACK_TIMEOUT_S = 240.0
+
 
 async def complete(
     messages: list[dict[str, str]],
@@ -189,6 +202,8 @@ async def complete(
     completion = await client.chat.completions.create(
         model=LLM_FEEDBACK_MODEL,
         messages=messages,
+        # Per request, overriding the client's own: see _FEEDBACK_TIMEOUT_S.
+        timeout=_FEEDBACK_TIMEOUT_S,
         **({"max_tokens": max_tokens} if max_tokens is not None else {}),
         # Thinking mode: Qwen3's documented sampling for it (a low temperature
         # there degrades into repetition). Non-thinking: low but not zero, so the
