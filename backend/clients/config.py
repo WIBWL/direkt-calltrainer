@@ -10,6 +10,7 @@ DiReKT model always under SKIP_KUGELAUDIO.
 
 import os
 
+import httpx
 from dotenv import load_dotenv
 from kugelaudio import KugelAudio
 from openai import AsyncOpenAI
@@ -37,7 +38,19 @@ def _flag(name: str) -> bool:
 DIREKT_URL = _required_env("DIREKT_URL")
 DIREKT_API_KEY = _required_env("DIREKT_API_KEY")
 
-CLIENT = AsyncOpenAI(base_url=f"{DIREKT_URL}/v1", api_key=DIREKT_API_KEY)
+# The library's own default is a 600-second read timeout and two retries, so a
+# gateway that accepts the connection and then says nothing -- a wedged worker,
+# no RST -- held a Turn for up to half an hour per leg while the user sat in
+# "thinking" with no error and no way out. Nothing above these clients imposes a
+# deadline: a Turn has none, and only the boot check wraps its calls in one.
+#
+# The read budget is per attempt and, on a stream, between chunks. Two minutes
+# is far longer than any leg here actually takes -- the slowest measured
+# first-token time is 3 s (ADR 0074) -- and short enough that a wedged backend
+# surfaces as a failed Turn while the user is still in the call.
+TIMEOUT = httpx.Timeout(120.0, connect=5.0)
+
+CLIENT = AsyncOpenAI(base_url=f"{DIREKT_URL}/v1", api_key=DIREKT_API_KEY, timeout=TIMEOUT)
 
 # Optional, default off. When truthy, TTS skips KugelAudio and uses the DiReKT
 # model on every call -- which is what lets the app run without KugelAudio
@@ -108,7 +121,9 @@ if GEMINI:
     # parameter -- it surfaces as a Turn that fails for no visible reason.
     # Change the live model without changing this and that is what you get.
     LLM_CLIENT = AsyncOpenAI(
-        base_url=_required_env("GEMINI_URL"), api_key=_required_env("GEMINI_API_KEY")
+        base_url=_required_env("GEMINI_URL"),
+        api_key=_required_env("GEMINI_API_KEY"),
+        timeout=TIMEOUT,  # see the constant: the library's own default is 600 s
     )
     LLM_MODEL = _required_env("GEMINI_LIVE_MODEL")
     LLM_FEEDBACK_MODEL = _required_env("GEMINI_FEEDBACK_MODEL")

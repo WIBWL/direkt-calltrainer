@@ -78,7 +78,20 @@ async def _check_feedback_llm() -> None:
 
 
 async def _check_tts() -> None:
-    await tts.synthesize("Hallo.", _CHECK_VOICE, _CHECK_LANGUAGE)
+    """The backend that is actually configured, not whatever answers.
+
+    `tts.synthesize` catches a KugelAudio failure and returns DiReKT audio, so
+    checking through it reported "TTS OK (kugel-3)" while KugelAudio was dead --
+    an expired key, say -- and the pilot then ran all day in the fallback voice,
+    which is 2-3x slower (ADR 0040), with a green boot log and a zero exit code
+    from scripts/check_backends.py. The check names KugelAudio, so it has to be
+    KugelAudio that answered.
+    """
+    if SKIP_KUGELAUDIO:
+        await tts.synthesize("Hallo.", _CHECK_VOICE, _CHECK_LANGUAGE)
+        return
+    # pylint: disable=protected-access  # no public one-shot that skips the fallback
+    await tts._synthesize_kugelaudio("Hallo.", _CHECK_VOICE, _CHECK_LANGUAGE)
 
 
 _CHECKS: dict[str, tuple] = {
@@ -113,6 +126,17 @@ async def _run_check(name: str, check_fn, model: str) -> bool:
     except (OpenAIError, KugelAudioError, OSError) as e:
         # Some of these carry no message either; the class name beats a blank.
         logger.error("Startup check: %s FAILED (%s) — %s", name, model, str(e) or type(e).__name__)
+        return False
+    except Exception as e:  # pylint: disable=broad-except  # see `check_backends`
+        # `check_backends` promises never to raise, and `lifespan` calls it
+        # without a try: anything escaping here would stop the app from booting
+        # over a dead dependency, which is the opposite of what the promise is
+        # for. The list above does not cover everything these round trips can
+        # produce -- the TTS check runs through a third-party SDK that parses
+        # server frames, so a non-JSON frame from a proxy error page is a
+        # ValueError and nothing here would have caught it.
+        logger.error("Startup check: %s FAILED (%s) — %s: %s",
+                     name, model, type(e).__name__, str(e) or "no message")
         return False
     logger.info("Startup check: %s OK (%s)", name, model)
     return True

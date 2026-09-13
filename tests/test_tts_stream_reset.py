@@ -143,3 +143,80 @@ async def test_the_orchestrator_closes_an_abandoned_stream_before_the_teardown_r
     await gen.aclose()
 
     assert closed == ["Es geht um die Exportfunktion, die seit elf Tagen nicht funktioniert."]
+
+
+async def test_the_one_shot_path_drops_the_socket_too(kugel, monkeypatch):
+    """ADR 0044's invariant is about the pooled connection, and the one-shot
+    request uses the same one.
+
+    It had no `final` check and no reset. `synthesize` catches the failure and
+    answers with DiReKT audio, so the fallback-closing line is simply spoken in
+    the other voice and everything looks healthy -- while the abandoned
+    request's frames wait on the shared socket for the next call in the process,
+    which then hears the end of somebody else's goodbye and is a chunk out of
+    step from there on.
+    """
+    kugel.frames = [_Chunk(b"\x00\x01" * 100)]  # audio, then the stream dies
+    kugel.fail = None
+
+    async def dying_stream(**_kwargs):
+        yield _Chunk(b"\x00\x01" * 100)
+        raise KugelAudioError("connection reset mid-stream")
+
+    async def fake_direkt(_text, _voice):
+        return b"DIREKT-WAV"
+
+    kugel.stream_async = dying_stream
+    monkeypatch.setattr(tts, "_synthesize", fake_direkt)
+
+    out = await tts.synthesize("Auf Wiederhoeren.", VOICE, "de")
+    await _settle()
+
+    assert out == b"DIREKT-WAV", "the caller still gets audio"
+    assert kugel.closed == 1, "and the socket nobody finished reading is dropped"
+
+
+async def test_the_one_shot_path_keeps_a_finished_socket(kugel):
+    """The other direction, so the reset cannot simply be made unconditional:
+    a stream read to its `final` frame leaves the connection usable."""
+    out = await tts.synthesize("Auf Wiederhoeren.", VOICE, "de")
+    await _settle()
+
+    assert out.startswith(b"RIFF")
+    assert kugel.closed == 0
+
+
+async def test_two_sessions_cannot_stream_on_the_pooled_socket_at_once(kugel):
+    """One request at a time on the shared connection.
+
+    The frames carry no request id, and `websockets` refuses two concurrent
+    `recv()` calls on one connection outright -- a ConcurrencyError, which is a
+    RuntimeError and is caught nowhere along the TTS path: one call would end on
+    `tts_failed` and the other be stored as an aborted Session and logged as a
+    client that had gone away. ADR 0044 treated low concurrency as a cost
+    argument; it is a precondition.
+    """
+    in_flight = 0
+    overlap = 0
+
+    async def counting_stream(**_kwargs):
+        nonlocal in_flight, overlap
+        in_flight += 1
+        overlap = max(overlap, in_flight)
+        try:
+            await asyncio.sleep(0)
+            yield _Chunk(b"\x00\x01" * 100)
+            await asyncio.sleep(0)
+            yield {"final": True}
+        finally:
+            in_flight -= 1
+
+    kugel.stream_async = counting_stream
+
+    async def one_call():
+        return [piece async for piece in tts.synthesize_stream("Ein Satz.", VOICE, "de")]
+
+    results = await asyncio.gather(one_call(), one_call(), one_call())
+
+    assert overlap == 1, "the requests were serialised, not interleaved"
+    assert all(r for r in results), "and every one of them got its audio"

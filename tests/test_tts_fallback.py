@@ -87,9 +87,17 @@ async def test_empty_kugelaudio_stream_falls_back_to_direkt(monkeypatch):
     class EmptyStreamingTTS:
         async def stream_async(self, **_kwargs):
             # An async generator that yields nothing -- a stream that finishes
-            # cleanly with no audio.
+            # cleanly with no audio, and without a `final` frame, so the
+            # one-shot path drops the pooled connection and re-warms it.
             if False:  # pylint: disable=using-constant-test
                 yield None
+
+        async def connect_async(self, _model):
+            """The re-warm's call. Present so the background task it schedules
+            finishes rather than leaving an AttributeError nobody retrieves."""
+
+        async def _close_ws_connection(self):
+            pass
 
     class EmptyKugelAudioClient:
         tts = EmptyStreamingTTS()

@@ -173,8 +173,17 @@ async def complete(
     caller: the boot check, which wants a single attempt so a 429 reports as a
     429 rather than as its own deadline expiring.
     """
+    # The thinking level belongs in this line for the reason config.py states:
+    # its floor belongs to the model, a value underneath it is an HTTP 400 that
+    # names no parameter, and this path is reached only from the worker -- so
+    # the log is the only place the pairing is ever visible. `stream_reply`
+    # logs it; this did not.
     logger.info(
-        "LLM completion (%s, max_tokens=%s, think=%s)...", LLM_FEEDBACK_MODEL, max_tokens, think
+        "LLM completion (%s, max_tokens=%s, think=%s, effort=%s)...",
+        LLM_FEEDBACK_MODEL, max_tokens, think,
+        _backend_kwargs(
+            think=think, qwen_sampling=think, presence_penalty=None
+        ).get("reasoning_effort", "-"),
     )
     client = LLM_CLIENT if retries is None else LLM_CLIENT.with_options(max_retries=retries)
     completion = await client.chat.completions.create(
