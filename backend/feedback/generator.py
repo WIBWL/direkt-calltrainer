@@ -266,27 +266,47 @@ def _occasion(scenario: db_models.Scenario) -> list[str]:
     the situation has to be guessed. A guess is exactly what this block must
     not rest on.
 
-    The situation and nothing else. ADR 0079 withholds `success_condition` --
-    what would have ended the call well is a result rather than an occasion, and
-    handing it over invites the model to grade the outcome under the heading of
-    tone. That used to be a separate column, and this block passed `call_goal`
-    beside the situation on the grounds that wanting something is part of an
-    occasion.
+    ADR 0079 withholds `success_condition`: what would have ended the call well
+    is a result rather than an occasion, and handing it over invites the model
+    to grade the outcome under the heading of tone. It used to be its own
+    column, and this block passed `call_goal` beside the situation on the
+    grounds that wanting something is part of an occasion -- which it is.
 
-    Migration `3ce81b27af40` merged the two columns, and the seeded goals now
-    read "... The matter is settled when someone names what is wrong and when it
-    will be fixed" -- so the criterion arrived in the dossier under "What the
-    caller wanted", and the guarantee was being made in a docstring while the
-    prompt broke it. The halves cannot be told apart again in one column of
-    authored prose, so what goes in is the situation, which is what the question
-    actually needs: whether a register suited the occasion depends on what the
-    occasion was, not on what would have counted as winning.
+    Migration `3ce81b27af40` merged the two columns, so the criterion arrived in
+    the dossier inside the goal, and the guarantee was being made in a docstring
+    while the prompt broke it. The answer is to cut the criterion back off
+    (`_wanted`) rather than to drop the goal: what the caller wanted *is* the
+    occasion, and a wrap-up left to guess it again is the state this block was
+    written to end.
     """
-    return [
+    lines = [
         "The occasion of this call (established fact, not something to assess):",
         f"    Situation: {scenario.description}",
-        "",
     ]
+    wanted = _goal_without_criterion(scenario)
+    if wanted:
+        lines.append(f"    What the caller wanted: {wanted}")
+    lines.append("")
+    return lines
+
+
+# Where the merged `call_goal` stops being the goal and starts being the
+# criterion. A seed convention rather than a schema one: all 17 seeded goals end
+# on this sentence, and `tests/test_wrapup_prompt.py` checks that against the
+# real seed, so the split cannot quietly stop working when one is reworded.
+_SETTLEMENT_MARKER = "The matter is settled when"
+
+
+def _goal_without_criterion(scenario: db_models.Scenario) -> str:
+    """The call goal without the sentence saying when it counts as met.
+
+    An authored goal carries no such sentence and goes in whole, which is right:
+    there is no second thing in it to withhold. A goal that is *nothing but* the
+    criterion yields an empty string, and the line is left out rather than
+    written blank.
+    """
+    head, marker, _ = (scenario.call_goal or "").partition(_SETTLEMENT_MARKER)
+    return (head if marker else scenario.call_goal or "").strip()
 
 
 def _loudness_course(session: db_models.Session) -> str | None:

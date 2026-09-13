@@ -34,8 +34,9 @@ from backend.db import models as db_models
 from backend.db.seed_data import FOCUS_GOALS
 from backend.feedback import metrics
 from backend.feedback.generator import (
-    _ask, _dossier, _in_language, _LANGUAGE_NAMES_EN, _messages, _NO_WRAPUP,
-    _NOTHING_SAID, _unfenced_text, _without_turn_markers, _Wrapup,
+    _ask, _dossier, _goal_without_criterion, _in_language, _LANGUAGE_NAMES_EN,
+    _messages, _NO_WRAPUP, _NOTHING_SAID, _occasion, _SETTLEMENT_MARKER,
+    _unfenced_text, _without_turn_markers, _Wrapup,
 )
 from backend.session.language_packs import LANGUAGE_PACKS
 
@@ -141,6 +142,7 @@ def test_the_dossier_names_the_occasion_before_the_statistics() -> None:
 
     assert "The occasion of this call" in dossier
     assert "line that has been down since Monday" in dossier
+    assert "Get a repair date" in dossier, "what the caller wanted is the occasion"
     assert dossier.index("The occasion") < dossier.index("Measured statistics")
 
 
@@ -194,6 +196,10 @@ def test_the_dossier_withholds_the_success_condition() -> None:
 
     assert "The matter is settled when" not in dossier
     assert "named engineer" not in dossier
+    # And the half in front of it is still there: the criterion is cut off the
+    # goal, not the goal dropped. A wrap-up left to guess the occasion again is
+    # the state the block was written to end.
+    assert "Get a repair date" in dossier
 
 
 def test_prompt_forbids_markup_inside_the_phase_paragraph(system_prompt: str) -> None:
@@ -493,3 +499,39 @@ def test_real_prose_still_becomes_the_fallback_summary() -> None:
     prose = "Sie haben ruhig und klar nachgefragt, und das Gespräch blieb sachlich."
 
     assert _unfenced_text(prose, "German") == prose
+
+
+def test_every_seeded_goal_marks_where_its_criterion_starts() -> None:
+    """The split rests on a seed convention, so the seed has to keep it.
+
+    `_goal_without_criterion` cuts the goal at "The matter is settled when",
+    which is how all 17 shipped Scenarios mark the half ADR 0079 withholds.
+    Reword one without the sentence and its criterion goes back into the
+    dossier, silently -- which is exactly how it got there in the first place,
+    when migration 3ce81b27af40 merged the two columns.
+    """
+    from backend.db.seed_data import SCENARIOS  # pylint: disable=import-outside-toplevel
+
+    missing = [s["id"] for s in SCENARIOS if _SETTLEMENT_MARKER not in s["call_goal"]]
+
+    assert not missing, f"call_goal without the settlement sentence: {missing}"
+
+
+def test_an_authored_goal_with_no_criterion_goes_in_whole() -> None:
+    """A User's own Scenario carries no such sentence, and there is nothing in
+    it to withhold: the goal is the occasion and all of it is."""
+    own = SimpleNamespace(call_goal="Klären, ob die Lieferung diese Woche noch kommt.")
+
+    assert _goal_without_criterion(own) == "Klären, ob die Lieferung diese Woche noch kommt."
+
+
+def test_a_goal_that_is_only_a_criterion_adds_no_line() -> None:
+    """Nothing is written rather than an empty label."""
+    odd = SimpleNamespace(
+        description="Eine Situation.",
+        call_goal=f"{_SETTLEMENT_MARKER} the date is confirmed.",
+        reverse=False,
+    )
+
+    assert _goal_without_criterion(odd) == ""
+    assert "What the caller wanted" not in "\n".join(_occasion(odd))
