@@ -16,7 +16,7 @@ import FilterSlider, { type FilterOption } from "./FilterSlider";
 
 /** Static labels; the "tenant" option is labelled with the company name. */
 const ORIGIN_LABELS: Record<Exclude<LibraryFilter, "tenant">, string> = {
-  recommended: "Ihre Empfehlungen",
+  recommended: "Empfehlungen",
   all: "Alle",
   standard: "Standard",
   own: "Individuell",
