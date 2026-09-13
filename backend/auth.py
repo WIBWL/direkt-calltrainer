@@ -59,11 +59,17 @@ _bearer = HTTPBearer(auto_error=False)
 @dataclass(frozen=True)
 class AuthContext:
     """The verified caller. `sub` is the Keycloak user id — the value written
-    as `session.subject_id` when the Session is persisted (ADR 0031/0034)."""
+    as `session.subject_id` when the Session is persisted (ADR 0031/0034).
+
+    `tenant` is a Keycloak user attribute (set at account creation) mapped into
+    the access token as a `tenant` claim; it decides which company's shared
+    Scenarios the caller sees (ADR 0060, `backend/tenants.py`). Optional — a
+    token without it falls through to the `default` tenant."""
 
     sub: str
     roles: list[str]
     token: str
+    tenant: str | None = None
 
 
 @lru_cache(maxsize=1)
@@ -110,7 +116,11 @@ def verify_token(token: str) -> AuthContext:
 
     resource_access = payload.get("resource_access") or {}
     roles = list((resource_access.get(OIDC_AUDIENCE) or {}).get("roles") or [])
-    return AuthContext(sub=sub, roles=roles, token=token)
+    tenant = payload.get("tenant")
+    return AuthContext(
+        sub=sub, roles=roles, token=token,
+        tenant=tenant.strip() if isinstance(tenant, str) and tenant.strip() else None,
+    )
 
 
 async def require_user(

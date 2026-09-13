@@ -1,4 +1,7 @@
-"""The seed runs on every application start (backend/db/provision.py, called
+"""The reference tables the application seeds itself (ADR 0041, ADR 0057,
+ADR 0058, ADR 0076).
+
+The seed runs on every application start (backend/db/provision.py, called
 from the lifespan handler), so running it twice must not change anything the
 first run produced.
 
@@ -49,7 +52,7 @@ def _run_seed(database_url: str) -> str:
 
 def _counts(url: str) -> dict[str, int]:
     engine = create_engine(url)
-    tables = ["language", "persona", "persona_objection", "scenario", "metric_type"]
+    tables = ["language", "tenant", "persona", "persona_objection", "scenario", "metric_type"]
     try:
         with engine.connect() as conn:
             return {t: conn.execute(text(f"SELECT count(*) FROM {t}")).scalar_one() for t in tables}
@@ -66,6 +69,7 @@ def test_seed_populates_the_reference_tables(migrated_database: str) -> None:
     assert counts["scenario"] > 0
     assert counts["language"] > 0
     assert counts["metric_type"] > 0
+    assert counts["tenant"] >= 3  # solox, appollo, default (ADR 0060)
 
 
 def test_seed_is_idempotent(migrated_database: str) -> None:
@@ -109,10 +113,11 @@ def test_seed_deactivates_personas_it_no_longer_contains(migrated_database: str)
         with engine.begin() as conn:
             conn.execute(
                 text(
-                    "INSERT INTO persona (key, name, role_label, role, traits, behavior,"
-                    " training_goal, difficulty, language_code, tts_voice, active)"
-                    " VALUES ('retired-persona', 'Alt', 'Alt', 'Alt', 'alt', 'alt', '', 'mittel',"
-                    " 'de', 'de_male', true)"
+                    "INSERT INTO persona (key, extern_id, name, role_label, role, traits,"
+                    " behavior, training_goal, difficulty, language_code, tts_voice,"
+                    " active, visibility)"
+                    " VALUES ('retired-persona', gen_random_uuid(), 'Alt', 'Alt', 'Alt',"
+                    " 'alt', 'alt', '', 'mittel', 'de', 'de_male', true, 'public')"
                 )
             )
 
@@ -126,3 +131,104 @@ def test_seed_deactivates_personas_it_no_longer_contains(migrated_database: str)
         engine.dispose()
 
     assert still_there is False, "Retired Persona should be deactivated, not left active"
+
+
+def test_seed_deactivates_metric_types_it_no_longer_contains(migrated_database: str) -> None:
+    """The same rule for the metric inventory, which ADR 0057 already claims it
+    follows: when a metric key was renamed, the old row is deactivated.
+
+    It was not, for a long time. Every German key from before that rename stayed
+    active beside its English replacement, and both carry the same display name
+    ("Redeanteil" for `redeanteil` and for `talk_share`), so anything reading the
+    inventory saw each renamed metric twice. Measurements reference these rows,
+    which is why this is a flag and not a delete.
+    """
+    _run_seed(migrated_database)
+
+    engine = create_engine(migrated_database)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO metric_type (key, name, unit, active)"
+                    " VALUES ('redeanteil', 'Redeanteil', '%', true)"
+                )
+            )
+
+        _run_seed(migrated_database)
+
+        with engine.connect() as conn:
+            still_there = conn.execute(
+                text("SELECT active FROM metric_type WHERE key = 'redeanteil'")
+            ).scalar_one()
+    finally:
+        engine.dispose()
+
+    assert still_there is False, "Renamed metric type should be deactivated"
+
+
+# --- The sweep must not reach User-owned rows (ADR 0058) ---------------------
+#
+# `scenario` holds authored Scenarios, Folgeszenarien and Rollentausch rows
+# beside the shipped ones, and the seed runs at every application start. The
+# three tests below pin the two halves of that: the sweep still retires a
+# built-in, and it does not touch a row somebody wrote.
+
+_AUTHORED_SCENARIO = (
+    "INSERT INTO scenario (key, extern_id, title, short_description, description,"
+    " case_facts, call_goal, briefing, active, reverse, visibility,"
+    " created_by, created_at, updated_at)"
+    " VALUES (:key, gen_random_uuid(), 'Eigenes', 'Kurz', 'Lang', 'Fakten', 'Ziel',"
+    " '', true, false, 'private', :created_by, now(), now())"
+)
+
+
+def _seed_twice_with(database_url: str, key, created_by: str | None) -> bool:
+    """Insert one scenario row, re-run the seed, and report whether it survived."""
+    _run_seed(database_url)
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(_AUTHORED_SCENARIO), {"key": key, "created_by": created_by})
+
+        _run_seed(database_url)
+
+        with engine.connect() as conn:
+            return conn.execute(
+                text("SELECT active FROM scenario WHERE title = 'Eigenes'")
+            ).scalar_one()
+    finally:
+        engine.dispose()
+
+
+def test_seed_deactivates_a_built_in_scenario_it_no_longer_contains(
+    migrated_database: str,
+) -> None:
+    """The sweep still does its job. Here so that the two tests below cannot be
+    satisfied by simply switching it off for this table."""
+    assert _seed_twice_with(migrated_database, "retired-scenario", None) is False
+
+
+def test_seed_leaves_an_authored_scenario_alone(migrated_database: str) -> None:
+    """A Scenario a User wrote is not a retired built-in, and the seed has no
+    opinion about it (ADR 0058)."""
+    assert _seed_twice_with(migrated_database, None, "keycloak-sub-1") is True
+
+
+def test_seed_leaves_an_authored_scenario_alone_even_when_it_has_a_key(
+    migrated_database: str,
+) -> None:
+    """The one that bites.
+
+    An authored row carries no `key` today, so the sweep passes it by through
+    SQL's three-valued logic alone -- `NULL NOT IN (...)` is NULL, not TRUE --
+    and the previous test would pass with no guard in `_deactivate_missing` at
+    all. Give `scenario.key` a default or backfill it, two tables away from the
+    sweep, and every User's library would be deactivated on the next boot with
+    no error and nothing failing.
+
+    So this one states the rule the sweep is supposed to follow -- the seed
+    retires what the seed created, and authorship is what says so -- rather than
+    the accident that currently enforces it.
+    """
+    assert _seed_twice_with(migrated_database, "user-picked-a-key", "keycloak-sub-1") is True

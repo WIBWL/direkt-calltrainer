@@ -1,8 +1,14 @@
-"""Startup health checks for the three pipeline backends.
+"""Startup health checks for the pipeline backends.
 
 Fires one minimal real request at each backend (STT, LLM, TTS) so a dead model
 surfaces at boot, not mid-call. Uses the exact prod code paths, including TTS's
-KugelAudio-then-DiReKT fallback (see `DEBUG` in `backend.clients.config`).
+KugelAudio-then-DiReKT fallback (see `SKIP_KUGELAUDIO` in `backend.clients.config`).
+
+A fourth check appears when the wrap-up runs on a model of its own (ADR 0074).
+It has to: that model is reached only from the RQ worker, so a name that 404s
+breaks nothing a caller would notice -- the calls keep working and the wrap-ups
+simply never arrive, which is exactly how a dead worker once went unnoticed for
+hours.
 """
 
 import asyncio
@@ -12,10 +18,12 @@ import logging
 import wave
 
 from kugelaudio.exceptions import KugelAudioError
-from openai import OpenAIError
+from openai import DEFAULT_MAX_RETRIES, OpenAIError
 
 from backend.clients import llm, stt, tts
-from backend.clients.config import DEBUG, KUGELAUDIO_MODEL, LLM_MODEL, STT_MODEL, TTS_MODEL
+from backend.clients.config import (
+    SKIP_KUGELAUDIO, KUGELAUDIO_MODEL, LLM_FEEDBACK_MODEL, LLM_MODEL, STT_MODEL, TTS_MODEL,
+)
 from backend.personas import PersonaVoice
 
 logger = logging.getLogger(__name__)
@@ -26,6 +34,17 @@ logger = logging.getLogger(__name__)
 _CHECK_VOICE = PersonaVoice(tts_voice="de_male", kugelaudio_voice_id=1885)
 _CHECK_LANGUAGE = "de"
 _CHECK_TIMEOUT = 20.0
+# One attempt, against the client's default of two retries. Retrying is right
+# for a Turn -- a call should survive a blip -- and wrong here: the retries and
+# their backoff run inside _CHECK_TIMEOUT, so a model answering 429 gets its
+# answer thrown away and the probe reports the deadline instead. A liveness
+# check that hides why it failed is worth less than one that fails honestly, and
+# nothing downstream depends on this passing: it only logs.
+#
+# Only the two LLM checks take it. STT and TTS go through clients this cannot
+# reach from here -- the DiReKT one is shared with STT's own path, and
+# KugelAudio is a different SDK entirely.
+_CHECK_RETRIES = 0
 
 
 def _silent_wav() -> bytes:
@@ -44,9 +63,18 @@ async def _check_stt() -> None:
 
 
 async def _check_llm() -> None:
-    async with contextlib.aclosing(llm.stream_reply([{"role": "user", "content": "ping"}])) as stream:
+    async with contextlib.aclosing(
+        llm.stream_reply([{"role": "user", "content": "ping"}], retries=_CHECK_RETRIES)
+    ) as stream:
         async for _ in stream:
             break  # one delta is enough to prove the model responds
+
+
+async def _check_feedback_llm() -> None:
+    # `think=True` because that is how all three of its callers use it, and the
+    # thinking level is the parameter most likely to be wrong for a given model
+    # -- an unsupported one is a 400 that names nothing (ADR 0074).
+    await llm.complete([{"role": "user", "content": "ping"}], think=True, retries=_CHECK_RETRIES)
 
 
 async def _check_tts() -> None:
@@ -56,23 +84,43 @@ async def _check_tts() -> None:
 _CHECKS: dict[str, tuple] = {
     "STT": (_check_stt, STT_MODEL),
     "LLM": (_check_llm, LLM_MODEL),
-    "TTS": (_check_tts, TTS_MODEL if DEBUG else KUGELAUDIO_MODEL),
+    "TTS": (_check_tts, TTS_MODEL if SKIP_KUGELAUDIO else KUGELAUDIO_MODEL),
 }
+if LLM_FEEDBACK_MODEL != LLM_MODEL:
+    # Only when they actually differ: on the gateway they are one name, and a
+    # second identical request would spend a boot request to learn nothing.
+    _CHECKS["LLM (wrap-up)"] = (_check_feedback_llm, LLM_FEEDBACK_MODEL)
 
 
 async def _run_check(name: str, check_fn, model: str) -> bool:
     try:
         await asyncio.wait_for(check_fn(), timeout=_CHECK_TIMEOUT)
-    except (OpenAIError, KugelAudioError, TimeoutError, OSError) as e:
-        logger.error("Startup check: %s FAILED (%s) — %s", name, model, e)
+    # Before OSError, which it is a subclass of -- and said in words, because
+    # asyncio's TimeoutError carries no message: `str(e)` is empty and the line
+    # used to end in a bare dash, which reads like a backend that answered with
+    # nothing rather than one that did not answer. The retries are named in it
+    # because they are the usual reason a *working* model lands here: the
+    # OpenAI client retries a 429 or a 5xx with backoff before it raises, and
+    # those attempts run inside this window, so a rate-limited model times out
+    # here instead of reporting its 429.
+    except TimeoutError:
+        logger.error(
+            "Startup check: %s FAILED (%s) — no answer within %.0f s; a 429 or a 5xx is "
+            "retried %d times inside that window and ends up looking like this",
+            name, model, _CHECK_TIMEOUT, DEFAULT_MAX_RETRIES,
+        )
+        return False
+    except (OpenAIError, KugelAudioError, OSError) as e:
+        # Some of these carry no message either; the class name beats a blank.
+        logger.error("Startup check: %s FAILED (%s) — %s", name, model, str(e) or type(e).__name__)
         return False
     logger.info("Startup check: %s OK (%s)", name, model)
     return True
 
 
 async def check_backends() -> bool:
-    """Check all three pipeline backends concurrently, one log line each;
-    returns True only if all passed.
+    """Check every configured pipeline backend concurrently, one log line
+    each; returns True only if all passed.
 
     Never raises — it runs from `lifespan`, which logs a dead dependency rather
     than failing the boot. The return value is for `scripts/check_backends.py`,

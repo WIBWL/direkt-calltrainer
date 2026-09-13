@@ -4,7 +4,7 @@ One transaction, once, after the call has ended -- never from inside the live
 turn loop, which must not be able to fail because of the database.
 
 This is the seam between the in-memory Session and the schema: it takes the two
-readings of a finished Session that backend/session/models.py produces -- the
+readings of a finished Session that backend/feedback/calls.py produces -- the
 utterances on their timeline, and the call folded into the facts its statistics
 come from -- and writes them as rows.
 """
@@ -23,10 +23,11 @@ from sqlalchemy.orm import Session as DbSession
 # entities visibly distinct from the identically named in-memory ones.
 from backend.db import models as db_models
 from backend.db.session import session_scope
-from backend.feedback import metrics
+from backend.feedback import interruptions, metrics
+from backend.feedback.calls import Conversation, conversation, utterances
 from backend.personas import Persona
 from backend.scenarios import Scenario
-from backend.session.models import Turn, conversation, utterances
+from backend.session.models import Turn
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ _STATUS = {
 }
 
 
-def persist_session(
+def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     extern_id: uuid.UUID,
     subject_id: str,
     persona: Persona,
@@ -74,10 +75,19 @@ def persist_session(
                 start_offset_ms=spoken.offset_ms,
                 duration_ms=spoken.duration_ms,
                 transcript=spoken.text,
+                interrupted=spoken.interrupted,
+                unheard_text=spoken.unheard or None,
+                # The raw facts of this utterance, kept because the audio they
+                # were measured from is discarded when the call ends (ADR 0048)
+                # while which stretch of the call was demanding is decided
+                # afterwards, by the wrap-up (ADR 0081). NULL on a Persona row.
+                acoustics_json=spoken.acoustics.as_json() if spoken.acoustics else None,
             )
             for index, spoken in enumerate(utterances(turns))
         ]
-        _write_analysis(db, session, conversation(turns))
+        _write_analysis(
+            db, session, conversation(turns, persona.language_id, scenario.reverse)
+        )
         # The wrap-up itself is generated asynchronously (ADR 0018/0019); this
         # row is what makes its outcome queryable afterwards (ADR 0032).
         session.jobs = [db_models.AnalysisJob(
@@ -94,17 +104,20 @@ def persist_session(
 
 
 def _write_analysis(
-    db: DbSession, session: db_models.Session, call: metrics.Conversation
+    db: DbSession, session: db_models.Session, call: Conversation
 ) -> None:
-    """Attach the Session's Measurement rows.
-
-    No `Finding` rows are written: marking a value as remarkable takes a norm to
-    compare it against, and none of these metrics has one that was measured
-    rather than guessed (ADR 0051). The table waits for pilot data.
+    """Attach the Session's Measurement and Finding rows.
 
     A metric the seed does not know is dropped rather than written against a
     guessed reference row -- provision.py seeds the inventory from the same
     METRICS tuple, so that can only happen against a database behind the code.
+
+    Findings are written for one thing only, and the distinction is what makes
+    it allowable: a hard interruption is an *event that occurred at a moment*,
+    not a value judged against a threshold. ADR 0051 keeps the table empty for
+    the second kind, because marking a figure as remarkable takes a norm nobody
+    measured. Nothing of that sort is written here -- an overlap either happened
+    or it did not, and the row says when.
     """
     metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType).all()}
     session.measurements = [
@@ -116,16 +129,32 @@ def _write_analysis(
         for m in metrics.measure(call)
         if m.key in metric_ids
     ]
+    session.findings = [
+        db_models.Finding(
+            metric_type_id=metric_ids.get(interruptions.COUNT_KEY),
+            category=interruptions.FINDING_CATEGORY,
+            offset_ms=event.offset_ms,
+            description=interruptions.finding_description(event),
+        )
+        for event in interruptions.classify(call.timeline).hard
+    ]
 
 
-def _reference(db: DbSession, model: type, key: str):
-    """A seeded reference row, by its natural key.
+def _reference(db: DbSession, model: type, extern_id: str):
+    """The Persona / Scenario row a Session points at, by its `extern_id`.
 
-    Assigned through the relationship rather than the foreign key, so the
-    primary key never has to be named here. Only Persona and Scenario go
-    through this -- the Feedback tables are attached directly, by id.
+    That is what the value object carries as `.id` since ADR 0058 (an authored
+    row has no `key` slug). Assigned through the relationship rather than the
+    foreign key, so the primary key never has to be named here -- only Persona
+    and Scenario go through this, the Feedback tables are attached directly, by
+    id. `active` is not checked -- a Session may reference a since-retired row,
+    same as before.
     """
-    row = db.query(model).filter_by(key=key).one_or_none()
+    try:
+        ref = uuid.UUID(str(extern_id))
+    except (ValueError, TypeError) as e:
+        raise LookupError(f"{model.__name__} {extern_id!r} is not a valid id") from e
+    row = db.query(model).filter_by(extern_id=ref).one_or_none()
     if row is None:
-        raise LookupError(f"{model.__name__} {key!r} is not seeded")
+        raise LookupError(f"{model.__name__} {extern_id!r} is not seeded")
     return row

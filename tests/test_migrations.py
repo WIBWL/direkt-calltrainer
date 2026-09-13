@@ -1,10 +1,24 @@
-"""The migrations have to be runnable in both directions.
+"""The migration chain, in both directions (ADR 0027, ADR 0052, ADR 0053).
 
 `downgrade()` is the half that never gets exercised by normal work, and
 autogenerate reliably produces a broken one — unnamed constraints it cannot
 drop, and NOT NULL columns added without a backfill. These tests run the whole
 chain rather than the newest revision, so a later revision cannot quietly break
 an earlier one's downgrade.
+
+**What "both directions" means here, exactly:** on an *empty* database, which is
+what `empty_database` hands these tests. The chain is not reversible once there
+are rows — `d7f41c9b3a26` widened `persona.traits` past the 120 characters it
+came from, so rolling back past it fails on any seeded database with
+`value too long for type character varying(120)`. That is deliberate (the
+migration says so: truncating silently would be worse), but it means a green run
+here is not a promise that a deployed schema can be rolled back. It cannot, and
+there are no backups either.
+
+Also pinned here rather than in a file of their own, because both are properties
+of the chain as a whole: every constraint follows the naming convention on
+`Base.metadata` (ADR 0053), without which autogenerate emits constraints whose
+`downgrade()` cannot run, and every foreign-key column is indexed (ADR 0052).
 """
 from sqlalchemy import create_engine, inspect, text
 

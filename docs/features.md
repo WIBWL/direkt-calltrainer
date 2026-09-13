@@ -23,6 +23,9 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 | F-23 | Mehrteilige Projektgespräche | Trainingsfälle erstrecken sich über mehrere Sitzungen, wobei sich der Gegenpart an vorangegangene Termine erinnert. | Funktionale Vollständigkeit | COULD | R-11 |
 | F-34 | Usergesteuertes Szenario | Der Nutzer beschreibt die zu trainierende Gesprächssituation per Freitext. | Funktionale Vollständigkeit | COULD | Systementwurf |
 | F-58 | Szenario aus hochgeladenem Dokument | Aus einem hochgeladenen Dokument erzeugt das System ein sitzungsbezogenes Szenario, um Gespräche mit stärkerem Unternehmensbezug zu üben. | Funktionale Vollständigkeit | SHOULD | R-42 |
+| F-60 | Folgeszenario aus dem Feedback | Aus den Verbesserungspunkten eines abgeschlossenen Gesprächs entwirft das System auf Knopfdruck das nächste Gespräch in derselben Sache – derselbe Fall, zeitlich später –, das genau die dort benannten Punkte verlangt. Es wird als eigenes Szenario gespeichert und lässt sich im Editor ändern. | Funktionale Vollständigkeit | SHOULD | R-22, Systementwurf |
+| F-62 | Zufallsszenario | Der Nutzer startet ein Gespräch, ohne zu wissen, worum es geht: das System zieht eines der verfügbaren Szenarien und nennt es erst nach dem Gespräch. Der Anlass erschließt sich wie bei einem eingehenden Anruf erst im Gespräch selbst. | Funktionale Vollständigkeit | COULD | Systementwurf |
+| F-63 | Anruf annehmen statt starten | Vor einem gewöhnlichen Gespräch klingelt das Telefon: der Nutzer sieht, wer anruft, und nimmt den Anruf an, statt einen Startknopf zu drücken. Das entspricht der Rollenverteilung – die KI ruft an, der Nutzer ist die Seite, die abnimmt. | Benutzbarkeit | COULD | Systementwurf |
 | F-59 | Mandantenbezogene Szenario-Bibliothek | Selbst erstellte Szenarien werden über die Sitzung hinaus mandantenbezogen gespeichert, sodass Kollegen ohne erneute Erfassung damit trainieren. | Funktionale Vollständigkeit | COULD | R-58 |
 
 ## Sprach- und Kommunikationsanalyse
@@ -58,7 +61,13 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 |---|---|---|---|---|---|
 | F-12 | Aufzeichnung des Gesprächs | Aufzeichnung und Transkription zur nachträglichen Reflexion. Das Transkript liegt unmittelbar nach dem Gespräch vollständig in Textform vor und wird während des Gesprächs nicht angezeigt. | Funktionale Vollständigkeit | MUST | R-28, R-52 |
 | F-13 | Aufzeichnung des Fortschritts | Nutzerbezogene Verlaufsdaten über längere Zeiträume, nachvollziehbar dargestellt. | Funktionale Vollständigkeit | SHOULD | R-27, R-29, R-30 |
+| F-64 | Gesprächsfeedback als PDF | Die Auswertung wird nach dem Gespräch als gestaltetes PDF zum Herunterladen angeboten: Zusammenfassung, Stärken, Verbesserungen, phasengerechte Sprache und Kennzahlen in der Reihenfolge der Seite, das vollständige Transkript mit Zeitmarken und Sprecherkennzeichnung am Ende. Die Datei entsteht im Browser und wird nicht hochgeladen. | Benutzbarkeit | COULD | F-12, Systementwurf |
 | F-48 | Trainingshistorie | Übersicht vergangener Trainings, filterbar nach Szenario-Typ und Zeitraum. | Funktionale Vollständigkeit | COULD | R-29 |
+| F-61 | Rollentausch eines Gesprächs | Ein abgeschlossenes Gespräch lässt sich mit vertauschten Rollen wiederholen: der Nutzer ruft an, die KI nimmt ab und übernimmt die Seite des Nutzers. Während des Gesprächs sieht der Nutzer die Unterlagen, die zuvor die KI hatte, samt einer kurzen Liste, worauf zu achten ist. | Funktionale Vollständigkeit | COULD | R-25, R-28, R-01 |
+| F-62 | Persönliche Fokusziele | Der Nutzer wählt aus einem Katalog bis zu fünf Trainingsziele, die in Training und Auswertung besonders hervorgehoben werden; die übrigen Ziele bleiben unberührt. Die Auswahl wird beim ersten Start erfragt, ist mit „ohne Fokus“ beantwortbar und im Profil jederzeit änderbar. | Funktionale Vollständigkeit | SHOULD | R-30, Systementwurf |
+| F-63 | Analyse des Gesprächseinstiegs | Prüfung, ob der erste eigene Redebeitrag Begrüßung, eigenen Namen und Anliegen enthält, sowie dessen Tempo gegenüber dem restlichen Gespräch. | Funktionale Korrektheit | SHOULD | F-62 |
+| F-64 | Vorschlag für das nächste Gespräch | Nach einem Gespräch werden bis zu zwei bestehende Szenarien zum direkten Start angeboten: dasselbe Szenario in der anderen Sprache und ein weiteres aus der Bibliothek, begründet aus Profil, Fokuszielen und Historie. | Funktionale Vollständigkeit | COULD | F-62 |
+| F-65 | Analyse des Gesprächsabschlusses | Prüfung, ob die letzten beiden eigenen Redebeiträge das Ergebnis zusammenfassen, einen konkreten nächsten Schritt festhalten und sich verabschieden. | Funktionale Korrektheit | SHOULD | F-62 |
 
 ## Bedienoberfläche
 
@@ -99,6 +108,6 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 | Prio | Anzahl |
 |---|---|
 | MUST | 17 |
-| SHOULD | 10 |
-| COULD | 14 |
-| **Gesamt** | **41** |
+| SHOULD | 11 |
+| COULD | 18 |
+| **Gesamt** | **46** |

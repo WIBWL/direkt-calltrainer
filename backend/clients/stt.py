@@ -6,8 +6,9 @@ model — a dead STT model fails the Turn (ADR 0011, ADR 0016).
 """
 
 import logging
+import time
 
-from backend.clients.config import STT_CLIENT, STT_MODEL
+from backend.clients.config import LOG_TRANSCRIPTS, STT_CLIENT, STT_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +21,25 @@ async def transcribe(audio_bytes: bytes, filename: str, content_type: str | None
     phrase ("Vielen Dank.") on near-silence, which a VAD misfire can let through.
     """
     logger.info("Transcribing via STT (%s, language=%s)...", STT_MODEL, language_id)
+    started = time.monotonic()
     transcription = await STT_CLIENT.audio.transcriptions.create(
         model=STT_MODEL,
         file=(filename, audio_bytes, content_type),
         language=language_id,
     )
-    logger.info("Transcript: %s", transcription.text)
+    # What the user said is personal data, and the log file is outside every
+    # deletion path this application has (ADR 0066). The length is the part
+    # that is actually useful for spotting a misfire — an empty transcript, or
+    # the short hallucination the docstring above warns about — and it says
+    # nothing about the person. The text itself only under LOG_TRANSCRIPTS.
+    if LOG_TRANSCRIPTS:
+        logger.info("Transcript: %s", transcription.text)
+    else:
+        # The duration alongside the length: STT is one blocking call per Turn
+        # (Whisper needs the whole utterance), so it is a fixed floor under
+        # every reply and worth seeing next to the LLM's own timing.
+        logger.info(
+            "Transcript received (%d characters) in %.2f s",
+            len(transcription.text), time.monotonic() - started,
+        )
     return transcription.text

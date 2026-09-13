@@ -17,6 +17,8 @@ Content sources:
     MetricType       -> backend/feedback/metrics.py (METRICS), which also
                         derives the measurement rows, so the seeded inventory
                         and the analysis cannot drift apart.
+    FocusGoal        -> backend/db/seed_data.py (FOCUS_GOALS, ADR 0076), read
+                        at runtime through backend/focus.py
 """
 
 from __future__ import annotations
@@ -28,8 +30,25 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy.orm import Session as DbSession
 
-from backend.db.models import Language, MetricType, Persona, PersonaObjection, Scenario
-from backend.db.seed_data import LANGUAGE_NAMES, PERSONAS, SCENARIOS
+from backend.authored_text import clean
+from backend.db.models import (
+    AuthoredContent,
+    FocusGoal,
+    Language,
+    MetricType,
+    Persona,
+    PersonaObjection,
+    Scenario,
+    Tenant,
+    VISIBILITY_PUBLIC,
+)
+from backend.db.seed_data import (
+    FOCUS_GOALS,
+    LANGUAGE_NAMES,
+    PERSONAS,
+    SCENARIOS,
+    TENANTS,
+)
 from backend.db.session import advisory_lock, session_scope
 from backend.feedback.metrics import METRICS
 
@@ -68,9 +87,11 @@ def seed(db: DbSession) -> dict[str, int]:
     """Bring the reference tables to the seed state; returns rows created."""
     created = {
         "Language": _seed_languages(db),
+        "Tenant": _seed_tenants(db),
         "Persona": _seed_personas(db),
         "Scenario": _seed_scenarios(db),
         "MetricType": _seed_metric_types(db),
+        "FocusGoal": _seed_focus_goals(db),
     }
     # Deactivate, never delete: `session` references these rows by foreign key,
     # so a Persona dropped from the seed has to stay readable for the Sessions
@@ -78,25 +99,63 @@ def seed(db: DbSession) -> dict[str, int]:
     # `active`, which is what actually removes it from the selection.
     _deactivate_missing(db, Persona, {p["id"] for p in PERSONAS})
     _deactivate_missing(db, Scenario, {s["id"] for s in SCENARIOS})
+    # The same rule for the focus catalogue (ADR 0076): `focus_selection_goal`
+    # references it, so a retired goal stays readable for the selections that
+    # already name it, and /api/focus filters on `active`.
+    _deactivate_missing(db, FocusGoal, {g["id"] for g in FOCUS_GOALS})
+    # And for the metric inventory. ADR 0057 states this already happens ("the
+    # old key is deactivated and the new one inserted"), but the call was never
+    # made, so every German key from before that rename stayed active beside its
+    # English replacement -- two rows with the same display name, and a Session
+    # measured before the rename pointing at the older one. Measurements
+    # reference these rows, hence deactivation and not a delete.
+    _deactivate_missing(db, MetricType, {m.key for m in METRICS})
     # Languages are deliberately absent: a closed code list, never retired, and
     # a Session keeps pointing at the code it ran in.
     return created
 
 
-def _deactivate_missing(db: DbSession, model, seeded_keys: set[str]) -> None:
-    """Sets `active` to False on every row the seed no longer contains."""
-    (
-        db.query(model)
-        .filter(model.key.notin_(seeded_keys), model.active.is_(True))
-        .update({"active": False}, synchronize_session=False)
+def _seed_tenants(db: DbSession) -> int:
+    """The pilot companies plus the `default` tenant (ADR 0060). Never
+    deactivated -- an authored row keeps pointing at the tenant it belonged to."""
+    return sum(
+        _upsert(db, Tenant, {"extern_ref": t["extern_ref"]}, {"name": t["name"]})[1]
+        for t in TENANTS
     )
+
+
+def _deactivate_missing(db: DbSession, model, seeded_keys: set[str]) -> None:
+    """Sets `active` to False on every row *the seed created* and no longer contains.
+
+    The scoping is the load-bearing part. Two of the four tables swept here carry
+    `AuthoredContent` (ADR 0058) -- `scenario` and `persona` -- which is exactly
+    the statement that they hold User-owned rows beside the shipped ones: an
+    authored Scenario, a Folgeszenario, a Rollentausch. Reading "not in the seed"
+    as "retired" over those would deactivate every one of them, on a path that
+    runs at every application start.
+
+    It does not today, and the reason is not a rule: an authored row carries no
+    `key`, and `NULL NOT IN (...)` is NULL rather than TRUE in SQL's three-valued
+    logic, so the UPDATE passes it by. Nothing said so and no test covered it, so
+    giving `key` a default or backfilling it -- an ordinary-looking change, two
+    tables away from this one -- would empty every User's library on the next
+    boot, with no error and nothing failing. `created_by IS NULL` is the rule
+    ADR 0058 actually states for "shipped", so that is what this asks, and the
+    mixin that lets a table hold User rows is the same thing that takes them out
+    of the sweep. A fifth table inherits the protection by inheriting the mixin.
+    """
+    query = db.query(model).filter(model.key.notin_(seeded_keys), model.active.is_(True))
+    if issubclass(model, AuthoredContent):
+        query = query.filter(model.created_by.is_(None))
+    query.update({"active": False}, synchronize_session=False)
 
 
 def inventory(db: DbSession) -> dict[str, int]:
     """Row counts of the reference tables, for the CLI's summary line."""
     return {
         model.__name__: db.query(model).count()
-        for model in (Language, Persona, PersonaObjection, Scenario, MetricType)
+        for model in (Language, Tenant, Persona, PersonaObjection, Scenario,
+                      MetricType, FocusGoal)
     }
 
 
@@ -123,23 +182,37 @@ def _seed_languages(db: DbSession) -> int:
     )
 
 
+# Seed text goes through the same sanitiser as authored text (ADR 0059): it is
+# team-written and expected to be a no-op, so a change here is a seed bug caught
+# at provisioning rather than a surprise in a live prompt.
 def _seed_personas(db: DbSession) -> int:
     created = 0
     for p in PERSONAS:
         row, was_created = _upsert(
             db, Persona, {"key": p["id"]},
-            {"name": p["name"], "role_label": p["role_label"], "role": p["role"],
-             "traits": p["traits"], "behavior": p["behavior"],
-             "training_goal": p["training_goal"], "difficulty": p["difficulty"],
-             "active": True, "language_code": p["language_id"],
+            {"name": clean(p["name"]), "role_label": clean(p["role_label"]),
+             "role": clean(p["role"]), "traits": clean(p["traits"]),
+             "traits_label": clean(p["traits_label"]),
+             "behavior": clean(p["behavior"]),
+             "training_goal": clean(p["training_goal"]), "difficulty": p["difficulty"],
+             # Defaults to True: a Persona is only seeded inactive while
+             # something it needs to run is still missing -- today a KugelAudio
+             # voice id. Written to the table either way, so filling the id in
+             # and dropping the flag is the whole change.
+             # Not run through `clean()`: a path is not authored prose, and the
+             # sanitiser's business is prompt text (ADR 0059).
+             "avatar_url": p.get("avatar_url"),
+             "active": p.get("active", True), "language_code": p["language_id"],
              "tts_voice": p["tts_voice"],
-             "kugelaudio_voice_id": p["kugelaudio_voice_id"]})
+             "kugelaudio_voice_id": p["kugelaudio_voice_id"],
+             # A shipped built-in belongs to nobody and everybody (ADR 0058).
+             "created_by": None, "visibility": VISIBILITY_PUBLIC})
         created += was_created
-        _seed_objections(db, row, p["objections"])
+        _seed_objections(db, row, p["objections"], p["objection_labels"])
     return created
 
 
-def _seed_objections(db: DbSession, persona: Persona, objections) -> None:
+def _seed_objections(db: DbSession, persona: Persona, objections, labels) -> None:
     """Bring one Persona's objections to the seed state (R-12, ADR 0045).
 
     Replaced wholesale rather than upserted: the list is what carries meaning,
@@ -152,30 +225,59 @@ def _seed_objections(db: DbSession, persona: Persona, objections) -> None:
     give objections a stable key first, or address them by persona and
     position. The same absence of a natural key that forces the rewrite is
     what makes the ids unusable as a reference.
+
+    `objections` is the English prompt text and `labels` the German display
+    text for the same move, one per objection and in the same order. They
+    are written in a single pass so the two cannot drift apart;
+    `tests/test_persona_scenario_library.py` pins the lengths in the seed.
     """
     db.flush()  # a freshly created Persona needs its id before rows point at it
     db.query(PersonaObjection).filter_by(
         persona_id=persona.persona_id).delete(synchronize_session=False)
-    for index, text in enumerate(objections):
-        db.add(PersonaObjection(persona_id=persona.persona_id, position=index, text=text))
+    for index, (text, label) in enumerate(zip(objections, labels, strict=True)):
+        db.add(PersonaObjection(
+            persona_id=persona.persona_id, position=index,
+            text=clean(text), text_label=clean(label)))
 
 
 def _seed_scenarios(db: DbSession) -> int:
     return sum(
         _upsert(db, Scenario, {"key": s["id"]},
-                {"scenario_type": s["scenario_type"], "title": s["name"],
-                 "short_description": s["short_description"],
-                 "description": s["description"], "case_facts": s["case_facts"],
-                 "call_goal": s["call_goal"],
-                 "success_condition": s["success_condition"]})[1]
+                {"title": clean(s["name"]),
+                 "short_description": clean(s["short_description"]),
+                 "briefing": clean(s["briefing"]),
+                 "description": clean(s["description"]),
+                 "case_facts": clean(s["case_facts"]),
+                 "description_label": clean(s["description_label"]),
+                 "case_facts_label": clean(s["case_facts_label"]),
+                 "call_goal": clean(s["call_goal"]),
+                 # Not cleaned: a closed vocabulary, not authored prose, and
+                 # the CHECK constraint is what validates it (ADR 0072).
+                 "category": s["category"],
+                 "created_by": None, "visibility": VISIBILITY_PUBLIC})[1]
         for s in SCENARIOS
+    )
+
+
+def _seed_focus_goals(db: DbSession) -> int:
+    """The focus-goal catalogue (F-62, ADR 0076).
+
+    Not cleaned: unlike a Persona or a Scenario, none of this text ever reaches
+    a prompt, so the sanitiser of ADR 0059 has nothing to protect here.
+    """
+    return sum(
+        _upsert(db, FocusGoal, {"key": g["id"]},
+                {"title": g["title"], "caption": g["caption"], "info": g["info"],
+                 "group_key": g["group"], "evidence": g["evidence"],
+                 "position": g["position"], "active": True})[1]
+        for g in FOCUS_GOALS
     )
 
 
 def _seed_metric_types(db: DbSession) -> int:
     return sum(
         _upsert(db, MetricType, {"key": m.key},
-                {"name": m.name, "unit": m.unit,
+                {"name": m.name, "unit": m.unit, "aspect": m.aspect,
                  "feature_id": m.feature_id, "active": m.active})[1]
         for m in METRICS
     )

@@ -20,18 +20,19 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from backend.auth import AuthContext, authenticate_ws
 from backend.logging_config import session_id_scope
-from backend import library
+from backend.tenants import resolve_tenant_id
+from backend import consent, library
 from backend.feedback import jobs
 from backend.personas import Persona
 from backend.scenarios import Scenario
 from backend.session import persistence
+from backend.feedback.calls import utterances
 from backend.session.models import (
     AudioChunk,
     Failed,
     StateChanged,
     TurnCompleted,
     TurnEvent,
-    utterances,
 )
 from backend.session.orchestrator import SessionOrchestrator
 
@@ -72,7 +73,9 @@ async def session_ws(websocket: WebSocket) -> None:
                 orchestrator.start_playback,
                 orchestrator.note_barge_in,
             )
-            if outcome in ("ok", "interrupted"):
+            if outcome == "interrupted" and orchestrator.ended:
+                reason = "completed"  # talked over the goodbye; the ending stands (ADR 0035)
+            elif outcome in ("ok", "interrupted"):
                 reason = await _run_session(websocket, orchestrator, orchestrator.start_playback)
             else:
                 # The opening Turn itself ended the Session: "failed" is the Turn
@@ -94,6 +97,7 @@ async def session_ws(websocket: WebSocket) -> None:
         # ask for its Feedback -- a 404 then means the write genuinely failed,
         # not that the client was merely early.
         await _record(session_id, auth.sub, persona, scenario, orchestrator, started_at, reason)
+        orchestrator.close()  # a notes refresh still in flight has no reader (ADR 0071)
         try:
             await websocket.send_json({"type": "session.ended", "reason": reason, "transcript": transcript})
             await websocket.close()
@@ -107,7 +111,7 @@ async def session_ws(websocket: WebSocket) -> None:
         logger.info("Session ended (%s)", reason)
 
 
-async def _record(
+async def _record(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     session_id: uuid.UUID,
     subject_id: str,
     persona: Persona,
@@ -122,12 +126,21 @@ async def _record(
     allowed to raise: the call is already over, and neither a database nor a
     Redis outage may cost the user the transcript they are waiting for.
     """
+    # The last point at which unconsented data can be prevented from existing
+    # (ADR 0066). Checked here rather than at the handshake on purpose: the
+    # handshake's answer would be minutes old by now, and a subject who
+    # withdrew during their own call must not have it stored afterwards. The
+    # call itself is unaffected — the transcript has already been sent.
+    if not await asyncio.to_thread(consent.allows_storage, subject_id):
+        logger.info("Session not stored: no storage consent for this subject")
+        return
+
     try:
         db_id = await asyncio.to_thread(
             persistence.persist_session,
             session_id, subject_id, persona, scenario, orchestrator.turns, started_at, reason,
         )
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         logger.exception("Session could not be persisted; it is lost")
         return
     try:
@@ -135,15 +148,31 @@ async def _record(
         # Redis to be importable, let alone reachable. `jobs` stays at module
         # scope -- it touches only the database, and the handler below needs it
         # bound even when this import is what failed.
-        from backend.feedback import queue
+        from backend.feedback import queue  # pylint: disable=import-outside-toplevel
 
         await asyncio.to_thread(queue.enqueue_feedback, db_id)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception("Feedback could not be queued for session %d", db_id)
         # The row persist_session just wrote says "queued" for a job nobody
         # ever received. This is the only place that knows better, so it
         # records it rather than leaving the row lying (ADR 0032).
         await asyncio.to_thread(jobs.mark_failed, db_id, str(e))
+
+
+def _load_selection(
+    persona_id: str | None, scenario_id: str | None, auth: AuthContext
+) -> tuple[Persona | None, Scenario | None]:
+    """The Persona and Scenario the handshake names, read together in one worker
+    thread -- `session_scope()` is synchronous and nothing blocking may run on
+    the event loop that streams live audio (CLAUDE.md, ADR 0034).
+
+    The Scenario is scoped to the caller and their company (ADR 0060): a
+    built-in, one shared with their tenant, or one of their own -- never another
+    User's private Scenario. Personas are all built-ins, so they are not scoped.
+    """
+    persona = library.get_persona(persona_id)
+    scenario = library.get_scenario(scenario_id, auth.sub, resolve_tenant_id(auth))
+    return persona, scenario
 
 
 async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario, AuthContext] | None:
@@ -171,8 +200,9 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario, AuthConte
     persona_id = start.get("persona_id")
     scenario_id = start.get("scenario_id")
     try:
-        persona = library.get_persona(persona_id)
-        scenario = library.get_scenario(scenario_id)
+        persona, scenario = await asyncio.to_thread(
+            _load_selection, persona_id, scenario_id, auth
+        )
     except SQLAlchemyError as e:
         # Not the client's fault, so not a protocol error (1002): the
         # library is unreachable. ADR 0041 puts the database on the
@@ -218,9 +248,15 @@ async def _run_session(
         if envelope.get("type") == "session.activate":
             on_activate()
             continue
-        # Between Turns nothing is playing, so a stray `turn.interrupt` — or any
-        # unrecognised message — is skipped, not an error (client and server
-        # versions need not match exactly).
+        # The server streams a reply's audio ahead of playback and finishes the
+        # turn on this side while the client is still speaking its tail, so a
+        # barge-in over that tail lands here, between turns. Trim the
+        # just-finished reply to what was actually heard (ADR 0035).
+        if envelope.get("type") == "turn.interrupt":
+            orchestrator.note_late_barge_in(_played_ms(envelope))
+            continue
+        # Any other unrecognised message is skipped, not an error (client and
+        # server versions need not match exactly).
         if envelope.get("type") != "turn.audio.meta":
             continue
 
@@ -233,6 +269,12 @@ async def _run_session(
             websocket, turn, orchestrator.start_playback, orchestrator.note_barge_in
         )
         if outcome == "interrupted":
+            # A barge-in over the tail of the reply that ended the call: the
+            # goodbye is in the history and the decision stands. Carrying on
+            # here ran a whole further Turn, and a second goodbye, on a call
+            # that was already over (ADR 0035).
+            if orchestrator.ended:
+                return "completed"
             continue
         if outcome != "ok":
             return "error" if outcome == "failed" else outcome
@@ -277,9 +319,17 @@ async def _run_turn_interruptible(
             return "interrupted"
         return "user"
 
+    # forward_task finished first. control_task is almost always still parked in
+    # its receive, but a barge-in over the tail of a reply that just completed
+    # can land in the gap between the wait returning and this cancel -- in which
+    # case control_task resolves with the interrupt instead of raising. Honour
+    # it, or the played-through position is lost and the whole reply stays in
+    # the transcript (ADR 0035).
     control_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
-        await control_task
+        late = await control_task
+        if late is not None and late[0] == "interrupt":
+            on_barge_in(late[1])
     return forward_task.result()
 
 

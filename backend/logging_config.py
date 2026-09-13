@@ -59,8 +59,9 @@ class _SessionIdFilter(logging.Filter):
 
 
 class _ColorFormatter(logging.Formatter):
-    """Colors warnings/errors regardless of source; dims third-party noise
-    (e.g. httpx's own request logs) so our own lines stand out."""
+    """Colors warnings/errors regardless of source; dims what third-party
+    libraries still emit (alembic, kugelaudio, ...) so our own lines stand
+    out. httpx is quieted outright in configure_logging()."""
 
     def format(self, record: logging.LogRecord) -> str:
         message = super().format(record)
@@ -101,6 +102,12 @@ def configure_logging(log_file: str | Path = "logs/calltrainer.log") -> None:
     root.handlers.clear()
     root.setLevel(logging.INFO)
     session_filter = _SessionIdFilter()
+
+    # httpx logs a line for every request it makes at INFO -- the startup
+    # backend checks, every OIDC key refresh, every pipeline call. Our own
+    # clients (backend/clients/*) already log the calls that matter, so drop
+    # httpx to WARNING; raise it back if you need raw HTTP tracing.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
     console = logging.StreamHandler()
     console.setFormatter(_ColorFormatter(_LOG_FORMAT, _DATE_FORMAT))

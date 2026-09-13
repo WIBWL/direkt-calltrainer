@@ -24,6 +24,28 @@
   --color-text-muted-secondary: #5f7180;
   --color-success: #2e8064;
   --color-danger: #b4453a;
+  /* The wordmark's "ai". Below 4.5:1 on white on purpose -- WCAG 1.4.3 exempts
+     brand names, so this may be the vivid orange and not a muted one. Do not
+     reuse it for ordinary text. */
+  --color-brand-accent: #ff6a00;
+
+  /* Chart identity hues (F-13, utils/metricGroups.ts). Slots 1, 5 and 7 of the
+     documented categorical palette, in that order, validated as an all-pairs
+     set against a white card: CVD ΔE 13.0, normal-vision ΔE 16.3.
+
+     Identity, never judgement. The hue belongs to a family of metrics and
+     never moves with a value, and none of the three is red, amber or green --
+     those are spent on ADR 0078's traffic light, and a dashboard that reused
+     one would invite exactly the reading ADR 0065 forbids. */
+  --series-speech: #2a78d6;
+  --series-content: #e87ba4;
+  --series-activity: #4a3aa7;
+  /* The same hues at a fill weight: an area under a line, a band, a hover
+     surface. Alpha rather than a lighter step, so a fill sits on any surface
+     without a second set of values to keep in step. */
+  --series-speech-fill: #2a78d61f;
+  --series-content-fill: #e87ba41f;
+  --series-activity-fill: #4a3aa71f;
 
   /* Shared font families */
   --font-sans: "Hanken Grotesk", Arial, sans-serif;
@@ -75,6 +97,16 @@ body {
   max-width: 640px;
 }
 
+/* A dashboard is a comparison, and a comparison needs room: the small
+   multiples only earn their name when several fit on one row. Four fifths of
+   the window rather than all of it, so the page keeps a margin and does not
+   read as an unframed sheet of data. The header deliberately keeps its usual
+   measure here, so it does not change width from one screen to the next. */
+.app-page-wide {
+  width: 80%;
+  max-width: none;
+}
+
 /* The shared header remains consistent across every training screen. */
 .app-header {
   width: 100%;
@@ -96,26 +128,22 @@ body {
 .app-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 9px;
   flex-shrink: 0;
 }
 
-.app-brand-mark {
-  width: 38px;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  border-radius: 12px;
-  background: var(--color-navy-900);
+/* Inherits weight and size from whatever wordmark it sits in, so the same
+   component works in the header, on the login screen and in the redirect card. */
+.brand-ai {
+  color: var(--color-brand-accent);
 }
 
-.app-brand-mark span {
-  width: 3px;
-  height: 12px;
-  border-radius: 2px;
-  background: var(--color-surface);
+.app-brand-logo {
+  display: block;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .app-brand-name {
@@ -270,19 +298,24 @@ h2 {
   transition: border-color 0.2s;
 }
 
-/* The indicator remains visible as an empty circle for unselected choices. */
+/* The indicator remains visible as an empty circle for unselected choices.
+   18px, the same as the "i" ring in the corner below it: the two are the only
+   marks in a card's right margin and a difference in size between them reads
+   as a difference in importance that is not there. Nothing to weigh against
+   here the way there was for the "i" — this is a `span`, not a target, so
+   WCAG 2.5.8 has nothing to say about it. */
 .choice-check {
   position: absolute;
   top: 12px;
   right: 12px;
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   border: 1px solid var(--color-blue-300);
   border-radius: 50%;
   color: transparent;
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1;
 }
@@ -306,12 +339,1014 @@ h2 {
   font-family: var(--font-sans);
   font-weight: 600;
   font-size: 0.95rem;
+  /* Authored titles can be a long run without spaces — break it and cap the
+     height so one card cannot blow out the grid row. */
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .card-subtitle {
   font-size: 0.8rem;
   color: var(--text-muted);
   line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* --- Scenario library: authored vs built-in (ADR 0058) --- */
+.scenario-library-controls {
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid #d9e8f1;
+  border-radius: 16px;
+  background: linear-gradient(
+    180deg,
+    #f3f9fc 0%,
+    #edf6fb 100%
+  );
+}
+
+.scenario-library-controls-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.scenario-library-caption {
+  color: var(--color-navy-700);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.scenario-library-filter-row {
+  display: grid;
+  grid-template-columns: 106px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.scenario-library-filter-row + .scenario-library-filter-row {
+  margin-top: 8px;
+}
+
+.scenario-library-filter-label {
+  color: var(--color-text-muted-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* The two filter rows (ADR 0064): level 1 origin, level 2 thematic category.
+   One rule set for both, so the second row cannot end up smaller than the
+   first. A pill track with a thumb that slides onto the active option; the
+   options stay ordinary buttons in a radiogroup, so the interaction is a click
+   or an arrow key, not a drag. */
+
+.filter-slider {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  gap: 4px;
+  padding: 4px;
+  overflow-x: auto;
+  background: var(--color-surface-filter);
+  border-radius: 999px;
+}
+
+.filter-slider-thumb {
+  position: absolute;
+  top: 0.25rem;
+  left: 0;
+  bottom: 0.25rem;
+  border-radius: 999px;
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgba(3, 37, 62, 0.16);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+/* Before the first measurement there is no position to slide from; staying
+   hidden avoids a jump from the left edge on mount. */
+.filter-slider-thumb.is-unmeasured {
+  opacity: 0;
+}
+
+.filter-slider-option {
+  position: relative; /* above the thumb */
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font: inherit;
+  font-size: 12.5px;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.filter-slider-option.active {
+  color: var(--color-navy-900);
+  font-weight: 600;
+}
+
+.filter-slider-option:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 1px;
+}
+
+.filter-slider-count {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  opacity: 0.75;
+}
+
+.filter-slider-option.active .filter-slider-count {
+  color: var(--color-blue-600);
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filter-slider-thumb {
+    transition: none;
+  }
+
+  .scenario-grid .persona-card {
+    transition: none;
+  }
+
+  .scenario-grid .persona-card:hover {
+    transform: none;
+  }
+}
+
+/* Shown only where the grid is genuinely bare — the random Scenario tile is
+   drawn from the same filtered set, so when there is nothing to list there is
+   nothing to draw either and the grid really is empty. */
+.library-empty {
+  margin: 0 0 1rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.library-new-button {
+  margin-left: auto;
+  border: 1px solid var(--color-blue-300);
+  background: var(--color-surface);
+  color: var(--color-blue-600);
+  border-radius: 12px;
+  padding: 0.5rem 0.9rem;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.library-new-button:hover {
+  border-color: var(--color-blue-600);
+}
+
+.card-wrap {
+  position: relative;
+  display: flex;
+}
+
+.card-wrap .persona-card {
+  flex: 1;
+}
+
+.scenario-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.scenario-grid .persona-card {
+  min-height: 126px;
+  padding: 16px 46px 15px 16px;
+  border-width: 1.5px;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.scenario-grid .persona-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(3, 37, 62, 0.055);
+}
+
+.scenario-grid .persona-card.selected {
+  box-shadow: inset 0 0 0 0.5px var(--color-blue-600);
+}
+
+.scenario-grid .persona-name {
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.scenario-grid .card-subtitle {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.scenario-grid .card-badge {
+  margin-top: auto;
+  padding: 3px 7px;
+  font-size: 9px;
+}
+
+@media (max-width: 720px) {
+  .scenario-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .scenario-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.setup-persona-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.setup-persona-grid .persona-card {
+  /* A row, unlike the Scenario cards: the portrait sits beside the text, not
+     above it, and reaches the card's top, bottom and left edges — so the card
+     carries no padding of its own and the text brings its own inset.
+     `overflow: hidden` is what rounds the picture's corners with the card's,
+     and `stretch` is what gives it the card's full height. */
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  min-height: 124px;
+  padding: 0;
+  overflow: hidden;
+  border-width: 1.5px;
+}
+
+.persona-card-portrait {
+  /* Flex so the initials fallback centres itself.
+     Width is fixed and the height stretches to the card's, rather than the
+     other way round: in a flex row the main size is resolved before the cross
+     size, so an `aspect-ratio` with a stretched height has nothing to compute
+     from and the slot blows up to its content's width. 72px is deliberately
+     narrower than the 3:4 the portraits are cropped for: three cards to a row
+     leave the body barely 90px of text once the check and the "i" have their
+     corner, which is what wrapped two-word names onto two lines and pushed
+     every role to the clamp. The slot gives that width back. Nothing is lost
+     by it — the source is square and `object-fit: cover` trims the sides
+     anyway, and at this width the zoom below still leaves the widest head in
+     the set (hair included) a clear margin either side; the picture is the
+     same size, there is just less room beside the face. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 72px;
+  font-size: 24px;
+}
+
+/* And the clamp is what keeps that drift small: three lines of role at most,
+   so one long text cannot stretch every card in its grid row. */
+.setup-persona-grid .card-subtitle {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* The slot is taller than it is wide and the source is square, so `object-fit:
+   cover` already trims the sides. The zoom on top of that is what brings the
+   face up to a size one Persona can be told from another at: unzoomed, the
+   card would show the whole half-body shot in 118px. Every picture is framed
+   the same way — square, subject centred, face in the upper third — which is
+   what lets one origin serve all of them. The two large square slots show the
+   pose whole and need neither: their box matches the source. */
+.persona-card-portrait > img {
+  transform: scale(1.5);
+  transform-origin: center 18%;
+}
+
+.persona-card-body {
+  /* min-width: 0 lets a long role wrap instead of pushing the portrait out.
+     The right inset leaves the check and the "i" their corners. */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 14px 44px 14px 14px;
+}
+
+.setup-persona-grid .persona-name {
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.setup-persona-grid .card-subtitle {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* A row, because the flag rides on this line now. The flag is 20px against a
+   12px word, which is wider than the text is tall but not taller — a flag is a
+   wide shape, and shrinking it to the word's measure would make the stripes
+   mush. */
+.setup-persona-grid .card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0.15rem;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-blue-600);
+  line-height: 1.35;
+}
+
+@media (max-width: 720px) {
+  .setup-persona-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .setup-persona-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card-badge {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  /* Inherited from the card's `card-origin-` class, so a badge and the tile it
+     sits on are the same colour by construction rather than by agreement. The
+     fallbacks only ever apply to a card without an origin, which the picker
+     does not produce. */
+  background: var(--origin-tint, var(--color-blue-100));
+  color: var(--origin-ink, var(--navy));
+}
+
+/* One colour per origin, declared once and read twice: as the tile's gradient
+   and as its badge. Seven kinds, six hues — before this the colour was on the
+   badge alone, and two kinds could share one because the label underneath
+   carried the difference. On a tinted tile the colour is what is read first,
+   so a kind needs its own wherever the difference is one of origin. Own and
+   shared are the exception: same origin, same author, same green.
+
+   `--origin-tint` is a wash rather than a colour: it is the top-left corner of
+   a gradient that is white again two thirds of the way down, so a grid of them
+   is a set of tinted cards and not a paint chart. */
+.card-origin-builtin {
+  --origin-tint: var(--color-blue-100);
+  --origin-ink: var(--color-blue-600);
+}
+
+/* Own Scenario, hand-authored or shared with the company — the same colour
+   either way, and nothing on the badge to tell them apart but the label. A ring
+   around the shared one made it read as a kind of its own, when it is the same
+   Scenario of the User's with one more place it can be seen from.
+
+   Olive, not the green it used to be: that green sat 28° from the follow-up's
+   teal, the closest two hues in the whole set, and on a pale wash 28° is not a
+   difference anyone reads. This sits in the one gap the other five leave — 38°
+   clear of its nearest neighbour — at the same lightness as the green it
+   replaces, so only the hue moved. It also fixes the badge, whose text was the
+   only one in the set under the 4.5:1 small-text minimum (4.17); this pairing
+   is 6.0. */
+.card-origin-own,
+.card-origin-shared {
+  --origin-tint: #ecf3d6;
+  --origin-ink: #4a6212;
+}
+
+/* Written from a Session's feedback rather than by hand (F-60). Teal, not the
+   blue it used to share with Standard. */
+.card-origin-follow-up {
+  --origin-tint: #d1edee;
+  --origin-ink: #0d6b6a;
+}
+
+/* A reverse (ADR 0070). Amber rather than a shade of the "own" green: it is
+   the caller's row on paper, but what the badge is saying is that the roles
+   are the other way round, which is not a degree of ownership. */
+.card-origin-reverse {
+  --origin-tint: #fdf0dd;
+  --origin-ink: #8a5200;
+}
+
+.card-origin-tenant {
+  --origin-tint: #ece3f7;
+  --origin-ink: #5b3a9c;
+}
+
+/* The random Scenario (F-62). Rose, and not the purple it started on: that is
+   the company's, and a case the User has never seen must not look like one a
+   colleague sent them. */
+.card-origin-random {
+  --origin-tint: #fce7ef;
+  --origin-ink: #9c3a63;
+}
+
+/* The wash itself. Only Scenario cards take it — a Persona card has no origin
+   and keeps the plain white it always had. */
+.scenario-grid .persona-card {
+  background: linear-gradient(
+    160deg,
+    var(--origin-tint, var(--color-surface)) 0%,
+    var(--color-surface) 70%
+  );
+}
+
+/* Selection deepens the wash instead of painting over it: the blue border and
+   the filled check already say which card is picked, and a flat fill would
+   make the selected card the one whose kind has become unreadable. */
+.scenario-grid .persona-card.selected {
+  background: linear-gradient(
+    160deg,
+    var(--origin-tint, var(--color-surface)) 0%,
+    var(--color-surface-selected) 85%
+  );
+}
+
+/* The "i" on a selection card, Personas and Scenarios alike. Bottom-right, on
+   the same 12px right edge and at the same 24px size as the check bubble above
+   it, so the two sit in one column down the card's right gutter -- the gutter
+   both grids' padding already keeps clear of text. Round and quiet: it must
+   read as an aside to the choice, not as a second way of making it. It replaced
+   the Scenario card's edit link, which moved into the panel (ADR 0062),
+   so a card carries one secondary affordance rather than two. */
+/* The button keeps its 24px box and the ring inside it is drawn on the span,
+   so the affordance can be quieter than its target: the "i" is the smaller of
+   the two things in a card's corner and should look it, but shrinking the
+   button itself would take the tap target under the 24px WCAG 2.5.8 asks for,
+   and the card behind it is a target too, so the spacing exception does not
+   apply. `place-items` centres the ring in that box. */
+.card-info {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: var(--color-navy-900);
+  cursor: pointer;
+}
+
+.card-info > span {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--color-navy-900);
+  border-radius: 50%;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.card-info:hover > span {
+  background: var(--color-blue-100);
+}
+
+/* On the ring rather than on the button, so the focus outline traces what is
+   actually visible; `outline` follows the border-radius. The button's own
+   outline is suppressed above by having no border of its own to trace. */
+.card-info:focus-visible {
+  outline: none;
+}
+
+.card-info:focus-visible > span {
+  outline: 2px solid var(--color-navy-900);
+  outline-offset: 2px;
+}
+
+/* --- Persona info panel (read-only; shares the editor's modal shell) --- */
+
+/* Name, role and language sit beside the portrait rather than under it, so the
+   panel opens on who this is and the sections below carry only what the card
+   did not already say. */
+.persona-info-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 1.4rem;
+}
+
+.persona-info-portrait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 160px;
+  height: 160px;
+  border-radius: 14px;
+  font-size: 44px;
+}
+
+.persona-info-identity {
+  min-width: 0;
+}
+
+.persona-info-role {
+  margin: 0 0 0.3rem;
+  line-height: 1.4;
+}
+
+/* Shared by all three portrait slots. The slot owns size, shape and clipping;
+   the picture inside fills it, which is what lets a slot crop by scaling the
+   picture (see `.persona-card-portrait img`). */
+.persona-avatar {
+  overflow: hidden;
+}
+
+.persona-avatar > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* What an <img> would have covered, the initials get instead. */
+.persona-avatar-fallback {
+  background: #eaf5fc;
+  color: var(--color-blue-600);
+  font-weight: 600;
+}
+
+.persona-info-language {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* The panel is only so wide; below this the two columns stop fitting. */
+@media (max-width: 520px) {
+  .persona-info-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .persona-info-portrait {
+    width: 128px;
+    height: 128px;
+    font-size: 36px;
+  }
+}
+
+.persona-info-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.persona-info-section h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.persona-info-section p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.persona-info-hint {
+  margin: 0 0 0.45rem !important;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.persona-info-objections {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  line-height: 1.5;
+}
+
+/* Bordered like the cases beside it. It was dashed for a while, to set it
+   apart as the one tile that is not a case — but it is the selection the
+   screen opens on, and a dashed box in the first place of the grid reads as a
+   placeholder for something missing rather than as the choice already made.
+   Its colour still comes from `card-origin-random` like every other card's,
+   and that, its badge and its text are enough to set it apart.
+
+   The control that opens the rest of the grid is `.library-more`, styled with
+   the training history's `.session-more` further down. */
+
+/* --- Scenario editor modal --- */
+
+/* `.call-confirm-scrim` is the same thing over the live call (the end-call
+   question): ConfirmDialog positions itself `absolute; inset: 0`, so whatever
+   holds it has to be a fixed, full-screen box. One rule rather than two, so the
+   app's dialogs cannot end up sitting on two different scrims. */
+.editor-backdrop,
+.call-confirm-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 37, 62, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  z-index: 50;
+}
+
+/* The end-call dialog is the only thing on its scrim, and ConfirmDialog draws
+   a scrim of its own — two of them stacked would darken the call screen twice
+   as much as any other dialog in the app. So this one contributes the fixed
+   full-screen box and nothing else. */
+.call-confirm-scrim {
+  background: none;
+}
+
+.editor-panel {
+  width: min(640px, 100%);
+  max-height: 90vh;
+  background: var(--color-surface);
+  border-radius: 16px;
+  /* Clip the scroll container so its scrollbar stops at the rounded corners
+   * instead of drawing a square edge over them. */
+  overflow: hidden;
+  display: flex;
+}
+
+.editor-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+
+.editor-panel h2 {
+  margin: 0 0 1rem;
+  color: var(--color-navy-900);
+}
+
+.persona-info-identity h2 {
+  margin: 0 0 0.35rem;
+}
+
+.editor-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.editor-field-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+.editor-field-count {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.editor-field-count.is-full {
+  color: var(--color-danger);
+}
+
+.editor-field input,
+.editor-field textarea,
+.editor-field select {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  resize: vertical;
+}
+
+/* Native select: no `resize`, and the platform arrow stays. */
+.editor-field select {
+  resize: none;
+}
+
+.editor-field input::placeholder,
+.editor-field textarea::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+
+.editor-field input:focus,
+.editor-field textarea:focus {
+  outline: 2px solid var(--color-blue-300);
+  outline-offset: 1px;
+}
+
+/* --- PDF upload in the scenario editor (F-58) --- */
+
+/* --- Case facts: type them, or drop the documents in (F-58) ------------ */
+/* The two ways to fill one field, side by side and the same size, with the
+   conjunction between them saying they are alternatives and not a sequence.
+   Tall on
+   purpose: a drop target the height of a button is hard to hit with a dragged
+   file, and the textarea beside it has to match or the row looks broken. */
+
+.facts-split {
+  display: flex;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+.facts-split textarea {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 200px;
+}
+
+.facts-split-or {
+  align-self: center;
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* A solid edge, not a dashed one: the dash is only borrowed to mean "drop
+   here", and this zone says that in words and with the cloud already. */
+.pdf-dropzone {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  /* White at rest, like the fields it sits beside — it is one input among
+     them, not a highlighted panel. The blue is kept for the two states that
+     are worth noticing: a file being dragged over it, and focus. */
+  background: var(--color-surface);
+  text-align: center;
+  cursor: pointer;
+}
+
+.pdf-dropzone:hover {
+  border-color: var(--color-blue-600);
+}
+
+/* The whole zone reacts, because a drop target that does not leaves the User
+   guessing whether it took. */
+.pdf-dropzone.is-dragging {
+  border-color: var(--color-blue-600);
+  background: var(--color-surface-selected);
+}
+
+.pdf-dropzone.is-busy {
+  cursor: default;
+}
+
+.pdf-dropzone.is-busy:hover {
+  border-color: var(--color-border);
+}
+
+/* The input is the keyboard's way in and is hidden rather than absent, so the
+   focus ring has to be drawn by the zone around it. */
+.pdf-dropzone:focus-within {
+  border-color: var(--color-blue-600);
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 2px;
+}
+
+.pdf-dropzone input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.pdf-dropzone-cloud {
+  width: 38px;
+  height: 38px;
+  color: var(--color-blue-600);
+}
+
+.pdf-dropzone-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+.pdf-dropzone-browse {
+  font-size: 0.82rem;
+  color: var(--color-blue-600);
+  text-decoration: underline;
+}
+
+.pdf-upload-note {
+  font-size: 0.78rem;
+  color: var(--color-success);
+}
+
+/* Stacked once half the panel is too narrow to be a target. After the rules
+   above, never with the page's other breakpoints: same specificity, so the
+   later of the two wins whatever the viewport says. */
+@media (max-width: 560px) {
+  .facts-split {
+    flex-direction: column;
+  }
+
+  .facts-split-or {
+    align-self: flex-start;
+  }
+
+  .pdf-dropzone,
+  .facts-split textarea {
+    min-height: 150px;
+  }
+}
+
+/* --- Share-with-company toggle (R-58) --- */
+
+.share-toggle {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin-top: 1.1rem;
+  padding: 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-filter);
+  cursor: pointer;
+}
+
+.share-toggle input {
+  margin-top: 0.15rem;
+}
+
+.share-toggle-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+.share-toggle-hint {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.editor-actions-spacer {
+  flex: 1;
+}
+
+.editor-actions button {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 10px;
+  padding: 0.5rem 1rem;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.editor-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.editor-save {
+  border-color: var(--color-blue-600) !important;
+  background: var(--color-blue-600) !important;
+  color: var(--color-surface);
+}
+
+.editor-delete {
+  border-color: var(--color-danger) !important;
+  color: var(--color-danger);
+}
+
+/* The edit button in the read-only info panel (ADR 0062). Filled in the same
+   dark blue as the button that leads on to the microphone check, and hovering
+   to the same lighter blue: it is the one action that leads somewhere from a
+   panel that otherwise only closes. Shape comes from `.editor-actions button`
+   so it lines up with the close button beside it; only the colour is its own. */
+.editor-edit {
+  border-color: var(--navy) !important;
+  background: var(--navy) !important;
+  color: var(--color-surface);
+  font-weight: 600;
+}
+
+.editor-edit:hover {
+  background: var(--navy-light) !important;
+}
+
+/* In-panel replacement for window.confirm when a click outside would discard
+   unsaved edits — a second scrim over the editor so it stays in the app's look. */
+.editor-confirm {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 37, 62, 0.35);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.editor-confirm-box {
+  width: min(400px, 100%);
+  background: var(--color-surface);
+  border-radius: 14px;
+  padding: 1.25rem;
+}
+
+.editor-confirm-box h3 {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--color-navy-900);
+}
+
+.editor-confirm-box p {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.editor-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.editor-confirm-actions button {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 10px;
+  padding: 0.5rem 1rem;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.editor-confirm-discard {
+  border-color: var(--color-danger) !important;
+  background: var(--color-danger) !important;
+  color: var(--color-surface);
+}
+
+.setup-page {
+  width: min(940px, calc(100% - 32px));
 }
 
 /* The setup introduction explains the purpose of the first training step. */
@@ -319,7 +1354,11 @@ h2 {
   margin-bottom: 24px;
 }
 
-.setup-intro .eyebrow {
+/* The wrap-up's intro is not a `.setup-intro` but carries the same eyebrow, and
+   it looked like a different element for want of this. */
+.setup-intro .eyebrow,
+.feedback-intro .eyebrow,
+.feedback-wait .eyebrow {
   margin-bottom: 10px;
   font-size: 12px;
   font-weight: 700;
@@ -356,11 +1395,12 @@ h2 {
 /* Each setup section groups one decision into a separate card. */
 .setup-section {
   width: 100%;
-  margin-bottom: 14px;
-  padding: 34px;
+  margin-bottom: 16px;
+  padding: 32px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
+  box-shadow: 0 12px 34px rgba(3, 37, 62, 0.055);
 }
 
 .setup-section-content {
@@ -372,14 +1412,21 @@ h2 {
   display: flex;
   align-items: flex-start;
   gap: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 22px;
 }
 
+/* The number is set exactly like the title beside it -- same face, colour, size,
+   weight, line height and tracking -- so the two read as one heading with a
+   number in front of it. It was 14px mono in blue before, which read as a label
+   stuck to the heading rather than as part of it. */
 .setup-section-index {
   flex-shrink: 0;
-  color: #000000;
-  font-size: 17px;
-  line-height: 26px;
+  color: var(--color-navy-900);
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
 }
 
 .setup-section-heading-text {
@@ -389,7 +1436,7 @@ h2 {
 .setup-section-heading-text h2 {
   margin: 0 0 4px;
   color: var(--color-navy-900);
-  font-size: 26px;
+  font-size: 25px;
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.02em;
@@ -405,18 +1452,18 @@ h2 {
 /* The summary groups all confirmed choices into one compact panel. */
 .selection-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
   margin: 0 0 14px;
   padding: 8px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-control);
+  border-radius: 12px;
   background: var(--color-surface-filter);
 }
 
 .selection-summary-item {
   min-width: 0;
-  padding: 10px 12px;
+  padding: 11px 12px;
   border-radius: 8px;
   background: var(--color-surface);
 }
@@ -475,9 +1522,14 @@ h2 {
   line-height: 1.5;
 }
 
+/* The sentence between a card's heading and its content, which would otherwise
+   sit flush against what it introduces. */
+.card p.card-lead {
+  margin-bottom: 1.1rem;
+}
+
 .start-call-button,
-.end-call-button,
-.restart-button {
+.end-call-button {
   display: block;
   width: 100%;
   border: none;
@@ -491,8 +1543,7 @@ h2 {
   transition: background 0.2s, opacity 0.2s;
 }
 
-.start-call-button:hover,
-.restart-button:hover {
+.start-call-button:hover {
   background: var(--navy-light);
 }
 
@@ -508,10 +1559,6 @@ h2 {
 
 .end-call-button:hover {
   opacity: 0.85;
-}
-
-.restart-button {
-  margin-top: 1.5rem;
 }
 
 .cancel-button {
@@ -536,14 +1583,33 @@ h2 {
   max-width: 800px;
 }
 
-.call-intro {
-  max-width: 800px;
-  margin-bottom: 40px;
+/* Except while a reverse briefing runs beside it (ADR 0070), where the page
+   carries two columns instead of one. `width` as well as `max-width`, because
+   .app-page sets the width itself. */
+.call-page-wide {
+  width: min(1240px, calc(100% - 32px));
+  max-width: 1240px;
+}
+
+.call-layout {
+  display: grid;
+  gap: 24px;
+}
+
+/* Side by side only where both columns are genuinely readable; below that the
+   briefing goes back under the call, which is the one case where reading it
+   means scrolling. An even split rather than a main column with a sidebar:
+   during a reverse the briefing is not an aside, it is the half of the call
+   the User is playing from. */
+@media (min-width: 1080px) {
+  .call-layout-with-brief {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
 }
 
 .call-panel {
   width: 100%;
-  min-height: 560px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -564,8 +1630,8 @@ h2 {
 }
 
 .call-persona-avatar {
-  width: 96px;
-  height: 96px;
+  width: 160px;
+  height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -573,7 +1639,7 @@ h2 {
   border-radius: 50%;
   background: #eaf5fc;
   color: var(--color-blue-600);
-  font-size: 24px;
+  font-size: 40px;
   font-weight: 600;
 }
 
@@ -584,7 +1650,7 @@ h2 {
   align-items: center;
 }
 
-.call-persona-details h2,
+.call-persona-details h1,
 .call-persona-details p {
   margin: 0;
   color: #000000;
@@ -734,7 +1800,6 @@ h2 {
 /* Tablet layouts preserve the two-button row while allowing both controls to shrink. */
 @media (max-width: 720px) {
   .call-panel {
-    min-height: 520px;
     padding: 24px;
   }
 
@@ -750,35 +1815,25 @@ h2 {
   }
 }
 
-/* Narrow phones stack controls and allow long scenario and persona names to wrap. */
+/* Narrow phones stack the controls and let a long persona name wrap. */
 @media (max-width: 480px) {
-  .call-intro {
-    margin-bottom: 28px;
-  }
-
-  .call-intro h1 {
-    font-size: 32px;
-    overflow-wrap: anywhere;
-  }
-
   .call-panel {
-    min-height: auto;
     gap: 20px;
     padding: 20px;
     border-radius: 18px;
   }
 
   .call-persona-avatar {
-    width: 80px;
-    height: 80px;
-    font-size: 21px;
+    width: 120px;
+    height: 120px;
+    font-size: 30px;
   }
 
   .call-persona-details {
     width: 100%;
   }
 
-  .call-persona-details h2,
+  .call-persona-details h1,
   .call-persona-details p {
     font-size: 16px;
   }
@@ -805,42 +1860,28 @@ h2 {
   margin-bottom: 0;
 }
 
-.mic-check-page .setup-section-heading {
-  margin-bottom: 10px;
-}
-
 .mic-check-intro {
   max-width: 800px;
   margin-bottom: 40px;
 }
 
-/* The active microphone is shown as read-only information above the test area. */
+/* The device picker above the test area. One element now: the box the <dd>
+   used to draw, with the label's row gone.
+
+   The 16px below it is what the old stack left between this box and the test
+   panel (6px of the list's own padding plus a 10px margin), so removing the
+   label changed the gap under the field by nothing. The 4px of side padding
+   went with it, which lines the field up with the panel below instead of
+   insetting it by four pixels — the reason it was inset was the label, which
+   needed to start where text starts. */
 .mic-device-information {
-  margin: 0 0 10px;
-  padding: 6px 4px;
-}
-
-.mic-device-information-row {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-}
-
-.mic-device-information dt {
-  color: #082f49;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 24px;
-}
-
-.mic-device-information dd {
+  box-sizing: border-box;
   width: 100%;
   height: 44px;
   min-width: 0;
   display: flex;
   align-items: center;
-  margin: 0;
+  margin: 0 0 16px;
   padding: 0 14px;
   overflow: hidden;
   border: 1px solid var(--color-border-subtle);
@@ -850,8 +1891,29 @@ h2 {
   font-size: 12px;
   font-weight: 600;
   line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+/* The <select> drops its own outline so it can fill the box edge to edge, so
+   the box has to carry the focus ring — without this, reaching the picker by
+   keyboard would show nothing at all (WCAG 2.4.7). */
+.mic-device-information:focus-within {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
+}
+
+/* Fills the dd's existing box look -- the picker, not just a status label now. */
+.mic-device-select {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 
 /* Every test state uses the centered Figma test-area layout. */
@@ -1009,13 +2071,8 @@ h2 {
   outline-offset: 3px;
 }
 
-/* Tablet layouts keep device names readable and enlarge the initial action. */
+/* Tablet layouts enlarge the initial action. */
 @media (max-width: 720px) {
-  .mic-device-information dd {
-    overflow-wrap: anywhere;
-    white-space: normal;
-  }
-
   .mic-test-panel > .start-call-button {
     width: 100%;
   }
@@ -1058,7 +2115,8 @@ h2 {
     gap: 12px;
   }
 
-  .setup-section-heading-text h2 {
+  .setup-section-heading-text h2,
+  .setup-section-index {
     font-size: 22px;
   }
 
@@ -1157,23 +2215,6 @@ h2 {
 }
 /* Marks a point as a strength or an improvement. Colour alone never carries
    the meaning -- the two lists have their own headings. */
-.bullet {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 10px;
-  vertical-align: middle;
-}
-
-.bullet.success {
-  background: var(--success);
-}
-
-.bullet.danger {
-  background: var(--danger);
-}
-
 /* The call's statistics (F-53). A grid, not a row: every figure describes the
    whole conversation, so they read as one block rather than as a sequence. */
 .metric-grid {
@@ -1200,10 +2241,71 @@ h2 {
   color: var(--navy);
 }
 
-.sparkline {
-  margin-top: 4px;
-  stroke: var(--blue);
+/* The loudness course (F-37). No value beside it -- the dB span behind the curve
+   reads like a level without being one (ADR 0004/0051) -- so the chart carries
+   the tile alone. */
+.loudness-course {
+  margin: 0;
+}
+
+.loudness-course-plot {
+  display: block;
+  width: 100%;
+  height: auto;
   overflow: visible;
+}
+
+/* The range the speaker held for most of the call. A pale tint, not a traffic
+   light: a colour reading as a verdict is the score ADR 0004 rules out. */
+.loudness-course-band {
+  fill: var(--color-surface-selected);
+}
+
+.loudness-course-median {
+  stroke: var(--color-border-subtle);
+  stroke-width: 1;
+  stroke-dasharray: 3 5;
+}
+
+/* One line, and the only thing in the figure with any weight. The raw curve
+   used to sit behind it; two lines competed for the same attention. */
+.loudness-course-line {
+  fill: none;
+  stroke: var(--color-blue-600);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.loudness-course-marker circle {
+  fill: var(--color-blue-600);
+}
+
+.loudness-course-marker text {
+  fill: var(--color-text-muted-secondary);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.loudness-course-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--color-text-muted-secondary);
+}
+
+/* Named, not left as a bare mm:ss range: the axis is the user's own speaking
+   time, not the call clock (backend/session/models.py). */
+.loudness-course-axis-name {
+  font-weight: 600;
+}
+
+.loudness-course-legend {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-text-muted-secondary);
 }
 
 /* The note under the statistics saying they carry no target range (ADR 0048).
@@ -1216,16 +2318,423 @@ h2 {
   color: var(--text-muted);
 }
 
-/* What the phase-appropriate-language block means, under the analysis of it
-   (F-42, ADR 0056). The selector carries `p` too, not just the class:
-   `.card p` is more specific than a bare class, so without the element this
-   rule loses its top margin to the margin reset every card applies. */
-.card p.phase-note {
-  margin: 0.9rem 0 0;
-  padding-left: 12px;
-  border-left: 3px solid var(--blue-light);
-  font-size: 0.9rem;
+/* --- Follow-up scenario from the feedback (F-60) ------------------------ */
+
+/* Reads as the consequence of the points above it: the same card, marked by an
+   accent rather than a competing colour. */
+/* The two things a finished training offers next: the follow-up Scenario (F-60) and
+   the Reverse (F-61). One card shape with a heading each, so that they
+   read as two named offers rather than as two paragraphs someone appended
+   under the feedback. The accent colour is the only difference. */
+
+/* Side by side and evenly, because they are alternatives — stacked, the second
+   reads as what follows the first. `auto-fit` rather than two fixed columns so
+   that whichever half is on offer alone takes the row: a lone card in a 50 %
+   column would look like the other one failed to load. */
+.next-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  align-items: stretch;
+  /* The spacing the cards used to bring themselves, now that they do not. */
+  margin-top: 1.5rem;
+}
+
+.card.next-step {
+  border-left: 3px solid var(--blue);
+  /* A column so the button can be pushed to the bottom: side by side, two
+     leads of different lengths would otherwise leave the buttons at different
+     heights, which reads as one card being unfinished. */
+  display: flex;
+  flex-direction: column;
+  /* The grid's own gap does the spacing between them. */
+  margin-top: 0;
+}
+
+/* The lead is what gives way, so what follows it lines up across the two. */
+.card p.next-step-lead {
+  flex: 1;
+}
+
+/* The card is a flex column now, and a bare button in one stretches the full
+   width unless it is told not to. The pill keeps its own size. */
+.card.next-step > .follow-up-button {
+  align-self: flex-start;
+}
+
+.next-step-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
   color: var(--text-muted);
+}
+
+.card h2.next-step-title {
+  margin: 0.3rem 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.card p.next-step-lead {
+  margin: 0 0 1rem;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.card p.follow-up-name {
+  margin: 0.9rem 0 0.2rem;
+  font-weight: 600;
+}
+
+.card p.follow-up-teaser {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.follow-up-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+
+.follow-up-button {
+  border: none;
+  border-radius: 999px;
+  padding: 0.6rem 1.3rem;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  background: var(--navy);
+  color: #fff;
+  transition: background 0.2s;
+}
+
+.follow-up-button:hover {
+  background: var(--navy-light);
+}
+
+.card p.follow-up-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+/* A request that failed: writing a follow-up or a reverse under its offer, or
+   building the PDF under the actions row. The message is written for the user
+   (often the backend's own `detail`), so it is said in the danger colour and
+   otherwise set like the note beside it. */
+p.follow-up-error {
+  color: var(--color-danger);
+}
+
+.card p.follow-up-error {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-danger);
+}
+
+/* --- Reverse: the roles swapped (F-61, ADR 0070) ------------------------ */
+
+/* The offer under the feedback. Same card as the follow-up, other accent, so
+   the two read as two options rather than as one thing said twice. */
+.card.reverse-offer {
+  border-left-color: #c98a2b;
+}
+
+.card.reverse-offer .next-step-eyebrow {
+  color: #8a5200;
+}
+
+.card.reverse-offer .follow-up-button {
+  background: #c98a2b;
+}
+
+.card.reverse-offer .follow-up-button:hover {
+  background: #b0761f;
+}
+
+/* The reverse's pre-call screen: the briefing and the button, nothing else.
+   Held to the panel's own width so the actions line up under it rather than
+   running the width of the widened page. */
+.brief-page {
+  max-width: 720px;
+}
+
+.brief-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+/* The briefing the User holds during a reverse call. Deliberately the loudest
+   thing on the call screen after the animation: it is the only place the case
+   exists for them, and a panel they have to hunt for mid-call is no panel. */
+.reverse-brief {
+  margin: 0 auto 1.5rem;
+  max-width: 720px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-left: 3px solid #c98a2b;
+  border-radius: var(--radius-card);
+  background: #fffaf2;
+  padding: 1.25rem 1.4rem;
+}
+
+.reverse-brief-eyebrow {
+  color: #8a5200;
+}
+
+.reverse-brief-title {
+  margin: 0.35rem 0 0;
+  font-size: 1.15rem;
+}
+
+.reverse-brief-lead {
+  margin: 0.3rem 0 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.reverse-brief-fields {
+  margin: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.reverse-brief-field dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8a5200;
+}
+
+.reverse-brief-field dd {
+  margin: 0.2rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.reverse-brief-watch {
+  margin-top: 1.2rem;
+  border-top: 1px solid #f0e2cc;
+  padding-top: 1rem;
+}
+
+.reverse-brief-watch-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.reverse-brief-watch-title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+/* How much of the list has been worked through. Deliberately a count and not a
+   percentage or a grade: it is the User's own tally mid-call, and ADR 0004
+   leaves no room for a score even a self-assessed one (ADR 0065). */
+.reverse-brief-watch-count {
+  flex: none;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: #8a5200;
+}
+
+.reverse-brief-progress {
+  height: 4px;
+  margin-bottom: 0.8rem;
+  border-radius: 999px;
+  background: #f0e2cc;
+  overflow: hidden;
+}
+
+.reverse-brief-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #c98a2b;
+  transition: width 160ms ease-out;
+}
+
+.reverse-brief-watch-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+
+/* A row rather than a line of text with a box next to it: the whole row is the
+   hit area, which is what makes ticking one off mid-sentence possible. */
+.reverse-brief-watch-list label {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  cursor: pointer;
+  transition: background 120ms ease-out, border-color 120ms ease-out;
+}
+
+.reverse-brief-watch-list label:hover {
+  background: #fff6e9;
+}
+
+/* The native box is kept for the keyboard and for screen readers, and hidden
+   visually behind the drawn one -- `display: none` would take it out of the
+   tab order along with everything that makes it a checkbox. */
+.reverse-brief-watch-list input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.reverse-brief-watch-box {
+  flex: none;
+  margin-top: 0.1rem;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid #d9c19b;
+  border-radius: 5px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease-out, border-color 120ms ease-out;
+}
+
+.reverse-brief-watch-list input:focus-visible + .reverse-brief-watch-box {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.reverse-brief-watch-list label.is-ticked {
+  background: #fdf3e4;
+  border-color: #f0e2cc;
+}
+
+.reverse-brief-watch-list label.is-ticked .reverse-brief-watch-box {
+  background: #c98a2b;
+  border-color: #c98a2b;
+}
+
+/* The tick itself, drawn rather than a glyph so it cannot pick up a font. */
+.reverse-brief-watch-list label.is-ticked .reverse-brief-watch-box::after {
+  content: "";
+  width: 5px;
+  height: 9px;
+  margin-top: -2px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* Ticked off: dimmed rather than struck through, because the goal stays true
+   for the rest of the call — it has been met once, not finished with. */
+.reverse-brief-watch-list label.is-ticked .reverse-brief-watch-text {
+  opacity: 0.55;
+}
+
+.reverse-brief-watch-note {
+  margin: 0.7rem 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Beside the call rather than under it (ADR 0070), and at its full length: no
+   scroll box of its own. A panel with an inner scrollbar hides part of the
+   briefing behind a gesture, and the one thing that must never happen mid-call
+   is the User not finding a fact they were told they have. The column simply
+   grows; the page scrolls if it has to, which on a briefing this size it
+   rarely does. Below the two-column breakpoint this goes back to being a block
+   under the call. */
+.reverse-brief-call {
+  margin: 0 auto;
+  background: #fff;
+}
+
+@media (min-width: 1080px) {
+  .reverse-brief-call {
+    max-width: none;
+  }
+}
+
+/* --- The facts of the case, for an ordinary call ------------------------ */
+
+/* The same box as the reverse's briefing, for the same reason -- ADR 0070's
+   exception to ADR 0033: text fixed before the call starts, never the
+   Persona's lines. In the app's blue rather than the reverse's amber, because
+   the two are different things and a call must not be mistaken for the other
+   kind at a glance. */
+.case-brief {
+  margin: 0 auto 1.5rem;
+  max-width: 720px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--color-blue-600);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-filter);
+  padding: 1.25rem 1.4rem;
+}
+
+.case-brief-eyebrow {
+  color: var(--color-blue-600);
+}
+
+/* `pre-line` because facts are often written as short lines rather than as a
+   paragraph, and the sanitiser keeps single newlines (it only collapses runs). */
+.case-brief-body {
+  margin: 0.4rem 0 0;
+  white-space: pre-line;
+}
+
+/* Beside the animation, with no scroll box of its own -- a fact hidden behind
+   a gesture is a fact not found, which is the one thing that must not happen
+   mid-call. Below the two-column breakpoint it goes back to being a block
+   under the call. */
+.case-brief-call {
+  margin: 0 auto;
+  background: var(--color-surface);
+}
+
+@media (min-width: 1080px) {
+  .case-brief-call {
+    max-width: none;
+  }
+}
+
+/* --- One type scale for the three pre-call panels ----------------------- */
+
+/* The Briefing (ADR 0054), the case facts and a reverse's own brief are read
+   one under the other on the same screen, and the first two always are. Their label and their prose are therefore one declaration
+   each rather than three copies: they had drifted to two different scales, and
+   two blocks of the same kind set differently read as two kinds of thing.
+   Only what genuinely differs — the colour, the spacing, the `pre-line` on the
+   facts — stays with each panel. */
+.scenario-briefing-title,
+.case-brief-eyebrow,
+.reverse-brief-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.scenario-briefing-body,
+.case-brief-body {
+  font-size: 0.92rem;
+  line-height: 1.55;
 }
 
 /* --- Transcript (F-12) -------------------------------------------------- */
@@ -1247,4 +2756,5687 @@ h2 {
   font-variant-numeric: tabular-nums;
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+
+/* --- Feedback page --- */
+
+.feedback-intro {
+  margin-bottom: 20px;
+}
+
+.feedback-title {
+  margin: 0;
+  font-size: 48px;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: var(--color-navy-900);
+}
+
+/* Every section of the feedback page has the same shape: a heading row above,
+   a white box below. Half of them used to carry the heading inside the box,
+   which made two blocks of the same kind look like two different kinds of
+   thing. A box may still hold a title, but only for an *item* within a
+   section — the two offers in the next-steps block are things you can pick,
+   not sections of the page. */
+.feedback-section {
+  margin-bottom: 28px;
+}
+
+.feedback-section-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.feedback-section-heading {
+  min-width: 0;
+}
+
+.feedback-section-eyebrow {
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-blue-600);
+}
+
+.feedback-section-title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--color-navy-900);
+}
+
+/* The mark before a heading, in the colours that half of the wrap-up carries. */
+.feedback-section-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.feedback-section-head.is-success .feedback-section-icon {
+  background: #eaf7f0;
+  color: #226048;
+}
+
+.feedback-section-head.is-success .feedback-section-eyebrow {
+  color: #226048;
+}
+
+.feedback-section-head.is-danger .feedback-section-icon {
+  background: #fff3e8;
+  color: #9a4d14;
+}
+
+.feedback-section-head.is-danger .feedback-section-eyebrow {
+  color: #9a4d14;
+}
+
+/* Kept at the far end of the heading row: a count, a control. */
+.feedback-section-aside {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* The one white box on this page. What differs between sections is what is in
+   it, not what it looks like. */
+.feedback-box {
+  padding: 24px 28px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 16px;
+  background: var(--color-surface);
+}
+
+.feedback-box.success {
+  border-color: #b9dac7;
+}
+
+.feedback-box.danger {
+  border-color: #e8c8a8;
+}
+
+.feedback-summary-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.57;
+  color: var(--color-text-muted-secondary);
+}
+
+/* The two halves of the wrap-up side by side. Each is a section of its own
+   with its own heading, so the grid holds sections rather than boxes. */
+.feedback-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.feedback-details .feedback-section {
+  margin-bottom: 0;
+}
+
+.feedback-point-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feedback-point-item {
+  padding: 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  background: #f8fbfd;
+}
+
+.feedback-point-item p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-navy-900);
+}
+
+.feedback-point-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.feedback-point-time {
+  flex-shrink: 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: #eaf4fa;
+  color: var(--color-blue-600);
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 500;
+}
+
+.feedback-point-item p {
+  flex: 1;
+}
+
+/* This section keeps a class of its own only for how its background note is
+   set — the white box is `.feedback-box` inside it, and the spacing comes from
+   `.feedback-section`, like every other section on the page. */
+.feedback-phase-text {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-navy-900);
+}
+
+.feedback-phase-note {
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 600;
+  color: var(--color-text-muted-secondary);
+}
+
+/* The background behind that sentence sits in the shared "i" (InfoDetails).
+   Two adjustments to the house style here: no quote bar, because the follow-up
+   card right above already carries a left accent and a second one reads as a
+   second kind of thing, and a tighter type scale to match the card's own. */
+.feedback-phase-card .info-details {
+  margin-top: 10px;
+}
+
+.feedback-phase-card .info-summary {
+  font-size: 12px;
+}
+
+.feedback-phase-card .info-body {
+  padding-left: 0;
+  border-left: 0;
+  font-size: 13px;
+}
+
+.feedback-phase-card .info-body p {
+  margin: 0 0 8px;
+}
+
+.feedback-phase-card .info-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* The three phases as term and gloss. A grid rather than the browser's default
+   indent, so the register each phase asks for starts on one column and the
+   reasons stay comparable down the list. */
+.feedback-phase-phases {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 8px;
+  margin: 0 0 10px;
+}
+
+.feedback-phase-phases dt {
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+/* The gloss continues the term's sentence, so the two are joined by the dash
+   rather than by punctuation of their own. */
+.feedback-phase-phases dt::after {
+  content: " —";
+}
+
+.feedback-phase-phases dd {
+  margin: 0;
+}
+
+.feedback-phase-source {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.feedback-metrics-section {
+  margin-bottom: 32px;
+}
+
+.feedback-metrics-filter {
+  margin-bottom: 18px;
+}
+
+.feedback-metrics-filter .filter-slider-option {
+  flex: 1;
+  justify-content: center;
+}
+
+.feedback-metrics-lead {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.feedback-metrics-section .metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.feedback-metrics-section .metric {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 112px;
+  padding: 18px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  background: var(--color-surface);
+}
+
+.feedback-metrics-section .metric-name {
+  font-size: 11px;
+  line-height: 1.3;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text-muted-secondary);
+}
+
+.feedback-metrics-section .metric-value {
+  margin-top: 12px;
+  font-size: 24px;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--color-navy-900);
+}
+
+.feedback-metrics-section .metric-disclaimer {
+  margin: 14px 0 0;
+  padding: 0;
+  border: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-text-muted-secondary);
+}
+
+.feedback-metrics-section .metric-loudness {
+  grid-column: 1 / -1;
+  min-height: 140px;
+}
+
+.feedback-metrics-section .metric-loudness .loudness-course {
+  margin-top: 14px;
+}
+
+/* The empty state stands in for a line, so it takes a line's inset. Without
+   it the sentence starts at the card's own border, out of column with every
+   line the card otherwise holds. */
+/* --- Header: brand link and account chip -------------------------------- */
+/* The header grew navigation when the app grew a second page. Both ends of it
+   collapse to their non-interactive form during a call, because leaving the
+   page would discard a Session that is never written back (ADR 0034). */
+
+.app-brand-link {
+  text-decoration: none;
+  border-radius: var(--radius-control);
+  flex-shrink: 0;
+}
+
+.app-brand-link:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 4px;
+}
+
+/* Only present when the header shows no training steps; keeps the brand left
+   and the account right instead of letting them meet in the middle. */
+.app-header-spacer {
+  flex: 1;
+}
+
+.account-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 6px 14px 6px 6px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--color-navy-900);
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.account-chip.is-open,
+.account-chip:hover {
+  background: var(--color-surface-selected);
+  border-color: var(--color-border);
+}
+
+.account-chip:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 2px;
+}
+
+.account-chip.is-active {
+  background: var(--color-blue-100);
+  border-color: var(--color-border-subtle);
+}
+
+/* Hidden rather than removed during the microphone check and the call: it keeps
+   its width, so the progress steps do not jump sideways on the way in and out.
+   `visibility` also takes it out of the tab order and off the screen reader. */
+.account-chip.is-locked {
+  visibility: hidden;
+}
+
+.account-avatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-navy-900);
+  color: var(--color-surface);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.account-chip-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  /* A long display name must not push the training steps around. */
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A block of its own even in the locked chip, where it is an empty span, so the
+   hidden chip reserves the caret's width as well. */
+.account-chip-caret {
+  display: block;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.account-chip.is-open .account-chip-caret {
+  transform: rotate(180deg);
+}
+
+/* --- Account menu ------------------------------------------------------- */
+/* Profil, Fortschritt and Abmelden under the account chip. Anchored to the
+   chip's right edge, since the chip sits at the right of the header. */
+
+.account-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.account-menu-list {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  min-width: 190px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  box-shadow: 0 10px 28px rgba(15, 30, 60, 0.14);
+}
+
+.account-menu-item {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  text-decoration: none;
+  color: var(--color-navy-900);
+  cursor: pointer;
+}
+
+.account-menu-item:hover {
+  background: var(--color-surface-selected);
+}
+
+.account-menu-item:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: -2px;
+}
+
+.account-menu-item.is-active {
+  font-weight: 600;
+  color: var(--color-blue-600);
+}
+
+.account-menu-separator {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--color-border-subtle);
+}
+
+/* The name is the first thing to go when the header runs out of room — the
+   avatar alone still identifies the account and still opens the menu. */
+@media (max-width: 720px) {
+  .account-chip-name {
+    display: none;
+  }
+
+  .account-chip {
+    padding-right: 6px;
+  }
+
+  /* The header stacks at this width and the chip moves to the left edge, where
+     a list anchored to its right would open off the screen. */
+  .account-menu-list {
+    right: auto;
+    left: 0;
+  }
+}
+
+/* --- Profile screen (F-31, F-49) ---------------------------------------- */
+
+.profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  border-radius: var(--radius-card);
+  /* Sits above the cards below it rather than being one of them: this block is
+     who you are, the cards are what is known about you. */
+  background: var(--color-navy-900);
+  color: var(--color-surface);
+}
+
+.profile-identity-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The way back and the file to take away. `wrap` because the second label is
+   long: on a narrow page it drops to its own line rather than squeezing the
+   first. */
+.feedback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+/* The quiet way back to the setup screen. Shared by the wrap-up and the
+   microphone check, which both lead there. */
+.back-to-start-button {
+  width: auto;
+  /* `inline-block` and the reset below so the class also works on a <Link>. */
+  display: inline-block;
+  text-decoration: none;
+  padding: 11px 18px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-navy-900);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.back-to-start-button:hover {
+  background: var(--color-blue-100);
+}
+
+/* On the two screens that lead into a call it sits below the card, along its
+   left edge — away from the corner the starting button occupies, so the way
+   out and the way on are not neighbours. One rule for both because a reverse's
+   briefing screen replaces the microphone check rather than following it: the
+   same button in the same place is the whole point. */
+.mic-check-page .back-to-start-button,
+.brief-page .back-to-start-button {
+  display: block;
+  margin: 22px auto 0 0;
+}
+
+/* Above a page heading, where it replaces what used to be a plain back link. */
+.page-back-button {
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 720px) {
+  .feedback-title {
+    font-size: 36px;
+  }
+
+  .feedback-details {
+    grid-template-columns: 1fr;
+  }
+
+  .feedback-metrics-section .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .feedback-metrics-section .metric-loudness {
+    grid-column: auto;
+  }
+
+  .feedback-section-head {
+    align-items: flex-start;
+  }
+
+  .feedback-section-aside {
+    margin-top: 2px;
+  }
+
+}
+
+.feedback-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -8px 0 20px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-text-muted-secondary);
+}
+
+.feedback-meta-separator {
+  color: var(--color-blue-300);
+}
+
+.profile-avatar {
+  width: 62px;
+  height: 62px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-blue-600);
+  color: var(--color-surface);
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.profile-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.profile-email {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--color-blue-300);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+
+/* A quiet aside next to a value, for the rare case worth flagging (an
+   unverified address). Lowercase and unboxed on purpose -- it qualifies the
+   value, it is not a label on it. */
+.profile-flag {
+  margin-left: 10px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.profile-signout {
+  flex-shrink: 0;
+  align-self: center;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: none;
+  padding: 0.6rem 1.25rem;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--color-surface);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.profile-signout:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--color-surface);
+}
+
+.profile-signout:focus-visible {
+  outline: 2px solid var(--color-blue-300);
+  outline-offset: 2px;
+}
+
+/* Label/value pairs. A two-column grid rather than a table: the values wrap
+   (a `sub` is long, a realm URL longer) and a table would either scroll the
+   page sideways or truncate them. */
+.profile-facts {
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) 1fr;
+  gap: 10px 24px;
+  margin: 0;
+}
+
+.profile-facts dt {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  /* Aligns the label to the first line of a value that wraps. */
+  padding-top: 1px;
+}
+
+.profile-facts dd {
+  margin: 0;
+  color: var(--color-navy-900);
+  overflow-wrap: anywhere;
+}
+
+.profile-page .card p + p {
+  margin-top: 0.9rem;
+}
+
+/* A section describing something that does not exist yet. Deliberately not
+   styled as a warning — nothing is wrong, it is simply not built. */
+@media (max-width: 560px) {
+  .profile-identity {
+    flex-wrap: wrap;
+  }
+
+  .profile-signout {
+    width: 100%;
+  }
+
+  .profile-facts {
+    grid-template-columns: 1fr;
+    gap: 2px 0;
+  }
+
+  .profile-facts dd {
+    margin-bottom: 12px;
+  }
+}
+
+/* --- Training history (F-48) -------------------------------------------- */
+/* One row per training. Rows rather than cards: a history is scanned for the
+   one call you have in mind, and a stack of thin lines compares far better
+   than a grid of boxes. */
+
+/* No frame of its own: the card around it already is one, and two nested
+   borders of nearly the same radius read as a mistake. Instead the rows run the
+   full width of the card, so a hover fill reaches its edges. */
+.session-list {
+  list-style: none;
+  margin: 0 -1.5rem;
+  padding: 0;
+  border-top: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.session-list li + li {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* The row proper and the delete button beside it. The button cannot live
+   inside the link (invalid markup, and a click would navigate too), so the two
+   sit side by side and the link takes what is left. */
+.session-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex: 1;
+  min-width: 0;
+  padding: 13px 1.5rem;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s;
+}
+
+.session-row:hover {
+  background: var(--color-surface-selected);
+}
+
+.session-row:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: -2px;
+}
+
+/* Fixed width so the dates line up into a column that can be read downwards. */
+.session-row-date {
+  flex: 0 0 10.5rem;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.session-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.session-row-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-row-persona {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  min-width: 0;
+}
+
+/* Small state labels on a history row. Tinted rather than solid, and stating
+   a fact rather than raising an alarm: a call that was abandoned, or one whose
+   wrap-up never got written, is a thing that happened, not the user's mistake.
+   Colour is a second channel here, never the only one -- each chip says in
+   words what its colour repeats, so it survives being read in greyscale or by
+   someone who does not separate green from red. */
+.chip {
+  margin-left: 8px;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* A wrap-up exists and can be opened. */
+.chip-success {
+  background: #e3f2ec;
+  color: var(--color-success);
+}
+
+/* One is on its way — the worker has not finished yet. */
+.chip-pending {
+  background: var(--color-blue-100);
+  color: var(--color-blue-600);
+}
+
+/* None was written and none is coming. Muted red: it closes off an
+   expectation, but nothing went wrong that the user could have prevented. */
+.chip-absent {
+  background: #f7e7e5;
+  color: var(--color-danger);
+}
+
+/* Plain statements of fact, e.g. that a call was abandoned. */
+.chip-neutral {
+  background: var(--color-surface-filter);
+  color: var(--color-text-muted);
+}
+
+.session-row-duration {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.session-row-chevron {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-top: 1.5px solid var(--color-blue-300);
+  border-right: 1.5px solid var(--color-blue-300);
+  transform: rotate(45deg);
+  transition: border-color 0.15s;
+}
+
+.session-row:hover .session-row-chevron {
+  border-color: var(--color-blue-600);
+}
+
+/* The bin, and the check and cross that replace it. The box widens from one
+   button to two while the bin slides out to the right, clipped at the box's
+   edge so it leaves rather than fades, and the two answers come in from the
+   left a moment after. Every button stays mounted; `visibility` hides the ones
+   not in play, and flips only at the end of a hiding transition (its own delay)
+   so the slide is still seen. */
+.session-row-actions {
+  position: relative;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  margin-right: 10px;
+  overflow: hidden;
+  transition: width 0.25s ease;
+}
+
+.session-row-actions.is-confirming {
+  width: 68px;
+}
+
+/* Quiet until the row is pointed at or the button itself focused: a delete
+   sitting in full colour on every line would be the loudest thing on a screen
+   whose purpose is reading. It stays reachable by keyboard regardless — only
+   the colour is held back, never the button. */
+.session-row-delete {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  padding: 0;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: color 0.15s, background 0.15s, opacity 0.15s, transform 0.25s ease,
+    visibility 0s;
+}
+
+.is-confirming .session-row-delete {
+  transform: translateX(110%);
+  visibility: hidden;
+  transition: color 0.15s, background 0.15s, opacity 0.15s, transform 0.25s ease,
+    visibility 0s linear 0.25s;
+}
+
+.session-row-yes,
+.session-row-no {
+  position: absolute;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-14px);
+  transition: transform 0.2s ease, opacity 0.15s, background 0.15s,
+    visibility 0s linear 0.2s;
+}
+
+.session-row-yes {
+  right: 36px;
+  background: var(--color-danger);
+  color: var(--color-surface);
+}
+
+.session-row-no {
+  right: 0;
+  background: var(--color-surface-selected);
+  color: var(--color-navy-900);
+}
+
+.is-confirming .session-row-yes,
+.is-confirming .session-row-no {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: transform 0.25s ease 0.08s, opacity 0.2s 0.08s, background 0.15s,
+    visibility 0s;
+}
+
+/* The cross a beat after the check, so the two read as arriving in order. */
+.is-confirming .session-row-no {
+  transition-delay: 0.14s, 0.14s, 0s, 0s;
+}
+
+.session-row-yes:hover {
+  background: #9a3a30;
+}
+
+.session-row-no:hover {
+  background: var(--color-border);
+}
+
+.session-row-yes[aria-busy="true"] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Inset, because the box clips anything drawn outside the buttons. */
+.session-row-yes:focus-visible,
+.session-row-no:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: -2px;
+}
+
+.session-row-error {
+  flex: 0 0 100%;
+  margin: 0;
+  padding: 0 1.5rem 12px;
+  font-size: 0.85rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-row-actions,
+  .session-row-delete,
+  .is-confirming .session-row-delete,
+  .session-row-yes,
+  .session-row-no,
+  .is-confirming .session-row-yes,
+  .is-confirming .session-row-no {
+    transition: none;
+  }
+}
+
+.session-item:hover .session-row-delete,
+.session-row-delete:focus-visible {
+  opacity: 1;
+}
+
+.session-row-delete:hover:not(:disabled) {
+  background: var(--color-surface-selected);
+  color: var(--color-danger);
+  opacity: 1;
+}
+
+.session-row-delete:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: -2px;
+}
+
+/* "There is more below", in the two places that say it: the training history
+   and the Scenario grid. One rule rather than a copy each — they look alike on
+   purpose, though what they do differs and their labels say so: the history
+   fetches the next page, the grid only unfolds what it already has. */
+.session-more,
+.library-more {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: none;
+  padding: 0.7rem 1.25rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--color-blue-600);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.session-more:hover:not(:disabled),
+.library-more:hover {
+  background: var(--color-surface-selected);
+}
+
+.session-more:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* On a narrow screen the date moves above the title instead of squeezing it. */
+@media (max-width: 560px) {
+  .session-row {
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+
+  .session-row-date {
+    flex: 0 0 100%;
+    order: -1;
+    font-size: 0.8rem;
+  }
+
+  .session-row-main {
+    flex: 1 1 auto;
+  }
+}
+
+/* --- Back link and page lead -------------------------------------------- */
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: var(--color-blue-600);
+  text-decoration: none;
+}
+
+.back-link::before {
+  content: "← ";
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+/* The one-line subtitle under a page heading — who the call was with. Sits in
+   the margin the h1 leaves, so it reads as part of the heading block. */
+.page-lead {
+  margin: -1rem 0 1.5rem;
+  color: var(--color-text-muted);
+}
+
+/* --- Storage consent (ADR 0066) ----------------------------------------- */
+
+/* Replaces the app rather than floating over it: the decision has to be made,
+   and dimming a usable screen behind it would suggest otherwise. */
+.consent-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  /* NOT align-items: center. On a scroll container, a centered flex item that
+     is taller than the viewport overflows equally in both directions, and the
+     part above the top edge cannot be scrolled to: scrolling never goes above
+     the origin, so the head of a long dialog is simply lost. The dialog below
+     centers itself with `margin: auto` instead, which resolves to zero once
+     there is no free space left. */
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px;
+  background: var(--color-background);
+  overflow-y: auto;
+}
+
+.consent-dialog {
+  width: min(560px, 100%);
+  /* Centers vertically while it fits and starts at the top once it does not
+     (see the backdrop above). */
+  margin: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 32px;
+}
+
+.consent-dialog h1 {
+  font-size: 1.4rem;
+  margin-bottom: 1.25rem;
+}
+
+.consent-dialog p {
+  margin: 0 0 0.9rem;
+  line-height: 1.55;
+}
+
+.consent-highlight {
+  padding: 12px 14px;
+  border-radius: var(--radius-control);
+  background: var(--color-blue-100);
+}
+
+.consent-dialog p.consent-note {
+  margin-top: 1.25rem;
+  padding-left: 12px;
+  border-left: 3px solid var(--color-blue-300);
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+/* Both answers are real answers, so both get a real button. A muted "no" next
+   to a bright "yes" is a dark pattern, and it would undermine the very consent
+   this dialog exists to collect. */
+.consent-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 1.5rem;
+}
+
+.consent-button {
+  flex: 1;
+  border-radius: 999px;
+  padding: 0.85rem 1.25rem;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, opacity 0.2s;
+}
+
+/* A link wearing the button's clothes — picking focus goals, starting a
+   training. An `<a>` is inline, and an inline box's vertical padding takes up
+   no line height: it paints over the line above instead, which is how the
+   button came to sit on top of the sentence it answers. `inline-flex` makes the
+   padding count, and the underline a link would carry does not belong on a
+   button. */
+a.consent-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.consent-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.consent-button-primary {
+  border: 1px solid var(--color-navy-900);
+  background: var(--color-navy-900);
+  color: var(--color-surface);
+}
+
+.consent-button-primary:hover:not(:disabled) {
+  background: var(--color-blue-600);
+  border-color: var(--color-blue-600);
+}
+
+.consent-button-secondary {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-navy-900);
+}
+
+.consent-button-secondary:hover:not(:disabled) {
+  background: var(--color-surface-selected);
+}
+
+.consent-button-danger {
+  border: 1px solid var(--color-danger);
+  background: var(--color-danger);
+  color: var(--color-surface);
+}
+
+.consent-button-danger:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.consent-error {
+  color: var(--color-danger);
+}
+
+.consent-result {
+  color: var(--color-success);
+}
+
+/* --- Consent on the profile --------------------------------------------- */
+
+.consent-status {
+  margin: 0 0 0.75rem;
+}
+
+/* The chip carries a left margin for use inline in a history row; as a
+   standalone status it should sit flush. */
+.consent-status .chip {
+  margin-left: 0;
+}
+
+.profile-page .card .consent-confirm {
+  margin-top: 1rem;
+  padding: 14px 16px;
+  border: 1px dashed var(--color-danger);
+  border-radius: var(--radius-control);
+}
+
+.profile-page .card .consent-confirm p {
+  margin: 0 0 0.9rem;
+  line-height: 1.5;
+}
+
+.consent-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.consent-confirm-actions .cancel-button {
+  width: auto;
+  margin-top: 0;
+  padding: 0.85rem 1rem;
+}
+
+.profile-page .card .consent-button {
+  flex: 0 0 auto;
+  margin-top: 1rem;
+}
+
+.consent-confirm .consent-button {
+  margin-top: 0;
+}
+
+/* --- Storage notice on the setup screen --------------------------------- */
+
+.setup-storage-note {
+  margin: 0 0 1rem;
+  padding: 12px 14px;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-filter);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.setup-storage-note a {
+  color: var(--color-blue-600);
+}
+
+/* --- Deleting one training (ADR 0066) ----------------------------------- */
+
+.session-delete {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.session-delete p {
+  margin: 0 0 0.9rem;
+  line-height: 1.5;
+}
+
+/* Sized to their labels: `.consent-button` grows to fill a row by default, and
+   this one spans the full page width, where a stretched confirm button is out
+   of all proportion to what it does. */
+.session-delete .consent-button {
+  flex: 0 0 auto;
+}
+
+/* It names what it destroys and asks again before doing it, which is where the
+   safety actually sits -- so it may look like the button it is. */
+.session-delete-trigger {
+  border: none;
+  border-radius: 999px;
+  padding: 0.55rem 1.4rem;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-danger);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.session-delete-trigger:hover {
+  background: #9a3a30;
+}
+
+/* --- The traffic light on a classification (ADR 0078) -------------------- */
+/* The only colour in this application that says something about a value. It
+   exists so a reader gets an impression before the reading starts: the wrap-up
+   hands them nine figures at equal weight, and nothing else on that screen says
+   which one is worth their attention first. Colour is seen rather than read,
+   which is the whole property being used here.
+
+   It points, it does not grade. Green means nothing here needs attention today,
+   red means look here first. Two metrics carry one, F-51's interruptions and
+   F-35's intonation, and ADR 0078 holds the seven conditions any further one
+   has to meet.
+
+   It colours the classification and nothing else. Never a whole tile, which
+   would shout an orientation the thresholds cannot support and drown out the
+   neighbouring metrics that carry no reading at all. Never a raw figure
+   either: on F-35 the step is read from the liveliness while the tile's
+   number is the range, so the colour goes on the word.
+
+   Colour is never the only channel: the step is written out beside it, the word
+   "assessment" follows, the scale it came from sits on the metric's own
+   page, and the three tints differ in lightness so they survive greyscale. */
+
+.metric-value-green {
+  color: var(--color-success);
+}
+
+.metric-value-yellow {
+  color: #b57a12;
+}
+
+.metric-value-red {
+  color: var(--color-danger);
+}
+
+.metric-light-label {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.metric-light-caveat {
+  font-style: italic;
+  opacity: 0.85;
+}
+
+/* The count set against the call it happened in. Grey and small: it qualifies
+   the figure, it is not a second figure. */
+.metric-context {
+  margin-top: 2px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+/* A metric with a page behind it. The tile keeps its shape and gains only a
+   hover and the line that says there is more. */
+.metric-open {
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-control);
+  transition: background 0.15s;
+}
+
+.metric-open:hover {
+  background: var(--color-surface-selected);
+}
+
+.metric-open:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 4px;
+}
+
+.metric-open-hint {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--color-blue-600);
+}
+
+/* --- One metric's own page --------------------------------------------- */
+
+/* Room between the areas of this page. A metric's page is figure, scale,
+   note, reading and excerpts stacked in one column, and at the default card
+   rhythm they ran together into one grey block where the eye had nowhere to
+   rest. The space is what says these are separate things. */
+.metric-page .card {
+  margin-top: 2rem;
+  padding: 1.75rem;
+}
+
+.metric-page h1 {
+  margin-bottom: 0.5rem;
+}
+
+.metric-page h2 {
+  margin-top: 2.5rem;
+}
+
+/* The figure is what the page is about, so it carries the weight and the
+   reading sits under it rather than beside it. */
+.metric-page-figure {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 1.25rem;
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.metric-page-figure .metric-light-label {
+  margin-top: 0;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+/* The scale the colour comes from. A boundary the user cannot see is a
+   judgement they cannot argue with. */
+.metric-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 1.5rem;
+}
+
+.metric-step {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 8px;
+  border-left: 3px solid var(--color-border);
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.metric-step dt,
+.metric-step dd {
+  margin: 0;
+}
+
+.metric-step dd {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* The step this call landed on. Weight and a filled ground, so the colour is
+   never the only thing that says which one it was: the three tints differ in
+   lightness, but a reader who sees none of them still sees the mark. */
+.metric-step.is-current {
+  border-left-color: var(--color-blue-600);
+  border-left-width: 5px;
+  padding-left: 6px;
+  background: var(--color-surface-selected);
+  color: var(--color-navy-900);
+  font-weight: 600;
+}
+
+/* After `.is-current` and at the same specificity, so a step that carries a
+   light keeps its own colour while it is the current one. Written as a doubled
+   class for exactly that reason; a single class would lose to `.is-current`
+   whatever the order. */
+.metric-step.metric-step-green {
+  border-left-color: var(--color-success);
+}
+
+.metric-step.metric-step-yellow {
+  border-left-color: #b57a12;
+}
+
+.metric-step.metric-step-red {
+  border-left-color: var(--color-danger);
+}
+
+/* Set off by a rule rather than by space alone: it explains the scale above it
+   and would otherwise read as a caption to the whole card. */
+.metric-note {
+  margin: 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+/* --- The pitch contour (F-35) --------------------------------------------- */
+/* Drawn the way phonetics draws F0: semitones on the vertical axis relative to
+   the speaker's own median, gaps left as gaps, one hue throughout. The reasons
+   are in PitchContour.tsx; what matters here is that nothing in this block may
+   encode a judgement. */
+
+.pitch-contour {
+  margin: 0;
+  /* An SVG scales as a whole, its labels with it, so on a phone the 9 px ticks
+     would land near 4 px. Below the width the drawing was laid out for it
+     scrolls sideways instead of shrinking into illegibility. */
+  overflow-x: auto;
+}
+
+.pitch-contour-plot {
+  display: block;
+  width: 100%;
+  min-width: 520px;
+  height: auto;
+}
+
+/* The speaker's own usual range, not a target band. */
+.pitch-contour-band {
+  fill: var(--color-blue-100);
+  opacity: 0.55;
+}
+
+/* Its two edges, which are measured values (5th and 95th percentile) and not
+   the rounded ones the gridlines show. */
+.pitch-contour-band-edge {
+  stroke: var(--color-blue-300);
+  stroke-width: 0.8;
+  stroke-dasharray: 2 2;
+  opacity: 0.8;
+}
+
+.pitch-contour-grid {
+  stroke: var(--color-border-subtle);
+  stroke-width: 1;
+}
+
+/* The zero line is the speaker's median, so it is the one line worth seeing. */
+.pitch-contour-median {
+  stroke: var(--color-blue-300);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.pitch-contour-line {
+  fill: none;
+  stroke: var(--color-blue-600);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* The connection across a stimmlose Stelle. Same hue, so the eye follows one
+   curve, but dotted and faint: nothing was measured here, and the line must not
+   claim otherwise. */
+.pitch-contour-bridge {
+  fill: none;
+  stroke: var(--color-blue-600);
+  stroke-width: 1;
+  stroke-dasharray: 1 2;
+  stroke-linecap: round;
+  opacity: 0.3;
+}
+
+/* Where one of the user's turns ends and the next begins. Light grey and
+   dashed: a seam in the recording, not a value. */
+.pitch-contour-break {
+  stroke: var(--color-border);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+/* The turn numbers above those seams. Quieter than the axis: they orient, they
+   are not read. */
+.pitch-contour-turn {
+  font-family: var(--font-sans);
+  font-size: 8px;
+  fill: var(--color-blue-300);
+}
+
+.pitch-contour-tick,
+.pitch-contour-axis-label {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  fill: var(--color-text-muted);
+}
+
+.pitch-contour-tick {
+  text-anchor: end;
+}
+
+.pitch-contour-axis-end {
+  text-anchor: end;
+}
+
+.pitch-contour-legend {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+/* --- intonation (F-35) ------------------------------------------------- */
+/* The contour and the five figures live on the metric's own page
+   (`SessionMetricView`); the wrap-up carries the tile like every other.
+
+   The arrangement is deliberate and replaced one that buried its own point: a
+   paragraph of method under every figure meant the sentence a reader acts on
+   sat in the middle of six hundred words about measurement. Now the lead
+   sentence carries the classification, the figures are figures, and the method
+   is behind the "i". Nothing was deleted, only moved. */
+
+/* The one sentence this block is built around. Larger than body text and above
+   the figures, because a reader who stops after it should still leave with the
+   right impression. */
+.melody-lead {
+  margin: 2rem 0 0;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--color-navy-900);
+}
+
+.melody-lead strong {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+/* --- Whether the tone suited the occasion -------------------------------- */
+/* The one thing on this page that is written rather than measured, so it is
+   set apart rather than run in with the figures: its own ground, its own rule
+   above it, and a caveat naming where it came from. A reader has to be able to
+   tell at a glance which parts of this page were counted and which were
+   interpreted. */
+
+.melody-fit {
+  margin: 2rem 0 0;
+  padding: 1.25rem 1.25rem 1rem;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-selected);
+}
+
+.melody-fit h3 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+.melody-fit p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.melody-fit-caveat {
+  margin-top: 0.75rem !important;
+  font-size: 0.8rem !important;
+  line-height: 1.5 !important;
+  color: var(--color-text-muted);
+}
+
+/* Section headings inside this block. Generous above, tight below: the space
+   belongs between the sections, not between a heading and what it names. */
+.melody-heading {
+  margin: 2.5rem 0 1rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+/* --- The five figures, as tiles ------------------------------------------ */
+/* `.metric-grid` and `.metric` on purpose, so these read as the same kind of
+   thing as the tiles in the wrap-up rather than as a second design language.
+   What they add is the icon: on the wrap-up grid the explanation lives on the
+   metric's own page, and here there is no further page to go to. */
+
+.melody-grid {
+  margin: 0 0 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 16px;
+}
+
+.melody-tile {
+  /* The icon is positioned against this. */
+  position: relative;
+  gap: 4px;
+  /* Room on the right for the icon, so a long value never runs under it. */
+  padding: 14px 46px 14px 16px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+}
+
+/* The figure is what the tile is for, so it gets the size. Everything else on
+   the tile is a label for it: the name above is small caps, the subline below
+   is grey, and the icon is out of the way in the corner. */
+.melody-tile .metric-value {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.melody-tile .metric-subline {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+/* Top right, out of the reading order of the tile itself. Only the summary is
+   taken out of flow: the `details` element stays where it sits in the markup,
+   which is last, so an opened explanation still unfolds under the figure
+   rather than over it. */
+.melody-tile .info-details {
+  margin: 0;
+}
+
+.melody-tile .info-summary {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.melody-tile .info-body {
+  margin-top: 12px;
+}
+
+/* An open tile takes the whole row. Three paragraphs in a 150px column is a
+   word per line, which is the failure mode of putting explanations inside grid
+   cells at all; this is the cheap way out of it and needs no state. Where
+   `:has` is unavailable the text is merely narrow, not broken. */
+.melody-tile:has(> .info-details[open]) {
+  grid-column: 1 / -1;
+}
+
+/* --- What a figure says on its own --------------------------------------- */
+/* Only the two that mean something without a norm: a slope has a natural zero,
+   and a speaker compared with themselves needs no reference point. Both stay
+   silent when there is nothing to say, so this list is often one item and
+   sometimes none. */
+
+.melody-notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.melody-notes li {
+  padding-left: 12px;
+  border-left: 2px solid var(--color-border);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+/* The method, folded away. Small headings so it can be skimmed for the one
+   question the reader came with, which is usually what the colour is worth. */
+/* --- One interruption, in its own words ---------------------------------- */
+
+.interruptions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.interruption {
+  padding: 8px 10px;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-selected);
+}
+
+.interruption-time {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.interruption-line {
+  margin: 0 0 4px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.interruption-speaker {
+  font-weight: 600;
+}
+
+.interruption-user {
+  margin-bottom: 0;
+}
+
+/* Where the user came in. A visible break rather than a word, so the sentence
+   reads as one that was stopped. */
+.interruption-cut {
+  display: inline-block;
+  width: 2px;
+  height: 0.95em;
+  margin: 0 4px;
+  vertical-align: text-bottom;
+  background: var(--color-danger);
+}
+
+/* What was never said. Struck through and faint, because the one thing this
+   must not do is read like part of the transcript. */
+.interruption-unheard {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.interruption-unheard.is-missing {
+  text-decoration: none;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* --- Progress dashboard (F-13, docs/dashboard-konzept.md) ---------------- */
+/* One rule governs everything below: nothing here may encode a judgement.
+   No red, no green, no arrows. A value is drawn in the same blue whether it
+   is high or low, because nobody has established which of the two is better
+   for these metrics (ADR 0051, ADR 0065). */
+
+.progress-page h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+/* The section headings are the wrap-up's (`SectionHeading`), and they need the
+   wrap-up's size back: `.progress-page h2` above is written for the second-level
+   pages' plain headings and would otherwise shrink these to body size. */
+.progress-page .feedback-section-title {
+  font-size: 20px;
+  margin: 0;
+}
+
+.progress-page .feedback-section-aside {
+  font-size: 0.85rem;
+}
+
+.progress-note {
+  margin-top: -0.5rem;
+  font-size: 0.85rem;
+}
+
+/* --- Ihr Training: the band that opens the page ---------------------------- */
+/* Three columns on a wide screen: the counted figures stacked on the left, the
+   calendar at its natural width beside them, and the rest to the variety table,
+   which is the one that runs out of room first (a Persona's name gets clipped
+   otherwise). The calendar is sized to the calendar rather than to a share of
+   the page: one month of seven columns has a natural width, and a larger share
+   only stretched the card, not the grid in it. */
+/* The first block on the page follows the lead and its "i", not another
+   block, so it needs less than a section's usual distance. */
+.progress-training-section {
+  margin-top: 1.5rem;
+}
+
+.progress-training {
+  display: grid;
+  grid-template-columns: minmax(170px, 210px) minmax(260px, 340px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* Each card is as tall as what is in it. Stretching them to the tallest would
+   draw a border around empty space beside the variety table once it is
+   expanded to every Scenario. */
+.progress-training .card {
+  margin: 0;
+}
+
+/* The three counted figures as cards with one large number each. Activity is
+   the one thing here that needs no norm to be readable (ADR 0065), and so the
+   one thing that can lead with a figure and no caveat. */
+.progress-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.progress-page .progress-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 1rem 1.25rem;
+}
+
+.progress-stat-figure {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-navy-900);
+}
+
+.progress-stat-label {
+  font-size: 0.9rem;
+  color: var(--color-navy-900);
+}
+
+.progress-stat-span {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+/* Between the two widths the figures go into a row of three above the other
+   two cards, and below 900px everything stacks. */
+@media (max-width: 1100px) {
+  .progress-training {
+    grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  }
+
+  .progress-stats {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .progress-training {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .progress-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- The period switch, where its reach begins ---------------------------- */
+/* A rule across the page with the switch on it: above it every stored
+   training, below it the selection. Placed rather than explained -- the line
+   says where the switch stops mattering before anybody reads the note. */
+.progress-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-top: 2.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.progress-scope-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+.progress-scope-note {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* The section right under the rule needs less air than one under a block. */
+.progress-scope + .progress-section {
+  margin-top: 1.75rem;
+}
+
+/* Period switch. Buttons rather than a select: three options that are always
+   worth seeing, and switching is the most frequent act on this screen. */
+.progress-periods {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  padding: 3px;
+}
+
+.progress-period {
+  border: none;
+  border-radius: 999px;
+  background: none;
+  padding: 0.35rem 0.9rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.progress-period.is-active {
+  background: var(--color-navy-900);
+  color: var(--color-surface);
+}
+
+.progress-period:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 2px;
+}
+
+/* Generous, and deliberately so: the complaint the redesign answers was that
+   ten equal boxes read as one undifferentiated block, and the first remedy for
+   that is space rather than decoration. */
+.progress-section {
+  margin-top: 2.75rem;
+}
+
+/* The same distance from every section heading to what it heads. A `.card`
+   brings a 1.5rem top margin of its own, so the sections led by a card sat
+   2.5rem under their heading and the ones led by tiles 1rem, and the page read
+   as unevenly spaced without anyone being able to say why. */
+.progress-section .feedback-section-head + .card {
+  margin-top: 0;
+}
+
+.progress-section-link {
+  font-size: 0.85rem;
+  color: var(--color-blue-600);
+}
+
+/* The focus tiles: small multiples, so identically sized (Tufte). `auto-fit`
+   rather than `auto-fill`, so two or three picked goals share the row instead
+   of standing at its left end beside empty tracks; five still fit on one row
+   at the page's full width. */
+.focus-tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+/* A single goal would otherwise be one tile the width of the page, its
+   sparkline stretched into a line across the screen. */
+.focus-tiles:has(> li:only-child) {
+  max-width: 560px;
+}
+
+.focus-tile {
+  display: block;
+  height: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+.focus-tile-title {
+  display: block;
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.3;
+  /* Ink, not the series hue: the palette rules keep text in text colours and
+     let a coloured mark beside it carry the identity. */
+  color: var(--color-navy-900);
+}
+
+/* A dot in the family's hue, once per group heading rather than once per row:
+   every row under the heading belongs to the same family, and the sparklines
+   in them already carry the hue. */
+.progress-group-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--series, var(--color-blue-600));
+  vertical-align: baseline;
+}
+
+/* --- metrics over time, one row each (block C) ------------------------- */
+/* A sparkline table: every row the same height and every course the same
+   width, which is what makes sixteen of them comparable at a glance. No colour
+   in any cell depends on a value; the hue is the group's and sits on the
+   sparkline and on the dot in the group heading. */
+
+.metric-table-card {
+  padding: 0.25rem 0 0.5rem;
+}
+
+.metric-table-scroll {
+  overflow-x: auto;
+}
+
+.metric-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.metric-table th,
+.metric-table td {
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.metric-table th:first-child,
+.metric-table td:first-child {
+  padding-left: 1.5rem;
+}
+
+.metric-table th:last-child,
+.metric-table td:last-child {
+  padding-right: 1.5rem;
+}
+
+.metric-table thead th {
+  padding-top: 12px;
+  padding-bottom: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+/* The family heading between the groups: a quiet band, not a row of data. */
+.metric-table-group th {
+  padding-top: 18px;
+  padding-bottom: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-navy-900);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.metric-table-row td,
+.metric-table-row th {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.metric-table tbody:last-child .metric-table-row:last-child td,
+.metric-table tbody:last-child .metric-table-row:last-child th {
+  border-bottom: none;
+}
+
+.metric-table-row {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.metric-table-row:hover {
+  background: var(--color-surface-selected);
+}
+
+.metric-table-name {
+  font-weight: 500;
+  min-width: 12rem;
+}
+
+.metric-table-name a {
+  color: var(--color-navy-900);
+  text-decoration: none;
+}
+
+.metric-table-row:hover .metric-table-name a {
+  color: var(--color-blue-600);
+}
+
+.metric-table-name a:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Two classes, so it outranks the table's own left alignment above. */
+.metric-table .metric-table-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.metric-table-last {
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+/* Every course the same width, so the eye can run down the column and compare
+   shapes rather than reading each one on its own scale. */
+.metric-table-course {
+  width: 30%;
+  min-width: 180px;
+}
+
+/* Scoped to the page and the card as well, because the metric detail page's
+   rule for its large chart (`.progress-page .card .sparkline`) matches a
+   sparkline in any card on these pages and would otherwise make every row
+   160px tall. */
+.progress-page .metric-table-card .metric-table .sparkline {
+  height: 36px;
+  margin-bottom: 0;
+}
+
+.metric-table-band {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-table-wait {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* A checklist metric across the trainings: one mark per training with the
+   count in it. Every mark alike, whatever it holds -- shading by count would be
+   a colour meaning "more is better" (ADR 0065), and the number is the reading. */
+.parts-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.parts-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--color-surface-filter);
+  color: var(--color-navy-900);
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-tile .parts-strip {
+  margin: 0.2rem 0 0.1rem;
+}
+
+/* A goal's further metrics under its first: smaller, one line each, the
+   figure beside a thin course. Separated by a rule so they read as supporting
+   the figure above rather than as a second headline. */
+.focus-supporting {
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0.6rem 0 0;
+  border-top: 1px solid var(--color-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.focus-supporting-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 64px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.focus-supporting-name {
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focus-supporting-value {
+  font-weight: 600;
+  color: var(--color-navy-900);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.focus-supporting .sparkline {
+  height: 22px;
+}
+
+/* What the wrap-ups said about a goal with no measurement: a label, the pips
+   and the count, the same marks the recurring block uses for the same kind of
+   statement. */
+.focus-mentions {
+  list-style: none;
+  margin: 0.2rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.focus-mentions li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label count"
+    "pips  pips";
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.focus-mentions-label {
+  grid-area: label;
+  font-size: 0.85rem;
+  color: var(--color-navy-900);
+}
+
+.focus-mentions-count {
+  grid-area: count;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.focus-mentions .recurring-pips,
+.focus-mentions .recurring-track {
+  grid-area: pips;
+}
+
+/* Air between the last row of tiles and the sentence under them. */
+.progress-section .progress-note {
+  margin-top: 1rem;
+}
+
+/* Tiles in a row are as tall as the tallest, so the link at the bottom of each
+   lines up instead of floating wherever its text happens to end. */
+.focus-tile {
+  display: flex;
+  flex-direction: column;
+}
+
+.focus-tile .progress-detail-link {
+  margin-top: auto;
+  padding-top: 0.6rem;
+}
+
+/* The number beside the curve, so the tile says something without the chart
+   having to be read. */
+.progress-metric-figure {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.progress-metric-figure-label {
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.focus-tile-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.progress-detail-link {
+  display: inline-block;
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--color-blue-600);
+}
+
+/* The sentence and its button on one line, the button at the far end, wrapping
+   under the text when the card gets narrow. */
+.progress-invite {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+
+.progress-invite p {
+  flex: 1 1 320px;
+  margin: 0;
+}
+
+.progress-invite .consent-button {
+  flex: 0 0 auto;
+}
+
+/* The two cards' own titles, one level under the section heading "Ihr
+   Training" that stands above both. */
+.progress-card-title {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+/* --- When the user trained ------------------------------------------------ */
+/* Counting what somebody did needs no norm, which is why this is the one block
+   here that carries no caveat (ADR 0065). The shading is magnitude on a single
+   hue, three steps, and the number is printed in the cell -- so the colour is a
+   second reading of what the cell already says, never the only one.
+
+   Derived from --series-activity by mixing it with the surface at 45 % and
+   70 %, validated as an ordinal ramp against a white card: monotone lightness,
+   adjacent gaps over 0.06, light end 2.23:1, one hue. A darker light end than
+   the eye would pick, because the first step has to stay visible against the
+   card at all. */
+
+.calendar {
+  margin: 0;
+}
+
+/* The month, and the two arrows that change it. The count sits on the same
+   line, to the right, because it belongs to the month that is named beside it
+   and nowhere else. */
+.calendar-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.calendar-title {
+  min-width: 0;
+  padding: 0 2px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+  white-space: nowrap;
+}
+
+.calendar-total {
+  margin-left: auto;
+  padding-left: 8px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.calendar-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-navy-900);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.calendar-page:hover:not(:disabled) {
+  background: var(--color-background);
+}
+
+/* Kept visible rather than removed: the two arrows are the only thing that says
+   this calendar has other months, and a disabled one still says which end it
+   is. */
+.calendar-page:disabled {
+  color: var(--color-border);
+  cursor: default;
+}
+
+/* Fixed layout, so the seven columns are seven equal shares of the card rather
+   than of the widest number in them. The negative margin takes back the ring of
+   border-spacing around the outside, which would otherwise sit on top of the
+   card's own padding and pull the grid in on both sides. */
+.calendar-month {
+  width: calc(100% + 8px);
+  margin: -4px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 4px;
+}
+
+.calendar-month th {
+  padding: 0 0 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.calendar-month th abbr {
+  text-decoration: none;
+}
+
+.calendar-month td {
+  padding: 0;
+}
+
+.calendar-day {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 32px;
+  border-radius: 9px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  transition: transform 120ms ease;
+}
+
+/* Today, whether or not anything was trained on it: a ring rather than a fill,
+   so it says "you are here" without joining the three-step scale. */
+.calendar-day-today {
+  box-shadow: 0 0 0 1.5px var(--series-activity);
+}
+
+/* A day with nothing on it still shows its date: this is a calendar, and a
+   month with holes in it is not one. Recessive, so the trained days are what
+   the eye lands on. */
+.calendar-step-0 {
+  color: var(--color-text-muted);
+  background: var(--color-background);
+}
+
+.calendar-step-1 {
+  background: color-mix(in srgb, var(--series-activity) 45%, var(--color-surface));
+  color: var(--color-navy-900);
+  font-weight: 600;
+}
+
+.calendar-step-2 {
+  background: color-mix(in srgb, var(--series-activity) 70%, var(--color-surface));
+  color: var(--color-surface);
+  font-weight: 600;
+}
+
+.calendar-step-3 {
+  background: var(--series-activity);
+  color: var(--color-surface);
+  font-weight: 600;
+}
+
+.calendar-day:hover {
+  transform: scale(1.08);
+}
+
+/* Available to a screen reader, invisible on screen: the digit in a cell means
+   a count on a trained day and a date on an empty one, which no marker can
+   convey and which the sentence here states outright. */
+.calendar-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* One line, and only ever one: the scale, or the hovered day in its place. A
+   fixed height, so swapping the two does not move the card's bottom edge. */
+.calendar-legend {
+  display: flex;
+  align-items: center;
+  min-height: 20px;
+  margin-top: 14px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.calendar-legend-scale {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.calendar-legend-label {
+  margin-left: 4px;
+}
+
+.calendar-key {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+}
+
+.calendar-readout {
+  color: var(--color-navy-900);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar-day {
+    transition: none;
+  }
+
+  .calendar-day:hover {
+    transform: none;
+  }
+}
+
+/* --- What was trained with what ------------------------------------------ */
+
+.variety-wrap {
+  overflow-x: auto;
+}
+
+.variety-grid {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.variety-grid th {
+  font-weight: 600;
+  text-align: left;
+  padding: 4px 10px 8px 0;
+  color: var(--color-text-muted);
+  vertical-align: bottom;
+}
+
+.variety-grid thead th {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.variety-grid tbody th {
+  font-weight: 500;
+  color: var(--color-navy-900);
+  padding-right: 14px;
+  /* Long Scenario titles must not push the grid off the card. */
+  max-width: 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variety-grid td {
+  padding: 3px 4px;
+}
+
+.variety-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 28px;
+  border-radius: var(--radius-control);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.variety-cell.is-played {
+  background: var(--color-blue-600);
+  color: var(--color-surface);
+}
+
+.variety-empty {
+  width: 100%;
+  height: 100%;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+/* Available to a screen reader, invisible on screen: an empty cell has to say
+   what it means, and a dash would be read out as punctuation. */
+.variety-empty-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- The chart ----------------------------------------------------------- */
+
+/* The chart takes its hue from `color`, which the component sets per series
+   from the metric's family (utils/metricGroups.ts). One place decides the
+   colour; every mark below inherits it through currentColor, so a mark can
+   never end up painted from a value. */
+
+.sparkline-wrap {
+  display: block;
+}
+
+.sparkline {
+  display: block;
+  width: 100%;
+  height: 56px;
+  overflow: visible;
+}
+
+/* The band is the user's own usual range, not a target. Faint on purpose: it
+   is context for the line, and a strong fill would read as a zone to stay in.
+   Deliberately grey rather than the series hue: it is the only mark here that
+   could be mistaken for a target zone, and colour would push it further that
+   way. */
+.sparkline-band {
+  fill: var(--color-border-subtle);
+  opacity: 0.3;
+}
+
+/* The area is what makes a flat line read as a shape. It fades out downwards so
+   it stays a backdrop for the line rather than a second mark competing with
+   it. */
+.sparkline-area {
+  fill: currentColor;
+  opacity: 0.12;
+}
+
+.sparkline-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.sparkline-dot {
+  fill: currentColor;
+  opacity: 0.55;
+  transition: opacity 120ms ease, r 120ms ease;
+}
+
+/* The reading the line under the chart is showing. A ring of surface colour
+   around it so it stays legible where the line runs under it. */
+.sparkline-dot.is-current {
+  opacity: 1;
+  stroke: var(--color-surface);
+  stroke-width: 2;
+  paint-order: stroke;
+}
+
+.sparkline-hit {
+  fill: transparent;
+  cursor: default;
+}
+
+/* The hovered reading, under the chart: which training this point was, which is
+   what the figure printed above the chart does not say. Never a floating box
+   over the marks. */
+.sparkline-readout {
+  margin: 2px 0 0;
+  /* Reserved whether or not it holds text, so a tile does not grow under the
+     pointer and shift the ones after it. */
+  min-height: 1.06rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sparkline-readout-value {
+  font-weight: 600;
+  color: var(--color-navy-900);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sparkline-dot {
+    transition: none;
+  }
+}
+
+/* --- Metric detail ------------------------------------------------------- */
+
+.progress-page .card .sparkline {
+  height: 160px;
+  margin-bottom: 0.75rem;
+}
+
+.progress-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.progress-table th {
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.progress-table td {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.progress-table tr:last-child td {
+  border-bottom: none;
+}
+
+.progress-table-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The demanding stretches of a call against the rest (ADR 0081). Reuses the
+   progress table's type and rules so the two read as the same kind of thing.
+   Both value columns are styled identically on purpose: giving the
+   under-pressure column any emphasis of its own would make it the figure that
+   counts and turn a comparison into a verdict. */
+
+.segment-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.segment-table th {
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.segment-table td {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.segment-table tr:last-child td {
+  border-bottom: none;
+}
+
+.segment-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.segment-training {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+}
+
+/* Quotations from the wrap-ups on the second level, for a metric and for a
+   focus goal. The sentence leads and the source follows it in small grey type:
+   the reader is here for what was said, and which call it was said in is the
+   footnote that makes it checkable. Deliberately not a table -- these are
+   paragraphs of prose, and a cell of running text is unreadable at any width. */
+
+.goal-statements {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.goal-statement + .goal-statement {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.goal-statement-text {
+  margin: 0 0 0.3rem;
+  line-height: 1.55;
+}
+
+.goal-statement-source {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* The kind is written out, never a colour on its own: a green dot beside a
+   sentence would grade the call, which is what ADR 0065 keeps off this screen.
+   The weight is the whole of the distinction. */
+.goal-statement-kind {
+  font-weight: 600;
+}
+
+/* --- What recurs, and what to practise next (blocks D and E) ------------- */
+/* These two were a dashed, half-transparent example until each feedback point
+   carried the goal it was about (ADR 0080). The example styling is gone with
+   it: the content is the user's own now, and anything that still whispered
+   "placeholder" would undersell it. `progress-preview-note` is the last name
+   left over from that phase; the rest were renamed when the two lists became
+   two cards. */
+
+.progress-preview-note {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+/* One card per kind, side by side. Two columns inside a single border read as
+   one table with a gap down the middle, which is what they were; the two lists
+   answer different questions and nothing is ever compared across them. */
+.recurring-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* No margin of their own: the section heading above sets the distance, as it
+   does for every other block on the page. */
+.recurring-columns .card {
+  margin: 0;
+}
+
+.recurring-heading {
+  margin: 0 0 1rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--color-text-muted);
+}
+
+.recurring-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.recurring-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 8px;
+  margin: 0 -8px;
+  border-radius: var(--radius-control);
+  transition: background-color 140ms ease;
+}
+
+.recurring-item:hover {
+  background: var(--color-surface-selected);
+}
+
+/* Position in the list, which is the order the lists are already in
+   (most-mentioned first) and says nothing else. Not a place and not a grade:
+   the figure beside it is the whole claim. */
+.recurring-rank {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-blue-100);
+  color: var(--color-blue-600);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.recurring-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recurring-goal {
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--color-navy-900);
+}
+
+/* One pip per analysed training, filled where the theme was named. The same
+   navy on both cards: a hue that separated strength from improvement would be a
+   good/bad axis, which ADR 0065 keeps off this screen. The headings carry the
+   distinction, exactly as they do in GoalStatements. */
+.recurring-pips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.recurring-pip {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-border);
+}
+
+.recurring-pip.is-named {
+  background: var(--color-blue-600);
+}
+
+.recurring-track {
+  display: block;
+  width: 100%;
+  max-width: 160px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.recurring-track-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-blue-600);
+}
+
+.recurring-count {
+  flex: 0 0 auto;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-navy-900);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.recurring-count-of {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+/* Under both cards: it describes the counting, which is the same on either
+   side, and inside one card it looked like a footnote to that card alone. */
+.recurring-note {
+  margin: 1rem 0 0;
+  font-size: 0.82rem;
+}
+
+/* The single practice suggestion. Reason first and small, the thing to play
+   next beside it and large, the button at its end, the caveat last. That order
+   is the argument: a suggestion whose ground the reader has not seen is an
+   instruction, so the ground comes before the offer.
+
+   Across the full width under the two lists rather than as a third card in
+   their row: the same content in a 450px column ran three times their height,
+   and the row read as lopsided. The ground takes the smaller share -- it is
+   read once, where the offer is what gets pressed. */
+
+.progress-practice-band {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(340px, 1.5fr);
+  gap: 16px 32px;
+  align-items: center;
+}
+
+/* Under each other from the width where the offer's own row (text plus button)
+   starts wrapping: two narrow columns would break both halves at once. */
+@media (max-width: 900px) {
+  .progress-practice-band {
+    grid-template-columns: 1fr;
+  }
+}
+
+.progress-practice-why {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+/* The chip at the head of the sentence that gives the ground. It says what
+   kind of thing this block is before the reader has read a word of it, which is
+   the same job the closing caveat does at the other end. */
+.progress-practice-chip {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--color-blue-100);
+  color: var(--color-blue-600);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
+/* The offer itself, lifted off the card so the eye lands on it: the name of the
+   call on the left, the button on the right, wrapping under it when the card
+   gets narrow. */
+.progress-practice-offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 24px;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-choice);
+  background: linear-gradient(
+    135deg,
+    var(--color-blue-100) 0%,
+    var(--color-surface-selected) 65%,
+    var(--color-surface) 100%
+  );
+}
+
+.progress-practice-text {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.progress-practice-what {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--color-navy-900);
+}
+
+/* What is fixed about the suggestion, as facts rather than as a clause: the
+   partner and the kind of call. Both are consequences of the ground above, so
+   they are stated, not argued. */
+.progress-practice-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  list-style: none;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.progress-practice-facts li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-practice-facts li + li::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-blue-300);
+}
+
+/* `.consent-button` stretches to fill its row; here it sits beside the text and
+   keeps its own width. */
+.progress-practice-start {
+  flex: 0 0 auto;
+  padding-inline: 1.6rem;
+  white-space: nowrap;
+}
+
+.progress-practice-note {
+  margin: 1.25rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+/* The header's plain text link, beside the account chip. */
+/* --- Training focus (F-61, ADR 0074) ------------------------------------ */
+/* The same picker in two frames: the first-run dialog and the profile card.
+   Everything below styles the picker; only .focus-dialog belongs to the first
+   of those. */
+
+/* Wider than the consent dialog, which carries four sentences — this one
+   carries the whole catalogue, two cards to a row. The backdrop already scrolls, so a tall
+   list on a short viewport stays reachable. */
+.focus-dialog {
+  width: min(920px, 100%);
+}
+
+/* Role and call types (F-62): chips, since there are few and each is a word
+   or two. The real control stays for the keyboard; the chip is what shows. */
+.focus-profile {
+  margin-top: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.focus-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+.focus-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.focus-chip:hover {
+  border-color: var(--color-blue-300);
+}
+
+.focus-chip.is-on {
+  border-color: var(--color-blue-600);
+  background: var(--color-surface-selected);
+  color: var(--color-navy-900);
+  font-weight: 600;
+}
+
+.focus-chip input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.focus-chip:has(input:focus-visible) {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 2px;
+}
+
+/* Two classes, to win over the dialog's own paragraph margins. */
+.focus-profile .focus-profile-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* The opening's three parts as its headline (F-63). No colour: which part was
+   said is a fact, and colour here says something about a value. */
+.feedback-metrics-section .metric-parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.feedback-metrics-section .metric-part.is-said {
+  color: var(--color-navy-900);
+}
+
+/* What to play next (F-64): one row per offer, the button on the right. */
+.next-calls {
+  margin-top: 16px;
+}
+
+.next-calls-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.next-call {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.next-call-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.next-call-title {
+  font-weight: 600;
+  color: var(--color-navy-900);
+}
+
+.next-call-reason {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.next-call .follow-up-button {
+  flex: none;
+}
+
+/* Why a suggested card is suggested (F-62). */
+.card-reason {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--color-blue-600);
+}
+
+.focus-groups {
+  margin-top: 1.25rem;
+}
+
+/* A rule between the groups, since the cards no longer form one column whose
+   breaks the headings alone could mark. */
+.focus-group + .focus-group {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.focus-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 0.6rem;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* `auto-fit` rather than a fixed two: the dialog gets two columns, the
+   narrower profile card falls back to one without a second rule. */
+.focus-goal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 10px;
+}
+
+/* Cards in one row end level, whatever their caption runs to. */
+.focus-goal-list > li {
+  display: flex;
+}
+
+.focus-group-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--color-surface-filter);
+  color: var(--color-blue-600);
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+.focus-group-count {
+  font-weight: 600;
+  color: var(--color-blue-600);
+}
+
+.focus-goal {
+  position: relative; /* for the check circle */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+/* The card looks like a Persona card, so it has to answer the pointer like
+   one. Neither a picked nor a locked card: both already say what they are, and
+   a hover would take it back. */
+.focus-goal:not(.focus-goal-selected):not(.focus-goal-locked):hover {
+  border-color: var(--color-blue-300);
+}
+
+/* Selected is marked by the border and the fill as well as by the tick: the
+   checkbox alone is a 13px cue on a list this long. */
+.focus-goal-selected {
+  border-color: var(--color-blue-600);
+  background: var(--color-surface-selected);
+}
+
+/* Title and "i" on one line, the icon hugging the title rather than stretching
+   to the right edge, where it would sit against the check circle. Opened, the
+   panel takes a line of its own so the text runs the card's full width. */
+.focus-goal-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-right: 30px; /* the check circle */
+}
+
+.focus-goal-head .info-details {
+  margin: 0;
+}
+
+.focus-goal-head .info-details[open] {
+  flex-basis: 100%;
+  margin-top: 0.25rem;
+}
+
+/* The real control, kept for the keyboard and the screen reader and drawn as
+   the circle below. */
+.focus-goal-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+/* Both halves of the text are labels for the same box, so either one ticks it. */
+.focus-goal-title,
+.focus-goal-caption {
+  display: block;
+  cursor: pointer;
+}
+
+/* Geometry comes from .choice-check, so this and a Persona card cannot drift.
+   It holds the pick's number, hence the smaller type. */
+.focus-goal-check {
+  top: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+}
+
+.focus-goal-selected .focus-goal-check {
+  border-color: var(--color-blue-600);
+  background: var(--color-blue-600);
+  color: var(--color-surface);
+}
+
+/* :has, because the circle now sits inside the title label rather than beside
+   the input. */
+.focus-goal:has(.focus-goal-input:focus-visible) .focus-goal-check {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 2px;
+}
+
+/* At the limit the unpicked cards go quiet, not faint: ten faded cards in a
+   grid read as a broken screen rather than a full one. */
+.focus-goal-locked .focus-goal-title,
+.focus-goal-locked .focus-goal-caption {
+  cursor: default;
+}
+
+.focus-goal-locked .focus-goal-check {
+  border-style: dashed;
+  border-color: var(--color-border);
+}
+
+.focus-goal-locked .focus-goal-title,
+.focus-goal-locked .focus-goal-caption {
+  color: var(--color-text-muted);
+}
+
+.focus-goal-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.focus-goal-caption {
+  margin-top: 2px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+/* Smaller than a standalone "i", because it sits inside a card rather than
+   under a section heading. Indented to the text, not to the checkbox. */
+.focus-goal .info-summary {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.focus-goal .info-body {
+  font-size: 0.85rem;
+}
+
+/* aria-live: the count is how a screen-reader user learns the limit was
+   reached, since the change itself is a set of checkboxes going disabled. */
+.focus-count {
+  margin: 1rem 0 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+/* Bleeds to the dialog's padding edges (32px) so the bar spans it fully, and
+   sticks to the bottom of the backdrop's scroll while the list runs past. */
+.focus-actions-bar {
+  position: sticky;
+  bottom: 0;
+  margin: 1.5rem -32px -32px;
+  padding: 14px 32px 20px;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+}
+
+.focus-tally {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+/* The limit as five slots that fill up: seen rather than read. */
+.focus-slots {
+  display: inline-flex;
+  flex: none;
+  gap: 5px;
+  transform: translateY(-1px);
+}
+
+.focus-slot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  border: 1px solid var(--color-blue-300);
+}
+
+.focus-slot-filled {
+  background: var(--color-blue-600);
+  border-color: var(--color-blue-600);
+}
+
+.focus-actions-bar .focus-count {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.focus-actions-bar .consent-actions {
+  margin-top: 0;
+  /* Two pill buttons at `flex: 1` squeeze past legibility on a narrow window. */
+  flex-wrap: wrap;
+}
+
+/* Moved down from the head: the reassurance that this is changeable belongs
+   where the decision is made. */
+.focus-bar-note {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* The read-only summary on the profile card. */
+.focus-summary {
+  margin: 0.5rem 0 0.9rem;
+  padding-left: 1.2rem;
+}
+
+.focus-summary li {
+  margin-bottom: 0.25rem;
+  line-height: 1.5;
+}
+
+.profile-page .card .focus-count {
+  margin-bottom: 1rem;
+}
+
+/* --- The "i": long explanations, folded away ---------------------------- */
+/* The screens around consent have to say a lot and are read only if they are
+   short. What a decision turns on stays in the open; the background lives in
+   here. Native <details>, so it opens on find-in-page and prints expanded. */
+
+/* Present to a screen reader, absent to the eye. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.info-details {
+  margin-top: 1rem;
+}
+
+/* Icon only: no label to leave room for. */
+.info-details-icon .info-summary {
+  gap: 0;
+}
+
+.info-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  /* Both spellings: the marker is the default triangle, and the icon below is
+     the affordance this control actually wants to show. */
+  list-style: none;
+}
+
+.info-summary::-webkit-details-marker {
+  display: none;
+}
+
+.info-summary:hover {
+  color: var(--color-navy-900);
+}
+
+.info-summary:focus-visible {
+  outline: 2px solid var(--color-navy-900);
+  outline-offset: 3px;
+  border-radius: var(--radius-control);
+}
+
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  /* The glyph is an "i", so it sits optically high in its circle without this. */
+  line-height: 1;
+}
+
+.info-body {
+  margin-top: 0.75rem;
+  padding-left: 12px;
+  border-left: 2px solid var(--color-border);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+.info-body > p {
+  margin: 0 0 0.75rem;
+}
+
+.info-body > p:last-child {
+  margin-bottom: 0;
+}
+
+.info-body .processing-notice {
+  margin: 0 0 0.75rem;
+}
+
+/* --- Where the data goes (F-49) ----------------------------------------- */
+
+.processing-notice {
+  margin-top: 1.25rem;
+  padding: 14px 16px;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-filter);
+}
+
+.processing-notice.is-compact {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.processing-notice-lead {
+  margin: 0 0 0.6rem;
+  font-weight: 600;
+}
+
+.processing-notice-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  line-height: 1.5;
+}
+
+.processing-notice-list li + li {
+  margin-top: 0.5rem;
+}
+
+/* --- The three deletion paths, told apart -------------------------------- */
+/* A list, not prose: they are three different things with three different
+   reaches, and a paragraph blurs exactly the distinction that matters. */
+
+.deletion-paths {
+  margin: 0 0 1.25rem;
+}
+
+.deletion-paths dt {
+  font-weight: 600;
+  margin-top: 0.9rem;
+}
+
+.deletion-paths dt:first-child {
+  margin-top: 0;
+}
+
+.deletion-paths dd {
+  margin: 0.2rem 0 0;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+/* --- Retention (ADR 0067) ------------------------------------------------ */
+
+.retention {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.profile-page .card .retention p {
+  margin: 0 0 0.9rem;
+  line-height: 1.5;
+}
+
+/* `.consent-button` carries `flex: 1`, so the two share the width evenly; they
+   drop under each other once that would squeeze the labels. */
+.retention-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.retention-actions .consent-button {
+  min-width: 15rem;
+}
+
+.profile-page .card .retention .consent-button {
+  margin-top: 0;
+}
+
+/* --- Legal pages (imprint, privacy, accessibility) ----------------------- */
+/* Long documents rather than screens, so they get reading measure, generous
+   line height and headings that structure rather than decorate. */
+
+.legal-page h1 {
+  margin-bottom: 2rem;
+}
+
+.legal-body {
+  line-height: 1.65;
+}
+
+.legal-body h2 {
+  margin: 2.25rem 0 0.75rem;
+  font-size: 1.15rem;
+  color: var(--color-navy-900);
+}
+
+.legal-body h3 {
+  margin: 1.75rem 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-blue-600);
+}
+
+.legal-body p {
+  margin: 0 0 1rem;
+}
+
+.legal-body ul {
+  margin: 0 0 1rem;
+  padding-left: 1.2rem;
+}
+
+.legal-body li {
+  margin-bottom: 0.6rem;
+}
+
+.legal-body a {
+  color: var(--color-blue-600);
+  overflow-wrap: anywhere;
+}
+
+/* Bare URLs, listed rather than linked, exactly as the source page has them. */
+.legal-links {
+  list-style: none;
+  padding-left: 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.legal-links li {
+  margin-bottom: 0.25rem;
+  overflow-wrap: anywhere;
+}
+
+/* The Art. 21 notice is set in capitals in the original and stays that way:
+   it is a legally prescribed form, not a styling choice. Letter-spacing and a
+   smaller size keep a wall of capitals readable. */
+.legal-uppercase {
+  font-size: 0.85rem;
+  letter-spacing: 0.01em;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+/* Marks the draft, and the two facts still to be filled in. Loud on purpose:
+   an unreviewed privacy statement must not be mistakable for a final one. */
+/* The date a legal document was last revised, and the one-line opener on the
+   notes page. Both sit above the body and set it up rather than joining it. */
+.legal-date {
+  margin: -0.5rem 0 2rem;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.legal-body p.legal-lead {
+  font-size: 1.05rem;
+  margin-bottom: 1.5rem;
+}
+
+/* --- Login page --- */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(
+      circle at 12% 14%,
+      rgba(50, 95, 127, 0.12),
+      transparent 31%
+    ),
+    radial-gradient(
+      circle at 80% 90%,
+      rgba(50, 95, 127, 0.08),
+      transparent 28%
+    ),
+    var(--color-background);
+}
+
+.login-header {
+  width: min(1280px, calc(100% - 80px));
+  margin: 0 auto;
+  padding-top: 48px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.login-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--color-navy-900);
+}
+
+.login-brand-logo {
+  display: block;
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.login-brand-name {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.login-main {
+  flex: 1;
+  width: min(1280px, calc(100% - 80px));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(430px, 0.82fr);
+  gap: 90px;
+  align-items: center;
+  padding: 34px 0 68px;
+}
+
+.login-hero {
+  max-width: 650px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 470px;
+  justify-self: end;
+}
+
+@media (max-width: 980px) {
+  .login-main {
+    grid-template-columns: 1fr;
+    gap: 44px;
+    align-items: start;
+  }
+
+  .login-hero {
+    max-width: none;
+  }
+
+  .login-card {
+    justify-self: start;
+    max-width: 620px;
+  }
+}
+
+@media (max-width: 620px) {
+  .login-header,
+  .login-main {
+    width: min(100% - 32px, 1280px);
+  }
+
+  .login-header {
+    padding-top: 26px;
+  }
+
+  .login-brand-logo {
+    width: 46px;
+    height: 46px;
+  }
+
+  .login-brand-name {
+    font-size: 26px;
+  }
+
+  .login-main {
+    padding-top: 26px;
+  }
+}
+
+.login-hero-badge {
+  width: max-content;
+  max-width: 100%;
+  height: 27px;
+  padding: 0 13px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #cbdbe6;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--color-blue-600);
+  font-size: 11.5px;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(3, 37, 62, 0.03);
+}
+
+.login-hero-badge-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+
+.login-hero-title {
+  max-width: 650px;
+  margin: 22px 0 24px;
+  font-family: var(--font-display);
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  color: var(--color-navy-900);
+}
+
+.login-hero-description {
+  max-width: 640px;
+  margin: 0 0 30px;
+  color: var(--color-text-muted-secondary);
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+@media (max-width: 620px) {
+  .login-hero-title {
+    font-size: 38px;
+  }
+
+  .login-hero-description {
+    font-size: 16px;
+  }
+}
+
+.login-training-preview {
+  width: 510px;
+  max-width: 100%;
+  min-height: 275px;
+  padding: 24px;
+  border-radius: 24px;
+  background: var(--color-surface);
+  box-shadow: 0 5px 18px rgba(3, 37, 62, 0.03);
+}
+
+.login-training-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.login-training-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.login-training-avatar {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-blue-100);
+  color: var(--color-blue-600);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.login-training-name {
+  margin-bottom: 3px;
+  color: var(--color-navy-900);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.login-training-meta {
+  color: var(--color-text-muted-secondary);
+  font-size: 12px;
+}
+
+.login-training-status {
+  margin-top: 8px;
+  padding: 5px 10px;
+  border: 1px solid #caeadb;
+  border-radius: 999px;
+  background: #eefaf5;
+  color: var(--color-success);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.login-training-status::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--color-success);
+  vertical-align: 1px;
+}
+
+.login-training-wave {
+  height: 98px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 18px 0 8px;
+}
+
+.login-training-wave span {
+  width: 4px;
+  border-radius: 3px;
+  background: var(--color-blue-600);
+  transform-origin: center;
+  animation: login-wave-pulse 1.7s ease-in-out infinite;
+}
+
+.login-training-wave span:nth-child(3n) {
+  animation-delay: -0.4s;
+}
+
+.login-training-wave span:nth-child(4n) {
+  animation-delay: -0.8s;
+}
+
+.login-training-wave span:nth-child(5n) {
+  animation-delay: -1.2s;
+}
+
+@keyframes login-wave-pulse {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+    opacity: 0.4;
+  }
+
+  50% {
+    transform: scaleY(1);
+    opacity: 0.95;
+  }
+}
+
+.login-training-wave span:nth-child(1) {
+  height: 9px;
+}
+
+.login-training-wave span:nth-child(2) {
+  height: 18px;
+}
+
+.login-training-wave span:nth-child(3) {
+  height: 30px;
+}
+
+.login-training-wave span:nth-child(4) {
+  height: 44px;
+}
+
+.login-training-wave span:nth-child(5) {
+  height: 28px;
+}
+
+.login-training-wave span:nth-child(6) {
+  height: 36px;
+}
+
+.login-training-wave span:nth-child(7) {
+  height: 20px;
+}
+
+.login-training-wave span:nth-child(8) {
+  height: 28px;
+}
+
+.login-training-wave span:nth-child(9) {
+  height: 15px;
+}
+
+.login-training-wave span:nth-child(10) {
+  height: 20px;
+}
+
+.login-training-wave span:nth-child(11) {
+  height: 12px;
+}
+
+.login-training-wave span:nth-child(12) {
+  height: 34px;
+}
+
+.login-training-wave span:nth-child(13) {
+  height: 49px;
+}
+
+.login-training-wave span:nth-child(14) {
+  height: 27px;
+}
+
+.login-training-wave span:nth-child(15) {
+  height: 39px;
+}
+
+.login-training-wave span:nth-child(16) {
+  height: 24px;
+}
+
+.login-training-wave span:nth-child(17) {
+  height: 30px;
+}
+
+.login-training-wave span:nth-child(18) {
+  height: 16px;
+}
+
+.login-training-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.login-training-footer > div:last-child {
+  text-align: right;
+}
+
+.login-training-footer strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--color-navy-900);
+  font-size: 16px;
+}
+
+.login-training-footer span {
+  color: var(--color-text-muted-secondary);
+  font-size: 12px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 470px;
+  justify-self: end;
+  padding: 38px 36px 34px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 20px;
+  background: var(--color-surface);
+  box-shadow: 0 10px 36px rgba(3, 37, 62, 0.035);
+}
+
+.login-card-title {
+  margin: 0 0 10px;
+  color: var(--color-navy-900);
+  font-family: var(--font-display);
+  font-size: 31px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.login-card-description {
+  margin: 0;
+  color: var(--color-text-muted-secondary);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.login-auth-note {
+  margin: 26px 0 18px;
+  padding: 14px 15px;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  background: #f8fbfd;
+  color: var(--color-text-muted-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.login-auth-icon {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--color-blue-100);
+  color: var(--color-blue-600);
+  font-size: 14px;
+}
+
+.login-auth-icon::before {
+  content: "";
+  width: 10px;
+  height: 8px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  transform: translateY(3px);
+}
+
+.login-auth-icon::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid currentColor;
+  border-bottom: 0;
+  border-radius: 7px 7px 0 0;
+  transform: translateY(-3px);
+}
+
+@media (max-width: 620px) {
+  .login-card {
+    padding: 28px 22px;
+  }
+
+  .login-card-title {
+    font-size: 27px;
+  }
+}
+
+.login-submit-button {
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-navy-700);
+  color: var(--color-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(3, 37, 62, 0.12);
+  transition:
+    background 0.16s ease,
+    transform 0.12s ease,
+    box-shadow 0.16s ease;
+}
+
+.login-submit-button:hover {
+  background: var(--color-navy-900);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(3, 37, 62, 0.16);
+}
+
+.login-submit-button:active {
+  transform: translateY(0);
+}
+
+.login-submit-button:focus-visible {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
+}
+
+.login-divider {
+  position: relative;
+  height: 1px;
+  margin: 25px 0 20px;
+  background: var(--color-border-subtle);
+}
+
+.login-divider span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 0 10px;
+  background: var(--color-surface);
+  color: var(--color-text-muted-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.login-privacy-note {
+  margin: 0;
+  color: var(--color-text-muted-secondary);
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.login-privacy-note a {
+  color: var(--color-blue-600);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-privacy-note a:hover {
+  text-decoration: underline;
+}
+
+.login-privacy-note a:focus-visible {
+  outline: 2px solid var(--color-blue-300);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.login-error {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border: 1px solid rgba(180, 69, 58, 0.28);
+  border-radius: 10px;
+  background: rgba(180, 69, 58, 0.06);
+  color: var(--color-danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.login-error strong {
+  font-weight: 600;
+}
+
+.login-error span {
+  overflow-wrap: anywhere;
+}
+
+.auth-status-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--color-background);
+}
+
+.auth-status-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 22px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: 0 8px 28px rgba(3, 37, 62, 0.06);
+}
+
+.auth-status-card > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.auth-status-card strong {
+  color: var(--color-navy-900);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.auth-status-card span {
+  color: var(--color-text-muted-secondary);
+  font-size: 12px;
+}
+
+.auth-status-spinner {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-blue-600);
+  border-radius: 50%;
+  animation: auth-status-spin 0.8s linear infinite;
+}
+
+@keyframes auth-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 980px) {
+  .login-main {
+    padding-top: 44px;
+    padding-bottom: 56px;
+  }
+
+  .login-training-preview {
+    width: 100%;
+    max-width: 620px;
+  }
+
+  .login-card {
+    justify-self: stretch;
+  }
+}
+
+@media (max-width: 620px) {
+  .login-page {
+    min-height: 100svh;
+  }
+
+  .login-header {
+    gap: 10px;
+  }
+
+  .login-main {
+    gap: 34px;
+    padding-bottom: 40px;
+  }
+
+  .login-hero-badge {
+    height: auto;
+    min-height: 27px;
+    padding: 5px 12px;
+  }
+
+  .login-training-preview {
+    padding: 20px;
+    border-radius: 18px;
+  }
+
+  .login-training-header {
+    gap: 12px;
+  }
+
+  .login-training-meta {
+    line-height: 1.4;
+  }
+
+  .login-training-status {
+    flex-shrink: 0;
+  }
+
+  .login-training-footer {
+    gap: 18px;
+  }
+
+  .login-card {
+    max-width: none;
+  }
+}
+
+@media (max-width: 430px) {
+  .login-hero-title {
+    font-size: 34px;
+  }
+
+  .login-training-header {
+    flex-direction: column;
+  }
+
+  .login-training-status {
+    margin-top: 0;
+  }
+
+  .login-training-wave {
+    height: 84px;
+  }
+
+  .login-training-footer {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .login-training-footer > div:last-child {
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-submit-button {
+    transition: none;
+  }
+
+  .login-submit-button:hover {
+    transform: none;
+  }
+
+  .auth-status-spinner {
+    animation: none;
+  }
+
+  .login-training-wave span {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* --- The language flag beside a Persona's name -------------------------- */
+
+/* The name and its flag on one line, the flag sitting on the text's baseline
+   rather than at the top of a tall name that has wrapped. */
+.language-flag {
+  flex: 0 0 auto;
+  width: 20px;
+  height: auto;
+  border-radius: 2px;
+  /* The white stripes of one flag and the white card behind it are the same
+     colour: without an edge the flag has no left and right side. */
+  box-shadow: 0 0 0 1px rgba(3, 37, 62, 0.22);
+}
+
+/* --- The transcript as a file rather than a page section (F-64) --------- */
+
+/* Only the failure has anything to say; the offer itself is a button in the
+   actions row and needs no box around it. */
+.transcript-download-error {
+  margin: 0.6rem 0 0;
+  max-width: 62ch;
+}
+
+/* --- ... and expanded in place, behind the actions row's toggle ---------- */
+/* A card holding one tile per utterance, rather than a list ruled into rows.
+   Scoped to this card throughout, because the bare `.transcript-line`/
+   `.transcript-time` above are the plainer form a past training's page uses
+   and must not be dragged along with it. */
+
+.feedback-transcript-section {
+  margin-top: 40px;
+  margin-bottom: 32px;
+  padding: 22px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.feedback-transcript-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+.feedback-transcript-eyebrow {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-blue-600);
+}
+
+.feedback-transcript-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--color-navy-900);
+}
+
+.feedback-transcript-count {
+  flex-shrink: 0;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--color-blue-100);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-blue-600);
+}
+
+/* The card is only the stack; each utterance carries its own ground, so the
+   eye separates them by tile rather than by rule. */
+.feedback-transcript-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: transparent;
+}
+
+.feedback-transcript-card .transcript-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--color-surface-selected);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-navy-900);
+}
+
+/* A pill rather than a bare number: on a tinted tile a muted timestamp in the
+   margin has nothing to sit against. */
+.feedback-transcript-card .transcript-time {
+  flex: 0 0 auto;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 7px;
+  background: var(--color-blue-100);
+  color: var(--color-blue-600);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.feedback-transcript-card .transcript-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--color-blue-600);
+  color: var(--color-surface);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.feedback-transcript-card .transcript-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.feedback-transcript-card .transcript-speaker {
+  margin-bottom: 4px;
+  font-size: 13px;
+  line-height: 1.3;
+  font-weight: 700;
+  color: var(--color-navy-900);
+}
+
+.feedback-transcript-card .transcript-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--color-text-muted-secondary);
+}
+
+/* After the rules above rather than with the page's other breakpoints: these
+   carry the same specificity, so the later of the two wins whatever the
+   viewport says. */
+@media (max-width: 720px) {
+  .feedback-transcript-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .feedback-transcript-card .transcript-line {
+    gap: 10px;
+    padding: 16px;
+  }
+}
+
+/* --- The die, thrown before a random Scenario (F-62) -------------------- */
+
+.rolling-page {
+  max-width: 640px;
+}
+
+.rolling-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 2.5rem 1.5rem 3rem;
+  text-align: center;
+}
+
+.rolling-title {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  color: var(--navy);
+}
+
+.rolling-lead {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--text-muted);
+}
+
+/* The stage owns the perspective, so the cube's own transform stays a plain
+   rotation and the keyframes below read as one.
+
+   The height is headroom, not the die: the throw opens 44px above where the
+   die comes to rest, and a box drawn tight around the resting position lets
+   that first frame overlap the heading. So the die sits low in a tall box and
+   the throw happens inside it. */
+.dice-stage {
+  position: relative;
+  width: 96px;
+  height: 176px;
+  margin: 1.2rem 0 1.4rem;
+  perspective: 520px;
+}
+
+.dice {
+  position: absolute;
+  top: 56px;
+  left: 0;
+  width: 96px;
+  height: 96px;
+  transform-style: preserve-3d;
+  animation: dice-tumble var(--roll-ms, 2000ms) cubic-bezier(0.3, 0.1, 0.2, 1) forwards;
+}
+
+.dice-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  gap: 6px;
+  padding: 11px;
+  border-radius: 16px;
+  background: linear-gradient(150deg, #ffffff 0%, #e8f1f8 100%);
+  box-shadow: inset 0 0 0 2px var(--color-border);
+  /* The far faces would otherwise show through the near ones — the cube is
+     translucent nowhere else, so this is what makes it read as solid. */
+  backface-visibility: hidden;
+}
+
+.dice-pip {
+  border-radius: 50%;
+  background: var(--navy);
+}
+
+.dice-pip.is-empty {
+  background: none;
+}
+
+/* 48px = half the cube's edge; every face is the same square pushed out along
+   its own axis. */
+.dice-face-front {
+  transform: translateZ(48px);
+}
+
+.dice-face-back {
+  transform: rotateY(180deg) translateZ(48px);
+}
+
+.dice-face-right {
+  transform: rotateY(90deg) translateZ(48px);
+}
+
+.dice-face-left {
+  transform: rotateY(-90deg) translateZ(48px);
+}
+
+.dice-face-top {
+  transform: rotateX(90deg) translateZ(48px);
+}
+
+.dice-face-bottom {
+  transform: rotateX(-90deg) translateZ(48px);
+}
+
+.dice-shadow {
+  position: absolute;
+  left: 12px;
+  bottom: 0;
+  width: 72px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(3, 37, 62, 0.18);
+  filter: blur(3px);
+  animation: dice-shadow var(--roll-ms, 2000ms) cubic-bezier(0.3, 0.1, 0.2, 1) forwards;
+}
+
+/* Whole turns all the way, so it lands square on the front face rather than at
+   whatever angle the last bounce left it. The two short hops at the end are
+   what make it a thrown object and not a spinning one: it loses height, then
+   settles. */
+@keyframes dice-tumble {
+  0% {
+    transform: translateY(-44px) rotateX(0deg) rotateY(0deg) scale(0.82);
+  }
+  16% {
+    transform: translateY(4px) rotateX(200deg) rotateY(160deg) scale(1);
+  }
+  32% {
+    transform: translateY(-30px) rotateX(380deg) rotateY(320deg) scale(1);
+  }
+  52% {
+    transform: translateY(4px) rotateX(560deg) rotateY(520deg) scale(1);
+  }
+  70% {
+    transform: translateY(-14px) rotateX(672deg) rotateY(648deg) scale(1);
+  }
+  84% {
+    transform: translateY(0) rotateX(720deg) rotateY(720deg) scale(1);
+  }
+  91% {
+    transform: translateY(-5px) rotateX(720deg) rotateY(720deg) scale(1);
+  }
+  100% {
+    transform: translateY(0) rotateX(720deg) rotateY(720deg) scale(1);
+  }
+}
+
+/* Tied to the hops above: the shadow tightens as the die comes down, which is
+   what gives the bounce its height. */
+@keyframes dice-shadow {
+  0% {
+    opacity: 0.05;
+    transform: scale(0.55);
+  }
+  16%,
+  52%,
+  84%,
+  100% {
+    opacity: 0.22;
+    transform: scale(1);
+  }
+  32% {
+    opacity: 0.08;
+    transform: scale(0.7);
+  }
+  70% {
+    opacity: 0.14;
+    transform: scale(0.85);
+  }
+  91% {
+    opacity: 0.18;
+    transform: scale(0.93);
+  }
+}
+
+/* The screen is not shown at all under reduced motion (see App.tsx), so there
+   is nothing to disable here — this only covers a throw already on screen when
+   the setting changes. */
+@media (prefers-reduced-motion: reduce) {
+  .dice,
+  .dice-shadow {
+    animation: none;
+  }
+}
+
+/* --- Screen transitions (F-61, ADR 0070) -------------------------------- */
+
+/* The film cut played when the roles are swapped: the card turns over the
+   screen, the screen changes behind it, the card leaves. Two phases, driven
+   from ScreenTransition.tsx — which also sets --cover-ms/--reveal-ms, so the
+   timers that fire the actual screen change and these animations are the same
+   numbers rather than two copies of them.
+
+   Deliberately above everything and untouchable: a transition the user can
+   click through is a transition that lands them on a half-built screen. */
+.screen-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  pointer-events: all;
+  perspective: 1200px;
+}
+
+/* The palette's navy, kept after a neutral grey was tried against it: the
+   grey is the more conventional "lights down" colour, and the navy is the one
+   that looks like this app doing it. Opaque either way, because the screen
+   changes underneath at the covered frame — a veil you can see through shows
+   the change happening. */
+.screen-transition-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--color-navy-900);
+}
+
+.screen-transition-card {
+  position: relative;
+  width: min(38vh, 34vw);
+  filter: drop-shadow(0 24px 48px rgba(3, 37, 62, 0.55));
+  transform-style: preserve-3d;
+}
+
+.reverse-card {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Cover: the screen darkens to opaque while the card flies in and turns.
+   `forwards` matters on both — the cut happens on the last frame, and a card
+   that snapped back to its start there would be visible for one frame. */
+.screen-transition-cover .screen-transition-scrim {
+  animation: screen-transition-scrim-in var(--cover-ms) cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.screen-transition-cover .screen-transition-card {
+  animation: reverse-card-in var(--cover-ms) cubic-bezier(0.34, 1.2, 0.5, 1) forwards;
+}
+
+/* Reveal: the card keeps turning the same way and leaves towards the viewer,
+   the scrim lifts off the new screen. Same direction of spin as the cover, so
+   the two phases read as one movement interrupted by the cut. */
+.screen-transition-reveal .screen-transition-scrim {
+  animation: screen-transition-scrim-out var(--reveal-ms) cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.screen-transition-reveal .screen-transition-card {
+  animation: reverse-card-out var(--reveal-ms) cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes screen-transition-scrim-in {
+  from {
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes screen-transition-scrim-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Y, not Z: the card turns over the way a card is turned over, so the reverse
+   symbol sweeps through its own edge instead of spinning flat like a wheel.
+   The slight Z tilt keeps it from looking like a closing door. */
+@keyframes reverse-card-in {
+  from {
+    opacity: 0;
+    transform: rotateY(-200deg) rotateZ(-24deg) scale(0.35);
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: rotateY(0deg) rotateZ(0deg) scale(1);
+  }
+}
+
+@keyframes reverse-card-out {
+  from {
+    opacity: 1;
+    transform: rotateY(0deg) rotateZ(0deg) scale(1);
+  }
+  60% {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+    transform: rotateY(200deg) rotateZ(20deg) scale(1.9);
+  }
+}
+
+/* The screen the cut lands on comes up rather than appearing: without it the
+   reveal is a hard edit from an opaque scrim to a finished page. */
+.brief-page .reverse-brief,
+.brief-page .scenario-briefing,
+.brief-page .case-brief,
+.brief-page .brief-actions,
+.brief-page .back-to-start-button {
+  animation: screen-enter 420ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+.brief-page .brief-actions,
+.brief-page .back-to-start-button {
+  animation-delay: 90ms;
+}
+
+@keyframes screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* A press should be felt, not just registered. Cheap, applies to every primary
+   action in the app, and the one place a click still says nothing is a button
+   that starts something slow. */
+.follow-up-button:active,
+.start-call-button:active {
+  transform: scale(0.97);
+}
+
+/* `opacity` is carried over from each button's own rule above: the disabled
+   start button fades rather than snapping, and redeclaring `transition` here
+   would drop that. */
+.follow-up-button,
+.start-call-button {
+  transition: background 0.2s, color 0.2s, opacity 0.2s, transform 0.08s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The transition itself is not started at all under reduced motion (see
+     ScreenTransition.tsx) — this covers the entry and the press, which are. */
+  .brief-page .reverse-brief,
+  .brief-page .scenario-briefing,
+  .brief-page .case-brief,
+  .brief-page .brief-actions,
+  .brief-page .back-to-start-button {
+    animation: none;
+  }
+
+  .follow-up-button,
+  .start-call-button {
+    transition: background 0.2s, color 0.2s, opacity 0.2s;
+  }
+
+  .follow-up-button:active,
+  .start-call-button:active {
+    transform: none;
+  }
+}
+
+/* --- The phone ringing before an ordinary call (F-63) ------------------- */
+
+.incoming-page {
+  max-width: 640px;
+}
+
+.incoming {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 0 2rem;
+}
+
+/* One grid cell holding both the device and the rings, so the rings inherit
+   the phone's exact box and can be drawn in its shape rather than as circles
+   around something twice as tall as it is wide. */
+.incoming-stage {
+  display: grid;
+  /* Positioned, so the mute arm below can be placed against this box — which
+     is the device's own box — rather than against whatever ancestor happens to
+     be positioned further up. A static grid container is not a containing
+     block, and the arm would have landed somewhere else entirely. */
+  position: relative;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.incoming-stage > * {
+  grid-area: 1 / 1;
+}
+
+.incoming-rings {
+  position: relative;
+  justify-self: stretch;
+  align-self: stretch;
+}
+
+/* Three rings over the sounding half of the cycle, then nothing: they stop
+   where the figure stops rather than pulsing on through its silence. */
+.incoming-rings span {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--color-blue-300);
+  border-radius: 38px;
+  opacity: 0;
+  animation: incoming-ring var(--ring-cycle, 4400ms) ease-out infinite;
+}
+
+.incoming-rings span:nth-child(2) {
+  animation-delay: 0.5s;
+}
+
+.incoming-rings span:nth-child(3) {
+  animation-delay: 1s;
+}
+
+@keyframes incoming-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  22% {
+    opacity: 0;
+  }
+  30%, 100% {
+    transform: scale(1.28);
+    opacity: 0;
+  }
+}
+
+/* The device. The frame is a gradient rather than a flat grey because a
+   brushed metal edge is most of what makes a rectangle read as a phone; the
+   padding is the frame's thickness and the screen sits inside it. Tilts in the
+   two-then-pause rhythm a phone actually rings in — a constant wobble reads as
+   a loading state, and this one is waiting for a person, not for the network. */
+.incoming-phone {
+  position: relative;
+  width: 214px;
+  padding: 5px;
+  border-radius: 38px;
+  background: linear-gradient(
+    148deg,
+    #b9c0c7 0%,
+    #6f777f 16%,
+    #d3d9de 38%,
+    #7c848c 62%,
+    #aeb6bd 82%,
+    #6f777f 100%
+  );
+  box-shadow: 0 24px 55px rgba(3, 37, 62, 0.38);
+  animation: incoming-shake var(--ring-cycle, 4400ms) ease-in-out infinite;
+}
+
+/* Two bursts and then still, on the figure's own bars: it sounds from 0 to
+   0.8s and again from 1.1 to 1.9s of a 4.4s cycle, which is 0-18% and 25-43%
+   of it. The percentages are why the two only stay together as long as they
+   share `--ring-cycle`. */
+@keyframes incoming-shake {
+  0%, 18%, 25%, 43%, 100% {
+    transform: rotate(0deg);
+  }
+  4.5%, 29.5% {
+    transform: rotate(-2deg);
+  }
+  9%, 34% {
+    transform: rotate(2deg);
+  }
+  13.5%, 38.5% {
+    transform: rotate(-1.4deg);
+  }
+}
+
+/* The keys down the sides, in the frame's own metal. */
+.incoming-key {
+  position: absolute;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #8b939b, #c3cad0, #7f878f);
+}
+
+/* The silent switch, drawn like the other keys and, unlike them, meaning
+   something: `.incoming-mute-switch` below is what is actually pressed. */
+.incoming-key-silent {
+  left: -3px;
+  top: 74px;
+  height: 20px;
+  transition: background 0.2s;
+}
+
+/* Orange while silenced, which is what the switch on a real phone shows. */
+.incoming-key-silent.is-silenced {
+  background: linear-gradient(180deg, #b45309, #f59e0b, #b45309);
+}
+
+/* The control for it: an arm reaching in from the left of the device, with the
+   label and the arrow inside the button rather than beside it. That is the
+   whole point of the shape — a 3px sliver is far under the 24px a target needs
+   (WCAG 2.5.8), and this makes the target 210px wide without drawing the
+   switch any bigger than a switch.
+
+   `top`/`height` centre it on the sliver (74px + 20/2 = 84; 62 + 44/2 = 84),
+   and the right edge lands 6px inside the frame, so the arrowhead stops just
+   short of the switch and the press area still covers it. */
+.incoming-mute-switch {
+  position: absolute;
+  top: 62px;
+  left: -204px;
+  width: 210px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0 10px 0 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.incoming-mute-label {
+  white-space: nowrap;
+}
+
+.incoming-mute-arrow {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 12px;
+}
+
+.incoming-mute-switch:hover {
+  color: var(--navy);
+}
+
+/* The switch lights up with its own control, so the arm and the sliver read as
+   one thing. `:has` on the stage because the sliver sits inside the phone,
+   which is the button's *earlier* sibling — no combinator reaches backwards.
+   Decoration only: where `:has` is unsupported, nothing is lost but the
+   highlight. */
+.incoming-stage:has(.incoming-mute-switch:hover) .incoming-key-silent {
+  background: linear-gradient(180deg, #c3cad0, #ffffff, #c3cad0);
+}
+
+.incoming-stage:has(.incoming-mute-switch:hover) .incoming-key-silent.is-silenced {
+  background: linear-gradient(180deg, #f59e0b, #fbbf24, #f59e0b);
+}
+
+.incoming-mute-switch:focus-visible {
+  outline: 2px solid var(--color-blue-300);
+  outline-offset: 2px;
+}
+
+.incoming-key-up {
+  left: -3px;
+  top: 108px;
+  height: 34px;
+}
+
+.incoming-key-down {
+  left: -3px;
+  top: 152px;
+  height: 34px;
+}
+
+.incoming-key-power {
+  right: -3px;
+  top: 124px;
+  height: 48px;
+}
+
+.incoming-screen {
+  position: relative;
+  height: 396px;
+  padding: 2.6rem 0.9rem 1.3rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 33px;
+  overflow: hidden;
+  background: linear-gradient(168deg, #14364f 0%, var(--color-navy-900) 55%, #061a2b 100%);
+  color: var(--color-surface);
+}
+
+/* The pill cut out of the display. Black, not dark blue: it is a hole in the
+   screen, and the one part of the device that is never lit. */
+.incoming-island {
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 82px;
+  height: 24px;
+  border-radius: 999px;
+  background: #000000;
+}
+
+.incoming-avatar {
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  /* Two `auto` margins, here and on the actions below, split the free space:
+     the caller sits in the middle of the display and the buttons stay at its
+     foot, which is where a phone puts them. */
+  margin: auto 0 0.7rem;
+  /* Flex and not grid, matching the app's other two portrait slots: the
+     picture inside is sized at 100% of this box, and a centred *grid* item
+     resolves that against a track rather than against the box. The initials
+     fallback centres the same way either way. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+/* Head and shoulders, the selection card's crop: the source is a square
+   half-body shot and at 72px the whole of it leaves a face nobody could tell
+   from another. The two large square slots show the pose whole and need no
+   zoom; this one is small, so it does. */
+.incoming-avatar > img {
+  transform: scale(1.5);
+  transform-origin: center 18%;
+}
+
+/* The initials fall back to the display's own look rather than the light blue
+   every other slot uses — this one sits on a dark phone screen. */
+.incoming-avatar.persona-avatar-fallback {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--color-surface);
+}
+
+.incoming-caller {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Pushed to the bottom of the display, where a phone puts them. */
+.incoming-actions {
+  display: flex;
+  gap: 2.4rem;
+  margin-top: auto;
+}
+
+.incoming-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.incoming-button {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #fff;
+  transition: transform 0.12s ease-out, filter 0.2s;
+}
+
+.incoming-button:hover {
+  filter: brightness(1.12);
+}
+
+.incoming-button:active {
+  transform: scale(0.94);
+}
+
+.incoming-handset {
+  width: 27px;
+  height: 27px;
+}
+
+.incoming-accept {
+  background: #2fb463;
+  /* The one thing on this screen that has to be pressed, so it is the one
+     thing that keeps moving once the rest has settled. */
+  animation: incoming-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes incoming-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(47, 180, 99, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 15px rgba(47, 180, 99, 0);
+  }
+}
+
+.incoming-decline {
+  background: #e5484d;
+}
+
+.incoming-action-label {
+  font-size: 0.72rem;
+  color: var(--color-blue-300);
+}
+
+.incoming-hint {
+  margin: 2.4rem 0 0;
+  max-width: 34ch;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* The arm reaches 204px left of a device that is centred in the page, so it
+   needs a viewport of roughly 214 + 2x204 to sit inside one. Below that the
+   words go and the arrow stays: it still points at the switch, the target is
+   still 78px wide, and the button keeps its name through `aria-label` — which
+   is why the name is there and not read off the <span>. */
+@media (max-width: 720px) {
+  .incoming-mute-switch {
+    left: -72px;
+    width: 78px;
+  }
+
+  .incoming-mute-label {
+    display: none;
+  }
+}
+
+/* A short window is the common case on a laptop once the header and the hint
+   are counted; the device gives up height before anything else does. */
+@media (max-height: 780px) {
+  .incoming-screen {
+    height: 330px;
+    padding-top: 2.3rem;
+  }
+
+  .incoming-avatar {
+    width: 58px;
+    height: 58px;
+    margin: auto 0 0.5rem;
+    font-size: 1.2rem;
+  }
+}
+
+/* The screen stays — it is a decision, not decoration — but nothing on it
+   moves. */
+@media (prefers-reduced-motion: reduce) {
+  .incoming-rings span,
+  .incoming-phone,
+  .incoming-accept {
+    animation: none;
+  }
+
+  .incoming-rings span {
+    opacity: 0.22;
+  }
+
+  .incoming-button {
+    transition: filter 0.2s;
+  }
+
+  .incoming-button:active {
+    transform: none;
+  }
+}
+
+/* --- The trainee's briefing (ADR 0054) ---------------------------------- */
+/* Shown on the setup screen under the selection summary and again on the
+   microphone check. Deliberately quiet -- a tinted panel, not a callout: it is
+   read once, before the call, and it competes with the start button on both
+   screens. The left rule is what separates it from the storage note above it
+   on the setup screen, which uses the same tinted background. */
+
+.scenario-briefing {
+  margin: 0 0 1.25rem;
+  padding: 14px 16px;
+  border-left: 3px solid var(--color-blue-600);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-filter);
+}
+
+.scenario-briefing-title {
+  margin: 0 0 6px;
+  color: var(--color-blue-600);
+}
+
+.scenario-briefing-body {
+  margin: 0;
+  /* Not muted: on the screen before the call this is one of only two things
+     to read, and on the setup screen it is what the selection is judged by. */
+  color: var(--color-navy-900);
+}
+
+
+
+/* --- The wait after the call, while the wrap-up is written -------------- */
+
+/* The wrap-up is written in the worker (ADR 0049), so hanging up is followed
+   by a real wait. It gets a screen rather than a grey line on the finished
+   page, and the screen gets something to watch: the call's own waveform, being
+   read by a magnifier passing over it. Centred and alone, because that is the
+   whole of it. */
+
+.feedback-wait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-block: 24px 8px;
+}
+
+.feedback-wait .feedback-title {
+  margin-bottom: 8px;
+}
+
+.feedback-wait-stage {
+  position: relative;
+  width: min(340px, 100%);
+  height: 180px;
+  display: grid;
+  place-items: center;
+  /* The lens travels past the last bar at each end; without this it leaves the
+     scene and drags the page sideways with it on a narrow screen. */
+  overflow: hidden;
+}
+
+.feedback-wait-wave {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 96px;
+}
+
+.feedback-wait-bar {
+  width: 9px;
+  /* The bar's own share of the scene (--h) is its resting shape; the animation
+     only scales it. That way `animation: none` under reduced motion leaves a
+     waveform standing rather than eleven bars of equal height. */
+  height: var(--h);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--color-blue-300), var(--color-blue-600));
+  animation: feedback-wait-bounce 1.3s ease-in-out infinite;
+  /* Staggered along the row, so it reads as a wave passing through rather than
+     as eleven bars pulsing together. */
+  animation-delay: calc(var(--i) * 110ms);
+}
+
+.feedback-wait-lens {
+  position: absolute;
+  color: var(--color-navy-900);
+  animation: feedback-wait-scan 5.2s ease-in-out infinite;
+}
+
+/* Around the resting height rather than up from it: a waveform is read from
+   its middle outwards. */
+@keyframes feedback-wait-bounce {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+/* Slower than the bars on purpose — the tempo difference is what makes one of
+   them the thing being read and the other the thing reading it. The tilt at
+   each end is the wrist turning round. */
+@keyframes feedback-wait-scan {
+  0%,
+  100% {
+    transform: translateX(-140px) rotate(-10deg);
+  }
+  50% {
+    transform: translateX(140px) rotate(10deg);
+  }
+}
+
+.feedback-wait-caption {
+  margin: 0 0 6px;
+  min-height: 1.5rem;
+  font-size: 1rem;
+  color: var(--color-navy-900);
+  /* Keyed on the caption index in FeedbackWaiting.tsx, so React remounts the
+     paragraph and the fade plays again for every line. */
+  animation: feedback-wait-caption-in 400ms ease-out both;
+}
+
+@keyframes feedback-wait-caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.feedback-wait-note {
+  margin: 0 0 20px;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+/* A way out, not an offer: quiet enough that waiting stays the obvious thing
+   to do, present because the transcript may be the only copy (F-64). */
+.feedback-wait-skip {
+  border: none;
+  background: none;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.feedback-wait-skip:hover {
+  color: var(--color-navy-900);
+}
+
+/* Unlike the die (F-62) and the card turn (F-61) this screen is still shown
+   under reduced motion — there is nothing behind it to skip to, only a wait.
+   What is left is the waveform standing still with the lens over it. */
+@media (prefers-reduced-motion: reduce) {
+  .feedback-wait-bar,
+  .feedback-wait-lens,
+  .feedback-wait-caption {
+    animation: none;
+  }
 }

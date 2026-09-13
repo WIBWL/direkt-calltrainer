@@ -9,6 +9,12 @@ The wire matches the schema (ADR 0057): the keys below are what
 frontend/src/protocol.ts declares, and they are the ORM's own column names
 passed straight through, so they are asserted verbatim here.
 """
+
+# pylint: disable=duplicate-code
+# Fixture data is repeated per test module on purpose: a test carrying its own
+# Turns shows what it ran against when it fails, and sharing them would let a
+# change made for one test quietly alter another.
+
 import uuid
 from datetime import datetime
 
@@ -20,7 +26,7 @@ from backend.db.models import Feedback, FeedbackPoint
 from backend.db.models import Persona as DbPersona
 from backend.db.models import Session
 from backend.session.models import Turn
-from tests.conftest import METRIC_KEY, PERSONA_KEY, SCENARIO_KEY, persist
+from tests.conftest import METRIC_KEY, persist
 
 pytestmark = pytest.mark.usefixtures("reference_data")
 
@@ -31,7 +37,7 @@ def _store(extern_id: uuid.UUID) -> None:
         turns=[
             Turn(seq=1, persona_text="Brandt hier.",
                  persona_offset_ms=0, persona_end_ms=1500),
-            # Both durations: Sprechtempo, the one metric type the reference
+            # Both durations: speaking pace, the one metric type the reference
             # fixture seeds, is a rate over phonation.
             Turn(seq=2,
                  user_text="Guten Tag!", user_offset_ms=1800, user_end_ms=2700,
@@ -67,8 +73,10 @@ async def test_personas_come_from_the_database(api_client: httpx.AsyncClient) ->
     response = await api_client.get("/api/personas")
 
     assert response.status_code == 200
-    assert [p["id"] for p in response.json()] == [PERSONA_KEY]
-    assert response.json()[0]["name"] == "Thomas Brandt"
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["name"] == "Thomas Brandt"
+    assert uuid.UUID(body[0]["id"])  # extern_id, not the slug (ADR 0058)
 
 
 async def test_scenarios_come_from_the_database(api_client: httpx.AsyncClient) -> None:
@@ -77,8 +85,18 @@ async def test_scenarios_come_from_the_database(api_client: httpx.AsyncClient) -
     response = await api_client.get("/api/scenarios")
 
     assert response.status_code == 200
-    assert set(response.json()[0]) == {"id", "name", "short_description"}
-    assert response.json()[0]["id"] == SCENARIO_KEY
+    entry = response.json()[0]
+    assert set(entry) == {
+        "id", "name", "short_description", "briefing", "category", "origin",
+        "shared", "follow_up",
+        # ADR 0070: which side of the phone this Scenario puts the User on,
+        # and the conversation a reverse replays.
+        "reverse", "origin_session",
+        # F-62: why a suggested card is suggested; null for the rest.
+        "recommendation",
+    }
+    assert uuid.UUID(entry["id"])  # extern_id the client sends back in session.start
+    assert entry["name"] == "Kündigungsabsicht"
 
 
 async def test_deactivated_persona_is_not_offered_for_a_new_call(
@@ -152,8 +170,13 @@ async def test_stored_session_is_returned_in_the_transcript_shape(
     assert body["session_id"] == str(extern_id)
     assert body["persona"] == "Thomas Brandt"
     assert body["scenario"] == "Kündigungsabsicht"
+    # The exact key set, so anything added here is a decision rather than
+    # drift. `interrupted` and `unheard_text` were added for F-51's
+    # interruption drill-down: the second is what the Persona had been about to
+    # say, kept beside the transcript and never inside it (ADR 0035).
     assert set(body["turns"][0]) == {
         "turn_id", "speaker", "start_offset_ms", "duration_ms", "transcript",
+        "interrupted", "unheard_text",
     }
 
 
@@ -202,9 +225,11 @@ async def test_measurements_reach_the_wire_with_the_schema_vocabulary(
 
     assert len(body["measurements"]) == 1
     measurement = body["measurements"][0]
-    assert set(measurement) == {"key", "name", "unit", "value", "detail"}
+    assert set(measurement) == {"key", "name", "unit", "aspect", "value", "detail"}
     assert measurement["key"] == METRIC_KEY
     assert measurement["value"] > 0
+    # The grouping the metrics slider switches on.
+    assert measurement["aspect"] == "how"
 
 
 @pytest.mark.parametrize(
@@ -244,6 +269,47 @@ async def test_phase_block_reaches_the_wire_as_phase_language(
     body = (await api_client.get(f"/api/sessions/{extern_id}")).json()
 
     assert body["feedback"]["phase_language"] == expected
+
+
+@pytest.mark.parametrize(
+    "stored, expected",
+    [
+        ("Eine Störungsmeldung verlangt ruhige Sachlichkeit.",
+         "Eine Störungsmeldung verlangt ruhige Sachlichkeit."),
+        (None, None),
+    ],
+    ids=["analysed", "not analysed"],
+)
+async def test_tone_fit_reaches_the_wire_under_its_own_key(
+    api_client: httpx.AsyncClient,
+    db_session: DbSession,
+    stored: str | None,
+    expected: str | None,
+) -> None:
+    """The column is `feedback.tone_fit` and the wire uses the same key
+    (ADR 0057). `IntonationReading.tsx` reads it, not FeedbackView: it answers
+    the question the intonation figures raise and cannot settle.
+
+    NULL survives as null rather than becoming an empty string, on the same
+    grounds as the block above: a wrap-up written before this existed came from
+    a prompt that was never given the occasion, so it has no judgement to show
+    and the frontend leaves the block out."""
+    extern_id = uuid.uuid4()
+    _store(extern_id)
+    session_id = db_session.query(Session).one().session_id
+    db_session.add(
+        Feedback(
+            session_id=session_id,
+            summary="Zusammenfassung.",
+            tone_fit=stored,
+            created_at=datetime.now(),
+        )
+    )
+    db_session.commit()
+
+    body = (await api_client.get(f"/api/sessions/{extern_id}")).json()
+
+    assert body["feedback"]["tone_fit"] == expected
 
 
 async def test_feedback_points_reach_the_wire_with_the_schema_vocabulary(

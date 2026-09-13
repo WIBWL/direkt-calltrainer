@@ -9,6 +9,15 @@
   "resetPasswordAllowed": false,
   "editUsernameAllowed": false,
 
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "config": { "kc.user.profile.config": ["{\"unmanagedAttributePolicy\":\"ENABLED\"}"] }
+      }
+    ]
+  },
+
   "clients": [
     {
       "clientId": "calltrainer-frontend",
@@ -56,6 +65,18 @@
             "id.token.claim": "true",
             "userinfo.token.claim": "true"
           }
+        },
+        {
+          "name": "calltrainer tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "tenant",
+            "claim.name": "tenant",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
         }
       ]
     }
@@ -63,31 +84,37 @@
 
   "users": [
     {
-      "username": "alice",
+      "id": "00000000-0000-4000-8000-000000000001",
+      "username": "niklas",
       "enabled": true,
       "emailVerified": true,
-      "email": "alice@example.test",
-      "firstName": "Alice",
-      "lastName": "Example",
-      "credentials": [{ "type": "password", "value": "alice", "temporary": false }]
+      "email": "niklas.heyder@solox.de",
+      "firstName": "Niklas",
+      "lastName": "Heyder",
+      "attributes": { "tenant": ["solox"] },
+      "credentials": [{ "type": "password", "value": "niklas", "temporary": false }]
     },
     {
-      "username": "bob",
+      "id": "00000000-0000-4000-8000-000000000002",
+      "username": "mathias",
       "enabled": true,
       "emailVerified": true,
-      "email": "bob@example.test",
-      "firstName": "Bob",
-      "lastName": "Example",
-      "credentials": [{ "type": "password", "value": "bob", "temporary": false }]
+      "email": "mathias.koehler@solox.de",
+      "firstName": "Mathias",
+      "lastName": "Köhler",
+      "attributes": { "tenant": ["solox"] },
+      "credentials": [{ "type": "password", "value": "mathias", "temporary": false }]
     },
     {
-      "username": "carol",
+      "id": "00000000-0000-4000-8000-000000000003",
+      "username": "eberhard",
       "enabled": true,
       "emailVerified": true,
-      "email": "carol@example.test",
-      "firstName": "Carol",
-      "lastName": "Example",
-      "credentials": [{ "type": "password", "value": "carol", "temporary": false }]
+      "email": "eberhard.hertling@appollo.systems",
+      "firstName": "Eberhard",
+      "lastName": "Hertling",
+      "attributes": { "tenant": ["appollo"] },
+      "credentials": [{ "type": "password", "value": "eberhard", "temporary": false }]
     }
   ]
 }

@@ -15,6 +15,12 @@ and it is decided differently depending on where the forwarding task happened
 to be suspended when the interrupt arrived. These two tests are the same
 barge-in twice, distinguished only by that.
 """
+
+# pylint: disable=duplicate-code
+# Fixture data is repeated per test module on purpose: a test carrying its own
+# Turns shows what it ran against when it fails, and sharing them would let a
+# change made for one test quietly alter another.
+
 from __future__ import annotations
 
 import asyncio
@@ -22,6 +28,7 @@ import json
 
 from backend.api.session_ws import _run_turn_interruptible
 from backend.session.models import AudioChunk, StateChanged
+from backend.session.nudges import INTERRUPTED_MARK
 from backend.session.orchestrator import SessionOrchestrator
 
 # pylint: disable=missing-function-docstring,protected-access
@@ -155,10 +162,10 @@ async def test_only_the_heard_sentence_is_committed_when_the_turn_is_cut_mid_syn
     """The whole point of ADR 0035, through the real orchestrator and the real
     interrupt path.
 
-    Three sentences go out as audio; the client reports it played 1000 ms, which
-    covers the first one only. The other two were streamed ahead and never
-    heard, so they must not enter the history -- otherwise the next reply picks
-    up from words the persona never spoke aloud.
+    Three sentences go out as audio; the client reports it played 700 ms which,
+    with the 300 ms grace, covers exactly the first one. The other two were
+    streamed ahead and never heard, so they must not enter the history --
+    otherwise the next reply picks up from words the persona never spoke aloud.
     """
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
     s1 = "Der erste Satz meiner Antwort ist inhaltlich vollstaendig und lang genug fuer seinen eigenen Chunk."
@@ -172,7 +179,7 @@ async def test_only_the_heard_sentence_is_committed_when_the_turn_is_cut_mid_syn
 
     orch = SessionOrchestrator(persona, scenario)
     events = orch.run_turn(b"a", "turn.webm", "audio/webm")
-    ws = _RealTurnWs(fake_pipeline.tts, played_ms=1000)
+    ws = _RealTurnWs(fake_pipeline.tts, played_ms=700)
 
     outcome = await _run_turn_interruptible(
         ws, events, orch.start_playback, orch.note_barge_in
@@ -184,7 +191,7 @@ async def test_only_the_heard_sentence_is_committed_when_the_turn_is_cut_mid_syn
     assert orch.turns[0].persona_text == s1
     assert s2 not in orch.turns[0].persona_text, "streamed ahead but never heard"
     assert s3 not in orch.turns[0].persona_text, "streamed ahead but never heard"
-    assert orch._messages[-1] == {"role": "assistant", "content": s1}
+    assert orch._messages[-1] == {"role": "assistant", "content": s1 + INTERRUPTED_MARK}
 
 
 class _TailWs:
@@ -206,12 +213,11 @@ class _TailWs:
 
     async def receive_text(self):
         await self._completed.wait()
-        # Enough that the first sentence counts as heard, which is what makes
-        # the finalizer commit something rather than discard it.
-        return json.dumps({"type": "turn.interrupt", "played_ms": 1000})
+        # 0.7s + 0.3s grace = exactly the first sentence.
+        return json.dumps({"type": "turn.interrupt", "played_ms": 700})
 
 
-async def test_a_barge_in_on_the_tail_does_not_commit_the_reply_twice(
+async def test_a_barge_in_on_the_tail_trims_the_committed_reply_to_what_was_heard(
     persona, scenario, fake_pipeline, monkeypatch
 ):
     """A barge-in that arrives after the reply is already finished.
@@ -219,13 +225,10 @@ async def test_a_barge_in_on_the_tail_does_not_commit_the_reply_twice(
     The server streams ahead of playback, so when it finishes a turn the client
     is still playing the tail of it -- and a user who talks over that tail sends
     the interrupt *after* _generate_reply has committed the reply to history.
-    The teardown then reached _finalize_interrupted anyway, which committed the
-    heard part a second time and trimmed persona_text to it, leaving the
-    Transcript at odds with the history the model reads from.
-
-    Nothing is left to finalize at that point: the turn is over. It only has to
-    be closed, so the next utterance starts a new one instead of being merged
-    onto this question.
+    The Transcript must still show only what was played, so the history and
+    persona_text are trimmed to the heard part *together* -- never one without
+    the other (ADR 0035). The reply is committed exactly once, and the finished
+    turn stays closed.
     """
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
     s1 = "Der erste Satz meiner Antwort ist inhaltlich vollstaendig und lang genug fuer seinen eigenen Chunk."
@@ -241,6 +244,57 @@ async def test_a_barge_in_on_the_tail_does_not_commit_the_reply_twice(
 
     assistant = [m for m in orch._messages if m["role"] == "assistant"]
     assert len(assistant) == 1, f"the reply was committed {len(assistant)}x"
-    assert assistant[0]["content"] == f"{s1} {s2}", "the whole reply, not the heard part"
-    assert orch.turns[0].persona_text == f"{s1} {s2}"
+    assert assistant[0]["content"] == s1 + INTERRUPTED_MARK, "only the heard sentence, in the history"
+    assert orch.turns[0].persona_text == s1, "and the same in the Transcript"
     assert orch._reopen_turn is None, "a finished turn is closed, not left open"
+
+
+class _AfterListeningWs:
+    """Interrupts only once the whole turn event stream is out (the last frame
+    is `state: listening`) -- i.e. the turn generator has fully returned, not
+    just committed. The teardown then has nothing to finalize, so the trim has
+    to happen off `note_barge_in` itself."""
+
+    def __init__(self):
+        self.sent: list = []
+        self._done = asyncio.Event()
+
+    async def send_json(self, data):
+        self.sent.append(data)
+        if data.get("type") == "state" and data.get("value") == "listening":
+            self._done.set()
+            await asyncio.sleep(0.02)
+
+    async def send_bytes(self, data):
+        self.sent.append(bytes(data))
+
+    async def receive_text(self):
+        await self._done.wait()
+        return json.dumps({"type": "turn.interrupt", "played_ms": 700})
+
+
+async def test_a_barge_in_after_the_turn_generator_returned_still_trims(
+    persona, scenario, fake_pipeline, monkeypatch
+):
+    """The reply finished *and* the generator returned before the interrupt --
+    so `_finalize_interrupted` never runs. `note_barge_in` sees the reply is
+    already revisable and trims it there (ADR 0035). This is the common
+    real-world case: a short reply is fully synthesised and forwarded in a
+    second or two, long before the client finishes playing it."""
+    monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
+    s1 = "Der erste Satz meiner Antwort ist inhaltlich vollstaendig und lang genug fuer seinen eigenen Chunk."
+    s2 = "Der zweite Satz folgt unmittelbar darauf und ist ebenfalls lang genug fuer einen eigenen Chunk hier."
+    fake_pipeline.stt.transcripts = ["Bitte erklaeren Sie mir das."]
+    fake_pipeline.llm.replies = [f"{s1} {s2}"]
+
+    orch = SessionOrchestrator(persona, scenario)
+    events = orch.run_turn(b"a", "turn.webm", "audio/webm")
+    ws = _AfterListeningWs()
+
+    outcome = await _run_turn_interruptible(ws, events, orch.start_playback, orch.note_barge_in)
+
+    assert outcome in ("interrupted", "ok")  # depends on which task the wait saw first
+    assistant = [m for m in orch._messages if m["role"] == "assistant"]
+    assert len(assistant) == 1
+    assert assistant[0]["content"] == s1 + INTERRUPTED_MARK, "history trimmed to the heard sentence"
+    assert orch.turns[0].persona_text == s1, "Transcript trimmed to match"

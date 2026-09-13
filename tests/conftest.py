@@ -19,7 +19,7 @@ The backend reads a handful of environment variables at import time
 module is imported. Values are dummies: no test in this suite makes a real
 network call — every pipeline backend (STT / LLM / TTS) is faked.
 
-`DEBUG=true` keeps TTS config fully offline (no KugelAudio client is
+`SKIP_KUGELAUDIO=true` keeps TTS config fully offline (no KugelAudio client is
 constructed); the KugelAudio-default / DiReKT-fallback dispatch is still
 covered in `test_tts_fallback.py` by patching the tts module directly.
 """
@@ -38,8 +38,18 @@ os.environ.setdefault("LLM_MODEL", "test-llm-model")
 os.environ.setdefault("TTS_MODEL", "test-tts-model")
 os.environ.setdefault("KUGELAUDIO_MODEL", "test-kugelaudio-model")
 os.environ.setdefault("KUGELAUDIO_API_KEY", "test-kugelaudio-key")
-os.environ.setdefault("DEBUG", "true")
+os.environ.setdefault("SKIP_KUGELAUDIO", "true")
 os.environ.setdefault("OIDC_ISSUER", "http://keycloak.test.invalid/realms/direkt")
+
+# Assigned rather than setdefault, for the reason spelled out for POSTGRES_*
+# below: this one decides *behaviour*, not just an endpoint. With GEMINI on, the
+# request shape changes (ADR 0074) and the caller's notes are not kept at all
+# (ADR 0075) -- so a developer whose own .env has it set, or a run inside the
+# app container where compose puts .env into the environment before pytest
+# starts, would silently exercise the other half of the code and fail the tests
+# that assert the documented default. The Gemini shape is covered on purpose
+# instead, by patching the constant where it is read.
+os.environ["GEMINI"] = ""
 
 # Deliberately unusable credentials, and the reason they are set here at all:
 # backend/clients/config.py calls load_dotenv() when the backend is first
@@ -88,6 +98,7 @@ from backend.scenarios import Scenario  # noqa: E402
 # The ORM models keep a namespace: `Persona` and `Scenario` above are the value
 # objects the app passes around, and both names would otherwise collide here.
 from backend.db import models as db_models  # noqa: E402
+from backend.db.seed_data import FOCUS_GOALS  # noqa: E402
 from backend.db.session import reset_engine, session_scope  # noqa: E402
 from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted  # noqa: E402
 from backend.session.models import Turn  # noqa: E402
@@ -105,6 +116,8 @@ TEST_PERSONAS = [
         language_name="Deutsch",
         voice=PersonaVoice(tts_voice="de_male", kugelaudio_voice_id=1885),
         role_label="Geschäftsführer, Fokus auf Strategie & Budget",
+        traits_label="Sachlich, auf die Zeit bedacht, verhandlungserfahren.",
+        training_goal="Einwandbehandlung unter Zeitdruck und Verbindlichkeit.",
         role="Managing director of a mid-sized company, focused on strategy and budget",
         traits="matter-of-fact, time-conscious, an experienced negotiator",
         behavior="You press for concrete answers and never settle for a vague one.",
@@ -116,6 +129,8 @@ TEST_PERSONAS = [
         language_name="Englisch",
         voice=PersonaVoice(tts_voice="de_female", kugelaudio_voice_id=1071),
         role_label="Marketing-Managerin bei einem Kundenunternehmen",
+        traits_label="Sehr höflich, ruhig und gefasst, nie drängend.",
+        training_goal="Bedarfsermittlung und Konkretheit.",
         role="Marketing manager at a company that is a customer of the user's",
         traits="very polite, calm and composed, never pushy",
         behavior="You stay friendly throughout, but keep asking until an answer is concrete.",
@@ -131,6 +146,7 @@ TEST_SCENARIOS = [
             "The customer (the persona) is calling the user, who works in support, "
             "about an unresolved issue with an existing contract."
         ),
+        category="operations",
     ),
     Scenario(
         id="test-scenario-price",
@@ -140,6 +156,7 @@ TEST_SCENARIOS = [
             "The customer (the persona) is calling to say they are considering "
             "cancelling, because the running costs seem too high for the benefit."
         ),
+        category="pricing",
     ),
 ]
 
@@ -155,7 +172,7 @@ def load_seed_module():
     import now -- kept as a function so the tests that check *what* the library
     ships still have one place to get it from.
     """
-    from backend.db import seed_data
+    from backend.db import seed_data  # pylint: disable=import-outside-toplevel
 
     return seed_data
 
@@ -198,10 +215,15 @@ def fake_library(monkeypatch):
     sites look the functions up."""
     by_id = {p.id: p for p in TEST_PERSONAS}
     by_key = {s.id: s for s in TEST_SCENARIOS}
+    # Personas are curated (no scoping); a Scenario read is scoped to the
+    # caller's `sub` + tenant (ADR 0058/0060), which the doubles ignore -- the real
+    # visibility query is tested against a database in test_authored_content.py.
+    # The WS handshake's tenant resolution is stubbed so it needs no database.
     monkeypatch.setattr(library, "list_personas", lambda: list(TEST_PERSONAS))
-    monkeypatch.setattr(library, "list_scenarios", lambda: list(TEST_SCENARIOS))
+    monkeypatch.setattr(library, "list_scenarios", lambda subject, tenant_id=1: list(TEST_SCENARIOS))
     monkeypatch.setattr(library, "get_persona", by_id.get)
-    monkeypatch.setattr(library, "get_scenario", by_key.get)
+    monkeypatch.setattr(library, "get_scenario", lambda extern_id, subject=None, tenant_id=1: by_key.get(extern_id))
+    monkeypatch.setattr("backend.api.session_ws.resolve_tenant_id", lambda auth: 1)
     return library
 
 
@@ -218,8 +240,24 @@ class FakeLLM:
         self.replies = list(replies or ["Alles klar, danke."])
         self.calls = []
         self.fail_times = 0
+        # `complete` is the call-state notes refresh (ADR 0071): one call per
+        # completed exchange. Empty by default, so the notes stay off and the
+        # message list the older tests index into is unchanged.
+        self.states = []
+        self.state_calls = []
+        self.state_fail_times = 0
 
-    def stream_reply(self, messages):
+    async def complete(self, messages, **_kwargs):
+        self.state_calls.append(messages)
+        if self.state_fail_times > 0:
+            self.state_fail_times -= 1
+            raise OpenAIError("simulated notes failure")
+        return self.states.pop(0) if self.states else ""
+
+    # `**_kwargs` so this keeps the real signature: `retries` is passed by the
+    # boot check (clients/health.py) and a fake that rejected it would fail
+    # where the real function works.
+    def stream_reply(self, messages, **_kwargs):
         self.calls.append(messages)
 
         async def _gen():
@@ -299,6 +337,7 @@ def fake_pipeline(monkeypatch):
     tts_fake = FakeTTS()
 
     monkeypatch.setattr(llm, "stream_reply", llm_fake.stream_reply)
+    monkeypatch.setattr(llm, "complete", llm_fake.complete)
     monkeypatch.setattr(stt, "transcribe", stt_fake.transcribe)
     monkeypatch.setattr(tts, "synthesize_stream", tts_fake.synthesize_stream)
     monkeypatch.setattr(tts, "synthesize", tts_fake.synthesize)
@@ -354,9 +393,23 @@ _DB_SETTINGS = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
                 "POSTGRES_HOST", "POSTGRES_PORT")
 
 # Bounds the reachability probe so an unreachable server fails in a few seconds
-# instead of hanging on libpq's default. psycopg tries both the IPv6 and the
-# IPv4 address, so the wait is up to twice this.
+# instead of hanging on libpq's default.
 _DB_CONNECT_TIMEOUT = 3
+
+
+def _loopback(host: str) -> str:
+    """`localhost` -> `127.0.0.1` for the test database server.
+
+    The persistence tests talk to a *local* Postgres — the `db` container's
+    forwarded port. On Windows `localhost` resolves to `::1` first, but Docker
+    Desktop's port forward binds IPv4 only, so every connect wastes the libpq
+    connect timeout on the v6 address before falling back — with dozens of
+    throwaway databases each opened several times, that turns a 45-second run
+    into minutes or an outright hang (the Alembic engine has no timeout at all).
+    Pinning the loopback name sidesteps it and changes nothing on a stack that
+    was already answering on v4. A real hostname in POSTGRES_HOST is left alone.
+    """
+    return "127.0.0.1" if host in ("localhost", "::1") else host
 
 
 def _render(url: URL) -> str:
@@ -376,7 +429,7 @@ def _server_url() -> URL:
         "postgresql+psycopg",
         username=_ENV["POSTGRES_USER"],
         password=_ENV["POSTGRES_PASSWORD"],
-        host=_ENV.get("POSTGRES_HOST") or "localhost",
+        host=_loopback(_ENV.get("POSTGRES_HOST") or "localhost"),
         port=int(_ENV.get("POSTGRES_PORT") or 5432),
         database=_ENV["POSTGRES_DB"],
     )
@@ -411,16 +464,32 @@ def database_env(url: str) -> Iterator[None]:
                 os.environ[key] = was
 
 
+def _alembic_config() -> Config:
+    """Alembic settings for a programmatic migration inside the test process.
+
+    `configure_logging=False` is the same opt-out `backend/db/provision.py`
+    uses, and for the same reason: migrations/env.py otherwise calls
+    fileConfig(), which disables every logger that already exists — including
+    the application's own. In the app that would silently cost logging for the
+    rest of the process; here it silently costs it for the rest of the test
+    session, which is how a test that asserts on log output came to fail only
+    when a database test happened to run before it.
+    """
+    config = Config(str(PROJECT_ROOT / "alembic.ini"))
+    config.attributes["configure_logging"] = False
+    return config
+
+
 def alembic_upgrade(url: str, revision: str = "head") -> None:
     """Migrates `url` up to `revision`."""
     with database_env(url):
-        command.upgrade(Config(str(PROJECT_ROOT / "alembic.ini")), revision)
+        command.upgrade(_alembic_config(), revision)
 
 
 def alembic_downgrade(url: str, revision: str) -> None:
     """Migrates `url` back down to `revision`."""
     with database_env(url):
-        command.downgrade(Config(str(PROJECT_ROOT / "alembic.ini")), revision)
+        command.downgrade(_alembic_config(), revision)
 
 
 @pytest.fixture(scope="session")
@@ -540,6 +609,9 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
     through the seed script, so these tests do not depend on what personas.py
     happens to contain."""
     language = db_models.Language(code="de", name="Deutsch")
+    # The default tenant every caller with no company resolves to (ADR 0060).
+    default_tenant = db_models.Tenant(extern_ref="default", name="Ohne Unternehmen")
+    # Built-ins: public and authored by nobody (ADR 0058), like a seeded row.
     persona = db_models.Persona(
         key=PERSONA_KEY,
         name="Thomas Brandt",
@@ -552,56 +624,87 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
         language_code="de",
         tts_voice="de_male",
         active=True,
+        visibility=db_models.VISIBILITY_PUBLIC,
     )
     scenario = db_models.Scenario(
         key=SCENARIO_KEY,
-        scenario_type="Preisgespräch",
         title="Kündigungsabsicht",
         short_description="Kunde erwägt zu kündigen.",
         description="Beschreibung",
         case_facts="",
         call_goal="",
-        success_condition="",
         active=True,
+        visibility=db_models.VISIBILITY_PUBLIC,
     )
     metric_type = db_models.MetricType(
-        key=METRIC_KEY, name="Sprechtempo", unit="Wörter/min", feature_id="F-36", active=True
+        key=METRIC_KEY, name="Sprechtempo", unit="Wörter/min", aspect=db_models.ASPECT_HOW,
+        feature_id="F-36", active=True,
     )
-    db_session.add_all([language, persona, scenario, metric_type])
+    # The focus catalogue, from the same list that seeds it in production. Not
+    # hand-written like the rows above: the wrap-up resolves each point's tag
+    # against these keys (`generator._goal_ids`), so a made-up catalogue here
+    # would let a test pass on a key the real system does not have.
+    focus_goals = [
+        db_models.FocusGoal(
+            key=goal["id"], group_key=goal["group"], position=goal["position"],
+            title=goal["title"], caption=goal["caption"], info=goal["info"],
+            evidence=goal["evidence"], active=True,
+        )
+        for goal in FOCUS_GOALS
+    ]
+    db_session.add_all(
+        [language, default_tenant, persona, scenario, metric_type, *focus_goals]
+    )
     db_session.commit()
     return ReferenceRows(
         persona=persona, scenario=scenario, language=language, metric_type=metric_type
     )
 
 
-def persist(
+def persist(  # pylint: disable=too-many-arguments
     *,
     extern_id: uuid.UUID | None = None,
     reason: str = "user",
     turns: list[Turn] | None = None,
     persona_key: str = PERSONA_KEY,
+    # Named for the same reason `persona_key` is: a test that runs against the
+    # *seeded* reference data rather than against `reference_data`'s two hand-
+    # written rows has to say which rows the Session points at.
+    scenario_key: str = SCENARIO_KEY,
     subject: str = TEST_AUTH.sub,
+    started_at: datetime = SESSION_STARTED,
 ) -> uuid.UUID:
     """Write a Session through the real write path; returns its extern_id.
 
     persist_session() opens its own session_scope(), so this needs the
     `app_database` fixture rather than `db_session` — the two see the same
     database, but only the former is what the application itself connects to.
+
+    `started_at` defaults to a fixed instant, so a test that does not care
+    about time gets a reproducible one; the history tests override it, because
+    the order the listing returns is the thing they are checking.
     """
     # Imported here, not at module scope: importing the write path pulls in
     # the feedback stack, which a collection-time import should not need.
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
 
-    # A key other than PERSONA_KEY is deliberately one the seed did not write.
-    persona = replace(TEST_PERSONAS[0], id=persona_key)
+    # The value object the write path receives carries the row's `extern_id` as
+    # `.id` since ADR 0058, so resolve it from the reference row the fixture
+    # inserted. A `persona_key` the fixture did not write yields a random id,
+    # which exercises the LookupError path.
+    with session_scope() as db:
+        prow = db.query(db_models.Persona).filter_by(key=persona_key).one_or_none()
+        srow = db.query(db_models.Scenario).filter_by(key=scenario_key).one_or_none()
+    persona = replace(TEST_PERSONAS[0], id=str(prow.extern_id) if prow else str(uuid.uuid4()))
+    scenario = replace(TEST_SCENARIOS[0], id=str(srow.extern_id) if srow else str(uuid.uuid4()))
     extern_id = extern_id or uuid.uuid4()
     persistence.persist_session(
         extern_id,
         subject,
         persona,
-        replace(TEST_SCENARIOS[0], id=SCENARIO_KEY),
+        scenario,
         turns if turns is not None else [],
-        SESSION_STARTED,
+        started_at,
         reason,
     )
     return extern_id
@@ -622,3 +725,70 @@ async def api_client(app_database: str) -> AsyncIterator[httpx.AsyncClient]:  # 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         yield client
+
+
+def stub_completions(monkeypatch, reply) -> list[tuple[list[dict[str, str]], bool]]:
+    """Replace `llm.complete` and record what it was asked.
+
+    `reply` is the text to answer with, or a callable invoked with the messages
+    (to raise, or to answer differently per attempt). The returned list holds
+    one `(messages, think)` pair per call, so a test can assert both what the
+    model was told and that it was asked off the live path (ADR 0011).
+
+    Lives here rather than in the one test file that uses it (F-61's): the
+    follow-up's tests grew their own variant while this branch was away, and a
+    stub of the pipeline's own client belongs beside the other pipeline fakes
+    either way.
+    """
+    calls: list[tuple[list[dict[str, str]], bool]] = []
+
+    # pylint: disable=unused-argument  # the signature has to mirror
+    # `llm.complete`, whose callers pass max_tokens; what it is set to is
+    # not what these tests are about.
+    async def complete(messages: list[dict[str, str]], *,
+                       max_tokens: int | None = None, think: bool = False) -> str:
+        calls.append((messages, think))
+        return reply(messages) if callable(reply) else reply
+
+    monkeypatch.setattr(llm, "complete", complete)
+    return calls
+
+
+def asked(calls, index: int = 0) -> str:
+    """Everything the model was told on one call, system prompt and material
+    together -- what a prompt assertion is made against."""
+    return "\n".join(message["content"] for message in calls[index][0])
+
+
+# One finished exchange with both speech durations filled in. speaking pace, the
+# one metric the reference fixture seeds, is a rate over phonation -- without
+# them nothing is measured and a Session carries no statistics at all. What a
+# test needs when it wants a Session that looks real and does not care what was
+# said in it (F-61).
+DRAFTED_FROM_TURNS = [
+    Turn(seq=1, persona_text="Brandt hier.", persona_offset_ms=0, persona_end_ms=1500),
+    Turn(seq=2, user_text="Guten Tag, was kann ich für Sie tun?",
+         user_offset_ms=1800, user_end_ms=3400,
+         user_speech_ms=1600, user_phonation_ms=1300,
+         persona_text="Der Preis ist zu hoch.",
+         persona_offset_ms=3700, persona_end_ms=5000),
+]
+
+
+def a_finished_session(
+    turns=None, subject: str | None = None, started_at: datetime | None = None
+) -> uuid.UUID:
+    """One Session written through the real write path, defaulting to
+    `DRAFTED_FROM_TURNS`.
+
+    `subject` names someone other than the test caller, which is how the
+    ownership refusals are set up; `started_at` moves it in time, which is how
+    the retention tests put one past the period. Both are omitted rather than
+    passed as None, so `persist` keeps its own defaults.
+    """
+    kwargs: dict = {}
+    if subject is not None:
+        kwargs["subject"] = subject
+    if started_at is not None:
+        kwargs["started_at"] = started_at
+    return persist(turns=DRAFTED_FROM_TURNS if turns is None else turns, **kwargs)

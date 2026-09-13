@@ -90,7 +90,7 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 | :--- | :------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------------- | :-- | :--------- |
 | R-20 | Nutzer wollen nach einem Gespräch eine zusammenfassende Rückmeldung erhalten.                                                                                 | SO 6.3, AP 5.3 | F   | F-09       |
 | R-21 | Die Rückmeldung soll qualitativ und differenziert ausfallen und sich nicht auf einen einzelnen Zahlenwert reduzieren. Quantitative Kennzahlen sind als Ergänzung erwünscht, nicht als Ersatz. | SO 6.2, 6.3, SO-S 1, AP-S 1 | Q   | Q-04, F-09, F-14 |
-| R-22 | Nutzer wollen konkrete, anwendbare Verbesserungsvorschläge, die sich auf bestimmte Stellen im Gespräch beziehen.                                              | SO 6.3         | F   | F-10, F-47 |
+| R-22 | Nutzer wollen konkrete, anwendbare Verbesserungsvorschläge, die sich auf bestimmte Stellen im Gespräch beziehen.                                              | SO 6.3         | F   | F-10, F-47, F-60 |
 | R-23 | Verbesserungsvorschläge sollen strukturiert sein. | AP 5.3         | F   | F-10       |
 | R-24 | Nutzer wollen die Auswertung visuell im Stil eines Dashboards dargestellt bekommen.                                                                           | AP 5.3         | F   | F-53    |
 | R-51 | Als Kennzahlen sind Redeanteil, Fragenanteil, Sprechtempo, Anzahl der Wörter, Reaktionszeit bis zur Antwort und Pausenzeiten belegt. Als ungeeignet wurde von keiner Seite eine Kennzahl benannt. Die Menge ist nicht abschließend und kann um weitere sinnvolle Kennzahlen erweitert werden. | SO-S 1, AP-S 1 | F   | F-53, F-24 |
@@ -104,7 +104,7 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 | :--- | :----------------------------------------------------------------------------------------------------------------------------------------------- | :------------- | :-- | :--------- |
 | R-28 | Nutzer wollen Gespräche genauer reflektieren können, als es aus der bloßen Erinnerung möglich ist.                                               | SO 4.7         | F   | F-12       |
 | R-29 | Das Training soll kontinuierlich über längere Zeiträume nutzbar sein, weil blinde Flecken sich erst mit der Zeit einschleifen.                   | SO 4.7, AP 3.7 | F   | F-13, F-48 |
-| R-30 | Nutzer wollen die Entwicklung des eigenen Gesprächsverhaltens über mehrere Gespräche hinweg nachvollziehen.                                      | SO 4.7         | F   | F-13       |
+| R-30 | Nutzer wollen die Entwicklung des eigenen Gesprächsverhaltens über mehrere Gespräche hinweg nachvollziehen.                                      | SO 4.7         | F   | F-13, F-62 |
 | R-31 | Nutzer wollen das gemeinsame Verständnis nach einem Gespräch absichern, wie es bisher über eine zusammenfassende E-Mail an den Kunden geschieht. | SO 2.3, 3.3    | F   | F-09, F-54    |
 | R-52 | Das Transkript soll unmittelbar nach dem Gespräch vollständig und in Textform vorliegen. Ein während des Gesprächs nur teilweise fertiges Transkript gilt als verwirrend.                         | SO-S 3, AP-S 3 | F   | F-12          |
 

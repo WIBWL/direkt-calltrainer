@@ -10,6 +10,9 @@ uvicorn[standard]==0.27.0
 kugelaudio==1.9.0
 openai==1.109.1
 
+# Scenario authoring: pull text out of an uploaded PDF (text-layer only, no OCR)
+pypdf==5.1.0
+
 # Database: Postgres driver, migrations, ERD generation
 alembic==1.14.0
 psycopg[binary]==3.2.10

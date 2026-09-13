@@ -13,6 +13,8 @@ things to check and this module keeps them apart:
 Covers:
   F-04  customer persona library  (extensible; cost-critical customers,
         managing directors / IT leads focused on strategy & budget)
+  F-44  the selection card and the info panel behind it -- here the portrait
+        each seeded Persona carries
   F-03  scenario types  (support cases, pricing/offer talks, ...)
   F-01  the counterpart reflects conversational dynamics, not just facts
   R-07  cost-critical customer   R-08  budget-focused decision maker
@@ -23,6 +25,10 @@ Covers:
   ADR 0045  the Scenario carries the case, the Persona carries the objections
   R-12  spontaneous objections
 """
+
+import pathlib
+import re
+import uuid
 
 import pytest
 
@@ -35,6 +41,7 @@ from tests.conftest import load_seed_module
 
 # _to_persona/_to_scenario are the mapping this module is about.
 # pylint: disable=missing-function-docstring,protected-access
+# pylint: disable=use-implicit-booleaness-not-comparison
 
 SEED = load_seed_module()
 
@@ -42,9 +49,15 @@ SEED = load_seed_module()
 # --- the mapping: database row -> value object --------------------------
 
 
+_PERSONA_EXTERN_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
+
+
 def _persona_row(**overrides):
     fields = {
         "key": "row-persona",
+        "extern_id": _PERSONA_EXTERN_ID,
+        "created_by": None,
+        "visibility": models.VISIBILITY_PUBLIC,
         "name": "Thomas Brandt",
         "role_label": "Geschäftsführer, Fokus auf Strategie & Budget",
         "role": "Managing director of a mid-sized company",
@@ -66,7 +79,9 @@ def test_persona_row_maps_onto_the_value_object():
     plain dataclass."""
     persona = _to_persona(_persona_row())
     assert isinstance(persona, Persona)
-    assert persona.id == "row-persona"
+    # ADR 0058: the value object's id is the extern_id (what the client uses),
+    # not the internal `key` slug.
+    assert persona.id == str(_PERSONA_EXTERN_ID)
     assert persona.name == "Thomas Brandt"
     assert persona.role == "Managing director of a mid-sized company"
     assert persona.traits == "matter-of-fact, time-conscious"
@@ -95,17 +110,20 @@ def test_persona_mapping_carries_language_and_both_voices():
 def test_scenario_row_maps_onto_the_value_object():
     """ADR 0043: `short_description` is the teaser shown, `description` the
     English call context the model reads."""
+    extern_id = uuid.UUID("22222222-2222-2222-2222-222222222222")
     scenario = _to_scenario(
         models.Scenario(
             key="row-scenario",
-            scenario_type="Angebots- und Preisgespräch",
+            extern_id=extern_id,
+            created_by=None,
+            visibility=models.VISIBILITY_PUBLIC,
             title="Kündigungsabsicht wegen Preis",
             short_description="Der Kunde erwägt zu kündigen.",
             description="The customer is calling to say they are considering cancelling.",
         )
     )
     assert isinstance(scenario, Scenario)
-    assert scenario.id == "row-scenario"
+    assert scenario.id == str(extern_id)
     assert scenario.name == "Kündigungsabsicht wegen Preis"
     assert scenario.short_description == "Der Kunde erwägt zu kündigen."
     assert scenario.description.startswith("The customer")
@@ -149,7 +167,7 @@ def test_seeded_persona_behaviour_encodes_price_pushback():
 def test_seeded_scenario_library_is_non_empty_and_well_formed():
     assert SEED.SCENARIOS, "F-03: the library ships at least one scenario"
     for entry in SEED.SCENARIOS:
-        assert entry["id"] and entry["name"] and entry["scenario_type"]
+        assert entry["id"] and entry["name"]
         assert entry["short_description"], "ADR 0043: the card shows a teaser"
         assert len(entry["description"]) > 40, "the model gets a real call context"
 
@@ -176,11 +194,29 @@ def test_every_seeded_persona_speaks_a_language_that_has_a_pack(entry):
 
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
-def test_every_seeded_persona_has_its_own_voice(entry):
+def test_every_offered_persona_has_its_own_voice(entry):
     """ADR 0040/0041: voice is a per-Persona property, and both backends need
-    an identity — KugelAudio by default, the DiReKT model as fallback."""
+    an identity — KugelAudio by default, the DiReKT model as fallback.
+
+    A Persona still waiting for a KugelAudio voice is seeded `active: False`
+    and is the one case where the id may be missing; the test below is what
+    keeps that from turning into a Persona on offer that cannot speak."""
     assert entry["tts_voice"]
-    assert isinstance(entry["kugelaudio_voice_id"], int)
+    if entry.get("active", True):
+        assert isinstance(entry["kugelaudio_voice_id"], int)
+
+
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_a_seeded_persona_without_a_voice_is_not_offered(entry):
+    """The converse, and the one that matters: `library.list_personas` filters
+    on `active`, so an unfinished Persona is invisible — but only as long as
+    nobody flips the flag before choosing the voice. Without the id the default
+    TTS backend has nothing to synthesise with and every Turn falls through to
+    the fallback model."""
+    if entry["kugelaudio_voice_id"] is None:
+        assert not entry.get("active", True), (
+            f"{entry['id']}: on offer without a KugelAudio voice"
+        )
 
 
 def test_seeded_scenarios_carry_no_language_of_their_own():
@@ -200,19 +236,20 @@ def test_scenario_row_maps_the_case_fields():
     scenario = _to_scenario(
         models.Scenario(
             key="row-case",
-            scenario_type="Angebots- und Preisgespräch",
             title="Kündigungsabsicht wegen Preis",
             short_description="Der Kunde erwägt zu kündigen.",
             description="The customer is calling to say they are considering cancelling.",
             case_facts="14 licences, 1,180 euros a month since March last year.",
-            call_goal="Get the price down, or a clear reason why not.",
-            success_condition="Settled once a specific figure with a date is committed to.",
+            call_goal=(
+                "Get the price down, or a clear reason why not. Settled once a "
+                "specific figure with a date is committed to."
+            ),
         )
     )
     assert scenario.case_facts == "14 licences, 1,180 euros a month since March last year."
-    assert scenario.call_goal == "Get the price down, or a clear reason why not."
-    assert scenario.success_condition == (
-        "Settled once a specific figure with a date is committed to."
+    assert scenario.call_goal == (
+        "Get the price down, or a clear reason why not. Settled once a "
+        "specific figure with a date is committed to."
     )
 
 
@@ -231,6 +268,7 @@ def test_persona_row_maps_its_objections_in_order():
 
 def test_persona_without_objections_maps_to_an_empty_tuple():
     """A Persona need not have objections; the prompt then omits the block."""
+    # Specifically an empty *tuple* (ADR 0026), not just any falsey value.
     assert _to_persona(_persona_row(objections=[])).objections == ()
 
 
@@ -248,7 +286,6 @@ def test_seeded_scenarios_carry_the_case():
     for entry in SEED.SCENARIOS:
         assert entry["case_facts"].strip(), f"{entry['id']}: no case facts"
         assert entry["call_goal"].strip(), f"{entry['id']}: no call goal"
-        assert entry["success_condition"].strip(), f"{entry['id']}: no success condition"
 
 
 def test_seeded_scenario_context_does_not_carry_the_trainer_objective():
@@ -271,6 +308,56 @@ def test_seeded_personas_carry_objections():
         assert all(text.strip() for text in objections)
 
 
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_seeded_persona_carries_german_display_text(entry):
+    """F-44: the info panel behind a card shows the Persona in the UI
+    language. `role_label` and `training_goal` were German already; these
+    two are the display twins added beside the English prompt fields."""
+    assert entry["traits_label"].strip(), f"{entry['id']}: no traits_label"
+    # Not a language check -- "German" is not mechanically decidable, and the
+    # suite only tests the other direction (the English fields carry no German).
+    # What is checkable is that the display field was actually written rather
+    # than copied off its prompt twin, which is the mistake worth catching.
+    assert entry["traits_label"] != entry["traits"], f"{entry['id']}: traits_label is the prompt text"
+
+
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_every_objection_has_exactly_one_german_label(entry):
+    """The two lists are parallel: `objections[i]` is the English move the
+    prompt gets and `objection_labels[i]` the same move for a person to
+    read. `provision._seed_objections` zips them strictly, so a mismatch
+    here would be a provisioning failure at startup rather than a wrong
+    label -- which is why the lengths are pinned in the seed."""
+    labels = entry["objection_labels"]
+    assert len(labels) == len(entry["objections"]), entry["id"]
+    assert all(label.strip() for label in labels), entry["id"]
+
+
+@pytest.mark.parametrize("entry", SEED.SCENARIOS, ids=lambda e: e["id"])
+def test_seeded_scenario_carries_german_display_text(entry):
+    """ADR 0062: the read view behind a card shows the situation and the facts
+    of the case. Those two columns are English prompt text (ADR 0043), so a
+    built-in needs a display twin for each -- without one the panel would show
+    a German user an English case."""
+    for field in ("description_label", "case_facts_label"):
+        assert entry[field].strip(), f"{entry['id']}: no {field}"
+        assert entry[field] != entry[field.removesuffix("_label")], (
+            f"{entry['id']}: {field} is the prompt text"
+        )
+
+
+@pytest.mark.parametrize("entry", SEED.SCENARIOS, ids=lambda e: e["id"])
+def test_seeded_scenario_display_text_carries_no_dash(entry):
+    """House style for anything the UI shows: no em or en dash. They were used
+    as a catch-all joiner in the seeded briefings, which reads as an aside in
+    text meant to state a rule."""
+    for field in ("name", "short_description", "briefing",
+                  "description_label", "case_facts_label"):
+        assert not _DISPLAY_DASH.search(entry[field] or ""), (
+            f"{entry['id']}.{field}: dash in display text"
+        )
+
+
 def test_seeded_persona_behaviour_carries_no_situation():
     """ADR 0045: `behavior` is manner only. Both Personas used to open it with
     the same sentence about having a reason for the call — a statement about
@@ -279,3 +366,167 @@ def test_seeded_persona_behaviour_carries_no_situation():
         lowered = entry["behavior"].lower()
         assert "reason for this call" not in lowered, entry["id"]
         assert "context of the call" not in lowered, entry["id"]
+
+
+# --- ADR 0072: the category the library filter runs on ----------------------
+
+
+def test_every_seeded_scenario_carries_a_valid_category():
+    """ADR 0072: a shipped Scenario that no category filter finds is one nobody
+    selects, and the value has to be one the CHECK constraint accepts."""
+    for entry in SEED.SCENARIOS:
+        assert entry["category"] in models.SCENARIO_CATEGORIES, entry["id"]
+
+
+def test_the_seeded_library_fills_every_category():
+    """F-03: short support cases, consultative project talks and pricing calls
+    are each trainable, and no filter option is empty on a fresh install. Before
+    the scenario catalogue landed, the consultative context had no Scenario at
+    all."""
+    assert {e["category"] for e in SEED.SCENARIOS} == set(models.SCENARIO_CATEGORIES)
+
+
+def test_scenario_row_maps_its_category():
+    """`library._to_scenario` carries the column onto the value object, which is
+    what `/api/scenarios` badges the card from."""
+    row = models.Scenario(
+        key="row-category", title="t", short_description="s", description="d",
+        case_facts="", call_goal="", category="requirements",
+    )
+    assert _to_scenario(row).category == "requirements"
+    row.category = None
+    assert _to_scenario(row).category is None
+
+
+# --- ADR 0043: the prompt fields are English --------------------------------
+
+# Two cheap signals that a German sentence slipped into a field the model reads
+# as English. Neither is a language detector: the umlaut check is exact for the
+# text this library actually contains, and the word list holds only forms that
+# cannot also be English ("die", "man", "war", "will", "in", "so" are German
+# words too and are deliberately absent).
+_UMLAUTS = re.compile(r"[äöüÄÖÜß]")
+# An em or en dash with space around it: the joiner this seed used to reach
+# for. A hyphen inside a compound ("IT-Seite") is not one and must pass.
+_DISPLAY_DASH = re.compile(r"\s[—–]\s")
+_GERMAN_ONLY = re.compile(
+    r"\b(ohne|nicht|und|oder|sind|wird|eine|einen|dass|sich|auch|aber|sehr|"
+    r"kein|keine|wenn|weil|damit|schon|noch|nur|zwischen|werden|haben)\b",
+    re.IGNORECASE,
+)
+
+# The three fields interpolated into the system prompt (ADR 0045). `name` and
+# `short_description` are display text and stay German on purpose.
+_PROMPT_FIELDS = ("description", "case_facts", "call_goal")
+
+
+@pytest.mark.parametrize("entry", SEED.SCENARIOS, ids=lambda e: e["id"])
+def test_seeded_scenario_prompt_fields_are_english(entry):
+    """ADR 0043: a Scenario carries no language of its own, which is what lets
+    any Persona run it. German in one of these fields would reach a Persona
+    speaking English and is invisible until someone plays that pairing.
+
+    This caught a real one: `call_goal` ended "...what it will cost, ohne
+    Fachbegriffe" after an edit that was only meant to remove a dash.
+    """
+    for field in _PROMPT_FIELDS:
+        text = entry[field]
+        assert not _UMLAUTS.search(text), f"{entry['id']}.{field}: umlaut in an English field"
+        found = _GERMAN_ONLY.search(text)
+        assert found is None, f"{entry['id']}.{field}: German word {found.group()!r}"
+
+
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_seeded_persona_prompt_fields_are_english(entry):
+    """Same for the Persona's prompt fields. `name` and `role_label` are display
+    text; `training_goal` is not read by the model at all (see library.py) and
+    is deliberately German."""
+    for field in ("role", "traits", "behavior"):
+        text = entry[field]
+        assert not _UMLAUTS.search(text), f"{entry['id']}.{field}: umlaut in an English field"
+        found = _GERMAN_ONLY.search(text)
+        assert found is None, f"{entry['id']}.{field}: German word {found.group()!r}"
+
+
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_seeded_persona_objections_are_english(entry):
+    """R-12 / ADR 0045: the objections are English moves, not quoted lines."""
+    for text in entry["objections"]:
+        assert not _UMLAUTS.search(text), f"{entry['id']}: umlaut in an objection"
+        assert _GERMAN_ONLY.search(text) is None, f"{entry['id']}: German in an objection"
+
+
+# --- the seeded portraits (F-44) ----------------------------------------
+#
+# The pairing of Persona and picture lives in the table (ADR 0041) while the
+# file is a frontend asset, so the two can drift apart without anything
+# failing at runtime: a wrong path is a missing image, and the UI quietly
+# falls back to the initials. These two tests are what make that a red test
+# instead.
+_PORTRAIT_DIR = pathlib.Path(__file__).resolve().parents[1] / "frontend" / "public" / "personas"
+
+
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_every_seeded_persona_carries_a_portrait_named_after_it(entry):
+    """The path is derived from the Persona's own id, so renaming one — which
+    is a new row anyway (see seed_data.py) — renames its picture too."""
+    assert entry["avatar_url"] == f"/personas/{entry['id']}.webp"
+
+
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_every_seeded_portrait_is_a_file_that_exists(entry):
+    """The other half: the path the row carries has to name a file the app
+    actually serves. `frontend/public/` is copied into `frontend/dist/` by the
+    Vite build, which is the directory the backend serves."""
+    served = _PORTRAIT_DIR / pathlib.PurePosixPath(entry["avatar_url"]).name
+    assert served.is_file(), f"{entry['id']}: no portrait at {entry['avatar_url']}"
+
+
+# --- the seed fits the columns it is written into -----------------------
+#
+# Nothing above this point would catch a seed value that is simply too long
+# for its column: the seed is a dict of strings and every assertion here reads
+# it as one. The database is the only thing that enforces a length, and it
+# does so at provisioning -- inside one transaction, so the first over-long
+# value drops *every* seeded row and the app answers /api/scenarios with a 500
+# (which is how `persona.traits` outgrew varchar(120) and took the whole
+# library down with it). These two tests put that failure here instead, where
+# it costs a test run rather than a deployment.
+#
+# Seed field -> column, mirroring `provision._seed_personas` /
+# `_seed_scenarios`. Only the fields that land in a column with a length are
+# worth listing; a Text column has no limit to check.
+_PERSONA_COLUMNS = {
+    "id": "key", "name": "name", "role_label": "role_label", "role": "role",
+    "traits": "traits", "avatar_url": "avatar_url", "difficulty": "difficulty",
+    "language_id": "language_code", "tts_voice": "tts_voice",
+}
+_SCENARIO_COLUMNS = {
+    "id": "key", "name": "title", "short_description": "short_description",
+    "briefing": "briefing", "description": "description",
+    "case_facts": "case_facts", "call_goal": "call_goal",
+    "category": "category",
+}
+
+
+def _too_long(model, field_to_column, entry):
+    """Every seeded value that is longer than its column allows."""
+    for field, column in field_to_column.items():
+        value = entry.get(field)
+        limit = getattr(model.__table__.c[column].type, "length", None)
+        if value is None or limit is None:
+            continue
+        if len(value) > limit:
+            yield f"{field} -> {model.__tablename__}.{column}: {len(value)} > {limit}"
+
+
+@pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
+def test_seeded_persona_fits_the_columns_it_is_written_into(entry):
+    over = list(_too_long(models.Persona, _PERSONA_COLUMNS, entry))
+    assert not over, f"{entry['id']}: " + "; ".join(over)
+
+
+@pytest.mark.parametrize("entry", SEED.SCENARIOS, ids=lambda e: e["id"])
+def test_seeded_scenario_fits_the_columns_it_is_written_into(entry):
+    over = list(_too_long(models.Scenario, _SCENARIO_COLUMNS, entry))
+    assert not over, f"{entry['id']}: " + "; ".join(over)

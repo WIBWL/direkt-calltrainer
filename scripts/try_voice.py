@@ -28,12 +28,15 @@ sys.path.insert(0, PROJECT_ROOT)
 
 load_dotenv()
 
+# pylint: disable=wrong-import-position  # sys.path is set up just above
 from backend.clients import stt, tts  # noqa: E402
 from backend.clients.config import KUGELAUDIO_CLIENT, KUGELAUDIO_MODEL  # noqa: E402
-from backend.personas import PersonaVoice  # noqa: E402
 
 SAMPLE_TEXT = {
-    "en": "Hi, this is Samantha Ferris from marketing, I'm calling about the recent increase in our subscription costs.",
+    "en": (
+        "Hi, this is Samantha Ferris from marketing, I'm calling about the "
+        "recent increase in our subscription costs."
+    ),
     "de": "Guten Tag, hier ist Thomas Brandt, ich habe eine Frage zu unserem aktuellen Vertrag.",
 }
 
@@ -62,12 +65,14 @@ async def audition(voice_ids: list[int], text: str, language: str, out_dir: str)
             response = await KUGELAUDIO_CLIENT.tts.generate_async(
                 text=text, model_id=KUGELAUDIO_MODEL, voice_id=voice_id, language=language
             )
-        except Exception as e:  # noqa: BLE001 - surfacing whatever the SDK raises is the point
+        except Exception as e:  # noqa: BLE001  # pylint: disable=broad-exception-caught
+            # Surfacing whatever the SDK raises is the point of the audition.
             print(f"  {voice_id}: SYNTHESIS FAILED - {type(e).__name__}: {e}")
             failures += 1
             continue
 
-        wav = tts._pcm16_to_wav(response.audio, response.sample_rate)
+        # A dev script reusing the client's WAV framing; not worth a public alias.
+        wav = tts._pcm16_to_wav(response.audio, response.sample_rate)  # pylint: disable=protected-access
         path = os.path.join(out_dir, f"voice_{voice_id}.wav")
         with open(path, "wb") as f:
             f.write(wav)
@@ -80,6 +85,7 @@ async def audition(voice_ids: list[int], text: str, language: str, out_dir: str)
 
 
 def main() -> int:
+    """Parse the arguments and run either --list or an audition."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("voice_ids", nargs="*", type=int, help="KugelAudio voice ids")
     parser.add_argument("--language", default="en", help="bare code, e.g. en or de (not en-GB)")

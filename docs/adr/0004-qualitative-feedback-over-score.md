@@ -2,7 +2,12 @@
 
 ## Status
 
-Accepted
+Accepted. Amended by ADR 0078, which permits a traffic light on a named
+classification of a single call under seven conditions. That amendment does not
+soften what this ADR refuses: an overall colour for a call, a Session or a user
+is a score with a palette and stays out. What it allows is a pointer telling the
+reader which of nine equally-weighted figures is worth reading first, which this
+ADR never argued against.
 
 ## Context
 

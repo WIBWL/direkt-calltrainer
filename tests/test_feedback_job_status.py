@@ -15,6 +15,12 @@ Postgres has to be running (`docker compose up -d db`); without it the database
 fixtures skip.
 """
 
+# pylint: disable=duplicate-code
+# Fixture data is repeated per test module on purpose: a test carrying its own
+# Turns shows what it ran against when it fails, and sharing them would let a
+# change made for one test quietly alter another.
+
+
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -30,6 +36,9 @@ from backend.feedback.generator import generate_feedback
 from backend.feedback.queue import JOB_TIMEOUT_S
 from backend.session.models import Turn
 from tests.conftest import persist
+
+# `app_database` is taken by several tests only to activate the fixture.
+# pylint: disable=unused-argument
 
 pytestmark = pytest.mark.usefixtures("reference_data")
 
@@ -71,8 +80,13 @@ def _job(db: DbSession, session_id: int) -> AnalysisJob:
 
 def _stub_model(monkeypatch, reply) -> None:
     """Replace the wrap-up's model call. `reply` is the text to answer with, or
-    a callable invoked instead (to observe state, or to fail)."""
-    async def complete(messages: list[dict[str, str]]) -> str:
+    a callable invoked instead (to observe state, or to fail).
+
+    The keyword-only arguments mirror `llm.complete`'s real signature, which the
+    generator calls with `think=True`.
+    """
+    async def complete(messages: list[dict[str, str]], *,
+                       max_tokens: int | None = None, think: bool = False) -> str:
         return reply(messages) if callable(reply) else reply
 
     monkeypatch.setattr(llm, "complete", complete)
@@ -116,7 +130,10 @@ def test_the_job_says_running_while_the_model_is_being_asked(
 
     generate_feedback(session_id)
 
-    assert seen == [("running", 1)]
+    assert seen[0] == ("running", 1)
+    # Whatever follows is the follow-up Scenario's own call (ADR 0069), and it
+    # is asked only once the wrap-up job is closed.
+    assert set(seen[1:]) <= {("done", 1)}
 
 
 def test_a_generated_wrapup_leaves_the_job_done(
@@ -138,6 +155,66 @@ def test_a_generated_wrapup_leaves_the_job_done(
     feedback = db_session.query(Feedback).filter_by(session_id=session_id).one()
     assert feedback.summary == _SUMMARY
     assert len(feedback.points) == 2
+
+
+@pytest.mark.parametrize(
+    "goal, expected",
+    [
+        ("closing", "closing"),
+        # Not in the catalogue: the model reached for a sixteenth key.
+        ("small_talk", None),
+        # In the catalogue, but about the training habit rather than the call.
+        ("training_regularity", None),
+        ("", None),
+    ],
+    ids=["known", "invented", "habit goal", "none offered"],
+)
+def test_a_points_goal_is_resolved_against_the_catalogue(
+    db_session: DbSession, app_database: str, monkeypatch: pytest.MonkeyPatch,
+    goal: str, expected: str | None,
+) -> None:
+    """The tag decides whether a point can be counted across trainings, so what
+    happens to a bad one matters.
+
+    Dropped to NULL, never raised on: a point with a good observation and a
+    made-up key is still a good observation, and losing the wrap-up over its
+    label would be the wrong trade. A wrong key is worse than none, because it
+    puts the point into somebody's tally of a weakness they do not have.
+
+    The two habit goals are refused at this end as well as in the prompt. A
+    rule the model can ignore is not a constraint, and neither goal is anything
+    a single call could show.
+    """
+    _store()
+    session_id = db_session.query(Session).one().session_id
+    _stub_model(monkeypatch, json.dumps({
+        "summary": _SUMMARY,
+        "strengths": [],
+        "improvements": [{"text": "Mehr Pausen lassen.", "goal": goal}],
+    }))
+
+    generate_feedback(session_id)
+
+    point = db_session.query(Feedback).filter_by(session_id=session_id).one().points[0]
+    assert (point.focus_goal.key if point.focus_goal else None) == expected
+
+
+def test_a_wrapup_written_before_the_tag_leaves_its_points_untagged(
+    db_session: DbSession, app_database: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A model answer with no `goal` key at all, which is what every stored
+    wrap-up from before this feature looks like. The point is kept and simply
+    carries no tag; the dashboard leaves it out of its counts rather than
+    filing it under a goal nobody chose."""
+    _store()
+    session_id = db_session.query(Session).one().session_id
+    _stub_model(monkeypatch, _REPLY)
+
+    generate_feedback(session_id)
+
+    points = db_session.query(Feedback).filter_by(session_id=session_id).one().points
+    assert len(points) == 2
+    assert all(point.focus_goal_id is None for point in points)
 
 
 def test_a_failed_generation_is_recorded_with_its_error(
@@ -276,3 +353,29 @@ def test_a_session_that_was_never_written_leaves_no_job_behind(
         generate_feedback(4_711)
 
     assert db_session.query(AnalysisJob).filter_by(session_id=4_711).count() == 0
+
+
+def test_a_call_with_nothing_in_it_is_summarised_without_the_model(
+    db_session: DbSession, app_database: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A training broken off before a word was said.
+
+    O5 asks the model for this one sentence, and a 4B model (ADR 0011) answers
+    it in the English the rule is written in -- "nothing to review", on a German
+    screen. There is nothing to interpret in an empty call, so nothing is asked:
+    the sentence is written here, in the Session's own language.
+    """
+    asked: list = []
+    _stub_model(monkeypatch, lambda messages: asked.append(messages) or _REPLY)
+    persist(turns=[])
+    session_id = db_session.query(Session).one().session_id
+
+    generate_feedback(session_id)
+
+    db_session.expire_all()
+    feedback = db_session.query(Feedback).one()
+    assert not asked, "an empty call costs no model call"
+    assert feedback.summary.startswith("In diesem Training wurde nicht gesprochen")
+    assert feedback.points == []
+    assert feedback.phase_language is None
+    assert _job(db_session, session_id).status == "done"
