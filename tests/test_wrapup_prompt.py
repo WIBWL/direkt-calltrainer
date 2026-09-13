@@ -312,9 +312,13 @@ def _measurement(  # pylint: disable=too-many-arguments,too-many-positional-argu
 
 def _session_with(*measurements) -> SimpleNamespace:
     # The Scenario is stood in for as well: `_dossier` reads its `reverse` flag
-    # to decide what to call the simulated side (ADR 0070), and its situation
-    # and goal for the tone_fit block. A real Session always has one --
-    # `session.scenario_id` is NOT NULL.
+    # to decide what to call the simulated side (ADR 0070) and its situation for
+    # the tone_fit block. A real Session always has one -- `session.scenario_id`
+    # is NOT NULL.
+    #
+    # `call_goal` is here although the dossier no longer reads it, and that is
+    # the point: it carries the settlement criterion, and a test asserting the
+    # criterion stays out needs a Scenario that actually holds one.
     return SimpleNamespace(
         measurements=list(measurements),
         turns=[],

@@ -386,8 +386,19 @@ def _overlapped(user: Segment, persona: list[Segment]) -> Segment | None:
     The last one, in the event of several: Persona windows are modelled from
     dispatched audio and can abut, and the user started inside the one that was
     still running.
+
+    Against the dispatched end, like `remaining_ms`. The question is whether the
+    Persona was still speaking when the user came in, and its window is the
+    audio that was sent. Measured against the *heard* end, a trimmed reply ends
+    a few hundred milliseconds after the user's start -- that is what trimmed it
+    -- and the two figures come off different clocks: the user's start is
+    derived from their recording's arrival minus its duration, carrying the
+    VAD's padding as error, while the heard end is the client's playback
+    position. When the error goes the wrong way the user's start falls just
+    outside the segment, the overlap is not found at all, and the hardest
+    interruptions are the ones that vanish.
     """
-    inside = [p for p in persona if p.offset_ms <= user.offset_ms < p.end_ms]
+    inside = [p for p in persona if p.offset_ms <= user.offset_ms < p.dispatched_end_ms]
     return inside[-1] if inside else None
 
 

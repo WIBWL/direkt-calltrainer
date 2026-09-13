@@ -592,3 +592,34 @@ async def test_the_trim_leaves_the_dispatched_end_alone(
     assert turn.persona_end_ms == turn.persona_offset_ms + 20000, "heard speech was cut back"
     assert turn.persona_dispatched_end_ms == dispatched_before, "what was sent is untouched"
     assert turn.persona_dispatched_end_ms > turn.persona_end_ms
+
+
+async def test_the_cut_off_words_are_kept_beside_the_transcript(
+    persona, scenario, fake_pipeline, monkeypatch
+):
+    """`turn.persona_unheard` holds what had been synthesized but not played.
+
+    It is deliberately outside the Transcript and outside the model's history --
+    ADR 0035 keeps both to the heard words -- and exists so the wrap-up's
+    drill-down can show what the Persona had been about to say, struck through.
+    Nothing exercised it: the field is written here and read two modules away,
+    and no test set or asserted it in between.
+    """
+    monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 100000)
+    reply = "Es geht um die Exportfunktion, die seit elf Tagen nicht mehr laeuft."
+    fake_pipeline.stt.transcripts = ["Erste Haelfte der Frage."]
+    fake_pipeline.llm.replies = [reply]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+    orch.note_late_barge_in(20000)
+
+    turn = orch.turns[0]
+    assert turn.persona_unheard, "the words that never played are kept"
+    assert turn.persona_unheard not in turn.persona_text, "and kept out of the Transcript"
+    assert reply.endswith(turn.persona_unheard.strip())
+    assert turn.persona_unheard not in str(orch._messages), "and out of the model's history"
+
+    # And it travels to the one place that shows it.
+    line = next(u for u in utterances(orch.turns) if u.speaker == "persona")
+    assert line.unheard == turn.persona_unheard

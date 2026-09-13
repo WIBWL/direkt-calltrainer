@@ -29,7 +29,24 @@ from backend.feedback.interruptions import (
 
 
 def _persona(offset: int, duration: int, interrupted: bool = False) -> Segment:
-    return Segment("persona", offset, duration, interrupted)
+    """One Persona segment. `duration` is the audio it had to say.
+
+    On an interrupted one that is the *dispatched* length and the part that was
+    heard is shorter -- which is what a trimmed reply is (ADR 0035), and what
+    `calls.timeline` now builds. Written with a single length, as this was, the
+    fixture described a segment the timeline cannot produce: a reply marked as
+    cut off that lost nothing. Every rule in this file was being checked against
+    that shape.
+
+    The heard part is put a third of the way in. Where exactly does not matter
+    to any rule here -- the classification reads the dispatched end throughout,
+    which is the point -- so a fixed fraction says "shorter, and by an amount
+    nothing depends on" more honestly than a number that looks calculated.
+    """
+    if not interrupted:
+        return Segment("persona", offset, duration)
+    return Segment("persona", offset, max(1, duration // 3),
+                   interrupted=True, dispatched_ms=duration)
 
 
 def _user(offset: int, duration: int = 5_000) -> Segment:
@@ -121,7 +138,11 @@ def test_a_terminal_overlap_stays_terminal_even_if_the_reply_was_trimmed() -> No
     modelled window, not somebody being cut off."""
     persona = _persona(0, 4_000, interrupted=True)
 
-    assert _kinds(persona, _user(persona.end_ms - 100)) == [Kind.TERMINAL]
+    # Off the dispatched end, which is what "a hair's worth of audio left"
+    # means: `end_ms` is where playback stopped, and on a trimmed segment that
+    # is the cut itself, so measuring from it would place the user after the
+    # reply rather than a hair before its end.
+    assert _kinds(persona, _user(persona.dispatched_end_ms - 100)) == [Kind.TERMINAL]
 
 
 # --- Rules 3 and 4: hard and soft -------------------------------------------
@@ -143,7 +164,7 @@ def test_a_trim_with_less_than_the_yield_window_left_is_not_counted_hard() -> No
     """Between the terminal window and the yield window: the reply was cut, but
     by so little that calling it an interruption would overstate it."""
     persona = _persona(0, 4_000, interrupted=True)
-    late = persona.end_ms - (YIELD_WINDOW_MS - 100)
+    late = persona.dispatched_end_ms - (YIELD_WINDOW_MS - 100)
 
     assert _kinds(persona, _user(late)) == [Kind.SOFT]
 
@@ -326,3 +347,20 @@ def test_a_turn_that_knows_only_one_end_reads_it_as_both() -> None:
     segment = Segment("persona", 0, 10_000, interrupted=True)
 
     assert segment.dispatched_end_ms == segment.end_ms == 10_000
+
+
+def test_a_cut_reported_slightly_early_is_still_found() -> None:
+    """The overlap is looked for against the dispatched end, not the heard one.
+
+    A trimmed reply stops playing a moment *after* the user began -- that is
+    what trimmed it -- and the two numbers come off different clocks: the user's
+    start is their recording's arrival minus its duration, carrying the VAD's
+    padding, while the heard end is the client's playback position. When the
+    error goes the wrong way the start falls past the heard end, and searched
+    for there the overlap is not found at all. The hardest interruptions, which
+    trim the most, are the ones that would vanish.
+    """
+    # 12 s dispatched, playback stopped at 2.9 s, the user's start derived as 3 s.
+    cut_early = Segment("persona", 0, 2_900, interrupted=True, dispatched_ms=12_000)
+
+    assert _kinds(cut_early, _user(3_000)) == [Kind.HARD]
