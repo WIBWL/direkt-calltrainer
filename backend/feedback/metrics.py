@@ -73,6 +73,10 @@ LOUDNESS_KEY = "loudness"
 # The grid the stored curves are drawn at, matching acoustics.py's loudness
 # sampling so the two can be read side by side.
 LOUDNESS_INTERVAL_MS = 100
+# How many audible samples the dynamic range needs before it is a range rather
+# than the distance between two samples. See `_loudness`: below twenty the 5th
+# to 95th percentile trims nothing at all.
+_MIN_LOUDNESS_POINTS = 20
 
 # The pitch curve is stored at half of that, and does not share the grid.
 #
@@ -550,7 +554,16 @@ def _loudness(call: Conversation) -> Measurement | None:
     presence, with the curve behind it. A range rather than a level, for the
     reason given on TurnAcoustics.loudness_db (ADR 0047)."""
     audible = sorted(v for v in call.loudness_db if v is not None)
-    if len(audible) < 3 or not _silence_found(call):
+    # Twenty points, because that is what it takes for the trim below to drop
+    # anything at all: at nineteen the margin rounds to zero and the "5th to
+    # 95th percentile" becomes the raw span between the two most extreme
+    # samples, which is the one thing a percentile is chosen to avoid. A single
+    # spike then decides the figure alone -- 24 dB reported where the trimmed
+    # span is 1.5 -- and it is shown as a measurement in dB on the tile and in
+    # the PDF, with nothing marking it as an estimate. Two seconds of audible
+    # speech; below that the metric is withheld, as `intonation._band` withholds
+    # its own band under the same number of frames.
+    if len(audible) < _MIN_LOUDNESS_POINTS or not _silence_found(call):
         return None
     margin = len(audible) // 20  # 5th to 95th percentile, ignoring the extremes
     return Measurement(

@@ -51,3 +51,15 @@ The detail route lost fifty-seven lines and every metric key it used to name. `a
 There is **one caller**. This buys layering and coverage, not leverage across call sites, and the deletion test comes back "moves complexity" as much as "concentrates" it. It was still worth doing for the coverage: a new metric can no longer be silently unexplained.
 
 A Session measured before a reading's input existed gets no step, which stays the honest answer — reading one off a figure the scale was withdrawn from would reinstate that scale under a new name.
+
+## Amendment, 2026-09-13: F-51's light was being stored
+
+The rule above had an exception nobody decided on. F-35's step was derived on read, as described; F-51's traffic light was written into the measurement's `detail_json` by `interruptions.Report.detail()` and served back from the row, with only its German wording added on read. A comment in `readings.py` recorded this as a fact of history — "this light predates the derive-on-read arrangement" — rather than as a decision, and no test covered it.
+
+It is the worse of the two cases to have got wrong. The thresholds behind that light are described in their own module as invented working values meant to be calibrated once the pilot has data, so the recalibration is not hypothetical: it is planned. A stored colour survives it. The interface then shows a figure coloured by the old scale next to a legend built from the new one — a red 3 beside a legend putting 3 in the yellow band, with the current step marked in a band the number is not in. That is exactly what ADR 0077 avoided when F-35's scale was replaced, and it would have arrived silently.
+
+The light is now derived like the other one. `Report.detail()` no longer writes it; `readings.py` reads `hard_offsets_ms` — whose length *is* the count the light is a reading of — and returns colour and word together, from beside the thresholds. A detail written before that list existed gets no light, the same answer a Session with no `pvq` gets. A colour left in a row by the older code is overwritten on read rather than passed through, so those Sessions pick up the current scale too.
+
+What this removes from the export is the judgement, not the facts: `detail_json` still travels raw, and it no longer has an opinion in it.
+
+Tests: `tests/test_metric_readings.py` pins that no measurement a call produces stores a step or a colour, that a recalibration reaches a Session already measured — figure and legend agreeing on the same count — and that a stale stored colour does not win. The invariant this ADR is named for had, until then, no test.

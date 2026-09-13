@@ -752,8 +752,19 @@ class Finding(Base):
     """A noteworthy observation about the Session — the qualitative counterpart
     to a Measurement.
 
-    Has no writer and no reader: the table stays for pilot data, but nothing in
-    the API, the wrap-up prompt or the frontend refers to it (ADR 0051).
+    Written since F-51: one row per hard interruption, by
+    `session/persistence.py` when a call ends and by
+    `scripts/backfill_interruptions.py` for Sessions recorded earlier. Read back
+    on the Session detail route (`api/sessions.py`) and in the subject's export
+    (`api/account.py`). It stood empty for a while and this said so, long after
+    it stopped being true.
+
+    What ADR 0051 rules out is still ruled out: a Finding is an event that
+    occurred at a moment, never a value judged against a threshold. Nothing
+    writes one because a figure crossed a line. Its `description` is German
+    prose about how the User conducted the call, so it is personal data and
+    every deletion path has to reach it -- which it does, through the Session's
+    cascade (ADR 0026/0052).
     """
 
     __tablename__ = "finding"

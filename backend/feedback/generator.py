@@ -863,6 +863,15 @@ def _store_segments(db: DbSession, session_id: int, pressure_turns: list[int]) -
             row.turn_id for row in session.turns
             if row.turn_id in wanted and row.speaker == db_models.SPEAKER_PERSONA
         }
+        # Measure before anything is written. The other way round -- flags set,
+        # rows deleted, then measured -- is not the rewrite ADR 0081 promises: a
+        # measurement that throws is caught below and the wrap-up is kept, but
+        # the delete and the flags have already committed with it. A re-queue of
+        # a Session that had good segment rows then leaves it with none, and
+        # with Persona rows marked `pressed` that nothing measures. Nothing here
+        # touches `row.pressed`; it reads the id set it is handed.
+        measured = segments.measure_segments(session, pressed_ids)
+
         for row in session.turns:
             if row.speaker == db_models.SPEAKER_PERSONA:
                 row.pressed = row.turn_id in pressed_ids
@@ -874,7 +883,7 @@ def _store_segments(db: DbSession, session_id: int, pressure_turns: list[int]) -
         db.flush()
 
         metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType).all()}
-        for segment, values in segments.measure_segments(session, pressed_ids).items():
+        for segment, values in measured.items():
             db.add_all([
                 db_models.Measurement(
                     session_id=session_id,

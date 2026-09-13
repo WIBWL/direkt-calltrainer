@@ -80,15 +80,34 @@ def _liveliness(detail: dict) -> dict:
     }
 
 
-def _light_label(detail: dict) -> dict:
-    """F-51's traffic light in words. The step itself is stored, unlike F-35's
-    -- this light predates the derive-on-read arrangement -- so only the German
-    is added, which keeps it beside the thresholds it describes."""
-    try:
-        light = interruptions.TrafficLight(detail.get("light"))
-    except ValueError:
-        return detail  # measured before the light existed, or a value since retired
-    return {**detail, "light_label": interruptions.LABELS[light]}
+def _interruption_light(detail: dict) -> dict:
+    """F-51's traffic light, colour and word, off the count in the detail.
+
+    Derived rather than read back: the step used to be written into the stored
+    detail, which is the one thing ADR 0091 says must not happen. The two
+    numbers behind this light are described in `interruptions.py` as invented
+    working values to be calibrated once the pilot has data -- and a stored
+    colour survives that calibration, so a Session stored at three
+    interruptions kept its red while the legend served beside it, built from
+    the constants, put three in the yellow band. The count itself is what is
+    stored; `hard_offsets_ms` holds one entry per hard interruption, so its
+    length is exactly the number the light reads.
+
+    A detail written before that list existed gets no light, which is the same
+    answer `_liveliness` gives a Session with no `pvq`: a step nobody can
+    reproduce from what is stored is worse than none.
+    """
+    offsets = detail.get("hard_offsets_ms")
+    if not isinstance(offsets, list):
+        return detail
+    light = interruptions.light_for(len(offsets))
+    return {
+        **detail,
+        # Written explicitly, so a colour stored by an older version of this
+        # code is replaced on read rather than left to win.
+        "light": light.value,
+        "light_label": interruptions.LABELS[light],
+    }
 
 
 # One entry per metric that says anything beyond its figure. Private: callers
@@ -99,7 +118,7 @@ _READINGS: dict[str, Reading] = {
         intonation.EXPLANATION, intonation.liveliness_steps, _liveliness,
     ),
     interruptions.COUNT_KEY: Reading(
-        interruptions.EXPLANATION, interruptions.light_steps, _light_label,
+        interruptions.EXPLANATION, interruptions.light_steps, _interruption_light,
     ),
     metrics.RUN_LENGTH_KEY: Reading(metrics.RUN_LENGTH_EXPLANATION),
 }

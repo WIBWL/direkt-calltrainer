@@ -298,13 +298,22 @@ class Report:
         Nothing in here enters the figure or the traffic light. It is what lets
         a reader weigh the count: how long the call ran, how many replies there
         were to cut into, and how much listening was audible.
+
+        The light itself is deliberately **not** in here. It is a reading, and
+        ADR 0091 says a reading is derived on every read: the two numbers behind
+        it are described in this module as invented working values meant to be
+        calibrated once the pilot has data, and a stored colour would survive
+        that calibration. It did, until this was removed -- a Session stored at
+        three interruptions kept `red` while the legend beside it, built from
+        the constants, put three in the yellow band. `backend/feedback/
+        readings.py` derives both colour and word from `hard_offsets_ms`, whose
+        length is exactly the count the light reads.
         """
         return {
             "persona_turns": self.persona_turns,
             "call_ms": self.call_ms,
             "soft_count": len(self.soft),
             "backchannel_count": len(self.backchannels),
-            "light": self.light.value,
             "hard_offsets_ms": [event.offset_ms for event in self.hard],
         }
 
@@ -318,13 +327,26 @@ class Report:
         that for themselves. It is deliberately not divided into the figure:
         that was tried and produced a scale on which one interruption was
         already the top step (see the note on the thresholds above).
+
+        Not stored with the measurement -- see `detail`. This property is the
+        live reading; `light_for` is the same rule for a count read back later.
         """
-        count = len(self.hard)
-        if count <= GREEN_MAX_COUNT:
-            return TrafficLight.GREEN
-        if count <= YELLOW_MAX_COUNT:
-            return TrafficLight.YELLOW
-        return TrafficLight.RED
+        return light_for(len(self.hard))
+
+
+def light_for(count: int) -> TrafficLight:
+    """Which step a count of hard interruptions lands on.
+
+    Beside the two constants, and the only place the comparison is written: the
+    live path reads it through `Report.light`, a stored Session through
+    `readings.py` on every read. Both go through here so a recalibration
+    reaches a call measured last month and one measured just now alike, which
+    is the whole of ADR 0091."""
+    if count <= GREEN_MAX_COUNT:
+        return TrafficLight.GREEN
+    if count <= YELLOW_MAX_COUNT:
+        return TrafficLight.YELLOW
+    return TrafficLight.RED
 
 
 def classify(timeline: tuple[Segment, ...]) -> Report:

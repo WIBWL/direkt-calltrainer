@@ -85,3 +85,70 @@ def test_a_metric_with_no_reading_is_served_exactly_as_stored():
 
 def test_a_measurement_with_no_detail_stays_without_one():
     assert readings.served_detail(intonation.RANGE_KEY, None) is None
+
+
+# --- A reading is not written down (ADR 0091) --------------------------------
+#
+# Everything above is the reading side. This is the invariant the module exists
+# for, and it had no test: F-51's step was being stored in the measurement's
+# detail and served back from there, which is exactly what ADR 0091 forbids and
+# exactly what ADR 0077 had already had to undo once for F-35.
+
+_READING_KEYS = frozenset({
+    "light", "light_label",
+    "liveliness", "liveliness_label", "liveliness_light",
+})
+
+
+def test_no_measurement_stores_a_step_or_a_colour():
+    """The detail a call writes holds facts and no judgement about them.
+
+    Named keys rather than a diff against `served_detail`: a key that is both
+    stored and derived would make the diff empty, which is the very state this
+    has to catch.
+    """
+    from tests.test_metrics import _call_with_a_barge_in  # pylint: disable=import-outside-toplevel
+    from backend.feedback.calls import conversation  # pylint: disable=import-outside-toplevel
+
+    for measurement in metrics.measure(conversation(_call_with_a_barge_in(), "de")):
+        stored = set(measurement.detail or {})
+        assert not stored & _READING_KEYS, f"{measurement.key} stores a reading: {stored & _READING_KEYS}"
+
+
+def test_a_recalibrated_threshold_reaches_a_call_already_measured(monkeypatch):
+    """The property the split is for, stated end to end.
+
+    The two numbers behind F-51's light are invented working values, and the
+    module says so: they are meant to be recalibrated once the pilot has data.
+    A stored step survives that recalibration, and then the interface shows a
+    figure coloured by the old scale beside a legend built from the new one --
+    a red 3 next to a legend putting 3 in the yellow band, with the current
+    step marked in a band the number is not in.
+    """
+    from backend.feedback import interruptions  # pylint: disable=import-outside-toplevel
+
+    stored = {"persona_turns": 8, "call_ms": 70_000, "soft_count": 1,
+              "backchannel_count": 0, "hard_offsets_ms": [1_000, 2_000, 3_000]}
+
+    assert readings.served_detail(interruptions.COUNT_KEY, stored)["light"] == "red"
+
+    monkeypatch.setattr(interruptions, "GREEN_MAX_COUNT", 2)
+    monkeypatch.setattr(interruptions, "YELLOW_MAX_COUNT", 5)
+
+    served = readings.served_detail(interruptions.COUNT_KEY, stored)
+    assert served["light"] == "yellow", "the same three interruptions, read against the new scale"
+    assert served["light_label"] == interruptions.LABELS[interruptions.TrafficLight.YELLOW]
+    # And the legend served beside it says the same thing about the same count.
+    band = next(s for s in readings.scales()[interruptions.COUNT_KEY] if s["light"] == "yellow")
+    assert band["range"] == "3 bis 5"
+
+
+def test_a_colour_stored_by_an_older_version_does_not_win():
+    """Rows written before the step was taken out still carry it. The reading
+    replaces it rather than leaving it in place, or those Sessions would keep
+    the frozen colour this change exists to remove."""
+    from backend.feedback import interruptions  # pylint: disable=import-outside-toplevel
+
+    stale = {"hard_offsets_ms": [], "light": "red"}
+
+    assert readings.served_detail(interruptions.COUNT_KEY, stale)["light"] == "green"
