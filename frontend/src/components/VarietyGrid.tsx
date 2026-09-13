@@ -90,7 +90,7 @@ export default function VarietyGrid({ variety }: { variety: Variety }) {
       {hidden > 0 && (
         <button
           type="button"
-          className="session-more variety-more"
+          className="session-more"
           aria-expanded={expanded}
           onClick={() => setExpanded((open) => !open)}
         >

@@ -1,11 +1,7 @@
 /**
  * Where a press leads: the training flow's screens and the transitions between
- * them, as one table.
- *
- * They used to be fourteen `setScreen` calls spread through `App.tsx`, five of
- * which produced the ringing phone and one of which was written inline in the
- * markup — so the machine could only be read by finding every call site, and
- * two of them had drifted apart (see `briefingFollows`).
+ * them, as one table, so the machine can be read in one place instead of by
+ * finding every call site.
  *
  * Pure on purpose: no React, no network, no environment. Everything a
  * transition depends on is passed in, which is what makes the table testable
@@ -117,7 +113,7 @@ export interface Transition {
  *
  * The switch is exhaustive on purpose: a new event refuses to compile until
  * someone decides where it goes and whether a cut covers it, which is exactly
- * what was easy to forget while this was fourteen call sites.
+ * what is easy to forget.
  */
 export function nextScreen(context: FlowContext, event: FlowEvent): Transition {
   switch (event) {

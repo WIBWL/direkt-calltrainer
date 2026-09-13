@@ -25,8 +25,9 @@ export default function ReverseBriefPanel({
   variant,
 }: {
   brief: ReverseBrief;
-  /** "prepare" on the mic-check screen, where there is room to read it before
-   * the call; "call" beside the state animation, where it is a reference. */
+  /** "prepare" on its own briefing screen, where there is room to read it
+   * before the call; "call" beside the state animation, where it is a
+   * reference. */
   variant: "prepare" | "call";
 }) {
   const [ticked, setTicked] = useState<Set<number>>(new Set());

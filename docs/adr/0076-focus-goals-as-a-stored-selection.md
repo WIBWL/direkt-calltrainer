@@ -241,7 +241,7 @@ cover the live-call audio path and nothing else.
 ### A view over the cards, not a group
 
 The listing marks the suggested cards (`recommendation: {call_type, goals}`)
-and the setup screen offers them as **Ihre Empfehlungen**, first in the origin
+and the setup screen offers them as **Empfehlungen**, first in the origin
 row. A suggested card keeps its own origin and appears under both: taking it out
 of "Standard" because it was also suggested would hide it from anyone looking
 there. ADR 0072's rule that every Scenario sits under exactly one origin option

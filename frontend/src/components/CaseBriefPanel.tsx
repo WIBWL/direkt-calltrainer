@@ -50,7 +50,7 @@ export default function CaseBriefPanel({
       <ScenarioBriefing briefing={briefing} />
 
       {facts && (
-        <section className="case-brief case-brief-prepare">
+        <section className="case-brief">
           <div className="case-brief-eyebrow">FAKTEN DES FALLS</div>
           <p className="case-brief-body">{facts}</p>
         </section>

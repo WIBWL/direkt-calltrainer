@@ -44,11 +44,26 @@ export default function ProgressGoalView() {
     </Link>
   );
 
-  if (state === "loading" || (!focus && !goal)) {
+  if (state === "loading") {
     return (
       <AppLayout pageClassName="app-page-narrow progress-page">
         {back}
         <p className="muted">Wird geladen …</p>
+      </AppLayout>
+    );
+  }
+
+  // The catalogue is what turns the key into a goal, so without it there is
+  // nothing to name. Null here is a failed load and not one still running:
+  // `FocusProvider` renders nothing below it until its request has settled.
+  if (!focus) {
+    return (
+      <AppLayout pageClassName="app-page-narrow progress-page">
+        {back}
+        <h1>Fokusziel</h1>
+        <div className="card">
+          <p>Ihre Fokusziele konnten nicht geladen werden. Bitte laden Sie die Seite neu.</p>
+        </div>
       </AppLayout>
     );
   }

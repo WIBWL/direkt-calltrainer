@@ -94,15 +94,7 @@ export default function ProfileView() {
       </section>
 
       <section className="card">
-        <div className="progress-section-head">
-          <h2>Ihre Trainings</h2>
-          {/* The history lists single calls; the dashboard is the same data
-              read across calls. Whoever is looking at one often wants the
-              other. */}
-          <Link to={ROUTES.progress} className="progress-section-link">
-            Fortschritt ansehen
-          </Link>
-        </div>
+        <h2>Ihre Trainings</h2>
         <SessionHistory />
       </section>
 

@@ -62,13 +62,24 @@ export function formatDate(iso: string | null | undefined): string | null {
   }).format(at);
 }
 
-/** Long form with the time, for a single prominent value. */
-export function formatLongDateTime(iso: string | null | undefined): string | null {
+/** The long date, e.g. "6. September 2026", for a single prominent value. */
+export function formatLongDate(iso: string | null | undefined): string | null {
   const at = parse(iso);
   if (!at) return null;
   return new Intl.DateTimeFormat("de-DE", {
     dateStyle: "long",
-    timeStyle: "short",
+    timeZone: DISPLAY_TIMEZONE,
+  }).format(at);
+}
+
+/** Day and month without the year, e.g. "6. September", for a sentence that
+ *  names a recent training. */
+export function formatDayMonth(iso: string | null | undefined): string | null {
+  const at = parse(iso);
+  if (!at) return null;
+  return new Intl.DateTimeFormat("de-DE", {
+    day: "numeric",
+    month: "long",
     timeZone: DISPLAY_TIMEZONE,
   }).format(at);
 }

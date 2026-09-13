@@ -10,9 +10,8 @@
  * the profile. Those two must not drift, and a claim about where personal data
  * travels is the worst possible thing to keep two copies of.
  *
- * A full privacy statement and an imprint are planned as their own pages. When
- * they land, this stays as the short version shown in context, and links to
- * them; it should not become the long one.
+ * The full privacy statement is its own page (`ROUTES.privacy`); this is the
+ * short version shown in context, and it should not become the long one.
  */
 export default function ProcessingNotice({ compact = false }: { compact?: boolean }) {
   return (

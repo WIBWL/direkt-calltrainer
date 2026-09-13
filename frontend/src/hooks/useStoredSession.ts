@@ -21,9 +21,9 @@ export type StoredSessionState = "loading" | "ready" | "missing" | "failed";
  * Transcript and figures are still there, and the caller says plainly that the
  * narrative is not.
  *
- * `reload` is the one thing that reads it twice: the caller can edit the
- * follow-up this Session produced (F-60), and the card would otherwise keep its
- * pre-edit title.
+ * `reload` is the one thing that reads it twice: once a follow-up has been
+ * created from this Session (F-60), so the detail route's `follow_up` carries
+ * the new row.
  */
 export function useStoredSession(sessionId: string | null) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);

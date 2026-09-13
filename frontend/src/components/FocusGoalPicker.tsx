@@ -98,11 +98,11 @@ export default function FocusGoalPicker({
                         (locked ? " focus-goal-locked" : "")
                       }
                     >
-                      {/* `for`, not a wrapping label: that lets the "i" sit
-                          beside the title as a sibling. Inside a label it would
-                          toggle the box whenever it was opened. Two labels on
-                          one input are valid, so title and caption both stay
-                          part of the hit area. */}
+                      {/* `for`, not a wrapping label: that keeps the "i" a
+                          sibling of the text. Inside a label it would toggle
+                          the box whenever it was opened. Two labels on one
+                          input are valid, so title and caption both stay part
+                          of the hit area. */}
                       <input
                         type="checkbox"
                         id={`focus-goal-${goal.key}`}
@@ -112,25 +112,17 @@ export default function FocusGoalPicker({
                         onChange={() => onToggle(goal.key)}
                       />
 
-                      <div className="focus-goal-head">
-                        <label
-                          className="focus-goal-title"
-                          htmlFor={`focus-goal-${goal.key}`}
-                        >
-                          {/* In the label so that clicking it ticks the box;
-                              hidden, so its number stays out of the name. */}
-                          <span className="choice-check focus-goal-check" aria-hidden="true">
-                            {checked ? position + 1 : ""}
-                          </span>
-                          {goal.title}
-                        </label>
-
-                        {/* Icon only: the same label on every card is noise, and
-                            naming the goal makes it a better one when read out. */}
-                        <InfoDetails label={`Was „${goal.title}“ bedeutet`} iconOnly>
-                          <p>{goal.info}</p>
-                        </InfoDetails>
-                      </div>
+                      <label
+                        className="focus-goal-title"
+                        htmlFor={`focus-goal-${goal.key}`}
+                      >
+                        {/* In the label so that clicking it ticks the box;
+                            hidden, so its number stays out of the name. */}
+                        <span className="choice-check focus-goal-check" aria-hidden="true">
+                          {checked ? position + 1 : ""}
+                        </span>
+                        {goal.title}
+                      </label>
 
                       <label
                         className="focus-goal-caption"
@@ -138,6 +130,15 @@ export default function FocusGoalPicker({
                       >
                         {goal.caption}
                       </label>
+
+                      {/* Last, so an opened explanation runs under the caption;
+                          its "i" is pinned to the bottom-right corner, as on a
+                          Persona or Scenario card. Icon only: the same label on
+                          every card is noise, and naming the goal makes it a
+                          better one when read out. */}
+                      <InfoDetails label={`Was „${goal.title}“ bedeutet`} iconOnly>
+                        <p>{goal.info}</p>
+                      </InfoDetails>
                     </div>
                   </li>
                 );

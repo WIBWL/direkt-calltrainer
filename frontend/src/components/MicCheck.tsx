@@ -43,7 +43,6 @@ export default function MicCheck({
 }: MicCheckProps) {
   const { level, error, start, stop } = useMicrophoneLevel(deviceId);
 
-  // The microphone stays inactive until the user deliberately starts the test.
   const [phase, setPhase] = useState<TestPhase>("idle");
 
   // Scale the small RMS input range to a percentage for visual and accessible feedback.
@@ -52,12 +51,10 @@ export default function MicCheck({
   useEffect(() => {
     if (phase !== "running" || level < HEARD_THRESHOLD) return;
 
-    // Recording is no longer needed after the microphone has been confirmed.
     setPhase("passed");
     stop();
   }, [phase, level, stop]);
 
-  // The same user-triggered handler starts the initial test and any later retry.
   const startTest = async () => {
     setPhase("running");
     if (await start()) {

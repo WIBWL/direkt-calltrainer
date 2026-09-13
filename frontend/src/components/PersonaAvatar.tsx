@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { initialsOf } from "../utils/initials";
+
 interface PersonaAvatarProps {
   /** Only ever used for the initials fallback — the picture itself is
    * decorative, see below. */
@@ -13,18 +15,6 @@ interface PersonaAvatarProps {
    * a slot can also crop, which the card does: at 64px a half-body shot shown
    * whole leaves a face too small to recognise. */
   className: string;
-}
-
-/** Initials for the fallback, limited to the first two name parts. */
-function getInitials(name: string): string {
-  const initials = name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
-
-  return initials || "?";
 }
 
 /**
@@ -54,7 +44,7 @@ export default function PersonaAvatar({ name, src, className }: PersonaAvatarPro
   if (!src || failed) {
     return (
       <span className={`${className} persona-avatar persona-avatar-fallback`} aria-hidden="true">
-        {getInitials(name)}
+        {initialsOf(name) || "?"}
       </span>
     );
   }

@@ -186,12 +186,12 @@ export default function ProgressView() {
             </li>
           </ul>
 
-          <div className="card progress-activity-card">
+          <div className="card">
             <h3 className="progress-card-title">Wann Sie trainiert haben</h3>
             <ActivityCalendar sessions={sessions} />
           </div>
 
-          <div className="card progress-variety-card">
+          <div className="card">
             <h3 className="progress-card-title">Womit Sie trainiert haben</h3>
             <VarietyGrid variety={variety(sessions)} />
             <p className="focus-tile-note">
@@ -229,14 +229,12 @@ export default function ProgressView() {
         </span>
       </div>
 
-      {/* No "nothing in this period" branch any more: counted in trainings,
-          the selection is never empty while anything is stored, and the case
-          of nothing stored returned above. */}
+      {/* No empty-period branch: counted in trainings, the selection is never
+          empty while anything is stored, and nothing stored returned above. */}
       {goals.length > 0 ? (
         <FocusSection
           goals={goals}
           series={series}
-          sessionCount={inPeriod.length}
           sessions={inPeriod}
           allSessions={sessions}
         />
@@ -263,7 +261,7 @@ export default function ProgressView() {
  *  instead of each repeating them. */
 function Frame({ children }: { children: ReactNode }) {
   return (
-    <AppLayout wide progressActive pageClassName="app-page-wide progress-page">
+    <AppLayout progressActive pageClassName="app-page-wide progress-page">
       <h1>Ihr Fortschritt</h1>
       {/* What the page is, first, and that nothing on it is a grade, in one
           sentence -- that half cannot move behind the "i": a reader who is not
@@ -303,15 +301,12 @@ function pickedGoals(catalogue: FocusGoal[], selected: string[]): FocusGoal[] {
 function FocusSection({
   goals,
   series,
-  sessionCount,
   sessions,
   allSessions,
 }: {
   goals: FocusGoal[];
   series: MetricSeries[];
-  sessionCount: number;
-  /** For the goals with no measurement of their own, which are answered by how
-   *  often the wrap-ups named them. */
+  /** The trainings the switch selected. */
   sessions: SessionSummary[];
   /** Everything stored, whatever the switch says (see `FocusTile`). */
   allSessions: SessionSummary[];
@@ -335,7 +330,6 @@ function FocusSection({
             <FocusTile
               goal={goal}
               series={series}
-              sessionCount={sessionCount}
               sessions={sessions}
               allSessions={allSessions}
             />
@@ -358,13 +352,12 @@ function FocusSection({
 function FocusTile({
   goal,
   series,
-  sessionCount,
   sessions,
   allSessions,
 }: {
   goal: FocusGoal;
   series: MetricSeries[];
-  sessionCount: number;
+  /** The trainings the switch selected. */
   sessions: SessionSummary[];
   /** Every stored training, for the regularity goal, which is about the
    *  calendar and not about the trainings the switch selected. */
@@ -385,7 +378,7 @@ function FocusTile({
 
       {backing.kind === "metric" && primary ? (
         <>
-          <MetricBody series={primary} sessionCount={sessionCount} />
+          <MetricBody series={primary} sessionCount={sessions.length} />
           {supporting.length > 0 && <SupportingMetrics series={supporting} />}
         </>
       ) : backing.kind === "segment" ? (
@@ -442,7 +435,7 @@ function SupportingMetrics({ series }: { series: MetricSeries[] }) {
               {last ? formatPoint(s, last.value) : "–"}
             </span>
             {s.shape === "line" && s.points.length >= MIN_SESSIONS_FOR_SERIES && (
-              <span className="focus-supporting-course">
+              <span>
                 <Sparkline series={s} height={22} showDots={false} interactive={false} />
               </span>
             )}
@@ -503,10 +496,10 @@ function SegmentBody({ sessions }: { sessions: SessionSummary[] }) {
  * A goal that has no measurement of its own, answered by what the wrap-ups
  * said about it.
  *
- * Six of the fourteen goals are like this, and four of them always will be:
- * whether a close was clear is in what was said, and no acoustic figure will
- * ever reach it. Counting the mentions is the honest substitute, and the
- * wording keeps it a count of statements rather than a verdict.
+ * Three of the fourteen goals are like this (`utils/focusMetrics.ts`): whether
+ * an objection was handled or empathy shown is in what was said, and no
+ * acoustic figure reaches it. Counting the mentions is the honest substitute,
+ * and the wording keeps it a count of statements rather than a verdict.
  *
  * No threshold here, unlike the recurring block, which needs two mentions
  * before it calls something a pattern. On a tile the user picked themselves,

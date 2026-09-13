@@ -1,49 +1,28 @@
 import { useEffect, useState } from "react";
 
 import { useFocusContext } from "../FocusContext";
-import type {
-  Origin,
-  OriginSessionRef,
-  ScenarioCategory,
-  ScenarioRecommendation,
+import {
+  CATEGORY_FILTER_LABELS,
+  CATEGORY_FILTERS,
+  LIBRARY_FILTERS,
+  RANDOM_SCENARIO_ID,
+  recommendationReason,
+  type CategoryFilter,
+  type LibraryFilter,
+  type ScenarioCard,
 } from "../scenarioLibrary";
-import { CATEGORIES, CATEGORY_LABELS, RANDOM_SCENARIO_ID } from "../scenarioLibrary";
+import { formatDayMonth } from "../utils/time";
 import FilterSlider, { type FilterOption } from "./FilterSlider";
-
-/** Level 1, the origin of a Scenario: who it comes from. "followUp" is the
- * follow-up drafted from a training (ADR 0069) and "reverse" the Reverse of one
- * finished Session (ADR 0070). Both are `origin: "own"` on the wire and options
- * of their own here — the hand-authored option means exactly that, and nothing
- * else. Not to be confused with the level-2 CategoryFilter below. */
-export type LibraryFilter =
-  | "recommended" | "all" | "standard" | "own" | "followUp" | "reverse" | "tenant";
-
-/** Level 2, the thematic category (ADR 0072). */
-export type CategoryFilter = "all" | ScenarioCategory;
-
-export const CATEGORY_FILTERS: CategoryFilter[] = ["all", ...CATEGORIES];
-
-export const CATEGORY_FILTER_LABELS: Record<CategoryFilter, string> = {
-  all: "Alle",
-  ...CATEGORY_LABELS,
-};
 
 /** Static labels; the "tenant" option is labelled with the company name. */
 const ORIGIN_LABELS: Record<Exclude<LibraryFilter, "tenant">, string> = {
-  recommended: "Ihre Empfehlungen",
+  recommended: "Empfehlungen",
   all: "Alle",
   standard: "Standard",
   own: "Individuell",
   followUp: "Folgeszenario",
   reverse: "Rollentausch",
 };
-
-/** The order the chips are shown in, the company's among them rather than
- * appended after. Not the order of the grid — that is alphabetical — but the
- * order the kinds are met in: everything, then what ships, then what the User
- * wrote, then what their company shared, and last the two the system builds
- * out of a finished training, which exist only once there has been one. */
-const ORIGIN_ORDER = ["all", "standard", "own", "tenant", "followUp", "reverse"] as const;
 
 /** How many tiles the collapsed grid shows: two full rows of three. The seeded
  * library alone is seventeen rows deep, and a selection screen that opens on
@@ -54,53 +33,16 @@ const ORIGIN_ORDER = ["all", "standard", "own", "tenant", "followUp", "reverse"]
  * choices and reading it as a sixth case is a moment's confusion every time. */
 const COLLAPSED_TILES = 6;
 
-export interface LibraryItem {
-  id: string;
-  name: string;
-  subtitle: string;
-  origin: Origin;
-  /** Shared with the company (own or a colleague's). */
-  shared: boolean;
-  /** F-03 call context, or null for an uncategorised Scenario (ADR 0072). */
-  category: ScenarioCategory | null;
-  /** Written from a Session's feedback (F-60) rather than by hand. Own, but its
-   * own origin — the hand-authored option means exactly that. */
-  followUp: boolean;
-  /** A reverse of one finished Session (ADR 0070). */
-  reverse: boolean;
-  /** The conversation it replays; null once that Session has been deleted. */
-  originSession: OriginSessionRef | null;
-  /** Why it is suggested (F-62), or null if it is not. */
-  recommendation: ScenarioRecommendation | null;
-}
-
-/** Why a card is suggested, in one line: that it matches the call types the
- *  User picked, and which of their focus goals it practises. */
-export function recommendationReason(
-  recommendation: ScenarioRecommendation,
-  goalTitle: (key: string) => string,
-): string {
-  const parts: string[] = [];
-  if (recommendation.call_type) parts.push("Passt zu Ihren Gesprächen");
-  if (recommendation.goals.length > 0) {
-    parts.push("Übt " + recommendation.goals.map((g) => `„${goalTitle(g)}“`).join(", "));
-  }
-  return parts.join(" · ");
-}
-
 /** Dates the call a reverse replays and names its Persona, so two reverses of
  * the same Scenario are told apart. */
-function reverseSubtitle(item: LibraryItem): string {
-  if (!item.originSession) return "Ursprungsgespräch gelöscht";
-  const when = new Date(item.originSession.started_at).toLocaleDateString("de-DE", {
-    day: "numeric",
-    month: "long",
-  });
-  return `Gespräch vom ${when} mit ${item.originSession.persona}`;
+function reverseSubtitle(card: ScenarioCard): string {
+  if (!card.origin_session) return "Ursprungsgespräch gelöscht";
+  const { started_at, persona } = card.origin_session;
+  return `Gespräch vom ${formatDayMonth(started_at) ?? started_at} mit ${persona}`;
 }
 
 interface LibraryPickerProps {
-  items: LibraryItem[];
+  items: ScenarioCard[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   /** Level 1: origin. */
@@ -119,42 +61,12 @@ interface LibraryPickerProps {
   newLabel: string;
   onNew: () => void;
   /** Open the read-only info panel. Editing is reached from inside it
-   * (ADR 0062), so the card carries no separate edit affordance -- not even
-   * on the caller's own rows, where it used to sit. */
+   * (ADR 0062), so the card carries no separate edit affordance. */
   onInfo: (id: string) => void;
-  /** Offer the random Scenario tile (F-62). Decided by the caller, not here,
-   * because the tile draws from what these filters show and `items` is that
-   * set *after* the two `slice`s below have had it — the caller is the one
-   * place that still knows how many drawable rows there really are. */
+  /** Offer the random Scenario tile (F-62). Decided by the caller, not here:
+   * the tile draws only from the drawable rows among what these filters show
+   * (`isDrawable`), and the caller is where that pool is built. */
   offerRandom?: boolean;
-}
-
-/** Whether an item passes the active origin filter. "tenant" = anything shared
- * with the company, the author's own shared Scenarios included.
- *
- * A reverse is `origin: "own"` on the wire but is deliberately *not* under the
- * hand-authored option: that option means what the User wrote, and a reverse is
- * a copy of a call they had. Every Scenario sits under exactly one of the
- * origin options proper; "tenant" and "recommended" are views across them. */
-export function matchesFilter(item: LibraryItem, filter: LibraryFilter): boolean {
-  // A view over the cards, like the company option: a suggested Scenario stays
-  // under its own origin too.
-  if (filter === "recommended") return item.recommendation !== null;
-  if (filter === "all") return true;
-  if (filter === "standard") return item.origin === "builtin";
-  if (filter === "followUp") return item.followUp;
-  if (filter === "reverse") return item.reverse;
-  // The hand-authored option is what is left of `own` once the two kinds the
-  // system wrote itself are taken out.
-  if (filter === "own") return item.origin === "own" && !item.followUp && !item.reverse;
-  return item.shared;
-}
-
-/** Whether an item passes the active category filter. An uncategorised
- * Scenario matches only "all". There is no category it belongs to, and filing
- * it under one nobody chose would be a guess (ADR 0072). */
-export function matchesCategory(item: LibraryItem, category: CategoryFilter): boolean {
-  return category === "all" || item.category === category;
 }
 
 /** The card's origin, which is also the suffix of its `card-origin-` class —
@@ -163,30 +75,33 @@ export function matchesCategory(item: LibraryItem, category: CategoryFilter): bo
  *
  * The two kinds the system wrote itself come first: both are `origin: "own"`,
  * and that is the distinction the badge is making. */
-function badgeClass(item: LibraryItem): string {
-  if (item.reverse) return "reverse";
-  if (item.followUp) return "follow-up";
-  if (item.origin === "own") return item.shared ? "shared" : "own";
-  return item.origin;
+function badgeClass(card: ScenarioCard): string {
+  if (card.reverse) return "reverse";
+  if (card.follow_up) return "follow-up";
+  if (card.origin === "own") return card.shared ? "shared" : "own";
+  return card.origin;
 }
 
-function badgeLabel(item: LibraryItem, tenantName: string | null): string {
-  if (item.reverse) return "Rollentausch";
-  if (item.followUp) return "Folgeszenario";
-  if (item.origin === "own") return item.shared ? "Individuell · geteilt" : "Individuell";
-  if (item.origin === "tenant") return tenantName ?? "Unternehmen";
+function badgeLabel(card: ScenarioCard, tenantName: string | null): string {
+  if (card.reverse) return "Rollentausch";
+  if (card.follow_up) return "Folgeszenario";
+  if (card.origin === "own") return card.shared ? "Individuell · geteilt" : "Individuell";
+  if (card.origin === "tenant") return tenantName ?? "Unternehmen";
   return "Standard";
 }
 
 /**
- * The Scenario selection grid: two filter rows, a "new" button, badged cards,
- * and an edit affordance on the caller's own rows (ADR 0058 / 0060 / 0064 /
+ * The Scenario selection grid: two filter rows, a "new" button, and badged
+ * cards with an "i" that opens the info panel (ADR 0058 / 0060 / 0062 /
  * 0069).
  *
  * The rows are independent and combine. Level 1 says where a Scenario comes
- * from (all, built-in, hand-authored, follow-up, or the caller's company),
+ * from (suggested, all, built-in, hand-authored, the caller's company,
+ * follow-up or reverse),
  * level 2 says what kind of call it is. Both are the same component, so they
- * are the same size by construction.
+ * are the same size by construction. What each option matches is decided in
+ * `scenarioLibrary.ts` (`matchesFilter`, `matchesCategory`), where the caller
+ * builds the visible set and the counts from the same functions.
  */
 export default function LibraryPicker({
   items,
@@ -205,13 +120,9 @@ export default function LibraryPicker({
   onInfo,
   offerRandom = false,
 }: LibraryPickerProps) {
-  // Which card is asking to be confirmed, if any. One id rather than a set:
-  // asking about a second row answers the first with "no", which is the safe
-  // way round and saves a stray confirmation sitting armed on a card the User
-  // has moved on from.
-  // The grid opens on one row and a half of cards; the rest is behind the tile
-  // at the end of it. Collapsed again whenever the filters change, because what
-  // "the first five" are has changed with them.
+  // The grid opens on `COLLAPSED_TILES`; the rest is behind the button under
+  // it. Collapsed again whenever the filters change, because which rows come
+  // first has changed with them.
   const [expanded, setExpanded] = useState(false);
   useEffect(() => setExpanded(false), [filter, category]);
 
@@ -225,34 +136,23 @@ export default function LibraryPicker({
   const { focus } = useFocusContext();
   const goalTitle = (key: string) => focus?.goals.find((g) => g.key === key)?.title ?? key;
 
-  const originOptions: FilterOption<LibraryFilter>[] = [
+  const originOptions = LIBRARY_FILTERS.flatMap<FilterOption<LibraryFilter>>((f) => {
     // The suggestions lead the row, and only when there are any (F-62): a chip
-    // that filters down to nothing is a promise the screen cannot keep. Outside
-    // `ORIGIN_ORDER` because it is not a kind of Scenario but a view across
-    // the kinds -- a suggested card keeps its origin and appears under both.
-    ...(showRecommended
-      ? [
-          {
-            value: "recommended" as LibraryFilter,
-            label: ORIGIN_LABELS.recommended,
-            count: originCounts.recommended,
-          },
-        ]
-      : []),
-    ...ORIGIN_ORDER.flatMap((f) => {
-      // The company's chip is the one that can be absent — it is offered only
-      // to a caller who has colleagues to share with (ADR 0060), and it is
-      // labelled with the company's own name rather than a static word.
-      // `flatMap` so it drops out of the middle of the row without leaving a
-      // gap.
-      if (f === "tenant") {
-        return tenantName
-          ? [{ value: f as LibraryFilter, label: tenantName, count: originCounts.tenant }]
-          : [];
-      }
-      return [{ value: f as LibraryFilter, label: ORIGIN_LABELS[f], count: originCounts[f] }];
-    }),
-  ];
+    // that filters down to nothing is a promise the screen cannot keep.
+    if (f === "recommended") {
+      return showRecommended
+        ? [{ value: f, label: ORIGIN_LABELS.recommended, count: originCounts.recommended }]
+        : [];
+    }
+    // The company's chip is the other one that can be absent — it is offered
+    // only to a caller who has colleagues to share with (ADR 0060), and it is
+    // labelled with the company's own name rather than a static word.
+    // `flatMap` so it drops out of the middle of the row without leaving a gap.
+    if (f === "tenant") {
+      return tenantName ? [{ value: f, label: tenantName, count: originCounts.tenant }] : [];
+    }
+    return [{ value: f, label: ORIGIN_LABELS[f], count: originCounts[f] }];
+  });
 
   const categoryOptions: FilterOption<CategoryFilter>[] = CATEGORY_FILTERS.map((c) => ({
     value: c,
@@ -332,48 +232,44 @@ export default function LibraryPicker({
           </div>
         )}
 
-        {shown.map((item) => (
-          <div key={item.id} className="card-wrap">
+        {shown.map((card) => (
+          <div key={card.id} className="card-wrap">
             <button
-              // The origin's colour stays; the "editable" padding does not,
-              // because the card no longer carries an edit link (ADR 0062).
               className={
-                "persona-card card-origin-" + badgeClass(item) +
-                (item.id === selectedId ? " selected" : "")
+                "persona-card card-origin-" + badgeClass(card) +
+                (card.id === selectedId ? " selected" : "")
               }
-              onClick={() => onSelect(item.id)}
+              onClick={() => onSelect(card.id)}
               type="button"
-              aria-pressed={item.id === selectedId}
+              aria-pressed={card.id === selectedId}
             >
               <span className="choice-check" aria-hidden="true">
-                {item.id === selectedId ? "✓" : ""}
+                {card.id === selectedId ? "✓" : ""}
               </span>
-              <span className="persona-name">{item.name}</span>
+              <span className="persona-name">{card.name}</span>
               <span className="card-subtitle">
-                {item.reverse ? reverseSubtitle(item) : item.subtitle}
+                {card.reverse ? reverseSubtitle(card) : card.short_description}
               </span>
-              {filter === "recommended" && item.recommendation && (
+              {filter === "recommended" && card.recommendation && (
                 <span className="card-reason">
-                  {recommendationReason(item.recommendation, goalTitle)}
+                  {recommendationReason(card.recommendation, goalTitle)}
                 </span>
               )}
               {/* Unclassed: its colours come from the card's own origin class,
                   so the badge and the tile it sits on cannot disagree. */}
-              <span className="card-badge">{badgeLabel(item, tenantName)}</span>
+              <span className="card-badge">{badgeLabel(card, tenantName)}</span>
             </button>
             {/* Every Scenario is readable (ADR 0062), so the "i" is on every
-                card — unlike the old edit link, which was on the caller's
-                own rows only and now lives inside the panel. */}
+                card. */}
             <button
               type="button"
               className="card-info"
-              onClick={() => onInfo(item.id)}
-              aria-label={`Mehr über ${item.name}`}
-              title={`Mehr über ${item.name}`}
+              onClick={() => onInfo(card.id)}
+              aria-label={`Mehr über ${card.name}`}
+              title={`Mehr über ${card.name}`}
             >
               <span aria-hidden="true">i</span>
             </button>
-
           </div>
         ))}
       </div>

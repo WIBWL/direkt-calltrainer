@@ -1,5 +1,7 @@
 import { useAuth } from "react-oidc-context";
 
+import { initialsOf } from "../utils/initials";
+
 /**
  * The signed-in user, as the interface needs them.
  *
@@ -23,21 +25,6 @@ export interface Account {
 
 const FALLBACK_NAME = "Angemeldet";
 
-/** Up to two initials from a full name, or one from a single word. */
-function initialsFrom(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  const first = parts[0];
-  if (!first) return "?";
-  const last = parts.length > 1 ? parts[parts.length - 1] : undefined;
-  // Taken per grapheme rather than per code unit, so a name starting with a
-  // character outside the BMP does not lose half of itself.
-  return [first, last]
-    .filter((part): part is string => part !== undefined)
-    .map((part) => [...part][0]?.toUpperCase() ?? "")
-    .join("");
-}
-
-
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
 }
@@ -56,7 +43,7 @@ export function useAccount(): Account {
     displayName,
     // Initials come from the name, not from the fallback label: initials taken
     // from a generic signed-in label would look like a person's and be wrong.
-    initials: asString(fullName) || username ? initialsFrom(displayName) : "?",
+    initials: (asString(fullName) || username ? initialsOf(displayName) : "") || "?",
     username,
     email: asString(claims?.email),
     emailVerified: claims?.email_verified === true,

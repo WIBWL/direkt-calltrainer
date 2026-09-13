@@ -155,7 +155,7 @@ function Column({
   empty: string;
 }) {
   return (
-    <div className="card recurring-card">
+    <div className="card">
       <h3 className="recurring-heading">{heading}</h3>
       {entries.length === 0 ? (
         <p className="focus-tile-note">{empty}</p>

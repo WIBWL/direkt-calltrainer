@@ -100,9 +100,8 @@ body {
 /* A dashboard is a comparison, and a comparison needs room: the small
    multiples only earn their name when several fit on one row. Four fifths of
    the window rather than all of it, so the page keeps a margin and does not
-   read as an unframed sheet of data. The header takes the same measure on
-   these screens (`.app-header-inner.is-wide`) so brand and account chip line
-   up with the content instead of sitting inside it. */
+   read as an unframed sheet of data. The header deliberately keeps its usual
+   measure here, so it does not change width from one screen to the next. */
 .app-page-wide {
   width: 80%;
   max-width: none;
@@ -114,10 +113,6 @@ body {
   height: 76px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.app-header-inner.is-wide {
-  width: 80%;
 }
 
 .app-header-inner {
@@ -2426,6 +2421,20 @@ h2 {
   color: var(--text-muted);
 }
 
+/* A request that failed: writing a follow-up or a reverse under its offer, or
+   building the PDF under the actions row. The message is written for the user
+   (often the backend's own `detail`), so it is said in the danger colour and
+   otherwise set like the note beside it. */
+p.follow-up-error {
+  color: var(--color-danger);
+}
+
+.card p.follow-up-error {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-danger);
+}
+
 /* --- Reverse: the roles swapped (F-61, ADR 0070) ------------------------ */
 
 /* The offer under the feedback. Same card as the follow-up, other accent, so
@@ -3098,11 +3107,15 @@ h2 {
   padding: 6px 14px 6px 6px;
   border-radius: 999px;
   border: 1px solid transparent;
+  background: none;
+  font: inherit;
+  cursor: pointer;
   text-decoration: none;
   color: var(--color-navy-900);
   transition: background 0.2s, border-color 0.2s;
 }
 
+.account-chip.is-open,
 .account-chip:hover {
   background: var(--color-surface-selected);
   border-color: var(--color-border);
@@ -3151,8 +3164,81 @@ h2 {
   white-space: nowrap;
 }
 
+/* A block of its own even in the locked chip, where it is an empty span, so the
+   hidden chip reserves the caret's width as well. */
+.account-chip-caret {
+  display: block;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.account-chip.is-open .account-chip-caret {
+  transform: rotate(180deg);
+}
+
+/* --- Account menu ------------------------------------------------------- */
+/* Profil, Fortschritt and Abmelden under the account chip. Anchored to the
+   chip's right edge, since the chip sits at the right of the header. */
+
+.account-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.account-menu-list {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  min-width: 190px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  box-shadow: 0 10px 28px rgba(15, 30, 60, 0.14);
+}
+
+.account-menu-item {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  text-decoration: none;
+  color: var(--color-navy-900);
+  cursor: pointer;
+}
+
+.account-menu-item:hover {
+  background: var(--color-surface-selected);
+}
+
+.account-menu-item:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: -2px;
+}
+
+.account-menu-item.is-active {
+  font-weight: 600;
+  color: var(--color-blue-600);
+}
+
+.account-menu-separator {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--color-border-subtle);
+}
+
 /* The name is the first thing to go when the header runs out of room — the
-   avatar alone still identifies the account and still opens the profile. */
+   avatar alone still identifies the account and still opens the menu. */
 @media (max-width: 720px) {
   .account-chip-name {
     display: none;
@@ -3160,6 +3246,13 @@ h2 {
 
   .account-chip {
     padding-right: 6px;
+  }
+
+  /* The header stacks at this width and the chip moves to the left edge, where
+     a list anchored to its right would open off the screen. */
+  .account-menu-list {
+    right: auto;
+    left: 0;
   }
 }
 
@@ -3534,18 +3627,39 @@ h2 {
   border-color: var(--color-blue-600);
 }
 
+/* The bin, and the check and cross that replace it. The box widens from one
+   button to two while the bin slides out to the right, clipped at the box's
+   edge so it leaves rather than fades, and the two answers come in from the
+   left a moment after. Every button stays mounted; `visibility` hides the ones
+   not in play, and flips only at the end of a hiding transition (its own delay)
+   so the slide is still seen. */
+.session-row-actions {
+  position: relative;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  margin-right: 10px;
+  overflow: hidden;
+  transition: width 0.25s ease;
+}
+
+.session-row-actions.is-confirming {
+  width: 68px;
+}
+
 /* Quiet until the row is pointed at or the button itself focused: a delete
    sitting in full colour on every line would be the loudest thing on a screen
    whose purpose is reading. It stays reachable by keyboard regardless — only
    the colour is held back, never the button. */
 .session-row-delete {
-  flex: 0 0 auto;
+  position: absolute;
+  top: 0;
+  right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 32px;
-  margin-right: 10px;
   border: none;
   border-radius: 50%;
   background: none;
@@ -3553,7 +3667,100 @@ h2 {
   color: var(--color-text-muted);
   cursor: pointer;
   opacity: 0.55;
-  transition: color 0.15s, background 0.15s, opacity 0.15s;
+  transition: color 0.15s, background 0.15s, opacity 0.15s, transform 0.25s ease,
+    visibility 0s;
+}
+
+.is-confirming .session-row-delete {
+  transform: translateX(110%);
+  visibility: hidden;
+  transition: color 0.15s, background 0.15s, opacity 0.15s, transform 0.25s ease,
+    visibility 0s linear 0.25s;
+}
+
+.session-row-yes,
+.session-row-no {
+  position: absolute;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-14px);
+  transition: transform 0.2s ease, opacity 0.15s, background 0.15s,
+    visibility 0s linear 0.2s;
+}
+
+.session-row-yes {
+  right: 36px;
+  background: var(--color-danger);
+  color: var(--color-surface);
+}
+
+.session-row-no {
+  right: 0;
+  background: var(--color-surface-selected);
+  color: var(--color-navy-900);
+}
+
+.is-confirming .session-row-yes,
+.is-confirming .session-row-no {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: transform 0.25s ease 0.08s, opacity 0.2s 0.08s, background 0.15s,
+    visibility 0s;
+}
+
+/* The cross a beat after the check, so the two read as arriving in order. */
+.is-confirming .session-row-no {
+  transition-delay: 0.14s, 0.14s, 0s, 0s;
+}
+
+.session-row-yes:hover {
+  background: #9a3a30;
+}
+
+.session-row-no:hover {
+  background: var(--color-border);
+}
+
+.session-row-yes[aria-busy="true"] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Inset, because the box clips anything drawn outside the buttons. */
+.session-row-yes:focus-visible,
+.session-row-no:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: -2px;
+}
+
+.session-row-error {
+  flex: 0 0 100%;
+  margin: 0;
+  padding: 0 1.5rem 12px;
+  font-size: 0.85rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-row-actions,
+  .session-row-delete,
+  .is-confirming .session-row-delete,
+  .session-row-yes,
+  .session-row-no,
+  .is-confirming .session-row-yes,
+  .is-confirming .session-row-no {
+    transition: none;
+  }
 }
 
 .session-item:hover .session-row-delete,
@@ -3570,47 +3777,6 @@ h2 {
 .session-row-delete:focus-visible {
   outline: 2px solid var(--color-blue-600);
   outline-offset: -2px;
-}
-
-/* Open confirmation: the bin stays in reach (clicking it again closes) and
-   shows which row the question below belongs to. */
-.session-row-delete[aria-expanded="true"] {
-  color: var(--color-danger);
-  opacity: 1;
-}
-
-/* Spans the full row underneath it, so the question and its answer are not
-   squeezed into the space the bin occupied. The side padding is the row's own,
-   so the question starts where the row's text does. */
-.session-row-confirm {
-  flex: 0 0 100%;
-  padding: 0 1.5rem 14px;
-}
-
-.session-row-confirm p {
-  margin: 0 0 0.75rem;
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
-.session-row-confirm-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.session-row-confirm .consent-button {
-  flex: 0 0 auto;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-}
-
-.session-row-confirm .cancel-button {
-  display: inline-block;
-  width: auto;
-  margin-top: 0;
-  padding: 0.5rem 0;
-  font-size: 0.9rem;
 }
 
 /* "There is more below", in the two places that say it: the training history
@@ -4622,24 +4788,10 @@ a.consent-button {
   margin-top: 2.75rem;
 }
 
-.progress-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 1rem;
-}
-
-.progress-section-head h2 {
-  margin: 0;
-}
-
 /* The same distance from every section heading to what it heads. A `.card`
    brings a 1.5rem top margin of its own, so the sections led by a card sat
    2.5rem under their heading and the ones led by tiles 1rem, and the page read
    as unevenly spaced without anyone being able to say why. */
-.progress-section-head + .card,
 .progress-section .feedback-section-head + .card {
   margin-top: 0;
 }
@@ -5804,29 +5956,6 @@ a.consent-button {
 }
 
 /* The header's plain text link, beside the account chip. */
-.header-link {
-  font-size: 0.9rem;
-  color: var(--color-navy-900);
-  text-decoration: none;
-  padding: 0.35rem 0.6rem;
-  border-radius: var(--radius-control);
-}
-
-.header-link:hover {
-  background: var(--color-surface-selected);
-}
-
-.header-link.is-active {
-  font-weight: 600;
-  color: var(--color-blue-600);
-}
-
-@media (max-width: 560px) {
-  .header-link {
-    display: none;
-  }
-}
-
 /* --- Training focus (F-61, ADR 0074) ------------------------------------ */
 /* The same picker in two frames: the first-run dialog and the profile card.
    Everything below styles the picker; only .focus-dialog belongs to the first
@@ -6049,26 +6178,6 @@ a.consent-button {
   background: var(--color-surface-selected);
 }
 
-/* Title and "i" on one line, the icon hugging the title rather than stretching
-   to the right edge, where it would sit against the check circle. Opened, the
-   panel takes a line of its own so the text runs the card's full width. */
-.focus-goal-head {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding-right: 30px; /* the check circle */
-}
-
-.focus-goal-head .info-details {
-  margin: 0;
-}
-
-.focus-goal-head .info-details[open] {
-  flex-basis: 100%;
-  margin-top: 0.25rem;
-}
-
 /* The real control, kept for the keyboard and the screen reader and drawn as
    the circle below. */
 .focus-goal-input {
@@ -6084,6 +6193,14 @@ a.consent-button {
 .focus-goal-caption {
   display: block;
   cursor: pointer;
+}
+
+/* The right gutter holds the check circle at the top and the "i" at the
+   bottom, so no line of text runs under either. */
+.focus-goal-title,
+.focus-goal-caption,
+.focus-goal .info-body {
+  padding-right: 26px;
 }
 
 /* Geometry comes from .choice-check, so this and a Persona card cannot drift.
@@ -6139,11 +6256,50 @@ a.consent-button {
   color: var(--color-text-muted);
 }
 
-/* Smaller than a standalone "i", because it sits inside a card rather than
-   under a section heading. Indented to the text, not to the checkbox. */
+/* The "i" in the bottom-right corner, drawn like `.card-info` on a Persona or
+   Scenario card: a 24px target around an 18px ring, centred in the same column
+   as the 22px check circle above it (both 21px from the right edge). The
+   summary is taken out of flow, so a closed <details> adds no height and an
+   opened one is only its text, under the caption. */
+.focus-goal .info-details {
+  margin: 0;
+}
+
 .focus-goal .info-summary {
-  font-size: 0.8rem;
-  font-weight: 500;
+  position: absolute;
+  right: 9px;
+  bottom: 9px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--color-navy-900);
+}
+
+.focus-goal .info-icon {
+  width: 18px;
+  height: 18px;
+  font-size: 0.65rem;
+  transition: background-color 0.2s;
+}
+
+.focus-goal .info-summary:hover .info-icon,
+.focus-goal .info-details[open] .info-icon {
+  background: var(--color-blue-100);
+}
+
+/* On the ring, as on `.card-info`, so the outline traces what is visible. */
+.focus-goal .info-summary:focus-visible {
+  outline: none;
+}
+
+.focus-goal .info-summary:focus-visible .info-icon {
+  outline: 2px solid var(--color-navy-900);
+  outline-offset: 2px;
+}
+
+.focus-goal .info-details[open] {
+  margin-bottom: 18px; /* keeps the last line clear of the "i" */
 }
 
 .focus-goal .info-body {

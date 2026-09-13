@@ -139,10 +139,7 @@ export default function Sparkline({
               <span className="sparkline-readout-value">
                 {formatPoint(series, point.value)}
               </span>{" "}
-              <span className="sparkline-readout-when">
-                {formatDate(point.at) ?? point.at}
-              </span>
-              <span className="sparkline-readout-where"> · {point.scenario}</span>
+              {formatDate(point.at) ?? point.at} · {point.scenario}
             </>
           )}
         </p>

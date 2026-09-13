@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 
 import { ApiError } from "../api";
 import {
@@ -24,6 +24,7 @@ import {
 } from "../scenarioLibrary";
 import { cx } from "../utils/cx";
 import ConfirmDialog from "./ConfirmDialog";
+import Modal from "./Modal";
 import ShareToggle from "./ShareToggle";
 
 interface ScenarioEditorProps {
@@ -136,26 +137,20 @@ export default function ScenarioEditor({
     (key) => draft[key] !== pristine.current[key],
   );
 
-  // Dismiss on Escape or a click on the backdrop outside the panel — the same
-  // "close without saving" as the Cancel button: blocked mid-save, and once a
+  // Escape or a click on the backdrop. An open question over the panel is
+  // closed first; otherwise the panel closes — blocked mid-save, and once a
   // field has been touched only after confirming through the in-panel dialog
   // (a native window.confirm would break out of the app's look).
-  const dismiss = useCallback(() => {
-    if (saving) return;
-    if (isDirty) setConfirmingClose(true);
-    else onClose();
-  }, [saving, isDirty, onClose]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (confirmingClose) setConfirmingClose(false);
-      else if (confirmingDelete) setConfirmingDelete(false);
-      else dismiss();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [dismiss, confirmingClose, confirmingDelete]);
+  const dismiss = () => {
+    if (confirmingClose) {
+      setConfirmingClose(false);
+    } else if (confirmingDelete) {
+      setConfirmingDelete(false);
+    } else if (!saving) {
+      if (isDirty) setConfirmingClose(true);
+      else onClose();
+    }
+  };
 
   // A file dropped anywhere but the zone below would otherwise be *opened* by
   // the browser, which navigates away from the editor and takes the unsaved
@@ -327,275 +322,261 @@ export default function ScenarioEditor({
   };
 
   return (
-    <div
-      className="editor-backdrop"
-      role="presentation"
-      onMouseDown={(e) => {
-        // Only a press that both starts and ends on the backdrop itself — not a
-        // text selection dragged out of the panel — counts as "click outside".
-        if (e.target === e.currentTarget && !confirmingClose && !confirmingDelete) dismiss();
-      }}
-    >
-      <div className="editor-panel" role="dialog" aria-modal="true" aria-labelledby="editor-title">
-        <div className="editor-scroll">
-          <h2 id="editor-title">
-            {isNew ? "Neues Szenario anlegen" : "Szenario bearbeiten"}
-          </h2>
-
-          {loading ? (
-            <p>Wird geladen …</p>
-          ) : (
-            <>
-              <div className="editor-fields">
-                {FIELDS.map((field) => {
-                  const value = draft[field.key];
-                  const limit = limits[field.key];
-                  const counter = (
-                    <span
-                      className={
-                        "editor-field-count" + (value.length >= limit ? " is-full" : "")
-                      }
-                      aria-hidden="true"
-                    >
-                      {value.length} / {limit}
-                    </span>
-                  );
-                  const caption = (
-                    <span>
-                      {field.label}
-                      {field.required && <span aria-hidden="true"> *</span>}
-                    </span>
-                  );
-                  return (
-                    <Fragment key={field.key}>
-                      {field.key === "case_facts" ? (
-                        <div className="editor-field">
-                          <label className="editor-field-label" htmlFor={factsId}>
-                            {caption}
-                            {counter}
-                          </label>
-
-                          {/* Typing them and dropping the documents in fill the
-                              same field, so they sit side by side at the same
-                              size with an "oder" between — not one under the
-                              other, which would read as a second step. */}
-                          <div className="facts-split">
-                            <textarea
-                              id={factsId}
-                              value={value}
-                              placeholder={field.placeholder}
-                              maxLength={limit}
-                              onChange={(e) =>
-                                setDraft((d) => ({ ...d, case_facts: e.target.value }))
-                              }
-                            />
-
-                            <span className="facts-split-or">oder</span>
-
-                            {/* A <label>, so a click anywhere in the zone opens
-                                the picker and the hidden input stays the
-                                keyboard's way in. */}
-                            <label
-                              className={cx(
-                                "pdf-dropzone",
-                                dragging && "is-dragging",
-                                pdfBusy && "is-busy",
-                              )}
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                if (!pdfBusy) setDragging(true);
-                              }}
-                              onDragLeave={(e) => {
-                                // Only when the pointer really left the zone —
-                                // crossing a child fires this too.
-                                if (
-                                  !e.currentTarget.contains(e.relatedTarget as Node | null)
-                                ) {
-                                  setDragging(false);
-                                }
-                              }}
-                              onDrop={(e) => {
-                                e.preventDefault();
-                                setDragging(false);
-                                if (pdfBusy) return;
-                                void handlePdfs(Array.from(e.dataTransfer.files));
-                              }}
-                            >
-                              <svg
-                                className="pdf-dropzone-cloud"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                aria-hidden="true"
-                              >
-                                <path d="M7 18.5a4.5 4.5 0 0 1-.7-8.95 5.5 5.5 0 0 1 10.64-1.1A4.25 4.25 0 0 1 17.6 18.5" />
-                                <path d="M12 21v-8.5" />
-                                <path d="m8.8 15.7 3.2-3.2 3.2 3.2" />
-                              </svg>
-
-                              <span className="pdf-dropzone-title">
-                                {pdfBusy
-                                  ? `PDFs werden ausgewertet … (${formatElapsed(pdfElapsed)})`
-                                  : "PDFs hierher ziehen"}
-                              </span>
-
-                              {!pdfBusy && (
-                                <span className="pdf-dropzone-browse">
-                                  Dateien durchsuchen
-                                </span>
-                              )}
-
-                              <input
-                                type="file"
-                                accept="application/pdf,.pdf"
-                                multiple
-                                disabled={pdfBusy}
-                                onChange={(e) => {
-                                  const files = Array.from(e.target.files ?? []);
-                                  e.target.value = ""; // allow re-selecting the same files
-                                  if (files.length > 0) void handlePdfs(files);
-                                }}
-                              />
-                            </label>
-                          </div>
-
-                          {pdfNote && <span className="pdf-upload-note">{pdfNote}</span>}
-                        </div>
-                      ) : (
-                        <label className="editor-field">
-                          <span className="editor-field-label">
-                            {caption}
-                            {counter}
-                          </span>
-                          {field.multiline ? (
-                            <textarea
-                              value={value}
-                              placeholder={field.placeholder}
-                              maxLength={limit}
-                              rows={3}
-                              onChange={(e) =>
-                                setDraft((d) => ({ ...d, [field.key]: e.target.value }))
-                              }
-                            />
-                          ) : (
-                            <input
-                              type="text"
-                              value={value}
-                              placeholder={field.placeholder}
-                              maxLength={limit}
-                              onChange={(e) =>
-                                setDraft((d) => ({ ...d, [field.key]: e.target.value }))
-                              }
-                            />
-                          )}
-                        </label>
-                      )}
-
-                      {field.key === "short_description" && (
-                        <label className="editor-field">
-                          <span className="editor-field-label">
-                            <span>
-                              Kategorie
-                              <span aria-hidden="true"> *</span>
-                            </span>
-                          </span>
-                          <select
-                            value={draft.category}
-                            onChange={(e) =>
-                              setDraft((d) => ({
-                                ...d,
-                                category: e.target.value as CategoryChoice,
-                              }))
-                            }
-                          >
-                            {/* Marked like the other answers that have to be
-                                given, and "Ohne Kategorie" is one of them —
-                                which is why it is not in `canSave`: the field
-                                cannot be left unanswered, because it starts on
-                                a valid answer. A Scenario that fits none of the
-                                four is better uncategorised than filed wrongly
-                                (ADR 0072); it then shows under "Alle" and under
-                                no category. */}
-                            <option value="">Ohne Kategorie</option>
-                            {CATEGORIES.map((c) => (
-                              <option key={c} value={c}>
-                                {CATEGORY_LABELS[c]}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </div>
-
-              {tenantName !== null && (
-                <ShareToggle
-                  visibility={visibility}
-                  onChange={handleShareToggle}
-                  label={`Mit ${tenantName} teilen`}
-                  hint="Kolleginnen und Kollegen sehen dieses Szenario dann in ihrer Bibliothek."
-                />
-              )}
-
-              {error && <p className="error">{error}</p>}
-
-              <div className="editor-actions">
-                {!isNew && (
-                  <button
-                    type="button"
-                    className="editor-delete"
-                    onClick={() => setConfirmingDelete(true)}
-                    disabled={saving}
-                  >
-                    Löschen
-                  </button>
-                )}
-                <span className="editor-actions-spacer" />
-                <button type="button" onClick={onClose} disabled={saving}>
-                  Abbrechen
-                </button>
-                <button
-                  type="button"
-                  className="editor-save"
-                  onClick={handleSave}
-                  disabled={!canSave}
-                >
-                  {saving ? "Speichert …" : "Speichern"}
-                </button>
-              </div>
-            </>
+    <Modal
+      labelledBy="editor-title"
+      onDismiss={dismiss}
+      overlay={
+        <>
+          {confirmingClose && (
+            <ConfirmDialog
+              title="Eingaben verwerfen?"
+              body="Deine Änderungen an diesem Szenario werden nicht gespeichert."
+              cancelLabel="Weiter bearbeiten"
+              confirmLabel="Verwerfen"
+              destructive
+              onCancel={() => setConfirmingClose(false)}
+              onConfirm={onClose}
+            />
           )}
-        </div>
-      </div>
 
-      {confirmingClose && (
-        <ConfirmDialog
-          title="Eingaben verwerfen?"
-          body="Deine Änderungen an diesem Szenario werden nicht gespeichert."
-          cancelLabel="Weiter bearbeiten"
-          confirmLabel="Verwerfen"
-          destructive
-          onCancel={() => setConfirmingClose(false)}
-          onConfirm={onClose}
-        />
-      )}
+          {confirmingDelete && (
+            <ConfirmDialog
+              title="Dieses Szenario wirklich löschen?"
+              body="Es verschwindet aus Ihrer Bibliothek. Bereits gespielte Trainings bleiben erhalten."
+              cancelLabel="Behalten"
+              confirmLabel="Löschen"
+              destructive
+              onCancel={() => setConfirmingDelete(false)}
+              onConfirm={() => void handleDelete()}
+            />
+          )}
+        </>
+      }
+    >
+      <h2 id="editor-title">{isNew ? "Neues Szenario anlegen" : "Szenario bearbeiten"}</h2>
 
-      {confirmingDelete && (
-        <ConfirmDialog
-          title="Dieses Szenario wirklich löschen?"
-          body="Es verschwindet aus Ihrer Bibliothek. Bereits gespielte Trainings bleiben erhalten."
-          cancelLabel="Behalten"
-          confirmLabel="Löschen"
-          destructive
-          onCancel={() => setConfirmingDelete(false)}
-          onConfirm={() => void handleDelete()}
-        />
+      {loading ? (
+        <p>Wird geladen …</p>
+      ) : (
+        <>
+          <div className="editor-fields">
+            {FIELDS.map((field) => {
+              const value = draft[field.key];
+              const limit = limits[field.key];
+              const counter = (
+                <span
+                  className={"editor-field-count" + (value.length >= limit ? " is-full" : "")}
+                  aria-hidden="true"
+                >
+                  {value.length} / {limit}
+                </span>
+              );
+              const caption = (
+                <span>
+                  {field.label}
+                  {field.required && <span aria-hidden="true"> *</span>}
+                </span>
+              );
+              return (
+                <Fragment key={field.key}>
+                  {field.key === "case_facts" ? (
+                    <div className="editor-field">
+                      <label className="editor-field-label" htmlFor={factsId}>
+                        {caption}
+                        {counter}
+                      </label>
+
+                      {/* Typing them and dropping the documents in fill the
+                          same field, so they sit side by side at the same
+                          size with an "oder" between — not one under the
+                          other, which would read as a second step. */}
+                      <div className="facts-split">
+                        <textarea
+                          id={factsId}
+                          value={value}
+                          placeholder={field.placeholder}
+                          maxLength={limit}
+                          onChange={(e) =>
+                            setDraft((d) => ({ ...d, case_facts: e.target.value }))
+                          }
+                        />
+
+                        <span className="facts-split-or">oder</span>
+
+                        {/* A <label>, so a click anywhere in the zone opens
+                            the picker and the hidden input stays the
+                            keyboard's way in. */}
+                        <label
+                          className={cx(
+                            "pdf-dropzone",
+                            dragging && "is-dragging",
+                            pdfBusy && "is-busy",
+                          )}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            if (!pdfBusy) setDragging(true);
+                          }}
+                          onDragLeave={(e) => {
+                            // Only when the pointer really left the zone —
+                            // crossing a child fires this too.
+                            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                              setDragging(false);
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setDragging(false);
+                            if (pdfBusy) return;
+                            void handlePdfs(Array.from(e.dataTransfer.files));
+                          }}
+                        >
+                          <svg
+                            className="pdf-dropzone-cloud"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M7 18.5a4.5 4.5 0 0 1-.7-8.95 5.5 5.5 0 0 1 10.64-1.1A4.25 4.25 0 0 1 17.6 18.5" />
+                            <path d="M12 21v-8.5" />
+                            <path d="m8.8 15.7 3.2-3.2 3.2 3.2" />
+                          </svg>
+
+                          <span className="pdf-dropzone-title">
+                            {pdfBusy
+                              ? `PDFs werden ausgewertet … (${formatElapsed(pdfElapsed)})`
+                              : "PDFs hierher ziehen"}
+                          </span>
+
+                          {!pdfBusy && (
+                            <span className="pdf-dropzone-browse">Dateien durchsuchen</span>
+                          )}
+
+                          <input
+                            type="file"
+                            accept="application/pdf,.pdf"
+                            multiple
+                            disabled={pdfBusy}
+                            onChange={(e) => {
+                              const files = Array.from(e.target.files ?? []);
+                              e.target.value = ""; // allow re-selecting the same files
+                              if (files.length > 0) void handlePdfs(files);
+                            }}
+                          />
+                        </label>
+                      </div>
+
+                      {pdfNote && <span className="pdf-upload-note">{pdfNote}</span>}
+                    </div>
+                  ) : (
+                    <label className="editor-field">
+                      <span className="editor-field-label">
+                        {caption}
+                        {counter}
+                      </span>
+                      {field.multiline ? (
+                        <textarea
+                          value={value}
+                          placeholder={field.placeholder}
+                          maxLength={limit}
+                          rows={3}
+                          onChange={(e) =>
+                            setDraft((d) => ({ ...d, [field.key]: e.target.value }))
+                          }
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={value}
+                          placeholder={field.placeholder}
+                          maxLength={limit}
+                          onChange={(e) =>
+                            setDraft((d) => ({ ...d, [field.key]: e.target.value }))
+                          }
+                        />
+                      )}
+                    </label>
+                  )}
+
+                  {field.key === "short_description" && (
+                    <label className="editor-field">
+                      <span className="editor-field-label">
+                        <span>
+                          Kategorie
+                          <span aria-hidden="true"> *</span>
+                        </span>
+                      </span>
+                      <select
+                        value={draft.category}
+                        onChange={(e) =>
+                          setDraft((d) => ({
+                            ...d,
+                            category: e.target.value as CategoryChoice,
+                          }))
+                        }
+                      >
+                        {/* Marked like the other answers that have to be
+                            given, and "Ohne Kategorie" is one of them —
+                            which is why it is not in `canSave`: the field
+                            cannot be left unanswered, because it starts on
+                            a valid answer. A Scenario that fits none of the
+                            four is better uncategorised than filed wrongly
+                            (ADR 0072); it then shows under "Alle" and under
+                            no category. */}
+                        <option value="">Ohne Kategorie</option>
+                        {CATEGORIES.map((c) => (
+                          <option key={c} value={c}>
+                            {CATEGORY_LABELS[c]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </Fragment>
+              );
+            })}
+          </div>
+
+          {tenantName !== null && (
+            <ShareToggle
+              visibility={visibility}
+              onChange={handleShareToggle}
+              label={`Mit ${tenantName} teilen`}
+              hint="Kolleginnen und Kollegen sehen dieses Szenario dann in ihrer Bibliothek."
+            />
+          )}
+
+          {error && <p className="error">{error}</p>}
+
+          <div className="editor-actions">
+            {!isNew && (
+              <button
+                type="button"
+                className="editor-delete"
+                onClick={() => setConfirmingDelete(true)}
+                disabled={saving}
+              >
+                Löschen
+              </button>
+            )}
+            <span className="editor-actions-spacer" />
+            <button type="button" onClick={onClose} disabled={saving}>
+              Abbrechen
+            </button>
+            <button
+              type="button"
+              className="editor-save"
+              onClick={handleSave}
+              disabled={!canSave}
+            >
+              {saving ? "Speichert …" : "Speichern"}
+            </button>
+          </div>
+        </>
       )}
-    </div>
+    </Modal>
   );
 }

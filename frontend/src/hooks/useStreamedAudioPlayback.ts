@@ -19,7 +19,7 @@ interface ScheduledChunk {
  *
  * Starts "held": chunks arriving before `activate()` is called are buffered,
  * not played — the opening Turn is generated in the background while the
- * user is still on the mic-check screen (see CallFlow), and should only
+ * user is still on the mic-check screen (see App.tsx), and should only
  * start playing once the call screen actually appears. `activate()` flushes
  * whatever's buffered and switches to playing chunks live from then on.
  *
