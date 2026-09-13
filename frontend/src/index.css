@@ -6178,26 +6178,6 @@ a.consent-button {
   background: var(--color-surface-selected);
 }
 
-/* Title and "i" on one line, the icon hugging the title rather than stretching
-   to the right edge, where it would sit against the check circle. Opened, the
-   panel takes a line of its own so the text runs the card's full width. */
-.focus-goal-head {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding-right: 30px; /* the check circle */
-}
-
-.focus-goal-head .info-details {
-  margin: 0;
-}
-
-.focus-goal-head .info-details[open] {
-  flex-basis: 100%;
-  margin-top: 0.25rem;
-}
-
 /* The real control, kept for the keyboard and the screen reader and drawn as
    the circle below. */
 .focus-goal-input {
@@ -6213,6 +6193,14 @@ a.consent-button {
 .focus-goal-caption {
   display: block;
   cursor: pointer;
+}
+
+/* The right gutter holds the check circle at the top and the "i" at the
+   bottom, so no line of text runs under either. */
+.focus-goal-title,
+.focus-goal-caption,
+.focus-goal .info-body {
+  padding-right: 26px;
 }
 
 /* Geometry comes from .choice-check, so this and a Persona card cannot drift.
@@ -6268,11 +6256,50 @@ a.consent-button {
   color: var(--color-text-muted);
 }
 
-/* Smaller than a standalone "i", because it sits inside a card rather than
-   under a section heading. Indented to the text, not to the checkbox. */
+/* The "i" in the bottom-right corner, drawn like `.card-info` on a Persona or
+   Scenario card: a 24px target around an 18px ring, centred in the same column
+   as the 22px check circle above it (both 21px from the right edge). The
+   summary is taken out of flow, so a closed <details> adds no height and an
+   opened one is only its text, under the caption. */
+.focus-goal .info-details {
+  margin: 0;
+}
+
 .focus-goal .info-summary {
-  font-size: 0.8rem;
-  font-weight: 500;
+  position: absolute;
+  right: 9px;
+  bottom: 9px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--color-navy-900);
+}
+
+.focus-goal .info-icon {
+  width: 18px;
+  height: 18px;
+  font-size: 0.65rem;
+  transition: background-color 0.2s;
+}
+
+.focus-goal .info-summary:hover .info-icon,
+.focus-goal .info-details[open] .info-icon {
+  background: var(--color-blue-100);
+}
+
+/* On the ring, as on `.card-info`, so the outline traces what is visible. */
+.focus-goal .info-summary:focus-visible {
+  outline: none;
+}
+
+.focus-goal .info-summary:focus-visible .info-icon {
+  outline: 2px solid var(--color-navy-900);
+  outline-offset: 2px;
+}
+
+.focus-goal .info-details[open] {
+  margin-bottom: 18px; /* keeps the last line clear of the "i" */
 }
 
 .focus-goal .info-body {
