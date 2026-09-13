@@ -346,3 +346,40 @@ def _started():
     from tests.conftest import SESSION_STARTED  # pylint: disable=import-outside-toplevel
 
     return SESSION_STARTED
+
+
+def test_a_withdrawal_under_an_older_version_still_blocks_the_write(
+    app_database: str, db_session: DbSession  # pylint: disable=unused-argument
+) -> None:
+    """A stale *no* is not asked again (ADR 0066's exception), and it must not
+    become a yes by going stale either.
+
+    `decision_required` is False for a withdrawal without looking at the
+    version -- that is the exception, and the ADR only said so after a review
+    found the paragraph claiming the opposite. `allows_storage` does look at
+    the version, and the two answers have to point the same way: nothing
+    stored, and the dialog left closed.
+    """
+    from backend.session import persistence  # pylint: disable=import-outside-toplevel
+
+    db_session.add(
+        Consent(
+            subject_id=TEST_AUTH.sub,
+            purpose=consent_service.PURPOSE,
+            version="an-older-wording",
+            status="withdrawn",
+            decided_at=datetime.now(UTC),
+        )
+    )
+    db_session.commit()
+
+    state = consent_service.current(db_session, TEST_AUTH.sub)
+    assert state.allows_storage is False, "a stale no is still a no"
+    assert state.decision_required is False, "and is not asked again"
+
+    written = persistence.persist_session(
+        uuid.uuid4(), TEST_AUTH.sub, _persona(), _scenario(), TURNS, _started(), "user",
+    )
+
+    assert written is None
+    assert db_session.query(Session).count() == 0

@@ -25,6 +25,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session as DbSession
 
+from backend import consent
 from backend.db import models as db_models
 from backend.db.seed_data import FOCUS_GROUP_NAMES, TRAINING_ROLE_CATALOGUE
 
@@ -182,9 +183,22 @@ def set_selection(
         raise UnknownChoice(f"unknown role: {role}")
     strange = [kind for kind in kinds if kind not in db_models.SCENARIO_CATEGORIES]
     if strange:
-        raise UnknownChoice(f"unknown call type(s): {', '.join(strange)}")
+        # Only the first few are named. The goals are capped at MAX_GOALS before
+        # they are looked up, the call types are not, and the whole list came
+        # back in the 400's body -- a request with a hundred thousand invented
+        # types answered with a body the same size. Nothing leaks and React
+        # escapes it; it is amplification, and naming three is as useful to the
+        # caller as naming all of them.
+        more = f" (and {len(strange) - 3} more)" if len(strange) > 3 else ""
+        raise UnknownChoice(f"unknown call type(s): {', '.join(strange[:3])}{more}")
 
     now = datetime.now(UTC)
+    # Same lock the consent write takes, for the same reason: `focus_selection`
+    # is unique per subject and this reads before it inserts, so two requests
+    # from one person -- a double press on the first-run dialog -- both find no
+    # row and both insert. The loser gets an IntegrityError and the dialog
+    # reports a failure for a save that worked.
+    consent.lock_subject(db, subject_id)
     record = (
         db.query(db_models.FocusSelection)
         .filter_by(subject_id=subject_id)

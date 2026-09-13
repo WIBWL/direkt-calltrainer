@@ -31,6 +31,7 @@ plaintext is not reached either. Both are recorded in ADR 0066.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 import uuid
 
 from sqlalchemy.orm import Session as DbSession
@@ -86,6 +87,34 @@ def reverses_of(db: DbSession, sessions: list[db_models.Session]) -> list[int]:
     ]
 
 
+def orphaned_reverses(db: DbSession, boundary: datetime) -> list[int]:
+    """Reverse Scenarios older than `boundary` whose origin Session is gone.
+
+    `origin_session_id` is `ON DELETE SET NULL`, so a reverse loses its one link
+    to the training it replays the moment that training is deleted. Every sweep
+    finds its candidates through that link, which means a reverse that survived
+    one run -- because a younger Session was still played on it -- was invisible
+    to every run after it. So was one whose origin the User deleted by hand, a
+    path that deliberately leaves the reverse behind.
+
+    Both were promised to go "on a later run". Neither did, and what outlives
+    the period is `reverse_brief`: German prose written from that person's own
+    wrap-up (ADR 0067/0070). Found here by their own age instead, and handed to
+    `delete_unreferenced_reverses` like any other candidate, so one still being
+    played is still spared.
+    """
+    return [
+        row.scenario_id
+        for row in db.query(db_models.Scenario)
+        .filter(
+            db_models.Scenario.reverse.is_(True),
+            db_models.Scenario.origin_session_id.is_(None),
+            db_models.Scenario.created_at < boundary,
+        )
+        .all()
+    ]
+
+
 def delete_unreferenced_reverses(db: DbSession, scenario_ids: list[int]) -> int:
     """Delete those of `scenario_ids` no Session points at any more.
 
@@ -98,9 +127,10 @@ def delete_unreferenced_reverses(db: DbSession, scenario_ids: list[int]) -> int:
     whole sweep down with it.
 
     Those rows are left for a later run rather than special-cased: once the
-    younger Session expires too, nothing references the reverse and it goes. A
-    reverse somebody keeps playing therefore outlives the period, which is the
-    right answer -- it is in use, not merely lying around.
+    younger Session expires too, nothing references the reverse and it goes --
+    which is what `orphaned_reverses` is for. A reverse somebody keeps playing
+    therefore outlives the period, which is the right answer: it is in use, not
+    merely lying around.
 
     Hard-deleted, not deactivated, for the reason `_delete_reverses` gives: the
     briefing is written from that person's own wrap-up, and deactivation keeps

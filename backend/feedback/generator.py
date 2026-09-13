@@ -815,7 +815,8 @@ def _looks_like_json(text: str) -> bool:
     `"summary":`."""
     if text[:1] in ("{", "["):
         return True
-    return any(f'"{field}"' in text[:200] for field in _Wrapup.model_fields)
+    fields: tuple[str, ...] = tuple(_Wrapup.model_fields)  # pylint: disable=not-an-iterable
+    return any(f'"{field}"' in text[:200] for field in fields)
 
 
 # --- Storage --------------------------------------------------------------
