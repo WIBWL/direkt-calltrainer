@@ -1,6 +1,7 @@
 .DS_Store
 .agents/
 .claude/
+docs/plans/
 .env
 .env.*
 !.env.example
@@ -14,4 +15,3 @@ frontend/public/vad
 logs/
 site/
 skills-lock.json
-test/

@@ -2,7 +2,11 @@
 
 ## Status
 
-Proposed (extends ADR 0045; follows the split of ADR 0043)
+Accepted. Extends ADR 0045 (which created the hole this fills) and follows the
+display/prompt split of ADR 0043. Built as `scenario.briefing` in migration
+`c8d1f3a67b40`; the briefing is shown on the microphone check as decided below
+*and* on the setup screen, where picking a Scenario is itself a decision the
+card's one line does not carry.
 
 ## Context
 

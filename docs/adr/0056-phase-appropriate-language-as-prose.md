@@ -1,4 +1,4 @@
-# ADR 0056: Phasengerechte Sprache Is a Paragraph, Not a Metric
+# ADR 0056: Phase-Appropriate Language Is a Paragraph, Not a Metric
 
 ## Status
 

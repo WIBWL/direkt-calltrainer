@@ -5,6 +5,21 @@ import { encodeWav } from "../utils/wav";
 
 const SAMPLE_RATE = 16000;
 
+/** Mirrors vad-web's own default constraints (real-time-vad.js's
+ * getStream/resumeStream) so picking a device doesn't also drop echo
+ * cancellation etc. for the whole call. */
+function getMicStream(deviceId: string | null): Promise<MediaStream> {
+  return navigator.mediaDevices.getUserMedia({
+    audio: {
+      channelCount: 1,
+      echoCancellation: true,
+      autoGainControl: true,
+      noiseSuppression: true,
+      ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+    },
+  });
+}
+
 /**
  * Arms the microphone for the whole call — including while the Persona is
  * "thinking"/"speaking" — so the user can barge in at any time.
@@ -12,10 +27,18 @@ const SAMPLE_RATE = 16000;
 export function useMicrophoneVAD(
   onSpeechRealStart: () => void,
   onTurnAudio: (blob: Blob, mimeType: string) => void,
+  deviceId: string | null,
 ) {
   const [micError, setMicError] = useState<string | null>(null);
   const vadRef = useRef<Awaited<ReturnType<typeof MicVAD.new>> | null>(null);
   const initRef = useRef<Promise<void> | null>(null);
+
+  // MicVAD.new() below runs once, ever (see initRef), so its getStream/
+  // resumeStream closures capture whatever deviceId was current at that
+  // point -- reading it from a ref instead means a later selection still
+  // takes effect on the next pause()/start() cycle (e.g. the mute toggle).
+  const deviceIdRef = useRef(deviceId);
+  deviceIdRef.current = deviceId;
 
   const ensureVad = useCallback(async () => {
     if (!initRef.current) {
@@ -23,6 +46,8 @@ export function useMicrophoneVAD(
         baseAssetPath: "/vad/",
         onnxWASMBasePath: "/vad/",
         startOnLoad: false,
+        getStream: () => getMicStream(deviceIdRef.current),
+        resumeStream: () => getMicStream(deviceIdRef.current),
         // vad-web's own defaults (0.3 / 0.25) leave only a 0.05 gap between
         // the positive/negative thresholds — narrower than Silero's own
         // authors recommend (a 0.15 gap, per vad-web's frame-processor
@@ -38,6 +63,22 @@ export function useMicrophoneVAD(
         negativeSpeechThreshold: 0.35,
         // Raised from vad-web's 400ms default to filter out quiet/brief "hmm"s.
         minSpeechMs: 500,
+        // How long the silence after a sentence has to last before the turn is
+        // sent. vad-web's default is 1400 ms, and it was never chosen here --
+        // it is simply what the library does. It is also the single largest
+        // piece of the delay between the user finishing and hearing a reply:
+        // the whole server pipeline (STT + reply + first audio) was measured at
+        // about a second, so the browser was waiting longer than everything
+        // else together.
+        //
+        // 1000 ms is short enough to stop the pause feeling like a hang and
+        // long enough to sit out a breath in the middle of a sentence, which is
+        // what this guards: cut it too fine and a user who pauses to think has
+        // their turn sent half-finished, and the persona answers a fragment.
+        // Raised here from 700 for exactly that reason -- someone working out
+        // what to say next needs a moment to do it, and being cut off mid-
+        // thought is the failure that costs a turn rather than a second.
+        redemptionMs: 1000,
         onSpeechStart: () => console.debug("[VAD] speech start (unconfirmed)"),
         // Fires once sustained past minSpeechMs -- use this for barge-in, not onSpeechStart above.
         onSpeechRealStart: () => {

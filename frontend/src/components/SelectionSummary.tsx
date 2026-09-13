@@ -3,21 +3,18 @@ interface SelectionSummaryProps {
   scenario: string;
   persona: string;
   language: string;
-  voice: string;
 }
 
 export default function SelectionSummary({
   scenario,
   persona,
   language,
-  voice,
 }: SelectionSummaryProps) {
   // Keeping the entries in one array avoids repeating the same markup.
   const summaryItems = [
     { label: "Szenario", value: scenario },
     { label: "Gesprächspartner", value: persona },
     { label: "Sprache", value: language },
-    { label: "Stimme", value: voice },
   ];
 
   return (

@@ -13,12 +13,32 @@ The person who performs Sessions, practicing their telephone communication skill
 _Avoid_: Trainee, learner, customer
 
 **Scenario**:
-The situational context configured for a Session — e.g. the caller's reason for calling or goal. Independent of the simulated counterpart's character traits (see Persona).
-_Avoid_: Persona, situation
+The situational context configured for a Session — e.g. the caller's reason for calling or goal. Independent of the simulated counterpart's character traits (see Persona). Carries a **Category**: what kind of call it is, one of `operations`, `requirements`, `pricing` or `closing` (docs/adr/0064), four values refining F-03's three call contexts. Display and filter only, never reaches the prompt. Optional: a Scenario may have none.
+_Avoid_: Persona, situation. For the Category: type, Szenariotyp (the free-text `scenario_type` column it replaces is gone; see docs/adr/0064)
+
+**Briefing**:
+The Scenario's text addressed to the User rather than to the Persona (docs/adr/0054): the role they answer the phone in, the room they have (what may be offered, promised or escalated), and what counts as a good outcome. The counterpart of the four prompt fields, which brief the simulated caller — one case described from two sides, and they have to agree, or the call cannot be won. Never reaches the prompt: an objective handed to the caller is one the caller pursues, which is the defect docs/adr/0045 removed. Shown before the Session starts, on the setup screen and again on the microphone check. Optional: a Scenario may have none, and then briefs nobody.
+_Avoid_: Instructions, task, script (it never says what to say), Kurzbeschreibung (that is the card's teaser, and it speaks about the caller)
+
+**Follow-up Scenario** (_Folgeszenario_):
+The Scenario the User has drafted from a finished Session's Feedback, at most one per Session and only where the Feedback names improvement points (docs/adr/0069). Asked for, like a Reverse: it was written unbidden by the Feedback worker until that ADR's amendment. A Scenario in every other respect — the User owns it, edits it, shares it and plays it against any Persona — so it is a category, not a kind: it is set apart only by the Session it came from, and it leaves the library when that Session is deleted. Not a repeat of the call it came from: a new case in the same subject area, built so that what the Feedback asked for is the way through it.
+_Avoid_: Follow-up call, next session, exercise
+
+**Focus Goal** (_Fokusziel_):
+One entry of a shipped catalogue of things a User can choose to work on, e.g. speaking pace, handling objections, empathy (docs/adr/0076). A User focuses on at most five at a time, or on none, and the selection belongs to the User rather than to a Session: it says what should be emphasised, never what happened. Each one carries an internal `evidence` value (`measured` / `mixed` / `interpretive`) recording how far it can be derived from a recording today. That is planning information for the analysis work; it is never shown, and the goal is that all of them become `measured`.
+_Avoid_: Learning goal, objective, KPI, target (there is no target value — see docs/adr/0004, docs/adr/0051). Not the Scenario's `call_goal`, which is what the simulated caller wants out of one call.
+
+**Reverse** (_Rollentausch_):
+A Session that replays one finished Session with the roles swapped: the User is the caller, and the Persona answers the phone and takes the side the User held. Stored as a Scenario of its own and asked for in the same way as a Follow-up Scenario — but where that one is *written from* a Session, this one *replays* it: it carries that Session's case verbatim plus a **Reverse Brief**, the German briefing the User reads while the call runs (docs/adr/0070). A row is at most one of the two. Not a mode: it is a marker on a row, so a reverse can be selected again like any other Scenario, and unlike a Follow-up Scenario it is neither edited nor shared.
+_Avoid_: Rollentausch (in code and on the wire — it stays "reverse"; the UI label is German), replay, re-run, mirror, role-play
 
 **Persona**:
 The character traits of the AI-simulated conversation partner within a Session — e.g. impatient, calm, confrontational. Combined independently with a Scenario.
 _Avoid_: Scenario, character, counterpart
+
+**Tenant**:
+The company a User belongs to, and the owner of the Scenarios its members author (docs/adr/0060). One of three independent properties of an authored Scenario: authorship (who wrote it, docs/adr/0058), ownership (which Tenant it belongs to — none, for a shipped built-in), and visibility (who may see it). Distinct from the User: colleagues share a Tenant. The pilot Tenants are Solox and APPOLLO. Personas are curated, not authored, so they have no Tenant.
+_Avoid_: Mandant (in code/schema — it stays "tenant"), organization, company, account
 
 **Language**:
 The language a Session's simulated conversation is conducted in. Not a Session parameter of its own: it follows from the selected Persona, which carries exactly one language and voice (docs/adr/0043, superseding the earlier per-Session model). Only German is supported so far.

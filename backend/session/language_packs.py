@@ -45,6 +45,17 @@ class LanguagePack:
 
     # The language's English name, interpolated into the English prompt frame.
     name_en: str
+    # Two short exchanges demonstrating register, sentence length and pacing in
+    # the target language -- never how a call should unfold. Four constraints
+    # shape them. They start mid-call and show no opening, because openings are
+    # what `opening_examples` is for: a second, smaller pool of opening lines
+    # here competes with it, and the model drew a name out of the smaller one
+    # ("Ostermann mein Name" reached a call whose Persona was called something
+    # else). For the same reason they name nobody at all. They sit in a domain
+    # no Scenario uses, because an example close to a Scenario's own subject
+    # gets reused as content instead of read as form. And they stay concrete,
+    # naming a date and a number, because that is the behaviour the frame asks
+    # for and a vague example would demonstrate the opposite.
     example_exchange: str
     # Several structurally different ways to open a call, in the target
     # language. The frame used to carry a single English one ('e.g. "Hi, this
@@ -53,6 +64,14 @@ class LanguagePack:
     # Frage...". Several varied openers spread that distribution; one anchor
     # collapses it.
     opening_examples: str
+    # The same, for a reverse (ADR 0070), where the Persona picks up instead of
+    # calling: several ways to answer a phone. A separate pool rather than a
+    # note on `opening_examples`, for the reason that field's comment gives --
+    # the model copies the shape of whatever examples it is shown, and an
+    # answering line and an opening line are different shapes. They say nothing
+    # about any case, because a callee who names one has invented the caller's
+    # reason before hearing it.
+    answering_examples: str
     # Quoted user phrases the English frame points at, in the target language.
     user_closing_examples: str
     vague_reassurance_examples: str
@@ -75,7 +94,55 @@ class LanguagePack:
     # middle of, which is the expensive direction of error -- a missed signal
     # costs one extra turn, a false one cuts the conversation off.
     closing_veto_re: re.Pattern[str]
+    # Matched against the *persona's* last sentence when it carries an
+    # unprompted [CALL_END] (ADR 0037): a demand or an open question there
+    # means the model lost the thread, not that the call is over. Narrow, like
+    # the user-side patterns, and a farewell in the same sentence overrides it.
+    still_pressing_re: re.Pattern[str]
+    # Whisper does not return an empty transcript on near-silence; it invents
+    # a fixed phrase in the audio's language ("Vielen Dank.", "Amen.", a
+    # subtitle credit). A whole transcript matching one of these is not a
+    # Turn (docs/research/model-parameters.md; ADR 0071). Whole-message
+    # patterns only: "Nein, danke, das passt" is a real answer.
+    stt_phantom_re: re.Pattern[str]
+    # A question word at the start makes an open question, anything else a
+    # closed one. Anchored, and deliberately shallow: a question word buried
+    # further in counts as closed rather than being guessed at.
+    open_question_re: re.Pattern[str]
+    # Lexical fillers only: real words, so they survive transcription. Hesitation
+    # sounds ("äh") do not -- Whisper drops them -- and so are not listed.
+    filler_re: re.Pattern[str]
+    # The three parts of an opening turn (F-63). The name is unknown, so
+    # self_intro_re looks for the frames it is said in, followed by a capital.
+    greeting_re: re.Pattern[str]
+    self_intro_re: re.Pattern[str]
+    # The third part depends on who rang: the called side offers help, the
+    # caller states the concern (a reverse, ADR 0070).
+    offer_re: re.Pattern[str]
+    concern_re: re.Pattern[str]
+    # The three parts of a closing (ADR 0089), read in the user's last two
+    # turns: a recap of what was settled, a concrete next step, a farewell.
+    # Unlike the opening they do not depend on who rang -- whoever ends a call
+    # well sums up, agrees what happens next and says goodbye. `sign_off_re` is
+    # wider than `farewell_re` above on purpose: that one decides live whether
+    # the call is over, where a false match cuts a call short, and "einen
+    # schönen Tag noch" is a farewell here without being a request to hang up.
+    recap_re: re.Pattern[str]
+    agreement_re: re.Pattern[str]
+    sign_off_re: re.Pattern[str]
     fallback_closing_line: str
+
+
+# Whisper's non-speech annotations -- "*Titelm*", "[Musik]", "(Applaus)" -- are
+# language-independent; the phantom phrases are per pack.
+_ANNOTATION_RE = re.compile(r"^\s*[*\[(][^*\]\)]*[*\])]\s*[.!?]*\s*$")
+
+
+def is_phantom(pack: LanguagePack, user_text: str) -> bool:
+    """True if the transcript is Whisper inventing speech on near-silence -- a
+    VAD misfire, not a Turn (ADR 0071)."""
+    stripped = user_text.strip()
+    return not stripped or bool(_ANNOTATION_RE.match(stripped)) or bool(pack.stt_phantom_re.match(stripped))
 
 
 def signals_closing(pack: LanguagePack, user_text: str) -> bool:
@@ -99,20 +166,26 @@ def signals_closing(pack: LanguagePack, user_text: str) -> bool:
 _GERMAN = LanguagePack(
     name_en="German",
     example_exchange=(
-        "Example of the register, sentence length and pacing to aim for — this "
-        "says nothing about how a call should unfold, only how it should "
-        "sound. Invent your own content that fits YOUR actual scenario and "
-        "character; never reuse this text or its specifics. The dialogue is in "
-        "the language you must speak:\n"
-        '[Caller opens] "Guten Tag, hier ist Frau Beck von der Buchhaltung, '
-        'ich habe eine Frage zu unserer letzten Rechnung."\n'
-        '[Other person] "Guten Tag Frau Beck, worum geht es denn genau?"\n'
-        '[Caller] "Wir wurden für März doppelt belastet, einmal am 3. und '
-        'einmal am 17."\n'
-        '[Other person] "Das schaue ich mir an. Können Sie mir die '
-        'Rechnungsnummer nennen?"\n'
-        '[Caller] "Die habe ich gerade nicht griffbereit, aber es war ein '
-        'Betrag über 480 Euro."'
+        "Two examples of the register, sentence length and pacing to aim for. "
+        "They say nothing about how a call should unfold, only how it should "
+        "sound, and they pick up mid-call: how to open one is not their "
+        "subject. They are deliberately about matters that have nothing to do "
+        "with yours, and they name nobody -- the only name in your call is "
+        "your own, and their dates and figures are not yours either. Invent "
+        "your own content, fitting YOUR scenario and character. The dialogues "
+        "are in the language you must speak:\n"
+        '[Caller] "Die Lieferung sollte letzten Donnerstag kommen, da ist '
+        'aber nichts angekommen."\n'
+        '[Other person] "Das sehe ich mir an. Haben Sie eine Auftragsnummer?"\n'
+        '[Caller] "Die 4-7-2-9-1. Zugesagt war telefonisch der 14."\n'
+        '[Other person] "Ich sehe hier einen neuen Termin, den 29."\n'
+        '[Caller] "Das sind zwei Wochen später. Bekomme ich das schriftlich?"\n'
+        "\n"
+        '[Caller] "Ist im Kurs am Mittwoch noch ein Platz frei?"\n'
+        '[Other person] "Welcher Starttermin denn?"\n'
+        '[Caller] "Der Achtwochenkurs ab dem 6. Oktober."\n'
+        '[Other person] "Da sind noch zwei Plätze frei."\n'
+        '[Caller] "Gut. Bis wann muss ich mich entscheiden?"'
     ),
     opening_examples=(
         "Guten Tag, Beck mein Name, ich rufe an wegen unserer letzten Rechnung.\n"
@@ -122,6 +195,12 @@ _GERMAN = LanguagePack(
         "Woche.\n"
         "Hallo, Sebastian Reuter hier. Ich wollte nochmal wegen der Lieferung "
         "nachhaken."
+    ),
+    answering_examples=(
+        "Guten Tag, Sie sprechen mit Beck, was kann ich für Sie tun?\n"
+        "Kundenservice, Lehmann am Apparat — guten Tag.\n"
+        "Winkler, schönen guten Tag. Wie kann ich Ihnen helfen?\n"
+        "Ja, guten Tag, hier ist Reuter. Was liegt an?"
     ),
     user_closing_examples='"das reicht mir"/"das wär\'s"',
     vague_reassurance_examples='"ich kümmere mich darum", "ich stelle das klar"',
@@ -141,7 +220,13 @@ _GERMAN = LanguagePack(
         # "keine Zeit mehr *für* X" is a complaint about X, not a request to
         # hang up -- and complaint Scenarios are exactly where it turns up.
         r"rufe? (sie |dich )?(nochmal|später|zurück)|keine zeit (mehr|gerade)\b(?!\s*f(ü|ue)r)|"
-        r"muss (jetzt |gleich )?(auflegen|los|schluss machen)|gespräch (beenden|abbrechen))",
+        r"muss (jetzt |gleich )?(auflegen|los|schluss machen)|gespräch (beenden|abbrechen)|"
+        # The inflected forms -- "ich beende das Gespräch jetzt", "ich lege
+        # jetzt auf" -- were said to the persona and missed. The look-ahead
+        # keeps "ich beende das Gespräch nicht" out, since the veto only reads
+        # the clause *before* a match.
+        r"beende\w*(?:\s+\w+){0,3}\s+(gespräch|telefonat)(?!\s+(noch\s+)?nicht\b)|"
+        r"lege?\s+(jetzt\s+|dann\s+|gleich\s+)?auf\b)",
         re.IGNORECASE,
     ),
     regreeting_re=re.compile(
@@ -166,6 +251,86 @@ _GERMAN = LanguagePack(
     closing_veto_re=re.compile(
         r"\b(nicht|kein\w*|nie|niemals|bevor|ehe)\b", re.IGNORECASE
     ),
+    # "Ich will wissen, wann ..." / "Ich muss wissen ..." / "Wann wird ..." --
+    # the shapes the persona's demands took in the calls that ended on them.
+    still_pressing_re=re.compile(
+        r"\b(ich (will|möchte|muss|brauche|erwarte)\b|wann (wird|ist|kommt|funktioniert|bekomme)\b|"
+        r"ich warte (auf|noch)\b)",
+        re.IGNORECASE,
+    ),
+    stt_phantom_re=re.compile(
+        r"^\W*(vielen dank( fürs zuschauen)?|amen|untertitel\w*( (des|der|von) [\w\s,.-]+)?|"
+        r"copyright [\w\s,.-]+)\W*$",
+        re.IGNORECASE,
+    ),
+    # Longest alternatives first, so "womit" is not shadowed by "wo"; leading
+    # fillers are skipped ("Und was brauchen Sie?").
+    open_question_re=re.compile(
+        r"^(?:(?:und|aber|also|okay|gut|ja|nun|jetzt)[\s,]+){0,2}"
+        r"(wieso|weshalb|warum|wofür|womit|worauf|worum|wohin|woher|welche[rnsm]?|"
+        r"wessen|wer|wen|wem|was|wann|wo|wie)\b",
+        re.IGNORECASE,
+    ),
+    # Word-bounded, so "halt" does not match "Haltung" or "enthalten".
+    filler_re=re.compile(
+        r"\b(quasi|sozusagen|gewissermaßen|irgendwie|eigentlich|halt|im\s+prinzip|"
+        r"sag\s+ich\s+mal|sagen\s+wir\s+mal|ehrlich\s+gesagt)\b",
+        re.IGNORECASE,
+    ),
+    greeting_re=re.compile(
+        r"\b(guten\s+(tag|morgen|abend)|hallo|grüß\s+gott|moin|servus|herzlich\s+willkommen)\b",
+        re.IGNORECASE,
+    ),
+    # "hier ist Schmidt", not "hier ist alles" or "hier ist Ihr Ansprechpartner".
+    self_intro_re=re.compile(
+        r"\bmein\s+name\s+ist\s+(?-i:[A-ZÄÖÜ])"
+        r"|\bhier\s+(?:ist|spricht)\s+(?!ihr\b|ihre\b|sie\b)(?-i:[A-ZÄÖÜ])"
+        r"|\b(?-i:[A-ZÄÖÜ])\w+\s+am\s+apparat\b",
+        re.IGNORECASE,
+    ),
+    offer_re=re.compile(
+        r"\b((was|wie)\s+(kann|darf)\s+ich\s+(für\s+sie|ihnen)\s+(tun|helfen|weiterhelfen)"
+        r"|wie\s+kann\s+ich\s+(ihnen\s+)?(helfen|weiterhelfen)"
+        r"|womit\s+kann\s+ich\s+(ihnen\s+)?(helfen|dienen)|worum\s+geht\s+es"
+        r"|was\s+führt\s+sie\s+zu\s+(mir|uns)|(was\s+ist\s+)?ihr\s+anliegen)",
+        re.IGNORECASE,
+    ),
+    concern_re=re.compile(
+        r"\b(ich\s+rufe\s+(sie\s+)?an\s*,?\s*(wegen|weil|bezüglich)|es\s+geht\s+um"
+        r"|ich\s+melde\s+mich\s+wegen|(grund|anlass)\s+meines\s+anrufs)",
+        re.IGNORECASE,
+    ),
+    # "Ich fasse das noch einmal kurz zusammen", "wir haben also vereinbart",
+    # "halten wir fest". A few words may sit between the verb and its particle.
+    recap_re=re.compile(
+        r"\b(zusammen(gefasst|fassend)|zusammenzufassen|fasse\s+(\w+\s+){0,4}zusammen"
+        r"|halten\s+wir\s+(\w+\s+){0,2}fest"
+        r"|(wir\s+haben|haben\s+wir)\s+(\w+\s+){0,3}(vereinbart|besprochen|festgehalten|abgemacht)"
+        r"|(ich\s+)?wiederhole\s+(\w+\s+){0,2}(kurz|noch\s*(ein)?mal))",
+        re.IGNORECASE,
+    ),
+    # A next step with something concrete in it: a first-person action ("ich
+    # schicke Ihnen", "ich rufe Sie zurück"), what the other side will get, the
+    # words that settle it, or a deadline. Deliberately not "ich kümmere mich
+    # darum": that is the vague reassurance `vague_reassurance_examples` warns the
+    # Persona about, and it commits to nothing a caller could hold anyone to.
+    agreement_re=re.compile(
+        r"\b(ich\s+(schicke|sende|maile|leite|buche|trage|reserviere|bestätige)\w*\b"
+        r"|ich\s+(melde|rufe)\s+(\w+\s+){0,3}(zurück|an|bei\s+ihnen|bis)"
+        r"|sie\s+(bekommen|erhalten|hören)\s+(\w+\s+){0,3}(von\s+mir|bis|morgen|heute)"
+        r"|(nächste[nr]?|weitere[nr]?)\s+schritt|(so\s+)?verbleiben\s+wir|wir\s+verbleiben"
+        # "so" is required: "wie machen wir das?" is a question, not a deal.
+        r"|so\s+machen\s+wir\s+(es|das)|machen\s+wir\s+(es|das)\s+so|abgemacht"
+        r"|bis\s+(spätestens\s+)?(montag|dienstag|mittwoch|donnerstag|freitag|morgen|übermorgen"
+        r"|ende\s+der\s+woche|nächste[nr]?\s+woche|zum\s+\d|\d))",
+        re.IGNORECASE,
+    ),
+    sign_off_re=re.compile(
+        r"\b(tschüss|auf\s+wiederhören|auf\s+wiedersehen|wiederhören|ciao"
+        r"|schönen\s+(tag|abend|nachmittag|feierabend)|schönes\s+wochenende"
+        r"|danke\s+(\w+\s+){0,2}für\s+(ihren\s+anruf|das\s+gespräch|ihre\s+zeit|ihre\s+geduld))",
+        re.IGNORECASE,
+    ),
     fallback_closing_line="Vielen Dank für Ihre Zeit. Auf Wiederhören.",
 )
 
@@ -173,19 +338,26 @@ _GERMAN = LanguagePack(
 _ENGLISH = LanguagePack(
     name_en="English",
     example_exchange=(
-        "Example of the register, sentence length and pacing to aim for — this "
-        "says nothing about how a call should unfold, only how it should "
-        "sound. Invent your own content that fits YOUR actual scenario and "
-        "character; never reuse this text or its specifics. The dialogue is in "
-        "the language you must speak:\n"
-        '[Caller opens] "Good morning, this is Claire Hughes from accounts, '
-        'I have got a question about our last invoice."\n'
-        '[Other person] "Good morning Ms Hughes, what is it about exactly?"\n'
-        '[Caller] "We were charged twice for March, once on the 3rd and once '
-        'on the 17th."\n'
-        '[Other person] "Let me look into that. Could you give me the invoice '
-        'number?"\n'
-        '[Caller] "I have not got it to hand, but it was around 480 pounds."'
+        "Two examples of the register, sentence length and pacing to aim for. "
+        "They say nothing about how a call should unfold, only how it should "
+        "sound, and they pick up mid-call: how to open one is not their "
+        "subject. They are deliberately about matters that have nothing to do "
+        "with yours, and they name nobody -- the only name in your call is "
+        "your own, and their dates and figures are not yours either. Invent "
+        "your own content, fitting YOUR scenario and character. The dialogues "
+        "are in the language you must speak:\n"
+        '[Caller] "The delivery was meant to arrive last Thursday and '
+        'nothing turned up."\n'
+        '[Other person] "Let me check. Do you have an order number?"\n'
+        '[Caller] "It is 4-7-2-9-1. I was given the 14th over the phone."\n'
+        '[Other person] "I have a new date here, the 29th."\n'
+        '[Caller] "That is two weeks later. Can I have that in writing?"\n'
+        "\n"
+        '[Caller] "Is there still a place on the Wednesday course?"\n'
+        '[Other person] "Which start date do you mean?"\n'
+        '[Caller] "The eight-week one, from 6 October."\n'
+        '[Other person] "There are two places left."\n'
+        '[Caller] "Good. When do I need to decide by?"'
     ),
     opening_examples=(
         "Hello, my name's Claire Hughes — I'm ringing about last month's "
@@ -196,6 +368,12 @@ _ENGLISH = LanguagePack(
         "last week.\n"
         "Hi, Peter Ross calling. I wanted to follow up on the delivery we "
         "discussed."
+    ),
+    answering_examples=(
+        "Good morning, Claire Hughes speaking — how can I help?\n"
+        "Customer service, Daniel here. What can I do for you?\n"
+        "Hello, Nina Alvarez speaking.\n"
+        "Good afternoon, Ross speaking — how can I help you today?"
     ),
     user_closing_examples='"that\'s all I needed"/"that\'ll do"',
     vague_reassurance_examples='"I\'ll look into it", "I\'ll get that sorted"',
@@ -229,6 +407,63 @@ _ENGLISH = LanguagePack(
         re.IGNORECASE,
     ),
     closing_veto_re=re.compile(r"\bnot\b|n'?t\b|\bnever\b|\bbefore\b", re.IGNORECASE),
+    still_pressing_re=re.compile(
+        r"\b(i (want|need|must|expect|require)\b|when (will|is|does|can)\b|i'?m (still )?waiting\b)",
+        re.IGNORECASE,
+    ),
+    stt_phantom_re=re.compile(
+        r"^\W*(thank you( for watching)?|thanks for watching|amen|subtitles? by [\w\s,.-]+|"
+        r"copyright [\w\s,.-]+)\W*$",
+        re.IGNORECASE,
+    ),
+    open_question_re=re.compile(
+        r"^(?:(?:and|but|so|okay|well|now)[\s,]+){0,2}"
+        r"(whose|whom|who|what|when|where|why|which|how)\b",
+        re.IGNORECASE,
+    ),
+    # Not "like": far more often a verb or a preposition than a filler.
+    filler_re=re.compile(
+        r"\b(basically|literally|actually|kind\s+of|sort\s+of|you\s+know|i\s+mean|"
+        r"so\s+to\s+speak)\b",
+        re.IGNORECASE,
+    ),
+    greeting_re=re.compile(r"\b(hello|hi|good\s+(morning|afternoon|evening))\b", re.IGNORECASE),
+    # "I'm Alice" is the commonest of them. German has no safe equivalent:
+    # nouns are capitalised, so "ich bin Kunde" would pass for a name.
+    self_intro_re=re.compile(
+        r"\bmy\s+name\s+is\s+(?-i:[A-Z])|\bthis\s+is\s+(?-i:[A-Z])|\b(?-i:[A-Z])\w+\s+speaking\b"
+        r"|\bi(?:'m|\s+am)\s+(?-i:[A-Z])",
+        re.IGNORECASE,
+    ),
+    offer_re=re.compile(
+        r"\b(how\s+(can|may)\s+i\s+(help|assist)|what\s+can\s+i\s+do\s+for\s+you"
+        r"|what('s|\s+is)\s+(it|this)\s+about)",
+        re.IGNORECASE,
+    ),
+    concern_re=re.compile(
+        r"\b(i('m|\s+am)\s+calling\s+(about|because|regarding)"
+        r"|the\s+reason\s+i('m|\s+am)\s+calling|it's\s+about)",
+        re.IGNORECASE,
+    ),
+    recap_re=re.compile(
+        r"\b(to\s+(sum\s+up|summari[sz]e|recap)|let\s+me\s+(just\s+)?(sum\s+up|summari[sz]e|recap)"
+        r"|just\s+to\s+(recap|confirm)|in\s+summary"
+        r"|(so\s+)?we('ve|\s+have)\s+(\w+\s+){0,2}(agreed|discussed|settled))",
+        re.IGNORECASE,
+    ),
+    agreement_re=re.compile(
+        r"\b(i('ll|\s+will)\s+(send|email|call|ring|book|confirm|forward|get\s+back)"
+        r"|you('ll|\s+will)\s+(get|receive|hear)|next\s+step"
+        r"|(we('ll|\s+will)|let's)\s+(go\s+with|leave\s+it)"
+        r"|by\s+(monday|tuesday|wednesday|thursday|friday|tomorrow|the\s+end\s+of|next\s+week|\d))",
+        re.IGNORECASE,
+    ),
+    sign_off_re=re.compile(
+        r"\b(goodbye|good\s+bye|bye|take\s+care"
+        r"|have\s+a\s+(good|nice|great|lovely)\s+(day|one|evening|weekend)"
+        r"|thanks?(\s+you)?\s+(\w+\s+){0,2}for\s+(calling|your\s+time|the\s+call))",
+        re.IGNORECASE,
+    ),
     fallback_closing_line="Thank you for your time. Goodbye.",
 )
 

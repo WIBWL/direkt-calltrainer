@@ -4,6 +4,13 @@
 
 Accepted (partially supersedes ADR 0021's TTS half — see below)
 
+**Status update:** the `DEBUG` flag named below is now `SKIP_KUGELAUDIO` — same
+meaning, same default, renamed for the leg it moves, alongside `GEMINI`
+(ADR 0074). A switch called DEBUG reads like general verbosity and is the one an
+operator might set on a whim, while what it actually does is trade the hosted
+voice for a fallback measured 2–3x slower. The Gemini removal decided below was
+itself reversed by ADR 0074.
+
 ## Context
 
 TTS previously toggled between the DiReKT gateway's Voxtral model and KugelAudio via a static `TTS_BACKEND` env var — an either-or choice made once at deploy time, with no runtime fallback if the chosen backend failed. Separately, an undocumented `LLM_BACKEND=gemini` escape hatch let dialogue generation run against Google Gemini's OpenAI-compatible endpoint instead of DiReKT; it was never the default and, in practice, was never adopted.

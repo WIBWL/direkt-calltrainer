@@ -22,6 +22,14 @@ what the seed *wrote* — which is exactly what makes comparing against them a
 meaningful assertion rather than a tautology.
 """
 
+# pylint: disable=duplicate-code
+# Fixture data is repeated per test module on purpose: a test carrying its own
+# Turns shows what it ran against when it fails, and sharing them would let a
+# change made for one test quietly alter another.
+
+
+import uuid
+
 import httpx
 import pytest
 
@@ -36,6 +44,12 @@ from backend.db.seed_data import SCENARIOS as SEEDED_SCENARIOS
 from backend.db.session import session_scope
 
 # pylint: disable=missing-function-docstring,redefined-outer-name
+
+# The Personas actually on offer. A seed entry may carry `active: False` while
+# something it needs to run is still missing (a KugelAudio voice, today), and
+# `library.list_personas` filters those out -- so the endpoint serves a subset
+# of the seed, and these tests compare against that subset.
+OFFERED_PERSONAS = [p for p in SEEDED_PERSONAS if p.get("active", True)]
 
 
 @pytest.fixture
@@ -57,16 +71,21 @@ async def test_personas_endpoint_lists_every_persona_with_card_fields(client):
     resp = await client.get("/api/personas")
     assert resp.status_code == 200
     body = resp.json()
-    assert len(body) == len(SEEDED_PERSONAS)
-    # Keyed rather than zipped: the endpoint orders by name, the seed by nothing
-    # in particular, and neither ordering is what this test is about.
-    by_id = {entry["id"]: entry for entry in body}
-    for persona in SEEDED_PERSONAS:
-        assert by_id[persona["id"]] == {
-            "id": persona["id"],
-            "name": persona["name"],
-            "role": persona["role_label"],
-            "language": LANGUAGE_NAMES[persona["language_id"]],
+    assert len(body) == len(OFFERED_PERSONAS)
+    # Keyed by name: `id` on the wire is the extern_id UUID now (ADR 0058), not
+    # the seed slug, and the endpoint orders by name while the seed does not.
+    by_name = {entry["name"]: entry for entry in body}
+    for persona in OFFERED_PERSONAS:
+        card = by_name[persona["name"]]
+        assert uuid.UUID(card["id"])  # a valid opaque id, not the slug
+        assert card["role"] == persona["role_label"]
+        assert card["language"] == LANGUAGE_NAMES[persona["language_id"]]
+        assert card["language_code"] == persona["language_id"]
+        # `avatar_url` is the portrait's path and `language_code` the flag's;
+        # both are display, neither is prompt. No authoring fields, since
+        # Personas are curated (ADR 0058).
+        assert set(card) == {
+            "id", "name", "role", "language", "language_code", "avatar_url",
         }
         assert persona["name"] and persona["role_label"], "a card needs a visible name and role"
 
@@ -76,12 +95,61 @@ async def test_personas_endpoint_serves_the_label_not_the_prompt_role(client):
     fields stay on the server."""
     body = (await client.get("/api/personas")).json()
     served = {e["role"] for e in body}
-    assert served == {p["role_label"] for p in SEEDED_PERSONAS}
+    assert served == {p["role_label"] for p in OFFERED_PERSONAS}
     for persona in SEEDED_PERSONAS:
         assert persona["role"] not in served
         assert persona["traits"] not in served
     for entry in body:
         assert "traits" not in entry and "behavior" not in entry
+
+
+async def test_persona_detail_serves_the_german_display_text(client):
+    """F-44 / ADR 0043: the info panel behind a card is fed by
+    `GET /api/personas/{id}`, and every text on it is the UI-language
+    display field -- never the English prompt field beside it."""
+    cards = (await client.get("/api/personas")).json()
+    card = next(c for c in cards if c["name"] == "Marcel Kropp")
+
+    resp = await client.get(f"/api/personas/{card['id']}")
+    assert resp.status_code == 200
+    detail = resp.json()
+
+    seeded = next(p for p in SEEDED_PERSONAS if p["name"] == "Marcel Kropp")
+    assert detail["role"] == seeded["role_label"]
+    assert detail["traits"] == seeded["traits_label"]
+    assert detail["training_goal"] == seeded["training_goal"]
+    assert detail["objections"] == seeded["objection_labels"]
+    assert set(detail) == {
+        "id", "name", "role", "language", "avatar_url", "traits", "training_goal",
+        "objections",
+    }
+
+
+async def test_persona_detail_withholds_the_english_prompt_fields(client):
+    """ADR 0043, the same rule the card route follows: `role`, `traits`,
+    `behavior` and an objection's English `text` brief the model and stay on
+    the server. The panel would be the obvious place to leak them, because
+    it shows a field of each name."""
+    cards = (await client.get("/api/personas")).json()
+    served = []
+    for card in cards:
+        detail = (await client.get(f"/api/personas/{card['id']}")).json()
+        served.append(detail["traits"])
+        served.extend(detail["objections"])
+        assert "behavior" not in detail
+
+    for persona in SEEDED_PERSONAS:
+        assert persona["traits"] not in served
+        assert persona["behavior"] not in served
+        for objection in persona["objections"]:
+            assert objection not in served
+
+
+async def test_persona_detail_404s_for_an_unknown_id(client):
+    """An id that is not a Persona's answers 404, exactly as an inactive
+    one does -- an inactive Persona is not on offer either."""
+    resp = await client.get(f"/api/personas/{uuid.uuid4()}")
+    assert resp.status_code == 404
 
 
 async def test_scenarios_endpoint_lists_every_scenario_with_its_teaser(client):
@@ -90,13 +158,16 @@ async def test_scenarios_endpoint_lists_every_scenario_with_its_teaser(client):
     assert resp.status_code == 200
     body = resp.json()
     assert len(body) == len(SEEDED_SCENARIOS)
-    by_id = {entry["id"]: entry for entry in body}
+    by_name = {entry["name"]: entry for entry in body}
     for scenario in SEEDED_SCENARIOS:
-        assert by_id[scenario["id"]] == {
-            "id": scenario["id"],
-            "name": scenario["name"],
-            "short_description": scenario["short_description"],
-        }
+        card = by_name[scenario["name"]]
+        assert uuid.UUID(card["id"])
+        assert card["short_description"] == scenario["short_description"]
+        assert card["origin"] == "builtin"
+        assert card["category"] == scenario["category"]
+        # ADR 0054: the trainee's own briefing rides on the card, because the
+        # setup screen and the microphone check both read it from this list.
+        assert card["briefing"] == scenario["briefing"]
 
 
 async def test_scenarios_endpoint_withholds_the_english_call_context(client):
@@ -116,10 +187,17 @@ async def test_scenarios_endpoint_withholds_the_case(client):
     exercise they are about to practise."""
     body = (await client.get("/api/scenarios")).json()
     for entry in body:
-        assert set(entry) == {"id", "name", "short_description"}
+        assert set(entry) == {
+            "id", "name", "short_description", "briefing", "category", "origin",
+            "shared", "follow_up",
+            # ADR 0070. Neither is prompt input: one is a casting marker,
+            # the other names a Session the caller already owns.
+            "reverse", "origin_session",
+            # F-62: which picked goals a suggestion rests on -- the User's own.
+            "recommendation",
+        }
         assert "case_facts" not in entry
         assert "call_goal" not in entry
-        assert "success_condition" not in entry
 
 
 async def test_a_deactivated_scenario_is_not_offered(client):
@@ -177,3 +255,19 @@ async def test_setup_lists_require_a_token(client):
     assert (await client.get("/api/personas")).status_code == 401
     assert (await client.get("/api/scenarios")).status_code == 401
     assert (await client.get("/health")).status_code == 200
+
+
+async def test_scenario_cards_carry_a_category_from_the_closed_vocabulary(client):
+    """ADR 0072: the card carries the F-03 call context the library's category
+    filter runs on, and it is a value from the vocabulary the CHECK constraint
+    enforces, not the free text it replaces."""
+    body = (await client.get("/api/scenarios")).json()
+    for entry in body:
+        assert entry["category"] in db_models.SCENARIO_CATEGORIES
+
+
+async def test_every_category_is_selectable(client):
+    """F-03: the library covers every call context, so none of the filter's
+    options is empty on a fresh install."""
+    body = (await client.get("/api/scenarios")).json()
+    assert {entry["category"] for entry in body} == set(db_models.SCENARIO_CATEGORIES)

@@ -22,10 +22,15 @@ from sqlalchemy.orm import sessionmaker
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = "5432"
 
-# Any process that provisions the database takes this lock first, so the app
-# and the worker starting together serialise instead of racing. Held by one
-# process at a time and never nested, so migrating and seeding can share it:
-# each acquires it, finishes, and releases before the other step begins.
+# Any process that provisions the database takes this lock first, so two of
+# them starting together serialise instead of racing: the app scaled past one
+# instance, or an instance booting while someone runs
+# scripts/seed_reference_data.py by hand. The worker is not one of them -- it
+# starts the RQ loop and nothing else, and it cannot meet an unmigrated schema
+# either, because Redis holds no volume and the queue is empty until the app
+# fills it. Held by one process at a time and never nested, so migrating and
+# seeding can share it: each acquires it, finishes, and releases before the
+# other step begins.
 PROVISION_LOCK_KEY = 8_243_119
 
 POOL_SIZE = 5

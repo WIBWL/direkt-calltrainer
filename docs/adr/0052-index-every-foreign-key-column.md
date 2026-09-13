@@ -20,6 +20,12 @@ We index all of them rather than only the ones on a known path. A selective rule
 
 Indexes that are *not* foreign keys remain out of scope, and ADR 0028's reasoning still governs them: `session.subject_id` in particular stays unindexed until authentication (ADR 0009) makes per-user history possible at all.
 
+That exception has since been taken up. ADR 0009 landed, `subject_id` holds the real Keycloak `sub`, and ADR 0064's history endpoint filters on that column and on nothing else — the "real query pattern rather than a guess" ADR 0028 asked to wait for. It is indexed as of migration `18f5098dfb1b`. The rule stated above is unchanged: this is a second index added for a named read path, not a licence to index on suspicion.
+
+Three columns stand in that exception today, and the list has to be kept complete here, because a rule whose exceptions nobody tracks cannot be checked: `session.subject_id` (the history), `consent.subject_id` (the newest decision for a subject, read on every write that needs consent) and `AuthoredContent.created_by` on `scenario` and `persona` (a User's own rows). Each one names its read path at the column. The two `subject_id` columns on `retention_preference` and `focus_selection` are `unique` rather than `index=True`, which indexes them as a side effect of the constraint they need anyway.
+
+The converse follows from the same reasoning and is easier to get wrong: where a unique constraint already leads with a foreign-key column, `index=True` beside it is a second index on the same column and is left off — `turn.session_id`, `measurement.session_id`, both `focus_selection*.selection_id` and `scenario.origin_session_id`. `test_every_foreign_key_column_is_indexed` passes either way, since it reads the leading column of any index, so this one is on the reviewer.
+
 ## Consequences
 
 Deleting a Session no longer scans its child tables, and reading one back uses an index instead of a sequential scan — both matter more as stored Sessions accumulate, which is exactly what ADR 0034 set up. The rule is uniform, so new tables inherit it without a fresh discussion, and its violation is caught by a test rather than by review.

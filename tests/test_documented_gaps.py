@@ -1,21 +1,23 @@
-"""Guards for features that the docs describe but the MVP does NOT yet
-implement. These tests assert the *current* state on purpose: when one
-starts failing, the corresponding feature has landed and needs its own
-proper feature tests (and this guard removed).
+"""Guards for features that the docs describe but the application does NOT yet
+implement. These tests assert the *current* state on purpose: when one starts
+failing, the corresponding feature has landed and needs its own proper feature
+tests (and this guard removed).
 
-  F-13 / F-48   progress history across sessions: auth (ADR 0009) and
-                persistence (ADR 0034) are both built, but nothing reads a
-                user's earlier Sessions
-  F-53          cross-session evaluation dashboard: not built
-  F-56          UI language switch (DE/EN): not built
-  F-58 / F-34   user-authored / document-derived scenarios: not built
+  F-56          UI language switch (DE/EN): not built. Each Persona has one
+                fixed language (ADR 0043) and the interface itself is German
+                throughout, so there is nothing to toggle yet.
+
+Removed guards, each because the feature landed and brought its own tests:
+F-13/F-48 (the history and the progress view -- `test_session_history.py`) and
+F-58/F-34 (authored and document-derived Scenarios -- `test_scenario_documents.py`,
+`test_persona_scenario_library.py`). The history guard is worth a note: it
+watched for `/api/history` and `/api/feedback`, and the feature shipped as
+`GET /api/sessions`, so it never failed and went on reading as a live guard
+long after what it guarded was gone. A current-state guard has to name the
+route the feature would actually take, or it only guards a spelling.
 """
 
 from pathlib import Path
-
-import pytest
-
-from backend.app import app
 
 # pylint: disable=missing-function-docstring
 
@@ -32,11 +34,3 @@ def test_frontend_has_no_ui_language_switch_yet():
     joined = "\n".join(_read(p.relative_to(REPO)) for p in src_files).lower()
     assert "i18n" not in joined
     assert "usetranslation" not in joined
-
-
-@pytest.mark.parametrize("endpoint", ["/api/feedback", "/api/history"])
-def test_no_cross_session_history_endpoints_are_registered(endpoint):
-    """F-13/F-48/F-53: only the Session just finished is readable, via
-    /api/sessions/{extern_id} (ADR 0050). There is no history."""
-    routes = {getattr(r, "path", None) for r in app.routes}
-    assert endpoint not in routes

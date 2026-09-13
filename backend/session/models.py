@@ -5,19 +5,20 @@ The events are internal — `backend/api/session_ws.py` is their only consumer,
 turning each into one wire message. Separate types, not dicts, so a missing
 branch there is obvious.
 
-This module owns the two readings of a finished Session: `utterances` puts what
-was said on a timeline, and `conversation` folds the measurements into the
-facts the Session's statistics are derived from. Both live here because both
-are questions about a *sequence* of Turns, which is what a Turn's fields alone
-cannot answer.
+What a running call writes, and nothing that reads a finished one. The two
+readings of a finished Session -- `utterances` on a timeline, `conversation`
+folded into the facts the statistics come from -- are in
+`backend/feedback/calls.py`, together with the record they produce. They were
+here until the direction of that dependency was the wrong way round: the live
+turn loop imported the ORM and the whole analysis package to name one result
+type. Nothing in this module may import from `backend.feedback` except
+`acoustics`, which measures during the call rather than after it.
 """
 
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
 from backend.feedback.acoustics import Pause
-from backend.feedback.metrics import Conversation
 
 
 @dataclass
@@ -28,6 +29,16 @@ class Turn:  # pylint: disable=too-many-instance-attributes
     seq: int
     persona_text: str = ""
     user_text: str = ""
+    # True once the user talked over this Turn's Persona reply and only the
+    # heard part was kept (ADR 0035). Kept off `persona_text` so the LLM history
+    # and the metrics never see it -- `utterances()` is the only reader, adding
+    # the visible "[unterbrochen]" marker to the transcript line.
+    persona_interrupted: bool = False
+    # What had been synthesized but not yet played when the user cut in (F-51).
+    # Kept out of `persona_text` and out of the model's history on purpose
+    # (ADR 0035 keeps both to the heard words); it exists so the wrap-up can
+    # show what the Persona had been about to say.
+    persona_unheard: str = ""
 
     # The two utterances placed on the Session's timeline, in milliseconds from
     # its start; None until that utterance has happened. The Persona's window is
@@ -36,7 +47,22 @@ class Turn:  # pylint: disable=too-many-instance-attributes
     user_offset_ms: int | None = None
     user_end_ms: int | None = None
     persona_offset_ms: int | None = None
+    # Where the Persona's audio stopped being *heard*: the end of what was
+    # dispatched, or the played position where a barge-in cut it (ADR 0035).
+    # This is the speaking time the metrics divide by.
     persona_end_ms: int | None = None
+    # Where it would have stopped had nobody cut in. Never trimmed, and never
+    # shown: the two are the same on an ordinary Turn and differ by exactly
+    # what the user did not hear on an interrupted one.
+    #
+    # Both are needed, and one was doing both jobs. F-51 asks "did the Persona
+    # have more to say", which is a statement about the audio that was sent;
+    # F-53's Redeanteil asks how long it was heard for. Trimming the single
+    # field for the second silently turned the first into a measurement of the
+    # browser's voice-detection delay -- the gap between the user starting to
+    # speak and the cut arriving -- and the drill-down then told the User their
+    # partner "had 0.7 seconds left" about a reply with nine seconds in it.
+    persona_dispatched_end_ms: int | None = None
 
     # Paraverbal facts about the user's speech (ADR 0048), taken while the
     # audio was still in memory and already rebased onto the Session's
@@ -44,8 +70,8 @@ class Turn:  # pylint: disable=too-many-instance-attributes
     # several fragments, needs no special case once the Session is folded up.
     #
     # How long the recording ran, and how much of that was speech rather than
-    # silence. Redeanteil divides by the first (the Persona's side is audio
-    # duration too), Sprechtempo by the second.
+    # silence. talk share divides by the first (the Persona's side is audio
+    # duration too), speaking pace by the second.
     user_speech_ms: int = 0
     user_phonation_ms: int = 0
     # False once any fragment of this Turn failed to measure: its words still
@@ -54,90 +80,9 @@ class Turn:  # pylint: disable=too-many-instance-attributes
     user_acoustics_complete: bool = True
     pauses: list[Pause] = field(default_factory=list)
     loudness_db: list[float | None] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
-class Utterance:
-    """One side of one exchange, on the Session's timeline."""
-
-    speaker: Literal["user", "persona"]
-    text: str
-    offset_ms: int
-    duration_ms: int | None
-
-
-def utterances(turns: Sequence[Turn]) -> list[Utterance]:
-    """The exchanges flattened into single-speaker utterances, in the order spoken.
-
-    Within one Turn the user speaks first: their text is the reply to the
-    *previous* Turn's Persona line, and this Turn's Persona line answers it.
-    Empty sides are skipped -- the opening Turn has no user text, and an
-    interrupted one may have no Persona text.
-
-    The single place that knows this ordering: both the Transcript sent over
-    the WebSocket and the persisted Turn rows are built from it.
-    """
-    spoken: list[Utterance] = []
-    for turn in turns:
-        if turn.user_text:
-            spoken.append(Utterance(
-                "user", turn.user_text, turn.user_offset_ms or 0,
-                _span(turn.user_offset_ms, turn.user_end_ms),
-            ))
-        if turn.persona_text:
-            spoken.append(Utterance(
-                "persona", turn.persona_text, turn.persona_offset_ms or 0,
-                _span(turn.persona_offset_ms, turn.persona_end_ms),
-            ))
-    return spoken
-
-
-def conversation(turns: Sequence[Turn]) -> Conversation:
-    """Fold the finished call into the facts its statistics are derived from.
-
-    Reaction time is the one measure that spans two Turns: the user's reply in
-    Turn N answers the Persona line of Turn N-1, so it is counted from that
-    line's end. Everything the machine did in between -- generating, then
-    synthesizing -- is outside the window by construction (ADR 0051).
-    """
-    reactions: list[int] = []
-    pauses: list[Pause] = []
-    loudness: list[float | None] = []
-    user_ms = user_phonation = persona_ms = 0
-    persona_stopped: int | None = None
-
-    for turn in turns:
-        # An unmeasured Turn's offset is the *end* of the user's speech, which
-        # read as a reaction time would be inflated by the whole utterance.
-        if (turn.user_acoustics_complete and
-                turn.user_offset_ms is not None and
-                persona_stopped is not None):
-            reactions.append(max(0, turn.user_offset_ms - persona_stopped))
-        user_ms += turn.user_speech_ms
-        user_phonation += turn.user_phonation_ms
-        pauses.extend(turn.pauses)
-        loudness.extend(turn.loudness_db)
-        persona_ms += _span(turn.persona_offset_ms, turn.persona_end_ms) or 0
-        persona_stopped = turn.persona_end_ms or persona_stopped
-
-    return Conversation(
-        user_text=" ".join(turn.user_text for turn in turns if turn.user_text),
-        user_speech_ms=user_ms,
-        user_phonation_ms=user_phonation,
-        # Only Turns the user spoke in: the opening Turn has no audio to measure.
-        user_acoustics_complete=all(
-            turn.user_acoustics_complete for turn in turns if turn.user_text
-        ),
-        persona_speech_ms=persona_ms,
-        reactions_ms=tuple(reactions),
-        pauses=tuple(pauses),
-        loudness_db=tuple(loudness),
-    )
-
-
-def _span(start: int | None, end: int | None) -> int | None:
-    """How long an utterance lasted, where both of its ends are known."""
-    return None if start is None or end is None else max(0, end - start)
+    # The pitch curve on the same grid as the loudness one (F-35), so the two
+    # concatenate identically across Turns.
+    pitch_hz: list[float | None] = field(default_factory=list)
 
 
 @dataclass

@@ -33,11 +33,11 @@ For development, add `--watch` (`docker compose up --build --watch`) to have the
 
 `docker compose up` brings its own Keycloak on `http://localhost:18081` and imports `keycloak/direkt-realm.json` — the `calltrainer-frontend` client and three fixed users:
 
-| user | password |
-|---|---|
-| `alice` | `alice` |
-| `bob` | `bob` |
-| `carol` | `carol` |
+| user | password | company (`tenant`) |
+|---|---|---|
+| `niklas` | `niklas` | Solox |
+| `mathias` | `mathias` | Solox |
+| `eberhard` | `eberhard` | APPOLLO |
 
 Opening `http://localhost:8391` redirects to Keycloak; log in as any of them. There is nothing to configure and no roles — a valid token is all the app checks (ADR 0009).
 

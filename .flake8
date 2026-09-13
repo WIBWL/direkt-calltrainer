@@ -19,4 +19,12 @@ exclude =
     .venv,
     __pycache__,
     frontend/node_modules,
-    backend/db/migrations/versions
+    backend/db/migrations/versions,
+    test
+
+# When an editor lints one migration file by its full path, `exclude` above does
+# not apply (flake8 only filters files it discovers itself, not ones passed
+# explicitly). autogenerate's continuation-line layout under op.create_table
+# trips the whole E12x family; ignore it there, the same call `exclude` makes.
+per-file-ignores =
+    backend/db/migrations/versions/*: E12

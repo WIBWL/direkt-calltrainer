@@ -23,7 +23,7 @@ improvements are taken for free.
 | `.env` / `.env.example` | `KUGELAUDIO_MODEL`: `kugel-2-turbo` → `kugel-3` | Measured (n=12): `kugel-3` matches turbo on time‑to‑first‑audio and is **faster on full synthesis** (839 ms vs 890 ms first chunk, 1136 ms vs 1356 ms mid). `kugel-2-turbo` is a deprecated id (`ka.models.list()` returns only `kugel-3`). The "turbo is faster" intuition does not hold here. |
 | `backend/clients/tts.py` + `backend/session/orchestrator.py` | **New `synthesize_stream`** — `stream_async` per sentence chunk, **each `AudioChunk` forwarded to the client as it arrives** instead of buffering the chunk into one WAV. The one‑chunk‑deep `asyncio.Task` pipeline (`_drain_if_pending`) is removed. Full write‑up: **ADR 0044**. | First‑audio for a Turn's first chunk: **~0.9 s → ~0.28 s** (p50, measured). End‑to‑end (STT + LLM + TTS) a Turn's first audio went **~1.5 s → ~1.0 s** in live testing. A persistent `streaming_session` was measured *slower* (~1.1 s) with this SDK — see ADR 0044. |
 | `backend/clients/config.py` | `KugelAudio(..., region="eu")` | Pins to `api.eu.kugelaudio.com`; the EU endpoint is used because the app is deployed in the EU (ADR 0020). Region-to-region RTT was not measured. |
-| `backend/app.py` | `await tts.prewarm()` in `lifespan` | `connect_async()` pools the `stream_async` WebSocket at startup — removes ~300–600 ms of cold start from the **first** Turn of the process. Best‑effort, no‑op under `DEBUG`. |
+| `backend/app.py` | `await tts.prewarm()` in `lifespan` | `connect_async()` pools the `stream_async` WebSocket at startup — removes ~300–600 ms of cold start from the **first** Turn of the process. Best‑effort, no‑op under `SKIP_KUGELAUDIO`. |
 | `backend/clients/llm.py` | `temperature 0.7, top_p 0.8, presence_penalty 1.5, top_k 20, min_p 0`; `max_tokens 250 → 180` | Qwen3's documented non‑thinking sampling. Latency‑neutral on the forward pass, but tighter sampling produced **shorter, more on‑task replies** — fewer tokens to generate and synthesise. `frequency_penalty 0.5` was the weakest anti‑repetition option tested. |
 | `backend/session/chunking.py` | First chunk flushed at the first sentence end past a **25‑char** floor (later chunks keep the 80‑char minimum) | The first chunk sets the whole Turn's perceived latency. A ~40‑char opening sentence reaches TTS ~0.2–0.3 s sooner than waiting for an 80‑char buffer, and the LLM produces 40 chars before 80. The floor still stops a bare "Ja." / "Guten Tag." firing its own TTS call. |
 | `backend/session/orchestrator.py` | `_OPENING_INSTRUCTION` example `"Hi, this is…"` → `"Guten Tag, hier ist…"` | With the English example the model opened the call in English **8/8**; German example → **0/8**. (Quality, not latency — but free and low‑risk.) |
@@ -101,6 +101,40 @@ else here is making the most of Qwen3‑4B.
 
 ---
 
+## Addendum 2026-09-08 — Gemini as the dialogue backend (ADR 0074)
+
+The recommendation above ("a larger model would fix what prompt+params can't")
+was acted on, not via the gateway but via Google's OpenAI-compatible endpoint.
+Measured the same way: time to first token, streamed, over the internet, n=4.
+
+| Model | `reasoning_effort` | TTFT (p50) |
+|---|---|---|
+| `gemini-3.5-flash-lite` | `minimal` | **0.70 s** |
+| `gemini-3.5-flash-lite` | `low` | 0.65 s |
+| `gemini-3.8-flash` | `low` | **2.98 s** |
+
+Three findings, all of which shaped ADR 0074:
+
+* **Bigger is not faster, and here it is not better.** `gemini-3.8-flash`
+  defaults to `medium` thinking and cannot go below `low`; three seconds before
+  the first word is not a phone call. It is a good writer, so it took the
+  wrap-up/follow-up/PDF leg instead — hence two models, not one.
+* **`minimal` and `low` cost the same** on `3.5-flash-lite` (within noise), so
+  the thinking floor can be raised for free if replies read too thin.
+* **A thinking level below what the model supports is a hard 400**
+  (`INVALID_ARGUMENT`), not a clamp, and the message names no parameter. It
+  arrives as a Turn that fails for no visible reason. `3.5-flash-lite` rejects
+  `none`. This cost a debugging cycle and is why the request now logs its level.
+
+Also measured: `gemini-2.5-flash-lite` and `gemini-2.5-flash` are listed by
+`models.list()` but 404 on this endpoint. And the free tier meters per model —
+`gemini-3.8-flash` 429s with `quotaValue: 20`, which is why the feedback leg
+defaults to `gemini-3.5-flash` instead of the strongest model available. And the browser was the larger latency source all along —
+vad-web's `redemptionMs` default of 1400 ms (never chosen, simply the library's)
+was longer than the entire server pipeline, and is now 700 ms.
+
+---
+
 ## LLM — `Qwen3-4B-AWQ`
 
 ### Current call (`backend/clients/llm.py`)
@@ -128,6 +162,39 @@ Everything not listed falls back to **vLLM defaults**: `temperature 1.0`,
 Qwen3 thinking mode is catastrophic here: multi‑second first‑token latency and
 no usable output within any sane token budget. The current code is right; this
 note is so nobody "cleans up" the `extra_body`.
+
+**Where thinking *is* used:** `llm.complete(think=True)` for the PDF fact
+extraction (F‑58, `backend/documents.py`). That call is off the live path — the
+user is waiting on a spinner in the Scenario editor, not on audio — and it is
+not streamed, so neither failure mode above applies. It sets **no `max_tokens`**
+(the fact list is bounded by a character cap, and the reasoning trace needs
+unpredictable room); the answer is validated as a whole, and if the document is
+too large to fit the context the gateway 400s and the caller falls back to the
+raw text. Sampling follows Qwen3's thinking‑mode card: `temperature 0.6,
+top_p 0.95, top_k 20, min_p 0`.
+
+**The wrap‑up generator uses it too** (`backend/feedback/generator.py::_ask`),
+since 2026‑09‑06. It previously ran non‑thinking at `temperature 0.3` with no
+`top_p`/`top_k`/`min_p` — vLLM's untruncated defaults — and the symptom was
+broken German grammar in the free‑text feedback: wrong case and gender endings,
+English word order. That is a 4B AWQ model writing German prose from an English
+brief (ADR 0043) in a single pass; the trace is the cheapest revision pass, and
+it is free in the worker.
+
+Two things moved with it:
+
+* `_MAX_FEEDBACK_TOKENS` `900 → 4000`: the budget now covers the trace as well
+  as the answer, and running out inside the trace yields no answer at all. Kept
+  capped (unlike the PDF summary) so a repetition loop cannot run to the job
+  timeout.
+* `llm._strip_reasoning` returns `""` for an inline `<think>` that never closes.
+  The caller scrapes a JSON object out of the reply and a trace is full of `{`,
+  so returning the trace would parse the model's deliberation as its answer.
+
+**Not measured against the gateway yet**: written from the model card and the
+failure modes above. Worth a before/after on real Sessions once `DIREKT_URL` is
+reachable; if the trace eats the budget in practice, raise the cap before
+reverting.
 
 ### Sampling parameters
 

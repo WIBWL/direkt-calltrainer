@@ -24,4 +24,9 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"]
+  // The specs are deliberately NOT excluded. They used to be, on the grounds
+  // that esbuild transpiles them for `npm test` and nothing emits them — but
+  // that made the one place the hooks' interfaces are exercised the one place
+  // not checked against them, and a fixture had already drifted out of shape
+  // unnoticed. They are type-checked with everything else.
 }

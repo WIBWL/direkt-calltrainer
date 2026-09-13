@@ -21,9 +21,14 @@ export const oidcAuthority: string = issuer;
 export const oidcClientId: string = import.meta.env.VITE_OIDC_CLIENT_ID ?? "calltrainer-frontend";
 
 /**
- * Where Keycloak sends the user back. The app has no router, so the SPA origin
- * is the target and react-oidc-context strips the `?code=&state=` after the
- * exchange.
+ * Where Keycloak sends the user back: always the SPA origin, never the page the
+ * user was on. Keeping it to one URL means the realm needs one registered
+ * redirect URI no matter how many routes the app grows.
+ *
+ * Getting back to the requested page is therefore the app's job, not Keycloak's
+ * — `onSigninCallback` in main.tsx strips the `?code=&state=` and hands the
+ * stored path to the router, which has to perform the navigation itself
+ * (`history.replaceState` fires no event the router would hear).
  */
 export const oidcRedirectUri: string =
   typeof window === "undefined" ? "" : window.location.origin + "/";

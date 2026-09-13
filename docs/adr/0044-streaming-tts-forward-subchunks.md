@@ -95,3 +95,34 @@ The orchestrator's one-chunk-deep synthesis pipeline (`_drain_if_pending`, the
 `asyncio.Task` per chunk) is gone: `stream_async` already overlaps generation
 and playback, so the extra machinery earned nothing once audio was forwarded
 sub-chunk by sub-chunk.
+
+## Amendment (2026-09-06): an abandoned stream poisons the pooled socket
+
+A trainee noticed, precisely, that "at some point" the persona's last sentence
+of every reply stopped being spoken in its Turn and came out at the start of
+the *next* Turn instead — a one-chunk offset that, once it began, never went
+away. The cause is in how `stream_async` uses the connection this ADR chose:
+it sends the request on the pooled socket and reads frames until `final`, and
+**nothing correlates a frame with a request**. A barge-in (ADR 0035) closes the
+Turn generator mid-stream, so the abandoned request's remaining audio *and* its
+`final` stay queued on the socket. The next `stream_async` then yields that
+stale audio as if it were its own, ends on the stale `final`, and leaves its own
+frames for the call after it. Every later chunk is spoken one request late, and
+the last chunk of a reply is spoken when the next reply's first chunk is
+requested — which is what was heard. The same offset put the wrong audio behind
+every barge-in checkpoint, so ADR 0035's "what was heard" trim was off by a
+sentence too.
+
+`synthesize_stream` therefore tracks whether the request's `final` frame was
+read and, on any other exit — cancelled, failed, or closed by the caller after a
+barge-in — drops the pooled connection (`_close_ws_connection`, the SDK's own
+internal call; 1.9.0 offers no public one) and re-warms a fresh one in the
+background, so the next *Turn*, seconds away, finds a clean socket. The
+orchestrator closes an abandoned stream itself (`aclose()` in `_speak`'s
+`finally`) rather than leaving it to the garbage collector, which would run
+that reset at some later, unspecified point — possibly after the next chunk
+had already been synthesized on the poisoned socket. The one cost is a cold
+handshake (~300–600 ms) on a chunk that arrives before the re-warm completes,
+which after a barge-in is the next Turn and never happens in practice.
+`cancel_current()` would be the cleaner primitive, but it exists only on the
+persistent `streaming_session` this ADR rejected for latency.
