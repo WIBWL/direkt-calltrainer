@@ -358,6 +358,8 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
                     turn.persona_offset_ms -= shift
                 if turn.persona_end_ms is not None:
                     turn.persona_end_ms = max(0, turn.persona_end_ms - shift)
+                if turn.persona_dispatched_end_ms is not None:
+                    turn.persona_dispatched_end_ms = max(0, turn.persona_dispatched_end_ms - shift)
         self._started = time.monotonic()
 
     def _note_persona_audio(self, turn: Turn, audio: bytes) -> None:
@@ -374,6 +376,9 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         if turn.persona_offset_ms is None:
             turn.persona_offset_ms = now
         turn.persona_end_ms = max(now, turn.persona_end_ms or now) + tts.duration_ms(audio)
+        # The same instant, kept in a field a barge-in never trims: F-51 reads
+        # it to say how much the Persona still had to say (see `Turn`).
+        turn.persona_dispatched_end_ms = turn.persona_end_ms
 
     def _new_or_reopened_turn(self) -> tuple[Turn, bool]:
         """Reuses a still-open turn from a prior barge-in, else creates a
@@ -994,7 +999,12 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         which after a barge-in runs past anything anybody heard -- by the whole
         reply where none of it was played. F-53's Redeanteil is the share of
         that time, so leaving it would report speech the user never got. Only
-        ever shrinks, and only with a position to shrink to."""
+        ever shrinks, and only with a position to shrink to.
+
+        `persona_dispatched_end_ms` is deliberately left where it was. F-51
+        needs the untrimmed end to say how much the Persona still had to say,
+        and when this trimmed the one field both of them read, that measurement
+        quietly became the browser's voice-detection delay instead."""
         if played_ms is None or turn.persona_offset_ms is None or turn.persona_end_ms is None:
             return
         turn.persona_end_ms = max(

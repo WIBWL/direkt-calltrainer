@@ -570,10 +570,18 @@ def _call_with_a_barge_in() -> list[Turn]:
 
     Both halves are needed. A trimmed reply on its own says nothing about
     timing, and an overlap on its own may have cost the Persona nothing.
+
+    The two ends are what a real trimmed Turn carries since the Redeanteil fix:
+    `persona_end_ms` is where the client stopped playing, `persona_dispatched_
+    end_ms` where the audio would have run to. Written with one end, as this
+    was, the fixture describes a Turn the orchestrator can no longer produce --
+    which is how a regression in exactly this measurement got through the
+    suite.
     """
     return [
         Turn(seq=1, persona_text="Guten Tag, ich rufe an wegen der offenen Rechnung ...",
-             persona_offset_ms=0, persona_end_ms=10_000, persona_interrupted=True),
+             persona_offset_ms=0, persona_end_ms=3_200, persona_dispatched_end_ms=10_000,
+             persona_interrupted=True),
         Turn(
             seq=2,
             user_text="Moment bitte",

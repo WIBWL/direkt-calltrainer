@@ -360,13 +360,22 @@ def _pvq(contour: tuple[float | None, ...]) -> tuple[float | None, int]:
     short to fill one window at all, which is measured whole rather than not at
     all -- the reading has its own floor (MIN_VOICED_MS_FOR_READING) and will
     withhold a step from it anyway.
+
+    "Too short to fill one window" is the test, and it has to be asked of the
+    windows seen rather than of the quotients collected. Windows that fail the
+    voicing floor are skipped and leave the list empty, so a long call whose
+    first windows are mostly silence would otherwise take its five-second
+    remainder for the short-call case and report a quotient over it -- against
+    boundaries that are stated for ten-second windows.
     """
     per_window = PVQ_WINDOW_MS // STEP_MS
     quotients: list[float] = []
+    full_windows_seen = False
     for start in range(0, len(contour), per_window):
         window = contour[start:start + per_window]
-        if len(window) < per_window and quotients:
+        if len(window) < per_window and full_windows_seen:
             break
+        full_windows_seen = full_windows_seen or len(window) == per_window
         voiced = [hz for hz in window if hz]
         floor = max(MIN_VOICED_FRAMES, int(len(window) * MIN_VOICED_SHARE_IN_WINDOW))
         if len(voiced) < floor:
@@ -444,20 +453,46 @@ def _endings(per_utterance: tuple[tuple[float | None, ...], ...]) -> Endings:
     """
     falling = rising = level = 0
     for utterance in per_utterance:
-        movement = _terminal_slope(utterance)
-        if movement is None:
+        read = _terminal_slope(utterance)
+        if read is None:
             continue
-        if movement <= -TERMINAL_FLAT_ST:
+        movement, frames = read
+        flat = _flat_threshold_st(frames)
+        if movement <= -flat:
             falling += 1
-        elif movement >= TERMINAL_FLAT_ST:
+        elif movement >= flat:
             rising += 1
         else:
             level += 1
     return Endings(falling=falling, rising=rising, level=level)
 
 
-def _terminal_slope(utterance: tuple[float | None, ...]) -> float | None:
-    """The final movement of one utterance, in semitones across the window.
+def _flat_threshold_st(frames: int) -> float:
+    """The level threshold for the window this ending was actually read over.
+
+    The derivation behind TERMINAL_FLAT_ST is parametric in the window length
+    -- GLISSANDO_ST_S2 / T semitones across T seconds -- and that constant
+    states it for the full 400 ms. An utterance shorter than the window is read
+    over its own voiced frames, as few as MIN_TERMINAL_FRAMES, and applied
+    unchanged there the constant is far too lax: across 70 ms the perceptual
+    floor is 4.6 ST, not 0.8, so a movement nobody could hear was being filed
+    as a falling or rising ending. Short utterances ("Ja, genau.") are most of
+    a phone call, which put a systematic drift from level into the one figure
+    on the Sprachmelodie page that carries an interpretation.
+
+    `frames - 1` because the movement is the change across the intervals
+    between frames, not across the frames.
+    """
+    return GLISSANDO_ST_S2 / (max(frames - 1, 1) * STEP_MS / 1000)
+
+
+def _terminal_slope(utterance: tuple[float | None, ...]) -> tuple[float, int] | None:
+    """The final movement of one utterance, in semitones across the window, and
+    how many voiced frames that window held.
+
+    The frame count travels with the figure because the threshold it is judged
+    against is derived from the window's length (`_flat_threshold_st`), and an
+    utterance shorter than TERMINAL_WINDOW_MS is read over a shorter one.
 
     Negative is falling. A least-squares line through the tail, reported as the
     change that line predicts from one end of the window to the other, so the
@@ -489,7 +524,7 @@ def _terminal_slope(utterance: tuple[float | None, ...]) -> float | None:
     if variance == 0:
         return None
     slope = sum((i - mean_x) * (y - mean_y) for i, y in enumerate(values)) / variance
-    return round(slope * (count - 1), 2)
+    return round(slope * (count - 1), 2), count
 
 
 def _thirds(contour: tuple[float | None, ...]) -> tuple[tuple[float | None, ...], ...]:

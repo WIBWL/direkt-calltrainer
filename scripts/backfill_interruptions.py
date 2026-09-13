@@ -59,6 +59,15 @@ def _timeline(session: db_models.Session) -> tuple[interruptions.Segment, ...]:
     against a segment whose end is unknown, and assuming one would invent the
     measurement. Ordered by `seq_index`, which is the order they were spoken in
     and is unique per Session by constraint.
+
+    No `dispatched_ms`: the schema keeps one duration per utterance, so the
+    audio a trimmed reply *would* have run to is not recoverable from a stored
+    Session, and `Segment` falls back to the stored one. For every Session this
+    script is for -- recorded before the live path measured any of this -- that
+    stored duration *is* the dispatched end, so the reading is the intended one.
+    For a Session recorded since, the live path has already written the figures
+    from the in-memory Turns, where both ends exist, and this script skips any
+    Session that has them.
     """
     return tuple(
         interruptions.Segment(

@@ -11,6 +11,8 @@ no audio. The thresholds are imported rather than written out, so the tests
 follow a recalibration instead of pinning yesterday's numbers -- except where a
 test is explicitly about the value of a constant.
 """
+from backend.feedback.calls import timeline
+from backend.session.models import Turn
 from backend.feedback.interruptions import (
     BACKCHANNEL_MAX_MS,
     GREEN_MAX_COUNT,
@@ -21,6 +23,7 @@ from backend.feedback.interruptions import (
     Segment,
     TrafficLight,
     classify,
+    finding_description,
     light_steps,
 )
 
@@ -245,3 +248,81 @@ def test_the_light_steps_are_built_from_the_thresholds() -> None:
     assert steps[0]["range"] == "0"
     assert steps[1]["range"] == "1 bis 2"
     assert steps[2]["range"] == "ab 3"
+
+
+# --- The timeline a real call produces ---------------------------------------
+#
+# Everything above constructs Segments by hand. That is deliberate and stays,
+# but it cannot notice when the thing that *builds* a Segment changes meaning --
+# and it did: trimming a Persona reply back to the heard part for F-53's
+# Redeanteil shortened the very window these rules measure against. Every test
+# in this file kept passing, because none of them goes through `calls.timeline`.
+
+def test_a_trimmed_reply_is_measured_against_the_audio_that_was_sent() -> None:
+    """`remaining_ms` is what the Persona still had to say, not how long the
+    client took to notice the user.
+
+    A barge-in leaves two different ends on the Turn: where playback stopped,
+    and where the audio would have run to. Read off the first, this figure
+    becomes the browser's voice-detection delay plus the upload -- a few hundred
+    milliseconds whatever the reply's length -- and the drill-down tells the
+    User their partner "had 0.4 seconds left" about nine seconds of audio. It
+    also decides the classification: the same interruption lands on TERMINAL or
+    HARD depending on how quickly the client reported it.
+    """
+    turns = [
+        Turn(
+            seq=1,
+            persona_text="Guten Tag, ich rufe an wegen der offenen Rechnung",
+            persona_offset_ms=0,
+            # 12 s dispatched, 3.4 s of it played before the cut landed.
+            persona_end_ms=3_400,
+            persona_dispatched_end_ms=12_000,
+            persona_interrupted=True,
+        ),
+        Turn(
+            seq=2,
+            user_text="Moment, das stimmt so nicht",
+            user_offset_ms=3_000,
+            user_end_ms=6_000,
+            user_speech_ms=3_000,
+        ),
+    ]
+
+    report = classify(timeline(turns))
+
+    assert len(report.events) == 1
+    event = report.events[0]
+    assert event.remaining_ms == 9_000, "12 s of audio, cut into at 3 s"
+    assert event.kind is Kind.HARD
+    assert "9.0 Sekunden" in finding_description(event)
+
+
+def test_the_heard_part_is_still_what_the_segment_lasts() -> None:
+    """The other half, so the two ends cannot be quietly merged again: what the
+    timeline says the Persona *spoke* is the part that was heard (ADR 0035)."""
+    turns = [
+        Turn(
+            seq=1,
+            persona_text="Guten Tag",
+            persona_offset_ms=0,
+            persona_end_ms=3_400,
+            persona_dispatched_end_ms=12_000,
+            persona_interrupted=True,
+        ),
+    ]
+
+    (segment,) = timeline(turns)
+
+    assert segment.duration_ms == 3_400
+    assert segment.end_ms == 3_400
+    assert segment.dispatched_end_ms == 12_000
+
+
+def test_a_turn_that_knows_only_one_end_reads_it_as_both() -> None:
+    """Sessions recorded before the distinction, and every ordinary Turn, carry
+    no separate dispatched end. Falling back to the one end is what keeps
+    `scripts/backfill_interruptions.py` reading old calls as it always did."""
+    segment = Segment("persona", 0, 10_000, interrupted=True)
+
+    assert segment.dispatched_end_ms == segment.end_ms == 10_000

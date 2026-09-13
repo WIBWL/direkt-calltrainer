@@ -566,3 +566,29 @@ async def test_a_trimmed_reply_counts_only_the_speech_that_played(
     assert orch.turns[0].persona_text, "part of it was heard and is kept"
     folded = conversation(orch.turns, persona.language_id)
     assert folded.persona_speech_ms == 20000, "the played span, not the dispatched one"
+
+
+async def test_the_trim_leaves_the_dispatched_end_alone(
+    persona, scenario, fake_pipeline, monkeypatch
+):
+    """Two ends, and the trim touches one of them.
+
+    `persona_end_ms` is heard speech, which F-53's Redeanteil divides by.
+    `persona_dispatched_end_ms` is what was sent, which F-51 measures "the
+    Persona still had this much to say" against. Trimming both -- which is what
+    a single field amounts to -- turned that measurement into the delay between
+    the user starting to speak and the client's cut arriving.
+    """
+    monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 100000)
+    fake_pipeline.stt.transcripts = ["Erste Haelfte der Frage."]
+    fake_pipeline.llm.replies = ["Es geht um die Exportfunktion, die seit elf Tagen nicht geht."]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+    dispatched_before = orch.turns[0].persona_dispatched_end_ms
+    orch.note_late_barge_in(20000)
+
+    turn = orch.turns[0]
+    assert turn.persona_end_ms == turn.persona_offset_ms + 20000, "heard speech was cut back"
+    assert turn.persona_dispatched_end_ms == dispatched_before, "what was sent is untouched"
+    assert turn.persona_dispatched_end_ms > turn.persona_end_ms

@@ -42,6 +42,12 @@ class Utterance:
     # The words that were cut off, for the wrap-up's drill-down. Empty
     # everywhere else.
     unheard: str = ""
+    # How long this side's audio would have run had nobody cut in. Persona
+    # lines only, and equal to `duration_ms` unless the reply was trimmed --
+    # `duration_ms` is what was heard, this is what was sent (F-51 against
+    # F-53, see `session.models.Turn`). None where the Turn predates the
+    # distinction, and every reader falls back to `duration_ms` there.
+    dispatched_ms: int | None = None
     # The raw paraverbal facts of this utterance, on a user line only (ADR
     # 0081). Carried through the flattening because the row is written from an
     # Utterance: without it the facts would stop at `conversation()`, which
@@ -80,6 +86,7 @@ def utterances(turns: Sequence[Turn]) -> list[Utterance]:
                 _span(turn.persona_offset_ms, turn.persona_end_ms),
                 interrupted=turn.persona_interrupted,
                 unheard=turn.persona_unheard,
+                dispatched_ms=_span(turn.persona_offset_ms, turn.persona_dispatched_end_ms),
             ))
     return spoken
 
@@ -244,6 +251,7 @@ def timeline(turns: Sequence[Turn]) -> tuple[Segment, ...]:
             offset_ms=spoken.offset_ms,
             duration_ms=spoken.duration_ms,
             interrupted=spoken.interrupted,
+            dispatched_ms=spoken.dispatched_ms,
         )
         for spoken in utterances(turns)
         if spoken.duration_ms

@@ -13,12 +13,22 @@ Three things about this architecture shape the rules, and none of them is
 obvious from the timeline alone:
 
 * A Persona utterance's end is **modelled from the audio that was sent**, not
-  observed. The server never learns when the client finished playing, and a
-  barge-in does not shorten that window (`orchestrator._note_persona_audio`).
-  So "the Persona stopped within half a second" cannot be read off the data:
-  the window runs on regardless. What *is* observable is whether the reply was
-  trimmed back to the heard part, which is precisely the event of interest --
-  the Persona had more to say and did not get to say it.
+  observed. The server never learns when the client finished playing
+  (`orchestrator._note_persona_audio`). So "the Persona stopped within half a
+  second" cannot be read off the data: the window runs on regardless. What *is*
+  observable is whether the reply was trimmed back to the heard part, which is
+  precisely the event of interest -- the Persona had more to say and did not
+  get to say it.
+
+  A barge-in does shorten a Persona segment's `duration_ms`, which is the one
+  thing this list used to say it did not. That is F-53 counting heard speech
+  and nothing else (ADR 0035), and it is right -- but every figure here is
+  about the audio that was *sent*, so the classification reads
+  `dispatched_end_ms` instead. Read off the heard end, "how much the Persona
+  still had to say" becomes the delay between the user starting to speak and
+  the client's cut reaching the server: a few hundred milliseconds whatever the
+  reply's length, which is also what the empirical calibration below would then
+  have been measuring.
 * Short backchannels never reach the server at all. ADR 0036 raised the
   client's VAD threshold to 500 ms of sustained speech, and anything below that
   is absorbed in the browser. The backchannel rule below is therefore a second
@@ -193,13 +203,27 @@ class Segment:
     # user actually heard (ADR 0035). The single reliable trace that the
     # Persona had more to say.
     interrupted: bool = False
+    # How long this segment's audio would have run had nobody cut in. Equal to
+    # `duration_ms` on everything except a trimmed Persona reply; None where
+    # the caller does not know it, which falls back to the same.
+    dispatched_ms: int | None = None
 
     @property
     def end_ms(self) -> int:
-        """Where this segment stops. For a Persona segment that is the end of
-        the audio that was *sent*, not of what was heard (see the module
-        docstring)."""
+        """Where this segment stops being heard. On a trimmed Persona segment
+        that is the played position the client reported, not the end of the
+        audio (which is `dispatched_end_ms`)."""
         return self.offset_ms + self.duration_ms
+
+    @property
+    def dispatched_end_ms(self) -> int:
+        """Where this segment's audio would have stopped. What "the Persona
+        still had this much to say" is measured against, and the reason it is
+        a second field: `end_ms` was cut back to the heard part for F-53's
+        Redeanteil, and read from here that turned every remaining-audio figure
+        into the delay between the user starting to speak and the client's cut
+        arriving -- a few hundred milliseconds, whatever the reply's length."""
+        return self.offset_ms + (self.duration_ms if self.dispatched_ms is None else self.dispatched_ms)
 
 
 @dataclass(frozen=True)
@@ -318,7 +342,8 @@ def classify(timeline: tuple[Segment, ...]) -> Report:
         overlapped = _overlapped(user, persona)
         if overlapped is None:
             continue
-        remaining = overlapped.end_ms - user.offset_ms
+        # Against the dispatched end, never the heard one: see `Segment`.
+        remaining = overlapped.dispatched_end_ms - user.offset_ms
         events.append(Event(
             kind=_kind(user, overlapped, remaining),
             offset_ms=user.offset_ms,
