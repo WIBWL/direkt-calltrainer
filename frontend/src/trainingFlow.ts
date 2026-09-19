@@ -34,7 +34,7 @@ export type Screen =
 /** What covers a transition, if anything. Named here rather than at the call
  * sites because which cut covers a change of screen is part of the same
  * decision as where it goes (`components/ScreenTransition.tsx` performs it). */
-export type Cut = "none" | "fade" | "reverse";
+export type Cut = "none" | "fade";
 
 /**
  * Everything the flow routes on, gathered from the caller.
@@ -126,9 +126,9 @@ export function nextScreen(context: FlowContext, event: FlowEvent): Transition {
       return { screen: context.reverse ? "brief" : "case-brief", cut: "none" };
 
     case "micConfirmed":
-      // A reverse goes to its briefing behind the card turn (F-61) — the same
-      // screen the offer under a wrap-up leads to, reached the same way.
-      if (context.reverse) return { screen: "brief", cut: "reverse" };
+      // A reverse goes to its briefing (F-61) — the same screen the offer
+      // under a wrap-up leads to, reached the same way.
+      if (context.reverse) return { screen: "brief", cut: "none" };
       // A drawn Scenario is thrown for first; the fade belongs between the
       // throw and the call, not in front of the throw. The two branches cannot
       // both apply: reverses are not in the random Scenario's pool.

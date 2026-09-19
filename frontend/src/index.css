@@ -7709,13 +7709,13 @@ a.consent-button {
   }
 }
 
-/* --- Screen transitions (F-61, ADR 0070) -------------------------------- */
+/* --- Screen transitions ---------------------------------------------------- */
 
-/* The film cut played when the roles are swapped: the card turns over the
-   screen, the screen changes behind it, the card leaves. Two phases, driven
-   from ScreenTransition.tsx — which also sets --cover-ms/--reveal-ms, so the
-   timers that fire the actual screen change and these animations are the same
-   numbers rather than two copies of them.
+/* The film cut between two screens: the screen dims to opaque, changes behind
+   the cover, and comes back. Two phases, driven from ScreenTransition.tsx —
+   which also sets --cover-ms/--reveal-ms, so the timers that fire the actual
+   screen change and these animations are the same numbers rather than two
+   copies of them.
 
    Deliberately above everything and untouchable: a transition the user can
    click through is a transition that lands them on a half-built screen. */
@@ -7723,10 +7723,7 @@ a.consent-button {
   position: fixed;
   inset: 0;
   z-index: 2000;
-  display: grid;
-  place-items: center;
   pointer-events: all;
-  perspective: 1200px;
 }
 
 /* The palette's navy, kept after a neutral grey was tried against it: the
@@ -7740,39 +7737,14 @@ a.consent-button {
   background: var(--color-navy-900);
 }
 
-.screen-transition-card {
-  position: relative;
-  width: min(38vh, 34vw);
-  filter: drop-shadow(0 24px 48px rgba(3, 37, 62, 0.55));
-  transform-style: preserve-3d;
-}
-
-.reverse-card {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-/* Cover: the screen darkens to opaque while the card flies in and turns.
-   `forwards` matters on both — the cut happens on the last frame, and a card
-   that snapped back to its start there would be visible for one frame. */
+/* `forwards` matters on both phases — the cut happens on the last frame, and
+   a scrim that snapped back to its start there would flash for one frame. */
 .screen-transition-cover .screen-transition-scrim {
   animation: screen-transition-scrim-in var(--cover-ms) cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-.screen-transition-cover .screen-transition-card {
-  animation: reverse-card-in var(--cover-ms) cubic-bezier(0.34, 1.2, 0.5, 1) forwards;
-}
-
-/* Reveal: the card keeps turning the same way and leaves towards the viewer,
-   the scrim lifts off the new screen. Same direction of spin as the cover, so
-   the two phases read as one movement interrupted by the cut. */
 .screen-transition-reveal .screen-transition-scrim {
   animation: screen-transition-scrim-out var(--reveal-ms) cubic-bezier(0.4, 0, 1, 1) forwards;
-}
-
-.screen-transition-reveal .screen-transition-card {
-  animation: reverse-card-out var(--reveal-ms) cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 @keyframes screen-transition-scrim-in {
@@ -7796,39 +7768,8 @@ a.consent-button {
   }
 }
 
-/* Y, not Z: the card turns over the way a card is turned over, so the reverse
-   symbol sweeps through its own edge instead of spinning flat like a wheel.
-   The slight Z tilt keeps it from looking like a closing door. */
-@keyframes reverse-card-in {
-  from {
-    opacity: 0;
-    transform: rotateY(-200deg) rotateZ(-24deg) scale(0.35);
-  }
-  55% {
-    opacity: 1;
-  }
-  to {
-    opacity: 1;
-    transform: rotateY(0deg) rotateZ(0deg) scale(1);
-  }
-}
-
-@keyframes reverse-card-out {
-  from {
-    opacity: 1;
-    transform: rotateY(0deg) rotateZ(0deg) scale(1);
-  }
-  60% {
-    opacity: 0.9;
-  }
-  to {
-    opacity: 0;
-    transform: rotateY(200deg) rotateZ(20deg) scale(1.9);
-  }
-}
-
-/* The screen the cut lands on comes up rather than appearing: without it the
-   reveal is a hard edit from an opaque scrim to a finished page. */
+/* The briefing screens come up rather than appearing: without it the arrival
+   is a hard edit to a finished page. */
 .brief-page .reverse-brief,
 .brief-page .scenario-briefing,
 .brief-page .case-brief,
@@ -8457,7 +8398,7 @@ a.consent-button {
   color: var(--color-navy-900);
 }
 
-/* Unlike the die (F-62) and the card turn (F-61) this screen is still shown
+/* Unlike the die (F-62) this screen is still shown
    under reduced motion — there is nothing behind it to skip to, only a wait.
    What is left is the waveform standing still with the lens over it. */
 @media (prefers-reduced-motion: reduce) {

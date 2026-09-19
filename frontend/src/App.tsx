@@ -135,8 +135,8 @@ export default function App() {
   // Carries over into the call the same way isMicrophoneMuted does.
   const [micDeviceId, setMicDeviceId] = useState<string | null>(null);
   const { devices: micDevices, refresh: refreshMicDevices } = useMicrophoneDevices();
-  // The reverse's film cut (F-61), played over whichever screen starts it.
-  const { playReverse, playFade } = useScreenTransition();
+  // The fade that covers a change of screen, played over whichever screen starts it.
+  const { playFade } = useScreenTransition();
   // Lazy initializer: read once on mount, not on every render.
   const [restored] = useState(loadFinishedSession);
   const [screen, setScreen] = useState<Screen>(restored ? "transcript" : "setup");
@@ -372,10 +372,9 @@ export default function App() {
       };
       const { screen: next, cut } = nextScreen(context, event);
       if (cut === "fade") playFade(() => setScreen(next));
-      else if (cut === "reverse") playReverse(() => setScreen(next));
       else setScreen(next);
     },
-    [playFade, playReverse],
+    [playFade],
   );
 
   // One request for whichever half the committed Scenario has: the case of an
@@ -522,10 +521,10 @@ export default function App() {
       return;
     }
 
-    // A reverse picked from the library keeps the microphone check, and the
-    // card is turned over on the way *out* of it rather than into it — see
-    // `handleMicConfirmed`. Coming from a finished call there is no check to
-    // pass, so that path turns the card straight away.
+    // A reverse picked from the library keeps the microphone check and reaches
+    // its briefing on the way *out* of it — see `handleMicConfirmed`. Coming
+    // from a finished call there is no check to pass, so that path goes to the
+    // briefing straight away.
     beginSession(scenarioId, personaId, selectedScenario?.reverse ?? false);
   }, [personaId, scenarioId, drawPool, selectedScenario, beginSession]);
 
@@ -548,11 +547,9 @@ export default function App() {
       // something to show immediately rather than one request later; the
       // effect above refetches it and lands on the same content.
       setReverseBrief(reverse.reverse_brief);
-      // Behind the card, so the wrap-up is gone and the briefing is there by
-      // the time anything is visible again (F-61, ADR 0070).
-      playReverse(() => beginSession(reverse.id, persona, true, true));
+      beginSession(reverse.id, persona, true, true);
     },
-    [personaId, restored, reloadScenarios, beginSession, playReverse],
+    [personaId, restored, reloadScenarios, beginSession],
   );
 
   const handleRemoveScenario = useCallback(
@@ -576,7 +573,7 @@ export default function App() {
   }, [playback, socket.sendActivate, advance]);
 
   // The microphone check's own button. Where it leads is `trainingFlow`'s to
-  // decide: a reverse to its briefing behind the card turn, a drawn Scenario to
+  // decide: a reverse to its briefing, a drawn Scenario to
   // the die (skipped under reduced motion, where it would be three seconds of
   // nothing), a case with nothing in it straight to the phone, everything else
   // to the case screen. The check's label asks the same function through

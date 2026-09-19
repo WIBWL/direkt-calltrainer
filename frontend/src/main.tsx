@@ -85,8 +85,7 @@ createRoot(document.getElementById("root")!).render(
         <ReturnToRequestedPage />
 
         {/* Above the routes on purpose: a transition outlives the screen that
-            started it, and a reverse started from a past training navigates
-            away mid-animation (see ScreenTransition.tsx). */}
+            started it (see ScreenTransition.tsx). */}
         <ScreenTransitionProvider>
           <Routes>
             {/* Public legal pages */}

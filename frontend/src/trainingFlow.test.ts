@@ -53,10 +53,10 @@ describe("confirming the microphone check", () => {
     });
   });
 
-  it("turns the card over for a reverse", () => {
+  it("sends a reverse to its briefing", () => {
     expect(nextScreen(ctx({ reverse: true }), "micConfirmed")).toEqual({
       screen: "brief",
-      cut: "reverse",
+      cut: "none",
     });
   });
 

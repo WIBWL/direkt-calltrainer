@@ -8,7 +8,6 @@ import AppLayout from "./AppLayout";
 import DeleteSessionPrompt, { useSessionDeletion } from "./DeleteSessionPrompt";
 import FeedbackScreen, { transcriptFromTurns } from "./FeedbackScreen";
 import { FeedbackReport, MetricSection } from "./FeedbackView";
-import { useScreenTransition } from "./ScreenTransition";
 
 /**
  * One past training, opened from the history (F-48): the wrap-up that was
@@ -36,7 +35,6 @@ export default function PastSessionView() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { detail, state, reload } = useStoredSession(sessionId ?? null);
   const navigate = useNavigate();
-  const { playReverse } = useScreenTransition();
   const [confirming, setConfirming] = useState(false);
   // Back to the history rather than to the now-empty page this was. Replacing
   // the entry means Back does not return to a training that no longer exists.
@@ -64,10 +62,7 @@ export default function PastSessionView() {
       personaId: detail.persona_id,
       reverse: true,
     };
-    // The navigation happens behind the card, which is why the transition is
-    // mounted above the router: this page is unmounted by the very cut it
-    // asked for (see ScreenTransition.tsx).
-    playReverse(() => navigate(ROUTES.training, { state: { start } }));
+    navigate(ROUTES.training, { state: { start } });
   };
 
   // Still a link, not a button: it navigates, so middle-click and "open in new
