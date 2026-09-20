@@ -306,6 +306,40 @@ def delete_one_session(
     return Response(status_code=204)
 
 
+# How often the User must have spoken before a call can be reversed or carried
+# forward. Both build an exercise out of *this* call, and one hung up after a
+# sentence has nothing to replay or continue. The post-call screen hides both
+# offers under the same number (`MIN_USER_TURNS` in FeedbackView.tsx, pinned to
+# this one by tests/test_reverse.py); these routes are what enforces it. They
+# used to ask only for *some* Turn, so a call the screen offered nothing for
+# could still be reversed by asking the route directly.
+MIN_USER_UTTERANCES = 3
+
+
+def _user_utterances(db: DbSession, session_pk: int) -> int:
+    """How often the User spoke in this Session. Stored Turns are one row per
+    speaker, so the Persona's greeting is not counted -- the same count the
+    screen makes. A COUNT rather than loading the Transcript for its length --
+    `.count()` rather than `func.count()`, which pylint cannot see through (the
+    same choice as `api/account.py`)."""
+    return (
+        db.query(db_models.Turn)
+        .filter(
+            db_models.Turn.session_id == session_pk,
+            db_models.Turn.speaker == db_models.SPEAKER_USER,
+        )
+        .count()
+    )
+
+
+def _too_short(what: str) -> HTTPException:
+    """The refusal both routes give a call below `MIN_USER_UTTERANCES`."""
+    return HTTPException(
+        status_code=409,
+        detail=f"In diesem Gespräch wurde zu wenig gesprochen, um daraus {what} zu bauen.",
+    )
+
+
 @router.post("/{extern_id}/reverse")
 async def create_reverse(
     extern_id: uuid.UUID,
@@ -341,11 +375,8 @@ async def create_reverse(
             status_code=409,
             detail="Dieses Gespräch ist selbst schon ein Rollentausch.",
         )
-    if not material.has_turns:
-        raise HTTPException(
-            status_code=409,
-            detail="Zu diesem Gespräch wurde nichts gesprochen, was sich tauschen ließe.",
-        )
+    if material.user_utterances < MIN_USER_UTTERANCES:
+        raise _too_short("einen Rollentausch")
 
     existing = await asyncio.to_thread(library.restore_reverse, material.session_pk)
     if existing is not None:
@@ -400,7 +431,7 @@ class _ReverseMaterial:
 
     session_pk: int
     already_reverse: bool
-    has_turns: bool
+    user_utterances: int
     description: str
     case_facts: str
     call_goal: str
@@ -415,7 +446,6 @@ def _reverse_material(extern_id: uuid.UUID, subject: str) -> _ReverseMaterial | 
             .filter_by(extern_id=extern_id)
             .options(
                 selectinload(db_models.Session.scenario),
-                selectinload(db_models.Session.turns),
                 selectinload(db_models.Session.feedback)
                 .selectinload(db_models.Feedback.points),
             )
@@ -428,7 +458,7 @@ def _reverse_material(extern_id: uuid.UUID, subject: str) -> _ReverseMaterial | 
         return _ReverseMaterial(
             session_pk=session.session_id,
             already_reverse=scenario.reverse,
-            has_turns=bool(session.turns),
+            user_utterances=_user_utterances(db, session.session_id),
             description=scenario.description,
             case_facts=scenario.case_facts,
             call_goal=scenario.call_goal,
@@ -471,6 +501,8 @@ async def create_follow_up(
     # Absent and not-yours stay the same answer as in `get_session` (ADR 0050).
     if material is None:
         raise HTTPException(status_code=404, detail="Unknown session")
+    if material.user_utterances < MIN_USER_UTTERANCES:
+        raise _too_short("ein Folgeszenario")
     if not material.call.improvements:
         raise HTTPException(
             status_code=409,
@@ -531,6 +563,7 @@ class _FollowUpMaterial:
     correct a figure against (ADR 0051)."""
 
     session_pk: int
+    user_utterances: int
     call: PlayedCall
 
 
@@ -558,6 +591,7 @@ def _follow_up_material(extern_id: uuid.UUID, subject: str) -> _FollowUpMaterial
         feedback = session.feedback
         return _FollowUpMaterial(
             session_pk=session.session_id,
+            user_utterances=_user_utterances(db, session.session_id),
             call=PlayedCall(
                 scenario_name=scenario.title,
                 scenario_teaser=scenario.short_description,

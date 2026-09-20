@@ -773,7 +773,8 @@ def asked(calls, index: int = 0) -> str:
 # one metric the reference fixture seeds, is a rate over phonation -- without
 # them nothing is measured and a Session carries no statistics at all. What a
 # test needs when it wants a Session that looks real and does not care what was
-# said in it (F-61).
+# said in it (F-61). Three user utterances, because the reverse and follow-up
+# routes refuse a call with fewer (`api/sessions.py::MIN_USER_UTTERANCES`).
 DRAFTED_FROM_TURNS = [
     Turn(seq=1, persona_text="Brandt hier.", persona_offset_ms=0, persona_end_ms=1500),
     Turn(seq=2, user_text="Guten Tag, was kann ich für Sie tun?",
@@ -781,6 +782,16 @@ DRAFTED_FROM_TURNS = [
          user_speech_ms=1600, user_phonation_ms=1300,
          persona_text="Der Preis ist zu hoch.",
          persona_offset_ms=3700, persona_end_ms=5000),
+    Turn(seq=3, user_text="Darüber können wir reden. Was wäre für Sie vertretbar?",
+         user_offset_ms=5300, user_end_ms=7600,
+         user_speech_ms=2300, user_phonation_ms=1900,
+         persona_text="Zehn Prozent weniger.",
+         persona_offset_ms=7900, persona_end_ms=9000),
+    Turn(seq=4, user_text="Das prüfe ich und melde mich morgen bei Ihnen.",
+         user_offset_ms=9300, user_end_ms=11400,
+         user_speech_ms=2100, user_phonation_ms=1700,
+         persona_text="Gut, danke.",
+         persona_offset_ms=11700, persona_end_ms=12500),
 ]
 
 

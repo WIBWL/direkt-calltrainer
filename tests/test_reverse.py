@@ -19,6 +19,7 @@ Postgres (`docker compose up -d db`); without it the database fixtures skip.
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import httpx
 import pytest
@@ -26,13 +27,16 @@ from openai import APIConnectionError
 from sqlalchemy.orm import Session as DbSession
 
 from backend import consent, deletion, library, retention
+from backend.api.sessions import MIN_USER_UTTERANCES
 from backend.db.models import Feedback, FeedbackPoint, Scenario, Session, Tenant
 from backend.reversals import (
     FIELD_LIMITS, GOAL_LIMIT, MAX_GOALS, ReverseError, draft_brief,
 )
 from backend.session.language_packs import get_pack
 from backend.session.prompting import build_system_prompt
-from tests.conftest import TEST_PERSONAS, a_finished_session, asked, stub_completions
+from tests.conftest import (
+    DRAFTED_FROM_TURNS, TEST_PERSONAS, a_finished_session, asked, stub_completions,
+)
 
 # `app_database` and `reference_data` are taken by several tests only to
 # activate the fixture.
@@ -225,6 +229,18 @@ async def test_an_unparseable_reply_is_retried_once_and_then_fails(
     with pytest.raises(ReverseError):
         await _draft()
     assert len(calls) == 2
+
+
+def test_the_route_and_the_screen_share_one_threshold() -> None:
+    """The post-call screen hides the offer under `MIN_USER_TURNS`; the route
+    refuses under `MIN_USER_UTTERANCES`. Two numbers for one rule, so they are
+    held together here -- the route used to ask only for *some* Turn."""
+    screen = (
+        Path(__file__).resolve().parent.parent /
+        "frontend" / "src" / "components" / "FeedbackView.tsx"
+    ).read_text(encoding="utf-8")
+    value = screen.split("const MIN_USER_TURNS = ", 1)[1].split(";", 1)[0]
+    assert int(value) == MIN_USER_UTTERANCES
 
 
 # --- The route (database) --------------------------------------------------
@@ -560,6 +576,20 @@ async def test_a_session_with_no_turns_is_refused(
 
     assert response.status_code == 409
     assert "gesprochen" in response.json()["detail"]
+
+
+async def test_a_call_too_short_for_the_screen_is_refused_too(
+    api_client: httpx.AsyncClient, db_session: DbSession, reference_data
+) -> None:
+    """One sentence from the User: the screen offers no reverse for it, and the
+    route used to build one anyway for anybody who asked it directly."""
+    _give_the_scenario_a_case(db_session)
+    extern_id = a_finished_session(turns=DRAFTED_FROM_TURNS[:2])
+
+    response = await api_client.post(f"/api/sessions/{extern_id}/reverse")
+
+    assert response.status_code == 409
+    assert db_session.query(Scenario).filter_by(reverse=True).count() == 0
 
 
 async def test_a_reverse_of_a_reverse_is_refused(

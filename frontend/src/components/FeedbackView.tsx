@@ -72,6 +72,10 @@ export interface FollowUpActions {
  * Counted in the User's own utterances: `turns` is the stored transcript, one
  * row per speaker (ADR 0051), so the Persona's greeting and its answer to a
  * single "Hallo?" would otherwise make three on their own.
+ *
+ * The routes refuse under the same number (`MIN_USER_UTTERANCES` in
+ * `backend/api/sessions.py`, pinned to this one by `tests/test_reverse.py`), so
+ * hiding the offer here is the courtesy and the refusal there is the rule.
  */
 const MIN_USER_TURNS = 3;
 
