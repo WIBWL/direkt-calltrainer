@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { Measurement, SessionTurn } from "../protocol";
 import { formatNumber, metricParts } from "../utils/metrics";
 import { fillerHits, questionsIn } from "../utils/transcriptEvidence";
+import { loudnessCourse } from "../utils/loudness";
 import { formatOffset } from "../utils/time";
 import LoudnessCourse from "./LoudnessCourse";
 
@@ -680,12 +681,15 @@ function Hesitations({
 }
 
 function Loudness({ detail }: { detail: Record<string, unknown> }) {
-  const curve = Array.isArray(detail.curve_db) ? (detail.curve_db as (number | null)[]) : null;
+  // The course arrives read: band, smoothing and stretches are derived by the
+  // server on every read (ADR 0091), from the same function that writes the
+  // wrap-up's sentence about it. This block only draws it.
+  const curve = loudnessCourse(detail);
   if (!curve) return null;
 
   return (
     <Block title="Ihr Verlauf im Gespräch">
-      <LoudnessCourse values={curve} />
+      <LoudnessCourse curve={curve} />
     </Block>
   );
 }

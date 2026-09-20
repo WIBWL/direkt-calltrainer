@@ -763,18 +763,53 @@ class _Band:
         return value - self.high if direction == _LOUDER else self.low - value
 
 
+def loudness_course(curve: Sequence[float | None]) -> dict | None:
+    """F-37's course as it is read: the smoothed line, the band it is read
+    against, and the at most two stretches that left it. None where there is too
+    little audible speech to say anything.
+
+    Derived on every read and never stored (ADR 0091), and served from here
+    rather than worked out again on the other side of the wire. It used to be:
+    this arithmetic existed a second time in `frontend/src/utils/loudness.ts`,
+    which drew the band on screen and into the PDF while this one put the same
+    call into a sentence for the wrap-up prompt. Two languages, one judgement,
+    nothing holding them together -- and the judgement is the whole of it, since
+    ADR 0051 declined to invent the norm a fixed dB threshold would need and
+    left the speaker's own samples as the only reference.
+    """
+    audible = sorted(value for value in curve if value is not None)
+    if len(audible) < _MIN_STRETCH_POINTS:
+        return None
+    band = _band(audible)
+    smoothed = _smooth(curve)
+    return {
+        "smoothed": smoothed,
+        "median": _percentile(audible, 0.5),
+        "low": band.low,
+        "high": band.high,
+        "stretches": [
+            {"direction": direction, "peak_index": peak}
+            for direction, peak in _find_stretches(smoothed, band)
+        ],
+    }
+
+
 def describe_loudness_course(curve: Sequence[float | None]) -> str:
     """F-37's curve as one sentence for the wrap-up prompt.
 
     Positions are thirds of the user's *own speaking time*, never a timestamp:
     `calls.conversation` concatenates their Turns and inserts nothing for the
     Persona's, so this clock and the transcript's do not agree.
+
+    The same reading the screen draws (`loudness_course` above), put into words:
+    a sentence and a drawing that disagreed about one call would be worse than
+    either alone.
     """
-    audible = sorted(value for value in curve if value is not None)
-    if len(audible) < _MIN_STRETCH_POINTS:
+    course = loudness_course(curve)
+    if course is None:
         return "Loudness course: too little audible speech to describe."
 
-    stretches = _find_stretches(_smooth(curve), _band(audible))
+    stretches = [(s["direction"], s["peak_index"]) for s in course["stretches"]]
     if not stretches:
         return (
             "Loudness course: even -- the user stayed inside their own usual range for "

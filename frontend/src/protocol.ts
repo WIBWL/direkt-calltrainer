@@ -194,7 +194,10 @@ export interface Measurement {
    * the inventory has retired. */
   aspect: MetricAspect | null;
   value: number;
-  /** ADR 0029's free-form payload: curves, sub-measures, pause positions. */
+  /** ADR 0029's free-form payload: curves, sub-measures, pause positions —
+   *  plus whatever the metric's reading adds on the way out (ADR 0091), which
+   *  is derived on every read and never stored: F-35's liveliness step, F-51's
+   *  light, F-37's `course` (the band and the stretches the page draws). */
   detail: Record<string, unknown> | null;
 }
 

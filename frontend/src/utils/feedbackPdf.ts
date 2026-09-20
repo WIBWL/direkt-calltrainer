@@ -8,7 +8,7 @@ import type {
   TranscriptEntry,
 } from "../protocol";
 import {
-  analyseLoudness,
+  loudnessCourse,
   loudnessClock,
   loudnessRuns,
   LOUDNESS_CAPTION,
@@ -18,7 +18,6 @@ import {
   ASPECT_LABELS,
   ASPECT_LEADS,
   formatMetricValue,
-  loudnessCurve,
   METRIC_ASPECTS,
   METRIC_DISCLAIMER,
   metricAspect,
@@ -552,8 +551,7 @@ export async function buildFeedbackPdf({
     }
 
     const loudness = all.find((measurement) => measurement.key === "loudness");
-    const values = loudness ? loudnessCurve(loudness) : null;
-    const curve = values ? analyseLoudness(values) : null;
+    const curve = loudness ? loudnessCourse(loudness.detail) : null;
     if (curve) course(loudness!.name, curve);
 
     keep(12);

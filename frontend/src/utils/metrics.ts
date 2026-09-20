@@ -418,15 +418,6 @@ function closingSubline(measurement: Measurement): string | null {
   return `geprüft: ${read === 1 ? "Ihr letzter Beitrag" : `Ihre letzten ${read} Beiträge`}`;
 }
 
-/** The loudness curve out of a Measurement's `detail` (ADR 0029), or null. It
- * is the only thing that metric has to show: its value is a dB span that reads
- * like a level without being one (ADR 0004/0051). */
-export function loudnessCurve(measurement: Measurement): (number | null)[] | null {
-  const curve = measurement.detail?.["curve_db"] as (number | null)[] | undefined;
-  if (!curve?.some((value) => value !== null)) return null;
-  return curve;
-}
-
 /** F-08's second half, already in `word_count`'s own `detail`: its own tile,
  * because the two answer different questions, but not its own metric_type row
  * — that would store one number twice. */

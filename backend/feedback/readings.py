@@ -37,11 +37,14 @@ Step = dict[str, str | None]
 class Reading:
     """What one metric offers a reader beyond its figure.
 
-    `explanation` is required and the other two are not, on purpose: ADR 0078
-    lets a scale exist only beside the population its boundaries came from, so
-    a scale with nothing to read next to it is a threshold the user cannot
-    argue with. The reverse is fine -- `run_length` is explained at length and
-    deliberately carries no step, because a correlation is not a boundary.
+    A scale may not exist without an explanation, which is ADR 0078's fourth
+    condition: a boundary is shown beside the population it came from, or it is
+    a threshold the user cannot argue with. The reverse is fine -- `run_length`
+    is explained at length and deliberately carries no step, because a
+    correlation is not a boundary.
+
+    A reading may also be more than words: `loudness` explains its figure and
+    derives the course the screen draws from the same entry.
     """
 
     # The text behind the metric's "i", read from the constant at request time
@@ -78,6 +81,26 @@ def _liveliness(detail: dict) -> dict:
         # decided both. The frontend maps no step to any colour of its own.
         "liveliness_light": intonation.LIGHTS[step],
     }
+
+
+def _loudness_course(detail: dict) -> dict:
+    """F-37's course: the smoothed line, the band read off the call's own
+    samples, and the stretches that left it.
+
+    Served rather than worked out again in the browser. The same reading goes
+    into the wrap-up prompt as a sentence (`metrics.describe_loudness_course`),
+    and the two used to be separate implementations in separate languages --
+    the drawing could have said one thing about a call while the sentence under
+    it said another, with nothing to notice.
+
+    A curve too short to read anything off is served exactly as stored, the
+    same answer `_liveliness` gives a Session with no `pvq`.
+    """
+    curve = detail.get("curve_db")
+    if not isinstance(curve, list):
+        return detail
+    course = metrics.loudness_course(curve)
+    return detail if course is None else {**detail, "course": course}
 
 
 def _interruption_light(detail: dict) -> dict:
@@ -141,7 +164,9 @@ _READINGS: dict[str, Reading] = {
     "reaction_time": Reading(explanations.REACTION_TIME),
     "pauses": Reading(explanations.PAUSES),
     "phonation_share": Reading(explanations.PHONATION_SHARE),
-    metrics.LOUDNESS_KEY: Reading(explanations.LOUDNESS),
+    # Explained like the rest, and the only one of them that also derives:
+    # the course the screen draws is read here (ADR 0091), never stored.
+    metrics.LOUDNESS_KEY: Reading(explanations.LOUDNESS, derive=_loudness_course),
 }
 
 

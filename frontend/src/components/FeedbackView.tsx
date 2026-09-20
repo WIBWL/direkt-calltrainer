@@ -19,11 +19,11 @@ import { ROUTES, sessionMetricPath } from "../routes";
 import { createFollowUp, createReverse, type ReverseScenario } from "../scenarioLibrary";
 import { retryFeedback } from "../sessions";
 import { cx } from "../utils/cx";
+import { loudnessCourse } from "../utils/loudness";
 import {
   ASPECT_LABELS,
   ASPECT_LEADS,
   formatMetricValue,
-  loudnessCurve,
   METRIC_ASPECTS,
   METRIC_DISCLAIMER,
   METRIC_KEYS,
@@ -948,7 +948,10 @@ function Metric({
   // Loudness is shown as a course, not a figure: its value is a dB span (95th
   // percentile minus 5th) that reads like a level without being one and that no
   // validated norm places (ADR 0004/0051). Without the curve the tile is empty.
-  const curve = measurement.key === "loudness" ? loudnessCurve(measurement) : null;
+  // The course itself is read off the call by the server and arrives in the
+  // Measurement's detail (ADR 0091), so the sentence the wrap-up writes about
+  // it cannot disagree with the picture here.
+  const curve = measurement.key === "loudness" ? loudnessCourse(measurement.detail) : null;
   if (measurement.key === "loudness" && !curve) return null;
 
   const context = interruptionContext(measurement);
@@ -985,7 +988,7 @@ function Metric({
   const body = curve ? (
     <>
       <span className="metric-name">{measurement.name} im Gesprächsverlauf</span>
-      <LoudnessCourse values={curve} />
+      <LoudnessCourse curve={curve} />
     </>
   ) : (
     <>

@@ -1,5 +1,4 @@
 import {
-  analyseLoudness,
   describeLoudness,
   loudnessClock,
   loudnessRuns,
@@ -9,9 +8,9 @@ import {
 } from "../utils/loudness";
 
 interface LoudnessCourseProps {
-  /** The loudness curve out of `Measurement.detail`: one point per 100 ms,
-   * `null` for a silent stretch inside an utterance. */
-  values: (number | null)[];
+  /** The course as the server read it (`loudnessCourse`): the smoothed line,
+   * the band from the call's own samples, and the stretches that left it. */
+  curve: LoudnessCurve;
 }
 
 const WIDTH = 640;
@@ -36,13 +35,11 @@ const LABEL_MARGIN = 70;
  * be a lie — hence the axis label.
  *
  * Inline SVG rather than a charting library: a band, a line and two markers.
- * The arithmetic behind all four lives in `utils/loudness.ts`, because the
- * downloadable report draws the same course and must draw the same one.
+ * What they are drawn from is read off the call by the server and arrives in
+ * the Measurement's detail (ADR 0091), so the sentence the wrap-up writes about
+ * the same course cannot disagree with this picture.
  */
-export default function LoudnessCourse({ values }: LoudnessCourseProps) {
-  const curve = analyseLoudness(values);
-  if (!curve) return null;
-
+export default function LoudnessCourse({ curve }: LoudnessCourseProps) {
   const x = (index: number) => (index / (curve.points - 1)) * WIDTH;
   const y = (value: number) => PLOT_TOP + PLOT_H - ((value - curve.floor) / curve.span) * PLOT_H;
 
