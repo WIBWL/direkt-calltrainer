@@ -7,6 +7,7 @@ import App from "./App";
 import { AuthGate } from "./AuthGate";
 import { ConsentProvider } from "./ConsentContext";
 import { FocusProvider } from "./FocusContext";
+import { ProgressProvider } from "./ProgressContext";
 import Accessibility from "./components/legal/Accessibility";
 import Imprint from "./components/legal/Imprint";
 import Notes from "./components/legal/Notes";
@@ -105,9 +106,24 @@ createRoot(document.getElementById("root")!).render(
               <Route element={<ConsentGate />}>
                 <Route path={ROUTES.training} element={<App />} />
                 <Route path={ROUTES.profile} element={<ProfileView />} />
-                <Route path={ROUTES.progress} element={<ProgressView />} />
-                <Route path={ROUTES.progressGoal} element={<ProgressGoalView />} />
-                <Route path={ROUTES.progressMetric} element={<ProgressMetricView />} />
+                {/* The three dashboard screens share one load of the
+                    history and one selection of trainings (see
+                    ProgressContext.tsx). Nested here rather than mounted with
+                    the other providers, because the training flow needs
+                    neither and should not pay for the request. The provider
+                    stays mounted while the router moves between the three, so
+                    walking into a detail and back asks for nothing. */}
+                <Route
+                  element={
+                    <ProgressProvider>
+                      <Outlet />
+                    </ProgressProvider>
+                  }
+                >
+                  <Route path={ROUTES.progress} element={<ProgressView />} />
+                  <Route path={ROUTES.progressGoal} element={<ProgressGoalView />} />
+                  <Route path={ROUTES.progressMetric} element={<ProgressMetricView />} />
+                </Route>
                 <Route path={ROUTES.session} element={<PastSessionView />} />
                 <Route path={ROUTES.sessionMetric} element={<SessionMetricView />} />
 

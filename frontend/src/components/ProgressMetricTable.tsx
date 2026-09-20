@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { useProgressContext } from "../ProgressContext";
 import { progressMetricPath } from "../routes";
 import { GROUPS, groupOf, type MetricGroup } from "../utils/metricGroups";
 import {
@@ -154,7 +155,10 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
  */
 function MetricRow({ series }: { series: MetricSeries }) {
   const navigate = useNavigate();
-  const path = progressMetricPath(series.key);
+  // The selection travels with the link, so the page behind it is drawn over
+  // the same trainings this row was (see ProgressContext.tsx).
+  const { withPeriod } = useProgressContext();
+  const path = withPeriod(progressMetricPath(series.key));
   const last = series.points[series.points.length - 1];
   const enough = series.points.length >= MIN_SESSIONS_FOR_SERIES;
 

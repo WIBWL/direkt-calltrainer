@@ -1,9 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { useConsentContext } from "../ConsentContext";
 import { useFocusContext } from "../FocusContext";
-import { useProgressData } from "../hooks/useProgressData";
+import { PERIODS, useProgressContext } from "../ProgressContext";
 import type { FocusGoal, SessionSummary } from "../protocol";
 import { ROUTES, progressGoalPath, progressMetricPath } from "../routes";
 import { backingOf } from "../utils/focusMetrics";
@@ -17,7 +17,6 @@ import {
   formatPoint,
   formatBand,
   variety,
-  latest,
   toSeries,
   type MetricSeries,
 } from "../utils/progressStats";
@@ -35,23 +34,6 @@ import Sparkline from "./Sparkline";
 import VarietyGrid from "./VarietyGrid";
 
 /**
- * Which trainings the screen is read over, counted in trainings (see
- * `progressStats.latest` for why not in days).
- *
- * It used to be 30 days, six months and everything. Six months is the retention
- * limit (ADR 0067), so the second and third said the same thing on almost
- * every account, and the first was empty for anybody who trains in bursts. The
- * widest option is still everything stored and nothing older.
- */
-const PERIODS = [
-  { key: "5", label: "Letzte 5", count: 5 },
-  { key: "10", label: "Letzte 10", count: 10 },
-  { key: "all", label: "Alle", count: null },
-] as const;
-
-type PeriodKey = (typeof PERIODS)[number]["key"];
-
-/**
  * The progress dashboard (F-13, docs/dashboard-konzept.md).
  *
  * Top to bottom: what I did (the counted figures, calendar and variety grid,
@@ -64,7 +46,11 @@ type PeriodKey = (typeof PERIODS)[number]["key"];
  *
  * The switch sits *under* the activity block deliberately: everything above it
  * counts every stored training, everything below is read over the selection, so
- * placement says what would otherwise need a caveat.
+ * placement says what would otherwise need a caveat. What it selects reaches
+ * the two detail levels as well, through the URL rather than through state
+ * here (`ProgressContext.tsx`): a tile that says "aus 5 Trainings" and a page
+ * behind it drawn over every stored one are two screens describing the same
+ * metric differently.
  *
  * Nothing here is evaluated — no target band, no colour meaning good, no arrow,
  * no aggregate score (ADR 0065), because nobody has established what a good
@@ -77,15 +63,15 @@ type PeriodKey = (typeof PERIODS)[number]["key"];
  * is a different product with a different legal footing.
  */
 export default function ProgressView() {
-  const { sessions, state, truncated, total } = useProgressData();
+  // The trainings and the selection both come from the provider, which the two
+  // detail levels read as well — that is what keeps a tile and the page behind
+  // it talking about the same set (see ProgressContext.tsx). `withPeriod` is
+  // not taken here: the links that need it sit in the tiles and in the metric
+  // table, which read it from the same context.
+  const { sessions, selected: inPeriod, state, truncated, total, period, setPeriod } =
+    useProgressContext();
   const { focus } = useFocusContext();
   const { consent } = useConsentContext();
-  // Everything by default, as dashboard-konzept.md section 10 decided: the
-  // first look should show all there is, and narrowing is one click away.
-  const [period, setPeriod] = useState<PeriodKey>("all");
-
-  const count = PERIODS.find((p) => p.key === period)?.count ?? null;
-  const inPeriod = latest(sessions, count);
   // The call length rides along with the measured metrics. It is derived
   // from the two timestamps rather than measured from the audio, but it belongs
   // to the same family: descriptive, and in need of no norm to be readable.
@@ -363,6 +349,7 @@ function FocusTile({
    *  calendar and not about the trainings the switch selected. */
   allSessions: SessionSummary[];
 }) {
+  const { withPeriod } = useProgressContext();
   const backing = backingOf(goal.key);
   const primary = series.find((s) => s.key === backing.metrics[0]);
   const supporting = backing.metrics
@@ -400,7 +387,7 @@ function FocusTile({
           charts in one click. Activity goals have none -- what answers them is
           the calendar and the variety grid on this very screen. */}
       {backing.kind !== "activity" && (
-        <Link className="progress-detail-link" to={progressGoalPath(goal.key)}>
+        <Link className="progress-detail-link" to={withPeriod(progressGoalPath(goal.key))}>
           Was dazu gesagt wurde
         </Link>
       )}
@@ -619,6 +606,7 @@ function MetricBody({ series, sessionCount }: { series: MetricSeries; sessionCou
  * would make it less so.
  */
 function OverviewSection({ series }: { series: MetricSeries[] }) {
+  const { withPeriod } = useProgressContext();
   const withSpread = series
     .filter((s) => s.points.length >= MIN_SESSIONS_FOR_SERIES && s.band)
     .map((s) => ({
@@ -641,7 +629,7 @@ function OverviewSection({ series }: { series: MetricSeries[] }) {
               <div className="focus-tile">
                 <h3 className="focus-tile-title">{s.name}</h3>
                 <MetricBody series={s} sessionCount={s.points.length} />
-                <Link className="progress-detail-link" to={progressMetricPath(s.key)}>
+                <Link className="progress-detail-link" to={withPeriod(progressMetricPath(s.key))}>
                   Einzelne Trainings ansehen
                 </Link>
               </div>
