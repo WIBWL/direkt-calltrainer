@@ -331,44 +331,43 @@ export default function App() {
     { briefing: string; facts: string } | null
   >(null);
 
-  // What the flow routes on, refreshed every render and read only from event
-  // handlers — which is what lets `advance` keep one identity for the life of
-  // the component. That matters: `handleAnalysed` is a dependency of the
-  // waiting screen's own patience timer, and a new identity would restart it.
-  const flowRef = useRef<FlowContext>({
+  // What the flow routes on that render state can answer, refreshed every
+  // render and read only from event handlers — which is what lets `advance`
+  // keep one identity for the life of the component. That matters:
+  // `handleAnalysed` is a dependency of the waiting screen's own patience
+  // timer, and a new identity would restart it. What only one handler knows
+  // travels on that handler's event instead (see `FlowEvent`).
+  const flowRef = useRef<Omit<FlowContext, "reducedMotion">>({
     reverse: false,
     drawn: false,
     committedCase: null,
-    reducedMotion: false,
-    skipMicCheck: false,
-    stored: false,
   });
   flowRef.current = {
     reverse: committed?.reverse === true,
     drawn: secretScenario !== null,
     committedCase,
-    // Asked at the moment of the transition rather than per render: it is a
-    // media query, and only the throw depends on it.
-    reducedMotion: false,
-    skipMicCheck: false,
-    stored: false,
   };
+  // The whole context at the moment of a press. Reduced motion is asked here
+  // rather than per render: it is a media query, and only the throw needs it.
+  const flowContext = (): FlowContext => ({
+    ...flowRef.current,
+    reducedMotion: prefersReducedMotion(),
+  });
 
   /**
    * The only way the screen changes.
    *
    * Every destination comes from `trainingFlow.nextScreen`, so the machine is
-   * the table there and not the sum of the call sites. `overrides` carries the
-   * facts a handler knows and the render does not — whether this commit skips
-   * the microphone check, whether the call that just ended was stored — which
-   * are arguments rather than state at the moment they are needed.
+   * the table there and not the sum of the call sites. The facts a handler
+   * knows and the render does not — whether this commit skips the microphone
+   * check, whether the call that just ended was stored — ride on the event
+   * itself, so leaving one out does not compile.
    */
   const advance = useCallback(
-    (event: FlowEvent, overrides: Partial<FlowContext> = {}) => {
-      const context = {
+    (event: FlowEvent) => {
+      const context: FlowContext = {
         ...flowRef.current,
         reducedMotion: prefersReducedMotion(),
-        ...overrides,
       };
       const { screen: next, cut } = nextScreen(context, event);
       if (cut === "fade") playFade(() => setScreen(next));
@@ -432,7 +431,7 @@ export default function App() {
     // Straight to the wrap-up's own waiting screen where one is being written,
     // and straight past it where none is: no stored Session, no wrap-up, and a
     // wait for something that is not coming (ADR 0066).
-    advance("callEnded", { stored: pendingEnd.sessionId !== null });
+    advance({ type: "callEnded", stored: pendingEnd.sessionId !== null });
     if (committed) {
       setLastPlayed({ scenarioId: committed.scenarioId, personaId: committed.personaId });
     }
@@ -499,7 +498,7 @@ export default function App() {
       // into. From there the ringing phone (F-63) is one further press:
       // nothing goes straight into a conversation, and the last press before
       // someone has to speak is always their own.
-      advance("sessionCommitted", { reverse, skipMicCheck });
+      advance({ type: "sessionCommitted", reverse, skipMicCheck });
       if (skipMicCheck) setIsMicrophoneMuted(false);
     },
     [],
@@ -569,7 +568,7 @@ export default function App() {
     setIsMicrophoneMuted(false);
     playback.activate();
     socket.sendActivate();
-    advance("callAccepted");
+    advance({ type: "callAccepted" });
   }, [playback, socket.sendActivate, advance]);
 
   // The microphone check's own button. Where it leads is `trainingFlow`'s to
@@ -579,7 +578,7 @@ export default function App() {
   // to the case screen. The check's label asks the same function through
   // `briefingFollows` when the screen renders, so the two cannot disagree.
   const handleMicConfirmed = useCallback(() => {
-    advance("micConfirmed");
+    advance({ type: "micConfirmed" });
   }, [advance]);
 
   // The same question asked once more, for the way in that cannot answer it at
@@ -589,7 +588,7 @@ export default function App() {
   useEffect(() => {
     if (screen !== "case-brief" || committedCase === null) return;
     if (committedCase.briefing || committedCase.facts) return;
-    advance("caseArrivedEmpty");
+    advance({ type: "caseArrivedEmpty" });
   }, [screen, committedCase, advance]);
 
   // The throw ends where every ordinary call now begins: at the ringing phone,
@@ -597,7 +596,7 @@ export default function App() {
   // timer is the whole of the screen's logic.
   useEffect(() => {
     if (screen !== "rolling") return undefined;
-    const timer = window.setTimeout(() => advance("rollFinished"), ROLL_MS);
+    const timer = window.setTimeout(() => advance({ type: "rollFinished" }), ROLL_MS);
     return () => window.clearTimeout(timer);
   }, [screen, advance]);
 
@@ -606,7 +605,7 @@ export default function App() {
   // point holding the connection (and the server-side Session) open for it.
   const handleCancelMicCheck = useCallback(() => {
     setCommitted(null);
-    advance("micCheckCancelled");
+    advance({ type: "micCheckCancelled" });
   }, [advance]);
 
   // The effect above owns VAD pause/resume; the button only changes UI state.
@@ -617,14 +616,14 @@ export default function App() {
   // The wrap-up has settled, or the User would rather not wait for it. Stable,
   // because the waiting screen hangs its own patience limit off it.
   const handleAnalysed = useCallback(() => {
-    advance("analysed");
+    advance({ type: "analysed" });
   }, [advance]);
 
   // Clears the stored finished Session too, so the wrap-up does not come
   // back when the next Session ends (ADR 0042 handles the reconnect side).
   const handleRestart = useCallback(() => {
     saveFinishedSession(null);
-    advance("restarted");
+    advance({ type: "restarted" });
   }, [advance]);
 
   // Starts a Scenario written out of a finished training as the next call,
@@ -812,7 +811,7 @@ export default function App() {
   // because it is the same moment in the flow.
   if (screen === "case-brief") {
     return (
-      <BriefScreen onContinue={() => advance("caseRead")} onLeave={handleCancelMicCheck}>
+      <BriefScreen onContinue={() => advance({ type: "caseRead" })} onLeave={handleCancelMicCheck}>
         {committedCase === null ? (
           // The reverse's briefing screen says the same thing in the same
           // place while its own text is in flight. Reached with the case
@@ -856,10 +855,7 @@ export default function App() {
     // router read the committed case's — and the two disagreed for a Scenario
     // carrying facts but no card briefing. The label may flip once while the
     // case is still in flight; it is no longer ever wrong.
-    const nextIsBriefing = briefingFollows({
-      ...flowRef.current,
-      reducedMotion: prefersReducedMotion(),
-    });
+    const nextIsBriefing = briefingFollows(flowContext());
     return (
       <AppLayout step="prepare" navigationLocked pageClassName="mic-check-page">
         <MicCheck

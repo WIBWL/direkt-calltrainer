@@ -37,11 +37,20 @@ export type Screen =
 export type Cut = "none" | "fade";
 
 /**
- * Everything the flow routes on, gathered from the caller.
+ * What the flow routes on that the caller's render state and environment can
+ * answer at the moment of any press.
  *
  * Passed in rather than read here — `prefersReducedMotion()` in particular is
  * an environment query, and a function that makes one cannot be tested by
  * describing a situation.
+ *
+ * A fact only one handler knows travels on that handler's event instead
+ * (`sessionCommitted`, `callEnded`). They used to sit here, where the caller
+ * held them as `false` between presses and every handler had to remember to
+ * override the one it knew: forgetting `stored` skipped the waiting screen,
+ * forgetting `reverse` sent a reverse to the wrong briefing, and nothing in the
+ * type said which event needed which. On the event, a missing one does not
+ * compile.
  */
 export interface FlowContext {
   /** The committed Scenario replays a finished Session with the roles swapped
@@ -63,27 +72,29 @@ export interface FlowContext {
   /** Whether the User asked for reduced motion. The die has nothing to say
    * standing still, so under it the throw is skipped rather than shown. */
   reducedMotion: boolean;
-  /** Whether the microphone check is skipped — true coming straight from a
-   * finished training (F-60/F-61), where the microphone was in use seconds ago
-   * and its device is still selected. */
-  skipMicCheck: boolean;
-  /** Whether the finished call was stored, and so has a wrap-up coming. */
-  stored: boolean;
 }
 
 /** What happened, as the flow hears it. */
 export type FlowEvent =
-  /** A pairing was committed to and the Session is connecting (ADR 0042). */
-  | "sessionCommitted"
+  /**
+   * A pairing was committed to and the Session is connecting (ADR 0042).
+   *
+   * Both facts come from the handler: the commit is the press that *sets* the
+   * committed Session, so render state has not caught up with it yet.
+   * `skipMicCheck` is true coming straight from a finished training
+   * (F-60/F-61), where the microphone was in use seconds ago and its device is
+   * still selected.
+   */
+  | { type: "sessionCommitted"; reverse: boolean; skipMicCheck: boolean }
   /** The microphone check was confirmed. */
-  | "micConfirmed"
+  | { type: "micConfirmed" }
   /** The case arrived and holds nothing to read, on a screen already showing
    * it. Only reachable for a way in that commits before its case is fetched. */
-  | "caseArrivedEmpty"
+  | { type: "caseArrivedEmpty" }
   /** The User read the case and pressed on. */
-  | "caseRead"
+  | { type: "caseRead" }
   /** The die finished rolling. */
-  | "rollFinished"
+  | { type: "rollFinished" }
   /**
    * The call was accepted — the ringing phone answered, or the reverse's
    * briefing read and its button pressed. A reverse has no phone to answer:
@@ -93,15 +104,16 @@ export type FlowEvent =
    * The only event that reaches the call, which is what keeps the three things
    * `App` does on the way in from being reachable any other way.
    */
-  | "callAccepted"
-  /** The call ended, by hang-up, error or the Persona saying goodbye. */
-  | "callEnded"
+  | { type: "callAccepted" }
+  /** The call ended, by hang-up, error or the Persona saying goodbye.
+   * `stored`: the Session was written, and so has a wrap-up coming. */
+  | { type: "callEnded"; stored: boolean }
   /** The wrap-up settled, or the User would rather not wait for it. */
-  | "analysed"
+  | { type: "analysed" }
   /** The microphone check was abandoned, dropping the committed Session. */
-  | "micCheckCancelled"
+  | { type: "micCheckCancelled" }
   /** Back to the beginning from the end of a training. */
-  | "restarted";
+  | { type: "restarted" };
 
 export interface Transition {
   screen: Screen;
@@ -116,14 +128,14 @@ export interface Transition {
  * what is easy to forget.
  */
 export function nextScreen(context: FlowContext, event: FlowEvent): Transition {
-  switch (event) {
+  switch (event.type) {
     case "sessionCommitted":
       // The check is skipped coming out of a finished training, but the case
       // never is: a reverse gets the briefing it has to argue from, everything
       // else the screen with its own Briefing on it. Nothing goes straight
       // into a conversation.
-      if (!context.skipMicCheck) return { screen: "mic-check", cut: "none" };
-      return { screen: context.reverse ? "brief" : "case-brief", cut: "none" };
+      if (!event.skipMicCheck) return { screen: "mic-check", cut: "none" };
+      return { screen: event.reverse ? "brief" : "case-brief", cut: "none" };
 
     case "micConfirmed":
       // A reverse goes to its briefing (F-61) — the same screen the offer
@@ -154,7 +166,7 @@ export function nextScreen(context: FlowContext, event: FlowEvent): Transition {
     case "callEnded":
       // Straight to the wrap-up's waiting screen where one is being written,
       // and straight past it where none is (ADR 0066).
-      return { screen: context.stored ? "analysing" : "transcript", cut: "none" };
+      return { screen: event.stored ? "analysing" : "transcript", cut: "none" };
 
     case "analysed":
       return { screen: "transcript", cut: "none" };
@@ -188,6 +200,6 @@ function hasNothingToRead(context: FlowContext): boolean {
  * was sometimes wrong.
  */
 export function briefingFollows(context: FlowContext): boolean {
-  const { screen } = nextScreen(context, "micConfirmed");
+  const { screen } = nextScreen(context, { type: "micConfirmed" });
   return screen === "brief" || screen === "case-brief";
 }
