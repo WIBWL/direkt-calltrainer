@@ -31,7 +31,6 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from decimal import Decimal
 
 from dotenv import load_dotenv
 
@@ -46,7 +45,8 @@ load_dotenv()
 # load_dotenv() before it reads the environment -- so these cannot move up.
 from backend.db import models as db_models  # noqa: E402
 from backend.db.session import session_scope  # noqa: E402
-from backend.feedback import interruptions  # noqa: E402
+from backend.feedback import interruptions, rows  # noqa: E402
+from backend.feedback.metrics import Measurement  # noqa: E402
 from scripts import _backfill_cli  # noqa: E402
 
 logger = logging.getLogger("backfill_interruptions")
@@ -108,13 +108,10 @@ def backfill(apply: bool) -> int:
             if not apply:
                 continue
 
-            session.measurements.append(db_models.Measurement(
-                metric_type_id=count_id,
-                value=Decimal(f"{len(report.hard)}.0000"),
-                # Marks the row as reconstructed rather than measured when the
-                # call ended. The figures are identical either way, but a row
-                # that says where it came from is worth the one key.
-                detail_json={**report.detail(), "backfilled": True},
+            session.measurements.extend(rows.measurements(
+                {interruptions.COUNT_KEY: count_id},
+                [Measurement(interruptions.COUNT_KEY, float(len(report.hard)), report.detail())],
+                backfilled=True,
             ))
             session.findings.extend(
                 db_models.Finding(

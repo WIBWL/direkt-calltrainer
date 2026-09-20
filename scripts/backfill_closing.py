@@ -33,7 +33,6 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from decimal import Decimal
 
 from dotenv import load_dotenv
 
@@ -48,7 +47,7 @@ load_dotenv()
 # load_dotenv() before it reads the environment -- so these cannot move up.
 from backend.db import models as db_models  # noqa: E402
 from backend.db.session import session_scope  # noqa: E402
-from backend.feedback import metrics  # noqa: E402
+from backend.feedback import metrics, rows  # noqa: E402
 from backend.session.language_packs import LANGUAGE_PACKS  # noqa: E402
 from scripts import _backfill_cli  # noqa: E402
 
@@ -97,14 +96,10 @@ def backfill(apply: bool) -> int:
             if not apply:
                 continue
 
-            measurement = metrics.closing_measurement(parts)
-            session.measurements.append(db_models.Measurement(
-                metric_type_id=closing_id,
-                value=Decimal(f"{measurement.value:.4f}"),
-                # Marks the row as reconstructed rather than measured when the
-                # call ended. The parts are identical either way, but a row that
-                # says where it came from is worth the one key.
-                detail_json=(measurement.detail or {}) | {"backfilled": True},
+            session.measurements.extend(rows.measurements(
+                {metrics.CLOSING_KEY: closing_id},
+                [metrics.closing_measurement(parts)],
+                backfilled=True,
             ))
             written += 1
     return written

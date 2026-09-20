@@ -15,7 +15,6 @@ import logging
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from decimal import Decimal
 
 from sqlalchemy.orm import Session as DbSession
 
@@ -24,7 +23,7 @@ from sqlalchemy.orm import Session as DbSession
 from backend import consent
 from backend.db import models as db_models
 from backend.db.session import session_scope
-from backend.feedback import interruptions, metrics
+from backend.feedback import interruptions, metrics, rows
 from backend.feedback.calls import Conversation, conversation, utterances
 from backend.personas import Persona
 from backend.scenarios import Scenario
@@ -127,8 +126,8 @@ def _write_analysis(
     """Attach the Session's Measurement and Finding rows.
 
     A metric the seed does not know is dropped rather than written against a
-    guessed reference row -- provision.py seeds the inventory from the same
-    METRICS tuple, so that can only happen against a database behind the code.
+    guessed reference row, and `feedback/rows.py` says so in the log -- it owns
+    that rule, and the rounding, for every writer.
 
     Findings are written for one thing only, and the distinction is what makes
     it allowable: a hard interruption is an *event that occurred at a moment*,
@@ -137,19 +136,11 @@ def _write_analysis(
     measured. Nothing of that sort is written here -- an overlap either happened
     or it did not, and the row says when.
     """
-    metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType).all()}
-    session.measurements = [
-        db_models.Measurement(
-            metric_type_id=metric_ids[m.key],
-            value=Decimal(f"{m.value:.4f}"),
-            detail_json=m.detail,
-        )
-        for m in metrics.measure(call)
-        if m.key in metric_ids
-    ]
+    ids = rows.metric_ids(db)
+    session.measurements = rows.measurements(ids, metrics.measure(call))
     session.findings = [
         db_models.Finding(
-            metric_type_id=metric_ids.get(interruptions.COUNT_KEY),
+            metric_type_id=ids.get(interruptions.COUNT_KEY),
             category=interruptions.FINDING_CATEGORY,
             offset_ms=event.offset_ms,
             description=interruptions.finding_description(event),

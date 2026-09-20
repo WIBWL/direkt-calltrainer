@@ -49,7 +49,6 @@ import asyncio
 import logging
 import re
 from datetime import UTC, datetime
-from decimal import Decimal
 
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session as DbSession
@@ -58,7 +57,7 @@ from backend.clients import llm
 from backend.db import models as db_models
 from backend.db.seed_data import FOCUS_GOALS
 from backend.db.session import session_scope
-from backend.feedback import jobs, metrics, segments
+from backend.feedback import jobs, metrics, rows, segments
 
 logger = logging.getLogger(__name__)
 
@@ -989,19 +988,9 @@ def _write_segments(db: DbSession, session_id: int, pressure_turns: list[int]) -
     ).delete(synchronize_session=False)
     db.flush()
 
-    metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType).all()}
+    ids = rows.metric_ids(db)
     for segment, values in measured.items():
-        db.add_all([
-            db_models.Measurement(
-                session_id=session_id,
-                metric_type_id=metric_ids[m.key],
-                segment=segment,
-                value=Decimal(f"{m.value:.4f}"),
-                detail_json=m.detail,
-            )
-            for m in values
-            if m.key in metric_ids
-        ])
+        db.add_all(rows.measurements(ids, values, segment=segment, session_id=session_id))
     logger.info(
         "Segment measurements for session %d: %d pressing utterance(s)",
         session_id, len(pressed_ids),

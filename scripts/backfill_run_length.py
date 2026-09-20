@@ -32,7 +32,6 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from decimal import Decimal
 
 from dotenv import load_dotenv
 
@@ -47,7 +46,7 @@ load_dotenv()
 # load_dotenv() before it reads the environment -- so these cannot move up.
 from backend.db import models as db_models  # noqa: E402
 from backend.db.session import session_scope  # noqa: E402
-from backend.feedback import metrics  # noqa: E402
+from backend.feedback import metrics, rows  # noqa: E402
 from scripts import _backfill_cli  # noqa: E402
 
 logger = logging.getLogger("backfill_run_length")
@@ -100,30 +99,26 @@ def backfill(apply: bool) -> int:
                 continue
 
             phonation, utterances, pause_count = terms
-            runs = utterances + pause_count
-            seconds = phonation / runs / 1000
+            # The figure itself comes from `metrics.run_length_measurement`, the
+            # same function the live path derives it with: the division and its
+            # four detail keys were written out a second time here, where they
+            # could have drifted with nothing to say so.
+            measurement = metrics.run_length_measurement(phonation, utterances, pause_count)
+            if measurement is None:
+                continue
+            detail = measurement.detail or {}
             logger.info(
                 "Session %s: %.1f s Sprechzeit auf %d Abschnitte (%d Äußerungen, "
                 "%d Pausen) = %.2f s",
-                session.extern_id, phonation / 1000, runs, utterances, pause_count, seconds,
+                session.extern_id, phonation / 1000, detail["runs"],
+                utterances, pause_count, measurement.value,
             )
             if not apply:
                 continue
 
-            session.measurements.append(db_models.Measurement(
-                metric_type_id=run_id,
-                value=Decimal(f"{seconds:.4f}"),
-                detail_json={
-                    "runs": runs,
-                    "phonation_ms": phonation,
-                    "utterances": utterances,
-                    "pause_count": pause_count,
-                    # Marks the row as reconstructed rather than measured when
-                    # the call ended. The figure is identical either way, but a
-                    # row that says where it came from is worth the one key.
-                    "backfilled": True,
-                },
-            ))
+            session.measurements.extend(
+                rows.measurements(by_key, [measurement], backfilled=True)
+            )
             written += 1
     return written
 

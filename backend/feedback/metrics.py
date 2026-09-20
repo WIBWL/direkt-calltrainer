@@ -529,20 +529,41 @@ def _run_length(call: Conversation) -> Measurement | None:
     if (not call.user_acoustics_complete or not call.user_turns or
             not _silence_found(call)):
         return None
-    runs = len(call.user_turns) + len(call.pauses)
-    if not call.user_phonation_ms:
+    return run_length_measurement(
+        call.user_phonation_ms, len(call.user_turns), len(call.pauses)
+    )
+
+
+def run_length_measurement(
+    phonation_ms: int, utterances: int, pauses: int
+) -> Measurement | None:
+    """The stored shape: mean run length in seconds, and the terms behind it.
+
+    A function of its own for the reason `closing_measurement` is one: it is
+    what `scripts/backfill_run_length.py` runs over stored Sessions. Everything
+    it divides was already stored by two other metrics, so ADR 0048's "a new
+    measurement starts the day it ships" does not bite -- and the script wrote
+    the division and the four detail keys out a second time until this existed,
+    where the two could have drifted with nothing to say so.
+
+    The guards that decide whether a call may be measured at all stay with the
+    deriver: they read the acoustics, which is what a stored Session no longer
+    has.
+    """
+    runs = utterances + pauses
+    if not runs or not phonation_ms:
         return None
     return Measurement(
         RUN_LENGTH_KEY,
-        call.user_phonation_ms / runs / _MS_PER_SECOND,
+        phonation_ms / runs / _MS_PER_SECOND,
         {
             "runs": runs,
-            "phonation_ms": call.user_phonation_ms,
+            "phonation_ms": phonation_ms,
             # The two terms of the denominator, because a call with many short
             # utterances and one with few interrupted ones reach the same run
             # count by different routes.
-            "utterances": len(call.user_turns),
-            "pause_count": len(call.pauses),
+            "utterances": utterances,
+            "pause_count": pauses,
         },
     )
 
