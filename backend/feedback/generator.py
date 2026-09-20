@@ -35,6 +35,13 @@ the job has one model call and one thing that can fail.
 
 Runs in the async worker (ADR 0018/0019), not in the live path.
 """
+# pylint: disable=too-many-lines  # over the ceiling by a hair, and not because
+# this module's own job grew: `_store_segments`/`_write_segments` below are the
+# segment feature's storage (ADR 0081), living here because the wrap-up is what
+# decides the split. `segments.py` says of itself that it "writes no derivation
+# of its own" -- it measures and does not store -- and moving the store beside
+# the measuring is what brings this back under the line. Until then the line is
+# borrowed rather than earned: do not add to this module to use it up.
 
 from __future__ import annotations
 

@@ -140,6 +140,60 @@ class UnknownChoice(ValueError):
     """A role or call type outside its vocabulary. A client bug, like UnknownGoal."""
 
 
+def _checked(
+    db: DbSession,
+    keys: list[str],
+    role: str | None,
+    categories: list[str] | None,
+) -> tuple[list[str], dict[str, db_models.FocusGoal], list[str]]:
+    """What `set_selection` may store, or the refusal that stops it.
+
+    Everything the request has to prove before a row is touched: the goals fit
+    in MAX_GOALS, exist and are active; the role and the call types are in their
+    vocabularies. Separate from the write below so that neither half has to be
+    read to follow the other -- and so the write is what its own locals are
+    about.
+
+    Returns the de-duplicated goal keys, the goal rows they name, and the
+    de-duplicated call types.
+    """
+    wanted = list(dict.fromkeys(keys))  # de-duplicated, order preserved
+    if len(wanted) > MAX_GOALS:
+        raise TooManyGoals(f"at most {MAX_GOALS} goals may be selected")
+
+    rows: dict[str, db_models.FocusGoal] = {}
+    if wanted:
+        # `IN ()` is not valid SQL, hence the guard rather than an unconditional
+        # query -- the same reason api/account.py's _count() has one.
+        rows = {
+            row.key: row
+            for row in db.query(db_models.FocusGoal).filter(
+                db_models.FocusGoal.key.in_(wanted),
+                db_models.FocusGoal.active.is_(True),
+            )
+        }
+    missing = [key for key in wanted if key not in rows]
+    if missing:
+        raise UnknownGoal(f"unknown focus goal(s): {', '.join(missing)}")
+
+    if role is not None and role not in db_models.TRAINING_ROLES:
+        raise UnknownChoice(f"unknown role: {role}")
+
+    kinds = list(dict.fromkeys(categories or ()))
+    strange = [kind for kind in kinds if kind not in db_models.SCENARIO_CATEGORIES]
+    if strange:
+        # Only the first few are named. The goals are capped at MAX_GOALS before
+        # they are looked up, the call types are not, and the whole list came
+        # back in the 400's body -- a request with a hundred thousand invented
+        # types answered with a body the same size. Nothing leaks and React
+        # escapes it; it is amplification, and naming three is as useful to the
+        # caller as naming all of them.
+        more = f" (and {len(strange) - 3} more)" if len(strange) > 3 else ""
+        raise UnknownChoice(f"unknown call type(s): {', '.join(strange[:3])}{more}")
+
+    return wanted, rows, kinds
+
+
 def set_selection(
     db: DbSession,
     subject_id: str,
@@ -160,37 +214,7 @@ def set_selection(
     mean the request was wrong, and silently dropping the surplus would store a
     focus the user did not pick.
     """
-    wanted = list(dict.fromkeys(keys))  # de-duplicated, order preserved
-    if len(wanted) > MAX_GOALS:
-        raise TooManyGoals(f"at most {MAX_GOALS} goals may be selected")
-
-    rows: dict[str, db_models.FocusGoal] = {}
-    if wanted:
-        # `IN ()` is not valid SQL, hence the guard rather than an unconditional
-        # query -- the same reason api/account.py's _count() has one.
-        rows = {
-            row.key: row
-            for row in db.query(db_models.FocusGoal).filter(
-                db_models.FocusGoal.key.in_(wanted),
-                db_models.FocusGoal.active.is_(True),
-            )
-        }
-    missing = [key for key in wanted if key not in rows]
-    if missing:
-        raise UnknownGoal(f"unknown focus goal(s): {', '.join(missing)}")
-    kinds = list(dict.fromkeys(categories or ()))
-    if role is not None and role not in db_models.TRAINING_ROLES:
-        raise UnknownChoice(f"unknown role: {role}")
-    strange = [kind for kind in kinds if kind not in db_models.SCENARIO_CATEGORIES]
-    if strange:
-        # Only the first few are named. The goals are capped at MAX_GOALS before
-        # they are looked up, the call types are not, and the whole list came
-        # back in the 400's body -- a request with a hundred thousand invented
-        # types answered with a body the same size. Nothing leaks and React
-        # escapes it; it is amplification, and naming three is as useful to the
-        # caller as naming all of them.
-        more = f" (and {len(strange) - 3} more)" if len(strange) > 3 else ""
-        raise UnknownChoice(f"unknown call type(s): {', '.join(strange[:3])}{more}")
+    wanted, rows, kinds = _checked(db, keys, role, categories)
 
     now = datetime.now(UTC)
     # Same lock the consent write takes, for the same reason: `focus_selection`
