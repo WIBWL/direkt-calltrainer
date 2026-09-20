@@ -7,12 +7,18 @@ Covers:
             passes through the same `clean()` and is expected to be unchanged.
   ADR 0024  user-authored Scenarios
 
+  ADR 0063  the editor's field limits come from the backend; the frontend's
+            fallback copy is pinned to them
+
 No infrastructure -- `clean` is a pure function and the seed content imports
 without a database.
 """
+import re
+from pathlib import Path
+
 import pytest
 
-from backend.authored_text import FIELD_LIMITS, clean
+from backend.authored_text import FIELD_LIMITS, WIRE_FIELD_LIMITS, clean
 from backend.db.seed_data import PERSONAS, SCENARIOS
 
 # pylint: disable=missing-function-docstring
@@ -96,3 +102,28 @@ def test_seed_content_is_within_the_field_limits(entry):
     for field, cap in limits.items():
         if field in entry:
             assert len(entry[field]) <= cap, f"{field}: {len(entry[field])} > {cap}"
+
+
+SCENARIO_LIBRARY_TS = (
+    Path(__file__).resolve().parent.parent / "frontend" / "src" / "scenarioLibrary.ts"
+)
+
+
+def _fallback_field_limits() -> dict[str, int]:
+    """`FALLBACK_FIELD_LIMITS` as written in the frontend source.
+
+    Read out of the source rather than executed, the way `test_metrics.py`
+    reads the metric catalogue: there is no Node in the pytest run.
+    """
+    text = SCENARIO_LIBRARY_TS.read_text(encoding="utf-8")
+    body = text.split("export const FALLBACK_FIELD_LIMITS: FieldLimits = {", 1)[1]
+    body = body.split("\n};", 1)[0]
+    pairs = re.findall(r"^  ([a-z_]+): (\d+),", body, re.MULTILINE)
+    return {key: int(value) for key, value in pairs}
+
+
+def test_frontend_fallback_limits_match_the_backend():
+    """The editor caps its inputs with this copy until the limits route answers,
+    and for good when it fails. A cap above the server's lets a User type a field
+    that Save rejects with a 422 -- which is where three of them had drifted."""
+    assert _fallback_field_limits() == WIRE_FIELD_LIMITS
