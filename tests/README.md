@@ -108,9 +108,10 @@ source of that content, and which imports without a database.
   `test_api.py`); the generated text itself is not asserted, since it is model
   output. `metrics.py` is covered by `test_metrics.py` and `acoustics.py` by
   `test_acoustics.py` since the pitch curve was added.
-* **Frontend** (React hooks, in-browser Silero VAD / ADR 0036, streamed audio
-  playback) — no JS test runner is configured. VAD confirmed-speech filtering
-  is a browser-only concern.
+* **Frontend** — not in this suite. Vitest covers the live-call audio path and
+  the training flow's transition table (`cd frontend && npm test`, ADR 0094);
+  in-browser Silero VAD confirmed-speech filtering (ADR 0036) stays a
+  browser-only concern that neither suite reaches.
 * **Real backend connectivity** — `scripts/check_backends.py` already does a
   live OK/FAIL probe against the configured STT/LLM/TTS models.
 * **Whether the model actually follows the frame** — every prompt test here

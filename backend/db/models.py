@@ -461,7 +461,8 @@ class Scenario(AuthoredContent, Base):
     # Scenario text because four readers branch on it -- the prompt casting
     # (`session/prompting.py`), the wrap-up's speaker labels, the library
     # filter and the briefing panel. That is exactly what the free-text
-    # `scenario_type` label ADR 0062 removed never had.
+    # `scenario_type` label had never had (removed by migration `e4a9c07b2f31`;
+    # ADR 0072's closed `category` replaces it).
     #
     # Distinct from `derived_from_session_id` above, which is the follow-up's
     # provenance (ADR 0069): that one says a Scenario was *written from* a

@@ -29,7 +29,7 @@ const CAPTIONS = [
 /**
  * How long this screen waits before handing over regardless.
  *
- * `useSessionFeedback` polls for ten minutes (the worker's own timeout), which
+ * `useSessionFeedback` polls for ten minutes (twice the worker's own timeout), which
  * is the right patience for a block on a page and the wrong one for a screen
  * that holds nothing else: a wrap-up that takes that long is one the User
  * should be reading their transcript instead of waiting for. The poll is not

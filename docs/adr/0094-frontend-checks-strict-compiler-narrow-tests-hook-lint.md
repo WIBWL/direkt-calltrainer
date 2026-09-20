@@ -8,7 +8,7 @@ Proposed. The first two parts describe what is in place. The third — ESLint re
 
 There is no CI workflow in the repository and no Node toolchain on the development machine. The frontend is verified when the image is built: `docker build --target frontend-build` runs `npm ci && npm run build`, and `build` is `tsc && vite build`. Whatever that step does not catch reaches the browser.
 
-**The compiler runs at maximum strictness** (`frontend/tsconfig.json`): `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnusedLocals`, `noUnusedParameters`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `verbatimModuleSyntax`. The test specs are type-checked with everything else, since a fixture had once drifted out of shape while they were excluded. CLAUDE.md still describes them as excluded; `tsconfig.json` is the current state.
+**The compiler runs at maximum strictness** (`frontend/tsconfig.json`): `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnusedLocals`, `noUnusedParameters`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `verbatimModuleSyntax`. The test specs are type-checked with everything else, since a fixture had once drifted out of shape while they were excluded. CLAUDE.md described them as excluded for a while after that; it has been corrected, and `tsconfig.json` is the current state.
 
 **The test suite is deliberately narrow** (Vitest, jsdom, hand-written Web Audio and WebSocket fakes in `src/test/setup.ts`):
 

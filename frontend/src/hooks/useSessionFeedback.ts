@@ -5,8 +5,9 @@ import { getSession } from "../sessions";
 
 const POLL_INTERVAL_MS = 2000;
 // Must not be shorter than the backend's JOB_TIMEOUT_S (backend/feedback/
-// queue.py): giving up earlier reports a failure on work that is still running,
-// and with no listing endpoint that wrap-up is then gone for good. Generation
+// queue.py): giving up earlier reports a failure on work that is still running.
+// The wrap-up would still reach the training history once it lands, but this
+// screen would already have told the User it failed. Generation
 // is asked in thinking mode and may be retried once, so "a few seconds" no
 // longer bounds it. Only this block waits, the transcript renders either way.
 const POLL_TIMEOUT_MS = 600_000;
