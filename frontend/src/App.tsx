@@ -770,9 +770,14 @@ export default function App() {
       // same exception to ADR 0033 for the same reason: fixed before the call,
       // never the Persona's lines. The case is already null for a
       // random Scenario, so nothing is revealed there.
+      //
+      // Briefing and facts both from the committed case: the selected card is
+      // not the committed Scenario when a follow-up starts from a wrap-up, and
+      // two sources for one case is the defect `briefingFollows` was built to
+      // end on the microphone check.
       return (
         <CaseBriefPanel
-          briefing={selectedScenario?.briefing}
+          briefing={committedCase?.briefing}
           caseFacts={committedCase?.facts}
           variant={variant}
         />
