@@ -13,6 +13,7 @@ import {
 } from "../utils/progressStats";
 import { formatDate } from "../utils/time";
 import AppLayout from "./AppLayout";
+import EarlyAndLate from "./EarlyAndLate";
 import GoalStatements from "./GoalStatements";
 import PartsStrip, { partsSummary } from "./PartsStrip";
 import Sparkline from "./Sparkline";
@@ -133,6 +134,11 @@ export default function ProgressMetricView() {
           </p>
         </div>
       )}
+
+      {/* Under the chart and above the table: it is a reading of the same
+          curve, and the table is the individual points the two of them
+          summarise. */}
+      <EarlyAndLate series={series} />
 
       <h2>Einzelne Trainings</h2>
       <div className="card">
