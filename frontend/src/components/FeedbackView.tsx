@@ -2,10 +2,12 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { ApiError } from "../api";
+import { useFocusContext } from "../FocusContext";
 import type { FeedbackState } from "../hooks/useSessionFeedback";
 import type {
   FeedbackPoint,
   Finding,
+  FocusGoal,
   FollowUpCard,
   Measurement,
   MetricAspect,
@@ -15,6 +17,7 @@ import type {
 } from "../protocol";
 import { sessionMetricPath } from "../routes";
 import { createFollowUp, createReverse, type ReverseScenario } from "../scenarioLibrary";
+import { retryFeedback } from "../sessions";
 import { cx } from "../utils/cx";
 import {
   ASPECT_LABELS,
@@ -113,6 +116,8 @@ const NOTICE: Record<string, string> = {
 export default function FeedbackView({
   detail,
   state,
+  sessionId,
+  onRetry,
   followUp,
   onReverse,
   next,
@@ -121,6 +126,12 @@ export default function FeedbackView({
    * was never stored. */
   detail: SessionDetail | null;
   state: FeedbackState;
+  /** The Session to ask again about, where a failed wrap-up can be retried.
+   *  Null on a call that was never stored — there is nothing to generate. */
+  sessionId?: string | null;
+  /** Poll again, once the retry has been accepted. Omitted on a screen that
+   *  does not poll (the history reads once), where the retry is not offered. */
+  onRetry?: () => void;
   /** Omitted where there is nowhere to act on the follow-up (F-60). */
   followUp?: FollowUpActions;
   /** Create and start the reverse of this Session (F-61, ADR 0070). Like
@@ -137,6 +148,13 @@ export default function FeedbackView({
       <>
         <div className="card">
           <p className="muted">{NOTICE[state]}</p>
+          {/* The one state that was a dead end. The work is still possible —
+              a wrap-up is written from the stored Transcript and Measurements,
+              never from audio (ADR 0048/0049) — and until now the only way to
+              ask for it again ran inside the container. */}
+          {state === "failed" && sessionId && onRetry && (
+            <RetryFeedback sessionId={sessionId} onQueued={onRetry} />
+          )}
         </div>
         {next}
       </>
@@ -749,6 +767,60 @@ function Reverse({
   );
 }
 
+/**
+ * Ask for the wrap-up once more.
+ *
+ * Deliberately plain: one button, and on a refusal the sentence the server
+ * wrote. The three ways this can be refused are states the screen cannot see
+ * for itself — a job may still be running, the call may hold nothing to
+ * summarise — so the message comes from the side that decided (the arrangement
+ * the follow-up and the reverse use for their own failures).
+ *
+ * On success it does not wait: polling resumes, and the notice above changes to
+ * "wird erstellt" in the same press.
+ */
+function RetryFeedback({
+  sessionId,
+  onQueued,
+}: {
+  sessionId: string;
+  onQueued: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const ask = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await retryFeedback(sessionId);
+      onQueued();
+    } catch (e) {
+      setError(
+        e instanceof ApiError && e.detail
+          ? e.detail
+          : "Die Auswertung konnte nicht angefordert werden. Bitte später noch einmal versuchen.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className="follow-up-button"
+        disabled={busy}
+        onClick={() => void ask()}
+      >
+        {busy ? "Wird angefordert …" : "Auswertung erneut erstellen"}
+      </button>
+      {error && <p className="follow-up-error">{error}</p>}
+    </>
+  );
+}
+
 function PointList({
   eyebrow,
   title,
@@ -765,6 +837,11 @@ function PointList({
   // Null on a screen with no transcript, and then the moment stays the plain
   // text it has always been (see TranscriptFocus.tsx).
   const focus = useTranscriptFocus();
+  // The catalogue, for naming the goal a point was tagged with. Null while it
+  // has not loaded or failed to, and the tag is then simply absent: a key like
+  // `active_listening` on screen would be worse than no tag at all.
+  const { focus: picked } = useFocusContext();
+  const goals = picked?.goals ?? [];
 
   if (points.length === 0) return null;
   return (
@@ -804,13 +881,43 @@ function PointList({
                     {formatOffset(turn.start_offset_ms)}
                   </span>
                 ))}
-              <p>{point.text}</p>
+              {/* The goal sits *above* the sentence, as an eyebrow over it.
+                  Beside it, in the row the timestamp is in, it competed with
+                  the sentence for the same line and read as a second remark;
+                  over it, it says what the paragraph below is about before the
+                  paragraph starts, which is what a heading does.
+
+                  Which focus goal the wrap-up filed this under (ADR 0080). The
+                  tag was written when the point was and has been on the wire
+                  ever since, read by nothing but the progress view's counting
+                  — so the one screen where the sentence actually stands never
+                  said what it was about. Shown for every tagged point, not
+                  only for the User's own five: the wrap-up writes about the
+                  call it read, and a point about something they are not
+                  currently working on is still about that thing. */}
+              <div className="feedback-point-body">
+                {goalTitle(goals, point.goal) && (
+                  <span className="feedback-point-goal">
+                    {goalTitle(goals, point.goal)}
+                  </span>
+                )}
+                <p>{point.text}</p>
+              </div>
             </div>
           );
         })}
       </div>
     </section>
   );
+}
+
+/** The display name of a tagged goal, or null for an untagged point and for a
+ *  key the catalogue does not know — a goal retired since the wrap-up was
+ *  written (ADR 0076 deactivates rather than deletes, so old points keep
+ *  pointing at it). */
+function goalTitle(goals: FocusGoal[], key: string | null): string | null {
+  if (!key) return null;
+  return goals.find((goal) => goal.key === key)?.title ?? null;
 }
 
 function Metric({

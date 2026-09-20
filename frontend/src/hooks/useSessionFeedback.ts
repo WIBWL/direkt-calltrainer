@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { SessionDetail } from "../protocol";
 import { getSession } from "../sessions";
@@ -44,6 +44,20 @@ export function useSessionFeedback(sessionId: string | null) {
     state: sessionId === null ? "missing" : "loading",
   }));
 
+  // Bumped to poll again for the same Session. The effect keys on it, which
+  // is what lets a wrap-up asked for a second time be waited for at all: the
+  // first poll has long since settled on `failed` and its deadline is spent.
+  const [attempt, setAttempt] = useState(0);
+
+  const restart = useCallback(() => {
+    if (sessionId === null) return;
+    // Straight to "loading", rather than waiting for the first answer: the
+    // press has to change something on screen at once, or it reads as a button
+    // that did nothing.
+    setResult({ sessionId, detail: null, state: "loading" });
+    setAttempt((n) => n + 1);
+  }, [sessionId]);
+
   useEffect(() => {
     if (sessionId === null) return undefined;
 
@@ -81,7 +95,7 @@ export function useSessionFeedback(sessionId: string | null) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [sessionId]);
+  }, [sessionId, attempt]);
 
   // The render that hands in a new id comes *before* the effect that starts
   // polling it, and a screen mounted in that same render runs its own effects
@@ -92,8 +106,8 @@ export function useSessionFeedback(sessionId: string | null) {
   // be one render too late.
   if (result.sessionId !== sessionId) {
     return sessionId === null
-      ? { detail: null, state: "missing" as const }
-      : { detail: null, state: "loading" as const };
+      ? { detail: null, state: "missing" as const, restart }
+      : { detail: null, state: "loading" as const, restart };
   }
-  return { detail: result.detail, state: result.state };
+  return { detail: result.detail, state: result.state, restart };
 }

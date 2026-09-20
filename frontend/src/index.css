@@ -2916,8 +2916,14 @@ p.follow-up-error {
   font-weight: 500;
 }
 
-.feedback-point-item p {
+/* The text and, above it, the goal it was filed under. A column of its own so
+   the timestamp keeps its place at the left edge of the row while the label
+   sits over the sentence rather than beside it. */
+.feedback-point-body {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* This section keeps a class of its own only for how its background note is
@@ -4265,6 +4271,68 @@ a.consent-button {
   font-size: 0.85rem;
   line-height: 1.55;
   color: var(--color-text-muted);
+}
+
+/* The focus goal a wrap-up point was filed under (ADR 0080). A quiet label,
+   not a badge: it names what the sentence above is about, and a coloured chip
+   there would compete with the sentence for the eye. */
+/* An eyebrow over the sentence, in the same key as the section eyebrows above
+   it: small, spaced, quiet. It names what the sentence is about and must not
+   compete with it. */
+.feedback-point-goal {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* The one link out of a single call into the same figure over all of them. */
+.metric-page-across {
+  margin: 1.25rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 0.9rem;
+}
+
+/* The silence itself, between the question and the answer it stood in front
+   of. Centred and quiet: it is a measurement standing between two quotations,
+   not a third voice in the exchange. */
+.evidence-gap {
+  margin: 0 0 0.75rem;
+  padding-left: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* All of them, in the order they happened. The longest is marked because it is
+   the one quoted above, so the list and the quotation cannot be read as two
+   different findings. */
+.evidence-gaps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-gaps li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.evidence-gaps li.is-peak {
+  color: inherit;
+  font-weight: 600;
+}
+
+.evidence-gaps .evidence-time {
+  display: inline;
+  margin: 0;
 }
 
 /* --- The two footnotes under the Kennzahlen grid -------------------------- */

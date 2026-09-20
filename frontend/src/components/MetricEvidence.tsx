@@ -63,7 +63,7 @@ export default function MetricEvidence({
     case "run_length":
       return <RunLength detail={detail} />;
     case "reaction_time":
-      return <ReactionTime detail={detail} />;
+      return <ReactionTime detail={detail} turns={turns} />;
     case "hesitations":
       return <Hesitations detail={detail} turns={userTurns} />;
     case "loudness":
@@ -512,10 +512,43 @@ function RunLength({ detail }: { detail: Record<string, unknown> }) {
   );
 }
 
-function ReactionTime({ detail }: { detail: Record<string, unknown> }) {
+/**
+ * Every silence that went into the average, and the exchange the longest one
+ * stood in.
+ *
+ * The exchange is the part worth showing. "Ihre längste Pause war 4,1 s" is a
+ * fact nobody can do anything with; the question that was waiting through it
+ * usually explains it, and sometimes justifies it — a pause before answering an
+ * objection is not the same event as a pause before a name.
+ *
+ * Takes every Turn rather than only the user's: what stood before the silence
+ * is the Persona's line, matched on the offset the gap was measured from, so
+ * the two cannot disagree about which exchange this was.
+ */
+function ReactionTime({
+  detail,
+  turns,
+}: {
+  detail: Record<string, unknown>;
+  turns: SessionTurn[];
+}) {
   const longest = number(detail.longest_s);
   const count = number(detail.count);
+  const gaps = Array.isArray(detail.gaps)
+    ? (detail.gaps as { at_ms: number; duration_ms: number }[])
+    : [];
   if (longest === null && count === null) return null;
+
+  // The longest by measurement, not by a second comparison of our own: the
+  // stored figure decides, and the entry is the one that carries it.
+  const peak = gaps.reduce<{ at_ms: number; duration_ms: number } | null>(
+    (best, gap) => (best === null || gap.duration_ms > best.duration_ms ? gap : best),
+    null,
+  );
+  const reply = peak ? turns.find((turn) => turn.start_offset_ms === peak.at_ms) : undefined;
+  const asked = peak
+    ? turns.filter((turn) => turn.speaker === "persona" && turn.start_offset_ms < peak.at_ms).pop()
+    : undefined;
 
   return (
     <Block title="Woraus der Mittelwert entsteht">
@@ -529,9 +562,33 @@ function ReactionTime({ detail }: { detail: Record<string, unknown> }) {
             : [{ label: "längste davon", value: `${formatNumber(longest, 1)} s` }]),
         ]}
       />
+
+      {peak && (asked || reply) && (
+        <>
+          <p className="evidence-lead">Die längste Pause stand hier:</p>
+          {asked && <Quote at={asked.start_offset_ms}>{asked.transcript}</Quote>}
+          <p className="evidence-gap">
+            {formatNumber(peak.duration_ms / 1000, 1)} s Pause
+          </p>
+          {reply && <Quote at={reply.start_offset_ms}>{reply.transcript}</Quote>}
+        </>
+      )}
+
+      {gaps.length > 1 && (
+        <ul className="evidence-gaps">
+          {gaps.map((gap) => (
+            <li key={gap.at_ms} className={gap === peak ? "is-peak" : undefined}>
+              <span className="evidence-time">{formatOffset(gap.at_ms)}</span>
+              <span>{formatNumber(gap.duration_ms / 1000, 1)} s</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
       <p className="muted">
         Gemessen wird vor jedem Ihrer Beiträge, der auf eine Äußerung Ihres Gegenübers folgt.
         Ihr erster Beitrag und ein Beitrag, mit dem Sie hineingegangen sind, zählen nicht mit.
+        Was die Technik zum Antworten braucht, liegt außerhalb dieser Zeit.
       </p>
     </Block>
   );

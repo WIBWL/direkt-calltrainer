@@ -2,8 +2,8 @@ import { Link, useParams } from "react-router-dom";
 
 import { useStoredSession } from "../hooks/useStoredSession";
 import type { Finding, SessionTurn } from "../protocol";
-import { ROUTES, sessionPath } from "../routes";
-import { formatValue, metricReading } from "../utils/metrics";
+import { ROUTES, progressMetricPath, sessionPath } from "../routes";
+import { comparableAcrossCalls, formatValue, metricReading } from "../utils/metrics";
 import { formatOffset } from "../utils/time";
 import { pairFor } from "../utils/segmentStats";
 import AppLayout from "./AppLayout";
@@ -99,6 +99,23 @@ export default function SessionMetricView() {
         <MetricScale steps={steps} current={current} />
 
         {note && <p className="metric-note">{note}</p>}
+
+        {/* The way up. Everything else on this screen is about one call, and
+            "is it always like this?" is exactly the question somebody asks in
+            front of a figure — but until now the connection ran one way only:
+            the progress view linked down into a training and nothing led back.
+
+            Not for the loudness: its dB span is the recording's level, so it
+            is kept out of every cross-call view (`comparableAcrossCalls`), and
+            a link promising a course would promise the one thing that view
+            refuses to draw. */}
+        {comparableAcrossCalls(measurement.key) && (
+          <p className="metric-page-across">
+            <Link to={progressMetricPath(measurement.key)}>
+              Diese Kennzahl über alle Trainings ansehen
+            </Link>
+          </p>
+        )}
       </div>
 
       {metricKey === "intonation" && (

@@ -152,7 +152,11 @@ export default function App() {
   // so nothing keeps asking once the User has moved on. Null while it is on its
   // way, and for a call that was never stored — the file is then the protocol
   // alone.
-  const { detail: endedSessionDetail, state: feedbackState } = useSessionFeedback(
+  const {
+    detail: endedSessionDetail,
+    state: feedbackState,
+    restart: restartFeedbackPoll,
+  } = useSessionFeedback(
     screen === "analysing" || screen === "transcript" ? endedSessionId : null,
   );
   // Holds a just-received session.ended until playback actually finishes —
@@ -951,6 +955,8 @@ export default function App() {
             <FeedbackView
               detail={endedSessionDetail}
               state={feedbackState}
+              sessionId={endedSessionId}
+              onRetry={restartFeedbackPoll}
               followUp={{
                 onStart: handleStartFollowUp,
                 // The new row is not in this screen's library copy yet, and
