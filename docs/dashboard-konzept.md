@@ -143,6 +143,50 @@ markiert die Auswertung in dem Modellaufruf, den sie ohnehin macht; damit danach
 nichts: Es stehen zwei Zahlen nebeneinander, und wie groß ein Unterschied sein
 darf, sagt niemand. Damit ist Stufe 3 abgeschlossen: Was dort offen aussah, ist entweder gebaut oder mit Begründung verworfen, und die Artikulation ist der letzte Fall der zweiten Art (Abschnitt 4.2).
 
+**Nachtrag (September 2026, zweite Runde).** Vier Dinge sind hinzugekommen,
+nachdem eine Durchsicht ergeben hatte, dass an den Stufen nichts mehr offen war,
+an der Seite aber sehr wohl:
+
+* **Block A endet nicht mehr blind.** Ein Kalendertag mit Trainings und eine
+  gespielte Zelle im Raster sind jetzt Knöpfe; darunter erscheinen die
+  Trainings dahinter, je mit Link (`TrainingLinks.tsx`). Vorher sagte eine
+  Zelle „2 Trainings“ und der einzige Weg zu diesen beiden führte über die
+  Historie im Profil, nach Datum, von Hand. Genau der Block, aus dem nichts
+  folgte, den Abschnitt 3 (Verbert) ausschließt. Leere Tage und ungespielte
+  Kombinationen bleiben stumme Zellen: dreißig Tabstopps, um zwei erreichbare
+  zu finden, wäre die schlechtere Barrierefreiheit.
+* **Auswahl nach Gesprächsanlass** als zweite Zeile neben dem Zeitraumschalter
+  (`OCCASIONS` in `ProgressContext.tsx`). Das ist die Antwort auf den stärksten
+  Einwand, den dieses Dokument gegen seine eigenen Diagramme erhebt
+  (Abschnitt 4.3): Szenario und Persona verschieben Redeanteil, Tempo und
+  Fragenanzahl mehr als eine Verhaltensänderung. Über alle Trainings ist eine
+  Linie Streuung, über eine Art von Gespräch ist sie eine Reihe. Erst
+  eingegrenzt, dann gekürzt, sonst hinge die Zahl der ausgewerteten Trainings
+  daran, was zwischendurch gespielt wurde. Jede Option trägt ihre Anzahl, eine
+  ohne Trainings ist nicht drückbar, und die Auswahl steht wie der Zeitraum in
+  der URL (`?anlass=`). Dafür führt `GET /api/sessions` jetzt `category` mit.
+* **„Früher und zuletzt“** auf der Seite einer Kennzahl (`EarlyAndLate.tsx`):
+  dieselbe Beschreibung zweimal, über die ältere und die jüngere Hälfte der
+  Auswahl, nebeneinander. Kein Unterschied, kein Pfeil, kein Wort für eine
+  Richtung. Es ist die Konstruktion, die ADR 0081 für die beiden Abschnitte
+  eines Gesprächs schon erlaubt, angewandt auf zwei Abschnitte einer
+  Geschichte; ADR 0065 trägt dazu einen Nachtrag mit fünf Bedingungen. Bewusst
+  nicht in der Übersicht: sechzehn solcher Paare wären sechzehn Einladungen,
+  einen Trend hineinzulesen.
+* **Der Übungsvorschlag nimmt Bezug auf sich selbst.** Hat eine Auswertung nach
+  dem Training, aus dem der Punkt stammt, noch einmal etwas zu dem Ziel
+  geschrieben, steht dieser Satz jetzt darunter. Damit schließt sich der Kreis
+  aus Abschnitt 3 (Zimmerman), der bisher nur in eine Richtung lief. Nichts
+  wird dafür gespeichert und nichts behauptet: zwei Aussagen in der
+  Reihenfolge, in der sie geschrieben wurden.
+
+Dazu zwei kleinere: Eine Textzielkachel führt jetzt mit dem jüngsten Satz aus
+den Auswertungen statt mit einer Punktreihe, weil für diese Ziele die Sätze das
+Einzige sind, was es gibt, und eine Zahl ohne Blick dahinter sich wie eine
+Messung liest. Und wo eine Kennzahl in weniger Trainings vorliegt als die
+Auswahl umfasst, sagt die Kachel das; warum, steht hinter dem „i“ der Tabelle,
+mit beiden möglichen Gründen und ohne einen davon zu behaupten.
+
 ## 1. Zweck
 
 Das Dashboard beantwortet für eine Nutzerin drei Fragen zu ihrem eigenen
@@ -714,6 +758,17 @@ Vorschlag, damit die spätere Umsetzung nicht am Datenweg hängt:
   0064). Was die Liste weiterhin nicht trägt, ist die Auswertung als Text:
   Zusammenfassung, Phasenabsatz, `tone_fit` und jeder nicht markierte Punkt
   bleiben auf der Detailroute.
+* **Die Rechenteile sind geprüft** (`utils/*.test.ts`, Vitest). Sie sind reine
+  Funktionen, und jeder ihrer Fehler zeichnet sauber: eine Reihe, die rückwärts
+  in der Zeit läuft, ein Band aus der falschen Streuung, ein Nenner, der die
+  Trainings ohne Auswertung mitzählt. Nichts davon wirft eine Ausnahme, und
+  alles davon wird zu einem Satz, den die Anwendung jemandem über sich selbst
+  sagt, über Daten, die er nicht nachrechnen kann. Geprüft werden deshalb die
+  Aussagen, die der Bildschirm laut trifft („Ihr üblicher Bereich 118 bis 141“,
+  „in 9 von 12 Trainings“), nicht Zeilen. Dass ein Fokusziel aus dem Katalog
+  auch eine Kachel und einen Übungsvorschlag bekommt, hängt an zwei Tabellen im
+  Frontend, die still danebenliegen können; `tests/test_focus_goal_coverage.py`
+  und `tests/test_recommendations.py` halten beide gegen den gesäten Katalog.
 * **Auf Anfrage berechnet, nicht materialisiert.** Sechs Monate Aufbewahrung
   begrenzen die Datenmenge je Konto auf eine Größenordnung, die eine Abfrage
   ohne Aggregattabelle trägt. Eine Aggregattabelle wäre eine zweite Wahrheit,
