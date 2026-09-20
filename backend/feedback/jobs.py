@@ -11,7 +11,7 @@ The row is created with the Session, in its transaction
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session as DbSession
 
@@ -23,6 +23,52 @@ logger = logging.getLogger(__name__)
 # "done" and "failed" are terminal: a late writer must not turn a wrap-up the
 # user can already read into an error.
 _OPEN = frozenset({db_models.JOB_QUEUED, db_models.JOB_RUNNING})
+
+# How long a queued job may wait before it is considered stale, and how long one
+# may run. Generous: the wrap-up is a single LLM call against a gateway that is
+# occasionally slow, and nobody is blocked while it works.
+#
+# It lives here rather than in `queue.py`, which owns the Redis side: every
+# reader of it is asking the question below, and importing it from there meant
+# pulling Redis into the REST layer -- which is why both readers deferred the
+# import inside a function and then answered the question twice.
+JOB_TIMEOUT_S = 300
+
+
+def is_live(job: db_models.AnalysisJob, *, include_queued: bool) -> bool:
+    """Whether this job may still be working.
+
+    False for a terminal row, and for one that has not moved in longer than a
+    job may run: the worker holding it is gone -- killed, timed out, or
+    restarted -- and nothing will ever move it off `running`, which is the gap
+    ADR 0032 names.
+
+    `include_queued` is the one thing the two callers differ on, so it is a
+    parameter rather than a second copy of this. A reader deciding what to show
+    (`api/sessions.py`) asks about a *running* row only: a queued one is not
+    abandoned, it is waiting. A writer deciding whether to queue a second job
+    (`scripts/requeue_feedback.py`) must count a queued one as working, or it
+    queues a duplicate and both write the same Session.
+
+    They did answer it separately, and differently: one coerced a naive
+    timestamp and the other would have raised on it, one guarded against a
+    missing timestamp and the other did not. Both defences are here now.
+    """
+    if job.status not in _OPEN:
+        return False
+    if job.status == db_models.JOB_QUEUED and not include_queued:
+        return False
+    updated = job.updated_at
+    if updated is None:
+        # The column is NOT NULL, so this is a row nobody wrote through `mark`.
+        # Nothing can be said about its age; it is not working.
+        return False
+    # A timestamptz reads back tz-aware, but comparing an aware and a naive
+    # datetime raises -- and a 500 here would cost the user a wrap-up that
+    # exists.
+    if updated.tzinfo is None:
+        updated = updated.replace(tzinfo=UTC)
+    return datetime.now(UTC) - updated <= timedelta(seconds=JOB_TIMEOUT_S)
 
 
 def latest(db: DbSession, session_id: int) -> db_models.AnalysisJob | None:

@@ -33,7 +33,7 @@ from backend.clients import llm
 from backend.db.models import AnalysisJob, Feedback, Session
 from backend.feedback import jobs
 from backend.feedback.generator import generate_feedback
-from backend.feedback.queue import JOB_TIMEOUT_S
+from backend.feedback.jobs import JOB_TIMEOUT_S
 from backend.session.models import Turn
 from tests.conftest import persist
 
@@ -379,3 +379,51 @@ def test_a_call_with_nothing_in_it_is_summarised_without_the_model(
     assert feedback.points == []
     assert feedback.phase_language is None
     assert _job(db_session, session_id).status == "done"
+
+
+# --- Whether a job may still be working (no database) ----------------------
+
+def _in_memory_job(status: str, age_s: float | None = 5, naive: bool = False) -> AnalysisJob:
+    """One job row, in memory. `age_s` None leaves it without a timestamp."""
+    if age_s is None:
+        return AnalysisJob(status=status, updated_at=None)
+    moved = datetime.now(UTC) - timedelta(seconds=age_s)
+    return AnalysisJob(status=status, updated_at=moved.replace(tzinfo=None) if naive else moved)
+
+
+@pytest.mark.parametrize("status", ["done", "failed"])
+def test_a_finished_job_is_not_working(status: str) -> None:
+    """Terminal either way: nothing will move it again."""
+    assert not jobs.is_live(_in_memory_job(status), include_queued=True)
+    assert not jobs.is_live(_in_memory_job(status), include_queued=False)
+
+
+def test_a_queued_job_is_working_only_for_a_caller_that_asked_about_queued() -> None:
+    """The one thing the two readers differ on, as a parameter rather than as a
+    second copy: a reader showing a status must not call a waiting job
+    abandoned, and a writer about to queue a second one must not call it idle."""
+    assert jobs.is_live(_in_memory_job("queued"), include_queued=True)
+    assert not jobs.is_live(_in_memory_job("queued"), include_queued=False)
+
+
+@pytest.mark.parametrize(
+    ("age_s", "live"), [(5, True), (JOB_TIMEOUT_S - 1, True), (JOB_TIMEOUT_S + 60, False)]
+)
+def test_a_running_job_is_believed_only_inside_the_window(age_s: float, live: bool) -> None:
+    """Past the timeout that bounds a job's run, the worker holding it is gone."""
+    assert jobs.is_live(_in_memory_job("running", age_s), include_queued=False) is live
+
+
+def test_a_naive_timestamp_is_read_as_utc_rather_than_raising() -> None:
+    """Comparing an aware and a naive datetime raises, and this is read while
+    serving a Session: a 500 here would cost the User a wrap-up that exists.
+    The read side coerced, the script would have raised -- one of the two
+    divergences that came of answering this question twice."""
+    assert jobs.is_live(_in_memory_job("running", 5, naive=True), include_queued=False)
+    assert not jobs.is_live(_in_memory_job("running", JOB_TIMEOUT_S + 60, naive=True), include_queued=False)
+
+
+def test_a_job_without_a_timestamp_is_not_working() -> None:
+    """Nothing can be said about its age. The script guarded against this and
+    the read side did not; the guard is now on both."""
+    assert not jobs.is_live(_in_memory_job("running", None), include_queued=True)

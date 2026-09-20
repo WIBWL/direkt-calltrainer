@@ -45,7 +45,6 @@ import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from openai import OpenAIError
@@ -58,6 +57,7 @@ from backend.auth import AuthContext, require_user
 from backend.db import models as db_models
 from backend.db.session import session_scope
 from backend.feedback import readings
+from backend.feedback.jobs import is_live
 from backend.followups import FollowUpError, PlayedCall, draft_follow_up
 from backend.reversals import ReverseError, draft_brief
 
@@ -680,25 +680,12 @@ def _feedback_status(session: db_models.Session) -> str:
 def _abandoned(job: db_models.AnalysisJob) -> bool:
     """True for a `running` row that has not moved in longer than a job may run.
 
-    The worker holding it is gone -- killed, timed out, or restarted -- and
-    nothing will ever move the row off `running`, which is the gap ADR 0032
-    names. Read as failed rather than left spinning; the row itself is not
-    touched, because this is the reader's judgement and not a repair.
+    Read as failed rather than left spinning; the row itself is not touched,
+    because this is the reader's judgement and not a repair. A *queued* row is
+    not abandoned, it is waiting, which is why the question is asked without
+    it -- `jobs.is_live` owns the window and both answers.
     """
-    if job.status != db_models.JOB_RUNNING:
-        return False
-    # Imported here so importing the REST layer never requires Redis, the same
-    # reason the live path defers it. JOB_TIMEOUT_S is what bounds a job's run,
-    # so it is also what makes one provably over.
-    from backend.feedback.queue import JOB_TIMEOUT_S  # pylint: disable=import-outside-toplevel
-
-    updated = job.updated_at
-    # A timestamptz reads back tz-aware, but comparing an aware and a naive
-    # datetime raises -- and a 500 here would cost the user a wrap-up that
-    # exists.
-    if updated.tzinfo is None:
-        updated = updated.replace(tzinfo=UTC)
-    return datetime.now(UTC) - updated > timedelta(seconds=JOB_TIMEOUT_S)
+    return job.status == db_models.JOB_RUNNING and not is_live(job, include_queued=False)
 
 
 def _turn(turn: db_models.Turn) -> dict:

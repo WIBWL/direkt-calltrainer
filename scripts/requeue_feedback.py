@@ -33,7 +33,6 @@ import argparse
 import logging
 import os
 import sys
-from datetime import UTC, datetime
 
 from dotenv import load_dotenv
 
@@ -47,6 +46,7 @@ load_dotenv()
 # The sys.path insert above has to run before the backend is importable, and
 # load_dotenv() before it reads the environment -- so these cannot move up.
 from backend.db import models as db_models  # noqa: E402
+from backend.feedback import jobs  # noqa: E402
 from backend.db.session import session_scope  # noqa: E402
 from backend.logging_config import configure_logging  # noqa: E402
 
@@ -71,15 +71,11 @@ def _still_working(job) -> bool:
     only of Sessions that had already finished one.
 
     Queued counts as working for the same reason: the job is in Redis and a
-    worker will take it.
+    worker will take it -- which is the one thing this reading and the read
+    side's differ on, and now the argument they pass rather than the reason
+    they were written twice.
     """
-    from backend.feedback.queue import JOB_TIMEOUT_S  # pylint: disable=import-outside-toplevel
-
-    if job.status not in (db_models.JOB_QUEUED, db_models.JOB_RUNNING):
-        return False
-    if job.updated_at is None:
-        return False
-    return (datetime.now(UTC) - job.updated_at).total_seconds() < JOB_TIMEOUT_S
+    return jobs.is_live(job, include_queued=True)
 
 
 def _candidates(db) -> list[tuple[int, str, int]]:
@@ -131,7 +127,8 @@ def main() -> int:
         return 0
 
     # Imported here, not at module scope: reporting must not require Redis.
-    from backend.feedback import jobs, queue  # pylint: disable=import-outside-toplevel
+    # `jobs` is imported up top -- it is the state machine and knows nothing of it.
+    from backend.feedback import queue  # pylint: disable=import-outside-toplevel
 
     queued = 0
     for session_id, extern_id, _turns in candidates:

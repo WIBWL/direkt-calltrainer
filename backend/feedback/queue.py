@@ -14,13 +14,13 @@ from redis import Redis
 from rq import Queue
 
 from backend.feedback.generator import generate_feedback
+from backend.feedback.jobs import JOB_TIMEOUT_S
 
 QUEUE_NAME = "feedback"
 
-# How long a queued job may wait before it is considered stale, and how long
-# one may run. Generous: the wrap-up is a single LLM call against a gateway
-# that is occasionally slow, and nobody is blocked while it works.
-JOB_TIMEOUT_S = 300
+# Bounds the job RQ runs, and the window a reader believes a `running` row for
+# (`jobs.is_live`). Defined beside that reading rather than here, so asking the
+# question does not require Redis.
 _RESULT_TTL_S = 3600
 
 # How long the *enqueue* may take, which is a different question entirely: it
