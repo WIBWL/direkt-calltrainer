@@ -57,6 +57,7 @@ from backend.auth import AuthContext, require_user
 from backend.db import models as db_models
 from backend.db.session import session_scope
 from backend.feedback import readings
+from backend.feedback import jobs
 from backend.feedback.jobs import is_live
 from backend.followups import FollowUpError, PlayedCall, draft_follow_up
 from backend.reversals import ReverseError, draft_brief
@@ -304,6 +305,83 @@ def delete_one_session(
     # Returned explicitly rather than annotated `-> None`: FastAPI derives a
     # response model from the annotation, and a 204 may not carry a body.
     return Response(status_code=204)
+
+
+# What each refusal of the retry route below says, by the reason `jobs` gives.
+# Here rather than in `jobs.py`: that module decides *whether*, this one speaks
+# to the User, and the sentences are part of the interface.
+_RETRY_REFUSALS = {
+    jobs.BLOCKED_DONE: "Für dieses Gespräch liegt bereits eine Auswertung vor.",
+    jobs.BLOCKED_EMPTY: (
+        "In diesem Gespräch wurde nichts aufgezeichnet, das sich auswerten ließe."
+    ),
+    jobs.BLOCKED_WORKING: (
+        "Die Auswertung wird gerade erstellt. Bitte warten Sie einen Moment."
+    ),
+}
+
+
+@router.post("/{extern_id}/feedback", status_code=202)
+def retry_feedback(
+    extern_id: uuid.UUID, caller: AuthContext = Depends(require_user)
+) -> dict:
+    """Ask for this Session's wrap-up to be written again (ADR 0049).
+
+    A wrap-up that failed used to be a dead end on screen: the page said so in
+    one sentence and offered nothing, while the work was still perfectly
+    possible — it is written from the stored Transcript and Measurements, never
+    from audio (ADR 0048/0049), so a call from last week can still be analysed.
+    The only way back was `scripts/requeue_feedback.py`, which runs inside the
+    container because Redis is not published to the host. That is an operator's
+    tool, and the person missing their wrap-up is not the operator.
+
+    404 for an id that is absent *or* not the caller's, exactly as the read and
+    the delete answer (ADR 0031/0050). 409 with a sentence for the three states
+    a retry would be wrong in (`jobs.retry_blocked`). 503 if the queue cannot
+    be reached, which is the same answer the follow-up route gives for its own
+    unreachable dependency — and the job row is then left where it was rather
+    than moved to `queued`, so the screen keeps showing the failure it already
+    showed instead of a spinner nothing will ever end.
+
+    202 and not 200: the wrap-up has been *accepted for writing*, and the
+    client goes back to polling the read route for it.
+    """
+    with session_scope() as db:
+        session = (
+            db.query(db_models.Session)
+            .filter_by(extern_id=extern_id, subject_id=caller.sub)
+            .one_or_none()
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Unknown session")
+
+        blocked = jobs.retry_blocked(session)
+        if blocked is not None:
+            raise HTTPException(status_code=409, detail=_RETRY_REFUSALS[blocked])
+
+        session_pk = session.session_id
+        # Imported here, not at module scope: every other route in this file
+        # works without Redis, and importing the queue would make the whole
+        # REST layer need it (the arrangement `requeue_feedback.py` uses).
+        from backend.feedback import queue  # pylint: disable=import-outside-toplevel
+
+        try:
+            queue.enqueue_feedback(session_pk)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning("Could not queue a wrap-up for session %s: %s", extern_id, e)
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Die Auswertung kann gerade nicht angefordert werden. "
+                    "Bitte später noch einmal versuchen."
+                ),
+            ) from e
+
+        # Only after the queue took it: a row moved to `queued` with no job
+        # behind it is the exact state `requeue_feedback.py` exists to repair.
+        jobs.mark(db, session_pk, db_models.JOB_QUEUED)
+
+    return {"status": db_models.JOB_QUEUED}
 
 
 # How often the User must have spoken before a call can be reversed or carried

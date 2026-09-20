@@ -111,6 +111,20 @@ def facts(turn: Turn) -> TurnFacts | None:
 
 
 @dataclass(frozen=True)
+class Reaction:
+    """One silence between the Persona falling silent and the user replying.
+
+    `at_ms` is where the reply began on the Session's timeline, which is the
+    offset the stored transcript carries for that utterance -- so a reader can
+    be shown the exchange this silence sat in without anything having to match
+    two clocks against each other.
+    """
+
+    at_ms: int
+    gap_ms: int
+
+
+@dataclass(frozen=True)
 class Conversation:  # pylint: disable=too-many-instance-attributes  # a record of measured facts, one field per fact
     """One finished call, reduced to the facts the statistics are derived from.
 
@@ -136,8 +150,11 @@ class Conversation:  # pylint: disable=too-many-instance-attributes  # a record 
     # Only ever a denominator, for the user's share of the speaking time.
     persona_speech_ms: int = 0
     # One entry per exchange: how long the user took to start replying,
-    # counted from the moment the Persona stopped speaking.
-    reactions_ms: tuple[int, ...] = ()
+    # counted from the moment the Persona stopped speaking, and when that
+    # reply began. Located like a Pause rather than a bare length, so the
+    # figure's own page can show *which* question the longest silence stood
+    # in front of (ADR 0098). A located event, not a per-Turn statistic.
+    reactions: tuple[Reaction, ...] = ()
     # Silent stretches inside the user's own speech, on the Session's timeline.
     pauses: tuple[Pause, ...] = ()
     # The user's loudness across the whole call, at acoustics.py's fixed rate.
@@ -178,7 +195,7 @@ def conversation(
     line's end. Everything the machine did in between -- generating, then
     synthesizing -- is outside the window by construction (ADR 0051).
     """
-    reactions: list[int] = []
+    reactions: list[Reaction] = []
     pauses: list[Pause] = []
     loudness: list[float | None] = []
     pitch: list[float | None] = []
@@ -191,7 +208,9 @@ def conversation(
         if (turn.user_acoustics_complete and
                 turn.user_offset_ms is not None and
                 persona_stopped is not None):
-            reactions.append(max(0, turn.user_offset_ms - persona_stopped))
+            reactions.append(
+                Reaction(turn.user_offset_ms, max(0, turn.user_offset_ms - persona_stopped))
+            )
         user_ms += turn.user_speech_ms
         user_phonation += turn.user_phonation_ms
         pauses.extend(turn.pauses)
@@ -220,7 +239,7 @@ def conversation(
             turn.user_acoustics_complete for turn in turns if turn.user_text
         ),
         persona_speech_ms=persona_ms,
-        reactions_ms=tuple(reactions),
+        reactions=tuple(reactions),
         pauses=tuple(pauses),
         loudness_db=tuple(loudness),
         pitch_hz=tuple(pitch),

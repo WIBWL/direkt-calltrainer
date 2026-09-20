@@ -433,12 +433,24 @@ def _reaction_time(call: Conversation) -> Measurement | None:
     """F-53. Average seconds between the Persona falling silent and the user
     starting to speak. The model's own thinking and speaking time falls outside
     this window by construction, so a slow gateway cannot read as hesitation."""
-    if not call.reactions_ms:
+    if not call.reactions:
         return None
+    gaps = [reaction.gap_ms for reaction in call.reactions]
     return Measurement(
         "reaction_time",
-        fmean(call.reactions_ms) / _MS_PER_SECOND,
-        {"longest_s": max(call.reactions_ms) / _MS_PER_SECOND, "count": len(call.reactions_ms)},
+        fmean(gaps) / _MS_PER_SECOND,
+        {
+            "longest_s": max(gaps) / _MS_PER_SECOND,
+            "count": len(gaps),
+            # Each silence with the reply it stood in front of, so the page can
+            # show the exchange instead of a bare average. Located events, the
+            # shape `_pauses` and F-51's interruption offsets already store --
+            # not a statistic per Turn, which ADR 0051 rules out.
+            "gaps": [
+                {"at_ms": reaction.at_ms, "duration_ms": reaction.gap_ms}
+                for reaction in call.reactions
+            ],
+        },
     )
 
 

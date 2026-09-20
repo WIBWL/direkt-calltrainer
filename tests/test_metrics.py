@@ -108,7 +108,7 @@ def test_pace_divides_by_phonation_not_by_the_recording() -> None:
 def test_reaction_time_is_measured_from_when_the_persona_stopped() -> None:
     """F-53. Reply at 1500 ms, Persona stopped at 1000 ms: half a second, with
     the gateway's latency outside the window by construction (ADR 0051)."""
-    assert conversation(_measured_call()).reactions_ms == (500,)
+    assert [r.gap_ms for r in conversation(_measured_call()).reactions] == [500]
 
 
 # --- A Turn that could not be measured (ADR 0048) --------------------------
@@ -445,7 +445,7 @@ def test_an_unmeasured_turn_contributes_no_reaction_time() -> None:
     """F-53/ADR 0048. Its offset is the end of the utterance, not the start, so
     reading it as a reaction time would report the utterance as hesitation. The
     measured Turn's 500 ms survives; nothing is invented for the other."""
-    assert conversation(_call_with_one_unmeasured_turn()).reactions_ms == (500,)
+    assert [r.gap_ms for r in conversation(_call_with_one_unmeasured_turn()).reactions] == [500]
 
 
 def test_incomplete_acoustics_suppress_the_metrics_that_depend_on_them() -> None:

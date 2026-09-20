@@ -71,6 +71,61 @@ def is_live(job: db_models.AnalysisJob, *, include_queued: bool) -> bool:
     return datetime.now(UTC) - updated <= timedelta(seconds=JOB_TIMEOUT_S)
 
 
+def newest(session: db_models.Session) -> db_models.AnalysisJob | None:
+    """The newest feedback job of a Session already loaded, or None.
+
+    The same question `latest` asks, for a caller that holds the row rather
+    than a primary key -- three places picked the maximum out of
+    `session.jobs` by hand, and a fourth was about to.
+    """
+    found = [job for job in session.jobs if job.kind == db_models.JOB_KIND_FEEDBACK]
+    return max(found, key=lambda job: job.job_id) if found else None
+
+
+# Why a wrap-up cannot be asked for again. Machine-readable, so the route can
+# turn each into its own sentence and a test can name the case.
+BLOCKED_DONE = "done"
+BLOCKED_EMPTY = "empty"
+BLOCKED_WORKING = "working"
+
+
+def retry_blocked(session: db_models.Session) -> str | None:
+    """Why this Session's wrap-up may not be queued again, or None if it may.
+
+    One rule for the two callers that ask it: the route a User presses
+    (`api/sessions.py`) and the backlog script (`scripts/requeue_feedback.py`).
+    They had the same rule written twice, and only the script's copy had ever
+    been corrected -- it queued a job that was two minutes into its model call
+    until `is_live` was given `include_queued`.
+
+    The three refusals, in the order they are asked:
+
+    `done` -- a wrap-up exists. `feedback.session_id` is UNIQUE, so a second
+    job would write nothing and be recorded as failed for a Session the User
+    can already read.
+
+    `empty` -- no Turns. There is nothing to summarise, and a model asked to
+    summarise an empty conversation writes a paragraph describing nothing.
+
+    `working` -- a job may still be running. Queued counts as working here
+    (unlike on the read side, which shows a queued row as waiting): two jobs
+    would race for the same Session.
+
+    A job that says `done` while no wrap-up exists is *not* refused. The script
+    used to skip it, on a list of retryable statuses; that state is a bug
+    somewhere else, and refusing to retry it leaves the User in a dead end with
+    a status that says everything is fine.
+    """
+    if session.feedback is not None:
+        return BLOCKED_DONE
+    if not session.turns:
+        return BLOCKED_EMPTY
+    job = newest(session)
+    if job is not None and is_live(job, include_queued=True):
+        return BLOCKED_WORKING
+    return None
+
+
 def latest(db: DbSession, session_id: int) -> db_models.AnalysisJob | None:
     """This Session's newest feedback job, by id, or None if it has none."""
     return (
