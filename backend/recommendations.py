@@ -155,16 +155,23 @@ def next_for_subject(
     partners: list[Partner],
 ) -> list[NextCall]:
     """`next_calls` over this subject's own profile and history."""
+    played_ids = library.played_scenario_ids(subject)
     return next_calls(played, persona, Choices(
         candidates, partners,
-        for_subject(subject, candidates), library.played_scenario_ids(subject),
+        for_subject(subject, candidates, played_ids), played_ids,
     ))
 
 
-def for_subject(subject: str, candidates: list[Candidate]) -> dict[str, Recommendation]:
-    """`recommend` over this subject's own focus selection and training history."""
+def for_subject(
+    subject: str, candidates: list[Candidate], played_ids: set[str] | None = None
+) -> dict[str, Recommendation]:
+    """`recommend` over this subject's own focus selection and training history.
+
+    `played_ids` is for a caller that already read the history: `next_for_subject`
+    needs it twice, and asked the database for it twice until it was passed in.
+    """
     with session_scope() as db:
         chosen = focus.selection(db, subject)
-    return recommend(
-        candidates, chosen.categories, chosen.keys, library.played_scenario_ids(subject)
-    )
+    if played_ids is None:
+        played_ids = library.played_scenario_ids(subject)
+    return recommend(candidates, chosen.categories, chosen.keys, played_ids)
