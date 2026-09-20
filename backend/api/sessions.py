@@ -165,6 +165,16 @@ def _session_summary(session: db_models.Session) -> dict:
         # Whether this training was a reverse (ADR 0070), so the history can
         # say so on the row. The Scenario is already loaded for its title.
         "reverse": session.scenario.reverse,
+        # The kind of call this was (ADR 0072's vocabulary), so the dashboard
+        # can read a course over one kind rather than over everything.
+        #
+        # It answers the concept's own objection to its charts: Scenario and
+        # Persona move talk share, pace and question count more than a change
+        # in behaviour does, so a line across every training shows scatter
+        # where it looks like development. Nullable, as the column is, and the
+        # frontend treats an uncategorised training as its own bucket rather
+        # than dropping it.
+        "category": session.scenario.category,
         "status": session.status,
         "has_feedback": session.feedback is not None,
         "feedback_status": _feedback_status(session),

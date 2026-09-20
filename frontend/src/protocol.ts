@@ -426,6 +426,16 @@ export interface SessionSummary {
    * answered (ADR 0070). Display only; the casting itself lives on the
    * Scenario row. */
   reverse: boolean;
+  /**
+   * The kind of call this was (ADR 0072), or null for an uncategorised
+   * Scenario — every authored one, and every reverse.
+   *
+   * On the listing because the progress view reads courses over it: the
+   * concept's own objection to its charts is that Scenario and Persona move
+   * the figures more than behaviour does, so "your last five advisory calls"
+   * is a series where "your last five trainings" is scatter.
+   */
+  category: ScenarioCategory | null;
   status: SessionOutcome;
   /** Whether a wrap-up was stored — i.e. whether this row has one to open. */
   has_feedback: boolean;
