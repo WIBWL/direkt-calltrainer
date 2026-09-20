@@ -8,6 +8,7 @@ import { formatOffset } from "../utils/time";
 import { pairFor } from "../utils/segmentStats";
 import AppLayout from "./AppLayout";
 import IntonationReading from "./IntonationReading";
+import MetricEvidence from "./MetricEvidence";
 import MetricScale from "./MetricScale";
 import SegmentComparison from "./SegmentComparison";
 
@@ -108,6 +109,12 @@ export default function SessionMetricView() {
           />
         </div>
       )}
+
+      {/* What the figure was read off: the words that were counted, the
+          passages that were found, the pauses that were measured. Every tile on
+          the wrap-up screen leads here now, so every page has to say more than
+          the tile did (see MetricEvidence.tsx). */}
+      <MetricEvidence measurement={measurement} turns={detail.turns} />
 
       {pair && (
         <>

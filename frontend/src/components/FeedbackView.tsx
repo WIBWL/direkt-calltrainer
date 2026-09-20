@@ -9,6 +9,7 @@ import type {
   FollowUpCard,
   Measurement,
   MetricAspect,
+  SegmentMeasurement,
   SessionDetail,
   SessionTurn,
 } from "../protocol";
@@ -22,6 +23,7 @@ import {
   loudnessCurve,
   METRIC_ASPECTS,
   METRIC_DISCLAIMER,
+  METRIC_KEYS,
   metricAspect,
   metricParts,
   metricReading,
@@ -35,6 +37,7 @@ import FilterSlider, { type FilterOption } from "./FilterSlider";
 import InfoDetails from "./InfoDetails";
 import LoudnessCourse from "./LoudnessCourse";
 import SectionHeading from "./SectionHeading";
+import { useTranscriptFocus } from "./TranscriptFocus";
 
 /** What a screen can do with the follow-up Scenario (F-60): start it as the
  * next call. That belongs to whoever owns the screen, so it is passed in — the
@@ -239,6 +242,7 @@ export function FeedbackReport({
         findings={detail.findings}
         notes={detail.metric_notes}
         sessionId={detail.session_id}
+        segments={detail.segments}
       />
 
       {/* Last, because it is what to do *after* reading all of the above. The
@@ -340,6 +344,7 @@ export function MetricSection({
   findings = [],
   notes = {},
   sessionId = null,
+  segments = [],
 }: {
   measurements: Measurement[];
   /** Individual moments noted during the call, e.g. F-51's interruptions.
@@ -350,6 +355,11 @@ export function MetricSection({
   /** The Session these figures belong to, for the per-metric page. Null on a
    *  call that was never stored, where there is nothing to link to. */
   sessionId?: string | null;
+  /** The same metrics over the demanding stretches and over the rest
+   *  (ADR 0081). Used here only to say that the comparison exists: it is two
+   *  figures per metric, which is a table and belongs on the metric's own
+   *  page. */
+  segments?: SegmentMeasurement[];
 }) {
   // Opens on the paraverbal half: the one reading the transcript cannot give.
   const [aspect, setAspect] = useState<MetricAspect>("how");
@@ -410,7 +420,80 @@ export function MetricSection({
         {METRIC_DISCLAIMER} Wo „Einschätzung“ steht, haben wir die Schwellen selbst
         gesetzt; welche das sind, steht jeweils dabei.
       </p>
+
+      <MetricNotes measured={all} segments={segments} />
     </section>
+  );
+}
+
+/**
+ * The two things the grid cannot say by being a grid.
+ *
+ * **That something is missing.** A metric that could not be measured leaves no
+ * tile, so the grid looks complete at any size. It is not a rare case: a
+ * recording with a noise floor under it defeats the silence detection, and
+ * five figures are withheld together rather than shown wrong (`metrics.py`,
+ * ADR 0085). Until now the screen said nothing at all, and a reader counting
+ * nine tiles where they saw fourteen last time had no way to learn why.
+ *
+ * Which ones are missing is deliberately not named. The frontend would have to
+ * guess at the reason, and "Sprechpausen fehlt" invites the reading that
+ * something went wrong with the user rather than with the microphone.
+ *
+ * **That a second reading exists.** Where the wrap-up marked demanding
+ * stretches, five of these metrics were measured twice over (ADR 0081). That
+ * comparison is two figures per metric and lives on the metric's own page; the
+ * grid only says that it is there, and says twice over that the split was a
+ * model's judgement while the figures beside it are measured.
+ */
+function MetricNotes({
+  measured,
+  segments,
+}: {
+  measured: Measurement[];
+  segments: SegmentMeasurement[];
+}) {
+  const shown = new Set(measured.map((m) => m.key));
+  // Counted off the catalogue the frontend already keeps, so a metric added on
+  // the backend does not have to be listed here a second time.
+  const missing = METRIC_KEYS.filter((key) => !shown.has(key)).length;
+  // Distinct metrics, not rows: each one that was compared carries two, one
+  // per stretch. The wire never sends the whole call here -- that is what
+  // `measurements` is -- so nothing has to be filtered out first.
+  const compared = new Set(segments.map((entry) => entry.key)).size;
+
+  if (missing === 0 && compared === 0) return null;
+
+  return (
+    <div className="metric-footnotes">
+      {compared > 0 && (
+        <p>
+          Für {compared} dieser Kennzahlen wurde zusätzlich verglichen, wie Sie an den
+          fordernden Stellen dieses Gesprächs gesprochen haben und wie im Rest. Der Vergleich
+          steht auf der Seite der jeweiligen Kennzahl.
+        </p>
+      )}
+      {missing > 0 && (
+        <p>
+          Nicht jede Kennzahl ließ sich in diesem Gespräch messen.{" "}
+          <InfoDetails label="Woran das liegen kann">
+            <p>
+              Manche Kennzahlen brauchen eine Mindestlänge: Bei einem Gespräch von wenigen
+              Sätzen gibt es zum Beispiel keinen Abschluss, der sich von der Begrüßung
+              trennen ließe.
+            </p>
+            <p>
+              Andere brauchen eine Aufnahme, in der sich Stille von Sprache trennen lässt.
+              Läuft im Hintergrund ein Geräusch mit, findet das Verfahren keine Pausen mehr.
+              Dann werden die betroffenen Kennzahlen weggelassen statt falsch angezeigt.
+            </p>
+            <p>
+              In beiden Fällen sagt das etwas über die Aufnahme und nichts über Ihr Gespräch.
+            </p>
+          </InfoDetails>
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -679,6 +762,10 @@ function PointList({
   turns: SessionTurn[];
   tone: "success" | "danger";
 }) {
+  // Null on a screen with no transcript, and then the moment stays the plain
+  // text it has always been (see TranscriptFocus.tsx).
+  const focus = useTranscriptFocus();
+
   if (points.length === 0) return null;
   return (
     <section className="feedback-section">
@@ -698,11 +785,25 @@ function PointList({
 
           return (
             <div className="feedback-point-item" key={i}>
-              {turn && (
-                <span className="feedback-point-time">
-                  {formatOffset(turn.start_offset_ms)}
-                </span>
-              )}
+              {/* The moment this was written about, as something to press.
+                  A timestamp alone is checkable only by somebody who still
+                  remembers the call; the line it names sits collapsed a little
+                  further down, and one press opens it there. */}
+              {turn &&
+                (focus ? (
+                  <button
+                    type="button"
+                    className="feedback-point-time feedback-point-jump"
+                    onClick={() => focus.reveal(turn.start_offset_ms)}
+                    aria-label={`Die Stelle bei ${formatOffset(turn.start_offset_ms)} im Transkript zeigen`}
+                  >
+                    {formatOffset(turn.start_offset_ms)}
+                  </button>
+                ) : (
+                  <span className="feedback-point-time">
+                    {formatOffset(turn.start_offset_ms)}
+                  </span>
+                ))}
               <p>{point.text}</p>
             </div>
           );
@@ -726,16 +827,8 @@ function Metric({
   // Loudness is shown as a course, not a figure: its value is a dB span (95th
   // percentile minus 5th) that reads like a level without being one and that no
   // validated norm places (ADR 0004/0051). Without the curve the tile is empty.
-  if (measurement.key === "loudness") {
-    const curve = loudnessCurve(measurement);
-    if (!curve) return null;
-    return (
-      <div className="metric metric-loudness">
-        <span className="metric-name">{measurement.name} im Gesprächsverlauf</span>
-        <LoudnessCourse values={curve} />
-      </div>
-    );
-  }
+  const curve = measurement.key === "loudness" ? loudnessCurve(measurement) : null;
+  if (measurement.key === "loudness" && !curve) return null;
 
   const context = interruptionContext(measurement);
   const detail = metricSubline(measurement);
@@ -768,7 +861,12 @@ function Metric({
   const melody = measurement.key === INTONATION_KEY;
   const parts = metricParts(measurement);
 
-  const body = (
+  const body = curve ? (
+    <>
+      <span className="metric-name">{measurement.name} im Gesprächsverlauf</span>
+      <LoudnessCourse values={curve} />
+    </>
+  ) : (
     <>
       <span className="metric-name">{measurement.name}</span>
       {parts ? (
@@ -800,12 +898,21 @@ function Metric({
     </>
   );
 
+  // One class list for both, so the loudness tile keeps its own width whether
+  // or not it opens. It used to return early and could therefore never be a
+  // link, which left the one tile carrying a drawing as the one tile with no
+  // way to see it larger.
+  const className = `metric${curve ? " metric-loudness" : ""}`;
+
   if (!detailed || !sessionId) {
-    return <div className="metric">{body}</div>;
+    return <div className={className}>{body}</div>;
   }
 
   return (
-    <Link className="metric metric-open" to={sessionMetricPath(sessionId, measurement.key)}>
+    <Link
+      className={`${className} metric-open`}
+      to={sessionMetricPath(sessionId, measurement.key)}
+    >
       {body}
       <span className="metric-open-hint">{openHint(measurement.key)}</span>
     </Link>
