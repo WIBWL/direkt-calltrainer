@@ -12,7 +12,7 @@ import type {
   SessionDetail,
   SessionTurn,
 } from "../protocol";
-import { sessionMetricPath } from "../routes";
+import { ROUTES, sessionMetricPath } from "../routes";
 import { createFollowUp, createReverse, type ReverseScenario } from "../scenarioLibrary";
 import { cx } from "../utils/cx";
 import {
@@ -410,6 +410,18 @@ export function MetricSection({
         {METRIC_DISCLAIMER} Wo „Einschätzung“ steht, haben wir die Schwellen selbst
         gesetzt; welche das sind, steht jeweils dabei.
       </p>
+
+      {/* The question a figure raises here is "and how is that for me usually",
+          which this screen cannot answer: it holds one call. Only where the
+          Session was stored — without consent there is nothing to compare it
+          with, and the link would lead to a page explaining that (ADR 0066). */}
+      {sessionId && (
+        <p className="metric-progress-link">
+          <Link to={ROUTES.progress}>
+            Diese Zahlen über Ihre Trainings hinweg ansehen
+          </Link>
+        </p>
+      )}
     </section>
   );
 }

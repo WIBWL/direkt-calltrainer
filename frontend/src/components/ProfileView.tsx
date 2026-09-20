@@ -95,6 +95,15 @@ export default function ProfileView() {
 
       <section className="card">
         <h2>Ihre Trainings</h2>
+        {/* The history lists the trainings one at a time; the progress screen
+            is the same set read across. The link belongs here rather than only
+            in the account chip: somebody who has come to look at what they
+            trained is one sentence away from the page that answers it, and the
+            concept has said so since the first draft. */}
+        <p className="card-lead">
+          Einzeln aufgeführt. Über alle Trainings hinweg steht das auf{" "}
+          <Link to={ROUTES.progress}>Ihrer Fortschrittsseite</Link>.
+        </p>
         <SessionHistory />
       </section>
 
