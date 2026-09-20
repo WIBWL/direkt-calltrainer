@@ -410,6 +410,34 @@ def test_a_question_about_how_is_no_agreement() -> None:
     assert closing.detail["agreement"] is False
 
 
+def test_a_deadline_given_as_a_window_is_an_agreement() -> None:
+    """A commitment can name a span instead of a day, and it is no less
+    concrete for it.
+
+    Found by reading the stored closings rather than by reasoning about the
+    pattern: these two forms are what trainees actually said while promising
+    something, and both went unrecognised where the English pack caught the
+    same commitment through "I will send you". A closing marked as having no
+    next step when it plainly had one is the false negative that matters here,
+    because the tile then reports a gap the call did not have.
+    """
+    for said in (
+        "Es sollte innerhalb der nächsten halben Stunde fertig sein.",
+        "Das ist in den nächsten zwei Tagen erledigt.",
+        "Es dauert nur noch bis zu dem eben genannten Datum.",
+    ):
+        closing = _closing_of(said, "Tschüss.")
+        assert closing.detail["agreement"] is True, said
+
+
+def test_a_place_is_no_deadline() -> None:
+    """The window above requires a unit of time. "Innerhalb unserer Abteilung"
+    says where something happens, not by when."""
+    closing = _closing_of("Das klären wir innerhalb unserer Abteilung.", "Tschüss.")
+
+    assert closing.detail["agreement"] is False
+
+
 def test_a_greeting_is_no_farewell() -> None:
     """"Schönen guten Tag" is how a call starts, not how it ends."""
     closing = _closing_of("Schönen guten Tag nochmal.", "Ja.")

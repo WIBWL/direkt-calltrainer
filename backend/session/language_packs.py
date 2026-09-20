@@ -314,6 +314,13 @@ _GERMAN = LanguagePack(
     # words that settle it, or a deadline. Deliberately not "ich kümmere mich
     # darum": that is the vague reassurance `vague_reassurance_examples` warns the
     # Persona about, and it commits to nothing a caller could hold anyone to.
+    #
+    # The last alternation is a deadline given as a *window* rather than as a
+    # named day, added after reading the stored closings: "innerhalb der
+    # nächsten halben Stunde" and "bis zu dem genannten Datum" are as concrete
+    # as "bis Freitag" and went unrecognised, while the English pack caught the
+    # same commitments through `i will send`. A time noun is required, so
+    # "innerhalb unserer Abteilung" stays what it is -- a place, not a promise.
     agreement_re=re.compile(
         r"\b(ich\s+(schicke|sende|maile|leite|buche|trage|reserviere|bestätige)\w*\b"
         r"|ich\s+(melde|rufe)\s+(\w+\s+){0,3}(zurück|an|bei\s+ihnen|bis)"
@@ -322,7 +329,10 @@ _GERMAN = LanguagePack(
         # "so" is required: "wie machen wir das?" is a question, not a deal.
         r"|so\s+machen\s+wir\s+(es|das)|machen\s+wir\s+(es|das)\s+so|abgemacht"
         r"|bis\s+(spätestens\s+)?(montag|dienstag|mittwoch|donnerstag|freitag|morgen|übermorgen"
-        r"|ende\s+der\s+woche|nächste[nr]?\s+woche|zum\s+\d|\d))",
+        r"|ende\s+der\s+woche|nächste[nr]?\s+woche|zum\s+\d|\d)"
+        r"|(innerhalb|in)\s+(von\s+|der\s+|den\s+)?(\w+\s+){0,3}"
+        r"(minute|minuten|stunde|stunden|tag|tagen|woche|wochen|monat|monaten)\b"
+        r"|bis\s+zu[rm]?\s+(\w+\s+){0,3}(datum|termin|zeitpunkt|uhrzeit|frist))",
         re.IGNORECASE,
     ),
     sign_off_re=re.compile(
