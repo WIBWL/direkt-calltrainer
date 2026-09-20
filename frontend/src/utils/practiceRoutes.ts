@@ -3,10 +3,17 @@ import type { ScenarioCategory } from "../scenarioLibrary";
 /**
  * Which kind of call a focus goal is practised in.
  *
- * Editorial, not computed. Nothing in the data says objection handling is best
- * practised on a pricing call — that is a judgement about the subject matter,
- * written down here so it can be argued with rather than buried in a model
- * call (dashboard concept, section 5.E).
+ * Editorial, not computed — a judgement about the subject matter, written down
+ * here so it can be argued with rather than buried in a model call (dashboard
+ * concept, section 5.E).
+ *
+ * The backend keeps the same judgement for the library's suggestions
+ * (`GOAL_CATEGORIES` in `backend/recommendations.py`), where a goal may name
+ * several kinds of call; this table names the one the single practice
+ * suggestion uses, and it must be one of those. `tests/test_recommendations.py`
+ * holds the two together — they had drifted, and a User who picked
+ * Einwandbehandlung was sent to a closing call on the setup screen and to a
+ * pricing call here.
  *
  * `null` means the goal binds to no kind of call: speaking rate or articulation
  * can be worked on in any conversation, so the suggestion is simply an unplayed
@@ -17,13 +24,19 @@ import type { ScenarioCategory } from "../scenarioLibrary";
  * practised in instead of quietly inheriting "any scenario".
  */
 export const PRACTICE_CATEGORY: Record<string, ScenarioCategory | null> = {
-  // Phases of a call bind to the kind of call they belong to.
-  opening: "operations",
+  // Phases of a call bind to the kind of call they belong to — where such a
+  // kind exists. Every call has an opening, and no category is *about* openings,
+  // so that one binds to none: the same reason the voice goals below do not
+  // steer. A closing is different: "Abschluss & Einwand" is the kind of call
+  // whose whole point is getting to one.
+  opening: null,
   needs_analysis: "requirements",
-  objection_handling: "pricing",
+  objection_handling: "closing",
   closing: "closing",
   // Impact: composure is practised where a call goes wrong, and a fault report
-  // is where a caller arrives annoyed.
+  // is where a caller arrives annoyed. The backend also counts a pricing call
+  // as pressure; one of the two has to be the suggestion, and an annoyed caller
+  // is the plainer case of it.
   composure: "operations",
   empathy: "operations",
   active_listening: "requirements",

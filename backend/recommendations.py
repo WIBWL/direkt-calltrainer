@@ -17,7 +17,14 @@ from backend.db.session import session_scope
 MAX_RECOMMENDATIONS = 5
 
 # The call context that exercises a focus goal. The voice goals are absent on
-# purpose: every Scenario trains the voice, so they cannot steer the choice.
+# purpose: every Scenario trains the voice, so they cannot steer the choice --
+# and so is `opening`, for the same reason one step on: every call has one, and
+# no category is about openings.
+#
+# The progress view's practice suggestion holds the same judgement, as one
+# category per goal (`frontend/src/utils/practiceRoutes.ts`). Its value must be
+# one of the ones named here; `tests/test_recommendations.py` pins that, after
+# the two disagreed about where Einwandbehandlung is practised.
 GOAL_CATEGORIES: dict[str, tuple[str, ...]] = {
     "objection_handling": ("closing",),
     "closing": ("closing",),

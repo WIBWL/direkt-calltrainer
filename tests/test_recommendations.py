@@ -10,10 +10,13 @@ Covers:
 
 The scoring is a pure function over plain values; one test runs the listing.
 """
+from pathlib import Path
+
 import httpx
 import pytest
 
 from backend.recommendations import (
+    GOAL_CATEGORIES,
     MAX_RECOMMENDATIONS,
     Candidate,
     Choices,
@@ -165,3 +168,64 @@ async def test_an_unknown_scenario_has_no_next(api_client: httpx.AsyncClient) ->
     )
 
     assert response.status_code == 404
+
+
+PRACTICE_ROUTES_TS = (
+    Path(__file__).resolve().parent.parent /
+    "frontend" / "src" / "utils" / "practiceRoutes.ts"
+)
+
+
+def _practice_category() -> dict[str, str | None]:
+    """The progress view's goal -> call type table, as written in the source.
+
+    Read out of the source rather than executed, the way `test_metrics.py`
+    reads the metric catalogue: there is no Node in the pytest run.
+    """
+    text = PRACTICE_ROUTES_TS.read_text(encoding="utf-8")
+    body = text.split("export const PRACTICE_CATEGORY", 1)[1].split("= {", 1)[1]
+    body = body.split("\n};", 1)[0]
+    table: dict[str, str | None] = {}
+    for line in body.splitlines():
+        line = line.strip()
+        if not line or line.startswith("//"):
+            continue
+        key, _, value = line.partition(":")
+        value = value.strip().rstrip(",").strip()
+        table[key.strip()] = None if value == "null" else value.strip('"')
+    return table
+
+
+def test_the_two_goal_tables_say_the_same_thing() -> None:
+    """Where a focus goal is practised is one editorial judgement, written down
+    twice: here for the library's suggestions, and in `practiceRoutes.ts` for the
+    progress view's single practice offer, which has to pick one kind of call.
+
+    The two had drifted, so a User who picked Einwandbehandlung was sent to a
+    closing call on the setup screen and to a pricing call on the progress view,
+    and composure to different sets. Either table may be changed -- but not on
+    its own.
+    """
+    practice = _practice_category()
+    assert practice, "PRACTICE_CATEGORY parsed as empty; has its shape changed?"
+
+    for goal, category in practice.items():
+        if category is None:
+            assert goal not in GOAL_CATEGORIES, (
+                f"{goal} steers the library's suggestions but not the practice "
+                f"offer; one of the two tables is wrong"
+            )
+        else:
+            assert goal in GOAL_CATEGORIES, (
+                f"{goal} steers the practice offer but not the library's "
+                f"suggestions; one of the two tables is wrong"
+            )
+            assert category in GOAL_CATEGORIES[goal], (
+                f"{goal} is practised in {category} on the progress view and in "
+                f"{GOAL_CATEGORIES[goal]} in the library"
+            )
+
+    assert set(GOAL_CATEGORIES) <= set(practice), (
+        "a goal the library steers by is missing from PRACTICE_CATEGORY, where "
+        "it would silently get no practice suggestion"
+    )
