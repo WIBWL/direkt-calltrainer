@@ -157,6 +157,7 @@ export default function PastSessionView() {
                 findings={detail.findings}
                 notes={detail.metric_notes}
                 sessionId={detail.session_id}
+                segments={detail.segments}
               />
             </>
           )

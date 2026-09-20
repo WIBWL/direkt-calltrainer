@@ -93,13 +93,28 @@ interface MetricDescriptor {
  * this, so the table can grow a field without every screen learning about it.
  */
 const CATALOGUE: Record<MetricKey, MetricDescriptor> = {
-  talk_share: { comparableAcrossCalls: true, inOverview: true, decimals: 0 },
-  questions: { comparableAcrossCalls: true, inOverview: true },
-  pace: { comparableAcrossCalls: true, inOverview: true, decimals: 0 },
+  talk_share: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    decimals: 0,
+    openHint: "Die Verteilung ansehen",
+  },
+  questions: { comparableAcrossCalls: true, inOverview: true, openHint: "Ihre Fragen ansehen" },
+  pace: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    decimals: 0,
+    openHint: "Diese Kennzahl ansehen",
+  },
   // Across trainings this repeats the call length in other units. Still
   // measured, and still reachable from its own page and the concise-speech goal.
-  word_count: { comparableAcrossCalls: true, inOverview: false, decimals: 0 },
-  fillers: { comparableAcrossCalls: true, inOverview: true },
+  word_count: {
+    comparableAcrossCalls: true,
+    inOverview: false,
+    decimals: 0,
+    openHint: "Die Verteilung ansehen",
+  },
+  fillers: { comparableAcrossCalls: true, inOverview: true, openHint: "Die Wörter ansehen" },
   opening: {
     comparableAcrossCalls: true,
     inOverview: true,
@@ -111,6 +126,7 @@ const CATALOGUE: Record<MetricKey, MetricDescriptor> = {
       ["concern", "Anliegen"],
     ],
     partsTotal: 3,
+    openHint: "Ihren Einstieg ansehen",
   },
   closing: {
     comparableAcrossCalls: true,
@@ -122,15 +138,41 @@ const CATALOGUE: Record<MetricKey, MetricDescriptor> = {
       ["farewell", "Verabschiedung"],
     ],
     partsTotal: 3,
+    openHint: "Ihren Abschluss ansehen",
   },
-  repetitions: { comparableAcrossCalls: true, inOverview: true },
-  hesitations: { comparableAcrossCalls: true, inOverview: true },
-  reaction_time: { comparableAcrossCalls: true, inOverview: true },
-  pauses: { comparableAcrossCalls: true, inOverview: true },
-  phonation_share: { comparableAcrossCalls: true, inOverview: true, decimals: 0 },
-  run_length: { comparableAcrossCalls: true, inOverview: true },
+  repetitions: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    openHint: "Die Passagen ansehen",
+  },
+  hesitations: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    openHint: "Diese Kennzahl ansehen",
+  },
+  reaction_time: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    openHint: "Diese Kennzahl ansehen",
+  },
+  pauses: { comparableAcrossCalls: true, inOverview: true, openHint: "Die Pausen ansehen" },
+  phonation_share: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    decimals: 0,
+    openHint: "Die Verteilung ansehen",
+  },
+  run_length: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    openHint: "Diese Kennzahl ansehen",
+  },
   // The one metric that is not comparable between calls; see the field above.
-  loudness: { comparableAcrossCalls: false, inOverview: true },
+  loudness: {
+    comparableAcrossCalls: false,
+    inOverview: true,
+    openHint: "Den Verlauf groß ansehen",
+  },
   intonation: {
     comparableAcrossCalls: true,
     inOverview: true,
@@ -142,6 +184,16 @@ const CATALOGUE: Record<MetricKey, MetricDescriptor> = {
     openHint: "Einzelne Stellen ansehen",
   },
 };
+
+/**
+ * Every metric the catalogue knows, in inventory order.
+ *
+ * Exported so a screen can ask how many of them a call actually carries —
+ * a measurement that could not be taken leaves no row at all, and the absence
+ * is invisible without a list to hold it against. Derived from the record
+ * rather than written out a second time.
+ */
+export const METRIC_KEYS = Object.keys(CATALOGUE) as MetricKey[];
 
 /**
  * What a key the catalogue has never been taught reads as.
@@ -195,7 +247,12 @@ export function showsInOverview(key: string): boolean {
   return describe(key).inOverview;
 }
 
-/** What the tile's drill-down promises. */
+/** What the tile's drill-down promises.
+ *
+ * Every metric in the catalogue names its own, because every tile opens a page
+ * now and "Ansehen" fourteen times says nothing about which of them is worth
+ * the click. The fallback is left for a key the catalogue has never been
+ * taught (see `UNKNOWN`). */
 export function openHint(key: string): string {
   return describe(key).openHint ?? "Ansehen";
 }

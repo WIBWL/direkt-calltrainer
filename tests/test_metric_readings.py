@@ -14,6 +14,8 @@ wrote down.
 
 Covers:
   F-35, F-51  the two readings that carry a step
+  F-53        every active metric carries an explanation, which is what makes
+              its tile openable at all
   F-53        the metric explained at length that deliberately carries none
   ADR 0051    a figure is measured once and stored; a step is not a figure
   ADR 0063    the text lives beside the threshold, not copied into the client
@@ -30,6 +32,22 @@ def test_every_explained_key_is_a_metric_that_exists():
     """A key here that no metric answers to serves text nothing can show."""
     inventory = {m.key for m in metrics.METRICS}
     assert readings.explained_keys() <= inventory
+
+
+def test_every_active_metric_is_explained():
+    """The condition behind "every tile opens".
+
+    A Kennzahl tile on the wrap-up screen becomes a link when this module
+    speaks for its metric -- that is what `MetricSection` reads `metric_notes`
+    for. Three of sixteen used to, so thirteen tiles stated a figure and
+    offered no way to see what it was read off.
+
+    Pinned as a rule and not as a count: a metric added to the inventory
+    without a word about it is exactly the drift `readings.py` was split out to
+    make visible, and it would arrive silently again.
+    """
+    active = {m.key for m in metrics.METRICS if m.active}
+    assert active <= readings.explained_keys(), sorted(active - readings.explained_keys())
 
 
 def test_every_scale_belongs_to_a_metric_that_is_explained():

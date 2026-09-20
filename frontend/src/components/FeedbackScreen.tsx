@@ -1,10 +1,12 @@
-import { useId, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useAccount } from "../hooks/useAccount";
 import type { SessionDetail, SessionTurn, TranscriptEntry } from "../protocol";
 import { downloadFeedbackPdf } from "../utils/feedbackPdf";
 import { initialsOf } from "../utils/initials";
+import { prefersReducedMotion } from "../utils/motion";
 import { formatOffset } from "../utils/time";
+import { TranscriptFocusProvider } from "./TranscriptFocus";
 
 interface FeedbackScreenProps {
   transcript: TranscriptEntry[];
@@ -63,7 +65,11 @@ export default function FeedbackScreen({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  // Which line of the transcript a wrap-up point pointed at, so it can be
+  // brought into view and marked while it is read (see TranscriptFocus.tsx).
+  const [focused, setFocused] = useState<number | null>(null);
   const logId = useId();
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
   // The User's own initials on their lines, from the ID token — the Persona is
   // the one with a fixed name here, and "D" for "Du" named nobody.
   const account = useAccount();
@@ -73,6 +79,25 @@ export default function FeedbackScreen({
   // labels rather than one that is sometimes a promise — a User who presses a
   // button offering feedback and gets a bare transcript was misled.
   const complete = Boolean(detail?.feedback);
+
+  // One press on a point's timestamp does two things, and the order matters:
+  // the panel has to be open before the line it holds can be scrolled to, so
+  // the scrolling waits for the render in the effect below.
+  const reveal = useCallback((offsetMs: number) => {
+    setExpanded(true);
+    setFocused(offsetMs);
+  }, []);
+
+  const focus = useMemo(() => ({ reveal, focused }), [reveal, focused]);
+
+  useEffect(() => {
+    if (focused === null || !expanded) return;
+    const line = transcriptRef.current?.querySelector(`[data-offset="${focused}"]`);
+    // `block: "center"` rather than the default: the line otherwise lands under
+    // the sticky header, and a reader who pressed a button and saw the page
+    // jump to nothing would take it for a broken control.
+    line?.scrollIntoView({ block: "center", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+  }, [focused, expanded]);
 
   const download = async () => {
     setBusy(true);
@@ -94,7 +119,7 @@ export default function FeedbackScreen({
     }
   };
 
-  return (
+  const body = (
     <>
       <div className="feedback-intro">
         <div className="eyebrow">TRAINING ABGESCHLOSSEN</div>
@@ -179,9 +204,13 @@ export default function FeedbackScreen({
             <span className="feedback-transcript-count">{transcript.length} Beiträge</span>
           </div>
 
-          <div className="feedback-transcript-card">
+          <div className="feedback-transcript-card" ref={transcriptRef}>
             {transcript.map((entry, i) => (
-              <div className="transcript-line" key={i}>
+              <div
+                className={`transcript-line${entry.offset_ms === focused ? " is-focused" : ""}`}
+                key={i}
+                data-offset={entry.offset_ms}
+              >
                 <span className="transcript-time">{formatOffset(entry.offset_ms)}</span>
 
                 {/* Decorative: the name is spelled out beside it. */}
@@ -204,6 +233,15 @@ export default function FeedbackScreen({
 
       {children}
     </>
+  );
+
+  // The points may point at a line only while there is one to point at. On a
+  // Session with no stored transcript they keep the plain timestamp they have
+  // always carried, rather than a control that would open nothing.
+  return transcript.length > 0 ? (
+    <TranscriptFocusProvider value={focus}>{body}</TranscriptFocusProvider>
+  ) : (
+    body
   );
 }
 

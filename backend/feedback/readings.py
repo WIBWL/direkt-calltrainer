@@ -26,7 +26,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from backend.feedback import interruptions, intonation, metrics
+from backend.feedback import explanations, interruptions, intonation, metrics
 
 # One step of a scale as the interface shows it: the machine-readable name, how
 # it is said, where it applies, and a colour where the scale has a direction.
@@ -114,13 +114,34 @@ def _interruption_light(detail: dict) -> dict:
 # ask the three functions below, so adding a metric here reaches every route
 # without any of them learning about it.
 _READINGS: dict[str, Reading] = {
+    # The two with a scale. Their wording lives beside the thresholds it
+    # describes, which is ADR 0078's fifth condition.
     intonation.RANGE_KEY: Reading(
         intonation.EXPLANATION, intonation.liveliness_steps, _liveliness,
     ),
     interruptions.COUNT_KEY: Reading(
         interruptions.EXPLANATION, interruptions.light_steps, _interruption_light,
     ),
-    metrics.RUN_LENGTH_KEY: Reading(metrics.RUN_LENGTH_EXPLANATION),
+    # The rest: explained, and deliberately without a step. Every active metric
+    # is in here, and that is the point of the list being this long. A tile the
+    # user cannot open is a figure they cannot check, and three of sixteen used
+    # to be openable -- so the other thirteen said a number and stopped, which
+    # is the state ADR 0004 warns about: told what a figure is and nothing
+    # about what it is worth, a reader supplies the direction themselves.
+    metrics.RUN_LENGTH_KEY: Reading(explanations.RUN_LENGTH),
+    "talk_share": Reading(explanations.TALK_SHARE),
+    "questions": Reading(explanations.QUESTIONS),
+    "pace": Reading(explanations.PACE),
+    "word_count": Reading(explanations.WORD_COUNT),
+    "fillers": Reading(explanations.FILLERS),
+    "opening": Reading(explanations.OPENING),
+    metrics.CLOSING_KEY: Reading(explanations.CLOSING),
+    "repetitions": Reading(explanations.REPETITIONS),
+    "hesitations": Reading(explanations.HESITATIONS),
+    "reaction_time": Reading(explanations.REACTION_TIME),
+    "pauses": Reading(explanations.PAUSES),
+    "phonation_share": Reading(explanations.PHONATION_SHARE),
+    metrics.LOUDNESS_KEY: Reading(explanations.LOUDNESS),
 }
 
 

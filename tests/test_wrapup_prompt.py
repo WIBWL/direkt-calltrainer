@@ -106,6 +106,27 @@ def test_prompt_asks_for_six_keys_including_the_phase_and_tone_blocks(
     assert "three keys" not in system_prompt
 
 
+def test_the_prose_blocks_carry_no_figures(system_prompt: str) -> None:
+    """The summary and the phase paragraph say it in words.
+
+    The wrap-up used to drop measured values into both, usually in brackets
+    after the statement they were meant to support ("sachlich (62 %)"). Every
+    one of those figures already stands on the same screen, in the Kennzahlen
+    grid, next to what it was measured from and to the scale it belongs to; in
+    a sentence it has none of that and reads as the verdict on the call that
+    F2 forbids in the next line.
+
+    Pinned by rule number and by the ban itself, not by the whole wording: the
+    two blocks are prose, and the sentence explaining why may be reworded.
+    """
+    assert "F5. The summary and the phase_language block carry no figures" in system_prompt
+    assert "never one in brackets after a statement" in system_prompt
+    assert "H8. No figures in this block either" in system_prompt
+    # And the silent check at the end asks for it again, which is the one the
+    # model actually runs over its own answer.
+    assert "neither the summary nor phase_language" in system_prompt
+
+
 def test_the_tone_block_starts_from_the_occasion_and_not_from_the_figures(
     system_prompt: str,
 ) -> None:

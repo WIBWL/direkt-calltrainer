@@ -2,18 +2,22 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { ApiError } from "../api";
+import { useFocusContext } from "../FocusContext";
 import type { FeedbackState } from "../hooks/useSessionFeedback";
 import type {
   FeedbackPoint,
   Finding,
+  FocusGoal,
   FollowUpCard,
   Measurement,
   MetricAspect,
+  SegmentMeasurement,
   SessionDetail,
   SessionTurn,
 } from "../protocol";
 import { ROUTES, sessionMetricPath } from "../routes";
 import { createFollowUp, createReverse, type ReverseScenario } from "../scenarioLibrary";
+import { retryFeedback } from "../sessions";
 import { cx } from "../utils/cx";
 import {
   ASPECT_LABELS,
@@ -22,6 +26,7 @@ import {
   loudnessCurve,
   METRIC_ASPECTS,
   METRIC_DISCLAIMER,
+  METRIC_KEYS,
   metricAspect,
   metricParts,
   metricReading,
@@ -35,6 +40,7 @@ import FilterSlider, { type FilterOption } from "./FilterSlider";
 import InfoDetails from "./InfoDetails";
 import LoudnessCourse from "./LoudnessCourse";
 import SectionHeading from "./SectionHeading";
+import { useTranscriptFocus } from "./TranscriptFocus";
 
 /** What a screen can do with the follow-up Scenario (F-60): start it as the
  * next call. That belongs to whoever owns the screen, so it is passed in — the
@@ -110,6 +116,8 @@ const NOTICE: Record<string, string> = {
 export default function FeedbackView({
   detail,
   state,
+  sessionId,
+  onRetry,
   followUp,
   onReverse,
   next,
@@ -118,6 +126,12 @@ export default function FeedbackView({
    * was never stored. */
   detail: SessionDetail | null;
   state: FeedbackState;
+  /** The Session to ask again about, where a failed wrap-up can be retried.
+   *  Null on a call that was never stored — there is nothing to generate. */
+  sessionId?: string | null;
+  /** Poll again, once the retry has been accepted. Omitted on a screen that
+   *  does not poll (the history reads once), where the retry is not offered. */
+  onRetry?: () => void;
   /** Omitted where there is nowhere to act on the follow-up (F-60). */
   followUp?: FollowUpActions;
   /** Create and start the reverse of this Session (F-61, ADR 0070). Like
@@ -134,6 +148,13 @@ export default function FeedbackView({
       <>
         <div className="card">
           <p className="muted">{NOTICE[state]}</p>
+          {/* The one state that was a dead end. The work is still possible —
+              a wrap-up is written from the stored Transcript and Measurements,
+              never from audio (ADR 0048/0049) — and until now the only way to
+              ask for it again ran inside the container. */}
+          {state === "failed" && sessionId && onRetry && (
+            <RetryFeedback sessionId={sessionId} onQueued={onRetry} />
+          )}
         </div>
         {next}
       </>
@@ -239,6 +260,7 @@ export function FeedbackReport({
         findings={detail.findings}
         notes={detail.metric_notes}
         sessionId={detail.session_id}
+        segments={detail.segments}
       />
 
       {/* Last, because it is what to do *after* reading all of the above. The
@@ -340,6 +362,7 @@ export function MetricSection({
   findings = [],
   notes = {},
   sessionId = null,
+  segments = [],
 }: {
   measurements: Measurement[];
   /** Individual moments noted during the call, e.g. F-51's interruptions.
@@ -350,6 +373,11 @@ export function MetricSection({
   /** The Session these figures belong to, for the per-metric page. Null on a
    *  call that was never stored, where there is nothing to link to. */
   sessionId?: string | null;
+  /** The same metrics over the demanding stretches and over the rest
+   *  (ADR 0081). Used here only to say that the comparison exists: it is two
+   *  figures per metric, which is a table and belongs on the metric's own
+   *  page. */
+  segments?: SegmentMeasurement[];
 }) {
   // Opens on the paraverbal half: the one reading the transcript cannot give.
   const [aspect, setAspect] = useState<MetricAspect>("how");
@@ -411,10 +439,14 @@ export function MetricSection({
         gesetzt; welche das sind, steht jeweils dabei.
       </p>
 
-      {/* The question a figure raises here is "and how is that for me usually",
-          which this screen cannot answer: it holds one call. Only where the
-          Session was stored — without consent there is nothing to compare it
-          with, and the link would lead to a page explaining that (ADR 0066). */}
+      <MetricNotes measured={all} segments={segments} />
+
+      {/* Last, and pointing away: everything above describes this call, and the
+          question a figure raises once it has been described is "and how is
+          that for me usually", which this screen cannot answer — it holds one
+          call. Only where the Session was stored; without consent there is
+          nothing to compare it with and the link would lead to a page
+          explaining that (ADR 0066). */}
       {sessionId && (
         <p className="metric-progress-link">
           <Link to={ROUTES.progress}>
@@ -423,6 +455,77 @@ export function MetricSection({
         </p>
       )}
     </section>
+  );
+}
+
+/**
+ * The two things the grid cannot say by being a grid.
+ *
+ * **That something is missing.** A metric that could not be measured leaves no
+ * tile, so the grid looks complete at any size. It is not a rare case: a
+ * recording with a noise floor under it defeats the silence detection, and
+ * five figures are withheld together rather than shown wrong (`metrics.py`,
+ * ADR 0085). Until now the screen said nothing at all, and a reader counting
+ * nine tiles where they saw fourteen last time had no way to learn why.
+ *
+ * Which ones are missing is deliberately not named. The frontend would have to
+ * guess at the reason, and "Sprechpausen fehlt" invites the reading that
+ * something went wrong with the user rather than with the microphone.
+ *
+ * **That a second reading exists.** Where the wrap-up marked demanding
+ * stretches, five of these metrics were measured twice over (ADR 0081). That
+ * comparison is two figures per metric and lives on the metric's own page; the
+ * grid only says that it is there, and says twice over that the split was a
+ * model's judgement while the figures beside it are measured.
+ */
+function MetricNotes({
+  measured,
+  segments,
+}: {
+  measured: Measurement[];
+  segments: SegmentMeasurement[];
+}) {
+  const shown = new Set(measured.map((m) => m.key));
+  // Counted off the catalogue the frontend already keeps, so a metric added on
+  // the backend does not have to be listed here a second time.
+  const missing = METRIC_KEYS.filter((key) => !shown.has(key)).length;
+  // Distinct metrics, not rows: each one that was compared carries two, one
+  // per stretch. The wire never sends the whole call here -- that is what
+  // `measurements` is -- so nothing has to be filtered out first.
+  const compared = new Set(segments.map((entry) => entry.key)).size;
+
+  if (missing === 0 && compared === 0) return null;
+
+  return (
+    <div className="metric-footnotes">
+      {compared > 0 && (
+        <p>
+          Für {compared} dieser Kennzahlen wurde zusätzlich verglichen, wie Sie an den
+          fordernden Stellen dieses Gesprächs gesprochen haben und wie im Rest. Der Vergleich
+          steht auf der Seite der jeweiligen Kennzahl.
+        </p>
+      )}
+      {missing > 0 && (
+        <p>
+          Nicht jede Kennzahl ließ sich in diesem Gespräch messen.{" "}
+          <InfoDetails label="Woran das liegen kann">
+            <p>
+              Manche Kennzahlen brauchen eine Mindestlänge: Bei einem Gespräch von wenigen
+              Sätzen gibt es zum Beispiel keinen Abschluss, der sich von der Begrüßung
+              trennen ließe.
+            </p>
+            <p>
+              Andere brauchen eine Aufnahme, in der sich Stille von Sprache trennen lässt.
+              Läuft im Hintergrund ein Geräusch mit, findet das Verfahren keine Pausen mehr.
+              Dann werden die betroffenen Kennzahlen weggelassen statt falsch angezeigt.
+            </p>
+            <p>
+              In beiden Fällen sagt das etwas über die Aufnahme und nichts über Ihr Gespräch.
+            </p>
+          </InfoDetails>
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -678,6 +781,60 @@ function Reverse({
   );
 }
 
+/**
+ * Ask for the wrap-up once more.
+ *
+ * Deliberately plain: one button, and on a refusal the sentence the server
+ * wrote. The three ways this can be refused are states the screen cannot see
+ * for itself — a job may still be running, the call may hold nothing to
+ * summarise — so the message comes from the side that decided (the arrangement
+ * the follow-up and the reverse use for their own failures).
+ *
+ * On success it does not wait: polling resumes, and the notice above changes to
+ * "wird erstellt" in the same press.
+ */
+function RetryFeedback({
+  sessionId,
+  onQueued,
+}: {
+  sessionId: string;
+  onQueued: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const ask = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await retryFeedback(sessionId);
+      onQueued();
+    } catch (e) {
+      setError(
+        e instanceof ApiError && e.detail
+          ? e.detail
+          : "Die Auswertung konnte nicht angefordert werden. Bitte später noch einmal versuchen.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className="follow-up-button"
+        disabled={busy}
+        onClick={() => void ask()}
+      >
+        {busy ? "Wird angefordert …" : "Auswertung erneut erstellen"}
+      </button>
+      {error && <p className="follow-up-error">{error}</p>}
+    </>
+  );
+}
+
 function PointList({
   eyebrow,
   title,
@@ -691,6 +848,15 @@ function PointList({
   turns: SessionTurn[];
   tone: "success" | "danger";
 }) {
+  // Null on a screen with no transcript, and then the moment stays the plain
+  // text it has always been (see TranscriptFocus.tsx).
+  const focus = useTranscriptFocus();
+  // The catalogue, for naming the goal a point was tagged with. Null while it
+  // has not loaded or failed to, and the tag is then simply absent: a key like
+  // `active_listening` on screen would be worse than no tag at all.
+  const { focus: picked } = useFocusContext();
+  const goals = picked?.goals ?? [];
+
   if (points.length === 0) return null;
   return (
     <section className="feedback-section">
@@ -710,18 +876,62 @@ function PointList({
 
           return (
             <div className="feedback-point-item" key={i}>
-              {turn && (
-                <span className="feedback-point-time">
-                  {formatOffset(turn.start_offset_ms)}
-                </span>
-              )}
-              <p>{point.text}</p>
+              {/* The moment this was written about, as something to press.
+                  A timestamp alone is checkable only by somebody who still
+                  remembers the call; the line it names sits collapsed a little
+                  further down, and one press opens it there. */}
+              {turn &&
+                (focus ? (
+                  <button
+                    type="button"
+                    className="feedback-point-time feedback-point-jump"
+                    onClick={() => focus.reveal(turn.start_offset_ms)}
+                    aria-label={`Die Stelle bei ${formatOffset(turn.start_offset_ms)} im Transkript zeigen`}
+                  >
+                    {formatOffset(turn.start_offset_ms)}
+                  </button>
+                ) : (
+                  <span className="feedback-point-time">
+                    {formatOffset(turn.start_offset_ms)}
+                  </span>
+                ))}
+              {/* The goal sits *above* the sentence, as an eyebrow over it.
+                  Beside it, in the row the timestamp is in, it competed with
+                  the sentence for the same line and read as a second remark;
+                  over it, it says what the paragraph below is about before the
+                  paragraph starts, which is what a heading does.
+
+                  Which focus goal the wrap-up filed this under (ADR 0080). The
+                  tag was written when the point was and has been on the wire
+                  ever since, read by nothing but the progress view's counting
+                  — so the one screen where the sentence actually stands never
+                  said what it was about. Shown for every tagged point, not
+                  only for the User's own five: the wrap-up writes about the
+                  call it read, and a point about something they are not
+                  currently working on is still about that thing. */}
+              <div className="feedback-point-body">
+                {goalTitle(goals, point.goal) && (
+                  <span className="feedback-point-goal">
+                    {goalTitle(goals, point.goal)}
+                  </span>
+                )}
+                <p>{point.text}</p>
+              </div>
             </div>
           );
         })}
       </div>
     </section>
   );
+}
+
+/** The display name of a tagged goal, or null for an untagged point and for a
+ *  key the catalogue does not know — a goal retired since the wrap-up was
+ *  written (ADR 0076 deactivates rather than deletes, so old points keep
+ *  pointing at it). */
+function goalTitle(goals: FocusGoal[], key: string | null): string | null {
+  if (!key) return null;
+  return goals.find((goal) => goal.key === key)?.title ?? null;
 }
 
 function Metric({
@@ -738,16 +948,8 @@ function Metric({
   // Loudness is shown as a course, not a figure: its value is a dB span (95th
   // percentile minus 5th) that reads like a level without being one and that no
   // validated norm places (ADR 0004/0051). Without the curve the tile is empty.
-  if (measurement.key === "loudness") {
-    const curve = loudnessCurve(measurement);
-    if (!curve) return null;
-    return (
-      <div className="metric metric-loudness">
-        <span className="metric-name">{measurement.name} im Gesprächsverlauf</span>
-        <LoudnessCourse values={curve} />
-      </div>
-    );
-  }
+  const curve = measurement.key === "loudness" ? loudnessCurve(measurement) : null;
+  if (measurement.key === "loudness" && !curve) return null;
 
   const context = interruptionContext(measurement);
   const detail = metricSubline(measurement);
@@ -780,7 +982,12 @@ function Metric({
   const melody = measurement.key === INTONATION_KEY;
   const parts = metricParts(measurement);
 
-  const body = (
+  const body = curve ? (
+    <>
+      <span className="metric-name">{measurement.name} im Gesprächsverlauf</span>
+      <LoudnessCourse values={curve} />
+    </>
+  ) : (
     <>
       <span className="metric-name">{measurement.name}</span>
       {parts ? (
@@ -812,12 +1019,21 @@ function Metric({
     </>
   );
 
+  // One class list for both, so the loudness tile keeps its own width whether
+  // or not it opens. It used to return early and could therefore never be a
+  // link, which left the one tile carrying a drawing as the one tile with no
+  // way to see it larger.
+  const className = `metric${curve ? " metric-loudness" : ""}`;
+
   if (!detailed || !sessionId) {
-    return <div className="metric">{body}</div>;
+    return <div className={className}>{body}</div>;
   }
 
   return (
-    <Link className="metric metric-open" to={sessionMetricPath(sessionId, measurement.key)}>
+    <Link
+      className={`${className} metric-open`}
+      to={sessionMetricPath(sessionId, measurement.key)}
+    >
       {body}
       <span className="metric-open-hint">{openHint(measurement.key)}</span>
     </Link>

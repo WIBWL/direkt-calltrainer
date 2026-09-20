@@ -2923,8 +2923,14 @@ p.follow-up-error {
   font-weight: 500;
 }
 
-.feedback-point-item p {
+/* The text and, above it, the goal it was filed under. A column of its own so
+   the timestamp keeps its place at the left edge of the row while the label
+   sits over the sentence rather than beside it. */
+.feedback-point-body {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* This section keeps a class of its own only for how its background note is
@@ -4272,6 +4278,321 @@ a.consent-button {
   font-size: 0.85rem;
   line-height: 1.55;
   color: var(--color-text-muted);
+}
+
+/* The focus goal a wrap-up point was filed under (ADR 0080). A quiet label,
+   not a badge: it names what the sentence above is about, and a coloured chip
+   there would compete with the sentence for the eye. */
+/* An eyebrow over the sentence, in the same key as the section eyebrows above
+   it: small, spaced, quiet. It names what the sentence is about and must not
+   compete with it. */
+.feedback-point-goal {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* The one link out of a single call into the same figure over all of them. */
+.metric-page-across {
+  margin: 1.25rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 0.9rem;
+}
+
+/* The silence itself, between the question and the answer it stood in front
+   of. Centred and quiet: it is a measurement standing between two quotations,
+   not a third voice in the exchange. */
+.evidence-gap {
+  margin: 0 0 0.75rem;
+  padding-left: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* All of them, in the order they happened. The longest is marked because it is
+   the one quoted above, so the list and the quotation cannot be read as two
+   different findings. */
+.evidence-gaps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-gaps li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.evidence-gaps li.is-peak {
+  color: inherit;
+  font-weight: 600;
+}
+
+.evidence-gaps .evidence-time {
+  display: inline;
+  margin: 0;
+}
+
+/* --- The two footnotes under the Kennzahlen grid -------------------------- */
+/* That a figure is missing, and that a second reading of some of them exists.
+   Both are quiet by design: they are context for the grid above, not findings
+   of their own. */
+.metric-footnotes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.metric-footnotes p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+/* --- The line a wrap-up point points at ---------------------------------- */
+/* The timestamp beside a strength or an improvement is a control: it opens the
+   transcript at that line (see TranscriptFocus.tsx). It keeps the look of the
+   text it replaced, because it stands inside a sentence about the call and a
+   button-shaped thing there would read as an action on the point itself. */
+.feedback-point-jump {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.feedback-point-jump:hover {
+  text-decoration-style: solid;
+}
+
+/* Marked while it is being read, and marked on the side rather than by a
+   background: a filled line in the middle of a transcript reads as a finding
+   about that line, which this is not. It says "here it is", nothing more. */
+.transcript-line.is-focused {
+  border-left: 3px solid var(--color-brand-accent);
+  margin-left: -3px;
+  background: var(--color-surface-selected);
+}
+
+/* --- What a figure was read off (MetricEvidence.tsx) ---------------------- */
+/* Every Kennzahl tile on the wrap-up screen opens its own page, so every page
+   has to show more than the tile did: the words that were counted, the
+   passages that were found, the pauses that were measured. Nothing in this
+   block may encode a direction -- no colour for a value, no target mark. The
+   one accent it uses sits on a *quoted word*, to say "this is the one that was
+   counted", never on a number. */
+
+.evidence-quote {
+  margin: 0 0 0.75rem;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--color-border);
+  background: var(--color-surface-selected);
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
+}
+
+.evidence-quote:last-of-type {
+  margin-bottom: 0;
+}
+
+.evidence-quote p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.evidence-time {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* The counted word inside its own sentence. Underlined as well as tinted, so
+   the mark survives a screen that cannot show the colour. */
+.evidence-hit {
+  padding: 0 0.15em;
+  border-bottom: 2px solid var(--color-brand-accent);
+  font-weight: 600;
+}
+
+.evidence-lead {
+  margin: 1.25rem 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+/* The two or three numbers a detail holds beside the measurement itself. */
+.evidence-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-facts li {
+  display: flex;
+  flex-direction: column;
+}
+
+.evidence-fact-value {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.evidence-fact-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* Two shares of one whole: talk share, and speech against the silence in it. */
+.evidence-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-bar {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.evidence-bar-label {
+  font-size: 0.9rem;
+}
+
+.evidence-bar-track {
+  height: 12px;
+  border-radius: 6px;
+  background: var(--color-surface-filter);
+  overflow: hidden;
+}
+
+/* One hue for both bars. A second colour would invite reading the pair as
+   good against bad, which is exactly what neither of them is. */
+.evidence-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--series-speech);
+}
+
+.evidence-bar-value {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* The counted words themselves. */
+.evidence-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 0.9rem;
+}
+
+.evidence-chip-count {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* A checklist's parts, written out. "nicht erkannt" is the wording, never
+   "fehlt" (ADR 0086), so the state is a word and not only a mark. */
+.evidence-parts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-parts li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  color: var(--color-text-muted);
+}
+
+.evidence-parts li.is-said {
+  color: inherit;
+}
+
+.evidence-part-state {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* Where the pauses fell across the user's own speaking time. */
+.evidence-strip {
+  position: relative;
+  height: 28px;
+  margin-top: 0.5rem;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-filter);
+  overflow: hidden;
+}
+
+.evidence-strip-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--series-speech);
+  opacity: 0.75;
+}
+
+.evidence-axis {
+  margin: 0.4rem 0 1rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 620px) {
+  /* The label above its bar: at this width three columns leave the track a
+     centimetre wide, which draws nothing. */
+  .evidence-bar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .evidence-bar-label {
+    grid-column: 1 / -1;
+  }
 }
 
 /* --- The pitch contour (F-35) --------------------------------------------- */
