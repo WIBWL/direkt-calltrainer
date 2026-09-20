@@ -37,30 +37,11 @@ _MS_PER_SECOND = 1000
 # on the string rather than each spelling it out.
 RUN_LENGTH_KEY = "run_length"
 
-# The text behind that metric's "i", kept beside the derivation it explains.
-# Plain German, no dashes: it is read by somebody who has just finished a call.
-RUN_LENGTH_EXPLANATION = (
-    "Gemessen wird, wie lange Sie am Stück sprechen, bevor Sie absetzen. Ihre "
-    "reine Sprechzeit geteilt durch die Anzahl Ihrer Sprechabschnitte. Als "
-    "Abschnitt zählt alles zwischen zwei Pausen ab einer Viertelsekunde "
-    "innerhalb einer Äußerung; eine längere Unterbrechung beendet die Äußerung "
-    "und taucht stattdessen in der Reaktionszeit auf. "
-    "Diese Zahl beschreibt als einzige hier das Sprechen selbst und nicht die "
-    "Stille dazwischen. Zwei Menschen können denselben Redefluss und dieselbe "
-    "mittlere Pausenlänge haben und trotzdem sehr verschieden klingen: der eine "
-    "spricht in Zwei-Wort-Häppchen, der andere in ganzen Sätzen. Genau das "
-    "steht hier. "
-    "Eine Einordnung gibt es bewusst nicht. In der Forschung hängt dieses Maß "
-    "eng damit zusammen, wie lebendig Zuhörer jemanden finden, enger sogar als "
-    "die Tonhöhenschwankung. Ein Zusammenhang ist aber kein Grenzwert, und es "
-    "ist nirgends belegt, ab wann ein Abschnitt zu kurz ist. Wie lang er sein "
-    "sollte, hängt außerdem vom Gespräch ab: wer zuhört und kurz bestätigt, "
-    "spricht zu Recht in kurzen Abschnitten. "
-    "Vergleichen Sie die Zahl deshalb nur mit Ihren eigenen anderen Gesprächen. "
-    "Weil wir schon ab einer Viertelsekunde trennen, fallen die Abschnitte "
-    "kürzer aus als in Veröffentlichungen zu diesem Maß, die meist später "
-    "trennen."
-)
+# The text behind this metric's "i" used to sit here. It moved to
+# `explanations.py` when twelve more were written -- this module is near
+# pylint's line ceiling, and the prose is read by a user while everything else
+# here is arithmetic.
+
 # Words, for rate denominators: letter runs, so punctuation and the digits STT
 # writes for numbers don't inflate the count.
 _WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
@@ -261,11 +242,27 @@ def _hesitations(call: Conversation) -> Measurement | None:
     """
     if not call.user_acoustics_complete or not call.pitch_per_turn:
         return None
-    found = [hold for turn in call.pitch_per_turn for hold in hesitations.holds(turn)]
+    # Kept with the utterance each one sits in, so the metric's page can quote
+    # the sentence rather than state a bare number. One located event per
+    # entry and no judgement about it, which is the shape `_pauses` and F-51's
+    # interruption offsets already store.
+    #
+    # `index` counts the user's utterances in the order they were spoken, which
+    # is the order `pitch_per_turn` holds them in and the order the stored
+    # transcript reads in. The two cannot drift apart here: a call with any
+    # utterance unmeasured returns above, before this runs.
+    found = [
+        {"turn": index, "start_ms": hold.start_ms, "duration_ms": hold.duration_ms}
+        for index, turn in enumerate(call.pitch_per_turn)
+        for hold in hesitations.holds(turn)
+    ]
     return Measurement(
         "hesitations",
         float(len(found)),
-        {"total_ms": sum(hold.duration_ms for hold in found)},
+        {
+            "total_ms": sum(int(hold["duration_ms"]) for hold in found),
+            "holds": found,
+        },
     )
 
 
@@ -405,7 +402,16 @@ def _pace(call: Conversation) -> Measurement | None:
     measurable = call.user_acoustics_complete and call.user_phonation_ms and _silence_found(call)
     if not words or not measurable:
         return None
-    return Measurement("pace", words * _MS_PER_MINUTE / call.user_phonation_ms)
+    # The two figures the rate is made of, so its page can show the division
+    # rather than the result alone. Both describe the whole call, like every
+    # other detail here: a tempo per Turn would be a statistic about one
+    # utterance, which is the thing ADR 0051 rules out and ADR 0081 took a
+    # narrow exception to only for facts that are never shown.
+    return Measurement(
+        "pace",
+        words * _MS_PER_MINUTE / call.user_phonation_ms,
+        {"words": words, "phonation_ms": call.user_phonation_ms},
+    )
 
 
 def _word_count(call: Conversation) -> Measurement | None:
