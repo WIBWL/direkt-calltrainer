@@ -145,15 +145,21 @@ export function formatPoint(series: MetricSeries, value: number): string {
  * did. Where both ends round to the same number the range is that number.
  */
 export function formatBand(series: MetricSeries): string | null {
-  if (!series.band) return null;
+  return series.band ? formatRange(series, series.band) : null;
+}
+
+/** The same, for a band that is not the series' own — the two halves below.
+ *  One rule, so an earlier range and the overall one cannot round or punctuate
+ *  differently on the same screen. */
+export function formatRange(series: MetricSeries, range: Band): string {
   if (isCount(series.unit)) {
-    const low = Math.max(0, Math.round(series.band.low));
-    const high = Math.max(low, Math.round(series.band.high));
+    const low = Math.max(0, Math.round(range.low));
+    const high = Math.max(low, Math.round(range.high));
     return low === high ? `meist ${low}` : `${low} bis ${high}`;
   }
   return (
-    `${formatValue(series.key, series.band.low, null)} bis ` +
-    `${formatValue(series.key, series.band.high, series.unit)}`
+    `${formatValue(series.key, range.low, null)} bis ` +
+    `${formatValue(series.key, range.high, series.unit)}`
   );
 }
 
@@ -191,6 +197,50 @@ export function band(values: number[]): Band | null {
     low: middle - BAND_DEVIATION * width,
     high: middle + BAND_DEVIATION * width,
   };
+}
+
+/** The user's earlier trainings and their recent ones, each described on its
+ *  own terms. */
+export interface Halves {
+  early: Band;
+  late: Band;
+  /** How many trainings each half holds. Always equal — see `halves`. */
+  each: number;
+}
+
+/**
+ * The same description twice, over the older half of the selection and over the
+ * newer half (dashboard concept, section 8's amendment).
+ *
+ * The page's answer to "has anything changed", given that it may not answer it.
+ * A sparkline shows the movement and leaves the reader to hold sixteen of them
+ * in their head; two ranges side by side put the earlier and the later spread
+ * where they can be read at a glance.
+ *
+ * What it computes is two bands and nothing else. **No difference, no ratio, no
+ * direction and no word for one** — how large a gap means something is exactly
+ * the norm ADR 0051 declined to invent, and a delta on this screen is what
+ * ADR 0065 rules out by name. It is the construction ADR 0081 already allows
+ * for the two stretches of a call, applied to two stretches of a history: put
+ * them beside each other and let the reader draw the comparison. The interface
+ * says twice that it is drawing none.
+ *
+ * Equal halves, so the two bands rest on the same number of calls; the middle
+ * training of an odd count belongs to neither rather than to both, since a
+ * point in both halves would pull them towards each other. Null below twice the
+ * series threshold, because a "usual range" over two values describes nothing
+ * and two of those beside each other describe nothing twice.
+ */
+export function halves(series: MetricSeries): Halves | null {
+  if (series.shape !== "line") return null;
+  const each = Math.floor(series.points.length / 2);
+  if (each < MIN_SESSIONS_FOR_SERIES) return null;
+
+  const values = series.points.map((point) => point.value);
+  const early = band(values.slice(0, each));
+  const late = band(values.slice(-each));
+  if (!early || !late) return null;
+  return { early, late, each };
 }
 
 export function median(values: number[]): number {
@@ -412,6 +462,36 @@ export function firstTrainingMonth(
  *  "is this cell today" cannot answer differently than the shading. */
 export function dayKey(date: Date): string {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+/**
+ * The trainings behind one cell of the calendar, newest first.
+ *
+ * What turns the calendar from a description into a way back in: a day that
+ * says "2 Trainings" and cannot be opened leaves the reader to find them in the
+ * history by date. Completed only, and through the same `dayKey` the shading is
+ * counted with, so the list under a cell can never hold a different number of
+ * rows than the cell prints.
+ */
+export function trainingsOn(sessions: SessionSummary[], date: Date): SessionSummary[] {
+  const key = dayKey(date);
+  return sessions.filter(
+    (session) =>
+      session.status === "completed" && dayKey(new Date(session.started_at)) === key,
+  );
+}
+
+/** The trainings behind one cell of the variety grid, newest first. No status
+ *  filter, because `variety` counts every stored training into the cell and the
+ *  list has to match what the cell says. */
+export function trainingsWith(
+  sessions: SessionSummary[],
+  scenario: string,
+  persona: string,
+): SessionSummary[] {
+  return sessions.filter(
+    (session) => session.scenario === scenario && session.persona === persona,
+  );
 }
 
 export interface VarietyCell {
