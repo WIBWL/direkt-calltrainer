@@ -282,9 +282,32 @@ _GERMAN = LanguagePack(
         re.IGNORECASE,
     ),
     # "hier ist Schmidt", not "hier ist alles" or "hier ist Ihr Ansprechpartner".
+    #
+    # The name itself is unknown, so what is matched is the frame it is said
+    # in. Three things may stand between the frame and the capital letter, and
+    # each of them was a real opening that went unrecognised:
+    #
+    #   "hier ist *die* Anna"     an article before a first name, which is how
+    #                             a good deal of German says it
+    #   "*Sie sprechen mit* ..."  the standard service phrasing, missing from
+    #                             this list entirely until somebody used it
+    #   "hier Schmidt"            the frame without its verb
+    #
+    # The article costs something, and it is worth writing down what: "hier ist
+    # die Rechnung" now counts as a name, because every German noun is
+    # capitalised and nothing here can tell one from a surname. This is read in
+    # the *first* utterance of a call only, where that sentence is not an
+    # opening anybody makes -- and of the two errors, a missed introduction is
+    # by far the more likely.
+    #
+    # Still not recognised, and structurally so rather than by oversight: a
+    # bare "Schmidt, guten Tag" names nobody that a pattern can see. It is why
+    # ADR 0086 has the tile say "nicht erkannt" and never "fehlt".
     self_intro_re=re.compile(
-        r"\bmein\s+name\s+ist\s+(?-i:[A-ZÄÖÜ])"
-        r"|\bhier\s+(?:ist|spricht)\s+(?!ihr\b|ihre\b|sie\b)(?-i:[A-ZÄÖÜ])"
+        r"\bmein\s+name(?:\s+ist|:)\s+(?:(?:die|der|frau|herrn?)\s+)?(?-i:[A-ZÄÖÜ])"
+        r"|\bsie\s+sprechen\s+mit\s+(?:(?:die|der|frau|herrn?)\s+)?(?-i:[A-ZÄÖÜ])"
+        r"|\bhier\s+(?:ist\s+|spricht\s+)?(?!ihr\b|ihre\b|sie\b)"
+        r"(?:(?:die|der|frau|herrn?)\s+)?(?-i:[A-ZÄÖÜ])"
         r"|\b(?-i:[A-ZÄÖÜ])\w+\s+am\s+apparat\b",
         re.IGNORECASE,
     ),
@@ -442,7 +465,9 @@ _ENGLISH = LanguagePack(
     # nouns are capitalised, so "ich bin Kunde" would pass for a name.
     self_intro_re=re.compile(
         r"\bmy\s+name\s+is\s+(?-i:[A-Z])|\bthis\s+is\s+(?-i:[A-Z])|\b(?-i:[A-Z])\w+\s+speaking\b"
-        r"|\bi(?:'m|\s+am)\s+(?-i:[A-Z])",
+        r"|\bi(?:'m|\s+am)\s+(?-i:[A-Z])"
+        # The counterpart of the German "Sie sprechen mit", added with it.
+        r"|\byou(?:'re|\s+are)\s+speaking\s+(?:with|to)\s+(?-i:[A-Z])",
         re.IGNORECASE,
     ),
     offer_re=re.compile(

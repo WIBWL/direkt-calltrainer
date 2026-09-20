@@ -282,18 +282,32 @@ def _opening(call: Conversation) -> Measurement | None:
     pack = _pack(call)
     if not pack or not call.user_turns:
         return None
-    first = call.user_turns[0][0]
-    found = {
-        "greeting": bool(pack.greeting_re.search(first)),
-        "name": bool(pack.self_intro_re.search(first)),
-        # Stored under its own key, so the screen can name the part checked.
-        ("concern" if call.reverse else "offer"): bool(
-            (pack.concern_re if call.reverse else pack.offer_re).search(first)
-        ),
-    }
+    found = opening_parts(call.user_turns[0][0], pack, reverse=call.reverse)
     return Measurement(
         "opening", float(sum(found.values())), found | {"pace_ratio": _opening_pace(call)}
     )
+
+
+def opening_parts(first_text: str, pack: LanguagePack, *, reverse: bool) -> dict[str, bool]:
+    """The three parts of an opening, found in the user's first utterance.
+
+    A function of its own for the reason `closing_parts` is one: it is what
+    `scripts/backfill_opening.py` runs over stored transcripts. The parts come
+    from words alone, so unlike the acoustic half of this metric they can reach
+    a call recorded before the patterns were what they are now -- which is not
+    hypothetical, the frames were widened once already after an opening that
+    said "hier ist die Anna" came back unrecognised.
+
+    Whoever rang decides the third part and nothing else (ADR 0070/0086).
+    """
+    return {
+        "greeting": bool(pack.greeting_re.search(first_text)),
+        "name": bool(pack.self_intro_re.search(first_text)),
+        # Stored under its own key, so the screen can name the part checked.
+        ("concern" if reverse else "offer"): bool(
+            (pack.concern_re if reverse else pack.offer_re).search(first_text)
+        ),
+    }
 
 
 def _opening_pace(call: Conversation) -> float | None:

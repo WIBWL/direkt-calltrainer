@@ -301,8 +301,40 @@ def test_each_side_is_checked_for_its_own_part() -> None:
 
 def test_a_frame_without_a_name_is_no_introduction() -> None:
     """"hier ist alles" and "hier ist Ihr Ansprechpartner" name nobody."""
-    for said in ("Hier ist alles in Ordnung.", "Hier ist Ihr Ansprechpartner."):
+    for said in ("Hier ist alles in Ordnung.", "Hier ist Ihr Ansprechpartner.",
+                 "Hier sind Ihre Unterlagen."):
         assert _opening_of((said, 2000)).detail["name"] is False
+
+
+@pytest.mark.parametrize("said", [
+    # Found in testing, each one an opening the check did not see.
+    "Guten Tag, hier ist die Anna.",       # an article before a first name
+    "Guten Tag, hier spricht der Peter.",
+    "Guten Tag, Sie sprechen mit Anna Beck.",  # the standard service phrasing
+    "Guten Tag, hier Beck.",               # the frame without its verb
+    "Mein Name: Beck.",
+    "Hier ist Frau Beck.",
+])
+def test_the_frames_a_name_is_actually_said_in(said: str) -> None:
+    """F-63. The name is unknown, so the check reads the frame around it -- and
+    a frame nobody uses recognises nobody. These were all real openings that
+    came back "nicht erkannt"; the article one is how a good deal of German
+    introduces a first name."""
+    assert _opening_of((said, 2000)).detail["name"] is True
+
+
+def test_a_bare_surname_is_still_not_recognised() -> None:
+    """The limit the widened pattern does not remove, pinned so the next
+    reading of this file does not take it for an oversight: "Beck, guten Tag"
+    is a name to a human and an indistinguishable capitalised word to a regular
+    expression. ADR 0086 is why the tile says "nicht erkannt", never "fehlt"."""
+    assert _opening_of(("Beck, guten Tag.", 2000)).detail["name"] is False
+
+
+def test_you_are_speaking_with_introduces_a_name_in_english() -> None:
+    """The English counterpart of "Sie sprechen mit", added with it."""
+    assert _opening_of(("Hello, you're speaking with Sarah.", 2000),
+                       language_id="en").detail["name"] is True
 
 
 def test_the_opening_follows_the_language_of_the_call() -> None:

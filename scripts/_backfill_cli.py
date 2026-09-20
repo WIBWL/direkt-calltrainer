@@ -1,9 +1,13 @@
 """Shared command line for the backfill scripts.
 
-The three of them differ only in which figure they compute; the CLI around it --
-the `--apply` flag, the dry-run wording, the exit code -- was the same in all
-three down to the character. Reworded in one place it would have applied to one
-script and left the other two saying something else.
+They differ only in which figure they compute; the CLI around it -- the
+`--apply` flag, the dry-run wording, the exit code -- was the same in all of
+them down to the character. Reworded in one place it would have applied to one
+script and left the others saying something else.
+
+`backfill_opening.py` stretches the name a little: it rewrites a figure that is
+already there, rather than filling a gap, because the patterns behind it
+changed. The command line it needs is the same one.
 
 Imported after each script's `sys.path` insert, like the `backend` imports
 beside it, so `scripts` resolves as a namespace package from the project root.
