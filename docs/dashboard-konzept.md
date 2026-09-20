@@ -7,7 +7,9 @@ ausgearbeitet, sondern nur benannt, wo sie gebraucht wird.
 **Umsetzungsstand:** Stufe 1 ist gebaut und liegt unter `/fortschritt`, über die
 volle Breite der Anwendung (1440 px, Kopfzeile mitgeführt). Der Bildschirm
 selbst ist `frontend/src/components/ProgressView.tsx`, die Detailebene
-`ProgressMetricView.tsx`, der Rechenteil `frontend/src/utils/progressStats.ts`.
+`ProgressMetricView.tsx`, der Rechenteil `frontend/src/utils/progressStats.ts`,
+die gemeinsame Datenhaltung der drei Bildschirme
+`frontend/src/ProgressContext.tsx`.
 Er greift ausschließlich auf echte, gespeicherte Werte zu und kommt ohne neuen
 Endpunkt aus, weil `GET /api/sessions` die Messwerte je Sitzung bereits
 mitliefert.
@@ -612,6 +614,13 @@ Drei Ebenen, mehr nicht:
    Kennzahl ist (`focusMetrics.goalsForMetric`). Sonst sammelte die
    Reaktionszeit Aussagen aus drei Zielen ein, für die sie nur eine Nebengröße
    ist.
+
+   **Der Zeitraum gilt hier mit** (seit September 2026). Gebaut war es anders:
+   Die Kachel sagte „aus 5 Trainings“, und die Seite dahinter zeichnete jedes
+   gespeicherte — zwei Bildschirme, die über dieselbe Kennzahl verschieden
+   sprachen. Die Auswahl reist im Link mit (`withPeriod`), und weil diese Ebene
+   den Schalter selbst nicht trägt, sagt sie in Worten, worüber sie gelesen
+   ist.
 3. **Ein einzelnes Training**. Führt in die bestehende Ansicht
    `PastSessionView`. Diese Ebene ist bereits gebaut und wird nicht verdoppelt.
 
@@ -686,7 +695,21 @@ Vorschlag, damit die spätere Umsetzung nicht am Datenweg hängt:
   Zeitraum ist aus demselben Grund ein Filter im Browser und kein Parameter:
   Eine Seite lädt, danach kostet ein Wechsel des Zeitraums keine Anfrage.
   Gedeckelt ist das durch die Aufbewahrung von sechs Monaten (ADR 0067) und
-  durch eine Seite von 100 Sitzungen, worüber die Ansicht Auskunft gibt.
+  durch zehn Seiten zu je 100 Sitzungen, worüber die Ansicht Auskunft gibt.
+  Eine Seite war es bis September 2026, und das war zu wenig: Die drei Zahlen
+  im Kopf und der Kalender lesen sich als Aussage über ein Konto, nicht über
+  eine Seite, und waren damit nicht unvollständig, sondern falsch, sobald mehr
+  als hundert Trainings gespeichert waren. Der Lader holt die Seiten
+  nacheinander und hört auf, sobald eine kurz zurückkommt
+  (`hooks/useProgressData.ts`).
+* **Ein Laden und eine Auswahl für alle drei Bildschirme**
+  (`ProgressContext.tsx`, als Layout-Route um die drei gelegt). Vorher rief
+  jede Ebene den Lader selbst auf, also kostete jeder Schritt in ein Detail und
+  zurück die ganze Verlaufsliste noch einmal. Der Zeitraum steht in der URL
+  (`?trainings=5|10`, die Voreinstellung bleibt draußen) und nicht im Zustand
+  einer Komponente: Damit überlebt er einen Neuladen und reist mit einem
+  geteilten Link — der Grund, aus dem Abschnitt 7 die Detailebenen überhaupt
+  zu Routen macht.
 * **Ein markierter Feedback-Punkt trägt seinen Text mit** (Ergänzung zu ADR
   0064). Was die Liste weiterhin nicht trägt, ist die Auswertung als Text:
   Zusammenfassung, Phasenabsatz, `tone_fit` und jeder nicht markierte Punkt
