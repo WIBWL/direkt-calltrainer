@@ -280,6 +280,17 @@ export function withDerived(measurements: Measurement[]): Measurement[] {
 }
 
 /**
+ * A bare number the way German text writes it: with a decimal comma. For the
+ * figures that belong to no metric of their own — a semitone span inside the
+ * intonation reading, a range in an aria-label — so they cannot fall back to
+ * `toFixed` and print a decimal point into a German sentence, which is what
+ * they did. A metric's own value goes through `formatValue` instead.
+ */
+export function formatNumber(value: number, decimals: number): string {
+  return value.toFixed(decimals).replace(".", ",");
+}
+
+/**
  * One figure as it is read out, for every screen that shows one.
  *
  * The single rule. There used to be three — this one keyed by metric, one in
@@ -294,7 +305,7 @@ export function withDerived(measurements: Measurement[]): Measurement[] {
  */
 export function formatValue(key: string, value: number, unit: string | null): string {
   const decimals = describe(key).decimals ?? (isCount(unit) ? 0 : 1);
-  const text = value.toFixed(decimals).replace(".", ",");
+  const text = formatNumber(value, decimals);
   return unit && !isCount(unit) ? `${text} ${unit}` : text;
 }
 

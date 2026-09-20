@@ -3,20 +3,13 @@ import { Link, useParams } from "react-router-dom";
 import { useStoredSession } from "../hooks/useStoredSession";
 import type { Finding, SessionTurn } from "../protocol";
 import { ROUTES, sessionPath } from "../routes";
-import { metricReading } from "../utils/metrics";
+import { formatValue, metricReading } from "../utils/metrics";
 import { formatOffset } from "../utils/time";
 import { pairFor } from "../utils/segmentStats";
 import AppLayout from "./AppLayout";
 import IntonationReading from "./IntonationReading";
 import MetricScale from "./MetricScale";
 import SegmentComparison from "./SegmentComparison";
-
-/** Counts read without decimals, everything else with one. The unit follows,
- *  except for "count", which the figure already is. */
-function formatFigure(value: number, unit: string | null): string {
-  const text = unit === "Anzahl" ? value.toFixed(0) : value.toFixed(1);
-  return unit && unit !== "Anzahl" ? `${text} ${unit}` : text;
-}
 
 /**
  * One metric of one training, in full (F-51's interruptions, F-35's intonation).
@@ -90,7 +83,7 @@ export default function SessionMetricView() {
       <div className="card">
         <p className="metric-page-figure">
           <span className={light ? `metric-value-${light}` : undefined}>
-            {formatFigure(measurement.value, measurement.unit)}
+            {formatValue(measurement.key, measurement.value, measurement.unit)}
           </span>
           {reading && (
             <span className="metric-light-label">

@@ -22,6 +22,8 @@
  * - **No colour carries meaning.** One hue throughout.
  */
 
+import { formatNumber } from "../utils/metrics";
+
 const WIDTH = 720;
 const HEIGHT = 232;
 const PAD_LEFT = 46;
@@ -112,8 +114,8 @@ export default function PitchContour({
         aria-label={
           `Tonhöhenverlauf über ${Math.round(seconds)} Sekunden Sprechzeit, ` +
           `bezogen auf Ihre mittlere Stimmlage von ${Math.round(medianHz)} Hertz. ` +
-          `Die Werte reichen von ${Math.min(...voiced).toFixed(1)} bis ` +
-          `${Math.max(...voiced).toFixed(1)} Halbtönen um diese Mitte` +
+          `Die Werte reichen von ${formatNumber(Math.min(...voiced), 1)} bis ` +
+          `${formatNumber(Math.max(...voiced), 1)} Halbtönen um diese Mitte` +
           (marks.length > 0
             ? `, verteilt auf ${marks.length + 1} Redebeiträge von Ihnen.`
             : ".")
