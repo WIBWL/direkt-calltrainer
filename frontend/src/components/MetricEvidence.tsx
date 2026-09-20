@@ -7,7 +7,7 @@ import { formatOffset } from "../utils/time";
 import LoudnessCourse from "./LoudnessCourse";
 
 /**
- * What a figure was read off, on the metric's own page.
+ * What a figure was read off, on the metric's own page (ADR 0098).
  *
  * Every tile on the wrap-up screen leads here now, and a page that repeated the
  * tile's number in a larger font would be worse than no link at all. So each

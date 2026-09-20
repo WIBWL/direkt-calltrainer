@@ -1,5 +1,8 @@
 """The text behind each metric's "i", in the user's own language.
 
+ADR 0098: every active metric carries one, and that is what makes its tile on
+the wrap-up screen open at all.
+
 One constant per metric, read by `readings.py` at request time and served on
 the Session detail route. Not stored with the Measurement and not copied into
 the frontend: the wording is edited together with the derivation it describes,

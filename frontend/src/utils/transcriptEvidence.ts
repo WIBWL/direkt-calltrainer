@@ -1,5 +1,5 @@
 /**
- * Finding in the stored transcript what a metric counted.
+ * Finding in the stored transcript what a metric counted (ADR 0098).
  *
  * The figures themselves are measured once, when the call ends, and are never
  * recomputed here (ADR 0051). What these functions do is locate the passage a
