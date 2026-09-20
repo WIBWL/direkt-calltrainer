@@ -6,8 +6,10 @@ import {
   activityStep,
   dayKey,
   firstTrainingMonth,
+  trainingsOn,
   type ActivityDay,
 } from "../utils/progressStats";
+import TrainingLinks from "./TrainingLinks";
 
 /**
  * When the user trained, on a calendar (F-13).
@@ -47,6 +49,11 @@ export default function ActivityCalendar({ sessions }: { sessions: SessionSummar
     month: today.getMonth(),
   });
   const [active, setActive] = useState<ActivityDay | null>(null);
+  // The day whose trainings are listed under the calendar. Separate from
+  // `active`, which is the hover readout: pointing at a cell and opening one
+  // are two different acts, and letting a hover close an opened list would
+  // make the list impossible to reach with the mouse still on the grid.
+  const [opened, setOpened] = useState<string | null>(null);
 
   const month = useMemo(
     () => activityMonth(sessions, shown.year, shown.month),
@@ -63,8 +70,11 @@ export default function ActivityCalendar({ sessions }: { sessions: SessionSummar
 
   const step = (by: number) => {
     // The readout names a day of the month on screen; paging away from it would
-    // otherwise leave that sentence standing over a different month.
+    // otherwise leave that sentence standing over a different month. The same
+    // goes for an opened day's list, which would then sit under a month it does
+    // not belong to.
     setActive(null);
+    setOpened(null);
     setShown(({ year, month: current }) => {
       const moved = new Date(year, current + by, 1);
       return { year: moved.getFullYear(), month: moved.getMonth() };
@@ -127,8 +137,12 @@ export default function ActivityCalendar({ sessions }: { sessions: SessionSummar
                       day={day}
                       weekday={WEEKDAY_NAMES[weekday] ?? ""}
                       isToday={dayKey(new Date(day.date)) === todayKey}
+                      isOpen={opened === day.date}
                       onEnter={() => setActive(day)}
                       onLeave={() => setActive(null)}
+                      onOpen={() =>
+                        setOpened((current) => (current === day.date ? null : day.date))
+                      }
                     />
                   )}
                 </td>
@@ -158,6 +172,19 @@ export default function ActivityCalendar({ sessions }: { sessions: SessionSummar
           </span>
         )}
       </figcaption>
+
+      {/* Under the whole calendar rather than under the week that was pressed:
+          a row inserted into the grid would push the following weeks down and
+          make the month change shape as it is read. */}
+      {opened && (
+        <TrainingLinks
+          title={`Trainings am ${new Date(opened).toLocaleDateString("de-DE", {
+            day: "numeric",
+            month: "long",
+          })}`}
+          sessions={trainingsOn(sessions, new Date(opened))}
+        />
+      )}
     </figure>
   );
 }
@@ -166,14 +193,18 @@ function Day({
   day,
   weekday,
   isToday,
+  isOpen,
   onEnter,
   onLeave,
+  onOpen,
 }: {
   day: ActivityDay;
   weekday: string;
   isToday: boolean;
+  isOpen: boolean;
   onEnter: () => void;
   onLeave: () => void;
+  onOpen: () => void;
 }) {
   const step = activityStep(day.count);
   const date = new Date(day.date);
@@ -181,22 +212,46 @@ function Day({
     `${weekday}, ${date.toLocaleDateString("de-DE", { day: "numeric", month: "long" })}: ` +
     describe(day);
 
+  const className =
+    `calendar-day calendar-step-${step}` +
+    (isToday ? " calendar-day-today" : "") +
+    (isOpen ? " calendar-day-open" : "");
+
+  // The day of the month on an empty day, the count on a day that has
+  // trainings. The number a reader is looking for differs: on an empty day it
+  // is "which day is this", on a full one it is "how many". The full sentence
+  // goes to a screen reader, which cannot see that a 2 in a coloured cell is a
+  // count while a 2 in a plain one is a date.
+  const content = (
+    <>
+      <span aria-hidden="true">{day.count > 0 ? day.count : day.dayOfMonth}</span>
+      <span className="calendar-sr">{spoken}</span>
+    </>
+  );
+
+  // A day with nothing on it stays a plain cell. Making every cell a button
+  // would put thirty stops in the tab order to reach the two that open
+  // something, and a control that does nothing when pressed is worse than no
+  // control.
+  if (day.count === 0) {
+    return (
+      <span className={className} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+        {content}
+      </span>
+    );
+  }
+
   return (
-    <span
-      className={
-        `calendar-day calendar-step-${step}` + (isToday ? " calendar-day-today" : "")
-      }
+    <button
+      type="button"
+      className={className}
+      aria-expanded={isOpen}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
+      onClick={onOpen}
     >
-      {/* The day of the month on an empty day, the count on a day that has
-          trainings. The number a reader is looking for differs: on an empty
-          day it is "which day is this", on a full one it is "how many". */}
-      <span aria-hidden="true">{day.count > 0 ? day.count : day.dayOfMonth}</span>
-      {/* The full sentence for a screen reader, which cannot see that a 2 in a
-          coloured cell is a count while a 2 in a plain one is a date. */}
-      <span className="calendar-sr">{spoken}</span>
-    </span>
+      {content}
+    </button>
   );
 }
 

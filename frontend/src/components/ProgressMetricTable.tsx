@@ -135,6 +135,15 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
           dort wie eine Note gelesen würde. Die Farbe steht für die Gruppe, nie für einen Wert.
         </p>
         <p>
+          Die Spalte „Trainings“ sagt, aus wie vielen Gesprächen eine Zeile besteht. Diese
+          Zahl kann kleiner sein als die Zahl Ihrer Trainings, und dafür gibt es zwei Gründe.
+          Entweder ist die Kennzahl neuer als das Gespräch: Die Aufnahme wird nach jedem
+          Training gelöscht, deshalb lässt sich nichts nachmessen. Oder die Aufnahme hatte so
+          viel Hintergrundgeräusch, dass sich Sprechen und Stille nicht trennen ließen. Dann
+          fehlen Sprechtempo, Sprechpausen, Redefluss, Sprechlänge und Lautstärke für dieses
+          eine Gespräch, weil ein Wert daraus mehr über den Raum sagen würde als über Sie.
+        </p>
+        <p>
           Die Lautstärke fehlt hier mit Absicht. Gemessen wird der Pegel der Aufnahme, und der
           hängt von Mikrofon und Abstand genauso ab wie von Ihnen. Über mehrere Gespräche
           hinweg ist er deshalb nicht vergleichbar. Ihren Verlauf innerhalb eines Gesprächs

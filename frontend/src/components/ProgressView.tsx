@@ -3,11 +3,11 @@ import { Link } from "react-router-dom";
 
 import { useConsentContext } from "../ConsentContext";
 import { useFocusContext } from "../FocusContext";
-import { PERIODS, useProgressContext } from "../ProgressContext";
+import { OCCASIONS, PERIODS, useProgressContext } from "../ProgressContext";
 import type { FocusGoal, SessionSummary } from "../protocol";
 import { ROUTES, progressGoalPath, progressMetricPath } from "../routes";
 import { backingOf } from "../utils/focusMetrics";
-import { mentionsFor } from "../utils/goalMentions";
+import { mentionsFor, statementsFor } from "../utils/goalMentions";
 import { showsInOverview } from "../utils/metrics";
 import { segmentTrainings } from "../utils/segmentStats";
 import {
@@ -68,8 +68,18 @@ export default function ProgressView() {
   // it talking about the same set (see ProgressContext.tsx). `withPeriod` is
   // not taken here: the links that need it sit in the tiles and in the metric
   // table, which read it from the same context.
-  const { sessions, selected: inPeriod, state, truncated, total, period, setPeriod } =
-    useProgressContext();
+  const {
+    sessions,
+    selected: inPeriod,
+    state,
+    truncated,
+    total,
+    period,
+    setPeriod,
+    occasion,
+    setOccasion,
+    occasionCounts,
+  } = useProgressContext();
   const { focus } = useFocusContext();
   const { consent } = useConsentContext();
   // The call length rides along with the measured metrics. It is derived
@@ -179,7 +189,7 @@ export default function ProgressView() {
 
           <div className="card">
             <h3 className="progress-card-title">Womit Sie trainiert haben</h3>
-            <VarietyGrid variety={variety(sessions)} />
+            <VarietyGrid variety={variety(sessions)} sessions={sessions} />
             <p className="focus-tile-note">
               Wie oft Sie welches Szenario mit welchem Gesprächspartner gespielt haben.
             </p>
@@ -209,36 +219,81 @@ export default function ProgressView() {
             </button>
           ))}
         </div>
+
+        {/* The second row, and the same control as the first, so the two
+            cannot read as different kinds of choice. It answers the objection
+            the concept raises against its own charts (section 4.3): a course
+            across a complaint, a price negotiation and an advisory call is
+            scatter, and across one kind of call it is a series. Each option
+            carries how many trainings it would yield, and an occasion with
+            none cannot be pressed — a filter leading to an empty page is a
+            dead end nobody meant to offer. */}
+        <div
+          className="progress-periods progress-occasions"
+          role="group"
+          aria-labelledby="progress-scope-label"
+        >
+          {OCCASIONS.map((option) => {
+            const count = occasionCounts[option.key];
+            return (
+              <button
+                type="button"
+                key={option.key}
+                className={`progress-period${option.key === occasion ? " is-active" : ""}`}
+                aria-pressed={option.key === occasion}
+                disabled={count === 0 && option.key !== occasion}
+                onClick={() => setOccasion(option.key)}
+              >
+                {option.label}
+                <span className="progress-period-count"> {count}</span>
+              </button>
+            );
+          })}
+        </div>
+
         <span className="progress-scope-note">
           {inPeriod.length} {inPeriod.length === 1 ? "Training" : "Trainings"}, für alles
           darunter
         </span>
       </div>
 
-      {/* No empty-period branch: counted in trainings, the selection is never
-          empty while anything is stored, and nothing stored returned above. */}
-      {goals.length > 0 ? (
-        <FocusSection
-          goals={goals}
-          series={series}
-          sessions={inPeriod}
-          allSessions={sessions}
-        />
+      {/* Empty only through the occasion row: counted in trainings, the period
+          alone is never empty while anything is stored. Reachable by a shared
+          link, and by deleting the last training of a kind while the filter is
+          on it. */}
+      {inPeriod.length === 0 ? (
+        <div className="card">
+          <p>
+            Zu diesem Gesprächsanlass liegt in Ihrer Auswahl kein Training vor. Mit „Alle
+            Anlässe“ steht hier wieder alles.
+          </p>
+        </div>
       ) : (
-        <OverviewSection series={overview} />
+        <>
+          {goals.length > 0 ? (
+            <FocusSection
+              goals={goals}
+              series={series}
+              sessions={inPeriod}
+              allSessions={sessions}
+            />
+          ) : (
+            <OverviewSection series={overview} />
+          )}
+
+          {/* Second, directly under the goals: what the wrap-ups keep naming,
+              and beside the improvements the one call to practise them in. It
+              is the only block on the page that leads back into training, and
+              it used to be the last one. */}
+          <ProgressRecurring
+            sessions={inPeriod}
+            catalogue={focus?.goals ?? []}
+            practice={<ProgressPractice sessions={inPeriod} catalogue={focus?.goals ?? []} />}
+          />
+
+          <ProgressMetricTable series={overview} />
+        </>
       )}
-
-      {/* Second, directly under the goals: what the wrap-ups keep naming, and
-          beside the improvements the one call to practise them in. It is the
-          only block on the page that leads back into training, and it used to
-          be the last one. */}
-      <ProgressRecurring
-        sessions={inPeriod}
-        catalogue={focus?.goals ?? []}
-        practice={<ProgressPractice sessions={inPeriod} catalogue={focus?.goals ?? []} />}
-      />
-
-      <ProgressMetricTable series={overview} />
     </Frame>
   );
 }
@@ -506,17 +561,32 @@ function GoalMentionBody({
   note: string | undefined;
 }) {
   const { strengths, improvements, total } = mentionsFor(sessions, goal);
+  // The newest thing a wrap-up wrote about this goal. `statementsFor` is
+  // ordered newest training first and keeps the wrap-up's own order within one,
+  // so the first entry is the most recent sentence.
+  const latest = statementsFor(sessions, [goal])[0];
 
   if (total === 0 || (strengths === 0 && improvements === 0)) {
     return <p className="focus-tile-note">{note}</p>;
   }
 
-  // Pips and a count in small type, the way the recurring block draws the same
-  // kind of statement. The large figure this used to lead with made "3 von 8"
-  // the most prominent thing on the tile, and in display type a count over a
-  // denominator reads as a mark (`MentionTally`).
+  // The sentence first, then the tally. For a goal with no measurement the
+  // sentences are the whole of what exists, and a count on its own asks the
+  // reader to take a number on trust — which is the reading that makes a
+  // frequency look like a measurement. Quoted, never summarised, and labelled
+  // in words rather than by colour, exactly as the goal's own page does it.
   return (
     <>
+      {latest && (
+        <figure className="focus-quote">
+          <blockquote>{latest.text}</blockquote>
+          <figcaption>
+            Zuletzt als {latest.kind === "strength" ? "Stärke" : "Verbesserung"} genannt,{" "}
+            {formatDate(latest.at) ?? latest.at}
+          </figcaption>
+        </figure>
+      )}
+
       <ul className="focus-mentions">
         {improvements > 0 && (
           <li>
@@ -580,6 +650,15 @@ function MetricBody({ series, sessionCount }: { series: MetricSeries; sessionCou
     );
   }
 
+  // How many of the selected trainings carry no value for this metric. A
+  // course drawn from 6 of 10 trainings says "6" beside it and nothing about
+  // the other four, which reads as a complete record with a short memory. Two
+  // things produce a gap and the sentence claims neither: a call recorded
+  // before the metric existed (ADR 0048 — the audio is gone, so it can never
+  // be filled in), and one whose recording was too noisy to tell speech from
+  // silence, which withholds five metrics at once (ADR 0085).
+  const missing = Math.max(0, sessionCount - series.points.length);
+
   return (
     <>
       <p className="progress-metric-figure">
@@ -589,6 +668,9 @@ function MetricBody({ series, sessionCount }: { series: MetricSeries; sessionCou
       <Sparkline series={series} />
       <p className="focus-tile-note">
         Ihr üblicher Bereich {formatBand(series) ?? "–"}, aus {series.points.length} Trainings.
+        {missing > 0 &&
+          ` In ${missing === 1 ? "einem weiteren Training" : `${missing} weiteren Trainings`}` +
+            " liegt dazu kein Wert vor."}
       </p>
     </>
   );

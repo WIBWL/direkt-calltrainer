@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { useProgressData, type ProgressLoadState } from "./hooks/useProgressData";
 import type { SessionSummary } from "./protocol";
+import { CATEGORY_LABELS, type ScenarioCategory } from "./scenarioLibrary";
 import { latest } from "./utils/progressStats";
 
 /**
@@ -14,16 +15,69 @@ import { latest } from "./utils/progressStats";
  * account, and the first was empty for anybody who trains in bursts. The widest
  * option is still everything stored and nothing older.
  *
- * `phrase` is the same selection in a sentence, for the pages that are read
- * over it without carrying the switch itself.
+ * `prefix` is the selection's half of the sentence the pages without the switch
+ * say themselves; the occasion below supplies the noun.
  */
 export const PERIODS = [
-  { key: "5", label: "Letzte 5", count: 5, phrase: "Ihren letzten 5 Trainings" },
-  { key: "10", label: "Letzte 10", count: 10, phrase: "Ihren letzten 10 Trainings" },
-  { key: "all", label: "Alle", count: null, phrase: "allen Ihren Trainings" },
+  { key: "5", label: "Letzte 5", count: 5, prefix: "Ihren letzten 5" },
+  { key: "10", label: "Letzte 10", count: 10, prefix: "Ihren letzten 10" },
+  { key: "all", label: "Alle", count: null, prefix: "allen Ihren" },
 ] as const;
 
 export type PeriodKey = (typeof PERIODS)[number]["key"];
+
+/**
+ * Which kind of call the dashboard is read over (ADR 0072's vocabulary).
+ *
+ * The answer to the concept's own strongest objection against its charts
+ * (section 4.3): the trainings are not repeated measures. Scenario and Persona
+ * move talk share, pace and the question count more than a change in behaviour
+ * would, so a line across every training shows scatter while looking like
+ * development. Narrowed to one occasion it is a series again, read against the
+ * same kind of call — still the user's own past and nobody else's, which is the
+ * only reference point ADR 0051 allows.
+ *
+ * It narrows and never judges: no occasion is the right one to train, and
+ * nothing here compares two of them.
+ *
+ * `noun` is the dative plural the period's prefix takes ("Ihren letzten 5
+ * Beratungsgesprächen"). It is not `CATEGORY_LABELS`, which names the occasion
+ * of a call on a library card ("Beratung & Anforderung") and does not decline.
+ */
+export const OCCASIONS = [
+  { key: "all", label: "Alle Anlässe", category: null, noun: "Trainings" },
+  {
+    key: "operations",
+    label: CATEGORY_LABELS.operations,
+    category: "operations",
+    noun: "Störungsgesprächen",
+  },
+  {
+    key: "requirements",
+    label: CATEGORY_LABELS.requirements,
+    category: "requirements",
+    noun: "Beratungsgesprächen",
+  },
+  {
+    key: "pricing",
+    label: CATEGORY_LABELS.pricing,
+    category: "pricing",
+    noun: "Preisgesprächen",
+  },
+  {
+    key: "closing",
+    label: CATEGORY_LABELS.closing,
+    category: "closing",
+    noun: "Abschlussgesprächen",
+  },
+] as const satisfies readonly {
+  key: string;
+  label: string;
+  category: ScenarioCategory | null;
+  noun: string;
+}[];
+
+export type OccasionKey = (typeof OCCASIONS)[number]["key"];
 
 /**
  * Everything by default, as dashboard-konzept.md section 10 decided: the first
@@ -35,25 +89,38 @@ export type PeriodKey = (typeof PERIODS)[number]["key"];
  */
 const DEFAULT_PERIOD: PeriodKey = "all";
 
-/** The selection's name in the URL. German, like every other path segment the
+/** Every occasion by default, for the reason the period defaults to everything:
+ *  the first look should show all there is. Narrowing is one press away, and
+ *  an account whose trainings are all of one kind sees the same page either
+ *  way. */
+const DEFAULT_OCCASION: OccasionKey = "all";
+
+/** The selections' names in the URL. German, like every other path segment the
  *  user can see. */
 const PERIOD_PARAM = "trainings";
+const OCCASION_PARAM = "anlass";
 
 interface ProgressContextValue {
-  /** Every stored training, newest first, whatever the switch says. What the
+  /** Every stored training, newest first, whatever the switches say. What the
    *  activity block at the top of the overview counts. */
   sessions: SessionSummary[];
-  /** The trainings the switch selected — what every figure below it is read
-   *  over, on the overview and on both detail levels alike. */
+  /** The trainings both switches selected — what every figure below them is
+   *  read over, on the overview and on both detail levels alike. */
   selected: SessionSummary[];
   state: ProgressLoadState;
   /** True when the account holds more trainings than the dashboard reads. */
   truncated: boolean;
   total: number;
   period: PeriodKey;
-  /** The current selection in a sentence ("Ihren letzten 5 Trainings"). */
+  occasion: OccasionKey;
+  /** The current selection in a sentence ("Ihren letzten 5
+   *  Beratungsgesprächen"). */
   periodPhrase: string;
   setPeriod: (key: PeriodKey) => void;
+  setOccasion: (key: OccasionKey) => void;
+  /** How many trainings each occasion would yield under the current period, by
+   *  key. The switch shows them, so nobody presses into an empty page. */
+  occasionCounts: Record<OccasionKey, number>;
   /** A dashboard path with the current selection on it. Every link between the
    *  three levels goes through this, which is what keeps them reading the same
    *  trainings. */
@@ -89,16 +156,34 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
   const option = readPeriod(params.get(PERIOD_PARAM));
   const period = option.key;
   const count = option.count;
+  const occasionOption = readOccasion(params.get(OCCASION_PARAM));
+  const occasion = occasionOption.key;
+  const category = occasionOption.category;
 
-  const selected = useMemo(() => latest(sessions, count), [sessions, count]);
+  // Narrowed first, cut second. The other order would take the last five
+  // trainings and then keep whichever of them were advisory calls, so "Letzte
+  // 5" plus "Beratung" could yield one — a selection whose size depends on
+  // what was played in between, which is not what either switch says.
+  const selected = useMemo(
+    () => latest(byOccasion(sessions, category), count),
+    [sessions, category, count],
+  );
 
-  const setPeriod = useCallback(
-    (key: PeriodKey) => {
+  const occasionCounts = useMemo(() => {
+    const counts = {} as Record<OccasionKey, number>;
+    for (const entry of OCCASIONS) {
+      counts[entry.key] = latest(byOccasion(sessions, entry.category), count).length;
+    }
+    return counts;
+  }, [sessions, count]);
+
+  const setParam = useCallback(
+    (name: string, key: string, fallback: string) => {
       const next = new URLSearchParams(params);
       // The default stays out of the URL, so the plain path is the one people
       // copy and the parameter appears only where it says something.
-      if (key === DEFAULT_PERIOD) next.delete(PERIOD_PARAM);
-      else next.set(PERIOD_PARAM, key);
+      if (key === fallback) next.delete(name);
+      else next.set(name, key);
       // Replaced rather than pushed: Back should leave the dashboard, not undo
       // three presses of a filter first.
       setParams(next, { replace: true });
@@ -106,9 +191,24 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     [params, setParams],
   );
 
+  const setPeriod = useCallback(
+    (key: PeriodKey) => setParam(PERIOD_PARAM, key, DEFAULT_PERIOD),
+    [setParam],
+  );
+  const setOccasion = useCallback(
+    (key: OccasionKey) => setParam(OCCASION_PARAM, key, DEFAULT_OCCASION),
+    [setParam],
+  );
+
   const withPeriod = useCallback(
-    (path: string) => (period === DEFAULT_PERIOD ? path : `${path}?${PERIOD_PARAM}=${period}`),
-    [period],
+    (path: string) => {
+      const query = new URLSearchParams();
+      if (period !== DEFAULT_PERIOD) query.set(PERIOD_PARAM, period);
+      if (occasion !== DEFAULT_OCCASION) query.set(OCCASION_PARAM, occasion);
+      const text = query.toString();
+      return text ? `${path}?${text}` : path;
+    },
+    [period, occasion],
   );
 
   const value = useMemo(
@@ -119,11 +219,28 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
       truncated,
       total,
       period,
-      periodPhrase: option.phrase,
+      occasion,
+      periodPhrase: `${option.prefix} ${occasionOption.noun}`,
       setPeriod,
+      setOccasion,
+      occasionCounts,
       withPeriod,
     }),
-    [sessions, selected, state, truncated, total, period, option.phrase, setPeriod, withPeriod],
+    [
+      sessions,
+      selected,
+      state,
+      truncated,
+      total,
+      period,
+      occasion,
+      option.prefix,
+      occasionOption.noun,
+      setPeriod,
+      setOccasion,
+      occasionCounts,
+      withPeriod,
+    ],
   );
 
   return <ProgressContext.Provider value={value}>{children}</ProgressContext.Provider>;
@@ -147,4 +264,29 @@ function readPeriod(raw: string | null): (typeof PERIODS)[number] {
   // system cannot know that from a `find`.
   if (!fallback) throw new Error("no default period in PERIODS");
   return fallback;
+}
+
+/** The same for the occasion. An unknown value falls back to every occasion
+ *  rather than to none, for the reason the period does: a selection nobody
+ *  offered is answered with the widest one, not with an error screen. */
+function readOccasion(raw: string | null): (typeof OCCASIONS)[number] {
+  const named = OCCASIONS.find((entry) => entry.key === raw);
+  if (named) return named;
+  const fallback = OCCASIONS.find((entry) => entry.key === DEFAULT_OCCASION);
+  if (!fallback) throw new Error("no default occasion in OCCASIONS");
+  return fallback;
+}
+
+/** The trainings of one kind of call, or all of them for null. An
+ *  uncategorised training — an authored Scenario, a reverse — belongs to no
+ *  occasion and is therefore only ever in "Alle Anlässe". Dropping it from
+ *  every narrowed view is right: it is a training whose kind nobody recorded,
+ *  and putting it under a heading it may not belong to would be the guess this
+ *  filter exists to avoid. */
+function byOccasion(
+  sessions: SessionSummary[],
+  category: ScenarioCategory | null,
+): SessionSummary[] {
+  if (category === null) return sessions;
+  return sessions.filter((session) => session.category === category);
 }

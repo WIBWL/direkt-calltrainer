@@ -2312,6 +2312,13 @@ h2 {
   color: var(--text-muted);
 }
 
+/* Out from under the disclaimer's rule: it is an offer and not part of the
+   caveat above it. */
+.metric-progress-link {
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+}
+
 /* --- Follow-up scenario from the feedback (F-60) ------------------------ */
 
 /* Reads as the consequence of the points above it: the same card, marked by an
@@ -4775,11 +4782,59 @@ a.consent-button {
   outline-offset: 2px;
 }
 
+.progress-period:disabled {
+  color: var(--color-border);
+  cursor: default;
+}
+
+/* The occasion row wraps onto its own line: five options with counts do not fit
+   beside the period switch at any width the page actually has, and the two are
+   read one after the other anyway ("the last five ... advisory calls"). */
+.progress-occasions {
+  flex-basis: 100%;
+  width: fit-content;
+}
+
+/* The count beside an occasion, so nobody presses into a narrow selection
+   without knowing how narrow. Dimmed, because it is context and not the
+   label. */
+.progress-period-count {
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Generous, and deliberately so: the complaint the redesign answers was that
    ten equal boxes read as one undifferentiated block, and the first remedy for
    that is space rather than decoration. */
 .progress-section {
   margin-top: 2.75rem;
+}
+
+/* --- The earlier half and the recent one (EarlyAndLate.tsx) -------------- */
+
+/* Side by side and equal in every respect: same width, same type, same
+   treatment. Stacked, the lower one would read as the conclusion of the upper,
+   and no conclusion is being drawn (ADR 0065). There is deliberately nothing
+   between the two columns — no arrow, no delta, no separator suggesting a
+   direction of travel. */
+.early-late {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.early-late-label {
+  margin: 0 0 4px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.early-late-range {
+  margin: 0;
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-navy-900);
 }
 
 /* The same distance from every section heading to what it heads. A `.card`
@@ -5052,6 +5107,37 @@ a.consent-button {
   height: 22px;
 }
 
+/* The newest thing a wrap-up wrote about a goal that has no measurement. It
+   leads the tile, because for those goals the sentences are the whole of what
+   exists and a tally on its own reads as a measurement of something. Quoted,
+   so it is visibly somebody else's words and not the interface's verdict. */
+.focus-quote {
+  margin: 0 0 12px;
+  padding-left: 10px;
+  border-left: 3px solid var(--color-border);
+}
+
+.focus-quote blockquote {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--color-navy-900);
+}
+
+.focus-quote blockquote::before {
+  content: "„";
+}
+
+.focus-quote blockquote::after {
+  content: "“";
+}
+
+.focus-quote figcaption {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
 /* What the wrap-ups said about a goal with no measurement: a label, the pips
    and the count, the same marks the recurring block uses for the same kind of
    statement. */
@@ -5275,6 +5361,10 @@ a.consent-button {
   padding: 0;
 }
 
+/* A day is a `span` where nothing happened and a `button` where something did,
+   so the resets here have to cover both: a cell must look identical whether or
+   not it can be pressed, or the grid would encode "has trainings" a second
+   time, in the shape of the cell. */
 .calendar-day {
   position: relative;
   display: flex;
@@ -5282,10 +5372,29 @@ a.consent-button {
   justify-content: center;
   width: 100%;
   height: 32px;
+  padding: 0;
+  border: 0;
   border-radius: 9px;
+  font: inherit;
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
   transition: transform 120ms ease;
+}
+
+button.calendar-day {
+  cursor: pointer;
+}
+
+.calendar-day:focus-visible {
+  outline: 2px solid var(--color-navy-900);
+  outline-offset: 2px;
+}
+
+/* The opened day keeps a ring while its trainings are listed below, because
+   the list stands under the whole calendar and would otherwise be a block with
+   no visible connection to the cell that opened it. */
+.calendar-day-open {
+  box-shadow: 0 0 0 2px var(--color-navy-900);
 }
 
 /* Today, whether or not anything was trained on it: a ring rather than a fill,
@@ -5424,13 +5533,18 @@ a.consent-button {
   padding: 3px 4px;
 }
 
+/* Like `.calendar-day`: a played cell is a button and an unplayed one a span,
+   and both have to draw identically apart from the fill they already carry. */
 .variety-cell {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 34px;
   height: 28px;
+  padding: 0;
+  border: 0;
   border-radius: var(--radius-control);
+  font: inherit;
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
 }
@@ -5438,6 +5552,18 @@ a.consent-button {
 .variety-cell.is-played {
   background: var(--color-blue-600);
   color: var(--color-surface);
+  cursor: pointer;
+}
+
+.variety-cell:focus-visible {
+  outline: 2px solid var(--color-navy-900);
+  outline-offset: 2px;
+}
+
+/* The opened pairing, for the same reason the opened calendar day keeps one:
+   the list sits under the whole table. */
+.variety-cell.is-open {
+  box-shadow: 0 0 0 2px var(--color-navy-900);
 }
 
 .variety-empty {
@@ -5445,6 +5571,64 @@ a.consent-button {
   height: 100%;
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-control);
+}
+
+/* --- The trainings behind a cell (TrainingLinks.tsx) --------------------- */
+
+/* Opened under the calendar and under the variety grid, so the two blocks that
+   describe what somebody did also lead back to it. Set off by a rule and a
+   tinted ground rather than by a border, because it appears inside a card that
+   already has one. */
+.training-links {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-background);
+}
+
+.training-links-title {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.training-links ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.training-links a {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  padding: 5px 6px;
+  border-radius: var(--radius-control);
+  font-size: 0.82rem;
+  text-decoration: none;
+  color: var(--color-navy-900);
+}
+
+.training-links a:hover {
+  background: var(--color-surface);
+}
+
+.training-links a:focus-visible {
+  outline: 2px solid var(--color-navy-900);
+  outline-offset: 1px;
+}
+
+.training-links-when {
+  font-variant-numeric: tabular-nums;
+  text-decoration: underline;
+}
+
+.training-links-what {
+  color: var(--color-text-muted);
 }
 
 /* Available to a screen reader, invisible on screen: an empty cell has to say
@@ -5852,6 +6036,22 @@ a.consent-button {
   font-size: 0.9rem;
   line-height: 1.6;
   color: var(--color-text-muted);
+}
+
+/* What a wrap-up has said about the goal since. Same type as the ground above
+   it, because it is the second half of the same account: the wrap-ups raised
+   this, and afterwards one said that. Nothing here is emphasised over the
+   other — no colour, no weight — since the two are statements in sequence and
+   not a before and an after. */
+.progress-practice-since {
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+.progress-practice-since q {
+  color: var(--color-navy-900);
 }
 
 /* The chip at the head of the sentence that gives the ground. It says what
