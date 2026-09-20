@@ -15,6 +15,8 @@ from pathlib import Path
 import httpx
 import pytest
 
+from backend.db.seed_data import FOCUS_GOALS
+from backend.feedback.generator import _NEVER_ASSIGNED
 from backend.recommendations import (
     GOAL_CATEGORIES,
     MAX_RECOMMENDATIONS,
@@ -228,4 +230,30 @@ def test_the_two_goal_tables_say_the_same_thing() -> None:
     assert set(GOAL_CATEGORIES) <= set(practice), (
         "a goal the library steers by is missing from PRACTICE_CATEGORY, where "
         "it would silently get no practice suggestion"
+    )
+
+
+def test_every_goal_the_wrap_up_can_name_has_somewhere_to_practise_it() -> None:
+    """The practice block turns the most-named improvement into one call to make
+    (dashboard concept, section 5.E). A goal absent from the table yields no
+    suggestion at all -- deliberate, so that adding a catalogue goal forces
+    somebody to decide what it is practised in.
+
+    Deliberate only while somebody notices. The check above holds the table
+    against the library's; this one holds it against the catalogue, which is
+    where a goal is actually added. Without it the block simply falls silent for
+    whoever picked the new goal, on the one part of the screen that leads back
+    into training.
+
+    The two habit goals are excluded on the same ground the generator excludes
+    them: they are about how often somebody trains, so they are never named in a
+    wrap-up and can never be the improvement this block answers.
+    """
+    practice = _practice_category()
+    assignable = {goal["id"] for goal in FOCUS_GOALS} - set(_NEVER_ASSIGNED)
+
+    missing = assignable - set(practice)
+    assert not missing, (
+        f"{sorted(missing)} can be named as an improvement but has no entry in "
+        f"PRACTICE_CATEGORY, so the practice block stays empty for it"
     )

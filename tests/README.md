@@ -49,6 +49,7 @@ source of that content, and which imports without a database.
 | Storage consent: the gate on the write path, version staleness, withdrawal deletes | F-49, F-31, ADR 0031, ADR 0034, ADR 0066 | `test_consent.py` |
 | Six-month retention: the boundary, the per-account suspension, idempotence | F-49, ADR 0031, ADR 0066, ADR 0067 | `test_retention.py` |
 | Focus goals: the five-goal limit at the backend, "no focus" as a decision, the catalogue, that deleting trainings leaves the selection alone, and the role and call types stored beside it | F-62, ADR 0031, ADR 0041, ADR 0066, ADR 0076 | `test_focus_goals.py` |
+| Every shipped focus goal reaches the dashboard: a tile backing per goal, no backing for a goal that is not shipped, and the habit goals excluded in both places at once | F-62, F-13, ADR 0076, ADR 0080 | `test_focus_goal_coverage.py` |
 | Data rights: overview counts, export completeness and scoping, deleting one training | F-49, F-31, ADR 0050, ADR 0064, ADR 0066 | `test_data_rights.py` |
 | Spoken content stays out of the log unless explicitly switched on | F-49, ADR 0039, ADR 0066 | `test_transcript_logging.py` |
 | Deep links into the client-side router survive a reload, without swallowing unknown API paths | F-31, ADR 0009, ADR 0064 | `test_spa_routing.py` |
