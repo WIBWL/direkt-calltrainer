@@ -9,6 +9,9 @@ The case that matters most is the pair at the top: a wide-but-slow contour and a
 narrow-but-lively one. A single range figure calls the first one expressive and
 the second one flat, which is backwards for a listener.
 """
+from dataclasses import fields
+from pathlib import Path
+
 import pytest
 
 from backend.feedback.readings import served_detail
@@ -26,7 +29,7 @@ from backend.feedback.intonation import (
     STEP_MS,
     TERMINAL_FLAT_ST,
     TERMINAL_WINDOW_MS,
-    Ending,
+    Endings,
     Liveliness,
     effective_step_ms,
     liveliness,
@@ -295,9 +298,22 @@ def test_an_ending_is_read_from_voiced_frames_only() -> None:
     assert profile(falling_then_silence, (falling_then_silence,)).endings.falling == 1
 
 
-def test_ending_values_are_the_documented_vocabulary() -> None:
-    """The frontend words these; a fourth value would render as nothing."""
-    assert {e.value for e in Ending} == {"falling", "rising", "level"}
+def test_the_endings_the_frontend_reads_are_the_ones_measured() -> None:
+    """The count travels as `endings.falling/rising/level` and the page words
+    exactly those three; a fourth kind added here would render as nothing.
+
+    Pinned against the frontend's own interface. An enum of the three values
+    used to stand in for this and was pinned only against itself, so a new
+    field on `Endings` would have left it green.
+    """
+    page = (
+        Path(__file__).resolve().parent.parent /
+        "frontend" / "src" / "components" / "IntonationReading.tsx"
+    ).read_text(encoding="utf-8")
+    body = page.split("interface Endings {", 1)[1].split("}", 1)[0]
+    read = {line.strip().split(":", 1)[0] for line in body.splitlines() if ":" in line}
+
+    assert {field.name for field in fields(Endings)} == read == {"falling", "rising", "level"}
 
 
 # --- The pitch variation quotient -------------------------------------------

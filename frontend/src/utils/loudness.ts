@@ -14,7 +14,7 @@ import { formatClock } from "./time";
  */
 
 /** acoustics.py's `_SAMPLE_INTERVAL_MS` — the curve's only time base. */
-export const MS_PER_POINT = 100;
+const MS_PER_POINT = 100;
 /** Moving-average window, 1 s: syllables and word stress average out, a real
  * shift in level survives. */
 const SMOOTH_POINTS = 10;

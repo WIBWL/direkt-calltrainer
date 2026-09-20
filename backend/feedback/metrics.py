@@ -70,15 +70,13 @@ _SENTENCE_SPLIT_RE = re.compile(r"[.!]+")
 # The one metric the wrap-up reads as a course rather than as a figure, so
 # generator.py has to be able to pick it out of the inventory by name.
 LOUDNESS_KEY = "loudness"
-# The grid the stored curves are drawn at, matching acoustics.py's loudness
-# sampling so the two can be read side by side.
-LOUDNESS_INTERVAL_MS = 100
 # How many audible samples the dynamic range needs before it is a range rather
 # than the distance between two samples. See `_loudness`: below twenty the 5th
 # to 95th percentile trims nothing at all.
 _MIN_LOUDNESS_POINTS = 20
 
-# The pitch curve is stored at half of that, and does not share the grid.
+# The pitch curve is stored at half the loudness curve's 100 ms (acoustics.py's
+# sampling grid), and does not share that grid.
 #
 # Measured, on a synthetic contour with speech's own syllable rate: at 100 ms
 # the drawing turns into a sawtooth, because roughly 4 to 5 syllables a second

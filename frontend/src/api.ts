@@ -22,7 +22,7 @@ let reauthStarted = false;
  * a stale signing key after the Keycloak realm was re-imported, a revoked
  * session, a wiped realm. Drop the local user and send the browser back through
  * login; on return the original page is restored. */
-export async function reauthenticate(): Promise<void> {
+async function reauthenticate(): Promise<void> {
   if (reauthStarted) return;
   reauthStarted = true;
   try {

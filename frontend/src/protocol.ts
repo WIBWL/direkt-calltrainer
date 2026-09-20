@@ -79,19 +79,18 @@ export interface SessionStartMessage {
   token: string;
 }
 
-/** Announces one recorded Turn; the raw audio follows as the next binary frame. */
+/**
+ * Announces one recorded Turn; the raw audio follows as the next binary frame.
+ *
+ * Carries no duration on purpose: the speaking time behind speaking rate, talk
+ * share and fluency is the server's own measurement of the recording
+ * (ADR 0047/0048), not the VAD's. A `duration_ms` field sat here for a while
+ * that neither side sent or read.
+ */
 export interface TurnAudioMetaMessage {
   type: "turn.audio.meta";
   turn_seq: number;
   mime_type: string;
-  /**
-   * How long the user spoke, in milliseconds, as measured by the VAD.
-   *
-   * Currently neither sent by `useSessionSocket` nor read by the server: the
-   * speaking time behind speaking rate, talk share and fluency comes from the
-   * server's own measurement of the recording (ADR 0047/0048).
-   */
-  duration_ms?: number;
 }
 
 /** Sent the moment the client starts playing the Persona's opening line.

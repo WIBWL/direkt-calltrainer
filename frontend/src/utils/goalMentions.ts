@@ -42,7 +42,7 @@ export const MIN_MENTIONS = 2;
 
 /** At most this many per column. The block answers "what keeps coming up",
  *  and a list of eight answers a different question. */
-export const MAX_SHOWN = 3;
+const MAX_SHOWN = 3;
 
 export function mentionSummary(sessions: SessionSummary[]): MentionSummary {
   const tagged = sessions.filter((session) => session.feedback_goals.length > 0);

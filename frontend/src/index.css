@@ -40,12 +40,6 @@
   --series-speech: #2a78d6;
   --series-content: #e87ba4;
   --series-activity: #4a3aa7;
-  /* The same hues at a fill weight: an area under a line, a band, a hover
-     surface. Alpha rather than a lighter step, so a fill sits on any surface
-     without a second set of values to keep in step. */
-  --series-speech-fill: #2a78d61f;
-  --series-content-fill: #e87ba41f;
-  --series-activity-fill: #4a3aa71f;
 
   /* Shared font families */
   --font-sans: "Hanken Grotesk", Arial, sans-serif;

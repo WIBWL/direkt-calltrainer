@@ -31,7 +31,7 @@ export interface SegmentPair {
 
 /** The pairs of one training, in the order the wire delivered them (metric,
  *  then segment), which is stable across reads. */
-export function pairsOf(segments: SegmentMeasurement[]): SegmentPair[] {
+function pairsOf(segments: SegmentMeasurement[]): SegmentPair[] {
   const byKey = new Map<string, SegmentPair>();
   for (const entry of segments) {
     const pair = byKey.get(entry.key) ?? {

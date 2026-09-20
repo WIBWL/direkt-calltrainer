@@ -205,14 +205,6 @@ PVQ_LIVELY_MAX = 0.25
 MIN_VOICED_MS_FOR_READING = 10_000
 
 
-class Ending(str, Enum):
-    """How one utterance ended."""
-
-    FALLING = "falling"
-    RISING = "rising"
-    LEVEL = "level"
-
-
 @dataclass(frozen=True)
 class Endings:
     """The terminal contours of a call, counted.
