@@ -423,9 +423,10 @@ def _goal_ids(db: DbSession) -> dict[str, int]:
     }
 
 
-# Goals about the training habit rather than about a call. Rule A6 tells the
-# model not to assign them; this is the same rule where it cannot be ignored.
-_NEVER_ASSIGNED = frozenset({"training_regularity", "training_variety"})
+# Goals about the training habit rather than about a call -- the catalogue's
+# `habit` group. Rule A6 tells the model not to assign them; this is the same
+# rule where it cannot be ignored.
+_NEVER_ASSIGNED = frozenset(goal["id"] for goal in FOCUS_GOALS if goal["group"] == "habit")
 
 
 def _goal_catalogue() -> str:

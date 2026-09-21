@@ -198,39 +198,32 @@ def _practice_category() -> dict[str, str | None]:
     return table
 
 
-def test_the_two_goal_tables_say_the_same_thing() -> None:
-    """Where a focus goal is practised is one editorial judgement, written down
-    twice: here for the library's suggestions, and in `practiceRoutes.ts` for the
-    progress view's single practice offer, which has to pick one kind of call.
+def test_the_practice_offer_uses_the_first_kind_of_call_on_the_goal_s_row() -> None:
+    """Where a focus goal is practised is one editorial judgement, written on
+    the goal's own row (`practised_in` in `seed_data.FOCUS_GOALS`). The library
+    suggests every kind named there; the progress view's single practice offer
+    (`practiceRoutes.ts`) has to pick one, and it picks the first.
 
     The two had drifted, so a User who picked Einwandbehandlung was sent to a
     closing call on the setup screen and to a pricing call on the progress view,
-    and composure to different sets. Either table may be changed -- but not on
-    its own.
+    and composure to different sets. The frontend copy exists because the
+    catalogue it would otherwise read does not travel with this judgement; this
+    holds it to the row.
     """
     practice = _practice_category()
     assert practice, "PRACTICE_CATEGORY parsed as empty; has its shape changed?"
 
-    for goal, category in practice.items():
-        if category is None:
-            assert goal not in GOAL_CATEGORIES, (
-                f"{goal} steers the library's suggestions but not the practice "
-                f"offer; one of the two tables is wrong"
-            )
-        else:
-            assert goal in GOAL_CATEGORIES, (
-                f"{goal} steers the practice offer but not the library's "
-                f"suggestions; one of the two tables is wrong"
-            )
-            assert category in GOAL_CATEGORIES[goal], (
-                f"{goal} is practised in {category} on the progress view and in "
-                f"{GOAL_CATEGORIES[goal]} in the library"
-            )
+    for goal in FOCUS_GOALS:
+        if goal["group"] == "habit":
+            continue
+        practised_in = goal.get("practised_in") or ()
+        expected = practised_in[0] if practised_in else None
+        assert practice.get(goal["id"], "missing") == expected, (
+            f"{goal['id']} is practised in {practised_in or 'no kind of call'} on its "
+            f"row, but PRACTICE_CATEGORY says {practice.get(goal['id'], 'nothing')}"
+        )
 
-    assert set(GOAL_CATEGORIES) <= set(practice), (
-        "a goal the library steers by is missing from PRACTICE_CATEGORY, where "
-        "it would silently get no practice suggestion"
-    )
+    assert set(GOAL_CATEGORIES) == {g["id"] for g in FOCUS_GOALS if g.get("practised_in")}
 
 
 def test_every_goal_the_wrap_up_can_name_has_somewhere_to_practise_it() -> None:

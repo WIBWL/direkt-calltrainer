@@ -1583,6 +1583,13 @@ TRAINING_ROLE_CATALOGUE = [
     {"key": "other", "name": "Sonstiges", "categories": []},
 ]
 
+# `practised_in` is the kinds of call a goal is practised in (ADR 0072's
+# vocabulary), an editorial judgement written down where the goal is defined.
+# The library suggests Scenarios of every kind named (`recommendations.py`); the
+# progress view's one practice offer uses the first (`practiceRoutes.ts`, pinned
+# to this by `tests/test_recommendations.py`). Absent means the goal binds to no
+# kind of call: every Scenario trains the voice, every call has an opening, and
+# a habit goal is about how often somebody trains rather than about a call.
 FOCUS_GOALS = [
     # --- A. Paraverbal: the measurable core of the voice.
     {
@@ -1693,6 +1700,7 @@ FOCUS_GOALS = [
         "group": "phases",
         "evidence": "mixed",
         "position": 6,
+        "practised_in": ("requirements",),
         "title": "Aktive Bedarfsermittlung",
         "caption": "Durch gezielte Fragen herausfinden, was Ihr Kunde wirklich braucht.",
         "info": (
@@ -1707,6 +1715,7 @@ FOCUS_GOALS = [
         "group": "phases",
         "evidence": "mixed",
         "position": 7,
+        "practised_in": ("closing",),
         "title": "Sichere Einwandbehandlung",
         "caption": "Auf Bedenken und Einwände ruhig und überzeugend eingehen.",
         "info": (
@@ -1726,6 +1735,7 @@ FOCUS_GOALS = [
         "group": "phases",
         "evidence": "mixed",
         "position": 8,
+        "practised_in": ("closing",),
         "title": "Klarer Gesprächsabschluss",
         "caption": (
             "Ergebnisse zusammenfassen und mit einer klaren nächsten Aktion "
@@ -1744,6 +1754,7 @@ FOCUS_GOALS = [
         "group": "impact",
         "evidence": "mixed",
         "position": 9,
+        "practised_in": ("requirements",),
         "title": "Aktives Zuhören",
         "caption": "Ausreden lassen, aufgreifen und bestätigen, statt zu unterbrechen.",
         "info": (
@@ -1760,6 +1771,7 @@ FOCUS_GOALS = [
         "group": "impact",
         "evidence": "interpretive",
         "position": 10,
+        "practised_in": ("operations",),
         "title": "Empathie und Kundenorientierung",
         "caption": "Die Situation und die Stimmung Ihres Gegenübers erkennen und aufgreifen.",
         "info": (
@@ -1774,6 +1786,10 @@ FOCUS_GOALS = [
         "group": "impact",
         "evidence": "mixed",
         "position": 11,
+        # A fault report is where a caller arrives annoyed, and a pricing call
+        # is pressure too. The first is the one practice suggestion (the
+        # plainer case of it); the library suggests both.
+        "practised_in": ("operations", "pricing"),
         "title": "Souveränität unter Druck",
         "caption": "Auch bei Gegenwind ruhig, klar und stabil in der Stimme bleiben.",
         "info": (

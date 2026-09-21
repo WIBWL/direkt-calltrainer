@@ -11,27 +11,20 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from backend import focus, library
+from backend.db.seed_data import FOCUS_GOALS
 from backend.db.session import session_scope
 
 # One row of the grid in front of the "show all" tile.
 MAX_RECOMMENDATIONS = 5
 
-# The call context that exercises a focus goal. The voice goals are absent on
-# purpose: every Scenario trains the voice, so they cannot steer the choice --
-# and so is `opening`, for the same reason one step on: every call has one, and
-# no category is about openings.
-#
-# The progress view's practice suggestion holds the same judgement, as one
-# category per goal (`frontend/src/utils/practiceRoutes.ts`). Its value must be
-# one of the ones named here; `tests/test_recommendations.py` pins that, after
-# the two disagreed about where Einwandbehandlung is practised.
+# The call context that exercises a focus goal, read off the catalogue, where
+# each goal names the kinds of call it is practised in (`practised_in` in
+# `seed_data.FOCUS_GOALS`). The voice goals name none on purpose: every Scenario
+# trains the voice, so they cannot steer the choice -- and neither does
+# `opening`, for the same reason one step on: every call has one, and no
+# category is about openings.
 GOAL_CATEGORIES: dict[str, tuple[str, ...]] = {
-    "objection_handling": ("closing",),
-    "closing": ("closing",),
-    "needs_analysis": ("requirements",),
-    "active_listening": ("requirements",),
-    "composure": ("operations", "pricing"),
-    "empathy": ("operations",),
+    goal["id"]: tuple(goal["practised_in"]) for goal in FOCUS_GOALS if goal.get("practised_in")
 }
 
 
