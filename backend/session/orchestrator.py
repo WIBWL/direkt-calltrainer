@@ -43,6 +43,7 @@ from backend.session.heard import heard_text
 from backend.session.history import History
 from backend.session.measuring import attach_measurements
 from backend.session import repetition
+from backend.session import reply_checks as checks
 from backend.session.prompting import build_system_prompt, opening_instruction
 from backend.session.nudges import (
     ANTI_REPEAT_NUDGE, ANTI_REPEAT_NUDGE_REVERSE, CLARIFY_AGAIN_NUDGE, CLARIFY_NUDGE,
@@ -527,14 +528,14 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             nudge = CLARIFY_AGAIN_NUDGE
         elif self._repeat_requests_in_a_row == 1:
             nudge = CLARIFY_NUDGE
-        elif self._previous_reply():
+        elif self.history.previous_reply():
             # Reversed, the anti-repeat rule turns around with the casting
             # (ADR 0070): the persona is the side that puts things on the
             # table, so the clause forbidding that would undo the system
             # prompt from the nearest position in context.
             frame = ANTI_REPEAT_NUDGE_REVERSE if self._scenario.reverse else ANTI_REPEAT_NUDGE
             nudge = (
-                frame.format(previous=self._previous_reply()) +
+                frame.format(previous=self.history.previous_reply()) +
                 self._settlement_check()
             )
         else:
@@ -653,7 +654,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         asked to hear something again (a greeting may be the answer)."""
         normal = not force_end_call and not allow_repetition
         # Computed once: neither changes between the attempt and its re-ask.
-        said = frozenset(self._said_sentences()) if normal else frozenset()
+        said = frozenset(checks.said_sentences(self.history.replies())) if normal else frozenset()
         cut_off = self._cut_off_sentence() if normal else ""
         for regeneration in range(2):  # first pass + one regeneration
             progress.filters = _ReplyFilters(
@@ -709,13 +710,14 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         # When the user asked for a repeat, repeating or restating the
         # *immediately previous* reply is the answer, not a loop -- but a
         # verbatim repeat of an *older* reply, and a sentence stuttered inside
-        # one reply, still are (ADR 0038).
+        # one reply, still are (ADR 0038). Read before this reply joins them.
+        replies = self.history.replies()
         repeated_reply = spoke and (
             repetition.has_repeated_sentence(turn.persona_text) or
-            self._repeats_earlier_reply(turn.persona_text, exclude_last=allow_repetition) or
-            (not allow_repetition and self._repeats_last_reply(turn.persona_text))
+            checks.repeats_earlier(turn.persona_text, replies, exclude_last=allow_repetition) or
+            (not allow_repetition and checks.repeats_last(turn.persona_text, replies))
         )
-        restates = spoke and not allow_repetition and self._restates_previous_reply(turn.persona_text)
+        restates = spoke and not allow_repetition and checks.restates_previous(turn.persona_text, replies)
         self.history.add_reply(turn.persona_text)
         progress.committed = True
 
@@ -789,76 +791,6 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=audio)
         turn.persona_text = f"{turn.persona_text} {self._pack.fallback_closing_line}".strip()
         self.history.revise_reply(turn.persona_text)
-
-    def _previous_reply(self) -> str:
-        """The Persona's last reply, or "" on the opening Turn. Call before the
-        current reply has been appended to history."""
-        return self.history.previous_reply()
-
-    def _repeats_last_reply(self, text: str) -> bool:
-        """True if this reply repeats its predecessor verbatim (modulo case and
-        whitespace) — the cross-Turn form of `repetition.has_repeated_sentence` (ADR 0038)."""
-        return bool(text.strip()) and self._previous_reply().strip().lower() == text.strip().lower()
-
-    def _repeats_earlier_reply(self, text: str, exclude_last: bool = False) -> bool:
-        """True if this reply reproduces one the persona gave further back than
-        the previous Turn, verbatim modulo case and whitespace — an A-B-A-B
-        oscillation, which `_repeats_last_reply` walks straight past because the
-        repeat is two Turns back (ADR 0038).
-
-        A trivially short reply ("Ja, genau.") can recur across the call without
-        being a loop, so only substantial ones count here — unlike
-        `_repeats_last_reply`, where an exact back-to-back repeat is degenerate
-        at any length.
-
-        `exclude_last` drops the immediately previous reply from the search:
-        when the user asked to hear it again, reproducing *that* one is the
-        answer, but reproducing one from further back is still a loop.
-        """
-        candidate = text.strip().lower()
-        if len(candidate) < repetition.MIN_LOOP_REPLY_CHARS:
-            return False
-        earlier = self.history.replies()
-        if exclude_last:
-            earlier = earlier[:-1]
-        return any(content.strip().lower() == candidate for content in earlier)
-
-    def _restates_previous_reply(self, text: str) -> bool:
-        """True if most of this reply was already in its predecessor — the
-        partial form of `_repeats_last_reply` (ADR 0038)."""
-        return repetition.restates(text, self._previous_reply())
-
-    def _assistant_lines(self) -> list[str]:
-        """Every reply the persona has given so far, oldest first. `[0]` is the
-        opening line once it exists; empty on the opening Turn itself."""
-        return self.history.replies()
-
-    def _reintroduces(self, first_chunk: str) -> bool:
-        """Whether a reply *opens* by greeting or re-introducing after the call
-        is already under way — the model restarting the call instead of
-        continuing it (ADR 0038). Judged on the first chunk, before it is
-        spoken, so `_generate_reply` can regenerate rather than end the call.
-
-        Narrow on purpose: a greeting at the very start of the reply, plus
-        either the persona's own name or the opening's wording carried over.
-        A late "Guten Tag" mirrored back at a user who greeted first is the
-        one legitimate case, and it still costs only a regeneration."""
-        earlier = self._assistant_lines()
-        if not earlier:  # the opening Turn — greeting is correct here
-            return False
-        opener = first_chunk.strip()
-        words = repetition.word_set(opener)
-        if len(words) < repetition.MIN_REINTRO_WORDS:
-            return False
-        if not self._pack.regreeting_re.match(opener):
-            return False
-        # A greeting at the very start of a reply is already the tell; pair it
-        # with the persona naming itself again, or the opening's own wording
-        # carried straight over, so a greeting mirrored back at a late-greeting
-        # user is the only thing that slips through.
-        if self._first_name and self._first_name in words:
-            return True
-        return repetition.word_overlap(opener, earlier[0]) >= repetition.REINTRO_OVERLAP
 
     def note_barge_in(self, played_ms: int | None) -> None:
         """How much of the reply the client played before the user cut in. Trim
@@ -979,7 +911,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         if progress.filters.filter_repeats and text_chunk:
             text_chunk = self._drop_repeats(turn, text_chunk, progress)
         if progress.ends_call and not progress.trust_marker:
-            if self._still_pressing(f"{turn.persona_text} {text_chunk}"):
+            if checks.still_pressing(f"{turn.persona_text} {text_chunk}", self._pack):
                 logger.info("Turn %d: unprompted [CALL_END] on a reply that is still pressing; ignored", turn.seq)
                 progress.ends_call = False
         return text_chunk
@@ -1009,21 +941,6 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         interrupted = self._interrupted_previous_turn()
         return repetition.last_sentence(interrupted.persona_text) if interrupted is not None else ""
 
-    def _said_sentences(self) -> set[str]:
-        """Every content sentence the persona has said so far, normalised."""
-        return repetition.said_sentences(strip_interrupted_mark(line) for line in self._assistant_lines())
-
-    def _still_pressing(self, text: str) -> bool:
-        """Whether a reply ends on a demand or a question rather than a
-        goodbye. A farewell anywhere in the reply wins outright: half of the
-        legitimate endings measured in docs/research/model-parameters.md finish
-        on a trailing question ("Auf Wiederhören. Darf ich mich melden?"), so
-        the farewell decides, not the last sentence's shape."""
-        if self._pack.farewell_re.search(text):
-            return False
-        last = repetition.last_sentence(text)
-        return last.endswith("?") or bool(self._pack.still_pressing_re.search(last))
-
     def _guard_opening(self, turn: Turn, text_chunk: str, progress: _ReplyProgress) -> str:
         """The checks on how a reply *opens*, run on its first chunk before any
         of it is spoken. A verbatim read-back of the user's line is dropped
@@ -1048,29 +965,13 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             text_chunk = rest
         if not filters.guard or not text_chunk.strip():
             return text_chunk
-        if self._reintroduces(text_chunk):
+        replies = self.history.replies()
+        if checks.reintroduces(text_chunk, replies, self._pack, self._first_name):
             raise _RegenerateReply(repetition.first_sentence(text_chunk))
-        repeated = self._repeats_earlier_opening(text_chunk)
+        repeated = checks.repeats_earlier_opening(text_chunk, replies)
         if repeated is not None:
             raise _RegenerateReply(repeated, REPEAT_OPENING_NUDGE)
         return text_chunk
-
-    def _repeats_earlier_opening(self, first_chunk: str) -> str | None:
-        """The first sentence of `first_chunk` if the persona has already said
-        exactly that sentence earlier in the call, else None (ADR 0038). The
-        pre-synthesis form of `_repeats_earlier_reply` / `_repeats_last_reply`:
-        after two barge-ins the history holds short cut-off lines that a 4B
-        model reproduces readily, and an exact repeat spoken out loud can only
-        be answered by ending the call, so it is caught here and regenerated
-        once instead. Short openers ("Ja, genau.") recur naturally and don't count."""
-        opening = repetition.first_sentence(first_chunk)
-        if len(opening) < repetition.MIN_LOOP_REPLY_CHARS:
-            return None
-        candidate = opening.lower()
-        for line in self._assistant_lines():
-            if repetition.first_sentence(strip_interrupted_mark(line)).lower() == candidate:
-                return opening
-        return None
 
     async def _stream_and_synthesize(
         self,
