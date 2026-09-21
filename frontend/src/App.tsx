@@ -59,7 +59,7 @@ import { prefersReducedMotion } from "./utils/motion";
 /** How long the die is on screen before the call begins (F-62). Long enough to
  * read as a throw and land, short enough not to become a wait — the Session is
  * already connected behind it, so this is the only thing it costs. */
-const ROLL_MS = 3000;
+const ROLL_MS = 2000;
 
 /** null = closed; { id: null } = new; { id } = editing that row. */
 type EditorState = { id: string | null } | null;
