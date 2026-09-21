@@ -130,10 +130,17 @@ class _ReplyProgress:  # pylint: disable=too-many-instance-attributes  # one rep
         # Set once the finished reply is in the history: past that point a late
         # barge-in (over the tail still playing) must not re-finalize the turn.
         self.committed = False
-        # True on a Turn the closing nudge asked to end (ADR 0037): its
-        # [CALL_END] is taken at its word. Elsewhere the marker is the model's
-        # own idea and is vetoed on a reply that is still pressing (ADR 0037).
-        self.trust_marker = False
+        # True on a Turn the user closed and the closing nudge asked to end
+        # (ADR 0037). The reply then ends the call whether or not it carried
+        # [CALL_END], and a marker it did carry is taken at its word; elsewhere
+        # the marker is the model's own idea and is vetoed on a reply that is
+        # still pressing. One flag: it was two, `trust_marker` here and a
+        # `force_end_call` argument through two frames, always set to the same
+        # value.
+        self.closing = False
+        # True on the first Turn in a row where the user asked to hear something
+        # again (ADR 0038): repeating the previous reply is then the answer.
+        self.allow_repetition = False
         # Chunks the guards emptied (an echo of the user, sentences already
         # said, the cut-off sentence picked back up). A reply that ends up
         # empty *because* of these is the model with nothing new to say, not
@@ -465,13 +472,11 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
 
             interrupted = self._interrupted_previous_turn()
             messages = self._messages_for_turn(closing, interrupted)
-            progress.trust_marker = closing
+            progress.closing = closing
+            progress.allow_repetition = self._repeat_requests_in_a_row == 1
 
             async with contextlib.aclosing(
-                self._generate_reply(
-                    turn, messages, progress, force_end_call=closing,
-                    allow_repetition=self._repeat_requests_in_a_row == 1,
-                )
+                self._generate_reply(turn, messages, progress)
             ) as replies:
                 async for event in replies:
                     yield event
@@ -639,20 +644,18 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
                     return
                 turn.persona_text = ""  # retry from scratch
 
-    async def _stream_reply_with_regeneration(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    async def _stream_reply_with_regeneration(
         self,
         turn: Turn,
         messages: list[dict[str, str]],
         progress: _ReplyProgress,
-        force_end_call: bool,
-        allow_repetition: bool,
     ) -> AsyncIterator[TurnEvent]:
         """The reply stream (one LLM attempt plus one retry on error), plus one
         regeneration if it opened by greeting again (ADR 0038) — caught before
         any audio, so the restart costs only an extra completion. Exempt: a
         nudged closing (asked for a fresh goodbye) and a turn where the user
         asked to hear something again (a greeting may be the answer)."""
-        normal = not force_end_call and not allow_repetition
+        normal = not progress.closing and not progress.allow_repetition
         # Computed once: neither changes between the attempt and its re-ask.
         said = frozenset(checks.said_sentences(self.history.replies())) if normal else frozenset()
         cut_off = self._cut_off_sentence() if normal else ""
@@ -683,18 +686,18 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
                 progress.suppressed = 0
                 progress.first_suppressed = None
 
-    async def _generate_reply(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    async def _generate_reply(
         self,
         turn: Turn,
         messages: list[dict[str, str]],
         progress: _ReplyProgress,
-        force_end_call: bool = False,
-        allow_repetition: bool = False,
     ) -> AsyncIterator[TurnEvent]:
         """Drive the reply and append the finished text to history, yielding
         events. Gives up on a `Failed` leg."""
+        force_end_call = progress.closing
+        allow_repetition = progress.allow_repetition
         async with contextlib.aclosing(
-            self._stream_reply_with_regeneration(turn, messages, progress, force_end_call, allow_repetition)
+            self._stream_reply_with_regeneration(turn, messages, progress)
         ) as events:
             async for event in events:
                 yield event
@@ -910,7 +913,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         text_chunk = strip_interrupted_mark(text_chunk)  # copied from the history (nudges.py)
         if progress.filters.filter_repeats and text_chunk:
             text_chunk = self._drop_repeats(turn, text_chunk, progress)
-        if progress.ends_call and not progress.trust_marker:
+        if progress.ends_call and not progress.closing:
             if checks.still_pressing(f"{turn.persona_text} {text_chunk}", self._pack):
                 logger.info("Turn %d: unprompted [CALL_END] on a reply that is still pressing; ignored", turn.seq)
                 progress.ends_call = False
