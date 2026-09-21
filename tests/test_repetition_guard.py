@@ -255,7 +255,7 @@ async def test_a_reply_that_opens_by_greeting_again_is_regenerated(persona, scen
     assert b"hier ist Thomas Brandt" not in spoken  # the re-greeting never went out
     assert clean.encode("utf-8") in spoken
     assert orch.turns[-1].persona_text == clean
-    assert orch._messages[-1] == {"role": "assistant", "content": clean}  # pylint: disable=protected-access
+    assert orch.history.messages[-1] == {"role": "assistant", "content": clean}
     assert len(fake_pipeline.llm.calls) == 3
     assert completed(events).ends_call is False
 
@@ -506,7 +506,7 @@ async def test_a_block_carried_over_under_a_new_opener_is_dropped_before_it_is_s
 
     assert completed(events).ends_call is False
     assert orch.turns[1].persona_text == "Das ist mir zu wenig. Wann kann ich mit einer Antwort rechnen?"
-    assert orch._messages[-1]["content"] == orch.turns[1].persona_text  # pylint: disable=protected-access
+    assert orch.history.messages[-1]["content"] == orch.turns[1].persona_text
 
 
 async def test_a_reply_that_is_nothing_but_the_users_line_is_re_asked_once(persona, scenario, fake_pipeline):
@@ -580,7 +580,7 @@ async def test_a_reply_opening_with_a_sentence_already_said_is_regenerated_not_s
     # Line A played in full, "Ich will" of the second chunk, then the barge-in:
     # the history now holds "<line A> Ich will—", as in the live call.
     orch.note_late_barge_in(12000)
-    assert orch._messages[-1]["content"] == f"{_LINE_A} Ich will—"  # pylint: disable=protected-access
+    assert orch.history.messages[-1]["content"] == f"{_LINE_A} Ich will—"
     await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
 
     events = await collect(orch.run_turn(b"c", "turn.webm", "audio/webm"))

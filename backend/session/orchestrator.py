@@ -40,6 +40,7 @@ from backend.scenarios import Scenario
 from backend.session.call_notes import CallNotes
 from backend.session.chunking import sentence_chunks
 from backend.session.heard import heard_text
+from backend.session.history import History
 from backend.session.measuring import attach_measurements
 from backend.session import repetition
 from backend.session.prompting import build_system_prompt, opening_instruction
@@ -284,9 +285,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         # backend/api/session_ws.py, which already has the AuthContext, so the
         # `sub` goes straight from the handshake to `session.subject_id`
         # (ADR 0009, ADR 0031) without a second copy living on the dialogue.
-        self._messages: list[dict[str, str]] = [
-            {"role": "system", "content": build_system_prompt(persona, scenario, self._pack)},
-        ]
+        self.history = History(build_system_prompt(persona, scenario, self._pack))
         self.turns: list[Turn] = []
         self._reopen_turn: Turn | None = None
         # Set by note_barge_in() just before the turn generator is torn down, so
@@ -392,7 +391,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         try:
             yield StateChanged(state="thinking")
             kickoff_messages = [
-                *self._messages,
+                *self.history.messages,
                 {
                     "role": "user",
                     "content": opening_instruction(self._pack, self._scenario.reverse),
@@ -447,10 +446,10 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             # onto its question instead of starting a fresh turn.
             if reopening and turn.user_text:
                 turn.user_text = f"{turn.user_text} {user_text}".strip()
-                self._messages[-1]["content"] = turn.user_text
+                self.history.extend_question(turn.user_text)
             else:
                 turn.user_text = user_text
-                self._messages.append({"role": "user", "content": user_text})
+                self.history.add_question(user_text)
             await attach_measurements(turn, acoustics, ended_ms)
             if turn.user_offset_ms is None:
                 turn.user_offset_ms = ended_ms  # unmeasured: the end is all we know
@@ -494,7 +493,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         handful of exchanges -- it attributed its own case to the user and
         asked about it for eight Turns. Without them (ADR 0075) it is the
         history itself, which is both cheaper and less lossy on a model that
-        can read it. `self._messages` stays the full record either way, for the
+        can read it. `self.history` stays the full record either way, for the
         guards, the barge-in trims and the Transcript.
 
         The nudge, never stored: the closing push when the user has said
@@ -512,11 +511,11 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         asked to hear something again, which is not a moment to weigh the
         matter settled."""
         if CALL_STATE_NOTES:
-            view = [self._messages[0], *self.notes.message(), *self._messages[1:][-HISTORY_WINDOW:]]
+            view = [self.history.system(), *self.notes.message(), *self.history.recent(HISTORY_WINDOW)]
         else:
             # The whole call, unbounded on purpose: a Session is one phone call,
             # so the record cannot outgrow a context measured in six figures.
-            view = list(self._messages)
+            view = self.history.messages
         if closing:
             nudge = CLOSING_NUDGE
         elif interrupted is not None and view[-1]["role"] == "user":
@@ -556,7 +555,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         opens the call and states its case, so the earliest turn on which a
         condition can honestly be met is the one this lets through.
         """
-        replies = sum(1 for m in self._messages if m["role"] == "assistant")
+        replies = len(self.history.replies())
         if replies < SETTLEMENT_CHECK_AFTER_REPLIES:
             return ""
         # A reverse asks the same question from the other end of the line
@@ -717,7 +716,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             (not allow_repetition and self._repeats_last_reply(turn.persona_text))
         )
         restates = spoke and not allow_repetition and self._restates_previous_reply(turn.persona_text)
-        self._messages.append({"role": "assistant", "content": turn.persona_text})
+        self.history.add_reply(turn.persona_text)
         progress.committed = True
 
         # force_end_call backstops [CALL_END]: a small model won't always
@@ -789,15 +788,12 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         self._note_persona_audio(turn, audio)
         yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=audio)
         turn.persona_text = f"{turn.persona_text} {self._pack.fallback_closing_line}".strip()
-        self._messages[-1]["content"] = turn.persona_text
+        self.history.revise_reply(turn.persona_text)
 
     def _previous_reply(self) -> str:
         """The Persona's last reply, or "" on the opening Turn. Call before the
         current reply has been appended to history."""
-        for message in reversed(self._messages):
-            if message["role"] == "assistant":
-                return message["content"]
-        return ""
+        return self.history.previous_reply()
 
     def _repeats_last_reply(self, text: str) -> bool:
         """True if this reply repeats its predecessor verbatim (modulo case and
@@ -822,7 +818,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         candidate = text.strip().lower()
         if len(candidate) < repetition.MIN_LOOP_REPLY_CHARS:
             return False
-        earlier = [m["content"] for m in self._messages if m["role"] == "assistant"]
+        earlier = self.history.replies()
         if exclude_last:
             earlier = earlier[:-1]
         return any(content.strip().lower() == candidate for content in earlier)
@@ -835,7 +831,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
     def _assistant_lines(self) -> list[str]:
         """Every reply the persona has given so far, oldest first. `[0]` is the
         opening line once it exists; empty on the opening Turn itself."""
-        return [m["content"] for m in self._messages if m["role"] == "assistant"]
+        return self.history.replies()
 
     def _reintroduces(self, first_chunk: str) -> bool:
         """Whether a reply *opens* by greeting or re-introducing after the call
@@ -891,14 +887,13 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         self._revisable = None
         if not progress.committed or not turn.persona_text:
             return
-        last = self._messages[-1] if self._messages else {}
-        if last.get("role") != "assistant" or last.get("content") != turn.persona_text:
+        if not self.history.last_reply_is(turn.persona_text):
             return
         heard = heard_text(progress.heard_checkpoints(), progress.spoken_text, played_ms)
         if not heard:
             # Nothing heard: drop the reply, keep the turn open to continue it.
             turn.persona_text = ""
-            self._messages.pop()
+            self.history.drop_reply()
             self._reopen_turn = turn
             self._trim_persona_window(turn, played_ms)
             self._discard_state_refresh(turn)
@@ -918,7 +913,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         turn.persona_interrupted = True
         # The dash tells the model this line was cut off (see nudges.py); the
         # words themselves are exactly the Transcript's, still in step.
-        self._messages[-1]["content"] = f"{heard}{INTERRUPTED_MARK}"
+        self.history.revise_reply(f"{heard}{INTERRUPTED_MARK}")
         self._reopen_turn = None
         self._trim_persona_window(turn, played_ms)
         self._schedule_state_refresh(turn)  # the notes must not know the unheard part
@@ -966,7 +961,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             turn.persona_unheard = _unheard(progress.spoken_text, heard)
             turn.persona_text = heard
             turn.persona_interrupted = True
-            self._messages.append({"role": "assistant", "content": f"{heard}{INTERRUPTED_MARK}"})
+            self.history.add_reply(f"{heard}{INTERRUPTED_MARK}")
             self._reopen_turn = None
             self._schedule_state_refresh(turn)
         else:

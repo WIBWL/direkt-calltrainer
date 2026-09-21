@@ -317,7 +317,7 @@ def _standing_nudge(orch, replies=3):
     opening exchanges (ADR 0073)."""
     # pylint: disable=protected-access  # the assembly is the unit under test
     for i in range(replies):
-        orch._messages.append({"role": "assistant", "content": f"Antwort {i}."})
+        orch.history.add_reply(f"Antwort {i}.")
     return orch._messages_for_turn(closing=False)[-1]["content"]
 
 

@@ -56,7 +56,7 @@ async def test_a_phantom_transcript_is_no_turn(persona, scenario, fake_pipeline)
     assert not any(isinstance(e, AudioChunk) for e in events), "nothing is said"
     assert isinstance(events[-1], StateChanged) and events[-1].state == "listening"
     assert not fake_pipeline.llm.calls, "no reply was even asked for"
-    assert not orch.turns and orch._messages[-1]["role"] == "system", "no Turn, no history entry"
+    assert not orch.turns and orch.history.messages[-1]["role"] == "system", "no Turn, no history entry"
 
     events = await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
     assert any(isinstance(e, AudioChunk) for e in events), "the next real utterance is a Turn as usual"

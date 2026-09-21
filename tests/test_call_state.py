@@ -66,7 +66,7 @@ async def test_the_model_reads_notes_plus_a_window_not_the_whole_history(persona
     history = [m for m in view[2:] if m["role"] in ("user", "assistant")]
     assert len(history) == HISTORY_WINDOW, "the last three exchanges verbatim"
     assert USER[0] not in str(view), "the first exchange reaches the model only through the notes"
-    assert USER[0] in [m["content"] for m in orch._messages], "but the full record keeps it"
+    assert USER[0] in [m["content"] for m in orch.history.messages], "but the full record keeps it"
 
 
 async def test_no_notes_before_the_first_exchange_has_completed(persona, scenario, fake_pipeline):

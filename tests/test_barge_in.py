@@ -126,7 +126,7 @@ async def test_interrupt_commits_only_what_played_through(persona, scenario, fak
     assert s3 not in heard, "the third sentence was streamed ahead but never played"
     assert heard != f"{s1} {s2} {s3}" and len(heard) < len(f"{s1} {s2}"), "s2 only partially"
     assert s2.startswith(heard[len(s1):].strip()), "the s2 fragment is a word-prefix of s2"
-    assert orch._messages[-1] == {"role": "assistant", "content": heard + INTERRUPTED_MARK}, "history in step"
+    assert orch.history.messages[-1] == {"role": "assistant", "content": heard + INTERRUPTED_MARK}, "history in step"
     assert orch._reopen_turn is None
 
 
@@ -197,7 +197,7 @@ async def test_a_sentence_heard_almost_to_its_end_keeps_almost_all_of_it(
     assert len(heard) >= 0.8 * len(s1)
     assert s2 not in heard
     assert orch._reopen_turn is None, "a word was heard, so the turn is closed"
-    assert orch._messages[-1] == {"role": "assistant", "content": heard + INTERRUPTED_MARK}
+    assert orch.history.messages[-1] == {"role": "assistant", "content": heard + INTERRUPTED_MARK}
 
     events = await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
     assert len(orch.turns) == 2, "the reaction is its own turn, not merged onto the first"
@@ -225,7 +225,7 @@ async def test_late_barge_in_trims_a_completed_reply_to_what_was_heard(
     orch.note_late_barge_in(700)  # 0.7s + 0.3s grace = exactly the first sentence
 
     assert orch.turns[0].persona_text == s1
-    assert orch._messages[-1] == {"role": "assistant", "content": s1 + INTERRUPTED_MARK}
+    assert orch.history.messages[-1] == {"role": "assistant", "content": s1 + INTERRUPTED_MARK}
     assert orch._reopen_turn is None
 
     # A second stray interrupt (played_ms now ~0) must not erase what is left.
@@ -250,7 +250,7 @@ async def test_late_barge_in_with_nothing_heard_reopens_the_turn(
     orch.note_late_barge_in(80)  # 0.4s into a 30s sentence -> not even the first word
 
     assert orch.turns[0].persona_text == ""
-    assert not [m for m in orch._messages if m["role"] == "assistant"]
+    assert not [m for m in orch.history.messages if m["role"] == "assistant"]
     assert orch._reopen_turn is orch.turns[0]
 
     await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
@@ -281,7 +281,7 @@ async def test_a_barge_in_mid_sentence_trims_the_transcript_to_the_word(
     assert sentence.startswith(heard), "a leading word-prefix of the sentence"
     assert 0 < len(heard) < len(sentence) // 2, "clearly cut short, not the whole sentence"
     assert heard == heard.strip() and sentence[len(heard)] == " ", "ends on a whole word"
-    assert orch._messages[-1]["content"] == heard + INTERRUPTED_MARK, "history trimmed in step"
+    assert orch.history.messages[-1]["content"] == heard + INTERRUPTED_MARK, "history trimmed in step"
 
 
 async def test_a_cut_off_persona_line_is_marked_in_the_transcript(
@@ -305,8 +305,8 @@ async def test_a_cut_off_persona_line_is_marked_in_the_transcript(
     turn = orch.turns[0]
     assert turn.persona_interrupted is True
     assert not turn.persona_text.endswith("[unterbrochen]"), "the raw text stays clean"
-    assert orch._messages[-1]["content"] == turn.persona_text + INTERRUPTED_MARK
-    assert "[unterbrochen]" not in orch._messages[-1]["content"], "no bracket token for the model"
+    assert orch.history.messages[-1]["content"] == turn.persona_text + INTERRUPTED_MARK
+    assert "[unterbrochen]" not in orch.history.messages[-1]["content"], "no bracket token for the model"
 
     persona_line = next(u.text for u in utterances(orch.turns) if u.speaker == "persona")
     assert persona_line == f"{turn.persona_text} ... [unterbrochen]"
@@ -377,7 +377,7 @@ async def test_a_reply_that_reads_the_users_line_back_is_cut_to_the_answer(
     events = await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
 
     assert orch.turns[1].persona_text == answer
-    assert question not in orch._messages[-1]["content"]
+    assert question not in orch.history.messages[-1]["content"]
     assert any(isinstance(e, AudioChunk) for e in events), "the answer itself is spoken"
     persona_lines = [u.text for u in utterances(orch.turns) if u.speaker == "persona"]
     assert not any(line.startswith(question) for line in persona_lines)
@@ -451,7 +451,7 @@ async def test_a_reply_that_is_nothing_but_the_cut_off_sentence_is_re_asked_once
     assert nudge["role"] == "system" and "picked the sentence the user cut off back up" in nudge["content"]
     assert _CUT in nudge["content"]
     assert orch.turns[1].persona_text == "Freitag passt mir, danke."
-    assert _CUT not in orch._messages[-1]["content"]
+    assert _CUT not in orch.history.messages[-1]["content"]
 
 
 async def test_re_delivering_the_cut_off_sentences_after_a_barge_in_is_trimmed_not_ended(
@@ -618,7 +618,7 @@ async def test_the_cut_off_words_are_kept_beside_the_transcript(
     assert turn.persona_unheard, "the words that never played are kept"
     assert turn.persona_unheard not in turn.persona_text, "and kept out of the Transcript"
     assert reply.endswith(turn.persona_unheard.strip())
-    assert turn.persona_unheard not in str(orch._messages), "and out of the model's history"
+    assert turn.persona_unheard not in str(orch.history.messages), "and out of the model's history"
 
     # And it travels to the one place that shows it.
     line = next(u for u in utterances(orch.turns) if u.speaker == "persona")
