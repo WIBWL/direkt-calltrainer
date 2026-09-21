@@ -22,6 +22,12 @@ module:
   metric functions in `metrics.py` run unchanged. Anything else would be a
   second definition of speaking pace, differing from the first by accident.
 
+**The store** is here too (`store`): the wrap-up names the pressing lines, and
+this marks them, measures both stretches and writes the rows, behind a
+savepoint of its own so a failure costs the segment figures and not the
+wrap-up. It lived in `generator.py` until that module passed its line ceiling
+on the strength of a feature that was not its own.
+
 What is deliberately absent: any figure comparing the two. No difference, no
 ratio, no "held up well". The two numbers are put side by side and the reader
 draws the comparison, because the size of a difference that means something is
@@ -32,8 +38,10 @@ from __future__ import annotations
 
 import logging
 
+from sqlalchemy.orm import Session as DbSession
+
 from backend.db import models as db_models
-from backend.feedback import metrics
+from backend.feedback import metrics, rows
 from backend.feedback.acoustics import TurnFacts
 from backend.feedback.calls import conversation
 from backend.session.models import Turn
@@ -145,3 +153,82 @@ def _end(row: db_models.Turn) -> int | None:
     """The utterance's end on the Session's timeline, or None where it has no
     measured duration -- the same thing the column means."""
     return None if row.duration_ms is None else row.start_offset_ms + row.duration_ms
+
+
+def store(db: DbSession, session_id: int, pressure_turns: list[int] | None) -> None:
+    """Mark the pressing utterances, measure the two stretches and store them
+    (ADR 0081), from the ids the wrap-up named.
+
+    Called by the wrap-up job (`generator`), which is what decides the split,
+    in the same transaction as the wrap-up but behind its own failure
+    boundary: these figures are an addition to a wrap-up, and a Session losing
+    them is a smaller loss than a Session losing the wrap-up they hang off.
+    A raise here would also retry the whole model call, which would be paying
+    for a second opinion to fix an arithmetic problem.
+
+    The boundary is a **savepoint**, not just an `except`. Catching a Python
+    error is enough for a Python error, and the delete, the flush and the
+    metric-type read here are SQL: after one of those fails, Postgres has
+    aborted the transaction and every later statement raises
+    `InFailedSqlTransaction` -- so the swallowed error would take the wrap-up,
+    the job status and the commit with it, which is exactly backwards. Rolling
+    back to the savepoint leaves the transaction usable and the wrap-up intact.
+
+    Idempotent, because `scripts/requeue_feedback.py` re-runs this job over
+    Sessions that already have rows: the previous segment rows go first. The
+    whole-call rows are never touched -- they were written when the call ended
+    and no model opinion has any business overwriting a measurement.
+    """
+    if pressure_turns is None:
+        # Nobody judged this call: the key was missing, or the reply never
+        # validated. Leaving `turn.pressed` NULL is what says so -- writing
+        # False everywhere would record the opposite finding, "judged, nobody
+        # pushed", which is a claim the model never made.
+        logger.info("Session %d: no pressure judgement in the wrap-up; leaving the rows unmarked", session_id)
+        return
+    try:
+        with db.begin_nested():
+            _write(db, session_id, pressure_turns)
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.exception("Segment measurement failed for session %d", session_id)
+
+
+def _write(db: DbSession, session_id: int, pressure_turns: list[int]) -> None:
+    """The body of `store`, inside its savepoint. See there."""
+    session = db.get(db_models.Session, session_id)
+    if session is None:
+        return
+    # Persona rows only, and only ids from this Session: the same rule the
+    # points' `turn_id` follows, and for the same reason -- a reference
+    # that leads somewhere else is worse than none.
+    wanted = set(pressure_turns)
+    pressed_ids = {
+        row.turn_id for row in session.turns
+        if row.turn_id in wanted and row.speaker == db_models.SPEAKER_PERSONA
+    }
+    # Measure before anything is written. The other way round -- flags set,
+    # rows deleted, then measured -- is not the rewrite ADR 0081 promises: a
+    # measurement that throws is caught below and the wrap-up is kept, but
+    # the delete and the flags have already committed with it. A re-queue of
+    # a Session that had good segment rows then leaves it with none, and
+    # with Persona rows marked `pressed` that nothing measures. Nothing here
+    # touches `row.pressed`; it reads the id set it is handed.
+    measured = measure_segments(session, pressed_ids)
+
+    for row in session.turns:
+        if row.speaker == db_models.SPEAKER_PERSONA:
+            row.pressed = row.turn_id in pressed_ids
+
+    db.query(db_models.Measurement).filter(
+        db_models.Measurement.session_id == session_id,
+        db_models.Measurement.segment != db_models.SEGMENT_CALL,
+    ).delete(synchronize_session=False)
+    db.flush()
+
+    ids = rows.metric_ids(db)
+    for segment, values in measured.items():
+        db.add_all(rows.measurements(ids, values, segment=segment, session_id=session_id))
+    logger.info(
+        "Segment measurements for session %d: %d pressing utterance(s)",
+        session_id, len(pressed_ids),
+    )
