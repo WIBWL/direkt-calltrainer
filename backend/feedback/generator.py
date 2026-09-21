@@ -41,6 +41,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, ValidationError
@@ -232,10 +233,11 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
     if course:
         lines.append(f"    {course}")
 
+    casting = _casting(reverse)
     if reverse:
         lines.append(
-            "In this call the trainee was the one who rang; the Agent answered "
-            "the phone on the company's side."
+            f"In this call the trainee was the one who rang; the {casting.partner} "
+            "answered the phone on the company's side."
         )
     lines.append("Transcript, timestamped from the start of the call:")
     turn_ids: set[int] = set()
@@ -243,7 +245,7 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
         if turn.speaker == db_models.SPEAKER_USER:
             speaker = "User"
         else:
-            speaker = "Agent" if reverse else "Caller"
+            speaker = casting.partner
         lines.append(
             f'    [turn_id={turn.turn_id}] {_timestamp(turn.start_offset_ms)} '
             f'{speaker}: "{turn.transcript}"'
@@ -274,9 +276,9 @@ def _occasion(scenario: db_models.Scenario) -> list[str]:
     Migration `3ce81b27af40` merged the two columns, so the criterion arrived in
     the dossier inside the goal, and the guarantee was being made in a docstring
     while the prompt broke it. The answer is to cut the criterion back off
-    (`_wanted`) rather than to drop the goal: what the caller wanted *is* the
-    occasion, and a wrap-up left to guess it again is the state this block was
-    written to end.
+    (`_goal_without_criterion`) rather than to drop the goal: what the caller
+    wanted *is* the occasion, and a wrap-up left to guess it again is the state
+    this block was written to end.
     """
     lines = [
         "The occasion of this call (established fact, not something to assess):",
@@ -387,10 +389,32 @@ def _phase_rules(reverse: bool) -> str:
     )
 
 
-def _wanted(reverse: bool) -> str:
-    """What the summary opens on: the concern the call was about, named from
-    whichever side brought it."""
-    return "the trainee rang about" if reverse else "the caller wanted"
+@dataclass(frozen=True)
+class _Casting:
+    """Who was on which end of the line, in the words the material and the
+    prompt both use (ADR 0070).
+
+    Every rule in the prompt about who may be quoted and who may not be judged
+    names the simulated side by the label the transcript gives it, so the two
+    must be the same word. They were three pairs of literals in two functions,
+    held together by a comment saying they had to match.
+    """
+
+    # The transcript's label for the simulated side.
+    partner: str
+    # The person the trainee spoke to, as a sentence refers to them.
+    other: str
+    # What the summary opens on: the concern the call was about, named from
+    # whichever side brought it.
+    wanted: str
+
+
+_ORDINARY = _Casting(partner="Caller", other="the caller", wanted="the caller wanted")
+_REVERSED = _Casting(partner="Agent", other="the agent", wanted="the trainee rang about")
+
+
+def _casting(reverse: bool) -> _Casting:
+    return _REVERSED if reverse else _ORDINARY
 
 
 def _goal_ids(db: DbSession) -> dict[str, int]:
@@ -496,10 +520,10 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
     task that can break the JSON.
     """
     # The transcript's own label for the simulated side, and the phrase for the
-    # person the trainee spoke to. Both are read straight out of the material,
-    # so they have to be the words `_dossier` actually wrote.
-    partner = "Agent" if reverse else "Caller"
-    other = "the agent" if reverse else "the caller"
+    # person the trainee spoke to -- the words `_dossier` wrote, from the same
+    # record.
+    casting = _casting(reverse)
+    partner, other = casting.partner, casting.other
     system = (
         "# Role\n"
         "You are a communication coach. You review one training phone call "
@@ -749,7 +773,7 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
         # "what the caller wanted" names the trainee in a reverse and the
         # machine everywhere else, so the one word that flips is spelled out
         # rather than left to be read either way.
-        f'{{"summary": "2-4 sentences: what {_wanted(reverse)}, how the '
+        f'{{"summary": "2-4 sentences: what {casting.wanted}, how the '
         'trainee handled it, and where the call ended up", '
         '"phase_language": "one paragraph on how the register moved through '
         'opening, core business and closing, ending in the sentence to say '
