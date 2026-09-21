@@ -44,7 +44,7 @@ async def _run(orch, fake_pipeline, turns):
     events = []
     for i in range(turns):
         events = await collect(orch.run_turn(bytes([i]), "turn.webm", "audio/webm"))
-        await orch.flush_state()
+        await orch.notes.settle()
     return events
 
 
@@ -94,15 +94,15 @@ async def test_a_failed_refresh_keeps_the_previous_notes(persona, scenario, fake
     fake_pipeline.llm.state_fail_times = 0
     orch = SessionOrchestrator(persona, scenario)
     await _run(orch, fake_pipeline, 1)
-    assert orch._state == "- first notes"
+    assert orch.notes.text == "- first notes"
 
     fake_pipeline.llm.state_fail_times = 1
     fake_pipeline.stt.transcripts = [USER[1]]
     fake_pipeline.llm.replies = [PERSONA[1]]
     await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
-    await orch.flush_state()
+    await orch.notes.settle()
 
-    assert orch._state == "- first notes", "stale notes beat none; the call goes on"
+    assert orch.notes.text == "- first notes", "stale notes beat none; the call goes on"
 
 
 async def test_a_barge_in_re_refreshes_the_notes_with_only_the_heard_part(
@@ -114,7 +114,7 @@ async def test_a_barge_in_re_refreshes_the_notes_with_only_the_heard_part(
     full = PERSONA[0]
 
     orch.note_late_barge_in(2000)  # a few words in
-    await orch.flush_state()
+    await orch.notes.settle()
 
     heard = orch.turns[0].persona_text
     assert full.startswith(heard) and heard != full
@@ -167,7 +167,7 @@ async def test_without_notes_no_summarisation_request_is_made(
     await _run(orch, fake_pipeline, 3)
 
     assert fake_pipeline.llm.state_calls == [], "nothing is spent filling notes nothing reads"
-    assert orch._state == ""
+    assert orch.notes.text == ""
 
 
 def _summarising_llm(monkeypatch, fake_pipeline):
@@ -205,16 +205,16 @@ async def test_a_trimmed_reply_is_summarised_from_the_notes_that_predate_it(
     orch = SessionOrchestrator(persona, scenario)
     await _run(orch, fake_pipeline, 1)
     full = PERSONA[0]
-    assert full in orch._state, "the notes absorbed the whole reply before the barge-in"
+    assert full in orch.notes.text, "the notes absorbed the whole reply before the barge-in"
 
     orch.note_late_barge_in(2000)  # a few words in
-    await orch.flush_state()
+    await orch.notes.settle()
 
     heard = orch.turns[0].persona_text
     assert full.startswith(heard) and heard != full
     unheard = full[len(heard):].strip()
-    assert unheard and unheard not in orch._state, "the unheard tail is out of the notes"
-    assert heard in orch._state, "and what was heard is in them"
+    assert unheard and unheard not in orch.notes.text, "the unheard tail is out of the notes"
+    assert heard in orch.notes.text, "and what was heard is in them"
 
 
 async def test_a_reply_nobody_heard_leaves_the_notes_as_they_were(
@@ -233,15 +233,15 @@ async def test_a_reply_nobody_heard_leaves_the_notes_as_they_were(
 
     orch = SessionOrchestrator(persona, scenario)
     await _run(orch, fake_pipeline, 2)
-    before = orch._state
+    before = orch.notes.text
     assert PERSONA[1] in before
 
     fake_pipeline.stt.transcripts = [USER[2]]
     fake_pipeline.llm.replies = [PERSONA[2]]
     await collect(orch.run_turn(b"c", "turn.webm", "audio/webm"))
     orch.note_late_barge_in(0)  # nothing played at all
-    await orch.flush_state()
+    await orch.notes.settle()
 
     assert orch.turns[-1].persona_text == "", "the reply was dropped"
-    assert PERSONA[2] not in orch._state, "and it is not in the notes either"
-    assert orch._state == before, "which are exactly the notes from before it"
+    assert PERSONA[2] not in orch.notes.text, "and it is not in the notes either"
+    assert orch.notes.text == before, "which are exactly the notes from before it"

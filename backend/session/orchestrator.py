@@ -37,20 +37,19 @@ from backend.clients.config import GEMINI, LOG_TRANSCRIPTS
 from backend.feedback.acoustics import analyze
 from backend.personas import Persona
 from backend.scenarios import Scenario
+from backend.session.call_notes import CallNotes
 from backend.session.chunking import sentence_chunks
 from backend.session.heard import heard_text
 from backend.session.measuring import attach_measurements
 from backend.session import repetition
-from backend.session.prompting import (
-    STATE_MAX_TOKENS, build_state_prompt, build_system_prompt, opening_instruction,
-)
+from backend.session.prompting import build_system_prompt, opening_instruction
 from backend.session.nudges import (
     ANTI_REPEAT_NUDGE, ANTI_REPEAT_NUDGE_REVERSE, CLARIFY_AGAIN_NUDGE, CLARIFY_NUDGE,
     CLOSING_NUDGE, ECHO_NUDGE,
     GENERIC_CRITERION, GENERIC_CRITERION_REVERSE, INTERRUPTED_MARK, INTERRUPTED_NUDGE,
     REGENERATE_NUDGE, REPEAT_OPENING_NUDGE, RESUME_NUDGE, SETTLEMENT_CHECK,
     SETTLEMENT_CHECK_AFTER_REPLIES, SETTLEMENT_CHECK_REVERSE,
-    STATE_NOTES_FRAME, strip_interrupted_mark,
+    strip_interrupted_mark,
 )
 from backend.session.language_packs import LanguagePack, get_pack, is_phantom, signals_closing
 from backend.session.models import AudioChunk, Failed, StateChanged, Turn, TurnCompleted, TurnEvent
@@ -268,25 +267,11 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         self._language_id = persona.language_id
         self._pack = get_pack(persona.language_id)
         self._voice = persona.voice
-        # Kept for the call-state notes (ADR 0071), which name the caller and
-        # weigh the call against the Scenario's goal and success condition.
-        self._persona = persona
         self._scenario = scenario
         # The caller's notes: what the model reads in place of the history
-        # beyond the last few exchanges (ADR 0071). Refreshed in the background
-        # after every completed exchange, so a refresh never sits on the path
-        # to the next reply; empty until the first exchange has completed.
-        self._state = ""
-        self._state_task: asyncio.Task[None] | None = None
-        # The notes as they stood *before* the exchange currently being
-        # summarised, and the Turn that exchange belongs to. Notes are
-        # rewritten from the previous notes rather than from the history
-        # (ADR 0075), so a barge-in that trims or drops a reply cannot be
-        # corrected by summarising again from the polluted text: the unheard
-        # sentence is already inside it and has no source left to contradict
-        # it. Every refresh for one Turn therefore starts from the same base.
-        self._state_base = ""
-        self._state_turn: int | None = None
+        # beyond the last few exchanges (ADR 0071), kept only while
+        # `CALL_STATE_NOTES` is on. Public so a test can wait for a refresh.
+        self.notes = CallNotes(persona, scenario)
         # Whether `session.activate` has already rebased the clock. See there.
         self._playback_started = False
         # Only its first name is used, to spot the persona re-introducing
@@ -527,8 +512,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         asked to hear something again, which is not a moment to weigh the
         matter settled."""
         if CALL_STATE_NOTES:
-            notes = [{"role": "system", "content": STATE_NOTES_FRAME + self._state}] if self._state else []
-            view = [self._messages[0], *notes, *self._messages[1:][-HISTORY_WINDOW:]]
+            view = [self._messages[0], *self.notes.message(), *self._messages[1:][-HISTORY_WINDOW:]]
         else:
             # The whole call, unbounded on purpose: a Session is one phone call,
             # so the record cannot outgrow a context measured in six figures.
@@ -585,75 +569,23 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         return SETTLEMENT_CHECK.format(criterion=criterion)
 
     def _schedule_state_refresh(self, turn: Turn) -> None:
-        """Refresh the caller's notes from this Turn's exchange, in the
-        background (ADR 0071). Called when a reply is committed and again when
-        a barge-in trims it -- the notes must only ever record what the user
-        heard -- so a refresh still running for the same exchange is replaced.
+        """Refresh the caller's notes from this Turn's exchange (ADR 0071).
+        Called when a reply is committed and again when a barge-in trims it --
+        the notes must only ever record what the user heard.
 
-        A no-op where the notes are not kept (ADR 0075): nothing reads
-        `self._state` there, and this is the request that would be spent
-        filling it."""
-        if not CALL_STATE_NOTES:
-            return
-        if not turn.user_text or not turn.persona_text:
-            return
-        if self._state_turn != turn.seq:
-            # First refresh for this exchange: today's notes are its base.
-            self._state_base = self._state
-            self._state_turn = turn.seq
-        if self._state_task is not None and not self._state_task.done():
-            self._state_task.cancel()
-        self._state_task = asyncio.create_task(self._refresh_state(turn.user_text, turn.persona_text))
+        A no-op where the notes are not kept (ADR 0075): nothing reads them
+        there, and this is the request that would be spent filling them."""
+        if CALL_STATE_NOTES:
+            self.notes.refresh(turn)
 
     def _discard_state_refresh(self, turn: Turn) -> None:
-        """The reply was dropped whole (nothing of it was heard): no refresh may
-        land for it, and the notes go back to what they said before it.
-
-        Without this the one request already in flight carried the full reply,
-        finished after the barge-in and wrote a sentence into the notes that the
-        user never heard -- with no second refresh to follow it, because the
-        exchange no longer exists."""
-        if not CALL_STATE_NOTES or self._state_turn != turn.seq:
-            return
-        if self._state_task is not None and not self._state_task.done():
-            self._state_task.cancel()
-        self._state = self._state_base
-        self._state_turn = None
-
-    async def _refresh_state(self, user_text: str, persona_text: str) -> None:
-        """One summarisation call; a failure keeps the previous notes, since
-        stale notes beat none and the call must not depend on this leg.
-
-        Summarised from `_state_base`, not from `_state`: on a re-run for the
-        same exchange the latter may already hold the unheard part of the reply
-        this run exists to take back out."""
-        messages = build_state_prompt(
-            self._state_base, user_text, persona_text, self._persona, self._scenario
-        )
-        try:
-            notes = await llm.complete(messages, max_tokens=STATE_MAX_TOKENS)
-        except (OpenAIError, TimeoutError, OSError) as e:
-            logger.warning("Call-state notes not refreshed: %s", e)
-            return
-        except Exception:  # pylint: disable=broad-except  # a background task nobody awaits
-            # Anything else would be swallowed until the garbage collector
-            # reports it as an unretrieved task exception, long after the call
-            # (ADR 0055). The notes are optional; the log line is not.
-            logger.exception("Call-state notes refresh raised")
-            return
-        if notes.strip():
-            self._state = notes.strip()
-
-    async def flush_state(self) -> None:
-        """Wait for a pending notes refresh -- for tests and for nothing else;
-        the live path never waits on it."""
-        if self._state_task is not None:
-            await asyncio.gather(self._state_task, return_exceptions=True)
+        """The reply was dropped whole: the notes go back to before it."""
+        if CALL_STATE_NOTES:
+            self.notes.discard(turn)
 
     def close(self) -> None:
         """The Session is over: a refresh still in flight has no reader."""
-        if self._state_task is not None and not self._state_task.done():
-            self._state_task.cancel()
+        self.notes.close()
 
     def _interrupted_previous_turn(self) -> Turn | None:
         """The Turn whose Persona reply the user talked over, if that reply is
