@@ -164,10 +164,12 @@ async def test_a_session_is_not_stored_without_consent(
     """
     # Imported here so a collection-time import does not pull in the live path.
     from backend.api import session_ws  # pylint: disable=import-outside-toplevel
+    from backend.session import persistence  # pylint: disable=import-outside-toplevel
 
-    await session_ws._record(  # pylint: disable=protected-access
-        uuid.uuid4(), TEST_AUTH.sub, _persona(), _scenario(), _orchestrator(), _started(), "user",
-    )
+    await session_ws._record(persistence.FinishedCall(  # pylint: disable=protected-access
+        extern_id=uuid.uuid4(), subject_id=TEST_AUTH.sub, persona=_persona(),
+        scenario=_scenario(), turns=_orchestrator().turns, started_at=_started(), reason="user",
+    ))
 
     assert db_session.query(Session).count() == 0
 
@@ -186,9 +188,10 @@ def test_the_writer_itself_refuses_without_consent(
     """
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
 
-    written = persistence.persist_session(
-        uuid.uuid4(), TEST_AUTH.sub, _persona(), _scenario(), TURNS, _started(), "user",
-    )
+    written = persistence.persist_session(persistence.FinishedCall(
+        extern_id=uuid.uuid4(), subject_id=TEST_AUTH.sub, persona=_persona(),
+        scenario=_scenario(), turns=TURNS, started_at=_started(), reason="user",
+    ))
 
     assert written is None
     assert db_session.query(Session).count() == 0
@@ -204,14 +207,16 @@ async def test_withdrawing_mid_call_still_prevents_the_write(
     withdrew while talking would find the call stored anyway.
     """
     from backend.api import session_ws  # pylint: disable=import-outside-toplevel
+    from backend.session import persistence  # pylint: disable=import-outside-toplevel
 
     await api_client.post("/api/consent", json={"granted": True})
     # ... the call runs ...
     await api_client.post("/api/consent", json={"granted": False})
 
-    await session_ws._record(  # pylint: disable=protected-access
-        uuid.uuid4(), TEST_AUTH.sub, _persona(), _scenario(), _orchestrator(), _started(), "user",
-    )
+    await session_ws._record(persistence.FinishedCall(  # pylint: disable=protected-access
+        extern_id=uuid.uuid4(), subject_id=TEST_AUTH.sub, persona=_persona(),
+        scenario=_scenario(), turns=_orchestrator().turns, started_at=_started(), reason="user",
+    ))
 
     assert db_session.query(Session).count() == 0
 
@@ -377,9 +382,10 @@ def test_a_withdrawal_under_an_older_version_still_blocks_the_write(
     assert state.allows_storage is False, "a stale no is still a no"
     assert state.decision_required is False, "and is not asked again"
 
-    written = persistence.persist_session(
-        uuid.uuid4(), TEST_AUTH.sub, _persona(), _scenario(), TURNS, _started(), "user",
-    )
+    written = persistence.persist_session(persistence.FinishedCall(
+        extern_id=uuid.uuid4(), subject_id=TEST_AUTH.sub, persona=_persona(),
+        scenario=_scenario(), turns=TURNS, started_at=_started(), reason="user",
+    ))
 
     assert written is None
     assert db_session.query(Session).count() == 0

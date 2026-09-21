@@ -278,7 +278,7 @@ def write_load(
 ) -> tuple[Samples, list[uuid.UUID]]:
     """`total` finished Sessions written concurrently through persist_session --
     the real transaction, including its Measurement rows and its queued job."""
-    from backend.session.persistence import persist_session
+    from backend.session.persistence import FinishedCall, persist_session
 
     samples = Samples(f"{label}  persist_session  ({workers} threads)")
     written: list[uuid.UUID] = []
@@ -295,7 +295,7 @@ def write_load(
         extern_id = uuid.uuid4()
         turns = synthetic_turns(turns_per_session, rng)
         with timed(samples):
-            stored = persist_session(
+            stored = persist_session(FinishedCall(
                 extern_id=extern_id,
                 subject_id=subject(index),
                 persona=personas[index % len(personas)],
@@ -303,7 +303,7 @@ def write_load(
                 turns=turns,
                 started_at=datetime.now(UTC) - timedelta(minutes=3),
                 reason="completed",
-            )
+            ))
             # A refusal is not an exception, so without this the run reported
             # a throughput made of nothing but consent refusals, and read back
             # Sessions that were never written.

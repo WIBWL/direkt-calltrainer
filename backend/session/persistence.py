@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session as DbSession
@@ -43,21 +44,30 @@ _STATUS = {
 }
 
 
-def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-    extern_id: uuid.UUID,
-    subject_id: str,
-    persona: Persona,
-    scenario: Scenario,
-    turns: Sequence[Turn],
-    started_at: datetime,
-    reason: str,
-) -> int | None:
+@dataclass(frozen=True)
+class FinishedCall:  # pylint: disable=too-many-instance-attributes  # one call's facts, by design
+    """Everything the write needs to know about a call that has ended.
+
+    Named rather than passed as seven positional arguments, which two callers
+    and three test helpers had to get in the same order -- three of them are
+    strings or ids of the same type, so a swap would have typed-checked.
+    """
+
+    extern_id: uuid.UUID
+    # The Keycloak `sub` from the handshake (ADR 0009): the Session belongs to
+    # the account that placed the call, not to a placeholder (ADR 0031).
+    subject_id: str
+    persona: Persona
+    scenario: Scenario
+    turns: Sequence[Turn]
+    started_at: datetime
+    # How it ended, in the wire protocol's vocabulary (see `_STATUS`).
+    reason: str
+
+
+def persist_session(call: FinishedCall) -> int | None:
     """Write the Session, its Turns and its measurements. Returns session_id,
     or None where storage consent was refused and nothing was written.
-
-    `subject_id` is the Keycloak `sub` from the handshake (ADR 0009): the
-    Session belongs to the account that placed the call, not to a placeholder
-    (ADR 0031).
 
     The consent check lives *inside* this transaction (ADR 0066). Asked from
     outside it, the answer was true and the INSERT that relied on it committed
@@ -70,6 +80,8 @@ def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-a
     Synchronous by design: the caller dispatches it off the event loop once the
     call is over (ADR 0034), so nothing here has to be async-aware.
     """
+    extern_id, subject_id, persona, scenario = call.extern_id, call.subject_id, call.persona, call.scenario
+    turns = call.turns
     with session_scope() as db:
         consent.lock_subject(db, subject_id)
         if not consent.allows_storage(subject_id, db=db):
@@ -81,8 +93,8 @@ def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-a
             persona=_reference(db, db_models.Persona, persona.id),
             scenario=_reference(db, db_models.Scenario, scenario.id),
             language_code=persona.language_id,
-            status=_STATUS.get(reason, db_models.STATUS_ABORTED),
-            started_at=started_at,
+            status=_STATUS.get(call.reason, db_models.STATUS_ABORTED),
+            started_at=call.started_at,
             ended_at=datetime.now(UTC),
         )
         session.turns = [

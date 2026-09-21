@@ -707,15 +707,15 @@ def persist(  # pylint: disable=too-many-arguments
     persona = replace(TEST_PERSONAS[0], id=str(prow.extern_id) if prow else str(uuid.uuid4()))
     scenario = replace(TEST_SCENARIOS[0], id=str(srow.extern_id) if srow else str(uuid.uuid4()))
     extern_id = extern_id or uuid.uuid4()
-    persistence.persist_session(
-        extern_id,
-        subject,
-        persona,
-        scenario,
-        turns if turns is not None else [],
-        started_at,
-        reason,
-    )
+    persistence.persist_session(persistence.FinishedCall(
+        extern_id=extern_id,
+        subject_id=subject,
+        persona=persona,
+        scenario=scenario,
+        turns=turns if turns is not None else [],
+        started_at=started_at,
+        reason=reason,
+    ))
     return extern_id
 
 

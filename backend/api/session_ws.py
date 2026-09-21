@@ -121,7 +121,15 @@ async def session_ws(websocket: WebSocket) -> None:
         # Before session.ended, so the row exists by the time the client can
         # ask for its Feedback -- a 404 then means the write genuinely failed,
         # not that the client was merely early.
-        await _record(session_id, auth.sub, persona, scenario, orchestrator, started_at, reason)
+        await _record(persistence.FinishedCall(
+            extern_id=session_id,
+            subject_id=auth.sub,
+            persona=persona,
+            scenario=scenario,
+            turns=orchestrator.turns,
+            started_at=started_at,
+            reason=reason,
+        ))
         orchestrator.close()  # a notes refresh still in flight has no reader (ADR 0071)
         try:
             await websocket.send_json({"type": "session.ended", "reason": reason, "transcript": transcript})
@@ -137,15 +145,7 @@ async def session_ws(websocket: WebSocket) -> None:
         logger.info("Session ended (%s)", reason)
 
 
-async def _record(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-    session_id: uuid.UUID,
-    subject_id: str,
-    persona: Persona,
-    scenario: Scenario,
-    orchestrator: SessionOrchestrator,
-    started_at: datetime,
-    reason: str,
-) -> None:
+async def _record(call: persistence.FinishedCall) -> None:
     """Persist the finished Session and queue its wrap-up (ADR 0034, ADR 0019).
 
     Dispatched off the event loop because the ORM is synchronous, and never
@@ -160,10 +160,7 @@ async def _record(  # pylint: disable=too-many-arguments,too-many-positional-arg
     # nothing was written. The call itself is unaffected either way — the
     # transcript has already been sent.
     try:
-        db_id = await asyncio.to_thread(
-            persistence.persist_session,
-            session_id, subject_id, persona, scenario, orchestrator.turns, started_at, reason,
-        )
+        db_id = await asyncio.to_thread(persistence.persist_session, call)
     except Exception:  # pylint: disable=broad-exception-caught
         logger.exception("Session could not be persisted; it is lost")
         return
