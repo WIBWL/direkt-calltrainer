@@ -121,6 +121,30 @@ export function toSeries(sessions: SessionSummary[]): MetricSeries[] {
 }
 
 /**
+ * The series that moved most across the period, widest first — what stands in
+ * for the focus goals when none are picked.
+ *
+ * "Moved most" is the width of the User's own usual range relative to its
+ * middle, so a talk share in percent and a reaction time in seconds can be set
+ * beside each other at all. It picks what to *show*, and says nothing about
+ * which movement is better: a wide band is not a worse one (ADR 0065). Only
+ * series with a band count — a single value has no spread, and a checklist has
+ * no band by construction.
+ */
+export function mostVarying(series: MetricSeries[], count: number): MetricSeries[] {
+  return series
+    .filter((s) => s.points.length >= MIN_SESSIONS_FOR_SERIES && s.band !== null)
+    .map((s) => ({ s, spread: relativeSpread(s.band as Band) }))
+    .sort((a, b) => b.spread - a.spread)
+    .slice(0, count)
+    .map(({ s }) => s);
+}
+
+function relativeSpread(range: Band): number {
+  return (range.high - range.low) / (Math.abs(range.median) || 1);
+}
+
+/**
  * One value of a series as the reader should see it.
  *
  * The same as `formatValue` for an ordinary metric. A checklist is written

@@ -12,6 +12,7 @@ import { showsInOverview } from "../utils/metrics";
 import { segmentTrainings } from "../utils/segmentStats";
 import {
   MIN_SESSIONS_FOR_SERIES,
+  mostVarying,
   activity,
   durationSeries,
   formatPoint,
@@ -678,6 +679,9 @@ function MetricBody({ series, sessionCount }: { series: MetricSeries; sessionCou
 
 // --- Replacement when no goals are picked (block B') -------------------------
 
+/** How many series stand in for the focus goals. */
+const OVERVIEW_COUNT = 3;
+
 /**
  * What stands where the focus goals would be when none are set.
  *
@@ -689,16 +693,7 @@ function MetricBody({ series, sessionCount }: { series: MetricSeries; sessionCou
  */
 function OverviewSection({ series }: { series: MetricSeries[] }) {
   const { withPeriod } = useProgressContext();
-  const withSpread = series
-    .filter((s) => s.points.length >= MIN_SESSIONS_FOR_SERIES && s.band)
-    .map((s) => ({
-      series: s,
-      // Relative spread, so a talk share in percent and a reaction time in
-      // seconds can be compared at all.
-      spread: s.band ? (s.band.high - s.band.low) / (Math.abs(s.band.median) || 1) : 0,
-    }))
-    .sort((a, b) => b.spread - a.spread)
-    .slice(0, 3);
+  const withSpread = mostVarying(series, OVERVIEW_COUNT);
 
   return (
     <section className="progress-section" aria-labelledby="overview-title">
@@ -706,7 +701,7 @@ function OverviewSection({ series }: { series: MetricSeries[] }) {
 
       {withSpread.length > 0 ? (
         <ul className="focus-tiles">
-          {withSpread.map(({ series: s }) => (
+          {withSpread.map((s) => (
             <li key={s.key}>
               <div className="focus-tile">
                 <h3 className="focus-tile-title">{s.name}</h3>

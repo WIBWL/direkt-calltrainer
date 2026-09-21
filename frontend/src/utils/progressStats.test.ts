@@ -16,6 +16,7 @@ import {
   halves,
   latest,
   median,
+  mostVarying,
   toSeries,
   trainingsOn,
   trainingsWith,
@@ -483,5 +484,42 @@ describe("what was played against whom", () => {
     ]);
 
     expect(grid.scenarios).toEqual(["Erstes", "Zweites"]);
+  });
+});
+
+describe("what stands in for the focus goals", () => {
+  const history = (values: Record<string, number[]>) =>
+    [0, 1, 2, 3].map((i) =>
+      session({
+        started_at: `2026-09-0${4 - i}T10:00:00Z`,
+        measurements: Object.entries(values)
+          .filter(([, v]) => v[i] !== undefined)
+          .map(([key, v]) => measurement(key, v[i] as number)),
+      }),
+    );
+
+  it("orders by spread relative to the middle, so units can be compared", () => {
+    // Pace moves by 40 around 120, a third; talk share by 2 around 50, a
+    // twenty-fifth. In absolute terms pace would win anyway — the reaction
+    // time below is what the relative measure is for.
+    const series = toSeries(
+      history({ pace: [100, 140, 120, 125], talk_share: [49, 51, 50, 50], reaction_time: [0.5, 1.5, 1, 1] }),
+    );
+
+    expect(mostVarying(series, 3).map((s) => s.key)).toEqual(["reaction_time", "pace", "talk_share"]);
+  });
+
+  it("leaves out a series too short to have a spread", () => {
+    const series = toSeries(history({ pace: [100, 140, 120, 125], fillers: [1, 9] }));
+
+    expect(mostVarying(series, 3).map((s) => s.key)).toEqual(["pace"]);
+  });
+
+  it("stops at the count it is asked for", () => {
+    const series = toSeries(
+      history({ pace: [100, 140, 120, 125], talk_share: [40, 60, 50, 50], reaction_time: [0.5, 1.5, 1, 1] }),
+    );
+
+    expect(mostVarying(series, 2)).toHaveLength(2);
   });
 });
