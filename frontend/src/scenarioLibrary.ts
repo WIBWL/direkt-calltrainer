@@ -129,7 +129,7 @@ export const RANDOM_SCENARIO_ID = "__random__";
  * remember (ADR 0069). Everything else is in — built-in, own and shared alike.
  *
  * This is only half the pool: the caller narrows it to what the two filter
- * rows currently show before handing it over (see `App.tsx`). The draw once
+ * rows currently show before handing it over (see `scenarioSelection.ts`). The draw once
  * ignored them both, on the argument that picking a category has already said
  * what is coming — but that read the surprise as the whole of the feature. It
  * is also the way into a case the User did not choose, and staying inside the

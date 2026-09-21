@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { apiFetch } from "./api";
@@ -22,6 +22,7 @@ import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useLiveCall, type EndedCall } from "./hooks/useLiveCall";
 import type { CommittedSession } from "./hooks/useSessionSocket";
 import { useNextCalls } from "./hooks/useNextCalls";
+import { useScenarioLibrary } from "./hooks/useScenarioLibrary";
 import NextCalls from "./components/NextCalls";
 import { useSessionFeedback } from "./hooks/useSessionFeedback";
 import type { Persona, TranscriptEntry } from "./protocol";
@@ -35,22 +36,12 @@ import {
   type Screen,
 } from "./trainingFlow";
 import {
-  CATEGORY_FILTERS,
-  deleteScenario,
   drawRandomScenario,
   getScenario,
   getTenant,
-  isDrawable,
-  LIBRARY_FILTERS,
-  listScenarios,
-  matchesCategory,
-  matchesFilter,
   RANDOM_SCENARIO_ID,
-  type CategoryFilter,
-  type LibraryFilter,
   type ReverseBrief,
   type ReverseScenario,
-  type ScenarioCard,
 } from "./scenarioLibrary";
 import { loadFinishedSession, saveFinishedSession } from "./utils/finishedSession";
 import { prefersReducedMotion } from "./utils/motion";
@@ -64,41 +55,6 @@ const ROLL_MS = 2000;
 /** null = closed; { id: null } = new; { id } = editing that row. */
 type EditorState = { id: string | null } | null;
 
-/** What the selection screen opens on (ADR 0072): everything, on both rows.
- * Opening on a shortlist, which this once did, hides the User's own Scenarios
- * behind a filter they have to know to press — and `LibraryPicker`'s `COLLAPSED_TILES` caps what
- * is on screen anyway, so the unfiltered row is a first page of the library
- * rather than a wall of it. */
-const DEFAULT_ORIGIN: LibraryFilter = "all";
-const DEFAULT_CATEGORY: CategoryFilter = "all";
-
-/** Where the screen opens: on the suggestions where there are any (F-62), with
- * the category row unfiltered — suggestions spread over the categories, and one
- * of them alone would often leave nothing. Otherwise the defaults above. */
-function startingFilters(scenarios: ScenarioCard[]): [LibraryFilter, CategoryFilter] {
-  return scenarios.some((s) => s.recommendation)
-    ? ["recommended", "all"]
-    : [DEFAULT_ORIGIN, DEFAULT_CATEGORY];
-}
-
-/** The Scenario to start on: the random Scenario (F-62), which is the one tile
- * that stands outside both filters and is therefore always on screen. It is
- * also the only opening selection that cannot be the wrong one — every other
- * default silently proposes a case the User did not choose.
- *
- * It needs a pool to draw from, so for a library holding nothing but reverses
- * and follow-ups this falls back to the first card the default filters show —
- * the first of all, for a library those filters leave empty — which keeps the
- * summary at the bottom of the screen from naming a card that is not on it. */
-function firstSelectable(scenarios: ScenarioCard[]): string | null {
-  if (scenarios.some(isDrawable)) return RANDOM_SCENARIO_ID;
-  const [origin, category] = startingFilters(scenarios);
-  const visible = scenarios.find(
-    (s) => matchesFilter(s, origin) && matchesCategory(s, category),
-  );
-  return (visible ?? scenarios[0])?.id ?? null;
-}
-
 /**
  * Owns the training flow: which screen is showing, what has been selected, and
  * the live Session behind it. Everything visible is delegated to a screen
@@ -106,13 +62,8 @@ function firstSelectable(scenarios: ScenarioCard[]): string | null {
  */
 export default function App() {
   const [personas, setPersonas] = useState<Persona[]>([]);
-  const [scenarios, setScenarios] = useState<ScenarioCard[]>([]);
   const [personaId, setPersonaId] = useState<string | null>(null);
-  const [scenarioId, setScenarioId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [scenarioFilter, setScenarioFilter] = useState<LibraryFilter>(DEFAULT_ORIGIN);
-  // The F-03 call context filter (ADR 0072), independent of the origin chips.
-  const [scenarioCategory, setScenarioCategory] = useState<CategoryFilter>(DEFAULT_CATEGORY);
   const [editingScenario, setEditingScenario] = useState<EditorState>(null);
   // The Persona whose read-only info panel is open, or null. Held here for
   // the same reason the editor's state is: SetupView is presentational.
@@ -178,41 +129,20 @@ export default function App() {
   // means the User picked the case themselves and knows what it is.
   const [secretScenario, setSecretScenario] = useState<string | null>(null);
 
-  // Reloaded after the user creates, edits, shares or deletes a row, so a
-  // refetch shows the change without a full page reload. `select` (when passed)
-  // is the id to select next — the saved row, or the first remaining one if it
-  // was deleted.
-  const reloadScenarios = useCallback(
-    (select?: string | null) =>
-      listScenarios()
-        .then((data) => {
-          setScenarios(data);
-          if (select !== undefined) setScenarioId(select ?? data[0]?.id ?? null);
-        })
-        .catch((e) =>
-          setLoadError(`Szenarien konnten nicht geladen werden: ${e.message}`),
-        ),
-    [],
-  );
+  // The library, its two filter rows and which case is picked. A restored
+  // wrap-up owns the screen, so nothing is preselected behind it.
+  const library = useScenarioLibrary(!restored);
+  const {
+    scenarioId,
+    select: setScenarioId,
+    selected: selectedScenario,
+    pool: drawPool,
+    reload: reloadScenarios,
+    remove: handleRemoveScenario,
+    setFilters: setScenarioFilters,
+  } = library;
 
   const selectedPersona = personas.find((persona) => persona.id === personaId) ?? null;
-  const selectedScenario = scenarios.find((scenario) => scenario.id === scenarioId) ?? null;
-  // What a random Scenario would be drawn from (F-62): what the two filter
-  // rows currently show, minus the two kinds nobody should be walked into
-  // unprepared.
-  const drawPool = useMemo(
-    () =>
-      scenarios.filter(
-        (s) =>
-          isDrawable(s) &&
-          matchesFilter(s, scenarioFilter) &&
-          matchesCategory(s, scenarioCategory),
-      ),
-    [scenarios, scenarioFilter, scenarioCategory],
-  );
-  // No pool, no tile: an offer to draw where there is nothing to draw from is
-  // a button that does nothing.
-  const offerRandom = drawPool.length > 0;
 
   // A reload restores the post-call screen without a selection to look the
   // name up in, so the stored one stands in.
@@ -222,9 +152,8 @@ export default function App() {
   // the drawn row, so the selection already *is* the case that was played.
   const scenarioName = selectedScenario?.name ?? restored?.scenarioName ?? null;
 
-  // The two lists load independently: either one failing leaves the other
-  // usable, and names itself in the error line. A restored wrap-up owns the
-  // screen, so nothing is preselected behind it.
+  // Loaded apart from the library, so either one failing leaves the other
+  // usable and names itself in the error line.
   useEffect(() => {
     apiFetch<Persona[]>("/api/personas")
       .then((data) => {
@@ -233,20 +162,6 @@ export default function App() {
       })
       .catch((e) =>
         setLoadError(`Personas konnten nicht geladen werden: ${e.message}`),
-      );
-
-    listScenarios()
-      .then((data) => {
-        setScenarios(data);
-        if (!restored) {
-          const [origin, category] = startingFilters(data);
-          setScenarioFilter(origin);
-          setScenarioCategory(category);
-          setScenarioId(firstSelectable(data));
-        }
-      })
-      .catch((e) =>
-        setLoadError(`Szenarien konnten nicht geladen werden: ${e.message}`),
       );
 
     getTenant()
@@ -490,8 +405,7 @@ export default function App() {
     (reverse: ReverseScenario) => {
       const persona = personaId ?? restored?.personaId ?? null;
       if (persona === null) return;
-      setScenarioFilter("reverse");
-      setScenarioCategory("all");
+      setScenarioFilters({ origin: "reverse", category: "all" });
       void reloadScenarios();
       // Seeded from the answer that just came back, so the briefing screen has
       // something to show immediately rather than one request later; the
@@ -499,18 +413,7 @@ export default function App() {
       setReverseBrief(reverse.reverse_brief);
       beginSession(reverse.id, persona, true, true);
     },
-    [personaId, restored, reloadScenarios, beginSession],
-  );
-
-  const handleRemoveScenario = useCallback(
-    (id: string) => {
-      void deleteScenario(id)
-        // Selects whatever is first afterwards, so the screen is never left
-        // pointing at a row that is gone.
-        .then(() => reloadScenarios(null))
-        .catch((e) => setLoadError(`Szenario konnte nicht entfernt werden: ${e.message}`));
-    },
-    [reloadScenarios],
+    [personaId, restored, reloadScenarios, setScenarioFilters, beginSession],
   );
 
   const handleConfirmed = useCallback(() => {
@@ -615,57 +518,6 @@ export default function App() {
     handleStartFollowUp(start.scenarioId, start.personaId, start.reverse ?? false);
   }, [location.state, navigate, handleStartFollowUp]);
 
-  // Memoised because the effect below depends on the visible set, and a fresh
-  // array every render would re-run it every render.
-  //
-  // By name, not by origin group: the grid badges every card with where it
-  // comes from, so grouping by that said the same thing twice and left no way
-  // to find a Scenario one already knows the name of. `localeCompare` with an
-  // explicit locale, because an umlaut has to sort with its base letter rather
-  // than after Z. The random Scenario is not in here — the picker draws it in a
-  // fixed first place ahead of this list.
-  const visibleScenarios = useMemo(
-    () =>
-      scenarios
-        .filter((s) => matchesFilter(s, scenarioFilter) && matchesCategory(s, scenarioCategory))
-        .sort((a, b) => a.name.localeCompare(b.name, "de")),
-    [scenarios, scenarioFilter, scenarioCategory],
-  );
-  // Each row is counted against the *other* row's selection, never its own
-  // (ADR 0072), so an option's number is what picking it would actually yield.
-  // Every level 1 value is counted, "tenant" included: that costs nothing when
-  // the caller has no company, and the picker decides whether to offer it.
-  const scenarioOriginCounts = Object.fromEntries(
-    LIBRARY_FILTERS.map((f) => [
-      f,
-      scenarios.filter((s) => matchesCategory(s, scenarioCategory) && matchesFilter(s, f)).length,
-    ]),
-  ) as Record<LibraryFilter, number>;
-  const scenarioCategoryCounts = Object.fromEntries(
-    CATEGORY_FILTERS.map((c) => [
-      c,
-      scenarios.filter((s) => matchesFilter(s, scenarioFilter) && matchesCategory(s, c)).length,
-    ]),
-  ) as Record<CategoryFilter, number>;
-
-  // The selection summary must never name a case that is not on the screen
-  // above it — the rule the opening selection already follows. A filter change
-  // can break it two ways: the random Scenario tile stops being offered, or the
-  // card that was picked is filtered away. Either way the selection falls back
-  // to the tile, which is where the screen opens; only with nothing left to
-  // fall back to does the summary report nothing selected. Falling back rather
-  // than clearing is the point: clearing left the summary empty even after the
-  // User filtered their way back to a library full of cases.
-  useEffect(() => {
-    setScenarioId((current) => {
-      if (current === RANDOM_SCENARIO_ID) return offerRandom ? current : null;
-      if (current !== null && visibleScenarios.some((item) => item.id === current)) {
-        return current;
-      }
-      return offerRandom ? RANDOM_SCENARIO_ID : null;
-    });
-  }, [offerRandom, visibleScenarios]);
-
   const handleScenarioSaved = (savedId: string | null) => {
     setEditingScenario(null);
     // Selects the saved row, so it is already picked for the next Session.
@@ -676,7 +528,7 @@ export default function App() {
   // a reload of the Persona list cannot leave a stale name in the heading;
   // if the Persona is gone the panel closes with the list.
   const infoPersona = personas.find((p) => p.id === infoPersonaId) ?? null;
-  const infoScenario = scenarios.find((s) => s.id === infoScenarioId) ?? null;
+  const infoScenario = library.scenarios.find((s) => s.id === infoScenarioId) ?? null;
 
   // Reading hands over to writing: the panel closes as the editor opens, so
   // Cancel in the editor returns to the library rather than to the panel.
@@ -929,25 +781,25 @@ export default function App() {
   return (
     <AppLayout step="prepare" pageClassName="setup-page">
       <SetupView
-        scenarioItems={visibleScenarios}
+        scenarioItems={library.visible}
         scenarioId={scenarioId}
-        scenarioFilter={scenarioFilter}
-        onScenarioFilter={setScenarioFilter}
-        scenarioOriginCounts={scenarioOriginCounts}
-        scenarioCategory={scenarioCategory}
-        onScenarioCategory={setScenarioCategory}
-        scenarioCategoryCounts={scenarioCategoryCounts}
-        showRecommended={scenarios.some((s) => s.recommendation)}
+        scenarioFilter={library.filters.origin}
+        onScenarioFilter={(origin) => setScenarioFilters((f) => ({ ...f, origin }))}
+        scenarioOriginCounts={library.counts.origin}
+        scenarioCategory={library.filters.category}
+        onScenarioCategory={(category) => setScenarioFilters((f) => ({ ...f, category }))}
+        scenarioCategoryCounts={library.counts.category}
+        showRecommended={library.showRecommended}
         tenantName={tenantName}
         onNewScenario={() => setEditingScenario({ id: null })}
         onShowScenarioInfo={setInfoScenarioId}
-        offerRandom={offerRandom}
+        offerRandom={library.offerRandom}
         personas={personas}
         personaId={personaId}
         onShowPersonaInfo={setInfoPersonaId}
         selectedScenario={selectedScenario}
         selectedPersona={selectedPersona}
-        loadError={loadError}
+        loadError={loadError ?? library.error}
         onSelectScenario={setScenarioId}
         onSelectPersona={setPersonaId}
         onStart={handleStartSession}
