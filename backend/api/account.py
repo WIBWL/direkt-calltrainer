@@ -11,13 +11,6 @@ Both are scoped by the caller's own `sub` in the query itself, like the history
 there is none to authorise or refuse.
 """
 
-# pylint: disable=duplicate-code
-# `_feedback` here and in the sibling route look alike and are not the same: the
-# export serves `created_at` and plain points, the detail route `turn_id` and the
-# focus goal. Two wire contracts -- merging them would need a flag, and a
-# serializer with a flag is worse than two honest ones.
-
-
 from __future__ import annotations
 
 import logging
@@ -29,6 +22,7 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
 
+from backend.api import served
 from backend.api._loading import SESSION_SUBTREE
 from backend import consent as consent_service
 from backend import focus as focus_service
@@ -112,7 +106,7 @@ def export_data(caller: AuthContext = Depends(require_user)) -> JSONResponse:
             "retention": _retention(db, caller.sub),
             "focus": _focus(db, caller.sub),
             "scenarios": _authored_scenarios(db, caller.sub),
-            "sessions": [_session(s) for s in sessions],
+            "sessions": [served.export(s) for s in sessions],
         }
 
     filename = f"calltrainer-export-{datetime.now(UTC).date().isoformat()}.json"
@@ -182,57 +176,6 @@ def _consent(db: DbSession, subject_id: str) -> dict:
     }
 
 
-def _session(session: db_models.Session) -> dict:
-    return {
-        "session_id": str(session.extern_id),
-        "persona": session.persona.name,
-        "scenario": session.scenario.title,
-        "language": session.language_code,
-        "status": session.status,
-        "started_at": session.started_at.isoformat(),
-        "ended_at": session.ended_at.isoformat() if session.ended_at else None,
-        "transcript": [
-            {
-                "speaker": t.speaker,
-                "start_offset_ms": t.start_offset_ms,
-                "duration_ms": t.duration_ms,
-                "text": t.transcript,
-            }
-            for t in sorted(session.turns, key=lambda t: t.seq_index)
-        ],
-        "measurements": [
-            {
-                "key": m.metric_type.key,
-                "name": m.metric_type.name,
-                "unit": m.metric_type.unit,
-                "value": float(m.value),
-                # Which stretch of the call this figure describes (ADR 0081).
-                # Without it the three rows a metric can have -- whole call,
-                # under pressure, the rest -- arrive as three identical keys
-                # with different numbers and nothing to tell them apart.
-                "segment": m.segment,
-                # Included here although the listing drops it (ADR 0064): this
-                # is the subject's own copy of their data, so completeness
-                # outweighs payload size, which is the opposite trade.
-                "detail": m.detail_json,
-            }
-            for m in session.measurements
-        ],
-        # One row per event that occurred in the call (F-51), not a judgement
-        # against a threshold -- and stored against this Session, so the
-        # subject's copy has to carry them.
-        "findings": [
-            {
-                "category": f.category,
-                "offset_ms": f.offset_ms,
-                "description": f.description,
-            }
-            for f in sorted(session.findings, key=lambda f: f.offset_ms or 0)
-        ],
-        "feedback": _feedback(session.feedback),
-    }
-
-
 def _focus(db: DbSession, subject_id: str) -> dict:
     """The training focus the subject picked (F-62).
 
@@ -288,17 +231,3 @@ def _authored_scenarios(db: DbSession, subject_id: str) -> list[dict]:
         }
         for row in rows
     ]
-
-
-def _feedback(feedback: db_models.Feedback | None) -> dict | None:
-    if feedback is None:
-        return None
-    return {
-        "summary": feedback.summary,
-        "phase_language": feedback.phase_language,
-        "tone_fit": feedback.tone_fit,
-        "created_at": feedback.created_at.isoformat(),
-        "points": [
-            {"kind": p.kind, "text": p.text} for p in feedback.points
-        ],
-    }
