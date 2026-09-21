@@ -49,6 +49,7 @@ produces, so the wait is bounded by one sentence.
 """
 
 import asyncio
+import contextlib
 import io
 import logging
 import wave
@@ -137,11 +138,39 @@ async def synthesize_stream(text: str, voice: PersonaVoice, language_id: str) ->
             KUGELAUDIO_MODEL, voice.kugelaudio_voice_id, language_id, len(text),
         )
     produced = False
-    finished = False  # the request's `final` frame was read: the socket is clean
     fallback = None
-    # Held across the yields on purpose: the connection is in use for this whole
-    # request, and a second Session sending on it meanwhile is what produces the
-    # ConcurrencyError the module docstring describes.
+    try:
+        async with contextlib.aclosing(_pooled_request(text, voice, language_id)) as chunks:
+            async for chunk in chunks:
+                produced = True
+                yield _pcm16_to_wav(chunk.audio, chunk.sample_rate)
+    except (KugelAudioError, TimeoutError, OSError) as e:
+        if produced:
+            raise KugelAudioError(f"KugelAudio stream failed after producing audio: {e}") from e
+        logger.warning("KugelAudio streaming failed before any audio, falling back to DiReKT: %s", e)
+        # Synthesized after the request has let go of the connection: DiReKT
+        # is a different backend and has no business holding KugelAudio's.
+        fallback = text
+    if fallback is not None:
+        yield await _synthesize(fallback, voice)
+
+
+async def _pooled_request(text: str, voice: PersonaVoice, language_id: str) -> AsyncIterator[AudioChunk]:
+    """One request on the pooled KugelAudio connection, and the only way onto it.
+
+    Both guards the module docstring describes live here, once, for both
+    callers: the lock is held for the whole request -- across the yields, on
+    purpose, since the connection is in use until `final` and a second Session
+    sending meanwhile is the `ConcurrencyError` -- and any exit short of the
+    `final` frame drops the socket and re-warms a fresh one. They were written
+    out twice, and the one-shot path went without them for a while.
+
+    Consume it under `contextlib.aclosing`: a caller that stops early (a
+    barge-in closing the stream) must reach the `finally` below *now*, not when
+    the garbage collector gets round to it, or the next request reads this
+    one's frames.
+    """
+    finished = False  # the request's `final` frame was read: the socket is clean
     async with _pool_lock:
         try:
             async for event in KUGELAUDIO_CLIENT.tts.stream_async(
@@ -151,25 +180,14 @@ async def synthesize_stream(text: str, voice: PersonaVoice, language_id: str) ->
                 language=language_id,
             ):
                 if isinstance(event, AudioChunk):
-                    produced = True
-                    yield _pcm16_to_wav(event.audio, event.sample_rate)
+                    yield event
                 elif isinstance(event, dict) and event.get("final"):
                     finished = True
-        except (KugelAudioError, TimeoutError, OSError) as e:
-            if produced:
-                raise KugelAudioError(f"KugelAudio stream failed after producing audio: {e}") from e
-            logger.warning("KugelAudio streaming failed before any audio, falling back to DiReKT: %s", e)
-            # Synthesized after the lock is released: DiReKT is a different
-            # backend and has no business holding KugelAudio's connection.
-            fallback = text
         finally:
             # Reached on every exit: exhausted, failed, cancelled, or closed by
-            # the caller after a barge-in. Anything short of `final` leaves this
-            # request's frames on the shared socket (module docstring).
+            # the caller after a barge-in.
             if not finished:
                 await _drop_and_rewarm()
-    if fallback is not None:
-        yield await _synthesize(fallback, voice)
 
 
 # Fire-and-forget re-warms, referenced so the loop cannot collect them mid-flight.
@@ -216,33 +234,19 @@ async def synthesize(text: str, voice: PersonaVoice, language_id: str) -> bytes:
 
 
 async def _synthesize_kugelaudio(text: str, voice: PersonaVoice, language_id: str) -> bytes:
-    """The one-shot request, on the same pooled connection as the streaming one.
-
-    Which is why it carries the same two guards: the lock, and the drop on any
-    exit short of `final`. It had neither, and it is the harder of the two to
-    notice -- `synthesize` catches the failure and answers in the DiReKT voice,
-    so the fallback-closing line is merely spoken differently while the
-    abandoned request's frames wait on the socket for the next call in the
-    process (module docstring)."""
+    """The one-shot request, on the same pooled connection as the streaming one
+    and through the same `_pooled_request`, so it carries the same two guards.
+    It once had neither, and it is the harder of the two to notice --
+    `synthesize` catches the failure and answers in the DiReKT voice, so the
+    fallback-closing line is merely spoken differently while the abandoned
+    request's frames wait on the socket for the next call in the process
+    (module docstring)."""
     pcm = bytearray()
     sample_rate = 24000
-    finished = False
-    async with _pool_lock:
-        try:
-            async for event in KUGELAUDIO_CLIENT.tts.stream_async(
-                text=text,
-                model_id=KUGELAUDIO_MODEL,
-                voice_id=voice.kugelaudio_voice_id,
-                language=language_id,
-            ):
-                if isinstance(event, AudioChunk):
-                    pcm += event.audio
-                    sample_rate = event.sample_rate
-                elif isinstance(event, dict) and event.get("final"):
-                    finished = True
-        finally:
-            if not finished:
-                await _drop_and_rewarm()
+    async with contextlib.aclosing(_pooled_request(text, voice, language_id)) as chunks:
+        async for chunk in chunks:
+            pcm += chunk.audio
+            sample_rate = chunk.sample_rate
 
     if not pcm:
         raise KugelAudioError("KugelAudio returned no audio")
