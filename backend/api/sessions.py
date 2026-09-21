@@ -375,6 +375,31 @@ def _reverse_response(scenario) -> dict:
     }
 
 
+def _owned_with_wrapup(
+    db: DbSession, extern_id: uuid.UUID, subject: str
+) -> db_models.Session | None:
+    """The caller's Session with its Scenario and wrap-up points loaded, or None
+    for one that is absent or someone else's -- the same answer either way
+    (ADR 0050).
+
+    The one read the reverse and the follow-up share, and the one where a
+    divergence would matter most: it is the ownership check for both routes that
+    turn a Session into a Scenario. The rest of the two stays two on purpose
+    (ADR 0100).
+    """
+    session = (
+        db.query(db_models.Session)
+        .filter_by(extern_id=extern_id)
+        .options(
+            selectinload(db_models.Session.scenario),
+            selectinload(db_models.Session.feedback)
+            .selectinload(db_models.Feedback.points),
+        )
+        .one_or_none()
+    )
+    return session if session is not None and session.subject_id == subject else None
+
+
 @dataclass(frozen=True)
 class _ReverseMaterial:
     """What a reverse is built from, read out before the database handle is
@@ -395,17 +420,8 @@ class _ReverseMaterial:
 def _reverse_material(extern_id: uuid.UUID, subject: str) -> _ReverseMaterial | None:
     """This Session's material, or None if it is not the caller's."""
     with session_scope() as db:
-        session = (
-            db.query(db_models.Session)
-            .filter_by(extern_id=extern_id)
-            .options(
-                selectinload(db_models.Session.scenario),
-                selectinload(db_models.Session.feedback)
-                .selectinload(db_models.Feedback.points),
-            )
-            .one_or_none()
-        )
-        if session is None or session.subject_id != subject:
+        session = _owned_with_wrapup(db, extern_id, subject)
+        if session is None:
             return None
         scenario = session.scenario
         feedback = session.feedback
@@ -529,17 +545,8 @@ def _follow_up_material(extern_id: uuid.UUID, subject: str) -> _FollowUpMaterial
     here the two are one case, because the input is missing either way.
     """
     with session_scope() as db:
-        session = (
-            db.query(db_models.Session)
-            .filter_by(extern_id=extern_id)
-            .options(
-                selectinload(db_models.Session.scenario),
-                selectinload(db_models.Session.feedback)
-                .selectinload(db_models.Feedback.points),
-            )
-            .one_or_none()
-        )
-        if session is None or session.subject_id != subject:
+        session = _owned_with_wrapup(db, extern_id, subject)
+        if session is None:
             return None
         scenario = session.scenario
         feedback = session.feedback
