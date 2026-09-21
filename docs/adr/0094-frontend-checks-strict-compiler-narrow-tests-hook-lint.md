@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. The first two parts describe what is in place. The third — ESLint restricted to the React hook rules — is not built.
+Accepted. All three parts are in place; the third — ESLint restricted to the React hook rules — was built on 2026-09-21 (see *Built* below).
 
 ## Context
 
@@ -41,3 +41,12 @@ The build gains a lint step and a development dependency. Effects that are delib
 A regression in what a screen shows is still caught only by looking at it. The accessibility of the markup is not checked automatically either (see ADR 0097).
 
 Because there is no CI, all of this runs only when somebody builds the image. The deploy builds the same image, so nothing reaches a server unchecked, but a broken commit can sit on a branch until then.
+
+## Built
+
+`frontend/eslint.config.js` enables `rules-of-hooks` and `exhaustive-deps` as errors and nothing else, parsing TypeScript through `@typescript-eslint/parser` only so it can read the source, not to add its rules. `reportUnusedDisableDirectives` is an error too, so a disable comment that stops suppressing anything fails the build instead of lingering. `npm run build` is now `eslint src && tsc && vite build`, and `npm run lint` runs the step alone.
+
+The first run found six violations. Four were incomplete dependency lists that happened to work: `beginSession` and the call's accept handler closed over callbacks that keep one identity by construction, and the listening effect read `vad` through a property path the rule could not follow — each now names what it reads. One was a hook name on a function that is not a hook (`useAppFonts` in the PDF builder, now `registerAppFonts`). And **one was a live defect**: `ProgressPractice` keyed its library fetch on the suggestion object, which is rebuilt on every render, although the comment beside it explained exactly why it must be keyed on whether there is one — every response re-ran the effect and fetched the library again. The code now says what the comment did.
+
+The four disable comments that remain are the deliberate exceptions this decision anticipated — effects keyed on identity or run once on mount — each carrying its reason.
+

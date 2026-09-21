@@ -66,7 +66,7 @@ export default function ProgressPractice({
     return () => {
       cancelled = true;
     };
-  }, [target]);
+  }, [hasTarget]);
 
   if (!target || !source) return null;
 

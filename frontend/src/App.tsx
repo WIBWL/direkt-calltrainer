@@ -313,6 +313,7 @@ export default function App() {
   // the Persona can start speaking the moment the call screen appears
   // (ADR 0042).
   const call = useLiveCall(committed, handleCallOver);
+  const { accept } = call;
 
   const vad = useMicrophoneVAD(call.bargeIn, call.sendTurnAudio, micDeviceId);
 
@@ -323,16 +324,17 @@ export default function App() {
 
   // Armed for the whole call, not just while it's nominally the user's turn
   // — see the barge-in handling above.
+  const { startListening, stopListening } = vad;
   useEffect(() => {
     if (screen !== "call" || isMicrophoneMuted) {
       // Pausing keeps the preloaded VAD instance warm without capturing speech.
-      vad.stopListening();
+      stopListening();
       return;
     }
 
-    void vad.startListening();
-    return () => vad.stopListening();
-  }, [isMicrophoneMuted, screen, vad.startListening, vad.stopListening]);
+    void startListening();
+    return () => stopListening();
+  }, [isMicrophoneMuted, screen, startListening, stopListening]);
 
   // The one way into a call: commit to a pairing and go to the microphone
   // check. Taken by the setup screen's button and by the follow-up's start
@@ -367,7 +369,10 @@ export default function App() {
       advance({ type: "sessionCommitted", reverse, skipMicCheck });
       if (skipMicCheck) setIsMicrophoneMuted(false);
     },
-    [],
+    // Both keep one identity (`advance` by its own empty-context design, the
+    // other is a state setter), so this does too -- but it says so now rather
+    // than relying on it silently (ADR 0094).
+    [advance, setScenarioId],
   );
 
   const handleStartSession = useCallback(() => {
@@ -420,9 +425,9 @@ export default function App() {
     // Reveal the buffered opening line and switch to live playback.
     // This is also the point at which the Session timeline starts.
     setIsMicrophoneMuted(false);
-    call.accept();
+    accept();
     advance({ type: "callAccepted" });
-  }, [call.accept, advance]);
+  }, [accept, advance]);
 
   // The microphone check's own button. Where it leads is `trainingFlow`'s to
   // decide: a reverse to its briefing, a drawn Scenario to

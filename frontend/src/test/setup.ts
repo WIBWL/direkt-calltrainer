@@ -9,8 +9,6 @@
  * deliver this frame now) on top of the shape the hooks actually use.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 // --- Web Audio -------------------------------------------------------------
 
 /** A decode call waiting for the test to hand it a buffer, the way the model
