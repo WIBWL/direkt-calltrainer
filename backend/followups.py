@@ -35,7 +35,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ValidationError
 
-from backend.authored_text import WIRE_FIELD_LIMITS, clean
+from backend.authored_text import WIRE_FIELD_LIMITS, clean, fit
 from backend.clients import llm
 
 logger = logging.getLogger(__name__)
@@ -91,30 +91,9 @@ class _Draft(BaseModel):
         """Cleaned and capped to what the authoring API enforces (ADR 0059/0063),
         so the editor shows exactly the text that would be stored."""
         return {
-            field: _fit(clean(getattr(self, field)), cap)
+            field: fit(clean(getattr(self, field)), cap)
             for field, cap in WIRE_FIELD_LIMITS.items()
         }
-
-
-def _fit(value: str, cap: int) -> str:
-    """One field, held to its cap without ending mid-word.
-
-    The prompt states every limit, and the card's twice over, and a small
-    model (ADR 0011) still writes past the 100 characters `short_description`
-    gets -- so the cap has to hold on this side as well. Cutting back to the
-    last space leaves a readable line instead of a severed word, and the
-    ellipsis says the sentence was cut rather than written that way. Only
-    ever a safety net: a draft that needs it has already lost its ending.
-    """
-    if len(value) <= cap:
-        return value
-    head = value[: cap - 1].rstrip()
-    space = head.rfind(" ")
-    # Back off to a word boundary only while that leaves most of the field --
-    # one very long word must not cut the line down to nothing.
-    if space > cap // 2:
-        head = head[:space]
-    return head.rstrip(" ,;:-–—") + "…"
 
 
 # --- Prompt ---------------------------------------------------------------
@@ -236,13 +215,7 @@ def _messages(material: str) -> list[dict[str, str]]:
         "the bar inside call_goal: never offer them something the caller "
         "would not accept, or the call cannot be won.\n"
         "\n"
-        "# Never\n"
-        "N1. No markdown, no headings, no bullet characters, no line breaks "
-        "inside the JSON strings.\n"
-        "N2. No straight double quote inside a string: forget the backslash in "
-        "front of one and the whole answer is unreadable. Use „ “ or single "
-        "quotes.\n"
-        "N3. No text of any kind before or after the JSON object.\n"
+        f"{llm.JSON_ANSWER_NEVER}"
         "\n"
         "# Output\n"
         "Answer with a single JSON object and nothing else.\n"

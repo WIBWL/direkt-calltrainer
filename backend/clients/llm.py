@@ -241,6 +241,22 @@ def _strip_reasoning(text: str) -> str:
 _FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
 
 
+# What a prompt asking for a JSON object has to forbid, word for word the same
+# wherever one does: the follow-up draft (F-60) and the reverse briefing (F-61)
+# carried two copies until they were found to be identical. Kept beside the
+# parser whose failures each rule prevents -- N2 above all, since one unescaped
+# double quote makes the whole answer unreadable to `json_object`.
+JSON_ANSWER_NEVER = (
+    "# Never\n"
+    "N1. No markdown, no headings, no bullet characters, no line breaks "
+    "inside the JSON strings.\n"
+    "N2. No straight double quote inside a string: forget the backslash in "
+    "front of one and the whole answer is unreadable. Use „ “ or single "
+    "quotes.\n"
+    "N3. No text of any kind before or after the JSON object.\n"
+)
+
+
 def json_object(raw: str) -> str:
     """The JSON object out of whatever the model wrapped it in. ValueError if
     there is none — a cue to retry or fall back, not an error worth a

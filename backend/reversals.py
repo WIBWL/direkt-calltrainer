@@ -33,7 +33,7 @@ import logging
 
 from pydantic import BaseModel
 
-from backend.authored_text import clean
+from backend.authored_text import clean, fit
 from backend.clients import llm
 
 logger = logging.getLogger(__name__)
@@ -82,9 +82,11 @@ class _Brief(BaseModel):
         on which writer filled the row in.
         """
         brief = {
-            field: clean(getattr(self, field))[:cap] for field, cap in FIELD_LIMITS.items()
+            field: fit(clean(getattr(self, field)), cap) for field, cap in FIELD_LIMITS.items()
         }
-        goals = [clean(g)[:GOAL_LIMIT].strip() for g in self.goals]
+        # Held at a word boundary like the follow-up's fields: a slice cut the
+        # briefing the User argues from in the middle of a word.
+        goals = [fit(clean(g), GOAL_LIMIT) for g in self.goals]
         brief["goals"] = [g for g in goals if g][:MAX_GOALS]
         return brief
 
@@ -190,13 +192,7 @@ def _messages(material: str) -> list[dict[str, str]]:
         "G4. Short: one line each, at most about twelve words, beginning with "
         "the verb. No sub-clause explaining why it matters.\n"
         "\n"
-        "# Never\n"
-        "N1. No markdown, no headings, no bullet characters, no line breaks "
-        "inside the JSON strings.\n"
-        "N2. No straight double quote inside a string: forget the backslash "
-        "in front of one and the whole answer is unreadable. Use „ “ or "
-        "single quotes.\n"
-        "N3. No text of any kind before or after the JSON object.\n"
+        f"{llm.JSON_ANSWER_NEVER}"
         "\n"
         "# Output\n"
         "Answer with a single JSON object and nothing else.\n"

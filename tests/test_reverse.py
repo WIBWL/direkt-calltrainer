@@ -203,6 +203,17 @@ async def test_a_long_goal_is_capped(monkeypatch: pytest.MonkeyPatch) -> None:
     assert len((await _draft())["goals"][0]) == GOAL_LIMIT
 
 
+async def test_a_long_goal_is_cut_at_a_word_and_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The follow-up's rule (`authored_text.fit`): a slice used to cut the goal
+    the User ticks off mid-call in the middle of a word."""
+    stub_completions(monkeypatch, json.dumps({**_BRIEF, "goals": ["Rechnung " * 40]}))
+
+    goal = (await _draft())["goals"][0]
+    assert len(goal) <= GOAL_LIMIT
+    assert goal.endswith("…")
+    assert set(goal[:-1].split()) == {"Rechnung"}, "no word cut in half"
+
+
 async def test_an_empty_goal_is_dropped(monkeypatch: pytest.MonkeyPatch) -> None:
     stub_completions(monkeypatch, json.dumps({**_BRIEF, "goals": ["Punkt.", "   ", ""]}))
 
