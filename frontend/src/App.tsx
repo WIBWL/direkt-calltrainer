@@ -19,11 +19,10 @@ import SetupView from "./components/SetupView";
 import FeedbackScreen from "./components/FeedbackScreen";
 import { useMicrophoneDevices } from "./hooks/useMicrophoneDevices";
 import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
-import { useBargeIn } from "./hooks/useBargeIn";
-import { useSessionSocket, type CommittedSession } from "./hooks/useSessionSocket";
+import { useLiveCall, type EndedCall } from "./hooks/useLiveCall";
+import type { CommittedSession } from "./hooks/useSessionSocket";
 import { useNextCalls } from "./hooks/useNextCalls";
 import NextCalls from "./components/NextCalls";
-import { useStreamedAudioPlayback } from "./hooks/useStreamedAudioPlayback";
 import { useSessionFeedback } from "./hooks/useSessionFeedback";
 import type { Persona, TranscriptEntry } from "./protocol";
 import ReverseBriefPanel from "./components/ReverseBriefPanel";
@@ -61,12 +60,6 @@ import { prefersReducedMotion } from "./utils/motion";
  * read as a throw and land, short enough not to become a wait — the Session is
  * already connected behind it, so this is the only thing it costs. */
 const ROLL_MS = 3000;
-
-interface PendingEnd {
-  reason: "user" | "error" | "completed";
-  turns: TranscriptEntry[];
-  sessionId: string | null;
-}
 
 /** null = closed; { id: null } = new; { id } = editing that row. */
 type EditorState = { id: string | null } | null;
@@ -159,9 +152,6 @@ export default function App() {
   } = useSessionFeedback(
     screen === "analysing" || screen === "transcript" ? endedSessionId : null,
   );
-  // Holds a just-received session.ended until playback actually finishes —
-  // see the effect below.
-  const [pendingEnd, setPendingEnd] = useState<PendingEnd | null>(null);
   // The committed Session: set when the user actually commits to one (the
   // start-the-session press), never by the selection itself — see ADR 0042.
   // Nothing connects on its own, which is also what keeps a persistently
@@ -273,47 +263,6 @@ export default function App() {
     }
   }, [micDevices, micDeviceId]);
 
-  // The Session (WebSocket + VAD + audio playback) lives here, at the App
-  // level, not inside whichever screen happens to be showing — it connects
-  // once the user commits to a Session, and its opening line is generated
-  // and buffered (see useStreamedAudioPlayback's hold/activate) while the
-  // microphone check is still on screen, so the Persona can start speaking
-  // the moment the call screen appears (ADR 0042).
-  const playback = useStreamedAudioPlayback();
-
-  // session.ended (e.g. after a natural [CALL_END]) can arrive while the
-  // Persona's closing line is still playing out — the server sends it the
-  // moment the reply's Turn completes, independent of local audio playback
-  // timing. Don't tear the Session down immediately: stash it and let the
-  // effect below act on it once the tail audio has actually finished, so
-  // the goodbye is heard instead of getting cut off mid-sentence. This only
-  // applies to natural/error endings — when the user clicks the end-call
-  // button, the call ends immediately instead (see the effect below).
-  const handleEnded = useCallback(
-    (reason: PendingEnd["reason"], turns: TranscriptEntry[], sessionId: string | null) => {
-      setPendingEnd({ reason, turns, sessionId });
-    },
-    [],
-  );
-
-  const socket = useSessionSocket({
-    session: committed,
-    onAudioChunk: playback.enqueue,
-    onEnded: handleEnded,
-  });
-
-  // Buffered opening audio belongs to exactly one connection (ADR 0042).
-  // Whenever `committed` changes, useSessionSocket above replaces the
-  // connection, so whatever the previous one buffered is audio from a
-  // Session that will never be conducted — drop it, and go back to holding.
-  // Both effects must key on `committed` and nothing else: if they drift
-  // apart, activate() starts replaying opening lines from abandoned
-  // Sessions back to back.
-  useEffect(() => {
-    playback.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- playback is stable-shaped; this must mirror the connection key above exactly
-  }, [committed]);
-
   // The facts of the committed case, for the screen before the call and the
   // panel beside it. Fetched rather than read off the card: the listing
   // deliberately withholds the case (ADR 0045) and only the detail route
@@ -414,18 +363,16 @@ export default function App() {
     };
   }, [committed, secretScenario]);
 
-  useEffect(() => {
-    if (pendingEnd === null) return;
-    // A user-initiated end should cut the call immediately, not let the
-    // Persona's audio keep playing out — only natural/error endings wait
-    // for the tail audio to finish (see handleEnded above).
-    if (pendingEnd.reason !== "user" && playback.isPlaying) return;
-    playback.reset();
-    setTranscript(pendingEnd.turns);
-    setEndedSessionId(pendingEnd.sessionId);
+  // What happens once a call is over and its goodbye has been heard: the
+  // transcript is kept, the finished Session is remembered across a reload,
+  // and the flow moves on. When that moment is due is `useLiveCall`'s to
+  // decide (see `endIsDue`).
+  const handleCallOver = (ended: EndedCall) => {
+    setTranscript(ended.turns);
+    setEndedSessionId(ended.sessionId);
     saveFinishedSession({
-      sessionId: pendingEnd.sessionId,
-      turns: pendingEnd.turns,
+      sessionId: ended.sessionId,
+      turns: ended.turns,
       personaName,
       scenarioName,
       // Kept so a reverse started from this screen after a reload still knows
@@ -435,24 +382,24 @@ export default function App() {
     // Straight to the wrap-up's own waiting screen where one is being written,
     // and straight past it where none is: no stored Session, no wrap-up, and a
     // wait for something that is not coming (ADR 0066).
-    advance({ type: "callEnded", stored: pendingEnd.sessionId !== null });
+    advance({ type: "callEnded", stored: ended.sessionId !== null });
     if (committed) {
       setLastPlayed({ scenarioId: committed.scenarioId, personaId: committed.personaId });
     }
     // This Session is over — the next one connects when the user commits
     // to it, not while the transcript is still being read (ADR 0042).
     setCommitted(null);
-    setPendingEnd(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- playback is stable-shaped; only isPlaying/pendingEnd should retrigger this
-  }, [pendingEnd, playback.isPlaying]);
+  };
 
-  // What the call screen shows, and the two acts that cut a reply short. All
-  // three belong together: both callbacks branch on the same merged state, and
-  // the line that carries ADR 0035's guarantee -- the played position reaching
-  // the server -- is one call inside it rather than one line here.
-  const { displayState, bargeIn, endCall } = useBargeIn(socket, playback);
+  // The Session (WebSocket + audio playback, with the VAD below) lives here,
+  // at the App level, not inside whichever screen happens to be showing — it
+  // connects once the user commits to a Session, and its opening line is
+  // generated and buffered while the microphone check is still on screen, so
+  // the Persona can start speaking the moment the call screen appears
+  // (ADR 0042).
+  const call = useLiveCall(committed, handleCallOver);
 
-  const vad = useMicrophoneVAD(bargeIn, socket.sendTurnAudio, micDeviceId);
+  const vad = useMicrophoneVAD(call.bargeIn, call.sendTurnAudio, micDeviceId);
 
   useEffect(() => {
     vad.preload();
@@ -570,10 +517,9 @@ export default function App() {
     // Reveal the buffered opening line and switch to live playback.
     // This is also the point at which the Session timeline starts.
     setIsMicrophoneMuted(false);
-    playback.activate();
-    socket.sendActivate();
+    call.accept();
     advance({ type: "callAccepted" });
-  }, [playback, socket.sendActivate, advance]);
+  }, [call.accept, advance]);
 
   // The microphone check's own button. Where it leads is `trainingFlow`'s to
   // decide: a reverse to its briefing, a drawn Scenario to
@@ -916,11 +862,11 @@ export default function App() {
           }
           personaAvatarUrl={selectedPersona?.avatar_url ?? null}
           isMicrophoneMuted={isMicrophoneMuted}
-          callState={displayState}
-          audioLevel={playback.audioLevel}
-          error={socket.error ?? vad.micError}
+          callState={call.displayState}
+          audioLevel={call.audioLevel}
+          error={call.error ?? vad.micError}
           onToggleMicrophone={handleToggleMicrophone}
-          onEndCall={endCall}
+          onEndCall={call.endCall}
           brief={brief}
         />
       </AppLayout>
