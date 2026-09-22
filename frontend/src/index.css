@@ -6487,13 +6487,13 @@ button.calendar-day {
 
 /* The header's plain text link, beside the account chip. */
 /* --- Training focus (F-61, ADR 0074) ------------------------------------ */
-/* The same picker in two frames: the first-run dialog and the profile card.
-   Everything below styles the picker; only .focus-dialog belongs to the first
-   of those. */
+/* The same picker appears on the first-run focus screen and in the profile.
+   Everything below styles that shared selection experience; .focus-dialog
+   sizes the catalogue card on the onboarding screen. */
 
-/* Wider than the consent dialog, which carries four sentences — this one
-   carries the whole catalogue, two cards to a row. The backdrop already scrolls, so a tall
-   list on a short viewport stays reachable. */
+/* Wider than the regular consent card because this screen carries the full
+   catalogue in a responsive grid. The surrounding page provides scrolling on
+   short viewports while the fixed action bar remains available. */
 .focus-dialog {
   width: min(920px, 100%);
   padding: 28px 30px 32px;
@@ -6589,7 +6589,7 @@ button.calendar-day {
   outline-offset: 2px;
 }
 
-/* Two classes, to win over the dialog's own paragraph margins. */
+/* Two classes, to win over the surrounding card's paragraph margins. */
 .focus-profile .focus-profile-note {
   margin: 0;
   font-size: 0.85rem;
