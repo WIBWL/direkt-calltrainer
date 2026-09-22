@@ -18,7 +18,7 @@ policy: one retry per leg, then end the Session cleanly (ADR 0016, ADR 0033).
 # pylint: disable=too-many-lines  # what is left after the seams were cut: the
 # prose lives in prompting.py (the system prompt) and nudges.py (the per-turn
 # pushes, each with the comment naming the observed failure it catches), the
-# pure helpers in heard.py and measuring.py. This is one call's control flow,
+# reply's heard-text record in heard.py, the pure helpers in measuring.py. This is one call's control flow,
 # and carving it further would split a single flow across files to buy lines.
 
 import asyncio
@@ -26,7 +26,7 @@ import contextlib
 import logging
 import re
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import NamedTuple
 
 from kugelaudio.exceptions import KugelAudioError
@@ -39,7 +39,7 @@ from backend.personas import Persona
 from backend.scenarios import Scenario
 from backend.session.call_notes import CallNotes
 from backend.session.chunking import sentence_chunks
-from backend.session.heard import heard_text
+from backend.session.heard import Cut, SpokenReply
 from backend.session.history import History
 from backend.session.measuring import attach_measurements
 from backend.session import repetition
@@ -121,12 +121,9 @@ class _ReplyProgress:  # pylint: disable=too-many-instance-attributes  # one rep
         self.chunk_seq = 0
         self.spoke_yet = False
         self.ends_call = False
-        self.spoken_text = ""
-        # Audio ms dispatched so far, plus per fully-synthesized chunk:
-        # (audio ms at its end, `spoken_text` through it, this chunk's text).
-        # A barge-in reads these to place and measure the cut (ADR 0035).
-        self.audio_ms = 0
-        self.checkpoints: list[tuple[int, str, str]] = []
+        # The voiced text and the audio behind it, which a barge-in cuts
+        # (ADR 0035).
+        self.spoken = SpokenReply()
         # Set once the finished reply is in the history: past that point a late
         # barge-in (over the tail still playing) must not re-finalize the turn.
         self.committed = False
@@ -150,25 +147,6 @@ class _ReplyProgress:  # pylint: disable=too-many-instance-attributes  # one rep
         self.first_suppressed: tuple[str, str] | None = None
         # Set per attempt by _stream_reply_with_regeneration.
         self.filters = _NO_FILTERS
-
-    def heard_checkpoints(self) -> list[tuple[int, str, str]]:
-        """`checkpoints` plus the chunk still being synthesized, if any.
-
-        A checkpoint is written only when a chunk is *fully* synthesized, but
-        its audio goes out sub-chunk by sub-chunk as KugelAudio produces it
-        (ADR 0044) -- so the client is already playing the opening sentence
-        while that sentence has no checkpoint. Measured against the finished
-        ones alone, a barge-in there found nothing heard and the whole reply
-        was dropped, where ADR 0035 asks for the word-prefix of the sentence
-        the user cut off. The pending entry ends at the audio actually
-        dispatched, which is the honest span to measure a prefix against.
-        """
-        done = self.checkpoints[-1][1] if self.checkpoints else ""
-        spoken = self.spoken_text.strip()
-        pending = spoken[len(done):].strip()
-        if not pending:
-            return self.checkpoints
-        return [*self.checkpoints, (self.audio_ms, spoken, pending)]
 
 
 def _strip_end_marker(text_chunk: str, progress: _ReplyProgress) -> str:
@@ -221,24 +199,6 @@ _FOREIGN_SCRIPT_RE = re.compile(
 
 def _strip_foreign_script(text_chunk: str) -> str:
     return _FOREIGN_SCRIPT_RE.sub("", text_chunk).strip()
-
-
-def _unheard(spoken_text: str, heard: str) -> str:
-    """The part of a cut-off reply the user never got to hear (F-51).
-
-    Kept only so the wrap-up can show what the Persona had been about to say
-    when it was interrupted. It is deliberately *not* put back into the model's
-    history or into the Transcript: ADR 0035 keeps those to the heard words
-    exactly, and a model that read its own unspoken sentence would carry on as
-    though it had been said.
-
-    Note what this is and is not. Generation is cancelled along with playback,
-    so this holds what had already been synthesized and not yet played, not the
-    whole sentence the model would eventually have produced. The interface has
-    to word it that way.
-    """
-    remainder = spoken_text[len(heard):] if spoken_text.startswith(heard) else ""
-    return remainder.strip()
 
 
 def _note_suppressed(progress: _ReplyProgress, text: str, nudge: str) -> None:
@@ -822,8 +782,8 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             return
         if not self.history.last_reply_is(turn.persona_text):
             return
-        heard = heard_text(progress.heard_checkpoints(), progress.spoken_text, played_ms)
-        if not heard:
+        cut = progress.spoken.cut(played_ms)
+        if not cut.heard:
             # Nothing heard: drop the reply, keep the turn open to continue it.
             turn.persona_text = ""
             self.history.drop_reply()
@@ -831,22 +791,33 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             self._trim_persona_window(turn, played_ms)
             self._discard_state_refresh(turn)
             return
-        if len(heard) >= len(turn.persona_text):
+        if len(cut.heard) >= len(turn.persona_text):
             return  # heard all of it, or a stale re-entry -- nothing to trim
         # Same switch as the pipeline's (clients/config.py): the trimmed line is
         # spoken content, and the log file is outside every deletion path
         # (ADR 0066). The length still says the trim happened and by how much.
         if LOG_TRANSCRIPTS:
-            logger.info("Turn %d reply trimmed to the heard part: %r", turn.seq, heard)
+            logger.info("Turn %d reply trimmed to the heard part: %r", turn.seq, cut.heard)
         else:
             logger.info("Turn %d reply trimmed to the heard part (%d of %d characters)",
-                        turn.seq, len(heard), len(turn.persona_text))
-        turn.persona_unheard = _unheard(progress.spoken_text, heard)
-        turn.persona_text = heard
+                        turn.seq, len(cut.heard), len(turn.persona_text))
+        self._commit_heard(turn, cut, played_ms, self.history.revise_reply)
+
+    def _commit_heard(
+        self, turn: Turn, cut: Cut, played_ms: int | None, write: Callable[[str], None]
+    ) -> None:
+        """Make the heard part of a cut reply the Turn's and the history's line.
+
+        `write` is how it enters the history: appended for a reply still being
+        generated, revised in place for one already committed. Everything else
+        is the same on both paths, which is why it is written once.
+        """
+        turn.persona_unheard = cut.unheard
+        turn.persona_text = cut.heard
         turn.persona_interrupted = True
         # The dash tells the model this line was cut off (see nudges.py); the
         # words themselves are exactly the Transcript's, still in step.
-        self.history.revise_reply(f"{heard}{INTERRUPTED_MARK}")
+        write(f"{cut.heard}{INTERRUPTED_MARK}")
         self._reopen_turn = None
         self._trim_persona_window(turn, played_ms)
         self._schedule_state_refresh(turn)  # the notes must not know the unheard part
@@ -873,7 +844,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
 
     def _finalize_interrupted(self, turn: Turn, progress: _ReplyProgress) -> None:
         """Barge-in cleanup (ADR 0035). Commit only what the client played --
-        `heard_text` -- and close the Turn; if nothing was heard, discard the
+        `SpokenReply.cut` -- and close the Turn; if nothing was heard, discard the
         reply and leave the Turn open for the next utterance to continue it.
         "Dispatched as audio" is not "heard": the server streams ahead, so
         committing everything sent put lines in the history the user never got.
@@ -888,16 +859,11 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         if not progress.spoke_yet:
             turn.persona_text = ""
             return
-        heard = heard_text(progress.heard_checkpoints(), progress.spoken_text, played_ms)
-        self._trim_persona_window(turn, played_ms)
-        if heard:
-            turn.persona_unheard = _unheard(progress.spoken_text, heard)
-            turn.persona_text = heard
-            turn.persona_interrupted = True
-            self.history.add_reply(f"{heard}{INTERRUPTED_MARK}")
-            self._reopen_turn = None
-            self._schedule_state_refresh(turn)
+        cut = progress.spoken.cut(played_ms)
+        if cut.heard:
+            self._commit_heard(turn, cut, played_ms, self.history.add_reply)
         else:
+            self._trim_persona_window(turn, played_ms)
             turn.persona_text = ""
 
     def _clean_chunk(self, turn: Turn, text_chunk: str, progress: _ReplyProgress) -> str:
@@ -1051,20 +1017,18 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
                     # Only commit Persona text once TTS has actually produced audio.
                     # Otherwise a silent TTS stream would leave an unheard reply in the Turn.
                     turn.persona_text += text_chunk + " "
-                    progress.spoken_text += text_chunk + " "
+                    progress.spoken.voice(text_chunk)
                 if not progress.spoke_yet:
                     yield StateChanged(state="speaking")
                     progress.spoke_yet = True
                 progress.chunk_seq += 1
                 self._note_persona_audio(turn, wav)
-                progress.audio_ms += tts.duration_ms(wav)
+                progress.spoken.add_audio(tts.duration_ms(wav))
                 yield AudioChunk(turn_seq=turn.seq, chunk_seq=progress.chunk_seq, audio=wav)
             if voiced:
                 # Chunk fully synthesized: record where its audio ends so a
                 # later barge-in can measure how much of it played (ADR 0035).
-                progress.checkpoints.append(
-                    (progress.audio_ms, progress.spoken_text.strip(), text_chunk.strip())
-                )
+                progress.spoken.finish_chunk(text_chunk)
             else:
                 logger.error("TTS synthesis returned no audio")
                 yield Failed(
