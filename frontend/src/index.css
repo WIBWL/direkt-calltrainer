@@ -494,10 +494,6 @@ h2 {
   .scenario-grid .persona-card {
     transition: none;
   }
-
-  .scenario-grid .persona-card:hover {
-    transform: none;
-  }
 }
 
 /* Shown only where the grid is genuinely bare — the random Scenario tile is
@@ -536,27 +532,28 @@ h2 {
 
 .scenario-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .scenario-grid .persona-card {
-  min-height: 126px;
-  padding: 16px 46px 15px 16px;
-  border-width: 1.5px;
+  min-height: 118px;
+  padding: 13px 40px 12px 13px;
+  border-width: 1px;
+  border-radius: var(--radius-control);
   transition:
-    transform 0.15s ease,
     border-color 0.15s ease,
-    background 0.15s ease,
+    background-color 0.15s ease,
     box-shadow 0.15s ease;
 }
 
 .scenario-grid .persona-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(3, 37, 62, 0.055);
+  border-color: var(--color-blue-300);
+  box-shadow: 0 4px 12px rgba(3, 37, 62, 0.04);
 }
 
 .scenario-grid .persona-card.selected {
-  box-shadow: inset 0 0 0 0.5px var(--color-blue-600);
+  border-color: var(--color-blue-600);
+  box-shadow: none;
 }
 
 .scenario-grid .persona-name {
@@ -572,6 +569,7 @@ h2 {
 .scenario-grid .card-badge {
   margin-top: auto;
   padding: 3px 7px;
+  border-radius: 5px;
   font-size: 9px;
 }
 
@@ -707,24 +705,17 @@ h2 {
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  /* Inherited from the card's `card-origin-` class, so a badge and the tile it
-     sits on are the same colour by construction rather than by agreement. The
-     fallbacks only ever apply to a card without an origin, which the picker
-     does not produce. */
+  /* The badge inherits its colour pair from the card's `card-origin-` class.
+     The card surface itself stays neutral; origin is communicated explicitly by
+     the labelled badge rather than by tinting the whole choice. */
   background: var(--origin-tint, var(--color-blue-100));
   color: var(--origin-ink, var(--navy));
 }
 
-/* One colour per origin, declared once and read twice: as the tile's gradient
-   and as its badge. Seven kinds, six hues — before this the colour was on the
-   badge alone, and two kinds could share one because the label underneath
-   carried the difference. On a tinted tile the colour is what is read first,
-   so a kind needs its own wherever the difference is one of origin. Own and
-   shared are the exception: same origin, same author, same green.
-
-   `--origin-tint` is a wash rather than a colour: it is the top-left corner of
-   a gradient that is white again two thirds of the way down, so a grid of them
-   is a set of tinted cards and not a paint chart. */
+/* One colour pair per Scenario origin. The variables are consumed by the
+   labelled badge only; the choice card itself remains neutral so origin colour
+   never competes with the blue selection state. Own and shared deliberately
+   use the same pair because they describe the same authored origin. */
 .card-origin-builtin {
   --origin-tint: var(--color-blue-100);
   --origin-ink: var(--color-blue-600);
@@ -776,25 +767,17 @@ h2 {
   --origin-ink: #9c3a63;
 }
 
-/* The wash itself. Only Scenario cards take it — a Persona card has no origin
-   and keeps the plain white it always had. */
+/* Scenario origin remains visible through the labelled badge. The card surface
+   itself stays neutral, matching the focus cards and keeping a mixed library
+   visually calm. */
 .scenario-grid .persona-card {
-  background: linear-gradient(
-    160deg,
-    var(--origin-tint, var(--color-surface)) 0%,
-    var(--color-surface) 70%
-  );
+  background: var(--color-surface);
 }
 
-/* Selection deepens the wash instead of painting over it: the blue border and
-   the filled check already say which card is picked, and a flat fill would
-   make the selected card the one whose kind has become unreadable. */
+/* Selection uses the same blue surface treatment as the focus choices rather
+   than introducing another colour system for the active state. */
 .scenario-grid .persona-card.selected {
-  background: linear-gradient(
-    160deg,
-    var(--origin-tint, var(--color-surface)) 0%,
-    var(--color-surface-selected) 85%
-  );
+  background: var(--color-surface-selected);
 }
 
 /* The "i" on a selection card, Personas and Scenarios alike. Bottom-right, on
