@@ -6483,6 +6483,23 @@ button.calendar-day {
   width: min(920px, 100%);
 }
 
+.focus-onboarding {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-background);
+}
+
+.focus-onboarding-main {
+  flex: 1;
+  width: 100%;
+  padding: 40px 24px 56px;
+}
+
+.focus-onboarding .focus-dialog {
+  margin: 0 auto;
+}
+
 /* Role and call types (F-62): chips, since there are few and each is a word
    or two. The real control stays for the keyboard; the chip is what shows. */
 .focus-profile {

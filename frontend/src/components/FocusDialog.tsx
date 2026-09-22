@@ -1,9 +1,10 @@
 import { useState } from "react";
 
 import type { FocusChoice, FocusState } from "../protocol";
+import AppFooter from "./AppFooter";
+import AppHeader from "./AppHeader";
 import FocusGoalPicker, { toggleGoal } from "./FocusGoalPicker";
 import FocusProfilePicker from "./FocusProfilePicker";
-
 /**
  * The training focus, asked once at the first start (F-62, ADR 0076).
  *
@@ -50,13 +51,15 @@ export default function FocusDialog({
   };
 
   return (
-    <div
-      className="consent-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="focus-title"
-    >
-      <div className="consent-dialog focus-dialog">
+    <div className="focus-onboarding">
+      <AppHeader />
+
+      <main className="focus-onboarding-main">
+      <div
+        className="consent-dialog focus-dialog"
+        role="dialog"
+        aria-labelledby="focus-title"
+      >
         <h1 id="focus-title">Worauf möchten Sie sich konzentrieren?</h1>
 
         <p>
@@ -137,6 +140,9 @@ export default function FocusDialog({
           </p>
         </div>
       </div>
+      </main>
+
+      <AppFooter />
     </div>
   );
 }
