@@ -367,15 +367,11 @@ h2 {
 
 /* --- Scenario library: authored vs built-in (ADR 0058) --- */
 .scenario-library-controls {
-  margin-bottom: 18px;
-  padding: 14px;
-  border: 1px solid #d9e8f1;
-  border-radius: 16px;
-  background: linear-gradient(
-    180deg,
-    #f3f9fc 0%,
-    #edf6fb 100%
-  );
+  margin-bottom: 14px;
+  padding: 13px 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-surface-filter);
 }
 
 .scenario-library-controls-top {
@@ -412,10 +408,9 @@ h2 {
 }
 
 /* The two filter rows (ADR 0064): level 1 origin, level 2 thematic category.
-   One rule set for both, so the second row cannot end up smaller than the
-   first. A pill track with a thumb that slides onto the active option; the
-   options stay ordinary buttons in a radiogroup, so the interaction is a click
-   or an arrow key, not a drag. */
+   Both use the same compact segmented control. The active option is still
+   shown by the moving thumb, but the rectangular treatment matches the calmer
+   control language used on the focus page. */
 
 .filter-slider {
   position: relative;
@@ -424,21 +419,24 @@ h2 {
   width: 100%;
   max-width: 100%;
   gap: 4px;
-  padding: 4px;
+  padding: 3px;
   overflow-x: auto;
-  background: var(--color-surface-filter);
-  border-radius: 999px;
+  background: transparent;
+  border-radius: 9px;
 }
 
 .filter-slider-thumb {
   position: absolute;
-  top: 0.25rem;
+  top: 3px;
   left: 0;
-  bottom: 0.25rem;
-  border-radius: 999px;
+  bottom: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
   background: var(--color-surface);
-  box-shadow: 0 1px 3px rgba(3, 37, 62, 0.16);
-  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(3, 37, 62, 0.08);
+  transition:
+    transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none;
 }
 
@@ -449,17 +447,17 @@ h2 {
 }
 
 .filter-slider-option {
-  position: relative; /* above the thumb */
+  position: relative;
   z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   border: 0;
   background: transparent;
-  border-radius: 999px;
-  padding: 7px 11px;
+  border-radius: 8px;
+  padding: 6px 9px;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 12px;
   white-space: nowrap;
   color: var(--color-text-muted);
   cursor: pointer;
@@ -516,10 +514,10 @@ h2 {
   border: 1px solid var(--color-blue-300);
   background: var(--color-surface);
   color: var(--color-blue-600);
-  border-radius: 12px;
-  padding: 0.5rem 0.9rem;
+  border-radius: 9px;
+  padding: 0.45rem 0.8rem;
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   cursor: pointer;
 }
 
