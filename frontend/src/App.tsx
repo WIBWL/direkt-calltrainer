@@ -20,12 +20,12 @@ import FeedbackScreen from "./components/FeedbackScreen";
 import { useMicrophoneDevices } from "./hooks/useMicrophoneDevices";
 import { useMicrophoneVAD } from "./hooks/useMicrophoneVAD";
 import { useLiveCall, type EndedCall } from "./hooks/useLiveCall";
-import type { CommittedSession } from "./hooks/useSessionSocket";
 import { useNextCalls } from "./hooks/useNextCalls";
 import { useScenarioLibrary } from "./hooks/useScenarioLibrary";
 import NextCalls from "./components/NextCalls";
 import { useSessionFeedback } from "./hooks/useSessionFeedback";
-import type { Persona, TranscriptEntry } from "./protocol";
+import { useTrainingRun, type CommitOptions } from "./hooks/useTrainingRun";
+import type { Persona } from "./protocol";
 import ReverseBriefPanel from "./components/ReverseBriefPanel";
 import { ROUTES, type TrainingStart } from "./routes";
 import {
@@ -37,13 +37,10 @@ import {
 } from "./trainingFlow";
 import {
   drawRandomScenario,
-  getScenario,
   getTenant,
   RANDOM_SCENARIO_ID,
-  type ReverseBrief,
   type ReverseScenario,
 } from "./scenarioLibrary";
-import { loadFinishedSession, saveFinishedSession } from "./utils/finishedSession";
 import { prefersReducedMotion } from "./utils/motion";
 
 
@@ -81,14 +78,23 @@ export default function App() {
   const { devices: micDevices, refresh: refreshMicDevices } = useMicrophoneDevices();
   // The fade that covers a change of screen, played over whichever screen starts it.
   const { playFade } = useScreenTransition();
-  // Lazy initializer: read once on mount, not on every render.
-  const [restored] = useState(loadFinishedSession);
+  // The training run: the committed Session, its case or briefing, what was
+  // said once it ended and what survives a reload (see useTrainingRun.ts).
+  const run = useTrainingRun();
+  const {
+    restored,
+    committed,
+    lastPlayed,
+    secretScenario,
+    committedCase,
+    reverseBrief,
+    transcript,
+    endedSessionId,
+    commit,
+    cancel: cancelRun,
+    restart: restartRun,
+  } = run;
   const [screen, setScreen] = useState<Screen>(restored ? "transcript" : "setup");
-  const [transcript, setTranscript] = useState<TranscriptEntry[]>(restored?.turns ?? []);
-  // Names the persisted Session so its Feedback can be fetched once the
-  // worker has produced it. Not kept anywhere but here: the wrap-up is
-  // reachable for as long as this screen is, and no longer.
-  const [endedSessionId, setEndedSessionId] = useState<string | null>(restored?.sessionId ?? null);
   // The wrap-up, polled once for the two screens that show it: the waiting
   // screen hands over when it settles, the post-call screen renders it, and the
   // downloadable report (F-64) reads the same `detail`, so the file carries
@@ -103,31 +109,11 @@ export default function App() {
   } = useSessionFeedback(
     screen === "analysing" || screen === "transcript" ? endedSessionId : null,
   );
-  // The committed Session: set when the user actually commits to one (the
-  // start-the-session press), never by the selection itself — see ADR 0042.
-  // Nothing connects on its own, which is also what keeps a persistently
-  // failing backend from looping: a failed Session is only ever retried by
-  // another deliberate click, never automatically.
-  const [committed, setCommitted] = useState<CommittedSession | null>(null);
-  // The pairing just played, kept past the end of the call for the offers of
-  // what to play next (F-64): `committed` is cleared the moment the call ends.
-  const [lastPlayed, setLastPlayed] = useState<{
-    scenarioId: string;
-    personaId: string;
-  } | null>(null);
   const nextCalls = useNextCalls(
     lastPlayed?.scenarioId ?? null,
     lastPlayed?.personaId ?? null,
     screen === "transcript",
   );
-  // The briefing shown during a reverse (ADR 0070). Held here rather than in
-  // the screens because both the mic check and the call show it, and because
-  // it is fetched once per committed Session rather than once per screen.
-  const [reverseBrief, setReverseBrief] = useState<ReverseBrief | null>(null);
-  // The drawn Scenario's name while it is still a secret (F-62): set only for
-  // a random Scenario, and the one thing the call screen must not show. Null
-  // means the User picked the case themselves and knows what it is.
-  const [secretScenario, setSecretScenario] = useState<string | null>(null);
 
   // The library, its two filter rows and which case is picked. A restored
   // wrap-up owns the screen, so nothing is preselected behind it.
@@ -178,26 +164,6 @@ export default function App() {
     }
   }, [micDevices, micDeviceId]);
 
-  // The facts of the committed case, for the screen before the call and the
-  // panel beside it. Fetched rather than read off the card: the listing
-  // deliberately withholds the case (ADR 0045) and only the detail route
-  // serves it — the same text the info panel behind a card's "i" shows.
-  //
-  // Withheld for a random Scenario, which is the one case the User is meant
-  // to walk into unread (F-62), and for a reverse, which has a briefing of
-  // its own and would otherwise be given two.
-  //
-  // The briefing comes from here rather than off the selection card, although
-  // the card carries one: a follow-up is started from a wrap-up, and its row
-  // is not in this screen's copy of the library yet — the reload runs beside
-  // the commit, not before it. One fetch for both halves is also one moment at
-  // which the case screen is ready, instead of two.
-  //
-  // `null` means "not fetched yet" and is what the briefing screen waits on;
-  // empty strings mean the case has nothing to read.
-  const [committedCase, setCommittedCase] = useState<
-    { briefing: string; facts: string } | null
-  >(null);
 
   // What the flow routes on that render state can answer, refreshed every
   // render and read only from event handlers — which is what lets `advance`
@@ -244,66 +210,20 @@ export default function App() {
     [playFade],
   );
 
-  // One request for whichever half the committed Scenario has: the case of an
-  // ordinary call (see the note on `committedCase` above), or the briefing of a
-  // reverse (ADR 0070). Both come from the detail route — the reverse's case is
-  // only ever served there, for the caller's own rows, which is what keeps the
-  // exception to ADR 0043 down to the one Session the User actually played.
-  //
-  // `handleReverse` has already put the briefing in place for a reverse it
-  // just created, so this runs for one too and overwrites it with the same
-  // content — which is why a failure must leave the existing value alone
-  // rather than clearing it.
-  useEffect(() => {
-    setCommittedCase(null);
-    if (!committed?.reverse) setReverseBrief(null);
-    // Nothing to fetch for a random Scenario, whose case is withheld (F-62).
-    if (!committed || (!committed.reverse && secretScenario !== null)) return undefined;
 
-    let cancelled = false;
-    getScenario(committed.scenarioId)
-      .then((detail) => {
-        if (cancelled) return;
-        if (!committed.reverse) {
-          setCommittedCase({ briefing: detail.briefing, facts: detail.case_facts });
-        } else if (detail.reverse_brief) {
-          setReverseBrief(detail.reverse_brief);
-        }
-      })
-      .catch(() => {
-        // The call is the point; it runs with or without the panel.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [committed, secretScenario]);
-
-  // What happens once a call is over and its goodbye has been heard: the
-  // transcript is kept, the finished Session is remembered across a reload,
+  // What happens once a call is over and its goodbye has been heard: the run
+  // keeps the transcript and remembers the finished Session across a reload,
   // and the flow moves on. When that moment is due is `useLiveCall`'s to
   // decide (see `endIsDue`).
   const handleCallOver = (ended: EndedCall) => {
-    setTranscript(ended.turns);
-    setEndedSessionId(ended.sessionId);
-    saveFinishedSession({
-      sessionId: ended.sessionId,
-      turns: ended.turns,
-      personaName,
-      scenarioName,
-      // Kept so a reverse started from this screen after a reload still knows
-      // which Persona to put on the other end (ADR 0070).
-      personaId,
-    });
+    // The names are kept because a reload restores the post-call screen
+    // without a selection to look them up in; the Persona's id so a reverse
+    // started from there after a reload still knows who answers (ADR 0070).
+    run.finish(ended, { personaName, scenarioName, personaId });
     // Straight to the wrap-up's own waiting screen where one is being written,
     // and straight past it where none is: no stored Session, no wrap-up, and a
     // wait for something that is not coming (ADR 0066).
     advance({ type: "callEnded", stored: ended.sessionId !== null });
-    if (committed) {
-      setLastPlayed({ scenarioId: committed.scenarioId, personaId: committed.personaId });
-    }
-    // This Session is over — the next one connects when the user commits
-    // to it, not while the transcript is still being read (ADR 0042).
-    setCommitted(null);
   };
 
   // The Session (WebSocket + audio playback, with the VAD below) lives here,
@@ -339,20 +259,18 @@ export default function App() {
   // The one way into a call: commit to a pairing and go to the microphone
   // check. Taken by the setup screen's button and by the follow-up's start
   // button alike, so the second is the same act as the first and not a shortcut
-  // past it. The stored finished Session goes here rather than in whoever
-  // called: once a new call is committed to, the previous wrap-up must not come
-  // back on the next reload.
+  // past it. Committing also forgets the stored finished Session (`commit`),
+  // so the previous wrap-up does not come back on the next reload.
   const beginSession = useCallback(
-    (nextScenarioId: string, nextPersonaId: string, reverse = false, skipMicCheck = false) => {
-      saveFinishedSession(null);
-      // Cleared here rather than in each caller, so a path that forgets about
-      // it gets the safe answer: a Scenario shown, not one wrongly hidden.
-      setSecretScenario(null);
+    (
+      nextScenarioId: string,
+      nextPersonaId: string,
+      { skipMicCheck = false, ...options }: CommitOptions & { skipMicCheck?: boolean } = {},
+    ) => {
+      const reverse = options.reverse ?? false;
       setScenarioId(nextScenarioId);
       setPersonaId(nextPersonaId);
-      // A new object every time: that identity is what makes this a new
-      // Session for useSessionSocket, even when the pairing is unchanged.
-      setCommitted({ personaId: nextPersonaId, scenarioId: nextScenarioId, reverse });
+      commit(nextScenarioId, nextPersonaId, options);
       // Straight from a finished training (F-60/F-61) the microphone has just
       // been used for the call this one follows from, and its device is still
       // selected — so the check would be a screen between the button and the
@@ -369,10 +287,10 @@ export default function App() {
       advance({ type: "sessionCommitted", reverse, skipMicCheck });
       if (skipMicCheck) setIsMicrophoneMuted(false);
     },
-    // Both keep one identity (`advance` by its own empty-context design, the
-    // other is a state setter), so this does too -- but it says so now rather
-    // than relying on it silently (ADR 0094).
-    [advance, setScenarioId],
+    // All three keep one identity (`advance` by its own empty-context design,
+    // `commit` by its empty list, the other is a state setter), so this does
+    // too -- but it says so now rather than relying on it silently (ADR 0094).
+    [advance, setScenarioId, commit],
   );
 
   const handleStartSession = useCallback(() => {
@@ -384,10 +302,7 @@ export default function App() {
     if (scenarioId === RANDOM_SCENARIO_ID) {
       const drawn = drawRandomScenario(drawPool);
       if (drawn === null) return; // nothing to draw from; the tile is not offered
-      beginSession(drawn.id, personaId, false);
-      // After `beginSession`, which clears it: both run in the same event, so
-      // this is the value that survives.
-      setSecretScenario(drawn.name);
+      beginSession(drawn.id, personaId, { drawnName: drawn.name });
       return;
     }
 
@@ -395,7 +310,7 @@ export default function App() {
     // its briefing on the way *out* of it — see `handleMicConfirmed`. Coming
     // from a finished call there is no check to pass, so that path goes to the
     // briefing straight away.
-    beginSession(scenarioId, personaId, selectedScenario?.reverse ?? false);
+    beginSession(scenarioId, personaId, { reverse: selectedScenario?.reverse ?? false });
   }, [personaId, scenarioId, drawPool, selectedScenario, beginSession]);
 
   // From the post-call screen into the reverse (F-61, ADR 0070): the same
@@ -412,11 +327,13 @@ export default function App() {
       if (persona === null) return;
       setScenarioFilters({ origin: "reverse", category: "all" });
       void reloadScenarios();
-      // Seeded from the answer that just came back, so the briefing screen has
-      // something to show immediately rather than one request later; the
-      // effect above refetches it and lands on the same content.
-      setReverseBrief(reverse.reverse_brief);
-      beginSession(reverse.id, persona, true, true);
+      // The briefing is seeded from the answer that just came back, so its
+      // screen has something to show immediately rather than one request later.
+      beginSession(reverse.id, persona, {
+        reverse: true,
+        skipMicCheck: true,
+        brief: reverse.reverse_brief,
+      });
     },
     [personaId, restored, reloadScenarios, setScenarioFilters, beginSession],
   );
@@ -462,9 +379,9 @@ export default function App() {
   // — the opening line generated for it is already spent, but there is no
   // point holding the connection (and the server-side Session) open for it.
   const handleCancelMicCheck = useCallback(() => {
-    setCommitted(null);
+    cancelRun();
     advance({ type: "micCheckCancelled" });
-  }, [advance]);
+  }, [advance, cancelRun]);
 
   // The effect above owns VAD pause/resume; the button only changes UI state.
   const handleToggleMicrophone = useCallback(() => {
@@ -480,9 +397,9 @@ export default function App() {
   // Clears the stored finished Session too, so the wrap-up does not come
   // back when the next Session ends (ADR 0042 handles the reconnect side).
   const handleRestart = useCallback(() => {
-    saveFinishedSession(null);
+    restartRun();
     advance({ type: "restarted" });
-  }, [advance]);
+  }, [advance, restartRun]);
 
   // Starts a Scenario written out of a finished training as the next call,
   // against the Persona that training was played with: the follow-up (F-60)
@@ -501,7 +418,7 @@ export default function App() {
       // has just been read, not from the selection screen. What it does not
       // skip is the case — the wrap-up gives way to the briefing screen, and
       // the call is started from there.
-      playFade(() => beginSession(followUpId, followUpPersonaId, reverse, true));
+      playFade(() => beginSession(followUpId, followUpPersonaId, { reverse, skipMicCheck: true }));
     },
     [reloadScenarios, beginSession, playFade],
   );
