@@ -24,7 +24,7 @@ import FocusProfilePicker from "./FocusProfilePicker";
  * many are left and how to go on must not be a scroll away.
  *
  * Answerable later either way: the profile section changes the selection, and
- * the dialog says so, so nobody has to get this right on the first day.
+ * the screen says so, so nobody has to get this right on the first day.
  */
 export default function FocusDialog({
   focus,
@@ -43,7 +43,7 @@ export default function FocusDialog({
   const [failed, setFailed] = useState(false);
 
   // Awaited rather than fired and forgotten: a rejected promise would go
-  // unhandled and the dialog would sit there looking as if the click worked.
+  // unhandled and the screen would sit there looking as if the click worked.
   // Role and call types go with either button: "no focus" is about the goals.
   const submit = async (goals: string[]) => {
     setFailed(false);
@@ -68,9 +68,8 @@ export default function FocusDialog({
           </p>
         </div>
 
-        <div
+        <section
           className="consent-dialog focus-dialog"
-          role="dialog"
           aria-labelledby="focus-title"
         >
           <p className="consent-highlight">
@@ -94,7 +93,7 @@ export default function FocusDialog({
             disabled={saving}
             onToggle={(key) => setSelected((s) => toggleGoal(s, key, focus.max_goals))}
           />
-        </div>
+        </section>
       </main>
 
       {/* Kept outside the content card so the tally and both answers remain
