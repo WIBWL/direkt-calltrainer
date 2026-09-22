@@ -694,8 +694,6 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
     ) -> AsyncIterator[TurnEvent]:
         """Drive the reply and append the finished text to history, yielding
         events. Gives up on a `Failed` leg."""
-        force_end_call = progress.closing
-        allow_repetition = progress.allow_repetition
         async with contextlib.aclosing(
             self._stream_reply_with_regeneration(turn, messages, progress)
         ) as events:
@@ -717,14 +715,14 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         replies = self.history.replies()
         repeated_reply = spoke and (
             repetition.has_repeated_sentence(turn.persona_text) or
-            checks.repeats_earlier(turn.persona_text, replies, exclude_last=allow_repetition) or
-            (not allow_repetition and checks.repeats_last(turn.persona_text, replies))
+            checks.repeats_earlier(turn.persona_text, replies, exclude_last=progress.allow_repetition) or
+            (not progress.allow_repetition and checks.repeats_last(turn.persona_text, replies))
         )
-        restates = spoke and not allow_repetition and checks.restates_previous(turn.persona_text, replies)
+        restates = spoke and not progress.allow_repetition and checks.restates_previous(turn.persona_text, replies)
         self.history.add_reply(turn.persona_text)
         progress.committed = True
 
-        # force_end_call backstops [CALL_END]: a small model won't always
+        # progress.closing backstops [CALL_END]: a small model won't always
         # include the marker even when told to (confirmed in testing).
         #
         # said_goodbye is the mirror of ADR 0037's veto, and it catches an
@@ -739,7 +737,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         said_goodbye = spoke and not progress.ends_call and bool(
             self._pack.farewell_re.search(turn.persona_text)
         )
-        ends_call = progress.ends_call or force_end_call or repeated_reply or restates or said_goodbye
+        ends_call = progress.ends_call or progress.closing or repeated_reply or restates or said_goodbye
         if ends_call:
             self.ended = True
             logger.info(
@@ -747,7 +745,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
                 "repeated reply=%s, restated reply=%s, said goodbye=%s)",
                 turn.seq,
                 progress.ends_call,
-                force_end_call,
+                progress.closing,
                 repeated_reply,
                 restates,
                 said_goodbye,
@@ -763,7 +761,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             # closing-intent path excludes itself above on the ground that the
             # reply *is* the goodbye, which is wrong when there is no reply --
             # the call then ended in silence.
-            if not spoke or repeated_reply or restates or (progress.ends_call and not force_end_call):
+            if not spoke or repeated_reply or restates or (progress.ends_call and not progress.closing):
                 async for event in self._speak_fallback_closing(turn, progress):
                     yield event
         yield TurnCompleted(turn_seq=turn.seq, ends_call=ends_call)

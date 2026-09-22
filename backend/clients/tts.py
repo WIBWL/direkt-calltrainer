@@ -138,7 +138,7 @@ async def synthesize_stream(text: str, voice: PersonaVoice, language_id: str) ->
             KUGELAUDIO_MODEL, voice.kugelaudio_voice_id, language_id, len(text),
         )
     produced = False
-    fallback = None
+    fall_back = False
     try:
         async with contextlib.aclosing(_pooled_request(text, voice, language_id)) as chunks:
             async for chunk in chunks:
@@ -148,11 +148,12 @@ async def synthesize_stream(text: str, voice: PersonaVoice, language_id: str) ->
         if produced:
             raise KugelAudioError(f"KugelAudio stream failed after producing audio: {e}") from e
         logger.warning("KugelAudio streaming failed before any audio, falling back to DiReKT: %s", e)
-        # Synthesized after the request has let go of the connection: DiReKT
-        # is a different backend and has no business holding KugelAudio's.
-        fallback = text
-    if fallback is not None:
-        yield await _synthesize(fallback, voice)
+        fall_back = True
+    # Outside the `except`, so a failure here is not chained to KugelAudio's.
+    # The connection is already released: `aclosing` closed the request on
+    # the way out of the `async with`.
+    if fall_back:
+        yield await _synthesize(text, voice)
 
 
 async def _pooled_request(text: str, voice: PersonaVoice, language_id: str) -> AsyncIterator[AudioChunk]:

@@ -387,9 +387,11 @@ def _owned_with_wrapup(
     turn a Session into a Scenario. The rest of the two stays two on purpose
     (ADR 0100).
     """
-    session = (
+    # Ownership in the WHERE clause, so someone else's row and its subtree
+    # are never loaded only to be thrown away.
+    return (
         db.query(db_models.Session)
-        .filter_by(extern_id=extern_id)
+        .filter_by(extern_id=extern_id, subject_id=subject)
         .options(
             selectinload(db_models.Session.scenario),
             selectinload(db_models.Session.feedback)
@@ -397,7 +399,6 @@ def _owned_with_wrapup(
         )
         .one_or_none()
     )
-    return session if session is not None and session.subject_id == subject else None
 
 
 @dataclass(frozen=True)
