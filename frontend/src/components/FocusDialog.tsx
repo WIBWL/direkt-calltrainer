@@ -55,91 +55,93 @@ export default function FocusDialog({
       <AppHeader />
 
       <main className="focus-onboarding-main">
-      <div
-        className="consent-dialog focus-dialog"
-        role="dialog"
-        aria-labelledby="focus-title"
-      >
-        <h1 id="focus-title">Worauf möchten Sie sich konzentrieren?</h1>
+        <div className="focus-onboarding-intro">
+          <h1 id="focus-title">Worauf möchten Sie sich konzentrieren?</h1>
 
-        <p>
-          Wählen Sie bis zu {focus.max_goals} Ziele. Auf diese Ziele schaut die Auswertung
-          danach besonders genau.
-        </p>
-
-        <p className="consent-highlight">
-          <strong>Alles andere wird weiterhin trainiert.</strong> Ein Fokus gewichtet nur, er
-          schaltet nichts ab.
-        </p>
-
-        <FocusProfilePicker
-          roles={focus.roles}
-          role={profile.role}
-          categories={profile.categories}
-          disabled={saving}
-          onChange={setProfile}
-        />
-
-        <FocusGoalPicker
-          goals={focus.goals}
-          groups={focus.groups}
-          selected={selected}
-          max={focus.max_goals}
-          disabled={saving}
-          onToggle={(key) => setSelected((s) => toggleGoal(s, key, focus.max_goals))}
-        />
-
-        {/* Sticky, so the tally and both answers stay in view over a list
-            that is taller than the viewport. */}
-        <div className="focus-actions-bar">
-          <div className="focus-tally">
-            <span className="focus-slots" aria-hidden="true">
-              {Array.from({ length: focus.max_goals }, (_, slot) => (
-                <span
-                  key={slot}
-                  className={
-                    "focus-slot" + (slot < selected.length ? " focus-slot-filled" : "")
-                  }
-                />
-              ))}
-            </span>
-            <span className="focus-count" aria-live="polite">
-              {selected.length} von {focus.max_goals} Zielen ausgewählt.
-              {selected.length >= focus.max_goals &&
-                " Wenn Sie tauschen möchten, wählen Sie zuerst ein Ziel ab."}
-            </span>
-          </div>
-
-          {failed && (
-            <p className="consent-error">
-              Ihre Auswahl konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.
-            </p>
-          )}
-
-          <div className="consent-actions">
-            <button
-              type="button"
-              className="consent-button consent-button-primary"
-              onClick={() => void submit(selected)}
-              disabled={saving || selected.length === 0}
-            >
-              {saving ? "Wird gespeichert …" : "Fokus übernehmen"}
-            </button>
-            <button
-              type="button"
-              className="consent-button consent-button-secondary"
-              onClick={() => void submit([])}
-              disabled={saving}
-            >
-              Ohne Fokus fortfahren
-            </button>
-          </div>
-
-          <p className="focus-bar-note">
-            Sie können Ihre Auswahl jederzeit im Profil ändern.
+          <p>
+            Wählen Sie bis zu {focus.max_goals} Ziele. Auf diese Ziele schaut die Auswertung
+            danach besonders genau.
           </p>
         </div>
-      </div>
+
+        <div
+          className="consent-dialog focus-dialog"
+          role="dialog"
+          aria-labelledby="focus-title"
+        >
+          <p className="consent-highlight">
+            <strong>Alles andere wird weiterhin trainiert.</strong> Ein Fokus gewichtet nur, er
+            schaltet nichts ab.
+          </p>
+
+          <FocusProfilePicker
+            roles={focus.roles}
+            role={profile.role}
+            categories={profile.categories}
+            disabled={saving}
+            onChange={setProfile}
+          />
+
+          <FocusGoalPicker
+            goals={focus.goals}
+            groups={focus.groups}
+            selected={selected}
+            max={focus.max_goals}
+            disabled={saving}
+            onToggle={(key) => setSelected((s) => toggleGoal(s, key, focus.max_goals))}
+          />
+
+          {/* Sticky, so the tally and both answers stay in view over a list
+            that is taller than the viewport. */}
+          <div className="focus-actions-bar">
+            <div className="focus-tally">
+              <span className="focus-slots" aria-hidden="true">
+                {Array.from({ length: focus.max_goals }, (_, slot) => (
+                  <span
+                    key={slot}
+                    className={
+                      "focus-slot" + (slot < selected.length ? " focus-slot-filled" : "")
+                    }
+                  />
+                ))}
+              </span>
+              <span className="focus-count" aria-live="polite">
+                {selected.length} von {focus.max_goals} Zielen ausgewählt.
+                {selected.length >= focus.max_goals &&
+                  " Wenn Sie tauschen möchten, wählen Sie zuerst ein Ziel ab."}
+              </span>
+            </div>
+
+            {failed && (
+              <p className="consent-error">
+                Ihre Auswahl konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.
+              </p>
+            )}
+
+            <div className="consent-actions">
+              <button
+                type="button"
+                className="consent-button consent-button-primary"
+                onClick={() => void submit(selected)}
+                disabled={saving || selected.length === 0}
+              >
+                {saving ? "Wird gespeichert …" : "Fokus übernehmen"}
+              </button>
+              <button
+                type="button"
+                className="consent-button consent-button-secondary"
+                onClick={() => void submit([])}
+                disabled={saving}
+              >
+                Ohne Fokus fortfahren
+              </button>
+            </div>
+
+            <p className="focus-bar-note">
+              Sie können Ihre Auswahl jederzeit im Profil ändern.
+            </p>
+          </div>
+        </div>
       </main>
 
       <AppFooter />

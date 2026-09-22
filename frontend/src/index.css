@@ -6496,6 +6496,21 @@ button.calendar-day {
   padding: 40px 24px 56px;
 }
 
+.focus-onboarding-intro {
+  width: min(920px, 100%);
+  margin: 0 auto 20px;
+}
+
+.focus-onboarding-intro h1 {
+  margin-bottom: 8px;
+}
+
+.focus-onboarding-intro p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
 .focus-onboarding .focus-dialog {
   margin: 0 auto;
 }
