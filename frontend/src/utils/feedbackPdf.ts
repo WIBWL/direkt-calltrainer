@@ -8,7 +8,7 @@ import type {
   TranscriptEntry,
 } from "../protocol";
 import {
-  analyseLoudness,
+  loudnessCourse,
   loudnessClock,
   loudnessRuns,
   LOUDNESS_CAPTION,
@@ -18,7 +18,6 @@ import {
   ASPECT_LABELS,
   ASPECT_LEADS,
   formatMetricValue,
-  loudnessCurve,
   METRIC_ASPECTS,
   METRIC_DISCLAIMER,
   metricAspect,
@@ -188,7 +187,7 @@ async function loadLogo(): Promise<string | null> {
 
 /** The app's faces under the two names the document then asks for: "app" in
  * normal and bold, and "display" for the titles. */
-async function useAppFonts(doc: {
+async function registerAppFonts(doc: {
   addFileToVFS: (file: string, data: string) => void;
   addFont: (file: string, name: string, style: string) => void;
 }) {
@@ -226,7 +225,7 @@ export async function buildFeedbackPdf({
 }: FeedbackPdfOptions) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const [, logo] = await Promise.all([useAppFonts(doc), loadLogo()]);
+  const [, logo] = await Promise.all([registerAppFonts(doc), loadLogo()]);
 
   // What the banner and the running head call this. A document without a
   // wrap-up is still only a protocol, and naming it a feedback would promise
@@ -552,8 +551,7 @@ export async function buildFeedbackPdf({
     }
 
     const loudness = all.find((measurement) => measurement.key === "loudness");
-    const values = loudness ? loudnessCurve(loudness) : null;
-    const curve = values ? analyseLoudness(values) : null;
+    const curve = loudness ? loudnessCourse(loudness.detail) : null;
     if (curve) course(loudness!.name, curve);
 
     keep(12);

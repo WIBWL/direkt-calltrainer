@@ -31,7 +31,6 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from decimal import Decimal
 
 from dotenv import load_dotenv
 
@@ -46,7 +45,8 @@ load_dotenv()
 # load_dotenv() before it reads the environment -- so these cannot move up.
 from backend.db import models as db_models  # noqa: E402
 from backend.db.session import session_scope  # noqa: E402
-from backend.feedback import interruptions  # noqa: E402
+from backend.feedback import interruptions, rows  # noqa: E402
+from backend.feedback.metrics import Measurement  # noqa: E402
 from scripts import _backfill_cli  # noqa: E402
 
 logger = logging.getLogger("backfill_interruptions")
@@ -59,6 +59,15 @@ def _timeline(session: db_models.Session) -> tuple[interruptions.Segment, ...]:
     against a segment whose end is unknown, and assuming one would invent the
     measurement. Ordered by `seq_index`, which is the order they were spoken in
     and is unique per Session by constraint.
+
+    No `dispatched_ms`: the schema keeps one duration per utterance, so the
+    audio a trimmed reply *would* have run to is not recoverable from a stored
+    Session, and `Segment` falls back to the stored one. For every Session this
+    script is for -- recorded before the live path measured any of this -- that
+    stored duration *is* the dispatched end, so the reading is the intended one.
+    For a Session recorded since, the live path has already written the figures
+    from the in-memory Turns, where both ends exist, and this script skips any
+    Session that has them.
     """
     return tuple(
         interruptions.Segment(
@@ -99,13 +108,10 @@ def backfill(apply: bool) -> int:
             if not apply:
                 continue
 
-            session.measurements.append(db_models.Measurement(
-                metric_type_id=count_id,
-                value=Decimal(f"{len(report.hard)}.0000"),
-                # Marks the row as reconstructed rather than measured when the
-                # call ended. The figures are identical either way, but a row
-                # that says where it came from is worth the one key.
-                detail_json={**report.detail(), "backfilled": True},
+            session.measurements.extend(rows.measurements(
+                {interruptions.COUNT_KEY: count_id},
+                [Measurement(interruptions.COUNT_KEY, float(len(report.hard)), report.detail())],
+                backfilled=True,
             ))
             session.findings.extend(
                 db_models.Finding(

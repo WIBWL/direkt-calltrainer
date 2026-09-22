@@ -8,13 +8,14 @@ before synthesis.
 
 import pytest
 
+from backend.session.models import AudioChunk
 from backend.session.orchestrator import (
     SessionOrchestrator,
     _ReplyProgress,
     _strip_end_marker,
     _strip_foreign_script,
 )
-from tests.conftest import collect, completed
+from tests.conftest import collect, completed, failure
 
 # pylint: disable=missing-function-docstring
 
@@ -145,6 +146,48 @@ async def test_a_nudged_marker_is_taken_at_its_word(persona, scenario, fake_pipe
     events = await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
 
     assert completed(events).ends_call is True
+
+
+@pytest.mark.parametrize(
+    "reply",
+    ["[CALL_END]", "[CALL_END] Auf Wiederhören.", "   [CALL_END]  "],
+)
+async def test_a_reply_that_is_only_the_marker_ends_the_call(
+    persona, scenario, fake_pipeline, reply
+):
+    """The marker alone, or first -- which drags the rest of the chunk with it
+    (`_strip_end_marker`) -- leaves no words to speak.
+
+    That is a caller hanging up, not a failed completion. It used to fall
+    through to the empty-reply branch: a second completion spent on the same
+    answer, then `llm_failed`, an error screen in place of the goodbye the user
+    had just asked for, and the Session stored as aborted. The marker is taken
+    at its word here exactly as it is on a reply that carries words (ADR 0037).
+    """
+    fake_pipeline.stt.transcripts = ["Okay, tschüss dann!"]
+    fake_pipeline.llm.replies = [reply]
+
+    orch = SessionOrchestrator(persona, scenario)
+    events = await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+
+    assert failure(events) is None, "a hang-up is not a pipeline failure"
+    assert completed(events).ends_call is True
+    assert orch.ended is True
+    assert len(fake_pipeline.llm.calls) == 1, "and no retry was spent on it"
+
+
+async def test_an_ending_with_no_words_still_says_goodbye(persona, scenario, fake_pipeline):
+    """The closing-intent path leaves the sign-off to the reply, on the ground
+    that the reply *is* the goodbye. Where there is no reply that reasoning
+    runs out and the call would end in silence, so the fallback line stands in."""
+    fake_pipeline.stt.transcripts = ["Okay, tschüss dann!"]
+    fake_pipeline.llm.replies = ["[CALL_END]"]
+
+    orch = SessionOrchestrator(persona, scenario)
+    events = await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+
+    assert any(isinstance(e, AudioChunk) for e in events), "something was spoken"
+    assert orch.turns[0].persona_text, "and it is in the Transcript"
 
 
 @pytest.mark.parametrize(

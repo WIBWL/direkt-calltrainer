@@ -57,6 +57,22 @@ export async function getSession(sessionId: string): Promise<SessionDetail | nul
 export const listSessions = (limit: number, offset: number) =>
   apiFetch<SessionHistoryPage>(`/api/sessions?limit=${limit}&offset=${offset}`);
 
+/**
+ * Ask for a Session's wrap-up to be written again (ADR 0049).
+ *
+ * For the one state the screen could not get out of: a generation that failed.
+ * Nothing is regenerated from audio — the wrap-up comes from the stored
+ * Transcript and Measurements — so a call from last week can still be
+ * analysed.
+ *
+ * 202 on success and the caller goes back to polling. Throws otherwise, and
+ * the refusals are worth telling apart: 409 means there is nothing to retry
+ * (a wrap-up exists, the call is empty, or a job may still be running) and 503
+ * that the queue is unreachable, which is worth trying again later.
+ */
+export const retryFeedback = (sessionId: string) =>
+  apiFetch(`/api/sessions/${sessionId}/feedback`, { method: "POST" });
+
 /** Delete one stored training. 404s for an id that is absent *or* not the
  * caller's, exactly as the read does. */
 export const deleteSession = (sessionId: string) =>

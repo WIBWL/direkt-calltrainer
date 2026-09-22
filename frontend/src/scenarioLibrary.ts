@@ -129,7 +129,7 @@ export const RANDOM_SCENARIO_ID = "__random__";
  * remember (ADR 0069). Everything else is in — built-in, own and shared alike.
  *
  * This is only half the pool: the caller narrows it to what the two filter
- * rows currently show before handing it over (see `App.tsx`). The draw once
+ * rows currently show before handing it over (see `scenarioSelection.ts`). The draw once
  * ignored them both, on the argument that picking a category has already said
  * what is coming — but that read the surprise as the whole of the feature. It
  * is also the way into a case the User did not choose, and staying inside the
@@ -295,16 +295,17 @@ export type FieldLimits = Record<TextField, number>;
 /** Max length per authorable field. The backend (`backend/authored_text.py`
  * FIELD_LIMITS) is the single source of truth and validates against it; the
  * editor calls `getFieldLimits()` so its input caps track that automatically.
- * This constant is only the offline fallback if that request fails — the server
- * still rejects an over-long field with a 422 either way. Keep it roughly in
- * step, but it does not need to be exact. */
+ * This constant is what the editor uses until that answer arrives, and for good
+ * if the request fails — so it must match exactly: a cap higher than the
+ * server's lets the User type a field that Save then answers with a 422. It had
+ * drifted to that for three fields; `tests/test_authored_text.py` pins it now. */
 export const FALLBACK_FIELD_LIMITS: FieldLimits = {
   name: 50,
   short_description: 100,
-  briefing: 600,
+  briefing: 500,
   description: 500,
-  case_facts: 3000,
-  call_goal: 1000,
+  case_facts: 2500,
+  call_goal: 500,
 };
 
 /** The lengths the API currently enforces, keyed by the same field names as

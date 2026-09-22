@@ -14,16 +14,17 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from decimal import Decimal
 
 from sqlalchemy.orm import Session as DbSession
 
 # Imported as a module, not by name: `db.Session`/`db.Turn` keep the schema's
 # entities visibly distinct from the identically named in-memory ones.
+from backend import consent
 from backend.db import models as db_models
 from backend.db.session import session_scope
-from backend.feedback import interruptions, metrics
+from backend.feedback import interruptions, metrics, rows
 from backend.feedback.calls import Conversation, conversation, utterances
 from backend.personas import Persona
 from backend.scenarios import Scenario
@@ -32,40 +33,68 @@ from backend.session.models import Turn
 logger = logging.getLogger(__name__)
 
 # How a Session ended, in the wire protocol's vocabulary -> in the schema's.
+# "disconnected" is a call nobody ended: stored, because the training happened,
+# but never as completed -- the history and the activity calendar count a
+# finished training, and walking away is not one (ADR 0034's amendment).
 _STATUS = {
     "user": db_models.STATUS_COMPLETED,
     "completed": db_models.STATUS_COMPLETED,
+    "disconnected": db_models.STATUS_ABORTED,
     "error": db_models.STATUS_ABORTED,
 }
 
 
-def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-    extern_id: uuid.UUID,
-    subject_id: str,
-    persona: Persona,
-    scenario: Scenario,
-    turns: Sequence[Turn],
-    started_at: datetime,
-    reason: str,
-) -> int:
-    """Write the Session, its Turns and its measurements. Returns session_id.
+@dataclass(frozen=True)
+class FinishedCall:  # pylint: disable=too-many-instance-attributes  # one call's facts, by design
+    """Everything the write needs to know about a call that has ended.
 
-    `subject_id` is the Keycloak `sub` from the handshake (ADR 0009): the
-    Session belongs to the account that placed the call, not to a placeholder
-    (ADR 0031).
+    Named rather than passed as seven positional arguments, which two callers
+    and three test helpers had to get in the same order -- three of them are
+    strings or ids of the same type, so a swap would have typed-checked.
+    """
+
+    extern_id: uuid.UUID
+    # The Keycloak `sub` from the handshake (ADR 0009): the Session belongs to
+    # the account that placed the call, not to a placeholder (ADR 0031).
+    subject_id: str
+    persona: Persona
+    scenario: Scenario
+    turns: Sequence[Turn]
+    started_at: datetime
+    # How it ended, in the wire protocol's vocabulary (see `_STATUS`).
+    reason: str
+
+
+def persist_session(call: FinishedCall) -> int | None:
+    """Write the Session, its Turns and its measurements. Returns session_id,
+    or None where storage consent was refused and nothing was written.
+
+    The consent check lives *inside* this transaction (ADR 0066). Asked from
+    outside it, the answer was true and the INSERT that relied on it committed
+    some milliseconds later -- long enough for a withdrawal in another tab to
+    record itself and delete every Session that existed at that moment, leaving
+    this one behind with no deletion path ever to reach it again. Here the
+    answer and the write commit together, and `lock_subject` holds the
+    withdrawal off until they do.
 
     Synchronous by design: the caller dispatches it off the event loop once the
     call is over (ADR 0034), so nothing here has to be async-aware.
     """
+    extern_id, subject_id, persona, scenario = call.extern_id, call.subject_id, call.persona, call.scenario
+    turns = call.turns
     with session_scope() as db:
+        consent.lock_subject(db, subject_id)
+        if not consent.allows_storage(subject_id, db=db):
+            logger.info("Session not stored: no storage consent for this subject")
+            return None
         session = db_models.Session(
             extern_id=extern_id,
             subject_id=subject_id,
             persona=_reference(db, db_models.Persona, persona.id),
             scenario=_reference(db, db_models.Scenario, scenario.id),
             language_code=persona.language_id,
-            status=_STATUS.get(reason, db_models.STATUS_ABORTED),
-            started_at=started_at,
+            status=_STATUS.get(call.reason, db_models.STATUS_ABORTED),
+            started_at=call.started_at,
             ended_at=datetime.now(UTC),
         )
         session.turns = [
@@ -109,8 +138,8 @@ def _write_analysis(
     """Attach the Session's Measurement and Finding rows.
 
     A metric the seed does not know is dropped rather than written against a
-    guessed reference row -- provision.py seeds the inventory from the same
-    METRICS tuple, so that can only happen against a database behind the code.
+    guessed reference row, and `feedback/rows.py` says so in the log -- it owns
+    that rule, and the rounding, for every writer.
 
     Findings are written for one thing only, and the distinction is what makes
     it allowable: a hard interruption is an *event that occurred at a moment*,
@@ -119,19 +148,11 @@ def _write_analysis(
     measured. Nothing of that sort is written here -- an overlap either happened
     or it did not, and the row says when.
     """
-    metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType).all()}
-    session.measurements = [
-        db_models.Measurement(
-            metric_type_id=metric_ids[m.key],
-            value=Decimal(f"{m.value:.4f}"),
-            detail_json=m.detail,
-        )
-        for m in metrics.measure(call)
-        if m.key in metric_ids
-    ]
+    ids = rows.metric_ids(db)
+    session.measurements = rows.measurements(ids, metrics.measure(call))
     session.findings = [
         db_models.Finding(
-            metric_type_id=metric_ids.get(interruptions.COUNT_KEY),
+            metric_type_id=ids.get(interruptions.COUNT_KEY),
             category=interruptions.FINDING_CATEGORY,
             offset_ms=event.offset_ms,
             description=interruptions.finding_description(event),

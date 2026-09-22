@@ -119,7 +119,11 @@ def sweep(db: DbSession, now: datetime | None = None) -> int:
         .filter(db_models.Session.started_at < boundary)
         .all()
     )
+    # Not an early return when nothing expired: an orphaned reverse has no
+    # Session left to expire alongside, so the one path that can still reach it
+    # runs on a day when there is nothing else to do.
     if not expired:
+        deletion.delete_unreferenced_reverses(db, deletion.orphaned_reverses(db, boundary))
         return 0
 
     # Grouped so the preference is read once per subject rather than once per
@@ -135,12 +139,28 @@ def sweep(db: DbSession, now: datetime | None = None) -> int:
         if not auto_delete_enabled(db, subject_id):
             suspended += 1
             continue
-        deletion.retire_follow_ups(db, sessions)
-        # Collected before the delete: `origin_session_id` is `ON DELETE SET
-        # NULL`, so once these Sessions go nothing ties a reverse to them.
-        reverse_ids.extend(deletion.reverses_of(db, sessions))
-        for session in sessions:
-            db.delete(session)
+        # One savepoint per subject. The sweep is one transaction, so without
+        # this a single failure -- a lock timeout, a foreign key that was not
+        # there a moment ago -- rolls back every other subject's deletion too,
+        # and the next run meets the same row and does the same thing. ADR 0067
+        # leans on a missed run delaying a deletion rather than cancelling it,
+        # and all-or-nothing turns one stuck subject into no retention at all.
+        try:
+            with db.begin_nested():
+                deletion.retire_follow_ups(db, sessions)
+                # Collected before the delete: `origin_session_id` is `ON DELETE
+                # SET NULL`, so once these Sessions go nothing ties a reverse to
+                # them.
+                reverse_ids.extend(deletion.reverses_of(db, sessions))
+                for session in sessions:
+                    db.delete(session)
+                db.flush()
+        except Exception:  # pylint: disable=broad-except
+            logger.exception(
+                "Retention sweep: could not delete the expired sessions of one subject; "
+                "the others are unaffected and the next run tries again"
+            )
+            continue
         deleted += len(sessions)
 
     db.flush()
@@ -149,7 +169,15 @@ def sweep(db: DbSession, now: datetime | None = None) -> int:
     # the same reason a withdrawal removes it (ADR 0070's addendum). Deleting a
     # *single* training deliberately does not: there a person is deciding about
     # that one row and is told the reverse stays. Nobody decides anything here.
-    deletion.delete_unreferenced_reverses(db, reverse_ids)
+    #
+    # Plus the ones nothing points at any more. `origin_session_id` is cleared
+    # when the origin goes, so a reverse spared by one run -- because a younger
+    # Session was still played on it -- was invisible to every run after it, and
+    # so was one whose origin the User deleted by hand. Both were promised to go
+    # on a later run and never did.
+    deletion.delete_unreferenced_reverses(
+        db, reverse_ids + deletion.orphaned_reverses(db, boundary)
+    )
     if deleted or suspended:
         logger.info(
             "Retention sweep: deleted %d session(s) older than %s; %d subject(s) had it suspended",

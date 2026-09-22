@@ -26,7 +26,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from backend.feedback import interruptions, intonation, metrics
+from backend.feedback import explanations, interruptions, intonation, metrics
 
 # One step of a scale as the interface shows it: the machine-readable name, how
 # it is said, where it applies, and a colour where the scale has a direction.
@@ -37,11 +37,14 @@ Step = dict[str, str | None]
 class Reading:
     """What one metric offers a reader beyond its figure.
 
-    `explanation` is required and the other two are not, on purpose: ADR 0078
-    lets a scale exist only beside the population its boundaries came from, so
-    a scale with nothing to read next to it is a threshold the user cannot
-    argue with. The reverse is fine -- `run_length` is explained at length and
-    deliberately carries no step, because a correlation is not a boundary.
+    A scale may not exist without an explanation, which is ADR 0078's fourth
+    condition: a boundary is shown beside the population it came from, or it is
+    a threshold the user cannot argue with. The reverse is fine -- `run_length`
+    is explained at length and deliberately carries no step, because a
+    correlation is not a boundary.
+
+    A reading may also be more than words: `loudness` explains its figure and
+    derives the course the screen draws from the same entry.
     """
 
     # The text behind the metric's "i", read from the constant at request time
@@ -80,28 +83,90 @@ def _liveliness(detail: dict) -> dict:
     }
 
 
-def _light_label(detail: dict) -> dict:
-    """F-51's traffic light in words. The step itself is stored, unlike F-35's
-    -- this light predates the derive-on-read arrangement -- so only the German
-    is added, which keeps it beside the thresholds it describes."""
-    try:
-        light = interruptions.TrafficLight(detail.get("light"))
-    except ValueError:
-        return detail  # measured before the light existed, or a value since retired
-    return {**detail, "light_label": interruptions.LABELS[light]}
+def _loudness_course(detail: dict) -> dict:
+    """F-37's course: the smoothed line, the band read off the call's own
+    samples, and the stretches that left it.
+
+    Served rather than worked out again in the browser. The same reading goes
+    into the wrap-up prompt as a sentence (`metrics.describe_loudness_course`),
+    and the two used to be separate implementations in separate languages --
+    the drawing could have said one thing about a call while the sentence under
+    it said another, with nothing to notice.
+
+    A curve too short to read anything off is served exactly as stored, the
+    same answer `_liveliness` gives a Session with no `pvq`.
+    """
+    curve = detail.get("curve_db")
+    if not isinstance(curve, list):
+        return detail
+    course = metrics.loudness_course(curve)
+    return detail if course is None else {**detail, "course": course}
+
+
+def _interruption_light(detail: dict) -> dict:
+    """F-51's traffic light, colour and word, off the count in the detail.
+
+    Derived rather than read back: the step used to be written into the stored
+    detail, which is the one thing ADR 0091 says must not happen. The two
+    numbers behind this light are described in `interruptions.py` as invented
+    working values to be calibrated once the pilot has data -- and a stored
+    colour survives that calibration, so a Session stored at three
+    interruptions kept its red while the legend served beside it, built from
+    the constants, put three in the yellow band. The count itself is what is
+    stored; `hard_offsets_ms` holds one entry per hard interruption, so its
+    length is exactly the number the light reads.
+
+    A detail written before that list existed gets no light, which is the same
+    answer `_liveliness` gives a Session with no `pvq`: a step nobody can
+    reproduce from what is stored is worse than none.
+    """
+    offsets = detail.get("hard_offsets_ms")
+    if not isinstance(offsets, list):
+        return detail
+    light = interruptions.light_for(len(offsets))
+    return {
+        **detail,
+        # Written explicitly, so a colour stored by an older version of this
+        # code is replaced on read rather than left to win.
+        "light": light.value,
+        "light_label": interruptions.LABELS[light],
+    }
 
 
 # One entry per metric that says anything beyond its figure. Private: callers
 # ask the three functions below, so adding a metric here reaches every route
 # without any of them learning about it.
 _READINGS: dict[str, Reading] = {
+    # The two with a scale. Their wording lives beside the thresholds it
+    # describes, which is ADR 0078's fifth condition.
     intonation.RANGE_KEY: Reading(
         intonation.EXPLANATION, intonation.liveliness_steps, _liveliness,
     ),
     interruptions.COUNT_KEY: Reading(
-        interruptions.EXPLANATION, interruptions.light_steps, _light_label,
+        interruptions.EXPLANATION, interruptions.light_steps, _interruption_light,
     ),
-    metrics.RUN_LENGTH_KEY: Reading(metrics.RUN_LENGTH_EXPLANATION),
+    # The rest: explained, and deliberately without a step. Every active metric
+    # is in here, and that is the point of the list being this long. A tile the
+    # user cannot open is a figure they cannot check, and three of sixteen used
+    # to be openable -- so the other thirteen said a number and stopped, which
+    # is the state ADR 0004 warns about: told what a figure is and nothing
+    # about what it is worth, a reader supplies the direction themselves.
+    metrics.RUN_LENGTH_KEY: Reading(explanations.RUN_LENGTH),
+    "talk_share": Reading(explanations.TALK_SHARE),
+    "questions": Reading(explanations.QUESTIONS),
+    "pace": Reading(explanations.PACE),
+    "word_count": Reading(explanations.WORD_COUNT),
+    "fillers": Reading(explanations.FILLERS),
+    "opening": Reading(explanations.OPENING),
+    metrics.CLOSING_KEY: Reading(explanations.CLOSING),
+    "repetitions": Reading(explanations.REPETITIONS),
+    "hesitations": Reading(explanations.HESITATIONS),
+    "reaction_time": Reading(explanations.REACTION_TIME),
+    "pauses": Reading(explanations.PAUSES),
+    "phonation_share": Reading(explanations.PHONATION_SHARE),
+    # Explained like the rest, and the only one of them that also derives:
+    # the course the screen draws is read here (ADR 0091), never stored.
+    metrics.LOUDNESS_KEY: Reading(explanations.LOUDNESS, derive=_loudness_course),
 }
 
 

@@ -20,8 +20,16 @@ network -- compose.yaml deliberately does not publish it to the host -- so the
 reporting half of this script works from a host shell and the `--apply` half
 does not.
 
-Safe to run twice: a Session that already has a wrap-up is never selected, so a
-second run after a successful one does nothing.
+Safe to run twice: a Session that already has a wrap-up is never selected, and
+neither is one whose job may still be working -- `queued` or `running` inside
+JOB_TIMEOUT_S, the same window `api/sessions.py` believes a running job for. It
+did select those, so a wrap-up two minutes into its model call was queued a
+second time and the two runs raced for the same Session.
+
+Both refusals are `jobs.retry_blocked`, which is also what the route behind the
+User's own "erneut erstellen" asks. One rule, two callers: this one sweeps a
+backlog after downtime, that one answers one person looking at one failed
+wrap-up.
 """
 
 from __future__ import annotations
@@ -43,16 +51,18 @@ load_dotenv()
 # The sys.path insert above has to run before the backend is importable, and
 # load_dotenv() before it reads the environment -- so these cannot move up.
 from backend.db import models as db_models  # noqa: E402
+from backend.feedback import jobs  # noqa: E402
 from backend.db.session import session_scope  # noqa: E402
 from backend.logging_config import configure_logging  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-# A Session whose job never finished. `running` is included because a worker
-# killed mid-job leaves the row there with nothing to move it (ADR 0032 names
-# this gap), and `failed` because a wrap-up that failed on a dead gateway is
-# worth another attempt once the gateway is back.
-RETRYABLE = (db_models.JOB_QUEUED, db_models.JOB_RUNNING, db_models.JOB_FAILED)
+# Which Sessions may be put back on the queue is decided in
+# `backend/feedback/jobs.py` and no longer here. The rule used to live in this
+# script alone, and then the User got a button for the same thing
+# (`POST /api/sessions/{id}/feedback`) -- two copies of a rule that had already
+# been wrong once here, when a job two minutes into its model call was queued a
+# second time and both runs wrote the same Session.
 
 
 def _candidates(db) -> list[tuple[int, str, int]]:
@@ -65,15 +75,9 @@ def _candidates(db) -> list[tuple[int, str, int]]:
     """
     found = []
     for session in db.query(db_models.Session).order_by(db_models.Session.session_id).all():
-        if session.feedback is not None:
-            continue
-        if not session.turns:
-            continue
-        jobs = [j for j in session.jobs if j.kind == db_models.JOB_KIND_FEEDBACK]
-        newest = max(jobs, key=lambda j: j.job_id) if jobs else None
-        # No job row at all also qualifies: api/sessions.py reads that as
+        # No job row at all qualifies too: api/sessions.py reads that as
         # "failed", so the Session is in the same dead end.
-        if newest is None or newest.status in RETRYABLE:
+        if jobs.retry_blocked(session) is None:
             found.append((session.session_id, str(session.extern_id), len(session.turns)))
     return found
 
@@ -104,7 +108,8 @@ def main() -> int:
         return 0
 
     # Imported here, not at module scope: reporting must not require Redis.
-    from backend.feedback import jobs, queue  # pylint: disable=import-outside-toplevel
+    # `jobs` is imported up top -- it is the state machine and knows nothing of it.
+    from backend.feedback import queue  # pylint: disable=import-outside-toplevel
 
     queued = 0
     for session_id, extern_id, _turns in candidates:

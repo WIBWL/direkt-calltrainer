@@ -9,6 +9,9 @@ The case that matters most is the pair at the top: a wide-but-slow contour and a
 narrow-but-lively one. A single range figure calls the first one expressive and
 the second one flat, which is backwards for a listener.
 """
+from dataclasses import fields
+from pathlib import Path
+
 import pytest
 
 from backend.feedback.readings import served_detail
@@ -17,6 +20,7 @@ from backend.feedback.intonation import (
     LABELS,
     LIGHTS,
     MAX_STEP_ST,
+    MIN_TERMINAL_FRAMES,
     MIN_VOICED_MS_FOR_READING,
     PVQ_LIVELY_MAX,
     PVQ_MONOTONE_MAX,
@@ -25,7 +29,7 @@ from backend.feedback.intonation import (
     STEP_MS,
     TERMINAL_FLAT_ST,
     TERMINAL_WINDOW_MS,
-    Ending,
+    Endings,
     Liveliness,
     effective_step_ms,
     liveliness,
@@ -135,10 +139,50 @@ def test_a_sentence_that_lifts_at_the_end_is_read_as_rising() -> None:
 
 def test_a_small_final_movement_counts_as_level() -> None:
     """Below the threshold a listener hears wobble, not a direction. Reading
-    every twitch as an intention would make the counts meaningless."""
-    barely = _steady(120, 60) + _sweep(120, 120 * 2 ** (TERMINAL_FLAT_ST / 24 / 12), 40)
+    every twitch as an intention would make the counts meaningless.
+
+    Half the threshold, which is the magnitude this is about. It was written
+    with a semitone-to-Hertz conversion too many and came to a twenty-fourth of
+    it -- 0.03 ST, a movement so small that the test stayed green for any
+    threshold above 0.04 and proved nothing about the edge it names.
+    """
+    half_of_it = 120 * 2 ** (TERMINAL_FLAT_ST / 2 / 12)
+    barely = _steady(120, 60) + _sweep(120, half_of_it, 40)
 
     assert profile(barely, (barely,)).endings.level == 1
+
+
+def test_a_movement_over_the_threshold_is_a_direction() -> None:
+    """The other side of the same edge, so the test above cannot be satisfied
+    by a threshold that calls everything level."""
+    clearly = _steady(120, 60) + _sweep(120, 120 * 2 ** (2 * TERMINAL_FLAT_ST / 12), 40)
+
+    assert profile(clearly, (clearly,)).endings.rising == 1
+
+
+def test_a_short_utterance_is_judged_against_its_own_window() -> None:
+    """The threshold is derived per window, not taken from the constant.
+
+    TERMINAL_FLAT_ST states the glissando threshold across the full 400 ms.
+    An utterance with only MIN_TERMINAL_FRAMES of voiced speech is read over
+    70 ms, where the perceptual floor is 4.6 ST -- nearly six times as much.
+    Applied unchanged there, a 1 ST movement nobody can hear was counted as a
+    falling ending, and short utterances are most of a phone call.
+    """
+    # The call is long enough to be read at all; the *utterance* is the short
+    # one, which is what the ending is taken from.
+    call = _steady(120, 100)
+    one_semitone_down = _sweep(120, 120 * 2 ** (-1.0 / 12), MIN_TERMINAL_FRAMES)
+
+    shape = profile(call, (one_semitone_down,))
+
+    assert shape.endings.level == 1, "1 ST across 70 ms is not a heard movement"
+    assert shape.endings.falling == 0
+
+    # Six semitones across the same 70 ms is over that window's own floor.
+    six_down = _sweep(120, 120 * 2 ** (-6.0 / 12), MIN_TERMINAL_FRAMES)
+
+    assert profile(call, (six_down,)).endings.falling == 1
 
 
 def test_endings_are_counted_per_utterance() -> None:
@@ -233,8 +277,17 @@ def test_thinning_takes_the_median_of_each_window_not_a_sample() -> None:
 
 def test_the_grid_constant_matches_the_analysis() -> None:
     """The movement figure divides by it. If this drifts from acoustics.py, the
-    semitones per second silently change by the same factor."""
-    assert STEP_MS == 10
+    semitones per second silently change by the same factor -- and so do the
+    voiced milliseconds behind the reading's floor, every Hold's duration and
+    the stored `curve_step_ms`.
+
+    Against the analysis constant, not against 10. Asserting the literal was
+    the drift it claimed to catch: `acoustics._PITCH_STEP_S` could be halved
+    and this would stay green, which is the whole failure it describes.
+    """
+    from backend.feedback import acoustics  # pylint: disable=import-outside-toplevel
+
+    assert STEP_MS == round(acoustics._PITCH_STEP_S * 1000)  # pylint: disable=protected-access
 
 
 def test_an_ending_is_read_from_voiced_frames_only() -> None:
@@ -245,9 +298,22 @@ def test_an_ending_is_read_from_voiced_frames_only() -> None:
     assert profile(falling_then_silence, (falling_then_silence,)).endings.falling == 1
 
 
-def test_ending_values_are_the_documented_vocabulary() -> None:
-    """The frontend words these; a fourth value would render as nothing."""
-    assert {e.value for e in Ending} == {"falling", "rising", "level"}
+def test_the_endings_the_frontend_reads_are_the_ones_measured() -> None:
+    """The count travels as `endings.falling/rising/level` and the page words
+    exactly those three; a fourth kind added here would render as nothing.
+
+    Pinned against the frontend's own interface. An enum of the three values
+    used to stand in for this and was pinned only against itself, so a new
+    field on `Endings` would have left it green.
+    """
+    page = (
+        Path(__file__).resolve().parent.parent /
+        "frontend" / "src" / "components" / "IntonationReading.tsx"
+    ).read_text(encoding="utf-8")
+    body = page.split("interface Endings {", 1)[1].split("}", 1)[0]
+    read = {line.strip().split(":", 1)[0] for line in body.splitlines() if ":" in line}
+
+    assert {field.name for field in fields(Endings)} == read == {"falling", "rising", "level"}
 
 
 # --- The pitch variation quotient -------------------------------------------

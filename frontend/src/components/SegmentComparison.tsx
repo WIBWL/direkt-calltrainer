@@ -1,3 +1,4 @@
+import { formatValue } from "../utils/metrics";
 import type { SegmentPair } from "../utils/segmentStats";
 
 /**
@@ -44,8 +45,8 @@ export default function SegmentComparison({
           {pairs.map((pair) => (
             <tr key={pair.key}>
               <td>{pair.name}</td>
-              <td className="segment-value">{figure(pair.pressure, pair.unit)}</td>
-              <td className="segment-value">{figure(pair.rest, pair.unit)}</td>
+              <td className="segment-value">{figure(pair.key, pair.pressure, pair.unit)}</td>
+              <td className="segment-value">{figure(pair.key, pair.rest, pair.unit)}</td>
             </tr>
           ))}
         </tbody>
@@ -64,11 +65,9 @@ export default function SegmentComparison({
   );
 }
 
-/** A figure, or a dash where that stretch of the call was too short to measure.
- *  A dash and not a zero: nothing was measured there, which is not the same as
- *  having measured nothing. */
-function figure(value: number | null, unit: string | null): string {
-  if (value === null) return "–";
-  const text = value.toFixed(1).replace(".", ",");
-  return unit ? `${text} ${unit}` : text;
+/** A figure as every other screen reads it, or a dash where that stretch of the
+ *  call was too short to measure. A dash and not a zero: nothing was measured
+ *  there, which is not the same as having measured nothing. */
+function figure(key: string, value: number | null, unit: string | null): string {
+  return value === null ? "–" : formatValue(key, value, unit);
 }

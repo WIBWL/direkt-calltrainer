@@ -262,6 +262,22 @@ def _detail(scenario, subject: str) -> dict:
     }
 
 
+def _cards(subject: str, tenant_id: int) -> list[dict]:
+    """Every Scenario the caller may select, as cards, grouped by origin and by
+    creation time within one. Both routes below need the same list in the same
+    order -- the listing serves it, `/next` breaks its ties by it -- so it is
+    built in one place rather than written out twice."""
+    return sorted(
+        (_card(s, subject) for s in library.list_scenarios(subject, tenant_id)),
+        key=_origin_group,
+    )
+
+
+def _candidate(card: dict) -> recommendations.Candidate:
+    """What the recommendations need to know about a card."""
+    return recommendations.Candidate(card["id"], card["category"], card["reverse"])
+
+
 @router.get("")
 def list_scenarios(
     user: AuthContext = Depends(require_user),
@@ -269,14 +285,8 @@ def list_scenarios(
 ) -> list[dict]:
     """Every Scenario the caller may select, each badged builtin/own/tenant,
     grouped by origin and by creation time within one."""
-    cards = sorted(
-        (_card(s, user.sub) for s in library.list_scenarios(user.sub, tenant_id)),
-        key=_origin_group,
-    )
-    picks = recommendations.for_subject(user.sub, [
-        recommendations.Candidate(card["id"], card["category"], card["reverse"])
-        for card in cards
-    ])
+    cards = _cards(user.sub, tenant_id)
+    picks = recommendations.for_subject(user.sub, [_candidate(card) for card in cards])
     for card in cards:
         pick = picks.get(card["id"])
         if pick:
@@ -296,24 +306,18 @@ def next_calls(
     Needs no stored Session, so it answers for a call that was not kept too. A
     Scenario or Persona the caller cannot select is a 404, as everywhere.
     """
-    cards = sorted(
-        (_card(s, user.sub) for s in library.list_scenarios(user.sub, tenant_id)),
-        key=_origin_group,
-    )
+    cards = _cards(user.sub, tenant_id)
     by_id = {card["id"]: card for card in cards}
     people = {p.id: p for p in library.list_personas()}
     if extern_id not in by_id or persona not in people:
         raise HTTPException(status_code=404, detail="Unknown scenario or persona")
 
-    def candidate(card: dict) -> recommendations.Candidate:
-        return recommendations.Candidate(card["id"], card["category"], card["reverse"])
-
     partners = [recommendations.Partner(p.id, p.language_id) for p in people.values()]
     offers = recommendations.next_for_subject(
         user.sub,
-        candidate(by_id[extern_id]),
+        _candidate(by_id[extern_id]),
         recommendations.Partner(persona, people[persona].language_id),
-        [candidate(card) for card in cards],
+        [_candidate(card) for card in cards],
         partners,
     )
     return [

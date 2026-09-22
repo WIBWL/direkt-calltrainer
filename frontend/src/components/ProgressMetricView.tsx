@@ -1,6 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 
-import { useProgressData } from "../hooks/useProgressData";
+import { useProgressContext } from "../ProgressContext";
 import { ROUTES, sessionPath } from "../routes";
 import { goalsForMetric } from "../utils/focusMetrics";
 import { statementsFor } from "../utils/goalMentions";
@@ -13,6 +13,7 @@ import {
 } from "../utils/progressStats";
 import { formatDate } from "../utils/time";
 import AppLayout from "./AppLayout";
+import EarlyAndLate from "./EarlyAndLate";
 import GoalStatements from "./GoalStatements";
 import PartsStrip, { partsSummary } from "./PartsStrip";
 import Sparkline from "./Sparkline";
@@ -37,11 +38,15 @@ import Sparkline from "./Sparkline";
  */
 export default function ProgressMetricView() {
   const { metricKey } = useParams<{ metricKey: string }>();
-  const { sessions, state } = useProgressData();
+  // The trainings the switch on the overview selected, not everything stored:
+  // this page and the tile that links here have to describe the same set, or
+  // the tile's "aus 5 Trainings" and the chart below disagree about what they
+  // are about (dashboard-konzept.md section 7, ProgressContext.tsx).
+  const { selected: sessions, periodPhrase, state, withPeriod } = useProgressContext();
   const series = toSeries(sessions).find((s) => s.key === metricKey);
 
   const back = (
-    <Link to={ROUTES.progress} className="back-link">
+    <Link to={withPeriod(ROUTES.progress)} className="back-link">
       Zurück zum Fortschritt
     </Link>
   );
@@ -94,6 +99,11 @@ export default function ProgressMetricView() {
         Zielwert, denn für diese Nutzergruppe gibt es keinen belegten Richtwert.
         {series.derivation && <> {series.derivation}</>}
       </p>
+      {/* Which trainings this page is drawn over. It carries no switch of its
+          own -- the selection is made on the overview and travels in the URL --
+          so it has to say in words what it is reading, or a page over the last
+          five trainings looks like a page over all of them. */}
+      <p className="muted">Gelesen über {periodPhrase}.</p>
 
       {series.shape === "parts" ? (
         // No line and no band for a checklist (see `SeriesShape`): the count per
@@ -124,6 +134,11 @@ export default function ProgressMetricView() {
           </p>
         </div>
       )}
+
+      {/* Under the chart and above the table: it is a reading of the same
+          curve, and the table is the individual points the two of them
+          summarise. */}
+      <EarlyAndLate series={series} />
 
       <h2>Einzelne Trainings</h2>
       <div className="card">

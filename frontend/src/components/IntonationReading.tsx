@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { Measurement, TrafficLight } from "../protocol";
+import { formatNumber } from "../utils/metrics";
 import InfoDetails from "./InfoDetails";
 import PitchContour from "./PitchContour";
 
@@ -172,8 +173,8 @@ export default function IntonationReading({
 
         <Tile
           name="Umfang"
-          value={`${measurement.value.toFixed(1)} Halbtöne`}
-          subline={`das ${Math.pow(2, measurement.value / 12).toFixed(2)}-fache der Frequenz`}
+          value={`${formatNumber(measurement.value, 1)} Halbtöne`}
+          subline={`das ${formatNumber(Math.pow(2, measurement.value / 12), 2)}-fache der Frequenz`}
           info="Was der Umfang misst"
         >
           <p>
@@ -240,7 +241,7 @@ export default function IntonationReading({
         {first != null && last != null && (
           <Tile
             name="Verlauf"
-            value={`${first.toFixed(1)} → ${last.toFixed(1)}`}
+            value={`${formatNumber(first, 1)} → ${formatNumber(last, 1)}`}
             subline={developmentSubline(first, last)}
             info="Was der Verlauf vergleicht"
           >
@@ -396,8 +397,8 @@ function developmentSubline(first: number, last: number): string {
   const change = last - first;
   if (Math.abs(change) < NOTABLE_CHANGE_ST) return "erstes zu letztem Drittel";
   return change < 0
-    ? `enger um ${Math.abs(change).toFixed(1)} Halbtöne`
-    : `weiter um ${change.toFixed(1)} Halbtöne`;
+    ? `enger um ${formatNumber(Math.abs(change), 1)} Halbtöne`
+    : `weiter um ${formatNumber(change, 1)} Halbtöne`;
 }
 
 /** A comparison of the speaker with themselves, which is the only comparison
@@ -412,10 +413,10 @@ function developmentNote(
 
   if (change < 0) {
     return (
-      `Gegen Ende wurde Ihre Melodie enger, um ${Math.abs(change).toFixed(1)} Halbtöne. Das ` +
+      `Gegen Ende wurde Ihre Melodie enger, um ${formatNumber(Math.abs(change), 1)} Halbtöne. Das ` +
       "passiert oft, wenn ein Gespräch anstrengend wird oder zum Schluss nur noch Formalien " +
       "abgearbeitet werden."
     );
   }
-  return `Gegen Ende wurde Ihre Melodie weiter, um ${change.toFixed(1)} Halbtöne.`;
+  return `Gegen Ende wurde Ihre Melodie weiter, um ${formatNumber(change, 1)} Halbtöne.`;
 }

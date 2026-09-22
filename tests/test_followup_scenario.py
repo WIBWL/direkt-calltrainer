@@ -32,7 +32,9 @@ from backend import deletion, library, retention
 from backend.authored_text import FIELD_LIMITS
 from backend.db.models import Feedback, FeedbackPoint, Measurement, Scenario, Session
 from backend.followups import FollowUpError, PlayedCall, draft_follow_up
-from tests.conftest import TEST_AUTH, a_finished_session, asked, stub_completions
+from tests.conftest import (
+    DRAFTED_FROM_TURNS, TEST_AUTH, a_finished_session, asked, stub_completions,
+)
 
 # `app_database` and `reference_data` are taken by several tests only to
 # activate the fixture.
@@ -431,6 +433,23 @@ async def test_nothing_is_written_without_improvement_points(
     nothing to build an exercise from, and the model is not asked."""
     extern_id = a_finished_session()
     _store_feedback(db_session, [])
+    calls = stub_completions(monkeypatch, _REPLY)
+
+    response = await _ask_for_one(api_client, extern_id)
+
+    assert response.status_code == 409
+    assert not calls
+    assert _follow_ups(db_session) == []
+
+
+async def test_nothing_is_written_for_a_call_too_short_to_build_on(
+    api_client: httpx.AsyncClient, db_session: DbSession,
+    reference_data, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One sentence from the User, improvement points or not: the screen offers
+    no follow-up under three utterances, and the route now refuses the same."""
+    extern_id = a_finished_session(turns=DRAFTED_FROM_TURNS[:2])
+    _store_feedback(db_session, _IMPROVEMENTS)
     calls = stub_completions(monkeypatch, _REPLY)
 
     response = await _ask_for_one(api_client, extern_id)

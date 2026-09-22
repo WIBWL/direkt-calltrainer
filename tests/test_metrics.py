@@ -108,7 +108,7 @@ def test_pace_divides_by_phonation_not_by_the_recording() -> None:
 def test_reaction_time_is_measured_from_when_the_persona_stopped() -> None:
     """F-53. Reply at 1500 ms, Persona stopped at 1000 ms: half a second, with
     the gateway's latency outside the window by construction (ADR 0051)."""
-    assert conversation(_measured_call()).reactions_ms == (500,)
+    assert [r.gap_ms for r in conversation(_measured_call()).reactions] == [500]
 
 
 # --- A Turn that could not be measured (ADR 0048) --------------------------
@@ -301,8 +301,40 @@ def test_each_side_is_checked_for_its_own_part() -> None:
 
 def test_a_frame_without_a_name_is_no_introduction() -> None:
     """"hier ist alles" and "hier ist Ihr Ansprechpartner" name nobody."""
-    for said in ("Hier ist alles in Ordnung.", "Hier ist Ihr Ansprechpartner."):
+    for said in ("Hier ist alles in Ordnung.", "Hier ist Ihr Ansprechpartner.",
+                 "Hier sind Ihre Unterlagen."):
         assert _opening_of((said, 2000)).detail["name"] is False
+
+
+@pytest.mark.parametrize("said", [
+    # Found in testing, each one an opening the check did not see.
+    "Guten Tag, hier ist die Anna.",       # an article before a first name
+    "Guten Tag, hier spricht der Peter.",
+    "Guten Tag, Sie sprechen mit Anna Beck.",  # the standard service phrasing
+    "Guten Tag, hier Beck.",               # the frame without its verb
+    "Mein Name: Beck.",
+    "Hier ist Frau Beck.",
+])
+def test_the_frames_a_name_is_actually_said_in(said: str) -> None:
+    """F-63. The name is unknown, so the check reads the frame around it -- and
+    a frame nobody uses recognises nobody. These were all real openings that
+    came back "nicht erkannt"; the article one is how a good deal of German
+    introduces a first name."""
+    assert _opening_of((said, 2000)).detail["name"] is True
+
+
+def test_a_bare_surname_is_still_not_recognised() -> None:
+    """The limit the widened pattern does not remove, pinned so the next
+    reading of this file does not take it for an oversight: "Beck, guten Tag"
+    is a name to a human and an indistinguishable capitalised word to a regular
+    expression. ADR 0086 is why the tile says "nicht erkannt", never "fehlt"."""
+    assert _opening_of(("Beck, guten Tag.", 2000)).detail["name"] is False
+
+
+def test_you_are_speaking_with_introduces_a_name_in_english() -> None:
+    """The English counterpart of "Sie sprechen mit", added with it."""
+    assert _opening_of(("Hello, you're speaking with Sarah.", 2000),
+                       language_id="en").detail["name"] is True
 
 
 def test_the_opening_follows_the_language_of_the_call() -> None:
@@ -410,6 +442,34 @@ def test_a_question_about_how_is_no_agreement() -> None:
     assert closing.detail["agreement"] is False
 
 
+def test_a_deadline_given_as_a_window_is_an_agreement() -> None:
+    """A commitment can name a span instead of a day, and it is no less
+    concrete for it.
+
+    Found by reading the stored closings rather than by reasoning about the
+    pattern: these two forms are what trainees actually said while promising
+    something, and both went unrecognised where the English pack caught the
+    same commitment through "I will send you". A closing marked as having no
+    next step when it plainly had one is the false negative that matters here,
+    because the tile then reports a gap the call did not have.
+    """
+    for said in (
+        "Es sollte innerhalb der nächsten halben Stunde fertig sein.",
+        "Das ist in den nächsten zwei Tagen erledigt.",
+        "Es dauert nur noch bis zu dem eben genannten Datum.",
+    ):
+        closing = _closing_of(said, "Tschüss.")
+        assert closing.detail["agreement"] is True, said
+
+
+def test_a_place_is_no_deadline() -> None:
+    """The window above requires a unit of time. "Innerhalb unserer Abteilung"
+    says where something happens, not by when."""
+    closing = _closing_of("Das klären wir innerhalb unserer Abteilung.", "Tschüss.")
+
+    assert closing.detail["agreement"] is False
+
+
 def test_a_greeting_is_no_farewell() -> None:
     """"Schönen guten Tag" is how a call starts, not how it ends."""
     closing = _closing_of("Schönen guten Tag nochmal.", "Ja.")
@@ -445,7 +505,7 @@ def test_an_unmeasured_turn_contributes_no_reaction_time() -> None:
     """F-53/ADR 0048. Its offset is the end of the utterance, not the start, so
     reading it as a reaction time would report the utterance as hesitation. The
     measured Turn's 500 ms survives; nothing is invented for the other."""
-    assert conversation(_call_with_one_unmeasured_turn()).reactions_ms == (500,)
+    assert [r.gap_ms for r in conversation(_call_with_one_unmeasured_turn()).reactions] == [500]
 
 
 def test_incomplete_acoustics_suppress_the_metrics_that_depend_on_them() -> None:
@@ -570,10 +630,18 @@ def _call_with_a_barge_in() -> list[Turn]:
 
     Both halves are needed. A trimmed reply on its own says nothing about
     timing, and an overlap on its own may have cost the Persona nothing.
+
+    The two ends are what a real trimmed Turn carries since the Redeanteil fix:
+    `persona_end_ms` is where the client stopped playing, `persona_dispatched_
+    end_ms` where the audio would have run to. Written with one end, as this
+    was, the fixture describes a Turn the orchestrator can no longer produce --
+    which is how a regression in exactly this measurement got through the
+    suite.
     """
     return [
         Turn(seq=1, persona_text="Guten Tag, ich rufe an wegen der offenen Rechnung ...",
-             persona_offset_ms=0, persona_end_ms=10_000, persona_interrupted=True),
+             persona_offset_ms=0, persona_end_ms=3_200, persona_dispatched_end_ms=10_000,
+             persona_interrupted=True),
         Turn(
             seq=2,
             user_text="Moment bitte",

@@ -11,6 +11,7 @@ the app. `roles` is still carried so a check can be added later without
 reshaping this.
 """
 
+import asyncio
 import logging
 import os
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ import httpx
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt.exceptions import PyJWKClientConnectionError
 
 logger = logging.getLogger(__name__)
 
@@ -101,12 +103,26 @@ def verify_token(token: str) -> AuthContext:
             algorithms=_ALGORITHMS,
             issuer=OIDC_ISSUER,
             audience=OIDC_AUDIENCE,
+            # PyJWT checks `exp` only when the claim is present, and requires
+            # nothing by default: a realm-signed token without one was a
+            # credential that never expired.
+            options={"require": ["exp"]},
         )
+    except (PyJWKClientConnectionError, httpx.HTTPError) as e:
+        # Before the PyJWTError branch, which this inherits from. A JWKS fetch
+        # that could not reach Keycloak is infrastructure, not the caller's
+        # token, and ADR 0009 says it must surface as a 5xx. Masked as a 401 it
+        # told every client its session had expired: `apiFetch` sends a 401 to
+        # the login screen, so a Keycloak outage looked exactly like every
+        # token in the pilot expiring at once. The comment that used to stand
+        # here claimed this already happened.
+        logger.error("JWKS unavailable, cannot verify tokens: %s", e)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "authentication backend unavailable"
+        ) from e
     except jwt.PyJWTError as e:
-        # Only token-level failures land here. A failed JWKS fetch (Keycloak
-        # down) raises something else and is left to 5xx on purpose — a 401 tells
-        # the client to retry, which can't help, and hides the outage among
-        # ordinary token-expiry 401s.
+        # Only token-level failures land here -- including a `kid` the realm
+        # does not know, which is the caller's problem and stays a 401.
         logger.warning("bearer token rejected: %s", e)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid or expired token") from e
 
@@ -130,7 +146,12 @@ async def require_user(
     Override it in tests via `app.dependency_overrides[require_user]`."""
     if credentials is None or not credentials.credentials:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing bearer token")
-    return verify_token(credentials.credentials)
+    # Off the event loop. Verifying a token is a synchronous HTTP round trip
+    # whenever the JWKS cache cannot answer -- and a token with a `kid` the
+    # cache does not hold forces a fresh fetch past it, which any caller can
+    # produce at will. The container runs a single worker, so that round trip
+    # stalled every call streaming audio on this loop (Q-03, ADR 0034).
+    return await asyncio.to_thread(verify_token, credentials.credentials)
 
 
 def authenticate_ws(message: dict) -> AuthContext | None:
@@ -141,7 +162,13 @@ def authenticate_ws(message: dict) -> AuthContext | None:
         return None
     try:
         return verify_token(token)
-    except HTTPException:
+    except HTTPException as e:
+        if e.status_code != status.HTTP_401_UNAUTHORIZED:
+            # An unreachable Keycloak is not a bad token, and answering the
+            # handshake with "Authentication required" would tell the User to
+            # log in again during an outage that logging in cannot fix
+            # (ADR 0009). Let it travel: the socket closes on the error instead.
+            raise
         return None
 
 

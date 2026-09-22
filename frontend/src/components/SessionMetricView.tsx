@@ -2,21 +2,15 @@ import { Link, useParams } from "react-router-dom";
 
 import { useStoredSession } from "../hooks/useStoredSession";
 import type { Finding, SessionTurn } from "../protocol";
-import { ROUTES, sessionPath } from "../routes";
-import { metricReading } from "../utils/metrics";
+import { ROUTES, progressMetricPath, sessionPath } from "../routes";
+import { comparableAcrossCalls, formatValue, metricReading } from "../utils/metrics";
 import { formatOffset } from "../utils/time";
 import { pairFor } from "../utils/segmentStats";
 import AppLayout from "./AppLayout";
 import IntonationReading from "./IntonationReading";
+import MetricEvidence from "./MetricEvidence";
 import MetricScale from "./MetricScale";
 import SegmentComparison from "./SegmentComparison";
-
-/** Counts read without decimals, everything else with one. The unit follows,
- *  except for "count", which the figure already is. */
-function formatFigure(value: number, unit: string | null): string {
-  const text = unit === "Anzahl" ? value.toFixed(0) : value.toFixed(1);
-  return unit && unit !== "Anzahl" ? `${text} ${unit}` : text;
-}
 
 /**
  * One metric of one training, in full (F-51's interruptions, F-35's intonation).
@@ -90,7 +84,7 @@ export default function SessionMetricView() {
       <div className="card">
         <p className="metric-page-figure">
           <span className={light ? `metric-value-${light}` : undefined}>
-            {formatFigure(measurement.value, measurement.unit)}
+            {formatValue(measurement.key, measurement.value, measurement.unit)}
           </span>
           {reading && (
             <span className="metric-light-label">
@@ -105,6 +99,23 @@ export default function SessionMetricView() {
         <MetricScale steps={steps} current={current} />
 
         {note && <p className="metric-note">{note}</p>}
+
+        {/* The way up. Everything else on this screen is about one call, and
+            "is it always like this?" is exactly the question somebody asks in
+            front of a figure — but until now the connection ran one way only:
+            the progress view linked down into a training and nothing led back.
+
+            Not for the loudness: its dB span is the recording's level, so it
+            is kept out of every cross-call view (`comparableAcrossCalls`), and
+            a link promising a course would promise the one thing that view
+            refuses to draw. */}
+        {comparableAcrossCalls(measurement.key) && (
+          <p className="metric-page-across">
+            <Link to={progressMetricPath(measurement.key)}>
+              Diese Kennzahl über alle Trainings ansehen
+            </Link>
+          </p>
+        )}
       </div>
 
       {metricKey === "intonation" && (
@@ -115,6 +126,12 @@ export default function SessionMetricView() {
           />
         </div>
       )}
+
+      {/* What the figure was read off: the words that were counted, the
+          passages that were found, the pauses that were measured. Every tile on
+          the wrap-up screen leads here now, so every page has to say more than
+          the tile did (see MetricEvidence.tsx). */}
+      <MetricEvidence measurement={measurement} turns={detail.turns} />
 
       {pair && (
         <>

@@ -29,7 +29,7 @@ const CAPTIONS = [
 /**
  * How long this screen waits before handing over regardless.
  *
- * `useSessionFeedback` polls for ten minutes (the worker's own timeout), which
+ * `useSessionFeedback` polls for ten minutes (twice the worker's own timeout), which
  * is the right patience for a block on a page and the wrong one for a screen
  * that holds nothing else: a wrap-up that takes that long is one the User
  * should be reading their transcript instead of waiting for. The poll is not
@@ -46,8 +46,8 @@ const WAIT_LIMIT_MS = 120_000;
  *
  * So the wait gets a screen of its own and something to watch. The animation
  * is the whole content — under `prefers-reduced-motion` the scene stands still
- * (see index.css) rather than being dropped, because unlike the die (F-62) or
- * the card turn (F-61) there is nothing behind it to skip to.
+ * (see index.css) rather than being dropped, because unlike the die (F-62)
+ * there is nothing behind it to skip to.
  *
  * It is never shown for a Session that was not stored: without consent there
  * is no wrap-up on the way (ADR 0066), and a wait for something that is not

@@ -5,7 +5,7 @@ import { useStoredSession } from "../hooks/useStoredSession";
 import type { FocusGoal, SessionSummary } from "../protocol";
 import { ROUTES, type TrainingStart } from "../routes";
 import { listScenarios, type ScenarioCard } from "../scenarioLibrary";
-import { mentionSummary } from "../utils/goalMentions";
+import { mentionSummary, statementsFor, type GoalStatement } from "../utils/goalMentions";
 import { PRACTICE_CATEGORY, PRACTICE_REASON } from "../utils/practiceRoutes";
 import { formatDayMonth } from "../utils/time";
 import InfoDetails from "./InfoDetails";
@@ -66,7 +66,7 @@ export default function ProgressPractice({
     return () => {
       cancelled = true;
     };
-  }, [target]);
+  }, [hasTarget]);
 
   if (!target || !source) return null;
 
@@ -76,6 +76,7 @@ export default function ProgressPractice({
   // what it is practised in. Silence is the honest answer, not a random call.
   if (category === undefined) return null;
 
+  const since = wordSince(sessions, target.goal, source);
   const personaId = detail?.persona_id ?? null;
   const followUp = detail?.follow_up ?? null;
   const suggestion = followUp
@@ -105,6 +106,28 @@ export default function ProgressPractice({
           Verbesserungspunkt genannt, zuletzt am {formatDayMonth(source.started_at) ?? source.started_at} im Gespräch
           „{source.scenario}“.
         </p>
+
+        {since && (
+          // The other half of Zimmerman's cycle. Until this existed the block
+          // only ever pointed forwards: it proposed a call, the user made it,
+          // and nothing on the screen ever referred back — so the dashboard
+          // served the reflection phase and led into planning without the
+          // planning ever being answered.
+          //
+          // Nothing is stored to do it and nothing is claimed by it. Two
+          // statements in the order they were written: the wrap-ups raised
+          // this, and afterwards a wrap-up said this. Whether the second
+          // follows from the first is not asserted anywhere — the user played
+          // whatever they played, and a sentence claiming their training
+          // caused it would be the measurement ADR 0080 refuses.
+          <p className="progress-practice-since">
+            <span className="progress-practice-chip">Seither</span>
+            In Ihrem Training am {formatDayMonth(since.at) ?? since.at} („{since.scenario}“)
+            stand dazu{" "}
+            {since.kind === "strength" ? "als Stärke" : "als Verbesserungspunkt"}:{" "}
+            <q>{since.text}</q>
+          </p>
+        )}
 
         <div className="progress-practice-offer">
           <div className="progress-practice-text">
@@ -168,6 +191,32 @@ function lastNaming(sessions: SessionSummary[], goal: string): SessionSummary | 
       session.feedback_goals.some((tag) => tag.kind === "improvement" && tag.goal === goal),
     ) ?? null
   );
+}
+
+/**
+ * What a wrap-up has said about this goal since the training the suggestion
+ * rests on, or null.
+ *
+ * Derived, never stored. The alternative was to remember that the button had
+ * been pressed — in `localStorage`, which would make the same account read
+ * differently on a laptop and at home, or in a column, which would make a UI
+ * preference into training data with a consent gate (ADR 0066) and an entry in
+ * `deletion.py`. Neither buys anything this does not: what matters is not that
+ * a button was pressed but that the wrap-ups have since had something to say.
+ *
+ * `statementsFor` is newest first, and `source` is by construction the newest
+ * training that named the goal as an improvement. So the newest statement is
+ * either from that same training — nothing has happened since — or from a
+ * later one, which is the case worth showing.
+ */
+function wordSince(
+  sessions: SessionSummary[],
+  goal: string,
+  source: SessionSummary,
+): GoalStatement | null {
+  const newest = statementsFor(sessions, [goal])[0];
+  if (!newest || newest.sessionId === source.session_id) return null;
+  return newest;
 }
 
 /**

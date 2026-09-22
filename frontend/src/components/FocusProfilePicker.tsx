@@ -3,7 +3,7 @@ import { CATEGORIES, CATEGORY_LABELS, type ScenarioCategory } from "../scenarioL
 
 /**
  * The role and the kinds of call a User takes (F-62) — what the Scenario
- * suggestions are made from. Shared by the first-run dialog and the profile.
+ * suggestions are made from. Shared by the first-run focus screen and the profile.
  *
  * Picking a role fills in the call types it usually means; they stay freely
  * adjustable, since a role is a guess about someone's work and they know better.

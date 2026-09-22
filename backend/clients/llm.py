@@ -136,6 +136,19 @@ async def stream_reply(
 # RQ job timeout.
 _MAX_FEEDBACK_TOKENS = 4000
 
+# And its own read timeout, longer than the client-wide TIMEOUT the live path
+# runs on. That one bounds the wait *between* streamed chunks; this call is not
+# streamed, so the whole document has to arrive inside it -- 4000 tokens plus a
+# thinking trace, which on the gateway's 4B model is minutes rather than
+# seconds. Under the shared 120 s the wrap-up would have been cut off on a busy
+# gateway and reported as a timeout, which is the opposite of what putting a
+# timeout there was for.
+#
+# Below `queue.JOB_TIMEOUT_S` (300 s) on purpose, and not imported from it: this
+# module must not depend on the queue. The request should give up inside the job
+# so the failure is recorded as one, rather than be killed with it.
+_FEEDBACK_TIMEOUT_S = 240.0
+
 
 async def complete(
     messages: list[dict[str, str]],
@@ -173,13 +186,24 @@ async def complete(
     caller: the boot check, which wants a single attempt so a 429 reports as a
     429 rather than as its own deadline expiring.
     """
+    # The thinking level belongs in this line for the reason config.py states:
+    # its floor belongs to the model, a value underneath it is an HTTP 400 that
+    # names no parameter, and this path is reached only from the worker -- so
+    # the log is the only place the pairing is ever visible. `stream_reply`
+    # logs it; this did not.
     logger.info(
-        "LLM completion (%s, max_tokens=%s, think=%s)...", LLM_FEEDBACK_MODEL, max_tokens, think
+        "LLM completion (%s, max_tokens=%s, think=%s, effort=%s)...",
+        LLM_FEEDBACK_MODEL, max_tokens, think,
+        _backend_kwargs(
+            think=think, qwen_sampling=think, presence_penalty=None
+        ).get("reasoning_effort", "-"),
     )
     client = LLM_CLIENT if retries is None else LLM_CLIENT.with_options(max_retries=retries)
     completion = await client.chat.completions.create(
         model=LLM_FEEDBACK_MODEL,
         messages=messages,
+        # Per request, overriding the client's own: see _FEEDBACK_TIMEOUT_S.
+        timeout=_FEEDBACK_TIMEOUT_S,
         **({"max_tokens": max_tokens} if max_tokens is not None else {}),
         # Thinking mode: Qwen3's documented sampling for it (a low temperature
         # there degrades into repetition). Non-thinking: low but not zero, so the
@@ -215,6 +239,22 @@ def _strip_reasoning(text: str) -> str:
 # So the unwrapping lives here, once, next to the call that produced the text.
 
 _FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
+
+
+# What a prompt asking for a JSON object has to forbid, word for word the same
+# wherever one does: the follow-up draft (F-60) and the reverse briefing (F-61)
+# carried two copies until they were found to be identical. Kept beside the
+# parser whose failures each rule prevents -- N2 above all, since one unescaped
+# double quote makes the whole answer unreadable to `json_object`.
+JSON_ANSWER_NEVER = (
+    "# Never\n"
+    "N1. No markdown, no headings, no bullet characters, no line breaks "
+    "inside the JSON strings.\n"
+    "N2. No straight double quote inside a string: forget the backslash in "
+    "front of one and the whole answer is unreadable. Use „ “ or single "
+    "quotes.\n"
+    "N3. No text of any kind before or after the JSON object.\n"
+)
 
 
 def json_object(raw: str) -> str:

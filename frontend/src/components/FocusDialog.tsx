@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import type { FocusChoice, FocusState } from "../protocol";
+import AppHeader from "./AppHeader";
 import FocusGoalPicker, { toggleGoal } from "./FocusGoalPicker";
 import FocusProfilePicker from "./FocusProfilePicker";
 
@@ -22,7 +23,7 @@ import FocusProfilePicker from "./FocusProfilePicker";
  * many are left and how to go on must not be a scroll away.
  *
  * Answerable later either way: the profile section changes the selection, and
- * the dialog says so, so nobody has to get this right on the first day.
+ * the screen says so, so nobody has to get this right on the first day.
  */
 export default function FocusDialog({
   focus,
@@ -34,11 +35,14 @@ export default function FocusDialog({
   saving: boolean;
 }) {
   const [selected, setSelected] = useState<string[]>(focus.selected);
-  const [profile, setProfile] = useState({ role: focus.role, categories: focus.categories });
+  const [profile, setProfile] = useState({
+    role: focus.role,
+    categories: focus.categories,
+  });
   const [failed, setFailed] = useState(false);
 
   // Awaited rather than fired and forgotten: a rejected promise would go
-  // unhandled and the dialog would sit there looking as if the click worked.
+  // unhandled and the screen would sit there looking as if the click worked.
   // Role and call types go with either button: "no focus" is about the goals.
   const submit = async (goals: string[]) => {
     setFailed(false);
@@ -50,78 +54,73 @@ export default function FocusDialog({
   };
 
   return (
-    <div
-      className="consent-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="focus-title"
-    >
-      <div className="consent-dialog focus-dialog">
-        <h1 id="focus-title">Worauf möchten Sie sich konzentrieren?</h1>
+    <div className="focus-onboarding">
+      <AppHeader />
 
-        <p>
-          Wählen Sie bis zu {focus.max_goals} Ziele. Auf diese Ziele schaut die Auswertung
-          danach besonders genau.
-        </p>
+      <main className="focus-onboarding-main">
+        <div className="focus-onboarding-intro">
+          <h1 id="focus-title">Worauf möchten Sie sich konzentrieren?</h1>
 
-        <p className="consent-highlight">
-          <strong>Alles andere wird weiterhin trainiert.</strong> Ein Fokus gewichtet nur, er
-          schaltet nichts ab.
-        </p>
+          <p>
+            Wählen Sie bis zu {focus.max_goals} Ziele. Auf diese Ziele schaut die Auswertung
+            danach besonders genau.
+          </p>
+        </div>
 
-        <FocusProfilePicker
-          roles={focus.roles}
-          role={profile.role}
-          categories={profile.categories}
-          disabled={saving}
-          onChange={setProfile}
-        />
+        <section
+          className="consent-dialog focus-dialog"
+          aria-labelledby="focus-title"
+        >
+          <p className="consent-highlight">
+            <strong>Alles andere wird weiterhin trainiert.</strong> Ein Fokus gewichtet nur, er
+            schaltet nichts ab.
+          </p>
 
-        <FocusGoalPicker
-          goals={focus.goals}
-          groups={focus.groups}
-          selected={selected}
-          max={focus.max_goals}
-          disabled={saving}
-          onToggle={(key) => setSelected((s) => toggleGoal(s, key, focus.max_goals))}
-        />
+          <FocusProfilePicker
+            roles={focus.roles}
+            role={profile.role}
+            categories={profile.categories}
+            disabled={saving}
+            onChange={setProfile}
+          />
 
-        {/* Sticky, so the tally and both answers stay in view over a list
-            that is taller than the viewport. */}
-        <div className="focus-actions-bar">
-          <div className="focus-tally">
-            <span className="focus-slots" aria-hidden="true">
-              {Array.from({ length: focus.max_goals }, (_, slot) => (
-                <span
-                  key={slot}
-                  className={
-                    "focus-slot" + (slot < selected.length ? " focus-slot-filled" : "")
-                  }
-                />
-              ))}
-            </span>
-            <span className="focus-count" aria-live="polite">
-              {selected.length} von {focus.max_goals} Zielen ausgewählt.
-              {selected.length >= focus.max_goals &&
-                " Wenn Sie tauschen möchten, wählen Sie zuerst ein Ziel ab."}
-            </span>
+          <FocusGoalPicker
+            goals={focus.goals}
+            groups={focus.groups}
+            selected={selected}
+            max={focus.max_goals}
+            disabled={saving}
+            onToggle={(key) => setSelected((s) => toggleGoal(s, key, focus.max_goals))}
+          />
+        </section>
+      </main>
+
+      {/* Kept outside the content card so the tally and both answers remain
+          available while the catalogue scrolls without covering the card's
+          lower edge or exposing the page background beneath it. */}
+      <div className="focus-actions-bar">
+        <div className="focus-actions-inner">
+          <div className="focus-actions-copy">
+            <div className="focus-tally">
+              <span className="focus-count" aria-live="polite">
+                {selected.length} von {focus.max_goals} Zielen ausgewählt.
+                {selected.length >= focus.max_goals &&
+                  " Wenn Sie tauschen möchten, wählen Sie zuerst ein Ziel ab."}
+              </span>
+            </div>
+
+            <p className="focus-bar-note">
+              Sie können Ihre Auswahl jederzeit im Profil ändern.
+            </p>
+
+            {failed && (
+              <p className="consent-error">
+                Ihre Auswahl konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.
+              </p>
+            )}
           </div>
 
-          {failed && (
-            <p className="consent-error">
-              Ihre Auswahl konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.
-            </p>
-          )}
-
           <div className="consent-actions">
-            <button
-              type="button"
-              className="consent-button consent-button-primary"
-              onClick={() => void submit(selected)}
-              disabled={saving || selected.length === 0}
-            >
-              {saving ? "Wird gespeichert …" : "Fokus übernehmen"}
-            </button>
             <button
               type="button"
               className="consent-button consent-button-secondary"
@@ -130,13 +129,19 @@ export default function FocusDialog({
             >
               Ohne Fokus fortfahren
             </button>
-          </div>
 
-          <p className="focus-bar-note">
-            Sie können Ihre Auswahl jederzeit im Profil ändern.
-          </p>
+            <button
+              type="button"
+              className="consent-button consent-button-primary"
+              onClick={() => void submit(selected)}
+              disabled={saving || selected.length === 0}
+            >
+              {saving ? "Wird gespeichert …" : "Fokus übernehmen"}
+            </button>
+          </div>
         </div>
       </div>
+
     </div>
   );
 }

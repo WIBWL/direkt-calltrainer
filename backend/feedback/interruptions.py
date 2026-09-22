@@ -13,12 +13,22 @@ Three things about this architecture shape the rules, and none of them is
 obvious from the timeline alone:
 
 * A Persona utterance's end is **modelled from the audio that was sent**, not
-  observed. The server never learns when the client finished playing, and a
-  barge-in does not shorten that window (`orchestrator._note_persona_audio`).
-  So "the Persona stopped within half a second" cannot be read off the data:
-  the window runs on regardless. What *is* observable is whether the reply was
-  trimmed back to the heard part, which is precisely the event of interest --
-  the Persona had more to say and did not get to say it.
+  observed. The server never learns when the client finished playing
+  (`orchestrator._note_persona_audio`). So "the Persona stopped within half a
+  second" cannot be read off the data: the window runs on regardless. What *is*
+  observable is whether the reply was trimmed back to the heard part, which is
+  precisely the event of interest -- the Persona had more to say and did not
+  get to say it.
+
+  A barge-in does shorten a Persona segment's `duration_ms`, which is the one
+  thing this list used to say it did not. That is F-53 counting heard speech
+  and nothing else (ADR 0035), and it is right -- but every figure here is
+  about the audio that was *sent*, so the classification reads
+  `dispatched_end_ms` instead. Read off the heard end, "how much the Persona
+  still had to say" becomes the delay between the user starting to speak and
+  the client's cut reaching the server: a few hundred milliseconds whatever the
+  reply's length, which is also what the empirical calibration below would then
+  have been measuring.
 * Short backchannels never reach the server at all. ADR 0036 raised the
   client's VAD threshold to 500 ms of sustained speech, and anything below that
   is absorbed in the browser. The backchannel rule below is therefore a second
@@ -193,13 +203,27 @@ class Segment:
     # user actually heard (ADR 0035). The single reliable trace that the
     # Persona had more to say.
     interrupted: bool = False
+    # How long this segment's audio would have run had nobody cut in. Equal to
+    # `duration_ms` on everything except a trimmed Persona reply; None where
+    # the caller does not know it, which falls back to the same.
+    dispatched_ms: int | None = None
 
     @property
     def end_ms(self) -> int:
-        """Where this segment stops. For a Persona segment that is the end of
-        the audio that was *sent*, not of what was heard (see the module
-        docstring)."""
+        """Where this segment stops being heard. On a trimmed Persona segment
+        that is the played position the client reported, not the end of the
+        audio (which is `dispatched_end_ms`)."""
         return self.offset_ms + self.duration_ms
+
+    @property
+    def dispatched_end_ms(self) -> int:
+        """Where this segment's audio would have stopped. What "the Persona
+        still had this much to say" is measured against, and the reason it is
+        a second field: `end_ms` was cut back to the heard part for F-53's
+        Redeanteil, and read from here that turned every remaining-audio figure
+        into the delay between the user starting to speak and the client's cut
+        arriving -- a few hundred milliseconds, whatever the reply's length."""
+        return self.offset_ms + (self.duration_ms if self.dispatched_ms is None else self.dispatched_ms)
 
 
 @dataclass(frozen=True)
@@ -274,13 +298,22 @@ class Report:
         Nothing in here enters the figure or the traffic light. It is what lets
         a reader weigh the count: how long the call ran, how many replies there
         were to cut into, and how much listening was audible.
+
+        The light itself is deliberately **not** in here. It is a reading, and
+        ADR 0091 says a reading is derived on every read: the two numbers behind
+        it are described in this module as invented working values meant to be
+        calibrated once the pilot has data, and a stored colour would survive
+        that calibration. It did, until this was removed -- a Session stored at
+        three interruptions kept `red` while the legend beside it, built from
+        the constants, put three in the yellow band. `backend/feedback/
+        readings.py` derives both colour and word from `hard_offsets_ms`, whose
+        length is exactly the count the light reads.
         """
         return {
             "persona_turns": self.persona_turns,
             "call_ms": self.call_ms,
             "soft_count": len(self.soft),
             "backchannel_count": len(self.backchannels),
-            "light": self.light.value,
             "hard_offsets_ms": [event.offset_ms for event in self.hard],
         }
 
@@ -294,13 +327,26 @@ class Report:
         that for themselves. It is deliberately not divided into the figure:
         that was tried and produced a scale on which one interruption was
         already the top step (see the note on the thresholds above).
+
+        Not stored with the measurement -- see `detail`. This property is the
+        live reading; `light_for` is the same rule for a count read back later.
         """
-        count = len(self.hard)
-        if count <= GREEN_MAX_COUNT:
-            return TrafficLight.GREEN
-        if count <= YELLOW_MAX_COUNT:
-            return TrafficLight.YELLOW
-        return TrafficLight.RED
+        return light_for(len(self.hard))
+
+
+def light_for(count: int) -> TrafficLight:
+    """Which step a count of hard interruptions lands on.
+
+    Beside the two constants, and the only place the comparison is written: the
+    live path reads it through `Report.light`, a stored Session through
+    `readings.py` on every read. Both go through here so a recalibration
+    reaches a call measured last month and one measured just now alike, which
+    is the whole of ADR 0091."""
+    if count <= GREEN_MAX_COUNT:
+        return TrafficLight.GREEN
+    if count <= YELLOW_MAX_COUNT:
+        return TrafficLight.YELLOW
+    return TrafficLight.RED
 
 
 def classify(timeline: tuple[Segment, ...]) -> Report:
@@ -318,7 +364,8 @@ def classify(timeline: tuple[Segment, ...]) -> Report:
         overlapped = _overlapped(user, persona)
         if overlapped is None:
             continue
-        remaining = overlapped.end_ms - user.offset_ms
+        # Against the dispatched end, never the heard one: see `Segment`.
+        remaining = overlapped.dispatched_end_ms - user.offset_ms
         events.append(Event(
             kind=_kind(user, overlapped, remaining),
             offset_ms=user.offset_ms,
@@ -339,8 +386,19 @@ def _overlapped(user: Segment, persona: list[Segment]) -> Segment | None:
     The last one, in the event of several: Persona windows are modelled from
     dispatched audio and can abut, and the user started inside the one that was
     still running.
+
+    Against the dispatched end, like `remaining_ms`. The question is whether the
+    Persona was still speaking when the user came in, and its window is the
+    audio that was sent. Measured against the *heard* end, a trimmed reply ends
+    a few hundred milliseconds after the user's start -- that is what trimmed it
+    -- and the two figures come off different clocks: the user's start is
+    derived from their recording's arrival minus its duration, carrying the
+    VAD's padding as error, while the heard end is the client's playback
+    position. When the error goes the wrong way the user's start falls just
+    outside the segment, the overlap is not found at all, and the hardest
+    interruptions are the ones that vanish.
     """
-    inside = [p for p in persona if p.offset_ms <= user.offset_ms < p.end_ms]
+    inside = [p for p in persona if p.offset_ms <= user.offset_ms < p.dispatched_end_ms]
     return inside[-1] if inside else None
 
 

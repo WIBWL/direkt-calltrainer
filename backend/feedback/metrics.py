@@ -37,30 +37,11 @@ _MS_PER_SECOND = 1000
 # on the string rather than each spelling it out.
 RUN_LENGTH_KEY = "run_length"
 
-# The text behind that metric's "i", kept beside the derivation it explains.
-# Plain German, no dashes: it is read by somebody who has just finished a call.
-RUN_LENGTH_EXPLANATION = (
-    "Gemessen wird, wie lange Sie am Stück sprechen, bevor Sie absetzen. Ihre "
-    "reine Sprechzeit geteilt durch die Anzahl Ihrer Sprechabschnitte. Als "
-    "Abschnitt zählt alles zwischen zwei Pausen ab einer Viertelsekunde "
-    "innerhalb einer Äußerung; eine längere Unterbrechung beendet die Äußerung "
-    "und taucht stattdessen in der Reaktionszeit auf. "
-    "Diese Zahl beschreibt als einzige hier das Sprechen selbst und nicht die "
-    "Stille dazwischen. Zwei Menschen können denselben Redefluss und dieselbe "
-    "mittlere Pausenlänge haben und trotzdem sehr verschieden klingen: der eine "
-    "spricht in Zwei-Wort-Häppchen, der andere in ganzen Sätzen. Genau das "
-    "steht hier. "
-    "Eine Einordnung gibt es bewusst nicht. In der Forschung hängt dieses Maß "
-    "eng damit zusammen, wie lebendig Zuhörer jemanden finden, enger sogar als "
-    "die Tonhöhenschwankung. Ein Zusammenhang ist aber kein Grenzwert, und es "
-    "ist nirgends belegt, ab wann ein Abschnitt zu kurz ist. Wie lang er sein "
-    "sollte, hängt außerdem vom Gespräch ab: wer zuhört und kurz bestätigt, "
-    "spricht zu Recht in kurzen Abschnitten. "
-    "Vergleichen Sie die Zahl deshalb nur mit Ihren eigenen anderen Gesprächen. "
-    "Weil wir schon ab einer Viertelsekunde trennen, fallen die Abschnitte "
-    "kürzer aus als in Veröffentlichungen zu diesem Maß, die meist später "
-    "trennen."
-)
+# The text behind this metric's "i" used to sit here. It moved to
+# `explanations.py` when twelve more were written -- this module is near
+# pylint's line ceiling, and the prose is read by a user while everything else
+# here is arithmetic.
+
 # Words, for rate denominators: letter runs, so punctuation and the digits STT
 # writes for numbers don't inflate the count.
 _WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
@@ -70,11 +51,13 @@ _SENTENCE_SPLIT_RE = re.compile(r"[.!]+")
 # The one metric the wrap-up reads as a course rather than as a figure, so
 # generator.py has to be able to pick it out of the inventory by name.
 LOUDNESS_KEY = "loudness"
-# The grid the stored curves are drawn at, matching acoustics.py's loudness
-# sampling so the two can be read side by side.
-LOUDNESS_INTERVAL_MS = 100
+# How many audible samples the dynamic range needs before it is a range rather
+# than the distance between two samples. See `_loudness`: below twenty the 5th
+# to 95th percentile trims nothing at all.
+_MIN_LOUDNESS_POINTS = 20
 
-# The pitch curve is stored at half of that, and does not share the grid.
+# The pitch curve is stored at half the loudness curve's 100 ms (acoustics.py's
+# sampling grid), and does not share that grid.
 #
 # Measured, on a synthetic contour with speech's own syllable rate: at 100 ms
 # the drawing turns into a sawtooth, because roughly 4 to 5 syllables a second
@@ -259,11 +242,27 @@ def _hesitations(call: Conversation) -> Measurement | None:
     """
     if not call.user_acoustics_complete or not call.pitch_per_turn:
         return None
-    found = [hold for turn in call.pitch_per_turn for hold in hesitations.holds(turn)]
+    # Kept with the utterance each one sits in, so the metric's page can quote
+    # the sentence rather than state a bare number. One located event per
+    # entry and no judgement about it, which is the shape `_pauses` and F-51's
+    # interruption offsets already store.
+    #
+    # `index` counts the user's utterances in the order they were spoken, which
+    # is the order `pitch_per_turn` holds them in and the order the stored
+    # transcript reads in. The two cannot drift apart here: a call with any
+    # utterance unmeasured returns above, before this runs.
+    found = [
+        {"turn": index, "start_ms": hold.start_ms, "duration_ms": hold.duration_ms}
+        for index, turn in enumerate(call.pitch_per_turn)
+        for hold in hesitations.holds(turn)
+    ]
     return Measurement(
         "hesitations",
         float(len(found)),
-        {"total_ms": sum(hold.duration_ms for hold in found)},
+        {
+            "total_ms": sum(int(hold["duration_ms"]) for hold in found),
+            "holds": found,
+        },
     )
 
 
@@ -283,18 +282,32 @@ def _opening(call: Conversation) -> Measurement | None:
     pack = _pack(call)
     if not pack or not call.user_turns:
         return None
-    first = call.user_turns[0][0]
-    found = {
-        "greeting": bool(pack.greeting_re.search(first)),
-        "name": bool(pack.self_intro_re.search(first)),
-        # Stored under its own key, so the screen can name the part checked.
-        ("concern" if call.reverse else "offer"): bool(
-            (pack.concern_re if call.reverse else pack.offer_re).search(first)
-        ),
-    }
+    found = opening_parts(call.user_turns[0][0], pack, reverse=call.reverse)
     return Measurement(
         "opening", float(sum(found.values())), found | {"pace_ratio": _opening_pace(call)}
     )
+
+
+def opening_parts(first_text: str, pack: LanguagePack, *, reverse: bool) -> dict[str, bool]:
+    """The three parts of an opening, found in the user's first utterance.
+
+    A function of its own for the reason `closing_parts` is one: it is what
+    `scripts/backfill_opening.py` runs over stored transcripts. The parts come
+    from words alone, so unlike the acoustic half of this metric they can reach
+    a call recorded before the patterns were what they are now -- which is not
+    hypothetical, the frames were widened once already after an opening that
+    said "hier ist die Anna" came back unrecognised.
+
+    Whoever rang decides the third part and nothing else (ADR 0070/0086).
+    """
+    return {
+        "greeting": bool(pack.greeting_re.search(first_text)),
+        "name": bool(pack.self_intro_re.search(first_text)),
+        # Stored under its own key, so the screen can name the part checked.
+        ("concern" if reverse else "offer"): bool(
+            (pack.concern_re if reverse else pack.offer_re).search(first_text)
+        ),
+    }
 
 
 def _opening_pace(call: Conversation) -> float | None:
@@ -403,7 +416,16 @@ def _pace(call: Conversation) -> Measurement | None:
     measurable = call.user_acoustics_complete and call.user_phonation_ms and _silence_found(call)
     if not words or not measurable:
         return None
-    return Measurement("pace", words * _MS_PER_MINUTE / call.user_phonation_ms)
+    # The two figures the rate is made of, so its page can show the division
+    # rather than the result alone. Both describe the whole call, like every
+    # other detail here: a tempo per Turn would be a statistic about one
+    # utterance, which is the thing ADR 0051 rules out and ADR 0081 took a
+    # narrow exception to only for facts that are never shown.
+    return Measurement(
+        "pace",
+        words * _MS_PER_MINUTE / call.user_phonation_ms,
+        {"words": words, "phonation_ms": call.user_phonation_ms},
+    )
 
 
 def _word_count(call: Conversation) -> Measurement | None:
@@ -425,12 +447,24 @@ def _reaction_time(call: Conversation) -> Measurement | None:
     """F-53. Average seconds between the Persona falling silent and the user
     starting to speak. The model's own thinking and speaking time falls outside
     this window by construction, so a slow gateway cannot read as hesitation."""
-    if not call.reactions_ms:
+    if not call.reactions:
         return None
+    gaps = [reaction.gap_ms for reaction in call.reactions]
     return Measurement(
         "reaction_time",
-        fmean(call.reactions_ms) / _MS_PER_SECOND,
-        {"longest_s": max(call.reactions_ms) / _MS_PER_SECOND, "count": len(call.reactions_ms)},
+        fmean(gaps) / _MS_PER_SECOND,
+        {
+            "longest_s": max(gaps) / _MS_PER_SECOND,
+            "count": len(gaps),
+            # Each silence with the reply it stood in front of, so the page can
+            # show the exchange instead of a bare average. Located events, the
+            # shape `_pauses` and F-51's interruption offsets already store --
+            # not a statistic per Turn, which ADR 0051 rules out.
+            "gaps": [
+                {"at_ms": reaction.at_ms, "duration_ms": reaction.gap_ms}
+                for reaction in call.reactions
+            ],
+        },
     )
 
 
@@ -527,20 +561,41 @@ def _run_length(call: Conversation) -> Measurement | None:
     if (not call.user_acoustics_complete or not call.user_turns or
             not _silence_found(call)):
         return None
-    runs = len(call.user_turns) + len(call.pauses)
-    if not call.user_phonation_ms:
+    return run_length_measurement(
+        call.user_phonation_ms, len(call.user_turns), len(call.pauses)
+    )
+
+
+def run_length_measurement(
+    phonation_ms: int, utterances: int, pauses: int
+) -> Measurement | None:
+    """The stored shape: mean run length in seconds, and the terms behind it.
+
+    A function of its own for the reason `closing_measurement` is one: it is
+    what `scripts/backfill_run_length.py` runs over stored Sessions. Everything
+    it divides was already stored by two other metrics, so ADR 0048's "a new
+    measurement starts the day it ships" does not bite -- and the script wrote
+    the division and the four detail keys out a second time until this existed,
+    where the two could have drifted with nothing to say so.
+
+    The guards that decide whether a call may be measured at all stay with the
+    deriver: they read the acoustics, which is what a stored Session no longer
+    has.
+    """
+    runs = utterances + pauses
+    if not runs or not phonation_ms:
         return None
     return Measurement(
         RUN_LENGTH_KEY,
-        call.user_phonation_ms / runs / _MS_PER_SECOND,
+        phonation_ms / runs / _MS_PER_SECOND,
         {
             "runs": runs,
-            "phonation_ms": call.user_phonation_ms,
+            "phonation_ms": phonation_ms,
             # The two terms of the denominator, because a call with many short
             # utterances and one with few interrupted ones reach the same run
             # count by different routes.
-            "utterances": len(call.user_turns),
-            "pause_count": len(call.pauses),
+            "utterances": utterances,
+            "pause_count": pauses,
         },
     )
 
@@ -550,7 +605,16 @@ def _loudness(call: Conversation) -> Measurement | None:
     presence, with the curve behind it. A range rather than a level, for the
     reason given on TurnAcoustics.loudness_db (ADR 0047)."""
     audible = sorted(v for v in call.loudness_db if v is not None)
-    if len(audible) < 3 or not _silence_found(call):
+    # Twenty points, because that is what it takes for the trim below to drop
+    # anything at all: at nineteen the margin rounds to zero and the "5th to
+    # 95th percentile" becomes the raw span between the two most extreme
+    # samples, which is the one thing a percentile is chosen to avoid. A single
+    # spike then decides the figure alone -- 24 dB reported where the trimmed
+    # span is 1.5 -- and it is shown as a measurement in dB on the tile and in
+    # the PDF, with nothing marking it as an estimate. Two seconds of audible
+    # speech; below that the metric is withheld, as `intonation._band` withholds
+    # its own band under the same number of frames.
+    if len(audible) < _MIN_LOUDNESS_POINTS or not _silence_found(call):
         return None
     margin = len(audible) // 20  # 5th to 95th percentile, ignoring the extremes
     return Measurement(
@@ -699,18 +763,53 @@ class _Band:
         return value - self.high if direction == _LOUDER else self.low - value
 
 
+def loudness_course(curve: Sequence[float | None]) -> dict | None:
+    """F-37's course as it is read: the smoothed line, the band it is read
+    against, and the at most two stretches that left it. None where there is too
+    little audible speech to say anything.
+
+    Derived on every read and never stored (ADR 0091), and served from here
+    rather than worked out again on the other side of the wire. It used to be:
+    this arithmetic existed a second time in `frontend/src/utils/loudness.ts`,
+    which drew the band on screen and into the PDF while this one put the same
+    call into a sentence for the wrap-up prompt. Two languages, one judgement,
+    nothing holding them together -- and the judgement is the whole of it, since
+    ADR 0051 declined to invent the norm a fixed dB threshold would need and
+    left the speaker's own samples as the only reference.
+    """
+    audible = sorted(value for value in curve if value is not None)
+    if len(audible) < _MIN_STRETCH_POINTS:
+        return None
+    band = _band(audible)
+    smoothed = _smooth(curve)
+    return {
+        "smoothed": smoothed,
+        "median": _percentile(audible, 0.5),
+        "low": band.low,
+        "high": band.high,
+        "stretches": [
+            {"direction": direction, "peak_index": peak}
+            for direction, peak in _find_stretches(smoothed, band)
+        ],
+    }
+
+
 def describe_loudness_course(curve: Sequence[float | None]) -> str:
     """F-37's curve as one sentence for the wrap-up prompt.
 
     Positions are thirds of the user's *own speaking time*, never a timestamp:
     `calls.conversation` concatenates their Turns and inserts nothing for the
     Persona's, so this clock and the transcript's do not agree.
+
+    The same reading the screen draws (`loudness_course` above), put into words:
+    a sentence and a drawing that disagreed about one call would be worse than
+    either alone.
     """
-    audible = sorted(value for value in curve if value is not None)
-    if len(audible) < _MIN_STRETCH_POINTS:
+    course = loudness_course(curve)
+    if course is None:
         return "Loudness course: too little audible speech to describe."
 
-    stretches = _find_stretches(_smooth(curve), _band(audible))
+    stretches = [(s["direction"], s["peak_index"]) for s in course["stretches"]]
     if not stretches:
         return (
             "Loudness course: even -- the user stayed inside their own usual range for "

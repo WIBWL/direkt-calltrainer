@@ -15,7 +15,7 @@ import httpx
 import pytest
 from sqlalchemy.orm import Session as DbSession
 
-from backend import retention
+from backend import deletion, retention
 from backend.db.models import (Feedback, RetentionPreference, Scenario, Session,
                                STATUS_COMPLETED, Turn)
 from backend.session.models import Turn as LiveTurn
@@ -231,9 +231,13 @@ async def test_the_retention_route_needs_a_token(api_client: httpx.AsyncClient) 
     assert response.status_code == 401
 
 
-def _reverse_of(db: DbSession, session_id: int) -> int:
+def _reverse_of(db: DbSession, session_id: int, created_at: datetime | None = None) -> int:
     """A reverse Scenario replaying that Session, shaped as reversals.py writes
-    one: no key, private, and a briefing derived from the call's own wrap-up."""
+    one: no key, private, and a briefing derived from the call's own wrap-up.
+
+    `created_at` because the sweep finds an orphaned reverse by its own age: its
+    origin is gone, so there is nothing else left to date it by.
+    """
     row = Scenario(
         key=None,
         title="Rollentausch",
@@ -248,6 +252,7 @@ def _reverse_of(db: DbSession, session_id: int) -> int:
         reverse=True,
         origin_session_id=session_id,
         reverse_brief={"goals": []},
+        **({"created_at": created_at} if created_at else {}),
     )
     db.add(row)
     db.flush()
@@ -304,4 +309,82 @@ def test_a_reverse_someone_still_plays_survives_the_sweep(
     removed = retention.sweep(db_session, now=NOW)
 
     assert removed == 1, "only the expired origin should go"
+    assert db_session.get(Scenario, reverse_id) is not None
+
+
+def test_a_spared_reverse_goes_once_nothing_plays_it_any_more(
+    db_session: DbSession, app_database: str  # pylint: disable=unused-argument
+) -> None:
+    """The second half of the promise the test above makes.
+
+    "Left for a later run: it goes when the younger Session expires too" was
+    never true. Every sweep found its candidates through `origin_session_id`,
+    which the first run had already nulled out by deleting the origin, so the
+    row was invisible to every run after it and the briefing -- German prose
+    from that person's own wrap-up -- outlived the period indefinitely
+    (ADR 0067/0070).
+    """
+    extern_id = persist(turns=TURNS, started_at=LONG_EXPIRED)
+    origin = db_session.query(Session).filter_by(extern_id=extern_id).one()
+    reverse_id = _reverse_of(db_session, origin.session_id, created_at=LONG_EXPIRED)
+    db_session.add(
+        Session(
+            extern_id=uuid.uuid4(),
+            subject_id=TEST_AUTH.sub,
+            persona_id=origin.persona_id,
+            scenario_id=reverse_id,
+            language_code=origin.language_code,
+            status=STATUS_COMPLETED,
+            started_at=JUST_INSIDE,
+        )
+    )
+    db_session.flush()
+
+    assert retention.sweep(db_session, now=NOW) == 1
+    assert db_session.get(Scenario, reverse_id) is not None, "still played, so still here"
+
+    # A year on, the younger Session has expired as well.
+    later = NOW + timedelta(days=365)
+
+    assert retention.sweep(db_session, now=later) == 1
+    assert db_session.get(Scenario, reverse_id) is None, "nothing plays it now"
+
+
+def test_a_reverse_whose_origin_was_deleted_by_hand_still_expires(
+    db_session: DbSession, app_database: str  # pylint: disable=unused-argument
+) -> None:
+    """Deleting a single training deliberately leaves its reverse behind: a
+    person is deciding about that one row and is told so.
+
+    That decision is about the row staying *now*, not about it never expiring.
+    With its origin gone the reverse had no link left for any sweep to find it
+    by, so "the six-month period applies to everyone" quietly stopped covering
+    it. It is found by its own age instead.
+    """
+    extern_id = persist(turns=TURNS, started_at=LONG_EXPIRED)
+    origin = db_session.query(Session).filter_by(extern_id=extern_id).one()
+    reverse_id = _reverse_of(db_session, origin.session_id, created_at=LONG_EXPIRED)
+
+    deletion.delete_session(db_session, TEST_AUTH.sub, extern_id)
+    db_session.flush()
+    assert db_session.get(Scenario, reverse_id) is not None, "the single delete keeps it"
+
+    retention.sweep(db_session, now=NOW)
+
+    assert db_session.get(Scenario, reverse_id) is None
+
+
+def test_a_young_orphaned_reverse_is_left_alone(
+    db_session: DbSession, app_database: str  # pylint: disable=unused-argument
+) -> None:
+    """Age is the test, not orphanhood. A reverse written last week whose origin
+    the User deleted yesterday is inside the period like anything else."""
+    extern_id = persist(turns=TURNS, started_at=JUST_INSIDE)
+    origin = db_session.query(Session).filter_by(extern_id=extern_id).one()
+    reverse_id = _reverse_of(db_session, origin.session_id, created_at=JUST_INSIDE)
+
+    deletion.delete_session(db_session, TEST_AUTH.sub, extern_id)
+    db_session.flush()
+    retention.sweep(db_session, now=NOW)
+
     assert db_session.get(Scenario, reverse_id) is not None

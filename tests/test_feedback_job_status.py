@@ -33,7 +33,7 @@ from backend.clients import llm
 from backend.db.models import AnalysisJob, Feedback, Session
 from backend.feedback import jobs
 from backend.feedback.generator import generate_feedback
-from backend.feedback.queue import JOB_TIMEOUT_S
+from backend.feedback.jobs import JOB_TIMEOUT_S
 from backend.session.models import Turn
 from tests.conftest import persist
 
@@ -379,3 +379,161 @@ def test_a_call_with_nothing_in_it_is_summarised_without_the_model(
     assert feedback.points == []
     assert feedback.phase_language is None
     assert _job(db_session, session_id).status == "done"
+
+
+# --- Whether a job may still be working (no database) ----------------------
+
+def _in_memory_job(status: str, age_s: float | None = 5, naive: bool = False) -> AnalysisJob:
+    """One job row, in memory. `age_s` None leaves it without a timestamp."""
+    if age_s is None:
+        return AnalysisJob(status=status, updated_at=None)
+    moved = datetime.now(UTC) - timedelta(seconds=age_s)
+    return AnalysisJob(status=status, updated_at=moved.replace(tzinfo=None) if naive else moved)
+
+
+@pytest.mark.parametrize("status", ["done", "failed"])
+def test_a_finished_job_is_not_working(status: str) -> None:
+    """Terminal either way: nothing will move it again."""
+    assert not jobs.is_live(_in_memory_job(status), include_queued=True)
+    assert not jobs.is_live(_in_memory_job(status), include_queued=False)
+
+
+def test_a_queued_job_is_working_only_for_a_caller_that_asked_about_queued() -> None:
+    """The one thing the two readers differ on, as a parameter rather than as a
+    second copy: a reader showing a status must not call a waiting job
+    abandoned, and a writer about to queue a second one must not call it idle."""
+    assert jobs.is_live(_in_memory_job("queued"), include_queued=True)
+    assert not jobs.is_live(_in_memory_job("queued"), include_queued=False)
+
+
+@pytest.mark.parametrize(
+    ("age_s", "live"), [(5, True), (JOB_TIMEOUT_S - 1, True), (JOB_TIMEOUT_S + 60, False)]
+)
+def test_a_running_job_is_believed_only_inside_the_window(age_s: float, live: bool) -> None:
+    """Past the timeout that bounds a job's run, the worker holding it is gone."""
+    assert jobs.is_live(_in_memory_job("running", age_s), include_queued=False) is live
+
+
+def test_a_naive_timestamp_is_read_as_utc_rather_than_raising() -> None:
+    """Comparing an aware and a naive datetime raises, and this is read while
+    serving a Session: a 500 here would cost the User a wrap-up that exists.
+    The read side coerced, the script would have raised -- one of the two
+    divergences that came of answering this question twice."""
+    assert jobs.is_live(_in_memory_job("running", 5, naive=True), include_queued=False)
+    assert not jobs.is_live(_in_memory_job("running", JOB_TIMEOUT_S + 60, naive=True), include_queued=False)
+
+
+def test_a_job_without_a_timestamp_is_not_working() -> None:
+    """Nothing can be said about its age. The script guarded against this and
+    the read side did not; the guard is now on both."""
+    assert not jobs.is_live(_in_memory_job("running", None), include_queued=True)
+
+
+# --- Asking for a wrap-up again (POST /api/sessions/{extern_id}/feedback) ----
+#
+# The state these cover used to be a dead end on screen: a failed wrap-up was
+# one sentence and no way out, while the work was still possible -- it is
+# written from the stored Transcript and Measurements, never from audio
+# (ADR 0048/0049). The only route back ran inside the container.
+
+
+def _queue_spy(monkeypatch, fail: bool = False) -> list[int]:
+    """Replace the enqueue so no Redis is needed; returns what it was given."""
+    from backend.feedback import queue  # pylint: disable=import-outside-toplevel
+
+    taken: list[int] = []
+
+    def enqueue(session_id: int) -> None:
+        if fail:
+            raise ConnectionError("no redis")
+        taken.append(session_id)
+
+    monkeypatch.setattr(queue, "enqueue_feedback", enqueue)
+    return taken
+
+
+async def test_a_failed_wrapup_can_be_asked_for_again(
+    api_client: httpx.AsyncClient, db_session: DbSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The point of the route: the Session is put back on the queue and its row
+    says so, so the screen stops showing a failure and starts polling again."""
+    extern_id = _store()
+    session_id = db_session.query(Session).one().session_id
+    jobs.mark_failed(session_id, "gateway down")
+    taken = _queue_spy(monkeypatch)
+
+    response = await api_client.post(f"/api/sessions/{extern_id}/feedback")
+
+    assert response.status_code == 202
+    assert response.json()["status"] == "queued"
+    assert taken == [session_id]
+    assert _job(db_session, session_id).status == "queued"
+
+
+async def test_a_session_that_already_has_a_wrapup_is_refused(
+    api_client: httpx.AsyncClient, db_session: DbSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`feedback.session_id` is UNIQUE, so a second job would write nothing and
+    be recorded as failed for a Session the User can already read."""
+    extern_id = _store()
+    session_id = db_session.query(Session).one().session_id
+    # `created_at` has a Python-side default only (no server_default), and a
+    # row built by hand here has to name it — see CLAUDE.md on column defaults.
+    db_session.add(
+        Feedback(session_id=session_id, summary=_SUMMARY, created_at=datetime.now(UTC))
+    )
+    db_session.commit()
+    taken = _queue_spy(monkeypatch)
+
+    response = await api_client.post(f"/api/sessions/{extern_id}/feedback")
+
+    assert response.status_code == 409
+    assert not taken
+
+
+async def test_a_job_that_may_still_be_working_is_refused(
+    api_client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Session is written with a queued job (ADR 0034). Two jobs would race
+    for the same row, which is the defect `requeue_feedback.py` was corrected
+    for -- and this route asks the same question it does."""
+    extern_id = _store()
+    taken = _queue_spy(monkeypatch)
+
+    response = await api_client.post(f"/api/sessions/{extern_id}/feedback")
+
+    assert response.status_code == 409
+    assert not taken
+
+
+async def test_someone_elses_session_is_a_404_like_everywhere(
+    api_client: httpx.AsyncClient, db_session: DbSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Absent and not-yours are the same answer (ADR 0031/0050): a 403 would
+    confirm the id exists, which is what the unguessable id withholds."""
+    extern_id = _store()
+    session = db_session.query(Session).one()
+    session.subject_id = "somebody-else"
+    db_session.commit()
+    taken = _queue_spy(monkeypatch)
+
+    assert (await api_client.post(f"/api/sessions/{extern_id}/feedback")).status_code == 404
+    assert (await api_client.post(f"/api/sessions/{uuid.uuid4()}/feedback")).status_code == 404
+    assert not taken
+
+
+async def test_an_unreachable_queue_leaves_the_row_where_it_was(
+    api_client: httpx.AsyncClient, db_session: DbSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Moving the row to `queued` with nothing behind it is the exact state
+    `requeue_feedback.py` exists to repair -- the screen would show a spinner
+    that never ends instead of the failure it already showed."""
+    extern_id = _store()
+    session_id = db_session.query(Session).one().session_id
+    jobs.mark_failed(session_id, "gateway down")
+    _queue_spy(monkeypatch, fail=True)
+
+    response = await api_client.post(f"/api/sessions/{extern_id}/feedback")
+
+    assert response.status_code == 503
+    assert _job(db_session, session_id).status == "failed"

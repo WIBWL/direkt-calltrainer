@@ -52,7 +52,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # scripts/stress_db.py` without PYTHONPATH -- the same shape as
 # scripts/seed_reference_data.py.
 # pylint: disable=wrong-import-position,import-outside-toplevel
-from backend import library  # noqa: E402
+from backend import consent, library  # noqa: E402
 from backend.feedback.acoustics import Pause  # noqa: E402
 from backend.session.models import Turn  # noqa: E402
 
@@ -152,9 +152,22 @@ def provision(url: str, pool_size: int) -> None:
         command.upgrade(Config(os.path.join(PROJECT_ROOT, "alembic.ini")), "head")
         with db_session.session_scope() as db:
             seed(db)
+            for index in range(SUBJECTS):
+                consent.record_decision(db, subject(index), True)
 
 
 # --- Synthetic load -------------------------------------------------------
+
+# The writes are spread over this many synthetic subjects, each of whom has
+# granted consent in `provision` -- without it `persist_session` refuses every
+# write (ADR 0066) and the run would time nothing but refusals.
+SUBJECTS = 50
+
+
+def subject(index: int) -> str:
+    """The synthetic subject the `index`-th Session is written under."""
+    return f"stress-{index % SUBJECTS:03d}"
+
 
 _SENTENCES = (
     "Guten Tag, vielen Dank fuer Ihren Anruf bei uns im Support.",
@@ -265,7 +278,7 @@ def write_load(
 ) -> tuple[Samples, list[uuid.UUID]]:
     """`total` finished Sessions written concurrently through persist_session --
     the real transaction, including its Measurement rows and its queued job."""
-    from backend.session.persistence import persist_session
+    from backend.session.persistence import FinishedCall, persist_session
 
     samples = Samples(f"{label}  persist_session  ({workers} threads)")
     written: list[uuid.UUID] = []
@@ -282,17 +295,22 @@ def write_load(
         extern_id = uuid.uuid4()
         turns = synthetic_turns(turns_per_session, rng)
         with timed(samples):
-            persist_session(
+            stored = persist_session(FinishedCall(
                 extern_id=extern_id,
-                subject_id=f"stress-{index % 50:03d}",
+                subject_id=subject(index),
                 persona=personas[index % len(personas)],
                 scenario=scenarios[index % len(scenarios)],
                 turns=turns,
                 started_at=datetime.now(UTC) - timedelta(minutes=3),
                 reason="completed",
-            )
-        with lock:
-            written.append(extern_id)
+            ))
+            # A refusal is not an exception, so without this the run reported
+            # a throughput made of nothing but consent refusals, and read back
+            # Sessions that were never written.
+            if stored is None:
+                raise RuntimeError(f"persist_session stored nothing for {subject(index)}")
+            with lock:
+                written.append(extern_id)
 
     start = time.perf_counter()
     with ThreadPoolExecutor(max_workers=workers) as pool:

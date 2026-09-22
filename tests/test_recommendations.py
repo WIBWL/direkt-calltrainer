@@ -10,10 +10,15 @@ Covers:
 
 The scoring is a pure function over plain values; one test runs the listing.
 """
+from pathlib import Path
+
 import httpx
 import pytest
 
+from backend.db.seed_data import FOCUS_GOALS
+from backend.feedback.generator import _NEVER_ASSIGNED
 from backend.recommendations import (
+    GOAL_CATEGORIES,
     MAX_RECOMMENDATIONS,
     Candidate,
     Choices,
@@ -165,3 +170,83 @@ async def test_an_unknown_scenario_has_no_next(api_client: httpx.AsyncClient) ->
     )
 
     assert response.status_code == 404
+
+
+PRACTICE_ROUTES_TS = (
+    Path(__file__).resolve().parent.parent /
+    "frontend" / "src" / "utils" / "practiceRoutes.ts"
+)
+
+
+def _practice_category() -> dict[str, str | None]:
+    """The progress view's goal -> call type table, as written in the source.
+
+    Read out of the source rather than executed, the way `test_metrics.py`
+    reads the metric catalogue: there is no Node in the pytest run.
+    """
+    text = PRACTICE_ROUTES_TS.read_text(encoding="utf-8")
+    body = text.split("export const PRACTICE_CATEGORY", 1)[1].split("= {", 1)[1]
+    body = body.split("\n};", 1)[0]
+    table: dict[str, str | None] = {}
+    for line in body.splitlines():
+        line = line.strip()
+        if not line or line.startswith("//"):
+            continue
+        key, _, value = line.partition(":")
+        value = value.strip().rstrip(",").strip()
+        table[key.strip()] = None if value == "null" else value.strip('"')
+    return table
+
+
+def test_the_practice_offer_uses_the_first_kind_of_call_on_the_goal_s_row() -> None:
+    """Where a focus goal is practised is one editorial judgement, written on
+    the goal's own row (`practised_in` in `seed_data.FOCUS_GOALS`). The library
+    suggests every kind named there; the progress view's single practice offer
+    (`practiceRoutes.ts`) has to pick one, and it picks the first.
+
+    The two had drifted, so a User who picked Einwandbehandlung was sent to a
+    closing call on the setup screen and to a pricing call on the progress view,
+    and composure to different sets. The frontend copy exists because the
+    catalogue it would otherwise read does not travel with this judgement; this
+    holds it to the row.
+    """
+    practice = _practice_category()
+    assert practice, "PRACTICE_CATEGORY parsed as empty; has its shape changed?"
+
+    for goal in FOCUS_GOALS:
+        if goal["group"] == "habit":
+            continue
+        practised_in = goal.get("practised_in") or ()
+        expected = practised_in[0] if practised_in else None
+        assert practice.get(goal["id"], "missing") == expected, (
+            f"{goal['id']} is practised in {practised_in or 'no kind of call'} on its "
+            f"row, but PRACTICE_CATEGORY says {practice.get(goal['id'], 'nothing')}"
+        )
+
+    assert set(GOAL_CATEGORIES) == {g["id"] for g in FOCUS_GOALS if g.get("practised_in")}
+
+
+def test_every_goal_the_wrap_up_can_name_has_somewhere_to_practise_it() -> None:
+    """The practice block turns the most-named improvement into one call to make
+    (dashboard concept, section 5.E). A goal absent from the table yields no
+    suggestion at all -- deliberate, so that adding a catalogue goal forces
+    somebody to decide what it is practised in.
+
+    Deliberate only while somebody notices. The check above holds the table
+    against the library's; this one holds it against the catalogue, which is
+    where a goal is actually added. Without it the block simply falls silent for
+    whoever picked the new goal, on the one part of the screen that leads back
+    into training.
+
+    The two habit goals are excluded on the same ground the generator excludes
+    them: they are about how often somebody trains, so they are never named in a
+    wrap-up and can never be the improvement this block answers.
+    """
+    practice = _practice_category()
+    assignable = {goal["id"] for goal in FOCUS_GOALS} - set(_NEVER_ASSIGNED)
+
+    missing = assignable - set(practice)
+    assert not missing, (
+        f"{sorted(missing)} can be named as an improvement but has no entry in "
+        f"PRACTICE_CATEGORY, so the practice block stays empty for it"
+    )

@@ -1,30 +1,27 @@
 import { formatClock } from "./time";
 
 /**
- * The reading behind F-37's loudness course: the curve with its jitter taken
- * out, the band drawn from the call's own samples, and the at most two
- * stretches that left it.
+ * The reading behind F-37's loudness course, as the server derived it, plus the
+ * arithmetic of drawing it.
  *
- * Pure arithmetic, deliberately kept out of the component that used to own it:
- * the course is drawn twice now — as SVG on the feedback page
- * (`LoudnessCourse.tsx`) and into the downloadable report
- * (`utils/feedbackPdf.ts`) — and the two saying different things about the same
- * call would be worse than either being absent. The drawing is each renderer's
- * own; every number they draw comes from here.
+ * What is *read* off the curve — the band from the call's own samples, the
+ * smoothing, the at most two stretches that left the band — is derived on every
+ * read by `backend/feedback/readings.py` and arrives in the Measurement's
+ * detail (ADR 0091). It used to be computed here as well, in a second
+ * implementation in a second language, while the backend computed the same
+ * thing to put one sentence about it into the wrap-up prompt. The two agreed by
+ * care alone: a drawing that marked no quieter stretch under a sentence that
+ * named one would have been nobody's fault in particular.
+ *
+ * What stays here is what the server has no business knowing: the extent of the
+ * plot, where the line breaks for a silence, the clock under the axis, and the
+ * words for a reader who cannot see it. The course is drawn twice — as SVG on
+ * the feedback page (`LoudnessCourse.tsx`) and into the downloadable report
+ * (`utils/feedbackPdf.ts`) — so those stay shared too.
  */
 
 /** acoustics.py's `_SAMPLE_INTERVAL_MS` — the curve's only time base. */
-export const MS_PER_POINT = 100;
-/** Moving-average window, 1 s: syllables and word stress average out, a real
- * shift in level survives. */
-const SMOOTH_POINTS = 10;
-/** How long a departure has to hold (2 s) to be marked. Below that it is
- * delivery, not a change in how the call was conducted. */
-const MIN_STRETCH_POINTS = 20;
-/** How far outside the call's own spread a stretch has to sit, in multiples of
- * it. Self-referential on purpose — ADR 0051 declined to invent the norms a
- * fixed dB threshold would need. */
-const DEVIATION = 2;
+const MS_PER_POINT = 100;
 /** The longest silence the line is drawn through (2 s); see `loudnessRuns`. */
 const BRIDGE_POINTS = 20;
 
@@ -59,33 +56,54 @@ export interface LoudnessCurve {
   total: string;
 }
 
-/** The reading, or null where there is nothing to read: a curve with fewer
- * than two audible samples has no course. */
-export function analyseLoudness(values: (number | null)[]): LoudnessCurve | null {
+/** One stretch as the wire names it (ADR 0057: English, snake_case). */
+interface ServedStretch {
+  direction: LoudnessDirection;
+  peak_index: number;
+}
+
+interface ServedCourse {
+  smoothed: (number | null)[];
+  median: number;
+  low: number;
+  high: number;
+  stretches: ServedStretch[];
+}
+
+/**
+ * The course in one loudness Measurement's served detail, or null where there
+ * is none to draw:
+ * a Session stored before this was served, or a call with too little audible
+ * speech for the server to read anything off.
+ *
+ * The plot's extent is worked out here rather than served: the floor, the
+ * ceiling and the point count are the raw curve's own, and scaling a drawing is
+ * not a judgement about the call.
+ */
+export function loudnessCourse(detail: Record<string, unknown> | null): LoudnessCurve | null {
+  const values = detail?.["curve_db"] as (number | null)[] | undefined;
+  const course = detail?.["course"] as ServedCourse | undefined;
+  if (!values || !course) return null;
+
   const audible = values.filter((value): value is number => value !== null);
   if (audible.length < 2) return null;
 
-  const sorted = [...audible].sort((a, b) => a - b);
-  const median = percentile(sorted, 0.5);
-  const spread = robustSpread(sorted, median);
-
-  const floor = sorted.reduce((least, value) => Math.min(least, value), Infinity);
-  const ceiling = sorted.reduce((most, value) => Math.max(most, value), -Infinity);
-
-  const smoothed = smooth(values);
-  const low = median - DEVIATION * spread;
-  const high = median + DEVIATION * spread;
+  const floor = Math.min(...audible);
+  const ceiling = Math.max(...audible);
 
   return {
-    smoothed,
+    smoothed: course.smoothed,
     points: values.length,
-    median,
-    low,
-    high,
+    median: course.median,
+    low: course.low,
+    high: course.high,
     floor,
     ceiling,
     span: ceiling - floor || 1,
-    stretches: findStretches(smoothed, low, high),
+    stretches: course.stretches.map((stretch) => ({
+      direction: stretch.direction,
+      peakIndex: stretch.peak_index,
+    })),
     total: formatClock((values.length * MS_PER_POINT) / 1000),
   };
 }
@@ -135,105 +153,4 @@ export function describeLoudness(curve: LoudnessCurve): string {
 /** Where on the user's own speaking clock a point sits. */
 export function loudnessClock(index: number): string {
   return formatClock((index * MS_PER_POINT) / 1000);
-}
-
-/**
- * The width the band is built from. Kept in step with `_band` in
- * backend/feedback/metrics.py, which the wrap-up is written from — the two
- * disagreeing would put a sentence about a quieter stretch above a chart that
- * marks none.
- *
- * Median absolute deviation, not a percentile band: a stretch covering a third
- * of the call *is* the tenth percentile, so a percentile band goes blind to the
- * long shifts that matter most. Zero falls back to the mean deviation, which
- * vanishes only for a constant curve.
- */
-function robustSpread(sorted: number[], median: number): number {
-  const deviations = sorted.map((value) => Math.abs(value - median)).sort((a, b) => a - b);
-  const middle = percentile(deviations, 0.5);
-  if (middle > 0) return middle;
-  return deviations.reduce((sum, value) => sum + value, 0) / (deviations.length || 1);
-}
-
-/** Linear-interpolated percentile of an already sorted series. */
-function percentile(sorted: number[], fraction: number): number {
-  const at = (sorted.length - 1) * fraction;
-  const below = sorted[Math.floor(at)] ?? 0;
-  const above = sorted[Math.ceil(at)] ?? below;
-  return below + (above - below) * (at - Math.floor(at));
-}
-
-/** The curve with the jitter taken out. A window more than half silent yields
- * no value — its average would be the edge of the silence, not a spoken level. */
-function smooth(values: (number | null)[]): (number | null)[] {
-  const half = Math.floor(SMOOTH_POINTS / 2);
-  return values.map((_, index) => {
-    let sum = 0;
-    let count = 0;
-    for (let i = Math.max(0, index - half); i <= Math.min(values.length - 1, index + half); i++) {
-      const value = values[i];
-      if (value !== null && value !== undefined) {
-        sum += value;
-        count += 1;
-      }
-    }
-    return count >= half ? sum / count : null;
-  });
-}
-
-/**
- * At most one stretch per direction, the one that departed furthest over its
- * length: one marker each reads as "here it moved" rather than as a scatter of
- * every wobble.
- *
- * A call held evenly yields none — the band comes from its own samples, so a
- * steady speaker never leaves it. A flat call must not be given a variation.
- */
-function findStretches(
-  smoothed: (number | null)[],
-  low: number,
-  high: number,
-): LoudnessStretch[] {
-  const marked: (LoudnessDirection | null)[] = smoothed.map((value) => {
-    if (value === null) return null;
-    if (value > high) return "louder";
-    if (value < low) return "quieter";
-    return null;
-  });
-
-  const best: Partial<Record<LoudnessDirection, { deviation: number; peakIndex: number }>> = {};
-  let index = 0;
-  while (index < marked.length) {
-    const direction = marked[index];
-    if (!direction) {
-      index += 1;
-      continue;
-    }
-    let end = index;
-    while (end < marked.length && marked[end] === direction) end += 1;
-
-    if (end - index >= MIN_STRETCH_POINTS) {
-      let deviation = 0;
-      let peak = 0;
-      let peakIndex = index;
-      for (let i = index; i < end; i++) {
-        const value = smoothed[i];
-        if (value === null || value === undefined) continue;
-        const distance = direction === "louder" ? value - high : low - value;
-        deviation += distance;
-        if (distance > peak) {
-          peak = distance;
-          peakIndex = i;
-        }
-      }
-      const current = best[direction];
-      if (!current || deviation > current.deviation) best[direction] = { deviation, peakIndex };
-    }
-    index = end;
-  }
-
-  return (["louder", "quieter"] as const).flatMap((direction) => {
-    const found = best[direction];
-    return found ? [{ direction, peakIndex: found.peakIndex }] : [];
-  });
 }

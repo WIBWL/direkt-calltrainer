@@ -23,6 +23,7 @@ import logging
 import pytest
 
 from backend.clients import stt
+from backend.personas import PersonaVoice
 
 SPOKEN = "Mein Name ist Alice Example und ich rufe wegen Vertrag 4711 an."
 
@@ -144,3 +145,86 @@ def test_the_switch_is_off_unless_it_is_set(monkeypatch) -> None:
     finally:
         monkeypatch.delenv("LOG_TRANSCRIPTS", raising=False)
         importlib.reload(config)
+
+
+# --- The other half of the pipeline -----------------------------------------
+#
+# The switch is one rule for the whole pipeline, and until now only the STT leg
+# was pinned to it. The TTS leg logged the Persona's line unconditionally, once
+# per chunk, so the whole Persona side of every call went into the file with the
+# switch off -- while `config.py` promised that off means "how long an utterance
+# was and nothing about what was in it". It is generated text rather than
+# recorded speech, but it carries the name and the facts the user has just said
+# back to them, and the file is outside every deletion path all the same.
+
+SPOKEN_BY_PERSONA = "Guten Tag Frau Example, es geht um Vertrag 4711."
+_VOICE = PersonaVoice(tts_voice="alloy", kugelaudio_voice_id="1")
+
+
+class _Chunk:
+    """Stands in for kugelaudio.models.AudioChunk (matched by isinstance)."""
+
+    def __init__(self) -> None:
+        self.audio = b"\x00\x01" * 100
+        self.sample_rate = 24000
+
+
+class _StreamingTTS:
+    """One chunk of audio and the `final` frame, so nothing is reset."""
+
+    async def stream_async(self, **_kwargs):
+        """The pooled streaming request."""
+        yield _Chunk()
+        yield {"final": True}
+
+    async def connect_async(self, _model="kugel-3"):
+        """The re-warm's call, so its background task finishes quietly."""
+
+    async def _close_ws_connection(self):
+        """The reset's call."""
+
+
+@pytest.fixture
+def tts_logged(monkeypatch):
+    """Everything `tts` logs while synthesizing one chunk through KugelAudio."""
+    from backend.clients import tts  # pylint: disable=import-outside-toplevel
+
+    monkeypatch.setattr(tts, "SKIP_KUGELAUDIO", False)
+    monkeypatch.setattr(tts, "AudioChunk", _Chunk)
+    monkeypatch.setattr(tts, "KUGELAUDIO_CLIENT", type("C", (), {"tts": _StreamingTTS()})())
+    recorder = _Recorder()
+    tts.logger.addHandler(recorder)
+    previous = tts.logger.level
+    tts.logger.setLevel(logging.DEBUG)
+    try:
+        yield tts, recorder
+    finally:
+        tts.logger.removeHandler(recorder)
+        tts.logger.setLevel(previous)
+
+
+async def test_the_persona_line_does_not_reach_the_log_by_default(tts_logged, monkeypatch) -> None:
+    """One chunk synthesized with the switch off says how much was spoken and
+    not a word of it."""
+    tts, logged = tts_logged
+    monkeypatch.setattr(tts, "LOG_TRANSCRIPTS", False)
+
+    async for _piece in tts.synthesize_stream(SPOKEN_BY_PERSONA, _VOICE, "de"):
+        pass
+
+    assert logged.messages, "nothing was captured — the test would pass vacuously"
+    assert SPOKEN_BY_PERSONA not in logged.text
+    assert "Example" not in logged.text and "4711" not in logged.text
+    assert str(len(SPOKEN_BY_PERSONA)) in logged.text, "the length still says what was synthesized"
+
+
+async def test_the_persona_line_is_logged_when_it_is_asked_for(tts_logged, monkeypatch) -> None:
+    """The switch has to actually switch, or the test above would pass against
+    a line that was simply deleted."""
+    tts, logged = tts_logged
+    monkeypatch.setattr(tts, "LOG_TRANSCRIPTS", True)
+
+    async for _piece in tts.synthesize_stream(SPOKEN_BY_PERSONA, _VOICE, "de"):
+        pass
+
+    assert SPOKEN_BY_PERSONA in logged.text

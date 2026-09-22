@@ -152,9 +152,10 @@ async def test_a_session_is_not_stored_without_consent(
     """The one that matters. Persisting is guarded at the point of writing, so
     a subject who never agreed leaves no stored record of their call.
 
-    Driven through `_record`, the WebSocket layer's own write path, rather than
-    through `persist_session` — the guard lives in the caller, and a test that
-    called the writer directly would pass while the guard did nothing.
+    Driven through `_record`, the WebSocket layer's own write path. The guard
+    itself has since moved *into* `persist_session`, so that it commits with
+    the write it authorises (see the test below); this one stays because the
+    path the live call actually takes has to be the one under test.
 
     `app_database` is requested for its effect and not its value, and it is
     load-bearing: without it `session_scope()` cannot reach a database at all,
@@ -163,11 +164,36 @@ async def test_a_session_is_not_stored_without_consent(
     """
     # Imported here so a collection-time import does not pull in the live path.
     from backend.api import session_ws  # pylint: disable=import-outside-toplevel
+    from backend.session import persistence  # pylint: disable=import-outside-toplevel
 
-    await session_ws._record(  # pylint: disable=protected-access
-        uuid.uuid4(), TEST_AUTH.sub, _persona(), _scenario(), _orchestrator(), _started(), "user",
-    )
+    await session_ws._record(persistence.FinishedCall(  # pylint: disable=protected-access
+        extern_id=uuid.uuid4(), subject_id=TEST_AUTH.sub, persona=_persona(),
+        scenario=_scenario(), turns=_orchestrator().turns, started_at=_started(), reason="user",
+    ))
 
+    assert db_session.query(Session).count() == 0
+
+
+def test_the_writer_itself_refuses_without_consent(
+    app_database: str, db_session: DbSession  # pylint: disable=unused-argument
+) -> None:
+    """The guard sits inside the write transaction, not in front of it.
+
+    Asked from outside, the answer was already some milliseconds old when the
+    INSERT it authorised committed -- long enough for a withdrawal in another
+    tab to record itself and delete every Session that existed *at that
+    moment*, leaving this one behind with no deletion path ever to reach it
+    (ADR 0066). So `persist_session` asks for itself, under the same advisory
+    lock the withdrawal takes, and answers None rather than writing.
+    """
+    from backend.session import persistence  # pylint: disable=import-outside-toplevel
+
+    written = persistence.persist_session(persistence.FinishedCall(
+        extern_id=uuid.uuid4(), subject_id=TEST_AUTH.sub, persona=_persona(),
+        scenario=_scenario(), turns=TURNS, started_at=_started(), reason="user",
+    ))
+
+    assert written is None
     assert db_session.query(Session).count() == 0
 
 
@@ -181,14 +207,16 @@ async def test_withdrawing_mid_call_still_prevents_the_write(
     withdrew while talking would find the call stored anyway.
     """
     from backend.api import session_ws  # pylint: disable=import-outside-toplevel
+    from backend.session import persistence  # pylint: disable=import-outside-toplevel
 
     await api_client.post("/api/consent", json={"granted": True})
     # ... the call runs ...
     await api_client.post("/api/consent", json={"granted": False})
 
-    await session_ws._record(  # pylint: disable=protected-access
-        uuid.uuid4(), TEST_AUTH.sub, _persona(), _scenario(), _orchestrator(), _started(), "user",
-    )
+    await session_ws._record(persistence.FinishedCall(  # pylint: disable=protected-access
+        extern_id=uuid.uuid4(), subject_id=TEST_AUTH.sub, persona=_persona(),
+        scenario=_scenario(), turns=_orchestrator().turns, started_at=_started(), reason="user",
+    ))
 
     assert db_session.query(Session).count() == 0
 
@@ -323,3 +351,41 @@ def _started():
     from tests.conftest import SESSION_STARTED  # pylint: disable=import-outside-toplevel
 
     return SESSION_STARTED
+
+
+def test_a_withdrawal_under_an_older_version_still_blocks_the_write(
+    app_database: str, db_session: DbSession  # pylint: disable=unused-argument
+) -> None:
+    """A stale *no* is not asked again (ADR 0066's exception), and it must not
+    become a yes by going stale either.
+
+    `decision_required` is False for a withdrawal without looking at the
+    version -- that is the exception, and the ADR only said so after a review
+    found the paragraph claiming the opposite. `allows_storage` does look at
+    the version, and the two answers have to point the same way: nothing
+    stored, and the dialog left closed.
+    """
+    from backend.session import persistence  # pylint: disable=import-outside-toplevel
+
+    db_session.add(
+        Consent(
+            subject_id=TEST_AUTH.sub,
+            purpose=consent_service.PURPOSE,
+            version="an-older-wording",
+            status="withdrawn",
+            decided_at=datetime.now(UTC),
+        )
+    )
+    db_session.commit()
+
+    state = consent_service.current(db_session, TEST_AUTH.sub)
+    assert state.allows_storage is False, "a stale no is still a no"
+    assert state.decision_required is False, "and is not asked again"
+
+    written = persistence.persist_session(persistence.FinishedCall(
+        extern_id=uuid.uuid4(), subject_id=TEST_AUTH.sub, persona=_persona(),
+        scenario=_scenario(), turns=TURNS, started_at=_started(), reason="user",
+    ))
+
+    assert written is None
+    assert db_session.query(Session).count() == 0

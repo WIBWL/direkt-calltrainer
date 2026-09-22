@@ -79,19 +79,18 @@ export interface SessionStartMessage {
   token: string;
 }
 
-/** Announces one recorded Turn; the raw audio follows as the next binary frame. */
+/**
+ * Announces one recorded Turn; the raw audio follows as the next binary frame.
+ *
+ * Carries no duration on purpose: the speaking time behind speaking rate, talk
+ * share and fluency is the server's own measurement of the recording
+ * (ADR 0047/0048), not the VAD's. A `duration_ms` field sat here for a while
+ * that neither side sent or read.
+ */
 export interface TurnAudioMetaMessage {
   type: "turn.audio.meta";
   turn_seq: number;
   mime_type: string;
-  /**
-   * How long the user spoke, in milliseconds, as measured by the VAD.
-   *
-   * Currently neither sent by `useSessionSocket` nor read by the server: the
-   * speaking time behind speaking rate, talk share and fluency comes from the
-   * server's own measurement of the recording (ADR 0047/0048).
-   */
-  duration_ms?: number;
 }
 
 /** Sent the moment the client starts playing the Persona's opening line.
@@ -195,7 +194,10 @@ export interface Measurement {
    * the inventory has retired. */
   aspect: MetricAspect | null;
   value: number;
-  /** ADR 0029's free-form payload: curves, sub-measures, pause positions. */
+  /** ADR 0029's free-form payload: curves, sub-measures, pause positions —
+   *  plus whatever the metric's reading adds on the way out (ADR 0091), which
+   *  is derived on every read and never stored: F-35's liveliness step, F-51's
+   *  light, F-37's `course` (the band and the stretches the page draws). */
   detail: Record<string, unknown> | null;
 }
 
@@ -427,6 +429,16 @@ export interface SessionSummary {
    * answered (ADR 0070). Display only; the casting itself lives on the
    * Scenario row. */
   reverse: boolean;
+  /**
+   * The kind of call this was (ADR 0072), or null for an uncategorised
+   * Scenario — every authored one, and every reverse.
+   *
+   * On the listing because the progress view reads courses over it: the
+   * concept's own objection to its charts is that Scenario and Persona move
+   * the figures more than behaviour does, so "your last five advisory calls"
+   * is a series where "your last five trainings" is scatter.
+   */
+  category: ScenarioCategory | null;
   status: SessionOutcome;
   /** Whether a wrap-up was stored — i.e. whether this row has one to open. */
   has_feedback: boolean;

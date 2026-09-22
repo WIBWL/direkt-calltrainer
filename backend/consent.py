@@ -14,10 +14,12 @@ agreed.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session as DbSession
 
 from backend.db import models as db_models
@@ -112,19 +114,51 @@ def record_decision(db: DbSession, subject_id: str, granted: bool) -> ConsentSta
     return ConsentState(status=status, version=CURRENT_VERSION, decided_at=row.decided_at)
 
 
-def allows_storage(subject_id: str) -> bool:
+def lock_subject(db: DbSession, subject_id: str) -> None:
+    """Serialise this subject's consent decision against their Session writes.
+
+    Both sides of ADR 0066's promise take this before they act: the write path
+    before it reads the decision, and `POST /api/consent` before it records a
+    withdrawal and deletes what that withdrawal covers. Without it the two
+    transactions interleave -- the write reads "granted", the withdrawal
+    commits and deletes every Session that exists *at that moment*, then the
+    write inserts one more. The result is a stored training under a withdrawn
+    consent that no deletion path will ever visit again, which is precisely the
+    state ADR 0066 says must not occur.
+
+    Transaction-scoped (`pg_advisory_xact_lock`), so it is released by the
+    commit or rollback that ends the caller's transaction and cannot be leaked.
+    Keyed on the subject, so two different Users never wait on each other.
+    """
+    key = int.from_bytes(
+        hashlib.blake2b(subject_id.encode("utf-8"), digest_size=8).digest(),
+        "big", signed=True,
+    )
+    db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+
+
+def allows_storage(subject_id: str, db: DbSession | None = None) -> bool:
     """Whether this subject's finished Sessions may be written.
 
-    Opens its own transaction, because the write path calls it from a thread of
-    its own once the call is over. **Fails closed**: if the question cannot be
-    answered, the answer is no. Everywhere else in this application a database
-    failure is logged and stepped over, on the grounds that losing a wrap-up is
-    better than losing a call — here the same reflex would store data on a
-    guess, which is the one outcome consent exists to prevent.
+    With `db`, the question is answered inside the caller's own transaction,
+    which is how the write path asks: the answer and the INSERT it authorises
+    then commit together, and `lock_subject` keeps a withdrawal from slipping
+    between them. A failure propagates there rather than being swallowed, and
+    that is still failing closed -- it aborts the transaction, so nothing is
+    written.
+
+    Without `db` it opens its own transaction, which is what the REST layer
+    wants. **Fails closed**: if the question cannot be answered, the answer is
+    no. Everywhere else in this application a database failure is logged and
+    stepped over, on the grounds that losing a wrap-up is better than losing a
+    call — here the same reflex would store data on a guess, which is the one
+    outcome consent exists to prevent.
     """
+    if db is not None:
+        return current(db, subject_id).allows_storage
     try:
-        with session_scope() as db:
-            return current(db, subject_id).allows_storage
+        with session_scope() as own:
+            return current(own, subject_id).allows_storage
     except Exception:  # pylint: disable=broad-except
         logger.exception("Consent could not be read; refusing to store the Session")
         return False

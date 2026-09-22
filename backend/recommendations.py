@@ -11,20 +11,20 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from backend import focus, library
+from backend.db.seed_data import FOCUS_GOALS
 from backend.db.session import session_scope
 
 # One row of the grid in front of the "show all" tile.
 MAX_RECOMMENDATIONS = 5
 
-# The call context that exercises a focus goal. The voice goals are absent on
-# purpose: every Scenario trains the voice, so they cannot steer the choice.
+# The call context that exercises a focus goal, read off the catalogue, where
+# each goal names the kinds of call it is practised in (`practised_in` in
+# `seed_data.FOCUS_GOALS`). The voice goals name none on purpose: every Scenario
+# trains the voice, so they cannot steer the choice -- and neither does
+# `opening`, for the same reason one step on: every call has one, and no
+# category is about openings.
 GOAL_CATEGORIES: dict[str, tuple[str, ...]] = {
-    "objection_handling": ("closing",),
-    "closing": ("closing",),
-    "needs_analysis": ("requirements",),
-    "active_listening": ("requirements",),
-    "composure": ("operations", "pricing"),
-    "empathy": ("operations",),
+    goal["id"]: tuple(goal["practised_in"]) for goal in FOCUS_GOALS if goal.get("practised_in")
 }
 
 
@@ -148,16 +148,23 @@ def next_for_subject(
     partners: list[Partner],
 ) -> list[NextCall]:
     """`next_calls` over this subject's own profile and history."""
+    played_ids = library.played_scenario_ids(subject)
     return next_calls(played, persona, Choices(
         candidates, partners,
-        for_subject(subject, candidates), library.played_scenario_ids(subject),
+        for_subject(subject, candidates, played_ids), played_ids,
     ))
 
 
-def for_subject(subject: str, candidates: list[Candidate]) -> dict[str, Recommendation]:
-    """`recommend` over this subject's own focus selection and training history."""
+def for_subject(
+    subject: str, candidates: list[Candidate], played_ids: set[str] | None = None
+) -> dict[str, Recommendation]:
+    """`recommend` over this subject's own focus selection and training history.
+
+    `played_ids` is for a caller that already read the history: `next_for_subject`
+    needs it twice, and asked the database for it twice until it was passed in.
+    """
     with session_scope() as db:
         chosen = focus.selection(db, subject)
-    return recommend(
-        candidates, chosen.categories, chosen.keys, library.played_scenario_ids(subject)
-    )
+    if played_ids is None:
+        played_ids = library.played_scenario_ids(subject)
+    return recommend(candidates, chosen.categories, chosen.keys, played_ids)

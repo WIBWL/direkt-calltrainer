@@ -11,7 +11,7 @@ The row is created with the Session, in its transaction
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session as DbSession
 
@@ -23,6 +23,107 @@ logger = logging.getLogger(__name__)
 # "done" and "failed" are terminal: a late writer must not turn a wrap-up the
 # user can already read into an error.
 _OPEN = frozenset({db_models.JOB_QUEUED, db_models.JOB_RUNNING})
+
+# How long a queued job may wait before it is considered stale, and how long one
+# may run. Generous: the wrap-up is a single LLM call against a gateway that is
+# occasionally slow, and nobody is blocked while it works.
+#
+# It lives here rather than in `queue.py`, which owns the Redis side: every
+# reader of it is asking the question below, and importing it from there meant
+# pulling Redis into the REST layer -- which is why both readers deferred the
+# import inside a function and then answered the question twice.
+JOB_TIMEOUT_S = 300
+
+
+def is_live(job: db_models.AnalysisJob, *, include_queued: bool) -> bool:
+    """Whether this job may still be working.
+
+    False for a terminal row, and for one that has not moved in longer than a
+    job may run: the worker holding it is gone -- killed, timed out, or
+    restarted -- and nothing will ever move it off `running`, which is the gap
+    ADR 0032 names.
+
+    `include_queued` is the one thing the two callers differ on, so it is a
+    parameter rather than a second copy of this. A reader deciding what to show
+    (`api/sessions.py`) asks about a *running* row only: a queued one is not
+    abandoned, it is waiting. A writer deciding whether to queue a second job
+    (`scripts/requeue_feedback.py`) must count a queued one as working, or it
+    queues a duplicate and both write the same Session.
+
+    They did answer it separately, and differently: one coerced a naive
+    timestamp and the other would have raised on it, one guarded against a
+    missing timestamp and the other did not. Both defences are here now.
+    """
+    if job.status not in _OPEN:
+        return False
+    if job.status == db_models.JOB_QUEUED and not include_queued:
+        return False
+    updated = job.updated_at
+    if updated is None:
+        # The column is NOT NULL, so this is a row nobody wrote through `mark`.
+        # Nothing can be said about its age; it is not working.
+        return False
+    # A timestamptz reads back tz-aware, but comparing an aware and a naive
+    # datetime raises -- and a 500 here would cost the user a wrap-up that
+    # exists.
+    if updated.tzinfo is None:
+        updated = updated.replace(tzinfo=UTC)
+    return datetime.now(UTC) - updated <= timedelta(seconds=JOB_TIMEOUT_S)
+
+
+def newest(session: db_models.Session) -> db_models.AnalysisJob | None:
+    """The newest feedback job of a Session already loaded, or None.
+
+    The same question `latest` asks, for a caller that holds the row rather
+    than a primary key -- three places picked the maximum out of
+    `session.jobs` by hand, and a fourth was about to.
+    """
+    found = [job for job in session.jobs if job.kind == db_models.JOB_KIND_FEEDBACK]
+    return max(found, key=lambda job: job.job_id) if found else None
+
+
+# Why a wrap-up cannot be asked for again. Machine-readable, so the route can
+# turn each into its own sentence and a test can name the case.
+BLOCKED_DONE = "done"
+BLOCKED_EMPTY = "empty"
+BLOCKED_WORKING = "working"
+
+
+def retry_blocked(session: db_models.Session) -> str | None:
+    """Why this Session's wrap-up may not be queued again, or None if it may.
+
+    One rule for the two callers that ask it: the route a User presses
+    (`api/sessions.py`) and the backlog script (`scripts/requeue_feedback.py`).
+    They had the same rule written twice, and only the script's copy had ever
+    been corrected -- it queued a job that was two minutes into its model call
+    until `is_live` was given `include_queued`.
+
+    The three refusals, in the order they are asked:
+
+    `done` -- a wrap-up exists. `feedback.session_id` is UNIQUE, so a second
+    job would write nothing and be recorded as failed for a Session the User
+    can already read.
+
+    `empty` -- no Turns. There is nothing to summarise, and a model asked to
+    summarise an empty conversation writes a paragraph describing nothing.
+
+    `working` -- a job may still be running. Queued counts as working here
+    (unlike on the read side, which shows a queued row as waiting): two jobs
+    would race for the same Session.
+
+    A job that says `done` while no wrap-up exists is *not* refused. The script
+    used to skip it, on a list of retryable statuses; that state is a bug
+    somewhere else, and refusing to retry it leaves the User in a dead end with
+    a status that says everything is fine.
+    """
+    if session.feedback is not None:
+        return BLOCKED_DONE
+    if not session.turns:
+        return BLOCKED_EMPTY
+    job = newest(session)
+    if job is not None and is_live(job, include_queued=True):
+        return BLOCKED_WORKING
+    return None
 
 
 def latest(db: DbSession, session_id: int) -> db_models.AnalysisJob | None:

@@ -41,8 +41,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from decimal import Decimal
 
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session as DbSession
@@ -116,10 +116,15 @@ class _Wrapup(BaseModel):
     # Ids, not prose: this one is not shown to anybody, it decides which
     # exchanges the segment measurements are computed over.
     #
-    # Defaulted like the two above, and an empty list is a legitimate answer --
-    # plenty of calls have nobody pushing back in them. An id the material does
-    # not hold is dropped at storage time, exactly as a made-up goal key is.
-    pressure_turns: list[int] = []
+    # `None` is "nobody judged": the key was absent, or the whole reply failed
+    # to validate and this is the narrative-only fallback. An empty *list* is
+    # the other thing entirely -- the model looked and found nobody pushing
+    # back, which plenty of calls are. `turn.pressed` keeps the same
+    # distinction, NULL against False, and writing False for a call nobody
+    # judged is how `scripts/inspect_pressure_segments.py` lost the one
+    # difference it exists to show. An id the material does not hold is dropped
+    # at storage time, exactly as a made-up goal key is.
+    pressure_turns: list[int] | None = None
     strengths: list[_Point] = []
     improvements: list[_Point] = []
 
@@ -168,7 +173,7 @@ async def _generate(session_id: int) -> None:
 
         with session_scope() as db:
             _store(db, session_id, wrapup, valid_turns)
-            _store_segments(db, session_id, wrapup.pressure_turns)
+            segments.store(db, session_id, wrapup.pressure_turns)
             jobs.mark(db, session_id, db_models.JOB_DONE)
         logger.info("Feedback stored for session %d (%d points)", session_id, len(wrapup.points))
     except Exception as e:  # pylint: disable=broad-exception-caught
@@ -212,19 +217,27 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
     reverse = session.scenario.reverse
     lines = _occasion(session.scenario)
     lines.append("Measured statistics for this call (established fact):")
+    # Whole-call rows only. Since ADR 0081 a Session also carries measurements
+    # over the demanding stretches and over the rest, and the block this feeds
+    # is headed "for this call" while rule M3 tells the model to treat what is
+    # in it as established fact. Unfiltered, a regenerated wrap-up read the
+    # same metric three times with three different values -- the segment rows
+    # are written by the previous run and are still there on the next one.
     lines += [
         f"    {m.metric_type.name}: {float(m.value):.1f} {m.metric_type.unit or ''}".rstrip()
         for m in session.measurements
-        if m.metric_type.key != metrics.LOUDNESS_KEY
+        if m.metric_type.key != metrics.LOUDNESS_KEY and
+        m.segment == db_models.SEGMENT_CALL
     ]
     course = _loudness_course(session)
     if course:
         lines.append(f"    {course}")
 
+    casting = _casting(reverse)
     if reverse:
         lines.append(
-            "In this call the trainee was the one who rang; the Agent answered "
-            "the phone on the company's side."
+            f"In this call the trainee was the one who rang; the {casting.partner} "
+            "answered the phone on the company's side."
         )
     lines.append("Transcript, timestamped from the start of the call:")
     turn_ids: set[int] = set()
@@ -232,7 +245,7 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
         if turn.speaker == db_models.SPEAKER_USER:
             speaker = "User"
         else:
-            speaker = "Agent" if reverse else "Caller"
+            speaker = casting.partner
         lines.append(
             f'    [turn_id={turn.turn_id}] {_timestamp(turn.start_offset_ms)} '
             f'{speaker}: "{turn.transcript}"'
@@ -254,16 +267,47 @@ def _occasion(scenario: db_models.Scenario) -> list[str]:
     the situation has to be guessed. A guess is exactly what this block must
     not rest on.
 
-    `success_condition` is deliberately left out. It says what would have ended
-    the call well, which is a result rather than an occasion, and handing it
-    over invites the model to grade the outcome under the heading of tone.
+    ADR 0079 withholds `success_condition`: what would have ended the call well
+    is a result rather than an occasion, and handing it over invites the model
+    to grade the outcome under the heading of tone. It used to be its own
+    column, and this block passed `call_goal` beside the situation on the
+    grounds that wanting something is part of an occasion -- which it is.
+
+    Migration `3ce81b27af40` merged the two columns, so the criterion arrived in
+    the dossier inside the goal, and the guarantee was being made in a docstring
+    while the prompt broke it. The answer is to cut the criterion back off
+    (`_goal_without_criterion`) rather than to drop the goal: what the caller
+    wanted *is* the occasion, and a wrap-up left to guess it again is the state
+    this block was written to end.
     """
-    return [
+    lines = [
         "The occasion of this call (established fact, not something to assess):",
         f"    Situation: {scenario.description}",
-        f"    What the caller wanted: {scenario.call_goal}",
-        "",
     ]
+    wanted = _goal_without_criterion(scenario)
+    if wanted:
+        lines.append(f"    What the caller wanted: {wanted}")
+    lines.append("")
+    return lines
+
+
+# Where the merged `call_goal` stops being the goal and starts being the
+# criterion. A seed convention rather than a schema one: all 17 seeded goals end
+# on this sentence, and `tests/test_wrapup_prompt.py` checks that against the
+# real seed, so the split cannot quietly stop working when one is reworded.
+_SETTLEMENT_MARKER = "The matter is settled when"
+
+
+def _goal_without_criterion(scenario: db_models.Scenario) -> str:
+    """The call goal without the sentence saying when it counts as met.
+
+    An authored goal carries no such sentence and goes in whole, which is right:
+    there is no second thing in it to withhold. A goal that is *nothing but* the
+    criterion yields an empty string, and the line is left out rather than
+    written blank.
+    """
+    head, marker, _ = (scenario.call_goal or "").partition(_SETTLEMENT_MARKER)
+    return (head if marker else scenario.call_goal or "").strip()
 
 
 def _loudness_course(session: db_models.Session) -> str | None:
@@ -273,9 +317,15 @@ def _loudness_course(session: db_models.Session) -> str | None:
     number, the wrap-up quotes it as a level -- above a chart that deliberately
     shows none. What goes in instead is what that chart says, from the same
     curve and the same parameters, so text and picture cannot contradict.
+
+    The whole call's row, like the figures above it: the segment rows carry a
+    `curve_db` of their own, and taking the first match described the pressing
+    stretch's curve as the course of the whole conversation.
     """
     for measurement in session.measurements:
         if measurement.metric_type.key != metrics.LOUDNESS_KEY:
+            continue
+        if measurement.segment != db_models.SEGMENT_CALL:
             continue
         curve = (measurement.detail_json or {}).get("curve_db")
         if curve:
@@ -339,10 +389,32 @@ def _phase_rules(reverse: bool) -> str:
     )
 
 
-def _wanted(reverse: bool) -> str:
-    """What the summary opens on: the concern the call was about, named from
-    whichever side brought it."""
-    return "the trainee rang about" if reverse else "the caller wanted"
+@dataclass(frozen=True)
+class _Casting:
+    """Who was on which end of the line, in the words the material and the
+    prompt both use (ADR 0070).
+
+    Every rule in the prompt about who may be quoted and who may not be judged
+    names the simulated side by the label the transcript gives it, so the two
+    must be the same word. They were three pairs of literals in two functions,
+    held together by a comment saying they had to match.
+    """
+
+    # The transcript's label for the simulated side.
+    partner: str
+    # The person the trainee spoke to, as a sentence refers to them.
+    other: str
+    # What the summary opens on: the concern the call was about, named from
+    # whichever side brought it.
+    wanted: str
+
+
+_ORDINARY = _Casting(partner="Caller", other="the caller", wanted="the caller wanted")
+_REVERSED = _Casting(partner="Agent", other="the agent", wanted="the trainee rang about")
+
+
+def _casting(reverse: bool) -> _Casting:
+    return _REVERSED if reverse else _ORDINARY
 
 
 def _goal_ids(db: DbSession) -> dict[str, int]:
@@ -368,9 +440,10 @@ def _goal_ids(db: DbSession) -> dict[str, int]:
     }
 
 
-# Goals about the training habit rather than about a call. Rule A6 tells the
-# model not to assign them; this is the same rule where it cannot be ignored.
-_NEVER_ASSIGNED = frozenset({"training_regularity", "training_variety"})
+# Goals about the training habit rather than about a call -- the catalogue's
+# `habit` group. Rule A6 tells the model not to assign them; this is the same
+# rule where it cannot be ignored.
+_NEVER_ASSIGNED = frozenset(goal["id"] for goal in FOCUS_GOALS if goal["group"] == "habit")
 
 
 def _goal_catalogue() -> str:
@@ -447,10 +520,10 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
     task that can break the JSON.
     """
     # The transcript's own label for the simulated side, and the phrase for the
-    # person the trainee spoke to. Both are read straight out of the material,
-    # so they have to be the words `_dossier` actually wrote.
-    partner = "Agent" if reverse else "Caller"
-    other = "the agent" if reverse else "the caller"
+    # person the trainee spoke to -- the words `_dossier` wrote, from the same
+    # record.
+    casting = _casting(reverse)
+    partner, other = casting.partner, casting.other
     system = (
         "# Role\n"
         "You are a communication coach. You review one training phone call "
@@ -486,6 +559,13 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
         "Reaktionszeit and Sprechpausen statistics already measure.\n"
         "F4. Never assert anything about the call that the transcript or the "
         "statistics do not show. No motives, no mood, no background.\n"
+        "F5. The summary and the phase_language block carry no figures at "
+        "all, and above all never one in brackets after a statement "
+        "('sachlich (62 %)'). Say the observation in words. Every figure "
+        "already stands next to this text on the screen, with what it was "
+        "measured from, and one dropped into a sentence reads as the "
+        "verdict on it that F2 forbids. Figures belong in a strength, in "
+        "an improvement, or where G2 allows one in tone_fit.\n"
         "\n"
         "# How to build a point\n"
         "Your job is to interpret: say what the statistics and the transcript "
@@ -581,6 +661,10 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
         "with the timestamp (P1), never grade the call (N1), never measure a "
         f"figure against a norm (F2), and never make the {partner} the subject "
         "(M1).\n"
+        "H8. No figures in this block either, exactly as in the summary "
+        "(F5). What is observed here is a change of register across the "
+        "call, and no number carries that: a percentage dropped into the "
+        "paragraph turns a description into a reckoning.\n"
         "\n"
         "# The tone_fit block\n"
         "A separate piece of feedback, about one thing only: whether the way "
@@ -689,7 +773,7 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
         # "what the caller wanted" names the trainee in a reverse and the
         # machine everywhere else, so the one word that flips is spelled out
         # rather than left to be read either way.
-        f'{{"summary": "2-4 sentences: what {_wanted(reverse)}, how the '
+        f'{{"summary": "2-4 sentences: what {casting.wanted}, how the '
         'trainee handled it, and where the call ended up", '
         '"phase_language": "one paragraph on how the register moved through '
         'opening, core business and closing, ending in the sentence to say '
@@ -710,7 +794,9 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
         "# Before you answer, check silently\n"
         "Every point quotes this call or a given figure with its timestamp; "
         "every improvement ends in a full sentence to say; no figure appears "
-        "that was not given to you; no point would survive being moved to "
+        "that was not given to you; neither the summary nor phase_language "
+        "carries a figure or a bracketed number (F5, H8); no point would "
+        "survive being moved to "
         "another call; phase_language covers all three phases or names the one "
         "the call never reached, and gives the closing the most room; tone_fit "
         "names what this occasion asked for before it says anything about how "
@@ -757,9 +843,37 @@ async def _ask(dossier: str, language: str, reverse: bool = False) -> _Wrapup:
 
 
 def _unfenced_text(raw: str, language: str) -> str:
-    """The model's prose, for the fallback: readable even though it isn't JSON."""
+    """The model's prose, for the fallback: readable even though it isn't JSON.
+
+    Prose is the whole condition. ADR 0049's degraded path is "a summary with no
+    evidence links" -- the paragraphs the model wrote, minus the structure -- and
+    an answer that failed to validate is very often not prose at all but JSON
+    that was cut off in the token budget or carried a field of the wrong type.
+    Stored raw, that reached the User as their summary, in the history and in
+    the PDF, and `scripts/requeue_feedback.py` skips any Session that already
+    has a Feedback row, so it could never be replaced.
+
+    So a reply that still looks like JSON is refused here and the fixed sentence
+    stands in. That sentence says no feedback could be written, which is true,
+    where a brace and a quoted key says nothing the User can read.
+    """
     stripped = llm.without_fenced_blocks(raw).strip()
-    return stripped or _in_language(_NO_WRAPUP, language)
+    if not stripped or _looks_like_json(stripped):
+        return _in_language(_NO_WRAPUP, language)
+    return stripped
+
+
+def _looks_like_json(text: str) -> bool:
+    """Whether this is the model's failed structure rather than its prose.
+
+    Deliberately crude: an opening brace or bracket, or one of the keys the
+    schema asks for quoted as JSON quotes it. A summary that happens to mention
+    a brace does not start with one, and no German paragraph opens with
+    `"summary":`."""
+    if text[:1] in ("{", "["):
+        return True
+    fields: tuple[str, ...] = tuple(_Wrapup.model_fields)  # pylint: disable=not-an-iterable
+    return any(f'"{field}"' in text[:200] for field in fields)
 
 
 # --- Storage --------------------------------------------------------------
@@ -835,60 +949,3 @@ def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) 
         for index, (kind, point) in enumerate(wrapup.points)
     ]
     db.add(feedback)
-
-
-def _store_segments(db: DbSession, session_id: int, pressure_turns: list[int]) -> None:
-    """Mark the pressing utterances and measure the two stretches (ADR 0081).
-
-    Runs in the same transaction as the wrap-up but behind its own failure
-    boundary: these figures are an addition to a wrap-up, and a Session losing
-    them is a smaller loss than a Session losing the wrap-up they hang off.
-    A raise here would also retry the whole model call, which would be paying
-    for a second opinion to fix an arithmetic problem.
-
-    Idempotent, because `scripts/requeue_feedback.py` re-runs this job over
-    Sessions that already have rows: the previous segment rows go first. The
-    whole-call rows are never touched -- they were written when the call ended
-    and no model opinion has any business overwriting a measurement.
-    """
-    try:
-        session = db.get(db_models.Session, session_id)
-        if session is None:
-            return
-        # Persona rows only, and only ids from this Session: the same rule the
-        # points' `turn_id` follows, and for the same reason -- a reference
-        # that leads somewhere else is worse than none.
-        wanted = set(pressure_turns)
-        pressed_ids = {
-            row.turn_id for row in session.turns
-            if row.turn_id in wanted and row.speaker == db_models.SPEAKER_PERSONA
-        }
-        for row in session.turns:
-            if row.speaker == db_models.SPEAKER_PERSONA:
-                row.pressed = row.turn_id in pressed_ids
-
-        db.query(db_models.Measurement).filter(
-            db_models.Measurement.session_id == session_id,
-            db_models.Measurement.segment != db_models.SEGMENT_CALL,
-        ).delete(synchronize_session=False)
-        db.flush()
-
-        metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType).all()}
-        for segment, values in segments.measure_segments(session, pressed_ids).items():
-            db.add_all([
-                db_models.Measurement(
-                    session_id=session_id,
-                    metric_type_id=metric_ids[m.key],
-                    segment=segment,
-                    value=Decimal(f"{m.value:.4f}"),
-                    detail_json=m.detail,
-                )
-                for m in values
-                if m.key in metric_ids
-            ])
-        logger.info(
-            "Segment measurements for session %d: %d pressing utterance(s)",
-            session_id, len(pressed_ids),
-        )
-    except Exception:  # pylint: disable=broad-exception-caught
-        logger.exception("Segment measurement failed for session %d", session_id)

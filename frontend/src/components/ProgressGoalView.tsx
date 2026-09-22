@@ -1,7 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 
 import { useFocusContext } from "../FocusContext";
-import { useProgressData } from "../hooks/useProgressData";
+import { useProgressContext } from "../ProgressContext";
 import type { SessionSummary } from "../protocol";
 import { ROUTES, progressMetricPath, sessionPath } from "../routes";
 import { backingOf } from "../utils/focusMetrics";
@@ -33,13 +33,17 @@ import SegmentComparison from "./SegmentComparison";
  */
 export default function ProgressGoalView() {
   const { goalKey } = useParams<{ goalKey: string }>();
-  const { sessions, state } = useProgressData();
+  // The overview's selection, for the reason ProgressMetricView gives: the
+  // tile and the page behind it count the same trainings or they contradict
+  // each other, and here it is a count of statements, which is the figure most
+  // easily misread (ADR 0080).
+  const { selected: sessions, periodPhrase, state, withPeriod } = useProgressContext();
   const { focus } = useFocusContext();
 
   const goal = focus?.goals.find((entry) => entry.key === goalKey);
 
   const back = (
-    <Link to={ROUTES.progress} className="back-link">
+    <Link to={withPeriod(ROUTES.progress)} className="back-link">
       Zurück zum Fortschritt
     </Link>
   );
@@ -97,6 +101,9 @@ export default function ProgressGoalView() {
       {back}
       <h1>{goal.title}</h1>
       <p className="page-lead">{goal.caption}</p>
+      {/* No switch of its own, so it says what it reads -- see the same line on
+          a metric's page. */}
+      <p className="muted">Gelesen über {periodPhrase}.</p>
 
       <div className="card">
         {/* Habit goals are never tagged -- the wrap-up is refused them in the
@@ -122,7 +129,7 @@ export default function ProgressGoalView() {
             {measured.map((series, index) => (
               <span key={series.key}>
                 {index > 0 && ", "}
-                <Link to={progressMetricPath(series.key)}>{series.name}</Link>
+                <Link to={withPeriod(progressMetricPath(series.key))}>{series.name}</Link>
               </span>
             ))}
             .
@@ -137,7 +144,7 @@ export default function ProgressGoalView() {
           <p className="muted">
             Dieses Ziel betrifft Ihr Training selbst, nicht ein einzelnes Gespräch. Wie
             regelmäßig und wie breit Sie trainieren, steht oben auf der{" "}
-            <Link to={ROUTES.progress}>Fortschrittsseite</Link>.
+            <Link to={withPeriod(ROUTES.progress)}>Fortschrittsseite</Link>.
           </p>
         )}
 

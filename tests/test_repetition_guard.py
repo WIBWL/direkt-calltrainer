@@ -255,7 +255,7 @@ async def test_a_reply_that_opens_by_greeting_again_is_regenerated(persona, scen
     assert b"hier ist Thomas Brandt" not in spoken  # the re-greeting never went out
     assert clean.encode("utf-8") in spoken
     assert orch.turns[-1].persona_text == clean
-    assert orch._messages[-1] == {"role": "assistant", "content": clean}  # pylint: disable=protected-access
+    assert orch.history.messages[-1] == {"role": "assistant", "content": clean}
     assert len(fake_pipeline.llm.calls) == 3
     assert completed(events).ends_call is False
 
@@ -506,7 +506,7 @@ async def test_a_block_carried_over_under_a_new_opener_is_dropped_before_it_is_s
 
     assert completed(events).ends_call is False
     assert orch.turns[1].persona_text == "Das ist mir zu wenig. Wann kann ich mit einer Antwort rechnen?"
-    assert orch._messages[-1]["content"] == orch.turns[1].persona_text  # pylint: disable=protected-access
+    assert orch.history.messages[-1]["content"] == orch.turns[1].persona_text
 
 
 async def test_a_reply_that_is_nothing_but_the_users_line_is_re_asked_once(persona, scenario, fake_pipeline):
@@ -580,7 +580,7 @@ async def test_a_reply_opening_with_a_sentence_already_said_is_regenerated_not_s
     # Line A played in full, "Ich will" of the second chunk, then the barge-in:
     # the history now holds "<line A> Ich will—", as in the live call.
     orch.note_late_barge_in(12000)
-    assert orch._messages[-1]["content"] == f"{_LINE_A} Ich will—"  # pylint: disable=protected-access
+    assert orch.history.messages[-1]["content"] == f"{_LINE_A} Ich will—"
     await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
 
     events = await collect(orch.run_turn(b"c", "turn.webm", "audio/webm"))
@@ -610,3 +610,42 @@ async def test_a_regeneration_that_loops_again_still_ends_the_call(
 
     assert len(fake_pipeline.llm.calls) == 4, "exactly one regeneration"
     assert completed(events).ends_call is True
+
+
+async def test_the_opening_checks_survive_a_first_chunk_the_filters_emptied(
+    persona, scenario, fake_pipeline
+):
+    """The opening checks stay armed until a chunk with *words in it* has been
+    seen, and a chunk the repeat filter emptied is not one (ADR 0035/0038).
+
+    The disarming flag used to be read from `_guard_opening`'s own return value,
+    before `_clean_chunk` ran -- so a first chunk that survived the guard and
+    was then emptied by `drop_said_sentences` counted as the chunk that had
+    been seen. The second chunk, the first one actually spoken, walked past
+    every opening check: the re-greeting, the echo of the user's line and the
+    repeated opening all went out audibly, which is the defect ADR 0038's
+    third front exists to prevent.
+    """
+    # `said` is deliberately *not* the opening's first sentence: the guard
+    # compares first sentences, so a chunk repeating one of those is caught by
+    # the guard itself and never reaches `_clean_chunk`. Repeating a later
+    # sentence is what passes the guard and is then dropped by the filter.
+    said = "Die Preisanpassung war um zwoelf Prozent, ohne jede Aenderung am Leistungsumfang."
+    regreet = "Guten Tag, hier ist Thomas Brandt von der Firma Solox, es geht um die Kosten."
+    clean = "Ich brauche dafuer eine belastbare Begruendung, sonst kommen wir hier nicht weiter."
+    fake_pipeline.stt.transcripts = ["Was genau meinen Sie damit?"]
+    fake_pipeline.llm.replies = [
+        f"Guten Tag, hier ist Thomas Brandt. {said}",  # the opening turn
+        f"{said} {regreet}",                           # chunk 1 emptied, chunk 2 re-greets
+        clean,                                         # the regeneration
+    ]
+
+    orch = SessionOrchestrator(persona, scenario)
+    await collect(orch.run_opening_turn())
+    events = await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+
+    spoken = b"".join(c.audio for c in audio_chunks(events))
+    assert b"hier ist Thomas Brandt" not in spoken, "the re-greeting never went out"
+    assert orch.turns[-1].persona_text == clean
+    assert len(fake_pipeline.llm.calls) == 3, "the second chunk was guarded, so one regeneration"
+    assert completed(events).ends_call is False

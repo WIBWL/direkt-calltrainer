@@ -11,13 +11,13 @@ Calltrainer is a use case built within [EFRE-DiReKT](https://efre-direkt.de/), a
 
 ## Architecture
 
-FastAPI backend, React + TypeScript frontend, one Docker image. Speech-to-text, dialogue generation, and text-to-speech all run through the EFRE-DiReKT gateway, an OpenAI-compatible model gateway - no separate provider accounts or local models needed to run the app.
+FastAPI backend, React + TypeScript frontend, one Docker image. Speech-to-text and dialogue generation run through the EFRE-DiReKT gateway, an OpenAI-compatible model gateway. Text-to-speech runs on KugelAudio by default and falls back to the gateway's own TTS model if KugelAudio fails or `SKIP_KUGELAUDIO` is set. Dialogue generation can optionally be moved to Gemini (`GEMINI=yes`, see ADR 0074). No local models are needed.
 
 > **Note:** The EFRE-DiReKT gateway is only reachable from its own network - connect via VPN before running the app.
 
 ## 1. Setup
 
-Copy `.env.example` to `.env` and fill in the real `DIREKT_API_KEY`.
+Copy `.env.example` to `.env` and fill in the real `DIREKT_API_KEY`, plus `KUGELAUDIO_API_KEY` for the default speech output (or set `SKIP_KUGELAUDIO` to use the gateway's TTS instead).
 
 ## 2. Run the App
 

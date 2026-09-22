@@ -686,7 +686,16 @@ def persist(  # pylint: disable=too-many-arguments
     """
     # Imported here, not at module scope: importing the write path pulls in
     # the feedback stack, which a collection-time import should not need.
+    from backend import consent  # pylint: disable=import-outside-toplevel
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
+
+    # The write path refuses without it (ADR 0066), and it checks inside its own
+    # transaction, so it cannot be granted from a test's `db_session`. A stored
+    # Session always has a decision behind it in reality; a test that wants the
+    # refusal asks for it explicitly (tests/test_consent.py).
+    with session_scope() as db:
+        if not consent.allows_storage(subject, db=db):
+            consent.record_decision(db, subject, granted=True)
 
     # The value object the write path receives carries the row's `extern_id` as
     # `.id` since ADR 0058, so resolve it from the reference row the fixture
@@ -698,15 +707,15 @@ def persist(  # pylint: disable=too-many-arguments
     persona = replace(TEST_PERSONAS[0], id=str(prow.extern_id) if prow else str(uuid.uuid4()))
     scenario = replace(TEST_SCENARIOS[0], id=str(srow.extern_id) if srow else str(uuid.uuid4()))
     extern_id = extern_id or uuid.uuid4()
-    persistence.persist_session(
-        extern_id,
-        subject,
-        persona,
-        scenario,
-        turns if turns is not None else [],
-        started_at,
-        reason,
-    )
+    persistence.persist_session(persistence.FinishedCall(
+        extern_id=extern_id,
+        subject_id=subject,
+        persona=persona,
+        scenario=scenario,
+        turns=turns if turns is not None else [],
+        started_at=started_at,
+        reason=reason,
+    ))
     return extern_id
 
 
@@ -764,7 +773,8 @@ def asked(calls, index: int = 0) -> str:
 # one metric the reference fixture seeds, is a rate over phonation -- without
 # them nothing is measured and a Session carries no statistics at all. What a
 # test needs when it wants a Session that looks real and does not care what was
-# said in it (F-61).
+# said in it (F-61). Three user utterances, because the reverse and follow-up
+# routes refuse a call with fewer (`api/sessions.py::MIN_USER_UTTERANCES`).
 DRAFTED_FROM_TURNS = [
     Turn(seq=1, persona_text="Brandt hier.", persona_offset_ms=0, persona_end_ms=1500),
     Turn(seq=2, user_text="Guten Tag, was kann ich für Sie tun?",
@@ -772,6 +782,16 @@ DRAFTED_FROM_TURNS = [
          user_speech_ms=1600, user_phonation_ms=1300,
          persona_text="Der Preis ist zu hoch.",
          persona_offset_ms=3700, persona_end_ms=5000),
+    Turn(seq=3, user_text="Darüber können wir reden. Was wäre für Sie vertretbar?",
+         user_offset_ms=5300, user_end_ms=7600,
+         user_speech_ms=2300, user_phonation_ms=1900,
+         persona_text="Zehn Prozent weniger.",
+         persona_offset_ms=7900, persona_end_ms=9000),
+    Turn(seq=4, user_text="Das prüfe ich und melde mich morgen bei Ihnen.",
+         user_offset_ms=9300, user_end_ms=11400,
+         user_speech_ms=2100, user_phonation_ms=1700,
+         persona_text="Gut, danke.",
+         persona_offset_ms=11700, persona_end_ms=12500),
 ]
 
 

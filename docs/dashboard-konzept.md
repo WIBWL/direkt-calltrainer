@@ -7,7 +7,9 @@ ausgearbeitet, sondern nur benannt, wo sie gebraucht wird.
 **Umsetzungsstand:** Stufe 1 ist gebaut und liegt unter `/fortschritt`, über die
 volle Breite der Anwendung (1440 px, Kopfzeile mitgeführt). Der Bildschirm
 selbst ist `frontend/src/components/ProgressView.tsx`, die Detailebene
-`ProgressMetricView.tsx`, der Rechenteil `frontend/src/utils/progressStats.ts`.
+`ProgressMetricView.tsx`, der Rechenteil `frontend/src/utils/progressStats.ts`,
+die gemeinsame Datenhaltung der drei Bildschirme
+`frontend/src/ProgressContext.tsx`.
 Er greift ausschließlich auf echte, gespeicherte Werte zu und kommt ohne neuen
 Endpunkt aus, weil `GET /api/sessions` die Messwerte je Sitzung bereits
 mitliefert.
@@ -140,6 +142,50 @@ markiert die Auswertung in dem Modellaufruf, den sie ohnehin macht; damit danach
 (die Aufnahme ist zu diesem Zeitpunkt längst gelöscht, ADR 0048). Verglichen wird
 nichts: Es stehen zwei Zahlen nebeneinander, und wie groß ein Unterschied sein
 darf, sagt niemand. Damit ist Stufe 3 abgeschlossen: Was dort offen aussah, ist entweder gebaut oder mit Begründung verworfen, und die Artikulation ist der letzte Fall der zweiten Art (Abschnitt 4.2).
+
+**Nachtrag (September 2026, zweite Runde).** Vier Dinge sind hinzugekommen,
+nachdem eine Durchsicht ergeben hatte, dass an den Stufen nichts mehr offen war,
+an der Seite aber sehr wohl:
+
+* **Block A endet nicht mehr blind.** Ein Kalendertag mit Trainings und eine
+  gespielte Zelle im Raster sind jetzt Knöpfe; darunter erscheinen die
+  Trainings dahinter, je mit Link (`TrainingLinks.tsx`). Vorher sagte eine
+  Zelle „2 Trainings“ und der einzige Weg zu diesen beiden führte über die
+  Historie im Profil, nach Datum, von Hand. Genau der Block, aus dem nichts
+  folgte, den Abschnitt 3 (Verbert) ausschließt. Leere Tage und ungespielte
+  Kombinationen bleiben stumme Zellen: dreißig Tabstopps, um zwei erreichbare
+  zu finden, wäre die schlechtere Barrierefreiheit.
+* **Auswahl nach Gesprächsanlass** als zweite Zeile neben dem Zeitraumschalter
+  (`OCCASIONS` in `ProgressContext.tsx`). Das ist die Antwort auf den stärksten
+  Einwand, den dieses Dokument gegen seine eigenen Diagramme erhebt
+  (Abschnitt 4.3): Szenario und Persona verschieben Redeanteil, Tempo und
+  Fragenanzahl mehr als eine Verhaltensänderung. Über alle Trainings ist eine
+  Linie Streuung, über eine Art von Gespräch ist sie eine Reihe. Erst
+  eingegrenzt, dann gekürzt, sonst hinge die Zahl der ausgewerteten Trainings
+  daran, was zwischendurch gespielt wurde. Jede Option trägt ihre Anzahl, eine
+  ohne Trainings ist nicht drückbar, und die Auswahl steht wie der Zeitraum in
+  der URL (`?anlass=`). Dafür führt `GET /api/sessions` jetzt `category` mit.
+* **„Früher und zuletzt“** auf der Seite einer Kennzahl (`EarlyAndLate.tsx`):
+  dieselbe Beschreibung zweimal, über die ältere und die jüngere Hälfte der
+  Auswahl, nebeneinander. Kein Unterschied, kein Pfeil, kein Wort für eine
+  Richtung. Es ist die Konstruktion, die ADR 0081 für die beiden Abschnitte
+  eines Gesprächs schon erlaubt, angewandt auf zwei Abschnitte einer
+  Geschichte; ADR 0065 trägt dazu einen Nachtrag mit fünf Bedingungen. Bewusst
+  nicht in der Übersicht: sechzehn solcher Paare wären sechzehn Einladungen,
+  einen Trend hineinzulesen.
+* **Der Übungsvorschlag nimmt Bezug auf sich selbst.** Hat eine Auswertung nach
+  dem Training, aus dem der Punkt stammt, noch einmal etwas zu dem Ziel
+  geschrieben, steht dieser Satz jetzt darunter. Damit schließt sich der Kreis
+  aus Abschnitt 3 (Zimmerman), der bisher nur in eine Richtung lief. Nichts
+  wird dafür gespeichert und nichts behauptet: zwei Aussagen in der
+  Reihenfolge, in der sie geschrieben wurden.
+
+Dazu zwei kleinere: Eine Textzielkachel führt jetzt mit dem jüngsten Satz aus
+den Auswertungen statt mit einer Punktreihe, weil für diese Ziele die Sätze das
+Einzige sind, was es gibt, und eine Zahl ohne Blick dahinter sich wie eine
+Messung liest. Und wo eine Kennzahl in weniger Trainings vorliegt als die
+Auswahl umfasst, sagt die Kachel das; warum, steht hinter dem „i“ der Tabelle,
+mit beiden möglichen Gründen und ohne einen davon zu behaupten.
 
 ## 1. Zweck
 
@@ -612,6 +658,13 @@ Drei Ebenen, mehr nicht:
    Kennzahl ist (`focusMetrics.goalsForMetric`). Sonst sammelte die
    Reaktionszeit Aussagen aus drei Zielen ein, für die sie nur eine Nebengröße
    ist.
+
+   **Der Zeitraum gilt hier mit** (seit September 2026). Gebaut war es anders:
+   Die Kachel sagte „aus 5 Trainings“, und die Seite dahinter zeichnete jedes
+   gespeicherte — zwei Bildschirme, die über dieselbe Kennzahl verschieden
+   sprachen. Die Auswahl reist im Link mit (`withPeriod`), und weil diese Ebene
+   den Schalter selbst nicht trägt, sagt sie in Worten, worüber sie gelesen
+   ist.
 3. **Ein einzelnes Training**. Führt in die bestehende Ansicht
    `PastSessionView`. Diese Ebene ist bereits gebaut und wird nicht verdoppelt.
 
@@ -686,11 +739,36 @@ Vorschlag, damit die spätere Umsetzung nicht am Datenweg hängt:
   Zeitraum ist aus demselben Grund ein Filter im Browser und kein Parameter:
   Eine Seite lädt, danach kostet ein Wechsel des Zeitraums keine Anfrage.
   Gedeckelt ist das durch die Aufbewahrung von sechs Monaten (ADR 0067) und
-  durch eine Seite von 100 Sitzungen, worüber die Ansicht Auskunft gibt.
+  durch zehn Seiten zu je 100 Sitzungen, worüber die Ansicht Auskunft gibt.
+  Eine Seite war es bis September 2026, und das war zu wenig: Die drei Zahlen
+  im Kopf und der Kalender lesen sich als Aussage über ein Konto, nicht über
+  eine Seite, und waren damit nicht unvollständig, sondern falsch, sobald mehr
+  als hundert Trainings gespeichert waren. Der Lader holt die Seiten
+  nacheinander und hört auf, sobald eine kurz zurückkommt
+  (`hooks/useProgressData.ts`).
+* **Ein Laden und eine Auswahl für alle drei Bildschirme**
+  (`ProgressContext.tsx`, als Layout-Route um die drei gelegt). Vorher rief
+  jede Ebene den Lader selbst auf, also kostete jeder Schritt in ein Detail und
+  zurück die ganze Verlaufsliste noch einmal. Der Zeitraum steht in der URL
+  (`?trainings=5|10`, die Voreinstellung bleibt draußen) und nicht im Zustand
+  einer Komponente: Damit überlebt er einen Neuladen und reist mit einem
+  geteilten Link — der Grund, aus dem Abschnitt 7 die Detailebenen überhaupt
+  zu Routen macht.
 * **Ein markierter Feedback-Punkt trägt seinen Text mit** (Ergänzung zu ADR
   0064). Was die Liste weiterhin nicht trägt, ist die Auswertung als Text:
   Zusammenfassung, Phasenabsatz, `tone_fit` und jeder nicht markierte Punkt
   bleiben auf der Detailroute.
+* **Die Rechenteile sind geprüft** (`utils/*.test.ts`, Vitest). Sie sind reine
+  Funktionen, und jeder ihrer Fehler zeichnet sauber: eine Reihe, die rückwärts
+  in der Zeit läuft, ein Band aus der falschen Streuung, ein Nenner, der die
+  Trainings ohne Auswertung mitzählt. Nichts davon wirft eine Ausnahme, und
+  alles davon wird zu einem Satz, den die Anwendung jemandem über sich selbst
+  sagt, über Daten, die er nicht nachrechnen kann. Geprüft werden deshalb die
+  Aussagen, die der Bildschirm laut trifft („Ihr üblicher Bereich 118 bis 141“,
+  „in 9 von 12 Trainings“), nicht Zeilen. Dass ein Fokusziel aus dem Katalog
+  auch eine Kachel und einen Übungsvorschlag bekommt, hängt an zwei Tabellen im
+  Frontend, die still danebenliegen können; `tests/test_focus_goal_coverage.py`
+  und `tests/test_recommendations.py` halten beide gegen den gesäten Katalog.
 * **Auf Anfrage berechnet, nicht materialisiert.** Sechs Monate Aufbewahrung
   begrenzen die Datenmenge je Konto auf eine Größenordnung, die eine Abfrage
   ohne Aggregattabelle trägt. Eine Aggregattabelle wäre eine zweite Wahrheit,

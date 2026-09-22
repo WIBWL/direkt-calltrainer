@@ -132,3 +132,15 @@ arrangement the rest of that prompt already uses for the same reason. Whether a
 4B model actually holds all seven is not something the tests can answer; they
 pin what it was asked, which is the line `tests/README.md` draws for every
 prompt test in this suite.
+
+## Amendment, 2026-09-13: the occasion block is the situation alone
+
+This ADR withholds `success_condition` from the dossier, on the ground that what would have ended the call well is a result rather than an occasion, and that handing it over invites the model to grade the outcome under the heading of tone. The block was built to match: the Scenario's `description` and its `call_goal`, and a test asserting the criterion stayed out.
+
+Migration `3ce81b27af40` then merged `success_condition` into `call_goal`, and the seeded goals now read "... The matter is settled when someone names what is wrong and when it will be fixed". So the criterion arrived in the dossier under *What the caller wanted*, in every wrap-up of every built-in Scenario. The test kept passing because it asserted against a `success_condition` attribute that the ORM object no longer has and `_dossier` therefore never reads — green for the one reason that makes a test worthless.
+
+The criterion is cut back off instead. All 17 shipped Scenarios mark it the same way — the goal, then a sentence beginning "The matter is settled when" — so `_goal_without_criterion` splits there and the occasion block keeps what the caller wanted. That half *is* occasion, and dropping it, which is what this amendment first did, left the wrap-up guessing at the situation again: the state this block was written to end. An authored goal carries no such sentence and goes in whole, because there is no second thing in it to withhold.
+
+The split rests on a seed convention rather than on the schema, so a test checks it against the real seed: reword one goal without that sentence and its criterion goes back into the dossier, silently, which is exactly how it arrived there the first time.
+
+`call_goal` keeps every other job it has — it briefs the simulated caller, it drives the settlement check (ADR 0073) — and only this block sees the shortened form.

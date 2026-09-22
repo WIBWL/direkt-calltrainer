@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted, **amended on 2026-09-19**: the reverse's card turn is gone, so a cut is now none or a fade (see the amendment at the end).
 
 ## Context
 
@@ -33,3 +33,11 @@ Those transitions used to be fourteen `setScreen` calls spread through `App.tsx`
 A new screen touches three places: the `Screen` type, the table, and the render branch in `App`. A new fact the flow routes on touches `FlowContext` and every test that builds one.
 
 The table does not guarantee the side effects of a transition. That playback is activated when the call begins is ensured by there being a single handler for `callAccepted`, not by the table.
+
+## Amendment (2026-09-19): the reverse's card turn is removed
+
+The Decision above names three cuts: none, a fade, or the reverse's card turn. The card turn has been removed, both the animation and the card itself (`ReverseCard.tsx` and its image), at the user's request. `Cut` is now `"none" | "fade"`, and `ScreenTransition.tsx` performs only the fade.
+
+A reverse still reaches its briefing on the way out of the microphone check. The table now returns `{ screen: "brief", cut: "none" }` for it, and the two other ways in, from the wrap-up and from a past training, start the reverse directly instead of behind a cover. Nothing else about the table changes: the reverse still goes to `brief` and not to the ringing phone, because the User is the one calling.
+
+The Decision is left as written because it records what was built at the time. The card turn's reason, that a turning card says "the roles swap" in a way a button label cannot, is withdrawn along with the card. The briefing screen that follows now carries that message on its own.

@@ -163,7 +163,10 @@ class TurnAcoustics:
     # Relative by nature: the browser's automatic gain control makes an
     # absolute level a statement about the user's headset (ADR 0047).
     loudness_db: tuple[float | None, ...]
-    # Fundamental frequency on the same grid, None wherever the frame carried
+    # Fundamental frequency on the *pitch* grid (_PITCH_STEP_S, 10 ms), which
+    # is emphatically not the loudness curve's 100 ms above: ten samples a
+    # second alias a syllable rate of four to five, and reading intonation off
+    # that grid is the defect ADR 0077 removed. None wherever the frame carried
     # no voicing -- which is most consonants, every pause and any breath, so a
     # dense curve is not to be expected and its gaps are not failures (F-35).
     #
@@ -298,8 +301,18 @@ def _pitch(sound: parselmouth.Sound) -> tuple[float | None, ...]:
         max(_PITCH_FLOOR_HZ, float(low) * _PITCH_FLOOR_FACTOR),
         float(high) * _PITCH_CEILING_FACTOR,
     )
-    # A narrowed window that finds nothing is a sign the first pass was noise,
-    # not that the speaker fell silent; keep the wider reading in that case.
+    # A narrowed window that finds *almost* nothing is a sign the first pass was
+    # noise, not that the speaker fell silent; keep the wider reading there.
+    #
+    # An absolute floor of a tenth of a second, so it only catches the case it
+    # names. It cannot notice a second pass that keeps most of the contour and
+    # loses one genuine excursion below the new floor -- the ceiling sits 15.9
+    # ST above q3 while the floor sits 5.0 ST below q1, so the bottom of the
+    # window is much the tighter of the two, and ADR 0077 argues the ceiling at
+    # length and says nothing about the floor. On speech-like contours the loss
+    # is a handful of frames and changes no reading; the case is recorded here
+    # rather than guarded against, because a guard would need a number with as
+    # little behind it as the one it was protecting.
     return _as_curve(refined if (refined > 0).sum() >= _MIN_FRAMES_FOR_REFINEMENT else first)
 
 
@@ -321,7 +334,16 @@ def _as_curve(frequencies: np.ndarray) -> tuple[float | None, ...]:
 
 
 def _sample(values: np.ndarray, duration_s: float) -> tuple[float | None, ...]:
-    """Thin a frame-rate curve to one point per _SAMPLE_INTERVAL_MS, NaN -> None."""
+    """Thin a frame-rate curve to roughly one point per _SAMPLE_INTERVAL_MS,
+    NaN -> None.
+
+    Roughly: the point count is rounded, then spread over the whole turn, so
+    the real spacing is duration / round(duration / 100 ms) -- 87.5 ms on a
+    0.35 s turn, 106.7 ms on a 0.32 s one. Readers treat it as exactly 100 ms
+    (`frontend/src/utils/loudness.ts`, `metrics._SMOOTH_POINTS`), which is
+    accurate to within 2.5 % from two seconds up and drifts on a call made of
+    very short turns.
+    """
     points = max(2, round(duration_s * 1000 / _SAMPLE_INTERVAL_MS))
     if values.size > points:
         values = values[np.linspace(0, values.size - 1, points).astype(int)]

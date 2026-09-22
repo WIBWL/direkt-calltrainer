@@ -114,6 +114,10 @@ nav:
       - ADR 0095 - On the Progress View, Colour Names a Family and Never a Value: adr/0095-on-the-progress-view-colour-names-a-family-never-a-value.md
       - ADR 0096 - The Training Flow Is One Transition Table: adr/0096-the-training-flow-is-one-transition-table.md
       - ADR 0097 - Motion Yields to the System Setting, Sound Can Be Stopped, Charts Carry Their Numbers in Text: adr/0097-motion-yields-sound-can-be-stopped-charts-carry-their-numbers.md
+      - ADR 0098 - Every Kennzahl Opens Onto Its Evidence, and the Evidence Is Never Recomputed: adr/0098-every-metric-opens-onto-its-evidence.md
+      - ADR 0099 - The Caller Opens the Transaction, a Domain Function Takes It: adr/0099-the-caller-opens-the-transaction.md
+      - ADR 0100 - The Follow-Up and the Reverse Stay Two Routes, Sharing What Must Not Drift: adr/0100-follow-up-and-reverse-stay-two-routes.md
+      - ADR 0101 - Four Structural Proposals Declined, So That They Are Not Proposed Again: adr/0101-four-structural-proposals-declined.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
   # site is served at the root (mkdocs serve / mkdocs build + static server).

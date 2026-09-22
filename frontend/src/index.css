@@ -40,12 +40,6 @@
   --series-speech: #2a78d6;
   --series-content: #e87ba4;
   --series-activity: #4a3aa7;
-  /* The same hues at a fill weight: an area under a line, a band, a hover
-     surface. Alpha rather than a lighter step, so a fill sits on any surface
-     without a second set of values to keep in step. */
-  --series-speech-fill: #2a78d61f;
-  --series-content-fill: #e87ba41f;
-  --series-activity-fill: #4a3aa71f;
 
   /* Shared font families */
   --font-sans: "Hanken Grotesk", Arial, sans-serif;
@@ -226,6 +220,21 @@ body {
     flex-direction: column;
     align-items: flex-start;
     gap: 14px;
+  }
+
+  /* The focus onboarding has no training stepper, so its mobile header can
+     keep the brand and account on one row instead of using the stacked layout
+     that the training screens need for their progress indicator. */
+  .focus-onboarding .app-header {
+    height: 76px;
+  }
+
+  .focus-onboarding .app-header-inner {
+    min-height: 76px;
+    padding: 0;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
   }
 
   .training-progress {
@@ -2318,6 +2327,13 @@ h2 {
   color: var(--text-muted);
 }
 
+/* Out from under the disclaimer's rule: it is an offer and not part of the
+   caveat above it. */
+.metric-progress-link {
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+}
+
 /* --- Follow-up scenario from the feedback (F-60) ------------------------ */
 
 /* Reads as the consequence of the points above it: the same card, marked by an
@@ -2922,8 +2938,14 @@ p.follow-up-error {
   font-weight: 500;
 }
 
-.feedback-point-item p {
+/* The text and, above it, the goal it was filed under. A column of its own so
+   the timestamp keeps its place at the left edge of the row while the label
+   sits over the sentence rather than beside it. */
+.feedback-point-body {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* This section keeps a class of its own only for how its background note is
@@ -4273,6 +4295,321 @@ a.consent-button {
   color: var(--color-text-muted);
 }
 
+/* The focus goal a wrap-up point was filed under (ADR 0080). A quiet label,
+   not a badge: it names what the sentence above is about, and a coloured chip
+   there would compete with the sentence for the eye. */
+/* An eyebrow over the sentence, in the same key as the section eyebrows above
+   it: small, spaced, quiet. It names what the sentence is about and must not
+   compete with it. */
+.feedback-point-goal {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* The one link out of a single call into the same figure over all of them. */
+.metric-page-across {
+  margin: 1.25rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 0.9rem;
+}
+
+/* The silence itself, between the question and the answer it stood in front
+   of. Centred and quiet: it is a measurement standing between two quotations,
+   not a third voice in the exchange. */
+.evidence-gap {
+  margin: 0 0 0.75rem;
+  padding-left: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* All of them, in the order they happened. The longest is marked because it is
+   the one quoted above, so the list and the quotation cannot be read as two
+   different findings. */
+.evidence-gaps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-gaps li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.evidence-gaps li.is-peak {
+  color: inherit;
+  font-weight: 600;
+}
+
+.evidence-gaps .evidence-time {
+  display: inline;
+  margin: 0;
+}
+
+/* --- The two footnotes under the Kennzahlen grid -------------------------- */
+/* That a figure is missing, and that a second reading of some of them exists.
+   Both are quiet by design: they are context for the grid above, not findings
+   of their own. */
+.metric-footnotes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.metric-footnotes p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+/* --- The line a wrap-up point points at ---------------------------------- */
+/* The timestamp beside a strength or an improvement is a control: it opens the
+   transcript at that line (see TranscriptFocus.tsx). It keeps the look of the
+   text it replaced, because it stands inside a sentence about the call and a
+   button-shaped thing there would read as an action on the point itself. */
+.feedback-point-jump {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.feedback-point-jump:hover {
+  text-decoration-style: solid;
+}
+
+/* Marked while it is being read, and marked on the side rather than by a
+   background: a filled line in the middle of a transcript reads as a finding
+   about that line, which this is not. It says "here it is", nothing more. */
+.transcript-line.is-focused {
+  border-left: 3px solid var(--color-brand-accent);
+  margin-left: -3px;
+  background: var(--color-surface-selected);
+}
+
+/* --- What a figure was read off (MetricEvidence.tsx) ---------------------- */
+/* Every Kennzahl tile on the wrap-up screen opens its own page, so every page
+   has to show more than the tile did: the words that were counted, the
+   passages that were found, the pauses that were measured. Nothing in this
+   block may encode a direction -- no colour for a value, no target mark. The
+   one accent it uses sits on a *quoted word*, to say "this is the one that was
+   counted", never on a number. */
+
+.evidence-quote {
+  margin: 0 0 0.75rem;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--color-border);
+  background: var(--color-surface-selected);
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
+}
+
+.evidence-quote:last-of-type {
+  margin-bottom: 0;
+}
+
+.evidence-quote p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.evidence-time {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* The counted word inside its own sentence. Underlined as well as tinted, so
+   the mark survives a screen that cannot show the colour. */
+.evidence-hit {
+  padding: 0 0.15em;
+  border-bottom: 2px solid var(--color-brand-accent);
+  font-weight: 600;
+}
+
+.evidence-lead {
+  margin: 1.25rem 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+/* The two or three numbers a detail holds beside the measurement itself. */
+.evidence-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-facts li {
+  display: flex;
+  flex-direction: column;
+}
+
+.evidence-fact-value {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.evidence-fact-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* Two shares of one whole: talk share, and speech against the silence in it. */
+.evidence-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-bar {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.evidence-bar-label {
+  font-size: 0.9rem;
+}
+
+.evidence-bar-track {
+  height: 12px;
+  border-radius: 6px;
+  background: var(--color-surface-filter);
+  overflow: hidden;
+}
+
+/* One hue for both bars. A second colour would invite reading the pair as
+   good against bad, which is exactly what neither of them is. */
+.evidence-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--series-speech);
+}
+
+.evidence-bar-value {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* The counted words themselves. */
+.evidence-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 0.9rem;
+}
+
+.evidence-chip-count {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* A checklist's parts, written out. "nicht erkannt" is the wording, never
+   "fehlt" (ADR 0086), so the state is a word and not only a mark. */
+.evidence-parts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence-parts li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  color: var(--color-text-muted);
+}
+
+.evidence-parts li.is-said {
+  color: inherit;
+}
+
+.evidence-part-state {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* Where the pauses fell across the user's own speaking time. */
+.evidence-strip {
+  position: relative;
+  height: 28px;
+  margin-top: 0.5rem;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-filter);
+  overflow: hidden;
+}
+
+.evidence-strip-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--series-speech);
+  opacity: 0.75;
+}
+
+.evidence-axis {
+  margin: 0.4rem 0 1rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 620px) {
+  /* The label above its bar: at this width three columns leave the track a
+     centimetre wide, which draws nothing. */
+  .evidence-bar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .evidence-bar-label {
+    grid-column: 1 / -1;
+  }
+}
+
 /* --- The pitch contour (F-35) --------------------------------------------- */
 /* Drawn the way phonetics draws F0: semitones on the vertical axis relative to
    the speaker's own median, gaps left as gaps, one hue throughout. The reasons
@@ -4781,11 +5118,59 @@ a.consent-button {
   outline-offset: 2px;
 }
 
+.progress-period:disabled {
+  color: var(--color-border);
+  cursor: default;
+}
+
+/* The occasion row wraps onto its own line: five options with counts do not fit
+   beside the period switch at any width the page actually has, and the two are
+   read one after the other anyway ("the last five ... advisory calls"). */
+.progress-occasions {
+  flex-basis: 100%;
+  width: fit-content;
+}
+
+/* The count beside an occasion, so nobody presses into a narrow selection
+   without knowing how narrow. Dimmed, because it is context and not the
+   label. */
+.progress-period-count {
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Generous, and deliberately so: the complaint the redesign answers was that
    ten equal boxes read as one undifferentiated block, and the first remedy for
    that is space rather than decoration. */
 .progress-section {
   margin-top: 2.75rem;
+}
+
+/* --- The earlier half and the recent one (EarlyAndLate.tsx) -------------- */
+
+/* Side by side and equal in every respect: same width, same type, same
+   treatment. Stacked, the lower one would read as the conclusion of the upper,
+   and no conclusion is being drawn (ADR 0065). There is deliberately nothing
+   between the two columns — no arrow, no delta, no separator suggesting a
+   direction of travel. */
+.early-late {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.early-late-label {
+  margin: 0 0 4px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.early-late-range {
+  margin: 0;
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-navy-900);
 }
 
 /* The same distance from every section heading to what it heads. A `.card`
@@ -5058,6 +5443,37 @@ a.consent-button {
   height: 22px;
 }
 
+/* The newest thing a wrap-up wrote about a goal that has no measurement. It
+   leads the tile, because for those goals the sentences are the whole of what
+   exists and a tally on its own reads as a measurement of something. Quoted,
+   so it is visibly somebody else's words and not the interface's verdict. */
+.focus-quote {
+  margin: 0 0 12px;
+  padding-left: 10px;
+  border-left: 3px solid var(--color-border);
+}
+
+.focus-quote blockquote {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--color-navy-900);
+}
+
+.focus-quote blockquote::before {
+  content: "„";
+}
+
+.focus-quote blockquote::after {
+  content: "“";
+}
+
+.focus-quote figcaption {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
 /* What the wrap-ups said about a goal with no measurement: a label, the pips
    and the count, the same marks the recurring block uses for the same kind of
    statement. */
@@ -5281,6 +5697,10 @@ a.consent-button {
   padding: 0;
 }
 
+/* A day is a `span` where nothing happened and a `button` where something did,
+   so the resets here have to cover both: a cell must look identical whether or
+   not it can be pressed, or the grid would encode "has trainings" a second
+   time, in the shape of the cell. */
 .calendar-day {
   position: relative;
   display: flex;
@@ -5288,10 +5708,29 @@ a.consent-button {
   justify-content: center;
   width: 100%;
   height: 32px;
+  padding: 0;
+  border: 0;
   border-radius: 9px;
+  font: inherit;
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
   transition: transform 120ms ease;
+}
+
+button.calendar-day {
+  cursor: pointer;
+}
+
+.calendar-day:focus-visible {
+  outline: 2px solid var(--color-navy-900);
+  outline-offset: 2px;
+}
+
+/* The opened day keeps a ring while its trainings are listed below, because
+   the list stands under the whole calendar and would otherwise be a block with
+   no visible connection to the cell that opened it. */
+.calendar-day-open {
+  box-shadow: 0 0 0 2px var(--color-navy-900);
 }
 
 /* Today, whether or not anything was trained on it: a ring rather than a fill,
@@ -5430,13 +5869,18 @@ a.consent-button {
   padding: 3px 4px;
 }
 
+/* Like `.calendar-day`: a played cell is a button and an unplayed one a span,
+   and both have to draw identically apart from the fill they already carry. */
 .variety-cell {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 34px;
   height: 28px;
+  padding: 0;
+  border: 0;
   border-radius: var(--radius-control);
+  font: inherit;
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
 }
@@ -5444,6 +5888,18 @@ a.consent-button {
 .variety-cell.is-played {
   background: var(--color-blue-600);
   color: var(--color-surface);
+  cursor: pointer;
+}
+
+.variety-cell:focus-visible {
+  outline: 2px solid var(--color-navy-900);
+  outline-offset: 2px;
+}
+
+/* The opened pairing, for the same reason the opened calendar day keeps one:
+   the list sits under the whole table. */
+.variety-cell.is-open {
+  box-shadow: 0 0 0 2px var(--color-navy-900);
 }
 
 .variety-empty {
@@ -5451,6 +5907,64 @@ a.consent-button {
   height: 100%;
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-control);
+}
+
+/* --- The trainings behind a cell (TrainingLinks.tsx) --------------------- */
+
+/* Opened under the calendar and under the variety grid, so the two blocks that
+   describe what somebody did also lead back to it. Set off by a rule and a
+   tinted ground rather than by a border, because it appears inside a card that
+   already has one. */
+.training-links {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-background);
+}
+
+.training-links-title {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.training-links ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.training-links a {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  padding: 5px 6px;
+  border-radius: var(--radius-control);
+  font-size: 0.82rem;
+  text-decoration: none;
+  color: var(--color-navy-900);
+}
+
+.training-links a:hover {
+  background: var(--color-surface);
+}
+
+.training-links a:focus-visible {
+  outline: 2px solid var(--color-navy-900);
+  outline-offset: 1px;
+}
+
+.training-links-when {
+  font-variant-numeric: tabular-nums;
+  text-decoration: underline;
+}
+
+.training-links-what {
+  color: var(--color-text-muted);
 }
 
 /* Available to a screen reader, invisible on screen: an empty cell has to say
@@ -5860,6 +6374,22 @@ a.consent-button {
   color: var(--color-text-muted);
 }
 
+/* What a wrap-up has said about the goal since. Same type as the ground above
+   it, because it is the second half of the same account: the wrap-ups raised
+   this, and afterwards one said that. Nothing here is emphasised over the
+   other — no colour, no weight — since the two are statements in sequence and
+   not a before and an after. */
+.progress-practice-since {
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+.progress-practice-since q {
+  color: var(--color-navy-900);
+}
+
 /* The chip at the head of the sentence that gives the ground. It says what
    kind of thing this block is before the reader has read a word of it, which is
    the same job the closing caveat does at the other end. */
@@ -5957,19 +6487,58 @@ a.consent-button {
 
 /* The header's plain text link, beside the account chip. */
 /* --- Training focus (F-61, ADR 0074) ------------------------------------ */
-/* The same picker in two frames: the first-run dialog and the profile card.
-   Everything below styles the picker; only .focus-dialog belongs to the first
-   of those. */
+/* The same picker appears on the first-run focus screen and in the profile.
+   Everything below styles that shared selection experience; .focus-dialog
+   sizes the catalogue card on the onboarding screen. */
 
-/* Wider than the consent dialog, which carries four sentences — this one
-   carries the whole catalogue, two cards to a row. The backdrop already scrolls, so a tall
-   list on a short viewport stays reachable. */
+/* Wider than the regular consent card because this screen carries the full
+   catalogue in a responsive grid. The surrounding page provides scrolling on
+   short viewports while the fixed action bar remains available. */
 .focus-dialog {
   width: min(920px, 100%);
+  padding: 28px 30px 32px;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(3, 37, 62, 0.055);
 }
 
-/* Role and call types (F-62): chips, since there are few and each is a word
-   or two. The real control stays for the keyboard; the chip is what shows. */
+/* The fixed action bar is outside normal document flow. Reserve enough space
+   at the end of the page so the last focus content can scroll above it. */
+.focus-onboarding {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 96px;
+  background: var(--color-background);
+}
+
+.focus-onboarding-main {
+  flex: 1;
+  width: 100%;
+  padding: 40px 24px 56px;
+}
+
+.focus-onboarding-intro {
+  width: min(920px, 100%);
+  margin: 0 auto 20px;
+}
+
+.focus-onboarding-intro h1 {
+  margin-bottom: 8px;
+}
+
+.focus-onboarding-intro p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
+.focus-onboarding .focus-dialog {
+  margin: 0 auto;
+}
+
+/* Role and call types (F-62): compact choice controls, since there are only a
+   few short options. The native controls remain available to the keyboard;
+   the styled labels provide the visible interaction surface. */
 .focus-profile {
   margin-top: 1.25rem;
   padding-bottom: 1.25rem;
@@ -5987,9 +6556,9 @@ a.consent-button {
   position: relative;
   display: inline-flex;
   align-items: center;
-  padding: 7px 14px;
+  padding: 7px 12px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: 9px;
   background: var(--color-surface);
   font-size: 0.9rem;
   cursor: pointer;
@@ -6020,7 +6589,7 @@ a.consent-button {
   outline-offset: 2px;
 }
 
-/* Two classes, to win over the dialog's own paragraph margins. */
+/* Two classes, to win over the surrounding card's paragraph margins. */
 .focus-profile .focus-profile-note {
   margin: 0;
   font-size: 0.85rem;
@@ -6098,8 +6667,8 @@ a.consent-button {
 /* A rule between the groups, since the cards no longer form one column whose
    breaks the headings alone could mark. */
 .focus-group + .focus-group {
-  margin-top: 1.5rem;
-  padding-top: 1.25rem;
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
   border-top: 1px solid var(--color-border-subtle);
 }
 
@@ -6125,7 +6694,7 @@ a.consent-button {
   padding: 0;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 /* Cards in one row end level, whatever their caption runs to. */
@@ -6157,7 +6726,7 @@ a.consent-button {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface);
@@ -6178,26 +6747,6 @@ a.consent-button {
   background: var(--color-surface-selected);
 }
 
-/* Title and "i" on one line, the icon hugging the title rather than stretching
-   to the right edge, where it would sit against the check circle. Opened, the
-   panel takes a line of its own so the text runs the card's full width. */
-.focus-goal-head {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding-right: 30px; /* the check circle */
-}
-
-.focus-goal-head .info-details {
-  margin: 0;
-}
-
-.focus-goal-head .info-details[open] {
-  flex-basis: 100%;
-  margin-top: 0.25rem;
-}
-
 /* The real control, kept for the keyboard and the screen reader and drawn as
    the circle below. */
 .focus-goal-input {
@@ -6213,6 +6762,14 @@ a.consent-button {
 .focus-goal-caption {
   display: block;
   cursor: pointer;
+}
+
+/* The right gutter holds the check circle at the top and the "i" at the
+   bottom, so no line of text runs under either. */
+.focus-goal-title,
+.focus-goal-caption,
+.focus-goal .info-body {
+  padding-right: 26px;
 }
 
 /* Geometry comes from .choice-check, so this and a Persona card cannot drift.
@@ -6268,15 +6825,75 @@ a.consent-button {
   color: var(--color-text-muted);
 }
 
-/* Smaller than a standalone "i", because it sits inside a card rather than
-   under a section heading. Indented to the text, not to the checkbox. */
-.focus-goal .info-summary {
-  font-size: 0.8rem;
-  font-weight: 500;
+/* The "i" in the bottom-right corner, drawn like `.card-info` on a Persona or
+   Scenario card: a 24px target around an 18px ring, centred in the same column
+   as the 22px check circle above it. The explanation opens as an overlay so it
+   never changes the height of the card or its grid row. */
+.focus-goal .info-details {
+  margin: 0;
 }
 
+.focus-goal .info-summary {
+  position: absolute;
+  right: 9px;
+  bottom: 9px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--color-navy-900);
+}
+
+.focus-goal .info-icon {
+  width: 18px;
+  height: 18px;
+  font-size: 0.65rem;
+  transition: background-color 0.2s;
+}
+
+.focus-goal .info-summary:hover .info-icon,
+.focus-goal .info-details[open] .info-icon {
+  background: var(--color-blue-100);
+}
+
+/* On the ring, as on `.card-info`, so the outline traces what is visible. */
+.focus-goal .info-summary:focus-visible {
+  outline: none;
+}
+
+.focus-goal .info-summary:focus-visible .info-icon {
+  outline: 2px solid var(--color-navy-900);
+  outline-offset: 2px;
+}
+
+/* Raise the active card above its neighbours so the explanation is not hidden
+   by another card in the grid. */
+.focus-goal:has(.info-details[open]) {
+  z-index: 5;
+}
+
+.focus-goal .info-details[open] {
+  margin-bottom: 0;
+}
+
+/* The explanation behaves like a small anchored popover. Keeping it outside
+   normal flow prevents one open explanation from stretching the whole row. */
 .focus-goal .info-body {
+  position: absolute;
+  right: 10px;
+  bottom: 40px;
+  z-index: 20;
+  width: min(300px, calc(100% - 20px));
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  box-shadow: 0 10px 24px rgba(3, 37, 62, 0.14);
   font-size: 0.85rem;
+  line-height: 1.5;
 }
 
 /* aria-live: the count is how a screen-reader user learns the limit was
@@ -6287,43 +6904,39 @@ a.consent-button {
   color: var(--color-text-muted);
 }
 
-/* Bleeds to the dialog's padding edges (32px) so the bar spans it fully, and
-   sticks to the bottom of the backdrop's scroll while the list runs past. */
+/* Fixed to the viewport so the selection tally and both actions remain
+   available without overlapping the focus card or exposing the page
+   background below the action area. */
 .focus-actions-bar {
-  position: sticky;
+  position: fixed;
+  left: 0;
+  right: 0;
   bottom: 0;
-  margin: 1.5rem -32px -32px;
-  padding: 14px 32px 20px;
+  z-index: 40;
+  padding: 14px 24px 16px;
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
-  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  box-shadow: 0 -8px 22px rgba(3, 37, 62, 0.07);
+}
+
+.focus-actions-inner {
+  width: min(1080px, 100%);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.focus-actions-copy {
+  min-width: 0;
 }
 
 .focus-tally {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
-}
-
-/* The limit as five slots that fill up: seen rather than read. */
-.focus-slots {
-  display: inline-flex;
-  flex: none;
-  gap: 5px;
-  transform: translateY(-1px);
-}
-
-.focus-slot {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  border: 1px solid var(--color-blue-300);
-}
-
-.focus-slot-filled {
-  background: var(--color-blue-600);
-  border-color: var(--color-blue-600);
+  margin: 0;
 }
 
 .focus-actions-bar .focus-count {
@@ -6332,17 +6945,73 @@ a.consent-button {
 }
 
 .focus-actions-bar .consent-actions {
+  flex: none;
   margin-top: 0;
-  /* Two pill buttons at `flex: 1` squeeze past legibility on a narrow window. */
   flex-wrap: wrap;
 }
 
-/* Moved down from the head: the reassurance that this is changeable belongs
-   where the decision is made. */
+/* The fixed action bar uses compact rectangular actions rather than the
+   pill shape used by consent dialogs elsewhere in the application. */
+.focus-actions-bar .consent-button {
+  border-radius: 9px;
+  padding: 0.75rem 1.2rem;
+}
+
+/* Keyboard users need a focus cue that remains visible on both the light
+   secondary action and the dark primary action. */
+.focus-actions-bar .consent-button:focus-visible {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
+}
+
+/* The reassurance belongs next to the current selection because both describe
+   the decision the user is making in the fixed action area. */
 .focus-bar-note {
-  margin: 10px 0 0;
+  margin: 4px 0 0;
   font-size: 0.85rem;
   color: var(--color-text-muted);
+}
+
+/* On smaller screens the action area becomes a compact vertical layout.
+   Extra page padding keeps the taller fixed bar from covering the content. */
+@media (max-width: 720px) {
+  .focus-onboarding {
+    padding-bottom: 160px;
+  }
+
+  .focus-actions-bar {
+    padding: 12px 16px 14px;
+  }
+
+  .focus-actions-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .focus-actions-bar .consent-actions {
+    width: 100%;
+    flex-wrap: nowrap;
+  }
+
+  .focus-actions-bar .consent-button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .focus-onboarding {
+    padding-bottom: 210px;
+  }
+
+  .focus-actions-bar .consent-actions {
+    flex-direction: column;
+  }
+
+  .focus-actions-bar .consent-button {
+    width: 100%;
+  }
 }
 
 /* The read-only summary on the profile card. */
@@ -7682,13 +8351,13 @@ a.consent-button {
   }
 }
 
-/* --- Screen transitions (F-61, ADR 0070) -------------------------------- */
+/* --- Screen transitions ---------------------------------------------------- */
 
-/* The film cut played when the roles are swapped: the card turns over the
-   screen, the screen changes behind it, the card leaves. Two phases, driven
-   from ScreenTransition.tsx — which also sets --cover-ms/--reveal-ms, so the
-   timers that fire the actual screen change and these animations are the same
-   numbers rather than two copies of them.
+/* The film cut between two screens: the screen dims to opaque, changes behind
+   the cover, and comes back. Two phases, driven from ScreenTransition.tsx —
+   which also sets --cover-ms/--reveal-ms, so the timers that fire the actual
+   screen change and these animations are the same numbers rather than two
+   copies of them.
 
    Deliberately above everything and untouchable: a transition the user can
    click through is a transition that lands them on a half-built screen. */
@@ -7696,10 +8365,7 @@ a.consent-button {
   position: fixed;
   inset: 0;
   z-index: 2000;
-  display: grid;
-  place-items: center;
   pointer-events: all;
-  perspective: 1200px;
 }
 
 /* The palette's navy, kept after a neutral grey was tried against it: the
@@ -7713,39 +8379,14 @@ a.consent-button {
   background: var(--color-navy-900);
 }
 
-.screen-transition-card {
-  position: relative;
-  width: min(38vh, 34vw);
-  filter: drop-shadow(0 24px 48px rgba(3, 37, 62, 0.55));
-  transform-style: preserve-3d;
-}
-
-.reverse-card {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
-/* Cover: the screen darkens to opaque while the card flies in and turns.
-   `forwards` matters on both — the cut happens on the last frame, and a card
-   that snapped back to its start there would be visible for one frame. */
+/* `forwards` matters on both phases — the cut happens on the last frame, and
+   a scrim that snapped back to its start there would flash for one frame. */
 .screen-transition-cover .screen-transition-scrim {
   animation: screen-transition-scrim-in var(--cover-ms) cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-.screen-transition-cover .screen-transition-card {
-  animation: reverse-card-in var(--cover-ms) cubic-bezier(0.34, 1.2, 0.5, 1) forwards;
-}
-
-/* Reveal: the card keeps turning the same way and leaves towards the viewer,
-   the scrim lifts off the new screen. Same direction of spin as the cover, so
-   the two phases read as one movement interrupted by the cut. */
 .screen-transition-reveal .screen-transition-scrim {
   animation: screen-transition-scrim-out var(--reveal-ms) cubic-bezier(0.4, 0, 1, 1) forwards;
-}
-
-.screen-transition-reveal .screen-transition-card {
-  animation: reverse-card-out var(--reveal-ms) cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 @keyframes screen-transition-scrim-in {
@@ -7769,39 +8410,8 @@ a.consent-button {
   }
 }
 
-/* Y, not Z: the card turns over the way a card is turned over, so the reverse
-   symbol sweeps through its own edge instead of spinning flat like a wheel.
-   The slight Z tilt keeps it from looking like a closing door. */
-@keyframes reverse-card-in {
-  from {
-    opacity: 0;
-    transform: rotateY(-200deg) rotateZ(-24deg) scale(0.35);
-  }
-  55% {
-    opacity: 1;
-  }
-  to {
-    opacity: 1;
-    transform: rotateY(0deg) rotateZ(0deg) scale(1);
-  }
-}
-
-@keyframes reverse-card-out {
-  from {
-    opacity: 1;
-    transform: rotateY(0deg) rotateZ(0deg) scale(1);
-  }
-  60% {
-    opacity: 0.9;
-  }
-  to {
-    opacity: 0;
-    transform: rotateY(200deg) rotateZ(20deg) scale(1.9);
-  }
-}
-
-/* The screen the cut lands on comes up rather than appearing: without it the
-   reveal is a hard edit from an opaque scrim to a finished page. */
+/* The briefing screens come up rather than appearing: without it the arrival
+   is a hard edit to a finished page. */
 .brief-page .reverse-brief,
 .brief-page .scenario-briefing,
 .brief-page .case-brief,
@@ -8430,7 +9040,7 @@ a.consent-button {
   color: var(--color-navy-900);
 }
 
-/* Unlike the die (F-62) and the card turn (F-61) this screen is still shown
+/* Unlike the die (F-62) this screen is still shown
    under reduced motion — there is nothing behind it to skip to, only a wait.
    What is left is the waveform standing still with the lens over it. */
 @media (prefers-reduced-motion: reduce) {

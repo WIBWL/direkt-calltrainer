@@ -191,7 +191,7 @@ async def test_only_the_heard_sentence_is_committed_when_the_turn_is_cut_mid_syn
     assert orch.turns[0].persona_text == s1
     assert s2 not in orch.turns[0].persona_text, "streamed ahead but never heard"
     assert s3 not in orch.turns[0].persona_text, "streamed ahead but never heard"
-    assert orch._messages[-1] == {"role": "assistant", "content": s1 + INTERRUPTED_MARK}
+    assert orch.history.messages[-1] == {"role": "assistant", "content": s1 + INTERRUPTED_MARK}
 
 
 class _TailWs:
@@ -242,7 +242,7 @@ async def test_a_barge_in_on_the_tail_trims_the_committed_reply_to_what_was_hear
 
     await _run_turn_interruptible(ws, events, orch.start_playback, orch.note_barge_in)
 
-    assistant = [m for m in orch._messages if m["role"] == "assistant"]
+    assistant = [m for m in orch.history.messages if m["role"] == "assistant"]
     assert len(assistant) == 1, f"the reply was committed {len(assistant)}x"
     assert assistant[0]["content"] == s1 + INTERRUPTED_MARK, "only the heard sentence, in the history"
     assert orch.turns[0].persona_text == s1, "and the same in the Transcript"
@@ -294,7 +294,7 @@ async def test_a_barge_in_after_the_turn_generator_returned_still_trims(
     outcome = await _run_turn_interruptible(ws, events, orch.start_playback, orch.note_barge_in)
 
     assert outcome in ("interrupted", "ok")  # depends on which task the wait saw first
-    assistant = [m for m in orch._messages if m["role"] == "assistant"]
+    assistant = [m for m in orch.history.messages if m["role"] == "assistant"]
     assert len(assistant) == 1
     assert assistant[0]["content"] == s1 + INTERRUPTED_MARK, "history trimmed to the heard sentence"
     assert orch.turns[0].persona_text == s1, "Transcript trimmed to match"

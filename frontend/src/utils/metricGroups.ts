@@ -42,7 +42,10 @@ export const GROUPS: Record<MetricGroup, GroupStyle> = {
   content: { label: "Gesprächsinhalt", color: "var(--series-content)" },
   // Slot 7, violet. Counting what somebody did needs no norm at all, which is
   // why the two charts in this family are the only ones on the screen that
-  // carry no caveat.
+  // carry no caveat. No Kennzahl belongs to this family, so `groupOf` never
+  // returns it: the activity charts read `--series-activity` from the
+  // stylesheet directly. The entry stays so the third hue is declared beside
+  // the other two, which is the set of three the palette was validated as.
   activity: { label: "Aktivität", color: "var(--series-activity)" },
 };
 

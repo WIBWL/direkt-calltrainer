@@ -49,6 +49,11 @@ def decide(decision: Decision, caller: AuthContext = Depends(require_user)) -> d
     in.
     """
     with session_scope() as db:
+        # Taken before either write: a Session being persisted right now holds
+        # this same lock while it reads the decision, so the two cannot
+        # interleave into a stored training under a withdrawn consent
+        # (ADR 0066). Released by the commit that ends this block.
+        consent_service.lock_subject(db, caller.sub)
         state = consent_service.record_decision(db, caller.sub, decision.granted)
         deleted = 0 if decision.granted else deletion.delete_subject_sessions(db, caller.sub)
         return {**_state(state), "deleted_sessions": deleted}

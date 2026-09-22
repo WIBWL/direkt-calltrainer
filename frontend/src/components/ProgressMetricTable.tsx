@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { useProgressContext } from "../ProgressContext";
 import { progressMetricPath } from "../routes";
 import { GROUPS, groupOf, type MetricGroup } from "../utils/metricGroups";
 import {
@@ -134,6 +135,15 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
           dort wie eine Note gelesen würde. Die Farbe steht für die Gruppe, nie für einen Wert.
         </p>
         <p>
+          Die Spalte „Trainings“ sagt, aus wie vielen Gesprächen eine Zeile besteht. Diese
+          Zahl kann kleiner sein als die Zahl Ihrer Trainings, und dafür gibt es zwei Gründe.
+          Entweder ist die Kennzahl neuer als das Gespräch: Die Aufnahme wird nach jedem
+          Training gelöscht, deshalb lässt sich nichts nachmessen. Oder die Aufnahme hatte so
+          viel Hintergrundgeräusch, dass sich Sprechen und Stille nicht trennen ließen. Dann
+          fehlen Sprechtempo, Sprechpausen, Redefluss, Sprechlänge und Lautstärke für dieses
+          eine Gespräch, weil ein Wert daraus mehr über den Raum sagen würde als über Sie.
+        </p>
+        <p>
           Die Lautstärke fehlt hier mit Absicht. Gemessen wird der Pegel der Aufnahme, und der
           hängt von Mikrofon und Abstand genauso ab wie von Ihnen. Über mehrere Gespräche
           hinweg ist er deshalb nicht vergleichbar. Ihren Verlauf innerhalb eines Gesprächs
@@ -154,7 +164,10 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
  */
 function MetricRow({ series }: { series: MetricSeries }) {
   const navigate = useNavigate();
-  const path = progressMetricPath(series.key);
+  // The selection travels with the link, so the page behind it is drawn over
+  // the same trainings this row was (see ProgressContext.tsx).
+  const { withPeriod } = useProgressContext();
+  const path = withPeriod(progressMetricPath(series.key));
   const last = series.points[series.points.length - 1];
   const enough = series.points.length >= MIN_SESSIONS_FOR_SERIES;
 

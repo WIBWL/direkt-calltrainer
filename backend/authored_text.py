@@ -71,6 +71,28 @@ def clean(value: str) -> str:
     return value.strip()
 
 
+def fit(value: str, cap: int) -> str:
+    """One field, held to its cap without ending mid-word.
+
+    For text a model wrote into a capped field -- the follow-up draft (F-60)
+    and the reverse briefing (F-61). The prompt states every limit and a small
+    model (ADR 0011) still writes past them, so the cap has to hold on this
+    side as well. Cutting back to the last space leaves a readable line instead
+    of a severed word, and the ellipsis says the sentence was cut rather than
+    written that way. Only ever a safety net: a draft that needs it has already
+    lost its ending.
+    """
+    if len(value) <= cap:
+        return value
+    head = value[: cap - 1].rstrip()
+    space = head.rfind(" ")
+    # Back off to a word boundary only while that leaves most of the field --
+    # one very long word must not cut the line down to nothing.
+    if space > cap // 2:
+        head = head[:space]
+    return head.rstrip(" ,;:-–—") + "…"
+
+
 # One line added to the system prompt when the Scenario is User-authored
 # (backend/session/orchestrator.py). `clean` above is the real defence -- it
 # removes the tokens a field could use to subvert the prompt structurally. This

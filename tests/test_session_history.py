@@ -184,6 +184,11 @@ async def test_a_row_carries_what_the_history_list_shows(
         # Which side the User was on (ADR 0070) -- two rows on the same
         # Scenario are otherwise indistinguishable.
         "reverse",
+        # The kind of call (ADR 0072), so the progress view can read a course
+        # over one kind. Without it every chart there mixes a complaint, a
+        # price negotiation and an advisory call into one line, which is the
+        # objection the dashboard concept raises against its own charts.
+        "category",
         # The wrap-up's tagged points: what each was about and how it was
         # worded. The dashboard counts them across Sessions and shows what was
         # written (ADR 0064's amendment). The wrap-up as a text -- summary,

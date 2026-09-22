@@ -30,10 +30,13 @@ from types import SimpleNamespace
 import pytest
 
 from backend.clients.llm import _strip_reasoning
+from backend.db import models as db_models
 from backend.db.seed_data import FOCUS_GOALS
+from backend.feedback import metrics
 from backend.feedback.generator import (
-    _ask, _dossier, _in_language, _LANGUAGE_NAMES_EN, _messages, _NO_WRAPUP,
-    _NOTHING_SAID, _without_turn_markers, _Wrapup,
+    _ask, _dossier, _goal_without_criterion, _in_language, _LANGUAGE_NAMES_EN,
+    _messages, _NO_WRAPUP, _NOTHING_SAID, _occasion, _SETTLEMENT_MARKER,
+    _unfenced_text, _without_turn_markers, _Wrapup,
 )
 from backend.session.language_packs import LANGUAGE_PACKS
 
@@ -103,6 +106,27 @@ def test_prompt_asks_for_six_keys_including_the_phase_and_tone_blocks(
     assert "three keys" not in system_prompt
 
 
+def test_the_prose_blocks_carry_no_figures(system_prompt: str) -> None:
+    """The summary and the phase paragraph say it in words.
+
+    The wrap-up used to drop measured values into both, usually in brackets
+    after the statement they were meant to support ("sachlich (62 %)"). Every
+    one of those figures already stands on the same screen, in the Kennzahlen
+    grid, next to what it was measured from and to the scale it belongs to; in
+    a sentence it has none of that and reads as the verdict on the call that
+    F2 forbids in the next line.
+
+    Pinned by rule number and by the ban itself, not by the whole wording: the
+    two blocks are prose, and the sentence explaining why may be reworded.
+    """
+    assert "F5. The summary and the phase_language block carry no figures" in system_prompt
+    assert "never one in brackets after a statement" in system_prompt
+    assert "H8. No figures in this block either" in system_prompt
+    # And the silent check at the end asks for it again, which is the one the
+    # model actually runs over its own answer.
+    assert "neither the summary nor phase_language" in system_prompt
+
+
 def test_the_tone_block_starts_from_the_occasion_and_not_from_the_figures(
     system_prompt: str,
 ) -> None:
@@ -139,7 +163,7 @@ def test_the_dossier_names_the_occasion_before_the_statistics() -> None:
 
     assert "The occasion of this call" in dossier
     assert "line that has been down since Monday" in dossier
-    assert "Get a repair date" in dossier
+    assert "Get a repair date" in dossier, "what the caller wanted is the occasion"
     assert dossier.index("The occasion") < dossier.index("Measured statistics")
 
 
@@ -180,10 +204,23 @@ def test_the_habit_goals_are_ruled_out_in_the_prompt(system_prompt: str) -> None
 def test_the_dossier_withholds_the_success_condition() -> None:
     """It says what would have ended the call well, which is a result and not
     an occasion. Handed over, it invites the model to grade the outcome under
-    the heading of tone."""
+    the heading of tone (ADR 0079).
+
+    Read off the Scenario the fixture actually carries. `success_condition` was
+    its own column when this was written and the test asserted against an
+    attribute of that name -- which migration `3ce81b27af40` merged into
+    `call_goal` and `_dossier` therefore cannot read. The assertion held for
+    the wrong reason, while the criterion itself was going into the dossier
+    inside the goal, which is the state it was written to prevent.
+    """
     dossier, _ = _dossier(_session_with())
 
+    assert "The matter is settled when" not in dossier
     assert "named engineer" not in dossier
+    # And the half in front of it is still there: the criterion is cut off the
+    # goal, not the goal dropped. A wrap-up left to guess the occasion again is
+    # the state the block was written to end.
+    assert "Get a repair date" in dossier
 
 
 def test_prompt_forbids_markup_inside_the_phase_paragraph(system_prompt: str) -> None:
@@ -281,28 +318,47 @@ def test_an_unfinished_reasoning_trace_yields_no_answer() -> None:
 # --- F-37: what the dossier says about loudness ----------------------------
 
 
-def _measurement(key: str, name: str, unit: str | None, value: float, detail=None):
-    """One Measurement as `_dossier` reads it -- no database needed."""
+def _measurement(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    key: str, name: str, unit: str | None, value: float, detail=None,
+    segment: str = db_models.SEGMENT_CALL,
+):
+    """One Measurement as `_dossier` reads it -- no database needed.
+
+    `segment` carries its real default: since ADR 0081 a Session also holds
+    rows measured over the demanding stretches and over the rest, and the
+    dossier speaks for the whole call only. A fixture without the field cannot
+    show that difference, and the dossier read all three as the call's own.
+    """
     return SimpleNamespace(
         value=value,
         detail_json=detail,
+        segment=segment,
         metric_type=SimpleNamespace(key=key, name=name, unit=unit),
     )
 
 
 def _session_with(*measurements) -> SimpleNamespace:
     # The Scenario is stood in for as well: `_dossier` reads its `reverse` flag
-    # to decide what to call the simulated side (ADR 0070), and its situation
-    # and goal for the tone_fit block. A real Session always has one --
-    # `session.scenario_id` is NOT NULL.
+    # to decide what to call the simulated side (ADR 0070) and its situation for
+    # the tone_fit block. A real Session always has one -- `session.scenario_id`
+    # is NOT NULL.
+    #
+    # `call_goal` is here although the dossier no longer reads it, and that is
+    # the point: it carries the settlement criterion, and a test asserting the
+    # criterion stays out needs a Scenario that actually holds one.
     return SimpleNamespace(
         measurements=list(measurements),
         turns=[],
         scenario=SimpleNamespace(
             reverse=False,
             description="A customer rings about a line that has been down since Monday.",
-            call_goal="Get a repair date and some acknowledgement of the trouble.",
-            success_condition="A named engineer and a date the customer accepts.",
+            # Carries the settlement criterion, as every seeded goal does since
+            # migration 3ce81b27af40 merged `success_condition` into it.
+            call_goal=(
+                "Get a repair date and some acknowledgement of the trouble. The "
+                "matter is settled when a named engineer and a date the customer "
+                "accepts have been given."
+            ),
         ),
     )
 
@@ -403,3 +459,100 @@ def test_a_language_without_a_sentence_gets_the_german_one() -> None:
     """A KeyError here would fail the job on the one screen whose whole purpose
     is to say why there is nothing to read. German is what the pilot runs in."""
     assert _in_language(_NOTHING_SAID, "Finnish") == _in_language(_NOTHING_SAID, "German")
+
+
+def test_only_the_whole_calls_statistics_reach_the_dossier() -> None:
+    """The block is headed "for this call" and rule M3 tells the model to treat
+    what is in it as established fact.
+
+    Since ADR 0081 a Session also carries the same metrics measured over the
+    demanding stretches and over the rest. Unfiltered, a regenerated wrap-up
+    read one metric three times with three different values -- the segment rows
+    are written by the previous run and are still there on the next one.
+    """
+    session = _session_with(
+        _measurement("pace", "Sprechtempo", "Wörter/min", 145.0),
+        _measurement("pace", "Sprechtempo", "Wörter/min", 172.0,
+                     segment=db_models.SEGMENT_PRESSURE),
+        _measurement("pace", "Sprechtempo", "Wörter/min", 131.0,
+                     segment=db_models.SEGMENT_REST),
+    )
+
+    dossier, _ = _dossier(session)
+
+    assert dossier.count("Sprechtempo") == 1
+    assert "145.0" in dossier and "172.0" not in dossier and "131.0" not in dossier
+
+
+def test_the_loudness_course_is_the_whole_calls_curve() -> None:
+    """The segment rows carry a `curve_db` of their own. Taking the first match
+    described the pressing stretch's course as the conversation's."""
+    session = _session_with(
+        _measurement("loudness", "Lautstärke", "dB", 9.0,
+                     detail={"curve_db": [40.0] * 30}, segment=db_models.SEGMENT_PRESSURE),
+        _measurement("loudness", "Lautstärke", "dB", 12.0,
+                     detail={"curve_db": [70.0] * 30}),
+    )
+
+    dossier, _ = _dossier(session)
+
+    assert metrics.describe_loudness_course([70.0] * 30) in dossier
+
+
+def test_a_reply_that_never_validated_is_not_shown_as_the_summary() -> None:
+    """ADR 0049's degraded path is "a summary with no evidence links" -- the
+    prose the model wrote, without its structure.
+
+    An answer that fails to validate is very often not prose at all: JSON cut
+    off in the token budget, or a field of the wrong type. Stored raw, that
+    reached the User as their summary, and `scripts/requeue_feedback.py` skips
+    a Session that already has a Feedback row, so it could never be replaced.
+    """
+    cut_off = '{"summary": "Sie haben klar nachgefragt.", "phase_language": "Sach'
+
+    assert _unfenced_text(cut_off, "German") == _NO_WRAPUP["German"]
+    assert _unfenced_text('["Klare Nachfrage."]', "German") == _NO_WRAPUP["German"]
+
+
+def test_real_prose_still_becomes_the_fallback_summary() -> None:
+    """The other side, so the guard cannot simply swallow every fallback: what
+    ADR 0049 asks to keep is kept."""
+    prose = "Sie haben ruhig und klar nachgefragt, und das Gespräch blieb sachlich."
+
+    assert _unfenced_text(prose, "German") == prose
+
+
+def test_every_seeded_goal_marks_where_its_criterion_starts() -> None:
+    """The split rests on a seed convention, so the seed has to keep it.
+
+    `_goal_without_criterion` cuts the goal at "The matter is settled when",
+    which is how all 17 shipped Scenarios mark the half ADR 0079 withholds.
+    Reword one without the sentence and its criterion goes back into the
+    dossier, silently -- which is exactly how it got there in the first place,
+    when migration 3ce81b27af40 merged the two columns.
+    """
+    from backend.db.seed_data import SCENARIOS  # pylint: disable=import-outside-toplevel
+
+    missing = [s["id"] for s in SCENARIOS if _SETTLEMENT_MARKER not in s["call_goal"]]
+
+    assert not missing, f"call_goal without the settlement sentence: {missing}"
+
+
+def test_an_authored_goal_with_no_criterion_goes_in_whole() -> None:
+    """A User's own Scenario carries no such sentence, and there is nothing in
+    it to withhold: the goal is the occasion and all of it is."""
+    own = SimpleNamespace(call_goal="Klären, ob die Lieferung diese Woche noch kommt.")
+
+    assert _goal_without_criterion(own) == "Klären, ob die Lieferung diese Woche noch kommt."
+
+
+def test_a_goal_that_is_only_a_criterion_adds_no_line() -> None:
+    """Nothing is written rather than an empty label."""
+    odd = SimpleNamespace(
+        description="Eine Situation.",
+        call_goal=f"{_SETTLEMENT_MARKER} the date is confirmed.",
+        reverse=False,
+    )
+
+    assert _goal_without_criterion(odd) == ""
+    assert "What the caller wanted" not in "\n".join(_occasion(odd))

@@ -212,7 +212,7 @@ def _standing_nudge(orch, replies=3):
     `replies` is how far into the call it is: the settlement check is withheld
     until the persona has given `SETTLEMENT_CHECK_AFTER_REPLIES` of them."""
     for i in range(replies):
-        orch._messages.append({"role": "assistant", "content": f"Antwort {i}."})
+        orch.history.add_reply(f"Antwort {i}.")
     return orch._messages_for_turn(closing=False)[-1]["content"]
 
 
@@ -283,7 +283,7 @@ def test_closing_turn_carries_only_the_closing_nudge(persona, scenario):
     """The user has already said goodbye: the call is ending either way, and a
     second, longer instruction beside it only competes with it."""
     orch = SessionOrchestrator(persona, replace(scenario, call_goal="a date is named"))
-    orch._messages.append({"role": "assistant", "content": "Vorherige Antwort."})
+    orch.history.add_reply("Vorherige Antwort.")
 
     nudge = orch._messages_for_turn(closing=True)[-1]["content"]
 

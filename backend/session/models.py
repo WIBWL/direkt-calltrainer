@@ -47,7 +47,22 @@ class Turn:  # pylint: disable=too-many-instance-attributes
     user_offset_ms: int | None = None
     user_end_ms: int | None = None
     persona_offset_ms: int | None = None
+    # Where the Persona's audio stopped being *heard*: the end of what was
+    # dispatched, or the played position where a barge-in cut it (ADR 0035).
+    # This is the speaking time the metrics divide by.
     persona_end_ms: int | None = None
+    # Where it would have stopped had nobody cut in. Never trimmed, and never
+    # shown: the two are the same on an ordinary Turn and differ by exactly
+    # what the user did not hear on an interrupted one.
+    #
+    # Both are needed, and one was doing both jobs. F-51 asks "did the Persona
+    # have more to say", which is a statement about the audio that was sent;
+    # F-53's Redeanteil asks how long it was heard for. Trimming the single
+    # field for the second silently turned the first into a measurement of the
+    # browser's voice-detection delay -- the gap between the user starting to
+    # speak and the cut arriving -- and the drill-down then told the User their
+    # partner "had 0.7 seconds left" about a reply with nine seconds in it.
+    persona_dispatched_end_ms: int | None = None
 
     # Paraverbal facts about the user's speech (ADR 0048), taken while the
     # audio was still in memory and already rebased onto the Session's
