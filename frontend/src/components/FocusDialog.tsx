@@ -101,54 +101,58 @@ export default function FocusDialog({
           available while the catalogue scrolls without covering the card's
           lower edge or exposing the page background beneath it. */}
       <div className="focus-actions-bar">
-        <div className="focus-tally">
-          <span className="focus-slots" aria-hidden="true">
-            {Array.from({ length: focus.max_goals }, (_, slot) => (
-              <span
-                key={slot}
-                className={
-                  "focus-slot" + (slot < selected.length ? " focus-slot-filled" : "")
-                }
-              />
-            ))}
-          </span>
+        <div className="focus-actions-inner">
+          <div className="focus-actions-copy">
+            <div className="focus-tally">
+              <span className="focus-slots" aria-hidden="true">
+                {Array.from({ length: focus.max_goals }, (_, slot) => (
+                  <span
+                    key={slot}
+                    className={
+                      "focus-slot" + (slot < selected.length ? " focus-slot-filled" : "")
+                    }
+                  />
+                ))}
+              </span>
 
-          <span className="focus-count" aria-live="polite">
-            {selected.length} von {focus.max_goals} Zielen ausgewählt.
-            {selected.length >= focus.max_goals &&
-              " Wenn Sie tauschen möchten, wählen Sie zuerst ein Ziel ab."}
-          </span>
+              <span className="focus-count" aria-live="polite">
+                {selected.length} von {focus.max_goals} Zielen ausgewählt.
+                {selected.length >= focus.max_goals &&
+                  " Wenn Sie tauschen möchten, wählen Sie zuerst ein Ziel ab."}
+              </span>
+            </div>
+
+            <p className="focus-bar-note">
+              Sie können Ihre Auswahl jederzeit im Profil ändern.
+            </p>
+
+            {failed && (
+              <p className="consent-error">
+                Ihre Auswahl konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.
+              </p>
+            )}
+          </div>
+
+          <div className="consent-actions">
+            <button
+              type="button"
+              className="consent-button consent-button-secondary"
+              onClick={() => void submit([])}
+              disabled={saving}
+            >
+              Ohne Fokus fortfahren
+            </button>
+
+            <button
+              type="button"
+              className="consent-button consent-button-primary"
+              onClick={() => void submit(selected)}
+              disabled={saving || selected.length === 0}
+            >
+              {saving ? "Wird gespeichert …" : "Fokus übernehmen"}
+            </button>
+          </div>
         </div>
-
-        {failed && (
-          <p className="consent-error">
-            Ihre Auswahl konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.
-          </p>
-        )}
-
-        <div className="consent-actions">
-          <button
-            type="button"
-            className="consent-button consent-button-primary"
-            onClick={() => void submit(selected)}
-            disabled={saving || selected.length === 0}
-          >
-            {saving ? "Wird gespeichert …" : "Fokus übernehmen"}
-          </button>
-
-          <button
-            type="button"
-            className="consent-button consent-button-secondary"
-            onClick={() => void submit([])}
-            disabled={saving}
-          >
-            Ohne Fokus fortfahren
-          </button>
-        </div>
-
-        <p className="focus-bar-note">
-          Sie können Ihre Auswahl jederzeit im Profil ändern.
-        </p>
       </div>
 
       <AppFooter />

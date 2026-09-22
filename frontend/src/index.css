@@ -6873,17 +6873,30 @@ button.calendar-day {
   right: 0;
   bottom: 0;
   z-index: 40;
-  padding: 14px max(24px, calc((100vw - 1080px) / 2)) 18px;
+  padding: 14px 24px 16px;
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
   box-shadow: 0 -8px 22px rgba(3, 37, 62, 0.07);
 }
 
+.focus-actions-inner {
+  width: min(1080px, 100%);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.focus-actions-copy {
+  min-width: 0;
+}
+
 .focus-tally {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  margin: 0;
 }
 
 /* The limit as five slots that fill up: seen rather than read. */
@@ -6912,15 +6925,15 @@ button.calendar-day {
 }
 
 .focus-actions-bar .consent-actions {
+  flex: none;
   margin-top: 0;
-  /* Two pill buttons at `flex: 1` squeeze past legibility on a narrow window. */
   flex-wrap: wrap;
 }
 
-/* Moved down from the head: the reassurance that this is changeable belongs
-   where the decision is made. */
+/* The reassurance belongs next to the current selection because both describe
+   the decision the user is making in the fixed action area. */
 .focus-bar-note {
-  margin: 10px 0 0;
+  margin: 4px 0 0;
   font-size: 0.85rem;
   color: var(--color-text-muted);
 }
