@@ -46,7 +46,7 @@ load_dotenv()
 # load_dotenv() before it reads the environment -- so these cannot move up.
 from backend.db import models as db_models  # noqa: E402
 from backend.db.session import session_scope  # noqa: E402
-from backend.feedback import metrics, rows  # noqa: E402
+from backend.feedback import metrics, rows, stored  # noqa: E402
 from scripts import _backfill_cli  # noqa: E402
 
 logger = logging.getLogger("backfill_run_length")
@@ -74,7 +74,7 @@ def _terms(session: db_models.Session, by_id: dict[int, str]) -> tuple[int, int,
         elif key == "pauses":
             pause_count = (measurement.detail_json or {}).get("count", 0)
 
-    utterances = sum(1 for turn in session.turns if turn.speaker == db_models.SPEAKER_USER)
+    utterances = len(stored.user_texts(session))
     if not phonation or not utterances:
         return None
     return phonation, utterances, pause_count

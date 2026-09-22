@@ -47,7 +47,7 @@ load_dotenv()
 # load_dotenv() before it reads the environment -- so these cannot move up.
 from backend.db import models as db_models  # noqa: E402
 from backend.db.session import session_scope  # noqa: E402
-from backend.feedback import metrics, rows  # noqa: E402
+from backend.feedback import metrics, rows, stored  # noqa: E402
 from backend.session.language_packs import LANGUAGE_PACKS  # noqa: E402
 from scripts import _backfill_cli  # noqa: E402
 
@@ -55,17 +55,6 @@ logger = logging.getLogger("backfill_closing")
 
 # How the three parts are named in the report, in the order the tile shows them.
 _LABELS = {"recap": "Zusammenfassung", "agreement": "Vereinbarung", "farewell": "Verabschiedung"}
-
-
-def _user_texts(session: db_models.Session) -> list[str]:
-    """The user's utterances in the order they were said.
-
-    One row per speaker per exchange (`feedback.calls.utterances`), which is the
-    same unit `Conversation.user_turns` counts in the live path, so the window of
-    two means the same two utterances here as it would have then.
-    """
-    rows = sorted(session.turns, key=lambda turn: turn.seq_index)
-    return [turn.transcript for turn in rows if turn.speaker == db_models.SPEAKER_USER]
 
 
 def backfill(apply: bool) -> int:
@@ -87,7 +76,7 @@ def backfill(apply: bool) -> int:
             pack = LANGUAGE_PACKS.get(session.language_code)
             if pack is None:
                 continue
-            parts = metrics.closing_parts(_user_texts(session), pack)
+            parts = metrics.closing_parts(stored.user_texts(session), pack)
             if parts is None:
                 continue
 

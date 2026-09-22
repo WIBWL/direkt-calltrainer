@@ -24,27 +24,14 @@ pass straight through to frontend/src/protocol.ts, with no translation step.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-
 from backend.db import models as db_models
-from backend.feedback import readings
+from backend.feedback import readings, stored
 from backend.feedback.jobs import is_live
 
 
 def _metric(metric_type: db_models.MetricType) -> dict:
     """What names a figure, on every route that serves one."""
     return {"key": metric_type.key, "name": metric_type.name, "unit": metric_type.unit}
-
-
-def _whole_call(session: db_models.Session) -> Iterator[db_models.Measurement]:
-    """The whole call's figures, one per metric (ADR 0051). The segment rows
-    (ADR 0081) are served apart, because every reader of the measurement list
-    assumes one entry per metric."""
-    return (m for m in session.measurements if m.segment == db_models.SEGMENT_CALL)
-
-
-def _turns(session: db_models.Session) -> list[db_models.Turn]:
-    return sorted(session.turns, key=lambda t: t.seq_index)
 
 
 def _findings(session: db_models.Session) -> list[db_models.Finding]:
@@ -124,7 +111,7 @@ def summary(session: db_models.Session) -> dict:
             # Whole-call rows only. `toSeries` builds one series per metric key
             # and would splice the pressure figure of one training into the
             # same line as the whole-call figure of the next.
-            for m in _whole_call(session)
+            for m in stored.whole_call(session)
         ],
         # The demanding stretches against the rest (ADR 0081), which is the
         # only data behind the focus goal "composure under pressure" and
@@ -150,12 +137,12 @@ def detail(session: db_models.Session, *, follow_up: dict | None) -> dict:
         "scenario": session.scenario.title,
         "reverse": session.scenario.reverse,
         "status": _feedback_status(session),
-        "turns": [_turn(t) for t in _turns(session)],
+        "turns": [_turn(t) for t in stored.ordered_turns(session)],
         # The whole call's figures, and only those. The segment rows travel
         # under their own key rather than in this list: every reader of it
         # assumes one entry per metric (ADR 0051), and mixing three
         # speaking pace rows in would draw the metric three times.
-        "measurements": [_measurement(m) for m in _whole_call(session)],
+        "measurements": [_measurement(m) for m in stored.whole_call(session)],
         # The same metrics over the demanding stretches and over the
         # rest (ADR 0081). Empty where nobody pushed back, where the
         # stretches were too short to measure, and for every call recorded
@@ -200,7 +187,7 @@ def export(session: db_models.Session) -> dict:
                 "duration_ms": t.duration_ms,
                 "text": t.transcript,
             }
-            for t in _turns(session)
+            for t in stored.ordered_turns(session)
         ],
         "measurements": [
             {

@@ -41,9 +41,7 @@ import logging
 from sqlalchemy.orm import Session as DbSession
 
 from backend.db import models as db_models
-from backend.feedback import metrics, rows
-from backend.feedback.acoustics import TurnFacts
-from backend.feedback.calls import conversation
+from backend.feedback import metrics, rows, stored
 from backend.session.models import Turn
 
 logger = logging.getLogger(__name__)
@@ -86,7 +84,7 @@ def measure_segments(
     if not pressed_turn_ids:
         return {}
 
-    turns = _turns_from_rows(session, pressed_turn_ids)
+    turns = _pressure_marked(session, pressed_turn_ids)
     measured: dict[str, list[metrics.Measurement]] = {}
     for segment, wanted in (
         (db_models.SEGMENT_PRESSURE, True),
@@ -96,63 +94,31 @@ def measure_segments(
         spoken_in = sum(1 for turn in part if turn.user_text)
         if spoken_in < MIN_UTTERANCES:
             continue
-        call = conversation(part, session.language_code)
+        call = stored.conversation_of(session, part)
         values = [m for m in metrics.measure(call) if m.key in SEGMENT_METRIC_KEYS]
         if values:
             measured[segment] = values
     return measured
 
 
-def _turns_from_rows(
+def _pressure_marked(
     session: db_models.Session, pressed_turn_ids: set[int]
 ) -> list[tuple[Turn, bool]]:
-    """Rebuild the in-memory exchanges from the stored utterances, each paired
-    with whether it belongs to a pressing stretch.
+    """The call's exchanges, each paired with whether it belongs to a pressing
+    stretch.
 
-    The inverse of `calls.utterances`, and only as much of one as
-    the metrics above need: the Persona's line gives its window, the user's
-    gives its window and its stored facts. A Persona line opens an exchange and
-    the user's answer closes it, which is how the call was spoken and how the
-    pressure carries over -- a user utterance is under pressure because the
-    line it answers was.
-
-    A Turn whose user side has no stored facts keeps its text and loses its
-    milliseconds, which is exactly the state `user_acoustics_complete=False`
-    describes and which the derivations already know how to withhold on.
+    A Persona line opens an exchange and the user's answer closes it, which is
+    how the call was spoken and how the pressure carries over -- a user
+    utterance is under pressure because the line it answers was.
     """
-    rebuilt: list[tuple[Turn, bool]] = []
+    marked: list[tuple[Turn, bool]] = []
     pressed = False
-    for index, row in enumerate(sorted(session.turns, key=lambda t: t.seq_index)):
+    for turn, row in stored.exchanges(session):
         if row.speaker == db_models.SPEAKER_PERSONA:
             # A new exchange starts here, and this line decides its pressure.
             pressed = row.turn_id in pressed_turn_ids
-            rebuilt.append((Turn(
-                seq=index,
-                persona_text=row.transcript,
-                persona_offset_ms=row.start_offset_ms,
-                persona_end_ms=_end(row),
-            ), pressed))
-            continue
-
-        facts = TurnFacts.from_json(row.acoustics_json) if row.acoustics_json else None
-        rebuilt.append((Turn(
-            seq=index,
-            user_text=row.transcript,
-            user_offset_ms=row.start_offset_ms,
-            user_end_ms=_end(row),
-            user_speech_ms=facts.speech_ms if facts else 0,
-            user_phonation_ms=facts.phonation_ms if facts else 0,
-            user_acoustics_complete=facts.complete if facts else False,
-            pauses=list(facts.pauses) if facts else [],
-            loudness_db=list(facts.loudness_db) if facts else [],
-        ), pressed))
-    return rebuilt
-
-
-def _end(row: db_models.Turn) -> int | None:
-    """The utterance's end on the Session's timeline, or None where it has no
-    measured duration -- the same thing the column means."""
-    return None if row.duration_ms is None else row.start_offset_ms + row.duration_ms
+        marked.append((turn, pressed))
+    return marked
 
 
 def store(db: DbSession, session_id: int, pressure_turns: list[int] | None) -> None:

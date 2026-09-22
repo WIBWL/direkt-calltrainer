@@ -50,7 +50,7 @@ load_dotenv()
 # load_dotenv() before it reads the environment -- so these cannot move up.
 from backend.db import models as db_models  # noqa: E402
 from backend.db.session import session_scope  # noqa: E402
-from backend.feedback import metrics  # noqa: E402
+from backend.feedback import metrics, stored  # noqa: E402
 from backend.session.language_packs import LANGUAGE_PACKS  # noqa: E402
 from scripts import _backfill_cli  # noqa: E402
 
@@ -64,18 +64,6 @@ _LABELS = {
     "offer": "Hilfsangebot",
     "concern": "Anliegen",
 }
-
-
-def _first_user_text(session: db_models.Session) -> str | None:
-    """The user's first utterance, or None for a call they never spoke in.
-
-    One row per speaker per exchange (`feedback.calls.utterances`), so the first
-    of them is the same utterance `Conversation.user_turns[0]` was in the live
-    path -- the Persona's own opening line is a row of its own and not this one.
-    """
-    rows = sorted(session.turns, key=lambda turn: turn.seq_index)
-    spoken = [turn.transcript for turn in rows if turn.speaker == db_models.SPEAKER_USER]
-    return spoken[0] if spoken else None
 
 
 def _said(parts: dict[str, bool]) -> str:
@@ -97,13 +85,16 @@ def backfill(apply: bool) -> int:
             return 0
 
         for session in db.query(db_models.Session).order_by(db_models.Session.session_id):
-            stored = next(
+            existing = next(
                 (m for m in session.measurements if m.metric_type_id == opening_id), None
             )
-            if stored is None:
+            if existing is None:
                 continue
             pack = LANGUAGE_PACKS.get(session.language_code)
-            first = _first_user_text(session)
+            # The first row of the user's, not of the call's: the Persona's
+            # own opening line is a row of its own and not this one.
+            spoken = stored.user_texts(session)
+            first = spoken[0] if spoken else None
             if pack is None or first is None:
                 continue
 
@@ -112,7 +103,7 @@ def backfill(apply: bool) -> int:
             parts = metrics.opening_parts(
                 first, pack, reverse=bool(session.scenario and session.scenario.reverse)
             )
-            detail = dict(stored.detail_json or {})
+            detail = dict(existing.detail_json or {})
             before = {key: bool(detail.get(key)) for key in parts}
             if before == parts:
                 continue
@@ -127,8 +118,8 @@ def backfill(apply: bool) -> int:
             # The acoustic half is carried over: `pace_ratio` was measured from
             # audio that no longer exists, and dropping it would lose a figure
             # this run has no way to produce again.
-            stored.detail_json = detail | parts
-            stored.value = float(sum(parts.values()))
+            existing.detail_json = detail | parts
+            existing.value = float(sum(parts.values()))
     return changed
 
 

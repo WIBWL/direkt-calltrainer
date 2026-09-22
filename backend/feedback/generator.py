@@ -51,7 +51,7 @@ from backend.clients import llm
 from backend.db import models as db_models
 from backend.db.seed_data import FOCUS_GOALS
 from backend.db.session import session_scope
-from backend.feedback import jobs, metrics, segments
+from backend.feedback import jobs, metrics, segments, stored
 
 logger = logging.getLogger(__name__)
 
@@ -225,9 +225,8 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
     # are written by the previous run and are still there on the next one.
     lines += [
         f"    {m.metric_type.name}: {float(m.value):.1f} {m.metric_type.unit or ''}".rstrip()
-        for m in session.measurements
-        if m.metric_type.key != metrics.LOUDNESS_KEY and
-        m.segment == db_models.SEGMENT_CALL
+        for m in stored.whole_call(session)
+        if m.metric_type.key != metrics.LOUDNESS_KEY
     ]
     course = _loudness_course(session)
     if course:
@@ -241,7 +240,7 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
         )
     lines.append("Transcript, timestamped from the start of the call:")
     turn_ids: set[int] = set()
-    for turn in sorted(session.turns, key=lambda t: t.seq_index):
+    for turn in stored.ordered_turns(session):
         if turn.speaker == db_models.SPEAKER_USER:
             speaker = "User"
         else:
@@ -322,10 +321,8 @@ def _loudness_course(session: db_models.Session) -> str | None:
     `curve_db` of their own, and taking the first match described the pressing
     stretch's curve as the course of the whole conversation.
     """
-    for measurement in session.measurements:
+    for measurement in stored.whole_call(session):
         if measurement.metric_type.key != metrics.LOUDNESS_KEY:
-            continue
-        if measurement.segment != db_models.SEGMENT_CALL:
             continue
         curve = (measurement.detail_json or {}).get("curve_db")
         if curve:

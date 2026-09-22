@@ -95,6 +95,7 @@ source of that content, and which imports without a database.
 | Scenario suggestions: call types and focus goals steer them, voice goals do not, a suggested Scenario keeps its own origin, and the offers after a call | F-62, F-64, ADR 0072, ADR 0076, ADR 0087 | `test_recommendations.py` |
 | Hesitation sounds read off the pitch contour: a held flat stretch counts, running speech and short vowels do not, and a failed measurement suppresses the figure | F-51, ADR 0048, ADR 0084 | `test_hesitations.py` |
 | A stored Session on the wire: one way to name a figure, the whole call apart from its segments, what the listing leaves out and what the export keeps | ADR 0051, ADR 0064, ADR 0066, ADR 0081, ADR 0091 | `test_served_session.py` |
+| Reading a stored Session back: transcript order, the whole call apart from its segments, the user's lines, rows rebuilt into Turns, and a slice of a reverse folded as a reverse | ADR 0051, ADR 0081, ADR 0086 | `test_stored_session.py` |
 | The call's message record: named operations for trimming, dropping and extending, and a window behind the system prompt | ADR 0035, ADR 0038, ADR 0071 | `test_history.py` |
 | Verdicts on one reply against the replies before it: repeats, oscillation, restatement, re-greeting, a still-pressing ending | ADR 0037, ADR 0038 | `test_reply_checks.py` |
 | Async wrap-up job status (queued → running → done/failed), and every path that can strand it | F-09, F-10, ADR 0019, ADR 0032, ADR 0034, ADR 0050 | `test_feedback_job_status.py` |
