@@ -6827,9 +6827,8 @@ button.calendar-day {
 
 /* The "i" in the bottom-right corner, drawn like `.card-info` on a Persona or
    Scenario card: a 24px target around an 18px ring, centred in the same column
-   as the 22px check circle above it (both 21px from the right edge). The
-   summary is taken out of flow, so a closed <details> adds no height and an
-   opened one is only its text, under the caption. */
+   as the 22px check circle above it. The explanation opens as an overlay so it
+   never changes the height of the card or its grid row. */
 .focus-goal .info-details {
   margin: 0;
 }
@@ -6867,12 +6866,34 @@ button.calendar-day {
   outline-offset: 2px;
 }
 
-.focus-goal .info-details[open] {
-  margin-bottom: 18px; /* keeps the last line clear of the "i" */
+/* Raise the active card above its neighbours so the explanation is not hidden
+   by another card in the grid. */
+.focus-goal:has(.info-details[open]) {
+  z-index: 5;
 }
 
+.focus-goal .info-details[open] {
+  margin-bottom: 0;
+}
+
+/* The explanation behaves like a small anchored popover. Keeping it outside
+   normal flow prevents one open explanation from stretching the whole row. */
 .focus-goal .info-body {
+  position: absolute;
+  right: 10px;
+  bottom: 40px;
+  z-index: 20;
+  width: min(300px, calc(100% - 20px));
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  box-shadow: 0 10px 24px rgba(3, 37, 62, 0.14);
   font-size: 0.85rem;
+  line-height: 1.5;
 }
 
 /* aria-live: the count is how a screen-reader user learns the limit was

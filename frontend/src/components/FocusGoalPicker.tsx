@@ -131,11 +131,11 @@ export default function FocusGoalPicker({
                         {goal.caption}
                       </label>
 
-                      {/* Last, so an opened explanation runs under the caption;
-                          its "i" is pinned to the bottom-right corner, as on a
-                          Persona or Scenario card. Icon only: the same label on
-                          every card is noise, and naming the goal makes it a
-                          better one when read out. */}
+                      {/* Last in the card so the "i" stays pinned to the bottom-right
+                      corner. The explanation itself opens as an overlay and does
+                      not change the grid row height. Icon only: the same label on
+                      every card is noise, and naming the goal makes it a better
+                      one when read out. */}
                       <InfoDetails label={`Was „${goal.title}“ bedeutet`} iconOnly>
                         <p>{goal.info}</p>
                       </InfoDetails>
