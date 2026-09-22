@@ -9,7 +9,6 @@ import {
   MIN_SESSIONS_FOR_SERIES,
   formatPoint,
   formatBand,
-  toSeries,
   partsSummary,
 } from "../utils/progressStats";
 import { formatDate } from "../utils/time";
@@ -43,8 +42,9 @@ export default function ProgressMetricView() {
   // this page and the tile that links here have to describe the same set, or
   // the tile's "aus 5 Trainings" and the chart below disagree about what they
   // are about (dashboard-konzept.md section 7, ProgressContext.tsx).
-  const { selected: sessions, periodPhrase, state, withPeriod } = useProgressContext();
-  const series = toSeries(sessions).find((s) => s.key === metricKey);
+  const { selected: sessions, series: all, periodPhrase, state, withPeriod } =
+    useProgressContext();
+  const series = all.find((s) => s.key === metricKey);
 
   const back = (
     <Link to={withPeriod(ROUTES.progress)} className="back-link">

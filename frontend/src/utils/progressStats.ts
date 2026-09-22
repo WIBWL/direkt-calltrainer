@@ -345,6 +345,19 @@ export function callDurationMs(session: SessionSummary): number | null {
   return ended - started;
 }
 
+/**
+ * Every series a selection of trainings has: the measured metrics plus the call
+ * length. The one list the overview, a metric's page and a goal's page all
+ * read (through `ProgressContext`), so a row the overview links to is always a
+ * series the page behind the link can find. Each screen used to assemble it
+ * itself, and only the overview added the call length — whose row then led to
+ * a page saying there were no values.
+ */
+export function selectionSeries(sessions: SessionSummary[]): MetricSeries[] {
+  const duration = durationSeries(sessions);
+  return [...toSeries(sessions), ...(duration ? [duration] : [])];
+}
+
 /** The call lengths as a series, in minutes, so they can be drawn like any
  *  metric. */
 export function durationSeries(sessions: SessionSummary[]): MetricSeries | null {

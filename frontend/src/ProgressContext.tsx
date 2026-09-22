@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { useProgressData, type ProgressLoadState } from "./hooks/useProgressData";
 import type { SessionSummary } from "./protocol";
 import { CATEGORY_LABELS, type ScenarioCategory } from "./scenarioLibrary";
-import { latest } from "./utils/progressStats";
+import { latest, selectionSeries, type MetricSeries } from "./utils/progressStats";
 
 /**
  * Which trainings the dashboard is read over, counted in trainings (see
@@ -107,6 +107,10 @@ interface ProgressContextValue {
   /** The trainings both switches selected — what every figure below them is
    *  read over, on the overview and on both detail levels alike. */
   selected: SessionSummary[];
+  /** Every series `selected` has, the call length included — derived once
+   *  here, so the overview and both detail levels cannot disagree about which
+   *  rows exist (`selectionSeries`). */
+  series: MetricSeries[];
   state: ProgressLoadState;
   /** True when the account holds more trainings than the dashboard reads. */
   truncated: boolean;
@@ -169,6 +173,8 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     [sessions, category, count],
   );
 
+  const series = useMemo(() => selectionSeries(selected), [selected]);
+
   const occasionCounts = useMemo(() => {
     const counts = {} as Record<OccasionKey, number>;
     for (const entry of OCCASIONS) {
@@ -215,6 +221,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     () => ({
       sessions,
       selected,
+      series,
       state,
       truncated,
       total,
@@ -229,6 +236,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     [
       sessions,
       selected,
+      series,
       state,
       truncated,
       total,

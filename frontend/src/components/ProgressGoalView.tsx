@@ -6,7 +6,6 @@ import type { SessionSummary } from "../protocol";
 import { ROUTES, progressMetricPath, sessionPath } from "../routes";
 import { backingOf } from "../utils/focusMetrics";
 import { mentionsFor, statementsFor } from "../utils/goalMentions";
-import { toSeries } from "../utils/progressStats";
 import { segmentTrainings } from "../utils/segmentStats";
 import { formatDate } from "../utils/time";
 import AppLayout from "./AppLayout";
@@ -37,7 +36,8 @@ export default function ProgressGoalView() {
   // tile and the page behind it count the same trainings or they contradict
   // each other, and here it is a count of statements, which is the figure most
   // easily misread (ADR 0080).
-  const { selected: sessions, periodPhrase, state, withPeriod } = useProgressContext();
+  const { selected: sessions, series: all, periodPhrase, state, withPeriod } =
+    useProgressContext();
   const { focus } = useFocusContext();
 
   const goal = focus?.goals.find((entry) => entry.key === goalKey);
@@ -92,7 +92,7 @@ export default function ProgressGoalView() {
   const backing = backingOf(goalKey);
   // Only a series that actually has points: linking to an empty metric page
   // promises a chart that is not there.
-  const measured = toSeries(sessions).filter((series) =>
+  const measured = all.filter((series) =>
     backing.metrics.includes(series.key),
   );
 

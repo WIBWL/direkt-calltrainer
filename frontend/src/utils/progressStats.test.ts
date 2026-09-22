@@ -17,6 +17,7 @@ import {
   latest,
   median,
   mostVarying,
+  selectionSeries,
   toSeries,
   trainingsOn,
   trainingsWith,
@@ -331,6 +332,18 @@ describe("how long a call ran", () => {
 
   it("is absent where no call has an end at all", () => {
     expect(durationSeries([session({ ended_at: null })])).toBeNull();
+  });
+});
+
+describe("the series of a selection", () => {
+  // The overview, a metric's page and a goal's page all read this one list, so
+  // a row the overview links to is one the page behind the link can find. The
+  // call length was the row that went missing: only the overview added it.
+  it("carries the call length beside the measured metrics", () => {
+    const keys = selectionSeries([
+      session({ measurements: [measurement("pace", 130)] }),
+    ]).map((s) => s.key);
+    expect(keys).toEqual(["pace", "duration"]);
   });
 });
 

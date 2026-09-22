@@ -15,11 +15,9 @@ import {
   MIN_SESSIONS_FOR_SERIES,
   mostVarying,
   activity,
-  durationSeries,
   formatPoint,
   formatBand,
   variety,
-  toSeries,
   partsSummary,
   type MetricSeries,
 } from "../utils/progressStats";
@@ -74,6 +72,7 @@ export default function ProgressView() {
   const {
     sessions,
     selected: inPeriod,
+    series,
     state,
     truncated,
     total,
@@ -85,11 +84,6 @@ export default function ProgressView() {
   } = useProgressContext();
   const { focus } = useFocusContext();
   const { consent } = useConsentContext();
-  // The call length rides along with the measured metrics. It is derived
-  // from the two timestamps rather than measured from the audio, but it belongs
-  // to the same family: descriptive, and in need of no norm to be readable.
-  const duration = durationSeries(inPeriod);
-  const series = [...toSeries(inPeriod), ...(duration ? [duration] : [])];
   const overview = series.filter((s) => showsInOverview(s.key));
   // Over everything stored, like the calendar they stand beside: the three
   // figures sit above the switch now, so they cannot follow it.
