@@ -6929,6 +6929,13 @@ button.calendar-day {
   flex-wrap: wrap;
 }
 
+/* The fixed action bar uses compact rectangular actions rather than the
+   pill shape used by consent dialogs elsewhere in the application. */
+.focus-actions-bar .consent-button {
+  border-radius: 9px;
+  padding: 0.75rem 1.2rem;
+}
+
 /* The reassurance belongs next to the current selection because both describe
    the decision the user is making in the fixed action area. */
 .focus-bar-note {
