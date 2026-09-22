@@ -5034,11 +5034,39 @@ a.consent-button {
   align-items: start;
 }
 
-/* Each card is as tall as what is in it. Stretching them to the tallest would
-   draw a border around empty space beside the variety table once it is
-   expanded to every Scenario. */
+/* In the ordinary view the three cards end level.
+
+   They did not, and it showed: the counted figures are three short boxes and
+   the calendar is a month grid, so the left column stopped some fifty pixels
+   above its neighbours and the row read as three unrelated blocks instead of
+   as one band.
+
+   Not while the variety table is expanded, which is what the guard is for and
+   what the rule here used to say in place of stretching at all: opened to
+   twenty Scenarios that card runs to twice the height of the calendar, and
+   pulling the other two up to it would draw a border around half a screen of
+   nothing. The expanded state is read off the show-more button's own
+   `aria-expanded` rather than from a second class, so there is no copy of it
+   to keep in step — and where the table is short enough to need no button,
+   there is nothing to expand and the cards level for good. */
+.progress-training:not(:has(.session-more[aria-expanded="true"])) {
+  align-items: stretch;
+}
+
 .progress-training .card {
   margin: 0;
+  /* So the closing line of a card that gained height can sit at its foot. */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Whichever of the two wide cards is the shorter one takes the difference.
+   Its closing line goes to the foot rather than leaving the gap underneath
+   itself, which is the one place the stretch would otherwise be visible as
+   empty space. */
+.progress-training .card > .focus-tile-note {
+  margin-top: auto;
+  padding-top: 0.6rem;
 }
 
 /* The three counted figures as cards with one large number each. Activity is
@@ -5052,9 +5080,21 @@ a.consent-button {
   gap: 12px;
 }
 
+/* The three divide the column between them rather than stacking at its top.
+   Equal shares and not three boxes with the slack under the last one: they
+   are the same kind of thing said three times, and one of them being taller
+   would say that it is not. */
+.progress-training:not(:has(.session-more[aria-expanded="true"])) .progress-stats {
+  grid-auto-rows: 1fr;
+}
+
 .progress-page .progress-stat {
   display: flex;
   flex-direction: column;
+  /* Centred, so a box that grew reads as deliberate rather than as a figure
+     with a gap under it. A no-op where the card is only as tall as its
+     content, which is what it is in the expanded view. */
+  justify-content: center;
   gap: 2px;
   padding: 1rem 1.25rem;
 }
