@@ -6936,6 +6936,13 @@ button.calendar-day {
   padding: 0.75rem 1.2rem;
 }
 
+/* Keyboard users need a focus cue that remains visible on both the light
+   secondary action and the dark primary action. */
+.focus-actions-bar .consent-button:focus-visible {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
+}
+
 /* The reassurance belongs next to the current selection because both describe
    the decision the user is making in the fixed action area. */
 .focus-bar-note {
