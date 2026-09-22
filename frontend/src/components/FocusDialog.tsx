@@ -104,17 +104,6 @@ export default function FocusDialog({
         <div className="focus-actions-inner">
           <div className="focus-actions-copy">
             <div className="focus-tally">
-              <span className="focus-slots" aria-hidden="true">
-                {Array.from({ length: focus.max_goals }, (_, slot) => (
-                  <span
-                    key={slot}
-                    className={
-                      "focus-slot" + (slot < selected.length ? " focus-slot-filled" : "")
-                    }
-                  />
-                ))}
-              </span>
-
               <span className="focus-count" aria-live="polite">
                 {selected.length} von {focus.max_goals} Zielen ausgewählt.
                 {selected.length >= focus.max_goals &&
