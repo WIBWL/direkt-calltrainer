@@ -97,7 +97,8 @@ source of that content, and which imports without a database.
 | A stored Session on the wire: one way to name a figure, the whole call apart from its segments, what the listing leaves out and what the export keeps | ADR 0051, ADR 0064, ADR 0066, ADR 0081, ADR 0091 | `test_served_session.py` |
 | Reading a stored Session back: transcript order, the whole call apart from its segments, the user's lines, rows rebuilt into Turns, and a slice of a reverse folded as a reverse | ADR 0051, ADR 0081, ADR 0086 | `test_stored_session.py` |
 | The call's message record: named operations for trimming, dropping and extending, and a window behind the system prompt | ADR 0035, ADR 0038, ADR 0071 | `test_history.py` |
-| Verdicts on one reply against the replies before it: repeats, oscillation, restatement, re-greeting, a still-pressing ending | ADR 0037, ADR 0038 | `test_reply_checks.py` |
+| Verdicts on one reply against the replies before it: repeats, oscillation, restatement, re-greeting, a still-pressing ending, and whether a finished reply ends the call and needs a goodbye | ADR 0037, ADR 0038 | `test_reply_checks.py` |
+| Which nudge a reply gets, in order of precedence, the reverse's reminder and the settlement check | ADR 0035, ADR 0037, ADR 0038, ADR 0070, ADR 0073 | `test_turn_nudge.py` |
 | Async wrap-up job status (queued → running → done/failed), and every path that can strand it | F-09, F-10, ADR 0019, ADR 0032, ADR 0034, ADR 0050 | `test_feedback_job_status.py` |
 | Wrap-up prompt & phase block (F-42), and the thinking-mode call it is asked with | F-09, F-42, F-43, ADR 0004, ADR 0011, ADR 0043, ADR 0049, ADR 0051, ADR 0056 | `test_wrapup_prompt.py` |
 | Documented gaps (current-state guards) | F-56 | `test_documented_gaps.py` |

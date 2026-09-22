@@ -45,12 +45,9 @@ from backend.session.measuring import attach_measurements
 from backend.session import repetition
 from backend.session import reply_checks as checks
 from backend.session.prompting import build_system_prompt, opening_instruction
+from backend.session import nudges
 from backend.session.nudges import (
-    ANTI_REPEAT_NUDGE, ANTI_REPEAT_NUDGE_REVERSE, CLARIFY_AGAIN_NUDGE, CLARIFY_NUDGE,
-    CLOSING_NUDGE, ECHO_NUDGE,
-    GENERIC_CRITERION, GENERIC_CRITERION_REVERSE, INTERRUPTED_MARK, INTERRUPTED_NUDGE,
-    REGENERATE_NUDGE, REPEAT_OPENING_NUDGE, RESUME_NUDGE, SETTLEMENT_CHECK,
-    SETTLEMENT_CHECK_AFTER_REPLIES, SETTLEMENT_CHECK_REVERSE,
+    ECHO_NUDGE, INTERRUPTED_MARK, REGENERATE_NUDGE, REPEAT_OPENING_NUDGE, RESUME_NUDGE,
     strip_interrupted_mark,
 )
 from backend.session.language_packs import LanguagePack, get_pack, is_phantom, signals_closing
@@ -462,76 +459,28 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         can read it. `self.history` stays the full record either way, for the
         guards, the barge-in trims and the Transcript.
 
-        The nudge, never stored: the closing push when the user has said
-        goodbye (ADR 0037); the "you were cut off here" push when the user
-        talked over the previous reply (ADR 0035), which outranks everything
-        but the goodbye because it is the one the model is most lost without;
-        a "say it again, reworded shorter" push when the user asked to hear
-        something again (ADR 0038), firmer once they have asked twice;
-        otherwise a standing reminder quoting the persona's own last reply so
-        it does not come back reworded (ADR 0038), followed by the settlement
-        check that reads the call against the Scenario's success condition.
-
-        The settlement check rides on that standing nudge alone. On a closing
-        turn the call is already ending, and on a repeat-request turn the user
-        asked to hear something again, which is not a moment to weigh the
-        matter settled."""
+        The nudge is never stored, and which one it is is `nudges.for_turn`'s."""
         if CALL_STATE_NOTES:
             view = [self.history.system(), *self.notes.message(), *self.history.recent(HISTORY_WINDOW)]
         else:
             # The whole call, unbounded on purpose: a Session is one phone call,
             # so the record cannot outgrow a context measured in six figures.
             view = self.history.messages
-        if closing:
-            nudge = CLOSING_NUDGE
-        elif interrupted is not None and view[-1]["role"] == "user":
-            # Between the dashed line and the user's message, so the message
-            # is what the model sees last (see nudges.py for why this one
-            # is placed differently from the rest).
-            return [*view[:-1], {"role": "system", "content": INTERRUPTED_NUDGE}, view[-1]]
-        elif self._repeat_requests_in_a_row >= 2:
-            nudge = CLARIFY_AGAIN_NUDGE
-        elif self._repeat_requests_in_a_row == 1:
-            nudge = CLARIFY_NUDGE
-        elif self.history.previous_reply():
-            # Reversed, the anti-repeat rule turns around with the casting
-            # (ADR 0070): the persona is the side that puts things on the
-            # table, so the clause forbidding that would undo the system
-            # prompt from the nearest position in context.
-            frame = ANTI_REPEAT_NUDGE_REVERSE if self._scenario.reverse else ANTI_REPEAT_NUDGE
-            nudge = (
-                frame.format(previous=self.history.previous_reply()) +
-                self._settlement_check()
-            )
-        else:
+        nudge = nudges.for_turn(
+            closing=closing,
+            interrupted=interrupted is not None and view[-1]["role"] == "user",
+            repeat_requests=self._repeat_requests_in_a_row,
+            previous_reply=self.history.previous_reply(),
+            replies=len(self.history.replies()),
+            reverse=self._scenario.reverse,
+            call_goal=self._scenario.call_goal,
+        )
+        if nudge is None:
             return view
-        return [*view, {"role": "system", "content": nudge}]
-
-    def _settlement_check(self) -> str:
-        """The reminder that the call may end now, phrased around this
-        Scenario's success condition where it has one (ADR 0073).
-
-        Withheld over the first exchanges. Measured over the seeded library,
-        this check on the opening exchanges is where it does damage and nothing
-        else: nine of ten premature hang-ups landed on the user's very first
-        reply, where the persona has only just said what it wants and the
-        trainee cannot yet have met a condition. Asking whether the matter is
-        settled there is a question with one possible answer, and the model
-        answered it wrong. It cannot cost a real closing either: the persona
-        opens the call and states its case, so the earliest turn on which a
-        condition can honestly be met is the one this lets through.
-        """
-        replies = len(self.history.replies())
-        if replies < SETTLEMENT_CHECK_AFTER_REPLIES:
-            return ""
-        # A reverse asks the same question from the other end of the line
-        # (ADR 0070): the criterion is the caller's either way, but there it is
-        # the persona's to meet rather than to be satisfied by.
-        if self._scenario.reverse:
-            criterion = self._scenario.call_goal.strip() or GENERIC_CRITERION_REVERSE
-            return SETTLEMENT_CHECK_REVERSE.format(criterion=criterion)
-        criterion = self._scenario.call_goal.strip() or GENERIC_CRITERION
-        return SETTLEMENT_CHECK.format(criterion=criterion)
+        message = {"role": "system", "content": nudge.content}
+        if nudge.before_last:
+            return [*view[:-1], message, view[-1]]
+        return [*view, message]
 
     def _schedule_state_refresh(self, turn: Turn) -> None:
         """Refresh the caller's notes from this Turn's exchange (ADR 0071).
@@ -667,65 +616,35 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             # Words with no audio behind them (synthesis failed): place them on
             # the timeline as an instant, so the Transcript still reads in order.
             turn.persona_offset_ms = turn.persona_end_ms = self._elapsed_ms()
-        spoke = bool(turn.persona_text)
-        # When the user asked for a repeat, repeating or restating the
-        # *immediately previous* reply is the answer, not a loop -- but a
-        # verbatim repeat of an *older* reply, and a sentence stuttered inside
-        # one reply, still are (ADR 0038). Read before this reply joins them.
-        replies = self.history.replies()
-        repeated_reply = spoke and (
-            repetition.has_repeated_sentence(turn.persona_text) or
-            checks.repeats_earlier(turn.persona_text, replies, exclude_last=progress.allow_repetition) or
-            (not progress.allow_repetition and checks.repeats_last(turn.persona_text, replies))
+        # Read against the replies before this one joins them.
+        ending = checks.ending(
+            turn.persona_text,
+            self.history.replies(),
+            marker=progress.ends_call,
+            closing=progress.closing,
+            allow_repetition=progress.allow_repetition,
+            pack=self._pack,
         )
-        restates = spoke and not progress.allow_repetition and checks.restates_previous(turn.persona_text, replies)
         self.history.add_reply(turn.persona_text)
         progress.committed = True
 
-        # progress.closing backstops [CALL_END]: a small model won't always
-        # include the marker even when told to (confirmed in testing).
-        #
-        # said_goodbye is the mirror of ADR 0037's veto, and it catches an
-        # obedient model rather than a careless one. The prompt forbids the
-        # marker in a reply that also says the matter is not settled -- so a
-        # reply that voices a reservation *and* signs off ("...sonst muessen
-        # wir eskalieren. Ich danke Ihnen. Auf Wiederhoeren.") withholds the
-        # marker exactly as instructed, and the call then hung on a persona
-        # that had audibly hung up. The same `farewell_re` that already
-        # overrules `_still_pressing` decides here, so both directions read the
-        # goodbye the same way.
-        said_goodbye = spoke and not progress.ends_call and bool(
-            self._pack.farewell_re.search(turn.persona_text)
-        )
-        ends_call = progress.ends_call or progress.closing or repeated_reply or restates or said_goodbye
-        if ends_call:
+        if ending.ends:
             self.ended = True
             logger.info(
                 "Turn %d ends the call (model marker=%s, closing-intent check=%s, "
                 "repeated reply=%s, restated reply=%s, said goodbye=%s)",
                 turn.seq,
-                progress.ends_call,
-                progress.closing,
-                repeated_reply,
-                restates,
-                said_goodbye,
+                ending.marker,
+                ending.closing,
+                ending.repeated,
+                ending.restates,
+                ending.said_goodbye,
             )
-            # Only the closing-intent path actually asked the model for a
-            # goodbye (CLOSING_NUDGE); a repeat or an unprompted ending
-            # didn't, so it can't be trusted to have included one. said_goodbye
-            # is deliberately absent from this list -- it *is* the goodbye, and
-            # appending the fallback line would say it twice.
-            #
-            # `not spoke` covers the endings with no words at all: a reply that
-            # was the marker alone, or one the guards emptied entirely. The
-            # closing-intent path excludes itself above on the ground that the
-            # reply *is* the goodbye, which is wrong when there is no reply --
-            # the call then ended in silence.
-            if not spoke or repeated_reply or restates or (progress.ends_call and not progress.closing):
+            if ending.needs_fallback:
                 async for event in self._speak_fallback_closing(turn, progress):
                     yield event
-        yield TurnCompleted(turn_seq=turn.seq, ends_call=ends_call)
-        if not ends_call:
+        yield TurnCompleted(turn_seq=turn.seq, ends_call=ending.ends)
+        if not ending.ends:
             self._schedule_state_refresh(turn)
             # Audio was streamed ahead of playback, so the client is still
             # speaking this reply's tail and a barge-in over it reaches the

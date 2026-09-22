@@ -2,10 +2,16 @@
 
 Each check answers one question about a reply the model has just produced --
 does it repeat, restate, restart the call, or end on a demand -- and none of
-them does anything about the answer. What a verdict leads to (dropping a
-sentence, regenerating, vetoing an end marker, ending the call) and in which
-order the checks run is the orchestrator's, because that order *is* the
-behaviour (ADR 0035, ADR 0037, ADR 0038).
+them does anything about the answer. What a verdict leads to while a reply is
+still streaming (dropping a sentence, regenerating, vetoing an end marker) and
+in which order those checks run is the orchestrator's, because that order *is*
+the behaviour (ADR 0035, ADR 0037, ADR 0038).
+
+The one exception is `ending`, the settled question asked once a reply is
+complete: does it end the call, and must a goodbye be said for it. That was two
+boolean expressions side by side in the orchestrator that had to agree, and the
+comments beside them recorded both ways they had failed to -- a call that ended
+in silence, and a goodbye said twice.
 
 They sat on `SessionOrchestrator` as methods whose only state was the history
 they read, so testing one meant driving a whole Turn through a faked pipeline.
@@ -17,10 +23,87 @@ without knowing what a reply or a call is.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from backend.session import repetition
 from backend.session.language_packs import LanguagePack
 from backend.session.nudges import strip_interrupted_mark
+
+
+@dataclass(frozen=True)
+class Ending:
+    """Whether a finished reply ends the call, and why."""
+
+    ends: bool
+    # Why, each reason on its own: they are logged together.
+    marker: bool
+    closing: bool
+    repeated: bool
+    restates: bool
+    said_goodbye: bool
+    # A fallback goodbye has to be spoken after the reply.
+    needs_fallback: bool
+
+
+def ending(  # pylint: disable=too-many-arguments  # the reasons a call ends, each its own input
+    text: str,
+    replies: Sequence[str],
+    *,
+    marker: bool,
+    closing: bool,
+    allow_repetition: bool,
+    pack: LanguagePack,
+) -> Ending:
+    """Whether a finished reply ends the call, and whether a goodbye must be
+    spoken after it.
+
+    `marker` is the model's own [CALL_END], already past ADR 0037's veto;
+    `closing` a Turn the user closed and the closing nudge asked to end, which
+    backstops the marker, since a small model will not always include it even
+    when told to (confirmed in testing). `replies` are the ones before this
+    reply, oldest first.
+
+    When the user asked for a repeat, repeating or restating the *immediately
+    previous* reply is the answer, not a loop -- but a verbatim repeat of an
+    *older* reply, and a sentence stuttered inside one reply, still are
+    (ADR 0038).
+
+    `said_goodbye` is the mirror of ADR 0037's veto, and it catches an obedient
+    model rather than a careless one. The prompt forbids the marker in a reply
+    that also says the matter is not settled -- so a reply that voices a
+    reservation *and* signs off ("...sonst muessen wir eskalieren. Ich danke
+    Ihnen. Auf Wiederhoeren.") withholds the marker exactly as instructed, and
+    the call then hung on a persona that had audibly hung up. The same
+    `farewell_re` that overrules `still_pressing` decides here, so both
+    directions read the goodbye the same way.
+
+    The fallback goodbye: only the closing path actually asked the model for one
+    (CLOSING_NUDGE); a repeat or an unprompted ending did not, so it cannot be
+    trusted to have said one. A goodbye the reply said itself is exempt -- it
+    *is* the goodbye, and the fallback would say it twice. A reply with no
+    words at all -- the marker alone, or one the guards emptied -- always needs
+    one, the closing path included, or the call ends in silence.
+    """
+    spoke = bool(text)
+    repeated = spoke and (
+        repetition.has_repeated_sentence(text) or
+        repeats_earlier(text, replies, exclude_last=allow_repetition) or
+        (not allow_repetition and repeats_last(text, replies))
+    )
+    restates = spoke and not allow_repetition and restates_previous(text, replies)
+    said_goodbye = spoke and not marker and bool(pack.farewell_re.search(text))
+    ends = marker or closing or repeated or restates or said_goodbye
+    return Ending(
+        ends=ends,
+        marker=marker,
+        closing=closing,
+        repeated=repeated,
+        restates=restates,
+        said_goodbye=said_goodbye,
+        needs_fallback=ends and (
+            not spoke or repeated or restates or (marker and not closing)
+        ),
+    )
 
 
 def repeats_last(text: str, replies: Sequence[str]) -> bool:

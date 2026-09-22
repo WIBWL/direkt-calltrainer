@@ -8,9 +8,14 @@ concrete text the model should steer away from or pick up from. They live
 here rather than in `orchestrator.py` because that module is at its line
 ceiling, and because they are prose, not control flow -- read and revised
 together, against transcripts.
+
+Which of them a reply gets is `for_turn`, at the end: the precedence between
+them was the orchestrator's, which imported every one of these names to
+choose among them, and a precedence is exactly what a table test pins.
 """
 
 import re
+from dataclasses import dataclass
 
 # Frames the caller's notes in the model's view of the call (ADR 0071). They
 # sit right after the system prompt, ahead of the last few exchanges, and are
@@ -242,3 +247,89 @@ INTERRUPTED_NUDGE = (
     "yourself again. If they have just offered, promised or proposed "
     "something, take a position on that before anything else."
 )
+
+
+@dataclass(frozen=True)
+class TurnNudge:
+    """This reply's nudge, and where it goes."""
+
+    content: str
+    # Between the history's last user message and the one before it, rather
+    # than after the whole view: `INTERRUPTED_NUDGE` is placed so the user's
+    # message is what the model sees last (see there).
+    before_last: bool = False
+
+
+def settlement_check(replies: int, *, reverse: bool, call_goal: str) -> str:
+    """The reminder that the call may end now, phrased around the Scenario's
+    call goal where it has one (ADR 0073); empty over the opening exchanges.
+
+    Withheld there because measured over the seeded library, this check on the
+    opening exchanges is where it does damage and nothing else: nine of ten
+    premature hang-ups landed on the user's very first reply, where the persona
+    has only just said what it wants and the trainee cannot yet have met a
+    condition. Asking whether the matter is settled there is a question with one
+    possible answer, and the model answered it wrong. It cannot cost a real
+    closing either: the persona opens the call and states its case, so the
+    earliest turn on which a condition can honestly be met is the one this lets
+    through.
+
+    A reverse asks the same question from the other end of the line (ADR 0070):
+    the criterion is the caller's either way, but there it is the persona's to
+    meet rather than to be satisfied by.
+    """
+    if replies < SETTLEMENT_CHECK_AFTER_REPLIES:
+        return ""
+    if reverse:
+        return SETTLEMENT_CHECK_REVERSE.format(
+            criterion=call_goal.strip() or GENERIC_CRITERION_REVERSE
+        )
+    return SETTLEMENT_CHECK.format(criterion=call_goal.strip() or GENERIC_CRITERION)
+
+
+def for_turn(  # pylint: disable=too-many-arguments  # each is one situation the precedence weighs
+    *,
+    closing: bool,
+    interrupted: bool,
+    repeat_requests: int,
+    previous_reply: str,
+    replies: int,
+    reverse: bool,
+    call_goal: str,
+) -> TurnNudge | None:
+    """The one nudge this reply gets, or None, in order of precedence.
+
+    The closing push when the user has said goodbye (ADR 0037); the "you were
+    cut off here" push when the user talked over the previous reply (ADR 0035)
+    -- `interrupted` is only true where the view ends on the user's message it
+    goes in front of -- which outranks everything but the goodbye because it is
+    the one the model is most lost without; a "say it again, reworded shorter"
+    push when the user asked to hear something again (ADR 0038), firmer once
+    they have asked twice; otherwise a standing reminder quoting the persona's
+    own last reply so it does not come back reworded (ADR 0038), followed by the
+    settlement check.
+
+    The settlement check rides on that standing nudge alone. On a closing turn
+    the call is already ending, and on a repeat-request turn the user asked to
+    hear something again, which is not a moment to weigh the matter settled.
+
+    Reversed, the anti-repeat rule turns around with the casting (ADR 0070):
+    the persona is the side that puts things on the table, so the clause
+    forbidding that would undo the system prompt from the nearest position in
+    context.
+    """
+    if closing:
+        return TurnNudge(CLOSING_NUDGE)
+    if interrupted:
+        return TurnNudge(INTERRUPTED_NUDGE, before_last=True)
+    if repeat_requests >= 2:
+        return TurnNudge(CLARIFY_AGAIN_NUDGE)
+    if repeat_requests == 1:
+        return TurnNudge(CLARIFY_NUDGE)
+    if previous_reply:
+        frame = ANTI_REPEAT_NUDGE_REVERSE if reverse else ANTI_REPEAT_NUDGE
+        return TurnNudge(
+            frame.format(previous=previous_reply) +
+            settlement_check(replies, reverse=reverse, call_goal=call_goal)
+        )
+    return None
