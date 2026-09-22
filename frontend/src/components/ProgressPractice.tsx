@@ -93,17 +93,24 @@ export default function ProgressPractice({
         Als Nächstes üben
       </h3>
 
-      {/* The ground, then the offer, then the button — left to right across
-          the band rather than stacked. That order is the argument either way:
-          a suggestion whose ground the reader has not seen is an instruction,
-          and this screen has no standing to give one. Reading order is the
-          same as the source order, so the two halves swap under each other on
-          a narrow screen without anything else changing. */}
+      {/* The ground, then the offer, then the button, stacked down one column
+          of reading width. That order is the argument: a suggestion whose
+          ground the reader has not seen is an instruction, and this screen has
+          no standing to give one.
+
+          The ground used to sit in a column beside the offer, which put four
+          lines of prose in 240 pixels next to a bordered, gradient-filled
+          panel — a card inside a card, with the two halves centred against
+          each other so that nothing lined up. Stacked, the prose gets a
+          readable measure and the offer needs no box of its own to be found:
+          the name of the call in the display face and the one dark button on
+          the screen are enough. */}
       <div className="progress-practice-band">
         <p className="progress-practice-why">
           <span className="progress-practice-chip">Vorschlag</span>
           {goal?.title ?? target.goal} wurde in {target.count} Ihrer Auswertungen als
-          Verbesserungspunkt genannt, zuletzt am {formatDayMonth(source.started_at) ?? source.started_at} im Gespräch
+          Verbesserungspunkt genannt, zuletzt am{" "}
+          {formatDayMonth(source.started_at) ?? source.started_at} im Gespräch
           „{source.scenario}“.
         </p>
 
@@ -161,24 +168,28 @@ export default function ProgressPractice({
 
       {/* The line calling this a suggestion and not an instruction stays in
           view: it is what keeps the button above from reading as an order. How
-          the suggestion was put together is background and sits behind the "i". */}
-      <p className="progress-practice-note">
-        Ein Vorschlag, keine Vorgabe. Über die Startseite können Sie jederzeit etwas anderes
-        wählen.
-      </p>
-      <InfoDetails label="Wie dieser Vorschlag zustande kommt">
-        <p>
-          Er folgt daraus, was Ihre Auswertungen mehrfach als Verbesserung genannt haben. Gibt es
-          zu dem Gespräch, in dem das zuletzt vorkam, ein Folgeszenario, wird dieses
-          vorgeschlagen. Sonst ein Szenario aus der Art von Gespräch, in der sich das Ziel üben
-          lässt, bevorzugt eines, das Sie noch nicht gespielt haben.
+          the suggestion was put together is background and sits behind the "i",
+          on the same line — two trailing rows each with their own weight made
+          the foot of the block heavier than the offer in it. */}
+      <div className="progress-practice-foot">
+        <p className="progress-practice-note">
+          Ein Vorschlag, keine Vorgabe. Über die Startseite können Sie jederzeit etwas anderes
+          wählen.
         </p>
-        <p>
-          Der Gesprächspartner ist derselbe wie in dem Training, in dem der Punkt zuletzt genannt
-          wurde. So bleibt die Stimme gleich, und das nächste Gespräch ist eine Übung an genau
-          diesem Punkt.
-        </p>
-      </InfoDetails>
+        <InfoDetails label="Wie dieser Vorschlag zustande kommt">
+          <p>
+            Er folgt daraus, was Ihre Auswertungen mehrfach als Verbesserung genannt haben. Gibt
+            es zu dem Gespräch, in dem das zuletzt vorkam, ein Folgeszenario, wird dieses
+            vorgeschlagen. Sonst ein Szenario aus der Art von Gespräch, in der sich das Ziel
+            üben lässt, bevorzugt eines, das Sie noch nicht gespielt haben.
+          </p>
+          <p>
+            Der Gesprächspartner ist derselbe wie in dem Training, in dem der Punkt zuletzt
+            genannt wurde. So bleibt die Stimme gleich, und das nächste Gespräch ist eine Übung
+            an genau diesem Punkt.
+          </p>
+        </InfoDetails>
+      </div>
     </section>
   );
 }

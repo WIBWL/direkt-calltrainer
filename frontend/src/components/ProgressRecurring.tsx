@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 
+import { useProgressContext } from "../ProgressContext";
 import type { FocusGoal, SessionSummary } from "../protocol";
+import { progressGoalPath } from "../routes";
 import { MIN_MENTIONS, mentionSummary, type GoalMentions } from "../utils/goalMentions";
 import InfoDetails from "./InfoDetails";
 import MentionTally from "./MentionTally";
@@ -82,13 +85,33 @@ export default function ProgressRecurring({
             />
           </div>
 
-          {/* Under the cards rather than inside one of them: it describes the
-              counting, which is the same on either side. One sentence stays in
-              view -- that this is what was written and not what was measured is
-              the half a reader must not miss -- and the rules of the count move
-              behind the "i", as on every other screen of the app. */}
+          {/* Under the two lists rather than beside them, and across the full
+              width: a third column held a paragraph, an offer and a button
+              where its neighbours hold two lines each, so it ran three times
+              their height and the row read as lopsided. It still follows
+              directly from what the lists say, which is the adjacency that
+              mattered — the ground and the offer are one glance either way.
+
+              Directly under them, too. The note on how the counting works used
+              to sit here, between the lists and the offer, and two lines of
+              prose plus an "i" pushed the one block that leads back into
+              training a screen further down while holding the two halves of
+              one glance apart. */}
+          {practice}
+
+          {/* Under everything rather than under the cards it describes: it
+              explains the counting behind both lists, and the counting is the
+              same on either side, so it is a footnote to the section and not a
+              caption to a card. One sentence stays in view -- that this is what
+              was written and not what was measured is the half a reader must
+              not miss -- and the rules of the count move behind the "i", as on
+              every other screen of the app. */}
+          {/* It names the two lists now that it no longer stands under them:
+              directly below the suggestion card, "gezählt wird" would read as
+              a note about the suggestion, which counts nothing. */}
           <p className="progress-preview-note recurring-note">
-            Gezählt wird, was Ihre Auswertungen geschrieben haben, nicht was gemessen wurde.
+            In den beiden Listen oben ist gezählt, was Ihre Auswertungen geschrieben haben,
+            nicht was gemessen wurde.
           </p>
           <InfoDetails label="Wie gezählt wird">
             <p>
@@ -104,14 +127,6 @@ export default function ProgressRecurring({
               mit.
             </p>
           </InfoDetails>
-
-          {/* Under the two lists rather than beside them, and across the full
-              width: a third column held a paragraph, an offer and a button
-              where its neighbours hold two lines each, so it ran three times
-              their height and the row read as lopsided. It still follows
-              directly from what the lists say, which is the adjacency that
-              mattered — the ground and the offer are one glance either way. */}
-          {practice}
         </>
       )}
     </section>
@@ -154,6 +169,10 @@ function Column({
   total: number;
   empty: string;
 }) {
+  // The selection travels with the link, so the goal's page counts the same
+  // trainings this row does (see ProgressContext.tsx).
+  const { withPeriod } = useProgressContext();
+
   return (
     <div className="card">
       <h3 className="recurring-heading">{heading}</h3>
@@ -161,25 +180,50 @@ function Column({
         <p className="focus-tile-note">{empty}</p>
       ) : (
         <ul className="recurring-list">
-          {entries.map((entry, index) => (
-            <li className="recurring-item" key={entry.goal}>
-              <span className="recurring-rank" aria-hidden="true">
-                {index + 1}
-              </span>
-              <span className="recurring-body">
-                <span className="recurring-goal">
-                  {/* The catalogue title where there is one. A key whose goal
-                      has since been retired still has points pointing at it,
-                      and the raw key is a poor label but an honest one. */}
-                  {titles.get(entry.goal) ?? entry.goal}
+          {entries.map((entry, index) => {
+            // The catalogue title where there is one. A key whose goal has
+            // since been retired still has points pointing at it, and the raw
+            // key is a poor label but an honest one.
+            const title = titles.get(entry.goal);
+            const body = (
+              <>
+                <span className="recurring-rank" aria-hidden="true">
+                  {index + 1}
                 </span>
-                <MentionTally count={entry.count} total={total} />
-              </span>
-              <span className="recurring-count">
-                {entry.count} <span className="recurring-count-of">von {total}</span>
-              </span>
-            </li>
-          ))}
+                <span className="recurring-body">
+                  <span className="recurring-goal">{title ?? entry.goal}</span>
+                  <MentionTally count={entry.count} total={total} />
+                </span>
+                <span className="recurring-count">
+                  {entry.count} <span className="recurring-count-of">von {total}</span>
+                </span>
+              </>
+            );
+
+            return (
+              <li key={entry.goal}>
+                {/* Each row opens the goal's own page, which is where the
+                    sentences behind the count are quoted. The row had the
+                    hover of something you can press and did nothing when you
+                    did — and this is the reading a count most needs, because
+                    "in 3 von 9 genannt" asks the reader to take a number on
+                    trust unless they can see what was written.
+
+                    Not for a goal the catalogue no longer knows: its page can
+                    only say that there is nothing under that name, and a link
+                    into a dead end is worse than a row that stays a row. That
+                    row keeps no hover either, so nothing on this screen looks
+                    pressable without being so. */}
+                {title ? (
+                  <Link className="recurring-item" to={withPeriod(progressGoalPath(entry.goal))}>
+                    {body}
+                  </Link>
+                ) : (
+                  <span className="recurring-item">{body}</span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

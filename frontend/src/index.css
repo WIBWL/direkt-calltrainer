@@ -6322,6 +6322,9 @@ button.calendar-day {
   padding: 0;
 }
 
+/* One theme. A link where the catalogue knows the goal — it opens the page
+   that quotes what the wrap-ups actually wrote about it — and a plain row
+   where it does not. */
 .recurring-item {
   display: flex;
   align-items: center;
@@ -6329,11 +6332,29 @@ button.calendar-day {
   padding: 10px 8px;
   margin: 0 -8px;
   border-radius: var(--radius-control);
+  color: inherit;
+  text-decoration: none;
   transition: background-color 140ms ease;
 }
 
-.recurring-item:hover {
+/* The hover belongs to the link and not to the row. It sat on every row while
+   none of them did anything, which is the one thing an affordance may not do:
+   the rows that cannot be opened now look like what they are. */
+a.recurring-item:hover {
   background: var(--color-surface-selected);
+}
+
+/* The title takes the link colour under the pointer, the way a row of the
+   metric table does. The whole row is the target, so the underline would run
+   the width of the card; the colour says the same thing without drawing a
+   line across the count. */
+a.recurring-item:hover .recurring-goal {
+  color: var(--color-blue-600);
+}
+
+a.recurring-item:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 2px;
 }
 
 /* Position in the list, which is the order the lists are already in
@@ -6429,33 +6450,38 @@ button.calendar-day {
   font-size: 0.82rem;
 }
 
-/* The single practice suggestion. Reason first and small, the thing to play
-   next beside it and large, the button at its end, the caveat last. That order
-   is the argument: a suggestion whose ground the reader has not seen is an
-   instruction, so the ground comes before the offer.
+/* The single practice suggestion. The ground first and small, the thing to
+   play next under it and large, the button at its end, the caveat last. That
+   order is the argument: a suggestion whose ground the reader has not seen is
+   an instruction, so the ground comes before the offer.
 
    Across the full width under the two lists rather than as a third card in
    their row: the same content in a 450px column ran three times their height,
-   and the row read as lopsided. The ground takes the smaller share -- it is
-   read once, where the offer is what gets pressed. */
+   and the row read as lopsided.
+
+   One column and not two. The ground used to sit beside the offer, which put
+   four lines of prose in 240 pixels next to a bordered, gradient-filled panel
+   — a card inside a card — with the two halves centred against each other, so
+   the chip and the name of the call missed each other by nine pixels and
+   nothing on the band lined up with anything else. Stacked, the prose gets a
+   measure it can be read at and the offer needs no box to be found.
+
+   The measure is on the prose and not on the band: this card runs the full
+   width of a 1440px page, and a paragraph set across it is 180 characters to
+   the line — but capping the whole band left the right two fifths of the card
+   empty, which reads as a layout that broke rather than as a column somebody
+   chose. So the two sentences get a width they can be read at, and the rows
+   that carry a structure — the rule, the offer, the foot — keep the card's. */
 
 .progress-practice-band {
-  display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(340px, 1.5fr);
-  gap: 16px 32px;
-  align-items: center;
-}
-
-/* Under each other from the width where the offer's own row (text plus button)
-   starts wrapping: two narrow columns would break both halves at once. */
-@media (max-width: 900px) {
-  .progress-practice-band {
-    grid-template-columns: 1fr;
-  }
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
 }
 
 .progress-practice-why {
   margin: 0;
+  max-width: 68ch;
   font-size: 0.9rem;
   line-height: 1.6;
   color: var(--color-text-muted);
@@ -6467,7 +6493,8 @@ button.calendar-day {
    other — no colour, no weight — since the two are statements in sequence and
    not a before and an after. */
 .progress-practice-since {
-  margin: 10px 0 0;
+  margin: 0;
+  max-width: 68ch;
   font-size: 0.9rem;
   line-height: 1.6;
   color: var(--color-text-muted);
@@ -6477,12 +6504,17 @@ button.calendar-day {
   color: var(--color-navy-900);
 }
 
-/* The chip at the head of the sentence that gives the ground. It says what
-   kind of thing this block is before the reader has read a word of it, which is
-   the same job the closing caveat does at the other end. */
+/* The chip over the sentence that gives the ground. It says what kind of thing
+   this block is before the reader has read a word of it, which is the same job
+   the closing caveat does at the other end.
+
+   On a line of its own. Inline at the head of the paragraph it set the first
+   line ninety pixels in while the two under it started at the margin, which
+   reads as a broken first-line indent rather than as a label. */
 .progress-practice-chip {
-  display: inline-block;
-  margin-right: 8px;
+  display: block;
+  width: fit-content;
+  margin: 0 0 6px;
   padding: 2px 10px;
   border-radius: 999px;
   background: var(--color-blue-100);
@@ -6491,26 +6523,26 @@ button.calendar-day {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  vertical-align: 1px;
 }
 
-/* The offer itself, lifted off the card so the eye lands on it: the name of the
-   call on the left, the button on the right, wrapping under it when the card
-   gets narrow. */
+/* The offer itself: the name of the call on the left, the button at the end of
+   the measure, wrapping under it where there is no room.
+
+   No box. It had a border and a 135-degree gradient inside a card that has a
+   border of its own, and the gradient ran out to the card's own white before
+   the panel's right edge did — so the fill dissolved while the border stayed,
+   which looks like a mistake rather than like a panel. What makes the offer
+   findable without one is the name set in the display face and the only dark
+   button on the screen; the rule above it is what separates it from the ground
+   it follows from. */
 .progress-practice-offer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px 24px;
-  padding: 1.1rem 1.25rem;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-choice);
-  background: linear-gradient(
-    135deg,
-    var(--color-blue-100) 0%,
-    var(--color-surface-selected) 65%,
-    var(--color-surface) 100%
-  );
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .progress-practice-text {
@@ -6533,7 +6565,7 @@ button.calendar-day {
 .progress-practice-facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 16px;
+  gap: 6px 8px;
   list-style: none;
   margin: 0.55rem 0 0;
   padding: 0;
@@ -6563,10 +6595,36 @@ button.calendar-day {
   white-space: nowrap;
 }
 
-.progress-practice-note {
-  margin: 1.25rem 0 0;
+/* The caveat and the "i" on one line. Two trailing rows, each with its own
+   rule and its own weight, made the foot of the block heavier than the offer
+   above it. Opened, the explanation takes the row to itself — an "i" body
+   squeezed into the width its summary happens to leave is the reason that
+   pattern is written this way everywhere else on this screen. */
+.progress-practice-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 24px;
+  margin-top: 1.25rem;
   padding-top: 1rem;
   border-top: 1px solid var(--color-border-subtle);
+}
+
+.progress-practice-foot:has(> .info-details[open]) {
+  display: block;
+}
+
+.progress-practice-foot .info-details {
+  margin-top: 0;
+}
+
+.progress-practice-note {
+  /* Shrinks rather than holding its whole sentence on one line, so the "i"
+     stays beside it instead of being pushed onto a row of its own. */
+  flex: 1 1 260px;
+  min-width: 0;
+  margin: 0;
   font-size: 0.82rem;
   line-height: 1.5;
   color: var(--color-text-muted);
