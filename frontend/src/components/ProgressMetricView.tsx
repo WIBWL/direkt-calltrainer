@@ -10,12 +10,13 @@ import {
   formatPoint,
   formatBand,
   toSeries,
+  partsSummary,
 } from "../utils/progressStats";
 import { formatDate } from "../utils/time";
 import AppLayout from "./AppLayout";
 import EarlyAndLate from "./EarlyAndLate";
 import GoalStatements from "./GoalStatements";
-import PartsStrip, { partsSummary } from "./PartsStrip";
+import PartsStrip from "./PartsStrip";
 import Sparkline from "./Sparkline";
 
 /**

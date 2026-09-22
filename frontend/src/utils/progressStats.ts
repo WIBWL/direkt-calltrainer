@@ -198,6 +198,23 @@ export function completeParts(series: MetricSeries): number | null {
 }
 
 /**
+ * The sentence that goes with a checklist metric: in how many trainings every
+ * part was recognised, out of how many. Null where the catalogue does not say
+ * how many parts there are, rather than a sentence with a guessed number in it.
+ *
+ * Here rather than beside the strip that draws it (`PartsStrip.tsx`): it is a
+ * sentence computed from a series, like `formatBand` above, three screens say
+ * it, and so does the progress PDF — which is a utility and would otherwise
+ * have to reach into a component for it.
+ */
+export function partsSummary(series: MetricSeries): string | null {
+  const total = partsTotal(series.key);
+  const complete = completeParts(series);
+  if (total === null || complete === null) return null;
+  return `In ${complete} von ${series.points.length} Trainings alle ${total} Teile erkannt`;
+}
+
+/**
  * The range the user held for most of their trainings: their median, widened by
  * their own spread.
  *

@@ -1,5 +1,4 @@
-import { partsTotal } from "../utils/metrics";
-import { completeParts, type MetricSeries } from "../utils/progressStats";
+import { type MetricSeries } from "../utils/progressStats";
 import { formatDate } from "../utils/time";
 
 /**
@@ -41,16 +40,4 @@ export default function PartsStrip({ series }: { series: MetricSeries }) {
       ))}
     </span>
   );
-}
-
-/**
- * The sentence that goes with the strip: in how many trainings every part was
- * recognised, out of how many. Null where the catalogue does not say how many
- * parts there are, rather than a sentence with a guessed number in it.
- */
-export function partsSummary(series: MetricSeries): string | null {
-  const total = partsTotal(series.key);
-  const complete = completeParts(series);
-  if (total === null || complete === null) return null;
-  return `In ${complete} von ${series.points.length} Trainings alle ${total} Teile erkannt`;
 }

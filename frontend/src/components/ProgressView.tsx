@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { useConsentContext } from "../ConsentContext";
@@ -9,6 +9,7 @@ import { ROUTES, progressGoalPath, progressMetricPath } from "../routes";
 import { backingOf } from "../utils/focusMetrics";
 import { mentionsFor, statementsFor } from "../utils/goalMentions";
 import { showsInOverview } from "../utils/metrics";
+import { downloadProgressPdf } from "../utils/progressPdf";
 import { segmentTrainings } from "../utils/segmentStats";
 import {
   MIN_SESSIONS_FOR_SERIES,
@@ -19,6 +20,7 @@ import {
   formatBand,
   variety,
   toSeries,
+  partsSummary,
   type MetricSeries,
 } from "../utils/progressStats";
 import { formatDate } from "../utils/time";
@@ -26,7 +28,7 @@ import ActivityCalendar from "./ActivityCalendar";
 import AppLayout from "./AppLayout";
 import InfoDetails from "./InfoDetails";
 import MentionTally from "./MentionTally";
-import PartsStrip, { partsSummary } from "./PartsStrip";
+import PartsStrip from "./PartsStrip";
 import ProgressMetricTable from "./ProgressMetricTable";
 import ProgressPractice from "./ProgressPractice";
 import ProgressRecurring from "./ProgressRecurring";
@@ -295,7 +297,75 @@ export default function ProgressView() {
           <ProgressMetricTable series={overview} />
         </>
       )}
+
+      {/* Last on the page, the way the feedback screen puts its download last:
+          what to do once the reading is done, after the reading. It is offered
+          even where the selection is empty, because the record at the top of
+          the sheet counts every stored training and is worth having on its
+          own. */}
+      <DownloadReport />
     </Frame>
+  );
+}
+
+/**
+ * The whole screen as a PDF (F-13), the counterpart of the feedback file F-64
+ * offers after one call (`utils/progressPdf.ts`).
+ *
+ * The dashboard is what somebody takes into a conversation with a trainer or an
+ * instructor, and the only way to take it was a screenshot per block. Built in
+ * the browser on the numbers the page already holds: a server route would be a
+ * second path to the same figures, which `docs/dashboard-konzept.md` section 9
+ * rules out by name.
+ *
+ * Styled as the feedback screen's actions row, and sharing its classes rather
+ * than copying its rules: it is the same kind of row in the same place doing
+ * the same thing, and two rules that have to stay identical eventually do not.
+ */
+function DownloadReport() {
+  const { sessions, selected, periodPhrase, truncated } = useProgressContext();
+  const { focus } = useFocusContext();
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  // Nothing to print before the first training, and the empty state above
+  // already says what to do about that.
+  if (sessions.length === 0) return null;
+
+  const download = async () => {
+    setBusy(true);
+    setFailed(false);
+    try {
+      await downloadProgressPdf({
+        sessions,
+        selected,
+        phrase: periodPhrase,
+        catalogue: focus?.goals ?? [],
+        picked: focus?.selected ?? [],
+        truncated,
+      });
+    } catch (e) {
+      console.debug("[progress pdf] failed", e);
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="feedback-actions">
+        <button type="button" className="back-to-start-button" disabled={busy} onClick={download}>
+          {busy ? "PDF wird erstellt …" : "Fortschritt herunterladen"}
+        </button>
+      </div>
+
+      {failed && (
+        <p className="follow-up-error transcript-download-error">
+          Das PDF konnte nicht erstellt werden. Bitte versuchen Sie es erneut.
+        </p>
+      )}
+    </>
   );
 }
 

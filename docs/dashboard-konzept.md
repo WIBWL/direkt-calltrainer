@@ -449,7 +449,7 @@ Einstellungen, während das Dashboard eine Arbeitsansicht ist.
 
 Stand nach der Überarbeitung (September 2026). Die Buchstaben der Abschnitte
 unten sind die ursprünglichen, die Reihenfolge auf dem Bildschirm ist A mit dem
-Aktivitätsteil, dann der Zeitraumschalter, dann B, D mit E und C.
+Aktivitätsteil, dann der Zeitraumschalter, dann B, D mit E und C, zuletzt F.
 
 ```
 +-----------------------------------------------------------------------+
@@ -493,6 +493,8 @@ Aktivitätsteil, dann der Zeitraumschalter, dann B, D mit E und C.
 |  ● Gesprächsinhalt                                                     |
 |  Fragen           4         ~~~~\/~~~      3 bis 6                 12  |
 |  Gesprächseinstieg 3 Teile  [3][2][3][3]   in 9 von 12 alle 3      12  |
++-----------------------------------------------------------------------+
+|  [ Fortschritt herunterladen ]                                         |  F
 +-----------------------------------------------------------------------+
 ```
 
@@ -615,6 +617,42 @@ Drei Wege, in dieser Rangfolge:
 Der Vorschlag nennt immer, woher er kommt („weil der Abschluss in Ihren letzten
 Auswertungen dreimal genannt wurde“). Eine Empfehlung ohne Begründung ist an
 dieser Stelle eine Anweisung.
+
+### F. Mitnehmen
+
+Ganz unten ein Knopf: **Fortschritt herunterladen**
+(`frontend/src/utils/progressPdf.ts`). Das Dashboard ist das, was jemand in ein
+Gespräch mit einer Ausbilderin oder einer Führungskraft mitnimmt, und bis dahin
+ging das nur als Bildschirmfoto je Block.
+
+Die Datei trägt, was die Seite trägt, in der Reihenfolge der Seite: die
+Aufzeichnung dessen, was trainiert wurde, über alle gespeicherten Gespräche,
+die Fokusziele, was die
+Auswertungen wiederholt nennen, und jede Kennzahl mit ihrem üblichen Bereich und
+einem gezeichneten Verlauf — gelesen über die Trainings, die die Schalter
+auswählen, was die erste Seite in Worten sagt.
+
+Drei Dinge stehen bewusst **nicht** darin:
+
+* **Der Kalender.** Zwölf Monatsraster sind vier Seiten Kästchen. Was ein Leser
+  daraus mitnimmt — wie viele Trainings in welchen Monat fielen — ist eine
+  Liste, und eine Liste ist das, was ein Blatt Papier gut kann.
+* **Jede Wertung.** Kein Zielwert, keine Ampel, kein Pfeil, keine Differenz
+  zwischen einem früheren und einem späteren Wert, keine Gesamtnote
+  (ADR 0004, ADR 0051, ADR 0065). Auf Papier ist die Regel schärfer als auf dem
+  Bildschirm: Ein Blatt, das jemand anderem in die Hand gegeben wird, liest sich
+  als Beurteilung der Person, solange nicht dasteht, dass es keine ist. Es steht
+  zweimal da, unter dem Titel und am Fuß.
+* **Eine Route auf dem Server.** Gebaut wird im Browser, aus den Zahlen, die die
+  Seite ohnehin hält. Ein zweiter Weg zu denselben Zahlen ist genau das, was
+  Abschnitt 9 ausschließt; dass die Feedback-Datei aus demselben Grund im
+  Browser gebaut wird, kommt hinzu (ADR 0066).
+
+Der Knopf sitzt, wo der Feedback-Bildschirm seinen hat: in derselben
+Aktionszeile und mit deren Klassen, nicht mit einer Kopie ihrer Regeln. Das
+Seitengerüst beider Dokumente — Banner, Schriften, Palette, Überschrift, Absatz,
+Seitenumbruch — ist `frontend/src/utils/pdfDocument.ts`, damit die zwei Dateien,
+die diese Anwendung schreibt, wie eine Anwendung aussehen.
 
 ## 6. Zustände
 
@@ -769,6 +807,12 @@ Vorschlag, damit die spätere Umsetzung nicht am Datenweg hängt:
   auch eine Kachel und einen Übungsvorschlag bekommt, hängt an zwei Tabellen im
   Frontend, die still danebenliegen können; `tests/test_focus_goal_coverage.py`
   und `tests/test_recommendations.py` halten beide gegen den gesäten Katalog.
+* **Die Mitnahme ist ebenfalls kein Endpunkt.** Das PDF (Abschnitt F) wird im
+  Browser gebaut, aus den Sitzungen, die für die Ansicht ohnehin geladen sind.
+  Eine Serverroute dafür wäre der zweite Weg zu denselben Zahlen, den der erste
+  Punkt ausschließt, und sie müsste die Auswahl der Schalter noch einmal
+  nachbilden. jsPDF und die Schriften werden erst beim Druck auf den Knopf
+  geholt, liegen also nicht im Startbündel.
 * **Auf Anfrage berechnet, nicht materialisiert.** Sechs Monate Aufbewahrung
   begrenzen die Datenmenge je Konto auf eine Größenordnung, die eine Abfrage
   ohne Aggregattabelle trägt. Eine Aggregattabelle wäre eine zweite Wahrheit,
@@ -821,6 +865,7 @@ Offene Fragen an die Projektleitung, die ich nicht allein entscheiden sollte:
 | 1 (gebaut) | Kopf, Kennzahlen mit Verläufen, Fokuszielkacheln für die acht messbaren Ziele, alle Zustände aus Abschnitt 6, Detailebene | Nur vorhandene Daten. Kein Schemaeingriff. |
 | 2 (gebaut) | Bereich D und E, dazu die zweite Ebene für Kennzahl und Fokusziel mit den zitierten Aussagen | Zuordnung im Generator, eine Spalte, ADR aus Abschnitt 10. Erledigt durch ADR 0080 (`feedback_point.focus_goal_id`, Migration `d4c81b70e2a5`) samt der redaktionellen Tabelle in `utils/practiceRoutes.ts` und der Ergänzung zu ADR 0064 für den Text auf der Liste. |
 | 3 (abgeschlossen) | Fokusziele ohne Messung mit Zahlen unterlegen | Gebaut: Sprachmelodie (F-35), Unterbrechungen (F-51), Abschnittswerte für „Souveränität unter Druck“ (ADR 0081). Verworfen mit Begründung: Füllwörter (Whisper normalisiert sie weg), das Fokusziel zur Lautstärke (misst das Mikrofon mit), die Artikulation (Abschnitt 4.2). Keine offenen Punkte mehr. |
+| 4 (gebaut) | Bereich F: die Ansicht als PDF zum Mitnehmen | Nur vorhandene Daten und kein Schemaeingriff — gebaut im Browser aus den Sitzungen, die die Ansicht ohnehin lädt (`utils/progressPdf.ts`), auf dem Seitengerüst, das aus der Feedback-Datei herausgelöst wurde (`utils/pdfDocument.ts`). Nachträglich ergänzt, nicht ursprünglich geplant: Der Bedarf kam aus dem Gebrauch, weil die Seite sonst nur als Bildschirmfoto in ein Gespräch mitzunehmen war. |
 
 Stufe 1 ist für sich genommen brauchbar und hält jede bestehende Entscheidung
 ein. Das ist der Zuschnitt, mit dem angefangen werden sollte.

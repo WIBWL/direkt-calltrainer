@@ -8,10 +8,11 @@ import {
   MIN_SESSIONS_FOR_SERIES,
   formatBand,
   formatPoint,
+  partsSummary,
   type MetricSeries,
 } from "../utils/progressStats";
 import InfoDetails from "./InfoDetails";
-import PartsStrip, { partsSummary } from "./PartsStrip";
+import PartsStrip from "./PartsStrip";
 import SectionHeading from "./SectionHeading";
 import Sparkline from "./Sparkline";
 

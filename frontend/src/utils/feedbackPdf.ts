@@ -1,6 +1,3 @@
-import hankenRegular from "../assets/fonts/HankenGrotesk-Regular.ttf";
-import hankenSemiBold from "../assets/fonts/HankenGrotesk-SemiBold.ttf";
-import schibstedBold from "../assets/fonts/SchibstedGrotesk-Bold.ttf";
 import type {
   Measurement,
   SessionFeedback,
@@ -14,6 +11,24 @@ import {
   LOUDNESS_CAPTION,
   type LoudnessCurve,
 } from "./loudness";
+import {
+  BLUE,
+  CAUTION,
+  CONTENT_WIDTH,
+  HEADING_HEIGHT,
+  INK,
+  LINE_HEIGHT,
+  MARGIN,
+  MUTED,
+  NAVY,
+  PAGE,
+  RULE,
+  SUCCESS,
+  TRACKING,
+  drawable,
+  openSheet,
+  stamp,
+} from "./pdfDocument";
 import {
   ASPECT_LABELS,
   ASPECT_LEADS,
@@ -47,60 +62,17 @@ import { formatLongDate, formatOffset } from "./time";
  * jsPDF and the fonts are fetched on the press — together the largest thing the
  * frontend can pull, and most trainings end without anyone wanting a file.
  *
- * Set in the app's own faces (Hanken Grotesk, Schibsted Grotesk for titles)
- * rather than the viewer's Helvetica, both OFL and therefore embeddable. They
- * are subsetted to Latin plus the marks German uses; a character outside that
- * subset would come out blank, which is what `drawable` guards against.
+ * The page chrome — geometry, palette, the app's own faces, the banner, the
+ * section heading, the wrapped paragraph and the page break — is
+ * `pdfDocument.ts`, shared with the progress report so that the two documents
+ * this application writes look like one application.
  */
 
-/** A4 in millimetres, which is also the unit the document is built in. */
-const PAGE = { width: 210, height: 297 };
-const MARGIN = { left: 18, right: 18, top: 18, bottom: 20 };
-const CONTENT_WIDTH = PAGE.width - MARGIN.left - MARGIN.right;
-
-/** The band at the top of the first page. */
-const BANNER_HEIGHT = 36;
 /** Where a speaker's text starts, leaving the left column to the timestamp.
  * A feedback point that cites an utterance is set on the same two columns, so
  * the timestamps of the report and of the transcript line up. */
 const TEXT_INDENT = 17;
-const LINE_HEIGHT = 4.8;
 
-const NAVY: [number, number, number] = [3, 37, 62];
-const BLUE: [number, number, number] = [50, 95, 127];
-const MUTED: [number, number, number] = [91, 107, 120];
-const RULE: [number, number, number] = [215, 226, 235];
-const WHITE: [number, number, number] = [255, 255, 255];
-const INK: [number, number, number] = [30, 40, 50];
-/** The two tones the feedback page gives its point lists (`is-success` /
- * `is-danger` in index.css). Taken from there rather than invented, so a
- * printed list is the one the reader saw. */
-const SUCCESS: [number, number, number] = [34, 96, 72];
-const CAUTION: [number, number, number] = [154, 77, 20];
-/** `--color-brand-accent`. The one place it is allowed here: the "ai" of the
- * wordmark, exactly as on screen (see `BrandName.tsx`). */
-const ACCENT: [number, number, number] = [255, 106, 0];
-
-/** The logo is a file in `public/` rather than a bundled asset, so it is
- * fetched by the same path the header's <img> uses. */
-const LOGO_URL = "/logo.png";
-/** The white tile the logo sits on inside the navy banner. Its strokes are
- * navy and blue, so it needs a light ground to be visible at all — the same
- * answer the favicon gives. */
-const LOGO_TILE = 18;
-const LOGO_PAD = 2;
-
-/**
- * How far apart the letters of a small uppercase line are set, in millimetres.
- * The page tracks those out (`letter-spacing` on `.feedback-section-eyebrow`
- * and `.metric-name`); caps set solid read as an abbreviation rather than as a
- * label, which is the whole reason that rule exists on screen.
- */
-const TRACKING = 0.2;
-
-/** What `heading` puts on the page, eyebrow to rule — the room a section
- * needs before anything of its own is drawn. */
-const HEADING_HEIGHT = 15;
 /** One statistic's box in the two-column grid. Fixed, so a figure with a
  * second line under it does not make its neighbour sit higher than it. */
 const TILE = { columns: 2, height: 16 };
@@ -141,76 +113,6 @@ export interface FeedbackPdfOptions {
   date?: Date;
 }
 
-/** Exactly what the subsetted fonts carry (see the note above). Anything else
- * is dropped rather than drawn: a missing glyph is an invisible gap, and a gap
- * in a transcript is worse than a visible replacement. */
-const SUPPORTED =
-  /[ -~ -ÿĀ-ſ‐-―‘-„†-•…‹›€]/;
-
-/** Speech transcribed from German or English stays inside the subset, so this
- * is a guard and not a transformation — it only fires on something unexpected,
- * an emoji or a script the fonts do not cover. */
-function drawable(text: string): string {
-  let out = "";
-  for (const ch of text) out += SUPPORTED.test(ch) ? ch : "?";
-  return out;
-}
-
-/** jsPDF wants a font and an image as base64, and the browser has no direct
- * route from an ArrayBuffer to one. Chunked because `String.fromCharCode` takes
- * its bytes as arguments, and a whole font at once overruns the argument limit.
- * The status is checked because a miss under the SPA is still a response with a
- * body, which would otherwise be base64ed into the document as a font. */
-async function loadBase64(url: string): Promise<string> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`${url}: ${response.status}`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 8192) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-  }
-  return btoa(binary);
-}
-
-/** The logo as a data URL, or null if it cannot be had. The report is worth
- * having without it, so a missing file costs the tile and nothing else — the
- * fonts, which decide how every line of it is set, are deliberately not
- * treated this leniently. */
-async function loadLogo(): Promise<string | null> {
-  try {
-    return `data:image/png;base64,${await loadBase64(LOGO_URL)}`;
-  } catch (e) {
-    console.debug("[feedback pdf] logo unavailable", e);
-    return null;
-  }
-}
-
-/** The app's faces under the two names the document then asks for: "app" in
- * normal and bold, and "display" for the titles. */
-async function registerAppFonts(doc: {
-  addFileToVFS: (file: string, data: string) => void;
-  addFont: (file: string, name: string, style: string) => void;
-}) {
-  const faces: [string, string, string, string][] = [
-    [hankenRegular, "HankenGrotesk-Regular.ttf", "app", "normal"],
-    [hankenSemiBold, "HankenGrotesk-SemiBold.ttf", "app", "bold"],
-    [schibstedBold, "SchibstedGrotesk-Bold.ttf", "display", "bold"],
-  ];
-  const loaded = await Promise.all(faces.map(([url]) => loadBase64(url)));
-  faces.forEach(([, file, name, style], i) => {
-    doc.addFileToVFS(file, loaded[i]!);
-    doc.addFont(file, name, style);
-  });
-}
-
-/** The date in the file name: the call's own day, in the reader's zone and in
- * the order a download list sorts by. Built from the local parts rather than
- * from `toISOString`, which would move a late-evening call to the next day. */
-function stamp(date: Date): string {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}_${pad(date.getMonth() + 1)}_${pad(date.getDate())}`;
-}
-
 /** The document and the name to save it under, without saving it. Separate
  * from the download so the layout can be built and looked at outside a
  * browser — which is how it was designed. */
@@ -223,161 +125,12 @@ export async function buildFeedbackPdf({
   turns = [],
   date = new Date(),
 }: FeedbackPdfOptions) {
-  const { jsPDF } = await import("jspdf");
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const [, logo] = await Promise.all([registerAppFonts(doc), loadLogo()]);
-
   // What the banner and the running head call this. A document without a
   // wrap-up is still only a protocol, and naming it a feedback would promise
   // the one thing it does not have.
   const title = feedback ? "Gesprächsfeedback" : "Gesprächsprotokoll";
-  const bottom = PAGE.height - MARGIN.bottom;
-  let page = 1;
-  let y = 0;
-
-  const footer = () => {
-    doc.setFont("app", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...MUTED);
-    doc.text(`Seite ${page}`, PAGE.width - MARGIN.right, PAGE.height - 10, { align: "right" });
-  };
-
-  /** The wordmark, set the way the app sets it: the display face, and the "ai"
-   * in the brand accent (`BrandName.tsx`). Three runs rather than one string,
-   * because only the middle one changes colour. It used to be a line of flat
-   * uppercase body text, which read as a label rather than as the mark it is. */
-  const wordmark = (x: number, baseline: number) => {
-    doc.setFont("display", "bold");
-    doc.setFontSize(11);
-    let cursor = x;
-    const runs: [string, [number, number, number]][] = [
-      ["Calltr", WHITE],
-      ["ai", ACCENT],
-      ["ner", WHITE],
-    ];
-    for (const [text, colour] of runs) {
-      doc.setTextColor(...colour);
-      doc.text(text, cursor, baseline);
-      cursor += doc.getTextWidth(text);
-    }
-  };
-
-  /** The first page carries the banner; every later one a rule, so the report
-   * keeps running rather than restarting. */
-  const startPage = (first: boolean) => {
-    if (first) {
-      doc.setFillColor(...NAVY);
-      doc.rect(0, 0, PAGE.width, BANNER_HEIGHT, "F");
-
-      // The logo centred in the band, the title block set beside it. Without
-      // the logo that block simply takes the margin back, so a failed fetch
-      // leaves a banner that still looks deliberate.
-      const tileTop = (BANNER_HEIGHT - LOGO_TILE) / 2;
-      let textLeft = MARGIN.left;
-      if (logo) {
-        doc.setFillColor(...WHITE);
-        doc.roundedRect(MARGIN.left, tileTop, LOGO_TILE, LOGO_TILE, 4, 4, "F");
-        doc.addImage(
-          logo,
-          "PNG",
-          MARGIN.left + LOGO_PAD,
-          tileTop + LOGO_PAD,
-          LOGO_TILE - LOGO_PAD * 2,
-          LOGO_TILE - LOGO_PAD * 2,
-        );
-        textLeft = MARGIN.left + LOGO_TILE + 8;
-      }
-
-      wordmark(textLeft, 15);
-      doc.setTextColor(...WHITE);
-      doc.setFont("display", "bold");
-      doc.setFontSize(19);
-      doc.text(drawable(title), textLeft, 26);
-      y = BANNER_HEIGHT + 14;
-    } else {
-      doc.setDrawColor(...RULE);
-      doc.setLineWidth(0.3);
-      doc.line(MARGIN.left, MARGIN.top, PAGE.width - MARGIN.right, MARGIN.top);
-      doc.setFont("app", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(...MUTED);
-      doc.text(drawable(title), MARGIN.left, MARGIN.top - 3);
-      y = MARGIN.top + 10;
-    }
-    footer();
-  };
-
-  const nextPage = () => {
-    doc.addPage();
-    page += 1;
-    startPage(false);
-  };
-
-  /** Break before drawing something that has to stay in one piece. */
-  const keep = (height: number) => {
-    if (y + height > bottom) nextPage();
-  };
-
-  /** Body text, wrapped and broken across pages. Returns nothing: everything
-   * here is laid out top to bottom, and `y` is the only cursor. */
-  const paragraph = (
-    text: string,
-    {
-      indent = 0,
-      size = 10,
-      colour = INK,
-      style = "normal",
-      lineHeight = LINE_HEIGHT,
-    }: {
-      indent?: number;
-      size?: number;
-      colour?: [number, number, number];
-      style?: "normal" | "bold";
-      lineHeight?: number;
-    } = {},
-  ) => {
-    doc.setFont("app", style);
-    doc.setFontSize(size);
-    doc.setTextColor(...colour);
-    const lines: string[] = doc.splitTextToSize(drawable(text), CONTENT_WIDTH - indent);
-    for (const line of lines) {
-      if (y > bottom) nextPage();
-      doc.setFont("app", style);
-      doc.setFontSize(size);
-      doc.setTextColor(...colour);
-      doc.text(line, MARGIN.left + indent, y);
-      y += lineHeight;
-    }
-  };
-
-  /** A section's heading, the same shape the page gives it (`SectionHeading`):
-   * the eyebrow above, the title under it, and a rule closing the row off. */
-  const heading = (eyebrow: string, name: string) => {
-    // The heading plus two lines of whatever follows: a title alone at the
-    // foot of a page announces nothing.
-    keep(24);
-    // Blue and tracked out, as `.feedback-section-eyebrow` is on screen —
-    // not muted grey. The eyebrow is the section's label, and a grey one
-    // reads as a footnote to the title under it.
-    doc.setFont("app", "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(...BLUE);
-    doc.setCharSpace(TRACKING);
-    doc.text(drawable(eyebrow.toUpperCase()), MARGIN.left, y);
-    doc.setCharSpace(0);
-    y += 5.6;
-    doc.setFont("display", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(...NAVY);
-    doc.text(drawable(name), MARGIN.left, y);
-    y += 2.8;
-    doc.setDrawColor(...RULE);
-    doc.setLineWidth(0.4);
-    doc.line(MARGIN.left, y, PAGE.width - MARGIN.right, y);
-    y += 6.5;
-  };
-
-  startPage(true);
+  const sheet = await openSheet(title);
+  const { doc } = sheet;
 
   // --- what this call was ------------------------------------------------
   const facts: [string, string][] = [
@@ -388,40 +141,28 @@ export async function buildFeedbackPdf({
     ["Datum", formatLongDate(date.toISOString()) ?? ""],
     ["Beiträge", String(transcript.length)],
   ];
-  for (const [label, value] of facts) {
-    doc.setFont("app", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...MUTED);
-    doc.setCharSpace(TRACKING);
-    doc.text(drawable(label.toUpperCase()), MARGIN.left, y);
-    doc.setCharSpace(0);
-    doc.setFont("app", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(...NAVY);
-    doc.text(drawable(value), MARGIN.left + 42, y);
-    y += 7;
-  }
-  y += 7;
+  sheet.facts(facts);
+  sheet.y += 7;
 
   // --- the wrap-up, in the order the page reads in -----------------------
   if (feedback) {
-    heading("Qualitative Einordnung", "Zusammenfassung");
-    paragraph(feedback.summary);
-    y += 9;
+    sheet.heading("Qualitative Einordnung", "Zusammenfassung");
+    sheet.paragraph(feedback.summary);
+    sheet.y += 9;
 
     points("Stärken", "Das gelang gut", "strength");
     points("Weiterentwickeln", "Das können Sie verbessern", "improvement");
 
     if (feedback.phase_language) {
-      heading("Gesprächsführung", "Phasengerechte Sprache");
-      paragraph(feedback.phase_language);
-      y += 2.5;
-      paragraph("Warm einsteigen, sachlich am Anliegen arbeiten, warm abschließen.", {
+      sheet.heading("Gesprächsführung", "Phasengerechte Sprache");
+      sheet.paragraph(feedback.phase_language);
+      sheet.y += 2.5;
+      sheet.paragraph("Warm einsteigen, sachlich am Anliegen arbeiten, warm abschließen.", {
         size: 9,
         colour: MUTED,
         lineHeight: 4.4,
       });
-      y += 9;
+      sheet.y += 9;
     }
   }
 
@@ -435,7 +176,7 @@ export async function buildFeedbackPdf({
     const list = feedback?.points.filter((point) => point.kind === kind) ?? [];
     if (list.length === 0) return;
 
-    heading(eyebrow, name);
+    sheet.heading(eyebrow, name);
     for (const point of list) {
       const turn =
         point.turn_id !== null
@@ -443,23 +184,23 @@ export async function buildFeedbackPdf({
           : undefined;
 
       // The timestamp and the first line of its point stay together.
-      keep(LINE_HEIGHT * 2);
+      sheet.keep(LINE_HEIGHT * 2);
       if (turn) {
         doc.setFont("app", "normal");
         doc.setFontSize(8);
         doc.setTextColor(...MUTED);
-        doc.text(formatOffset(turn.start_offset_ms), MARGIN.left, y);
+        doc.text(formatOffset(turn.start_offset_ms), MARGIN.left, sheet.y);
       }
-      const top = y;
-      paragraph(point.text, { indent: TEXT_INDENT });
+      const top = sheet.y;
+      sheet.paragraph(point.text, { indent: TEXT_INDENT });
       // The accent bar beside the point, in the colour its list carries on
       // screen: it is what tells the two lists apart once they are printed.
       doc.setDrawColor(...(kind === "strength" ? SUCCESS : CAUTION));
       doc.setLineWidth(0.8);
-      if (y > top) doc.line(MARGIN.left + 13, top - 3.4, MARGIN.left + 13, y - 3.4);
-      y += 3.5;
+      if (sheet.y > top) doc.line(MARGIN.left + 13, top - 3.4, MARGIN.left + 13, sheet.y - 3.4);
+      sheet.y += 3.5;
     }
-    y += 6;
+    sheet.y += 6;
   }
 
   /** The call's statistics (F-53), grouped into the two halves the page's
@@ -474,8 +215,8 @@ export async function buildFeedbackPdf({
     // piece. `heading` keeps room for two lines of body text, which is right
     // for prose and too little here: the first thing under this one is a
     // 16 mm grid, and the heading would sit alone at the foot of the page.
-    keep(HEADING_HEIGHT + 18 + TILE.height);
-    heading("Ergänzende Auswertung", "Kennzahlen zum Gespräch");
+    sheet.keep(HEADING_HEIGHT + 18 + TILE.height);
+    sheet.heading("Ergänzende Auswertung", "Kennzahlen zum Gespräch");
 
     for (const aspect of METRIC_ASPECTS) {
       const group = all.filter(
@@ -485,19 +226,19 @@ export async function buildFeedbackPdf({
 
       // The half's name, its lead and one row of figures: the name alone at
       // the foot of a page announces a group that is on the next one.
-      keep(18 + TILE.height);
-      paragraph(ASPECT_LABELS[aspect], { size: 10.5, style: "bold", colour: NAVY });
-      y += 0.5;
-      paragraph(ASPECT_LEADS[aspect], { size: 8.5, colour: MUTED, lineHeight: 4.2 });
-      y += 4;
+      sheet.keep(18 + TILE.height);
+      sheet.paragraph(ASPECT_LABELS[aspect], { size: 10.5, style: "bold", colour: NAVY });
+      sheet.y += 0.5;
+      sheet.paragraph(ASPECT_LEADS[aspect], { size: 8.5, colour: MUTED, lineHeight: 4.2 });
+      sheet.y += 4;
 
       const column = CONTENT_WIDTH / TILE.columns;
       let index = 0;
-      let top = y;
+      let top = sheet.y;
       for (const measurement of group) {
         if (index === 0) {
-          keep(TILE.height);
-          top = y;
+          sheet.keep(TILE.height);
+          top = sheet.y;
         }
         const left = MARGIN.left + index * column;
 
@@ -544,19 +285,19 @@ export async function buildFeedbackPdf({
         }
 
         index = (index + 1) % TILE.columns;
-        if (index === 0) y = top + TILE.height;
+        if (index === 0) sheet.y = top + TILE.height;
       }
-      if (index !== 0) y = top + TILE.height;
-      y += 5;
+      if (index !== 0) sheet.y = top + TILE.height;
+      sheet.y += 5;
     }
 
     const loudness = all.find((measurement) => measurement.key === "loudness");
     const curve = loudness ? loudnessCourse(loudness.detail) : null;
     if (curve) course(loudness!.name, curve);
 
-    keep(12);
-    paragraph(METRIC_DISCLAIMER, { size: 8.5, colour: MUTED, lineHeight: 4.2 });
-    y += 9;
+    sheet.keep(12);
+    sheet.paragraph(METRIC_DISCLAIMER, { size: 8.5, colour: MUTED, lineHeight: 4.2 });
+    sheet.y += 9;
   }
 
   /** F-37's loudness course, drawn the way `LoudnessCourse.tsx` draws it and
@@ -568,15 +309,15 @@ export async function buildFeedbackPdf({
   function course(name: string, curve: LoudnessCurve) {
     // Label, plot, axis and legend in one piece: split across a page the band
     // would be on one and what it means on the next.
-    keep(PLOT_HEIGHT + 30);
+    sheet.keep(PLOT_HEIGHT + 30);
 
     doc.setFont("app", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...MUTED);
-    doc.text(drawable(`${name} im Gesprächsverlauf`), MARGIN.left, y);
-    y += 5;
+    doc.text(drawable(`${name} im Gesprächsverlauf`), MARGIN.left, sheet.y);
+    sheet.y += 5;
 
-    const top = y;
+    const top = sheet.y;
     const px = (index: number) => MARGIN.left + (index / (curve.points - 1)) * CONTENT_WIDTH;
     const py = (value: number) =>
       top + PLOT_HEIGHT - ((value - curve.floor) / curve.span) * PLOT_HEIGHT;
@@ -625,31 +366,31 @@ export async function buildFeedbackPdf({
       doc.text(drawable(caption), at, above ? py(value) - 2.4 : py(value) + 4.4, { align });
     }
 
-    y = top + PLOT_HEIGHT + 4;
+    sheet.y = top + PLOT_HEIGHT + 4;
     doc.setFont("app", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(...MUTED);
-    doc.text("0:00", MARGIN.left, y);
-    doc.text(drawable("Ihre Sprechzeit"), PAGE.width / 2, y, { align: "center" });
-    doc.text(drawable(curve.total), PAGE.width - MARGIN.right, y, { align: "right" });
-    y += 5;
+    doc.text("0:00", MARGIN.left, sheet.y);
+    doc.text(drawable("Ihre Sprechzeit"), PAGE.width / 2, sheet.y, { align: "center" });
+    doc.text(drawable(curve.total), PAGE.width - MARGIN.right, sheet.y, { align: "right" });
+    sheet.y += 5;
 
-    paragraph(
+    sheet.paragraph(
       "Das Band ist der Bereich, in dem Sie die meiste Zeit gesprochen haben; markiert " +
         "ist, wo Sie ihn mindestens zwei Sekunden lang verlassen haben. Gezählt wird nur " +
         "Ihre eigene Sprechzeit, nicht die Dauer des Gesprächs.",
       { size: 8, colour: MUTED, lineHeight: 4 },
     );
-    y += 6;
+    sheet.y += 6;
   }
 
   /** The conversation itself, last in the document: it is read closely or not
    * at all, and everything above comments on it. */
   function protocol() {
-    heading("Gespräch im Detail", "Vollständiges Transkript");
+    sheet.heading("Gespräch im Detail", "Vollständiges Transkript");
 
     if (transcript.length === 0) {
-      paragraph("Es wurden keine Beiträge aufgezeichnet.", { size: 10, colour: MUTED });
+      sheet.paragraph("Es wurden keine Beiträge aufgezeichnet.", { size: 10, colour: MUTED });
       return;
     }
 
@@ -667,26 +408,26 @@ export async function buildFeedbackPdf({
 
       // The speaker's line and at least one line of what they said stay
       // together: a name alone at the foot of a page belongs to nothing.
-      keep(LINE_HEIGHT * 2 + 3);
+      sheet.keep(LINE_HEIGHT * 2 + 3);
 
       doc.setFont("app", "bold");
       doc.setFontSize(9);
       doc.setTextColor(...colour);
-      doc.text(drawable(mine ? "Sie" : personaName), MARGIN.left + TEXT_INDENT, y);
+      doc.text(drawable(mine ? "Sie" : personaName), MARGIN.left + TEXT_INDENT, sheet.y);
 
       doc.setFont("app", "normal");
       doc.setFontSize(8);
       doc.setTextColor(...MUTED);
-      doc.text(formatOffset(entry.offset_ms), MARGIN.left, y);
+      doc.text(formatOffset(entry.offset_ms), MARGIN.left, sheet.y);
 
-      y += 5;
+      sheet.y += 5;
       doc.setFont("app", "normal");
       doc.setFontSize(10);
       doc.setTextColor(...INK);
 
       for (const line of lines) {
-        if (y > bottom) {
-          nextPage();
+        if (sheet.y > sheet.bottom) {
+          sheet.nextPage();
           // Whoever was speaking is named again: a reader who opens the
           // document at this page would otherwise find a paragraph belonging
           // to nobody.
@@ -696,15 +437,15 @@ export async function buildFeedbackPdf({
           doc.text(
             drawable(`${mine ? "Sie" : personaName} (Fortsetzung)`),
             MARGIN.left + TEXT_INDENT,
-            y,
+            sheet.y,
           );
-          y += 5;
+          sheet.y += 5;
           doc.setFont("app", "normal");
           doc.setFontSize(10);
           doc.setTextColor(...INK);
         }
-        const stretchTop = y - 3.4;
-        doc.text(line, MARGIN.left + TEXT_INDENT, y);
+        const stretchTop = sheet.y - 3.4;
+        doc.text(line, MARGIN.left + TEXT_INDENT, sheet.y);
         doc.setDrawColor(...colour);
         doc.setLineWidth(0.8);
         doc.line(
@@ -713,10 +454,10 @@ export async function buildFeedbackPdf({
           MARGIN.left + TEXT_INDENT - 4,
           stretchTop + LINE_HEIGHT,
         );
-        y += LINE_HEIGHT;
+        sheet.y += LINE_HEIGHT;
       }
 
-      y += 5;
+      sheet.y += 5;
     }
   }
 
