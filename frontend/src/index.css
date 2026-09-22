@@ -6486,10 +6486,13 @@ button.calendar-day {
   box-shadow: 0 10px 28px rgba(3, 37, 62, 0.055);
 }
 
+/* The fixed action bar is outside normal document flow. Reserve enough space
+   at the end of the page so the footer can be scrolled fully above it. */
 .focus-onboarding {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  padding-bottom: 96px;
   background: var(--color-background);
 }
 
