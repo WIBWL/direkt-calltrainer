@@ -17,11 +17,16 @@ that belongs to a Session — the follow-up drafted from its feedback (ADR 0069)
 One exception: a reverse Scenario (ADR 0070) is content about the subject's own
 call rather than reference data — it carries a briefing written from that call's
 wrap-up — so it is removed rather than left standing. Two of the three paths do
-that: the withdrawal (`delete_subject_sessions`) and the retention sweep, which
-reaches it through `reverses_of` plus `delete_unreferenced_reverses`. Deleting a
-*single* training deliberately does not, and the profile screen says so: there a
-person is deciding about that one training and can remove the reverse herself,
-where the other two paths run with nobody deciding anything.
+that: the withdrawal (`delete_subject_sessions`) and the retention sweep.
+Deleting a *single* training deliberately does not, and the profile screen says
+so: there a person is deciding about that one training and can remove the
+reverse herself, where the other two paths run with nobody deciding anything.
+
+All three go through `remove`, which owns the order the steps have to run in —
+follow-ups retired, reverses read while the link to them still exists, the
+Sessions deleted, the reverses nothing plays any more deleted after them. The
+sweep used to spell that sequence out itself, with the reason for the order
+written as a comment in both files.
 
 What this module does *not* do is claim to be a complete erasure. Two limits
 are known and named rather than papered over: backups are not reached (there is
@@ -41,6 +46,32 @@ from backend.db import models as db_models
 logger = logging.getLogger(__name__)
 
 
+def remove(
+    db: DbSession, sessions: list[db_models.Session], *, with_reverses: bool
+) -> None:
+    """Delete these Sessions and what goes with them, in the one order that works.
+
+    Their follow-ups are retired first (`retire_follow_ups`). With
+    `with_reverses`, the reverses replaying them are read next -- *before* the
+    delete, because `origin_session_id` is `ON DELETE SET NULL` and nothing ties
+    a reverse to its training afterwards -- and deleted once the Sessions are
+    gone, except one a Session left standing is still played on
+    (`delete_unreferenced_reverses`). Without it the reverses stay: deleting one
+    training by hand is a person deciding about that one row (ADR 0070's
+    addendum).
+
+    Flushed before it returns, so a caller that goes on to write in the same
+    transaction cannot observe rows this call has logically already removed.
+    """
+    retire_follow_ups(db, sessions)
+    reverse_ids = reverses_of(db, sessions) if with_reverses else []
+    for session in sessions:
+        db.delete(session)
+    db.flush()
+    if reverse_ids:
+        delete_unreferenced_reverses(db, reverse_ids)
+
+
 def retire_follow_ups(db: DbSession, sessions: list[db_models.Session]) -> None:
     """Deactivate the follow-up Scenarios drafted from these Sessions (ADR 0069).
 
@@ -51,9 +82,8 @@ def retire_follow_ups(db: DbSession, sessions: list[db_models.Session]) -> None:
     already use — it takes the row out of the library and leaves everything that
     points at it intact.
 
-    Called before the Sessions go, from every path that removes one: the
-    withdrawal and the single delete below, and the retention sweep
-    (`backend/retention.py`). The column's `ON DELETE SET NULL` then clears the
+    Called before the Sessions go, by `remove`, which every path that removes
+    one goes through. The column's `ON DELETE SET NULL` then clears the
     provenance, so this is not a place a raw-SQL delete can leave inconsistent —
     only one where it would leave the Scenario on offer.
     """
@@ -72,9 +102,10 @@ def reverses_of(db: DbSession, sessions: list[db_models.Session]) -> list[int]:
     `ON DELETE SET NULL` (ADR 0070), so the moment they are deleted nothing
     connects the two any more and the reverse looks like any other row.
 
-    Split from the delete below because the retention sweep needs the two halves
-    on either side of its own delete, and because what can go is not decided
-    here — see `delete_unreferenced_reverses`.
+    Split from the delete below because the two sit on either side of the
+    Sessions' own delete in `remove`, and because what can go is not decided
+    here — see `delete_unreferenced_reverses`. Public for the retention
+    script's dry run, which counts them without deleting anything.
     """
     session_ids = [session.session_id for session in sessions]
     if not session_ids:
@@ -174,13 +205,10 @@ def delete_subject_sessions(db: DbSession, subject_id: str) -> int:
     being maintained.
     """
     sessions = db.query(db_models.Session).filter_by(subject_id=subject_id).all()
-    retire_follow_ups(db, sessions)
-    for session in sessions:
-        db.delete(session)
-    # Flushed here rather than left to the caller's commit, so a caller that
-    # goes on to write in the same transaction (the withdrawal does) cannot
-    # observe rows this call has logically already removed.
-    db.flush()
+    remove(db, sessions, with_reverses=True)
+    # Every other reverse of this subject's too: one whose training was deleted
+    # by hand earlier lost its link to it and is not among the reverses of the
+    # Sessions just removed.
     _delete_reverses(db, subject_id)
     logger.info("Deleted %d stored session(s) for the subject", len(sessions))
     return len(sessions)
@@ -236,8 +264,6 @@ def delete_session(db: DbSession, subject_id: str, extern_id: uuid.UUID) -> bool
     )
     if session is None:
         return False
-    retire_follow_ups(db, [session])
-    db.delete(session)
-    db.flush()
+    remove(db, [session], with_reverses=False)
     logger.info("Deleted one stored session")
     return True
