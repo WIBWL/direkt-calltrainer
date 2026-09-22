@@ -1,7 +1,6 @@
 import { useState } from "react";
 
 import type { FocusChoice, FocusState } from "../protocol";
-import AppFooter from "./AppFooter";
 import AppHeader from "./AppHeader";
 import FocusGoalPicker, { toggleGoal } from "./FocusGoalPicker";
 import FocusProfilePicker from "./FocusProfilePicker";
@@ -143,7 +142,6 @@ export default function FocusDialog({
         </div>
       </div>
 
-      <AppFooter />
     </div>
   );
 }

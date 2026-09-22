@@ -6502,7 +6502,7 @@ button.calendar-day {
 }
 
 /* The fixed action bar is outside normal document flow. Reserve enough space
-   at the end of the page so the footer can be scrolled fully above it. */
+   at the end of the page so the last focus content can scroll above it. */
 .focus-onboarding {
   min-height: 100vh;
   display: flex;
@@ -6952,7 +6952,7 @@ button.calendar-day {
 }
 
 /* On smaller screens the action area becomes a compact vertical layout.
-   Extra page padding keeps the taller fixed bar from covering the footer. */
+   Extra page padding keeps the taller fixed bar from covering the content. */
 @media (max-width: 720px) {
   .focus-onboarding {
     padding-bottom: 160px;
