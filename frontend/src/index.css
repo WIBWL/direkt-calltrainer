@@ -6922,6 +6922,48 @@ button.calendar-day {
   color: var(--color-text-muted);
 }
 
+/* On smaller screens the action area becomes a compact vertical layout.
+   Extra page padding keeps the taller fixed bar from covering the footer. */
+@media (max-width: 720px) {
+  .focus-onboarding {
+    padding-bottom: 160px;
+  }
+
+  .focus-actions-bar {
+    padding: 12px 16px 14px;
+  }
+
+  .focus-actions-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .focus-actions-bar .consent-actions {
+    width: 100%;
+    flex-wrap: nowrap;
+  }
+
+  .focus-actions-bar .consent-button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .focus-onboarding {
+    padding-bottom: 210px;
+  }
+
+  .focus-actions-bar .consent-actions {
+    flex-direction: column;
+  }
+
+  .focus-actions-bar .consent-button {
+    width: 100%;
+  }
+}
+
 /* The read-only summary on the profile card. */
 .focus-summary {
   margin: 0.5rem 0 0.9rem;
