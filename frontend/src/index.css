@@ -587,22 +587,20 @@ h2 {
 
 .setup-persona-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .setup-persona-grid .persona-card {
-  /* A row, unlike the Scenario cards: the portrait sits beside the text, not
-     above it, and reaches the card's top, bottom and left edges — so the card
-     carries no padding of its own and the text brings its own inset.
-     `overflow: hidden` is what rounds the picture's corners with the card's,
-     and `stretch` is what gives it the card's full height. */
+  /* Persona cards keep their horizontal portrait layout, but use the same
+     border weight and corner radius as the Scenario and focus choices. */
   flex-direction: row;
   align-items: stretch;
   gap: 0;
-  min-height: 124px;
+  min-height: 116px;
   padding: 0;
   overflow: hidden;
-  border-width: 1.5px;
+  border-width: 1px;
+  border-radius: var(--radius-control);
 }
 
 .persona-card-portrait {
@@ -638,8 +636,8 @@ h2 {
 
 /* The slot is taller than it is wide and the source is square, so `object-fit:
    cover` already trims the sides. The zoom on top of that is what brings the
-   face up to a size one Persona can be told from another at: unzoomed, the
-   card would show the whole half-body shot in 118px. Every picture is framed
+   face up to a size one Persona can be told from another at: unzoomed, the card
+   would show too much of the half-body shot at this size. Every picture is framed
    the same way — square, subject centred, face in the upper third — which is
    what lets one origin serve all of them. The two large square slots show the
    pose whole and need neither: their box matches the source. */
@@ -656,7 +654,7 @@ h2 {
   flex-direction: column;
   justify-content: center;
   gap: 0.2rem;
-  padding: 14px 44px 14px 14px;
+  padding: 13px 40px 12px 13px;
 }
 
 .setup-persona-grid .persona-name {
