@@ -6481,6 +6481,9 @@ button.calendar-day {
    list on a short viewport stays reachable. */
 .focus-dialog {
   width: min(920px, 100%);
+  padding: 28px 30px 32px;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(3, 37, 62, 0.055);
 }
 
 .focus-onboarding {
