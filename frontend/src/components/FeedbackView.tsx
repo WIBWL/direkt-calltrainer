@@ -5,15 +5,12 @@ import { ApiError } from "../api";
 import { useFocusContext } from "../FocusContext";
 import type { FeedbackState } from "../hooks/useSessionFeedback";
 import type {
-  FeedbackPoint,
   Finding,
-  FocusGoal,
   FollowUpCard,
   Measurement,
   MetricAspect,
   SegmentMeasurement,
   SessionDetail,
-  SessionTurn,
 } from "../protocol";
 import { ROUTES, sessionMetricPath } from "../routes";
 import { createFollowUp, createReverse, type ReverseScenario } from "../scenarioLibrary";
@@ -21,20 +18,20 @@ import { retryFeedback } from "../sessions";
 import { cx } from "../utils/cx";
 import { loudnessCourse } from "../utils/loudness";
 import {
-  ASPECT_LABELS,
-  ASPECT_LEADS,
   formatMetricValue,
-  METRIC_ASPECTS,
   METRIC_DISCLAIMER,
   METRIC_KEYS,
-  metricAspect,
   metricParts,
   metricReading,
   metricSubline,
   openHint,
-  withDerived,
   type MetricPart,
 } from "../utils/metrics";
+import {
+  metricGroups,
+  wrapUpOutline,
+  type OutlinePoint,
+} from "../utils/reportOutline";
 import { formatOffset } from "../utils/time";
 import FilterSlider, { type FilterOption } from "./FilterSlider";
 import InfoDetails from "./InfoDetails";
@@ -193,9 +190,13 @@ export function FeedbackReport({
   next?: ReactNode;
 }) {
   const { feedback, measurements, turns } = detail;
+  // The catalogue, for naming the goal a point was tagged with. Null while it
+  // has not loaded or failed to, and the tags are then simply absent.
+  const { focus: picked } = useFocusContext();
   if (!feedback) return null;
 
-  const improvements = feedback.points.filter((p) => p.kind === "improvement");
+  const outline = wrapUpOutline(feedback, turns, picked?.goals ?? []);
+  const improvements = outline.improvements;
   const spokenTurns = turns.filter((turn) => turn.speaker === "user").length;
   const longEnough = spokenTurns >= MIN_USER_TURNS;
 
@@ -231,7 +232,7 @@ export function FeedbackReport({
       <section className="feedback-section">
         <SectionHeading eyebrow="QUALITATIVE EINORDNUNG" title="Zusammenfassung" />
         <div className="feedback-box">
-          <p className="feedback-summary-text">{feedback.summary}</p>
+          <p className="feedback-summary-text">{outline.summary}</p>
         </div>
       </section>
 
@@ -239,8 +240,7 @@ export function FeedbackReport({
         <PointList
           eyebrow="STÄRKEN"
           title="Das gelang gut"
-          points={feedback.points.filter((p) => p.kind === "strength")}
-          turns={turns}
+          points={outline.strengths}
           tone="success"
         />
 
@@ -248,12 +248,11 @@ export function FeedbackReport({
           eyebrow="WEITERENTWICKELN"
           title="Das können Sie verbessern"
           points={improvements}
-          turns={turns}
           tone="danger"
         />
       </div>
 
-      {feedback.phase_language && <PhaseLanguage text={feedback.phase_language} />}
+      {outline.phaseLanguage && <PhaseLanguage text={outline.phaseLanguage} />}
 
       <MetricSection
         measurements={measurements}
@@ -382,16 +381,18 @@ export function MetricSection({
   // Opens on the paraverbal half: the one reading the transcript cannot give.
   const [aspect, setAspect] = useState<MetricAspect>("how");
 
-  const all = withDerived(measurements);
+  const groups = metricGroups(measurements);
+  const all = groups.flatMap((group) => group.measurements);
 
-  const options: FilterOption<MetricAspect>[] = METRIC_ASPECTS.map((value) => ({
-    value,
-    label: ASPECT_LABELS[value],
-    count: all.filter((m) => metricAspect(m) === value).length,
+  const options: FilterOption<MetricAspect>[] = groups.map((group) => ({
+    value: group.aspect,
+    label: group.label,
+    count: group.measurements.length,
   }));
   // Nothing to switch between when one half is empty: show what there is.
   const split = options.every((option) => option.count > 0);
-  const shown = split ? all.filter((m) => metricAspect(m) === aspect) : all;
+  const current = groups.find((group) => group.aspect === aspect)!;
+  const shown = split ? current.measurements : all;
 
   if (all.length === 0) return null;
 
@@ -412,7 +413,7 @@ export function MetricSection({
             onChange={setAspect}
             label="Kennzahlen nach Art filtern"
           />
-          <p className="feedback-metrics-lead">{ASPECT_LEADS[aspect]}</p>
+          <p className="feedback-metrics-lead">{current.lead}</p>
         </div>
       )}
 
@@ -839,23 +840,16 @@ function PointList({
   eyebrow,
   title,
   points,
-  turns,
   tone,
 }: {
   eyebrow: string;
   title: string;
-  points: FeedbackPoint[];
-  turns: SessionTurn[];
+  points: OutlinePoint[];
   tone: "success" | "danger";
 }) {
   // Null on a screen with no transcript, and then the moment stays the plain
   // text it has always been (see TranscriptFocus.tsx).
   const focus = useTranscriptFocus();
-  // The catalogue, for naming the goal a point was tagged with. Null while it
-  // has not loaded or failed to, and the tag is then simply absent: a key like
-  // `active_listening` on screen would be worse than no tag at all.
-  const { focus: picked } = useFocusContext();
-  const goals = picked?.goals ?? [];
 
   if (points.length === 0) return null;
   return (
@@ -869,31 +863,25 @@ function PointList({
 
       <div className={`feedback-box feedback-point-list ${tone}`}>
         {points.map((point, i) => {
-          const turn =
-            point.turn_id !== null
-              ? turns.find((candidate) => candidate.turn_id === point.turn_id)
-              : undefined;
-
+          const at = point.offsetMs;
           return (
             <div className="feedback-point-item" key={i}>
               {/* The moment this was written about, as something to press.
                   A timestamp alone is checkable only by somebody who still
                   remembers the call; the line it names sits collapsed a little
                   further down, and one press opens it there. */}
-              {turn &&
+              {at !== null &&
                 (focus ? (
                   <button
                     type="button"
                     className="feedback-point-time feedback-point-jump"
-                    onClick={() => focus.reveal(turn.start_offset_ms)}
-                    aria-label={`Die Stelle bei ${formatOffset(turn.start_offset_ms)} im Transkript zeigen`}
+                    onClick={() => focus.reveal(at)}
+                    aria-label={`Die Stelle bei ${formatOffset(at)} im Transkript zeigen`}
                   >
-                    {formatOffset(turn.start_offset_ms)}
+                    {formatOffset(at)}
                   </button>
                 ) : (
-                  <span className="feedback-point-time">
-                    {formatOffset(turn.start_offset_ms)}
-                  </span>
+                  <span className="feedback-point-time">{formatOffset(at)}</span>
                 ))}
               {/* The goal sits *above* the sentence, as an eyebrow over it.
                   Beside it, in the row the timestamp is in, it competed with
@@ -910,11 +898,7 @@ function PointList({
                   call it read, and a point about something they are not
                   currently working on is still about that thing. */}
               <div className="feedback-point-body">
-                {goalTitle(goals, point.goal) && (
-                  <span className="feedback-point-goal">
-                    {goalTitle(goals, point.goal)}
-                  </span>
-                )}
+                {point.goal && <span className="feedback-point-goal">{point.goal}</span>}
                 <p>{point.text}</p>
               </div>
             </div>
@@ -923,15 +907,6 @@ function PointList({
       </div>
     </section>
   );
-}
-
-/** The display name of a tagged goal, or null for an untagged point and for a
- *  key the catalogue does not know — a goal retired since the wrap-up was
- *  written (ADR 0076 deactivates rather than deletes, so old points keep
- *  pointing at it). */
-function goalTitle(goals: FocusGoal[], key: string | null): string | null {
-  if (!key) return null;
-  return goals.find((goal) => goal.key === key)?.title ?? null;
 }
 
 function Metric({

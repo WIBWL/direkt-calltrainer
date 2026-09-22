@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { useFocusContext } from "../FocusContext";
 import { useAccount } from "../hooks/useAccount";
 import type { SessionDetail, SessionTurn, TranscriptEntry } from "../protocol";
 import { downloadFeedbackPdf } from "../utils/feedbackPdf";
 import { initialsOf } from "../utils/initials";
 import { prefersReducedMotion } from "../utils/motion";
+import { callMeta } from "../utils/reportOutline";
 import { formatOffset } from "../utils/time";
 import { TranscriptFocusProvider } from "./TranscriptFocus";
 
@@ -73,6 +75,9 @@ export default function FeedbackScreen({
   // The User's own initials on their lines, from the ID token — the Persona is
   // the one with a fixed name here, and "D" for "Du" named nobody.
   const account = useAccount();
+  // Handed to the file so a point there names its goal as it does on the page.
+  const { focus: picked } = useFocusContext();
+  const meta = callMeta(personaName, scenarioName, detail?.reverse);
 
   // What the file is called on the button, and what it will hold: without a
   // wrap-up there is no feedback to download, only the protocol. The two
@@ -107,9 +112,8 @@ export default function FeedbackScreen({
         transcript,
         personaName,
         scenarioName,
-        feedback: detail?.feedback ?? null,
-        measurements: detail?.measurements ?? [],
-        turns: detail?.turns ?? [],
+        detail: detail ?? null,
+        goals: picked?.goals ?? [],
       });
     } catch (e) {
       console.debug("[feedback pdf] failed", e);
@@ -133,15 +137,13 @@ export default function FeedbackScreen({
           so. Which side the User was on is part of that — the transcript below
           reads very differently depending on it (ADR 0070). */}
       <div className="feedback-meta" aria-label="Trainingsdetails">
-        {scenarioName && <span>{scenarioName}</span>}
-        {scenarioName && (
+        {meta.scenario && <span>{meta.scenario}</span>}
+        {meta.scenario && (
           <span className="feedback-meta-separator" aria-hidden="true">
             ·
           </span>
         )}
-        <span>
-          {detail?.reverse ? `Rollentausch: Sie riefen an, ${personaName} nahm ab` : personaName}
-        </span>
+        <span>{meta.reversal ? `Rollentausch: ${meta.reversal}` : meta.partner}</span>
       </div>
 
       {feedback}

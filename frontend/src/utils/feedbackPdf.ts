@@ -1,9 +1,4 @@
-import type {
-  Measurement,
-  SessionFeedback,
-  SessionTurn,
-  TranscriptEntry,
-} from "../protocol";
+import type { FocusGoal, SessionDetail, TranscriptEntry } from "../protocol";
 import {
   loudnessCourse,
   loudnessClock,
@@ -29,17 +24,8 @@ import {
   openSheet,
   stamp,
 } from "./pdfDocument";
-import {
-  ASPECT_LABELS,
-  ASPECT_LEADS,
-  formatMetricValue,
-  METRIC_ASPECTS,
-  METRIC_DISCLAIMER,
-  metricAspect,
-  metricParts,
-  metricSubline,
-  withDerived,
-} from "./metrics";
+import { formatMetricValue, METRIC_DISCLAIMER, metricParts, metricSubline } from "./metrics";
+import { reportOutline, type OutlinePoint } from "./reportOutline";
 import { formatLongDate, formatOffset } from "./time";
 
 /**
@@ -65,7 +51,8 @@ import { formatLongDate, formatOffset } from "./time";
  * The page chrome — geometry, palette, the app's own faces, the banner, the
  * section heading, the wrapped paragraph and the page break — is
  * `pdfDocument.ts`, shared with the progress report so that the two documents
- * this application writes look like one application.
+ * this application writes look like one application. What the report *says* is
+ * `reportOutline.ts`, shared with the page, so this file only lays it out.
  */
 
 /** Where a speaker's text starts, leaving the left column to the timestamp.
@@ -96,18 +83,15 @@ export interface FeedbackPdfOptions {
   // prop straight through: that is "may be passed as undefined", not "may be
   // omitted".
   scenarioName?: string | null | undefined;
-  /** The wrap-up as the page shows it, or nothing: a call run without consent
-   * has none (ADR 0066), and neither has one whose generation failed. The
-   * document is then the protocol it used to be, and says so on its banner. */
-  feedback?: SessionFeedback | null | undefined;
-  /** The call's statistics (F-53). Present without a wrap-up as well — they
-   * are measured during the call and stored with the Session. */
-  measurements?: Measurement[] | undefined;
-  /** The stored utterances, used for one thing only: a feedback point that
-   * names a Turn carries that Turn's timestamp, exactly as on screen. The
-   * transcript itself is printed from `transcript`, which exists even for a
-   * call that was never stored. */
-  turns?: SessionTurn[] | undefined;
+  /** The stored Session the page was drawn from, or nothing: a call run
+   * without consent was never stored (ADR 0066). Its wrap-up may still be
+   * missing — failed, or on its way — and the document is then the protocol
+   * it used to be, and says so on its banner. The transcript itself is printed
+   * from `transcript`, which exists even for a call that was never stored. */
+  detail?: SessionDetail | null | undefined;
+  /** The focus-goal catalogue, so a point names the goal it was filed under
+   * exactly as on screen. */
+  goals?: FocusGoal[] | undefined;
   /** When the call happened. Defaults to now, which is right for a call that
    * has just ended — the only screen this is offered on. */
   date?: Date;
@@ -120,15 +104,24 @@ export async function buildFeedbackPdf({
   transcript,
   personaName,
   scenarioName,
-  feedback,
-  measurements = [],
-  turns = [],
+  detail,
+  goals,
   date = new Date(),
 }: FeedbackPdfOptions) {
+  const outline = reportOutline({
+    personaName,
+    scenarioName,
+    reverse: detail?.reverse,
+    feedback: detail?.feedback,
+    measurements: detail?.measurements,
+    turns: detail?.turns,
+    goals,
+  });
+  const { meta, wrapUp } = outline;
   // What the banner and the running head call this. A document without a
   // wrap-up is still only a protocol, and naming it a feedback would promise
   // the one thing it does not have.
-  const title = feedback ? "Gesprächsfeedback" : "Gesprächsprotokoll";
+  const title = wrapUp ? "Gesprächsfeedback" : "Gesprächsprotokoll";
   const sheet = await openSheet(title);
   const { doc } = sheet;
 
@@ -136,8 +129,11 @@ export async function buildFeedbackPdf({
   const facts: [string, string][] = [
     // The case first: it is what the reader needs in order to place everything
     // under it, the Persona included.
-    ...(scenarioName ? ([["Szenario", scenarioName]] as [string, string][]) : []),
-    ["Gesprächspartner", personaName],
+    ...(meta.scenario ? ([["Szenario", meta.scenario]] as [string, string][]) : []),
+    ["Gesprächspartner", meta.partner],
+    // Which side the User was on: the transcript below reads the other way
+    // round in a reverse (ADR 0070), as the page's meta row says too.
+    ...(meta.reversal ? ([["Rollentausch", meta.reversal]] as [string, string][]) : []),
     ["Datum", formatLongDate(date.toISOString()) ?? ""],
     ["Beiträge", String(transcript.length)],
   ];
@@ -145,17 +141,17 @@ export async function buildFeedbackPdf({
   sheet.y += 7;
 
   // --- the wrap-up, in the order the page reads in -----------------------
-  if (feedback) {
+  if (wrapUp) {
     sheet.heading("Qualitative Einordnung", "Zusammenfassung");
-    sheet.paragraph(feedback.summary);
+    sheet.paragraph(wrapUp.summary);
     sheet.y += 9;
 
-    points("Stärken", "Das gelang gut", "strength");
-    points("Weiterentwickeln", "Das können Sie verbessern", "improvement");
+    points("Stärken", "Das gelang gut", wrapUp.strengths, SUCCESS);
+    points("Weiterentwickeln", "Das können Sie verbessern", wrapUp.improvements, CAUTION);
 
-    if (feedback.phase_language) {
+    if (wrapUp.phaseLanguage) {
       sheet.heading("Gesprächsführung", "Phasengerechte Sprache");
-      sheet.paragraph(feedback.phase_language);
+      sheet.paragraph(wrapUp.phaseLanguage);
       sheet.y += 2.5;
       sheet.paragraph("Warm einsteigen, sachlich am Anliegen arbeiten, warm abschließen.", {
         size: 9,
@@ -171,31 +167,39 @@ export async function buildFeedbackPdf({
 
   /** One of the two point lists, with the timestamp of the utterance a point
    * cites — the same two columns the transcript is set on, so a reader can
-   * find the line a point is about. */
-  function points(eyebrow: string, name: string, kind: "strength" | "improvement") {
-    const list = feedback?.points.filter((point) => point.kind === kind) ?? [];
+   * find the line a point is about — and the focus goal it was filed under as
+   * a small line over it, where `.feedback-point-goal` sets it on screen. */
+  function points(
+    eyebrow: string,
+    name: string,
+    list: OutlinePoint[],
+    tone: [number, number, number],
+  ) {
     if (list.length === 0) return;
 
     sheet.heading(eyebrow, name);
     for (const point of list) {
-      const turn =
-        point.turn_id !== null
-          ? turns.find((candidate) => candidate.turn_id === point.turn_id)
-          : undefined;
-
-      // The timestamp and the first line of its point stay together.
-      sheet.keep(LINE_HEIGHT * 2);
-      if (turn) {
+      // The timestamp, the goal and the first line of the point stay together.
+      sheet.keep(LINE_HEIGHT * (point.goal ? 3 : 2));
+      if (point.offsetMs !== null) {
         doc.setFont("app", "normal");
         doc.setFontSize(8);
         doc.setTextColor(...MUTED);
-        doc.text(formatOffset(turn.start_offset_ms), MARGIN.left, sheet.y);
+        doc.text(formatOffset(point.offsetMs), MARGIN.left, sheet.y);
       }
       const top = sheet.y;
+      if (point.goal) {
+        sheet.paragraph(point.goal.toUpperCase(), {
+          indent: TEXT_INDENT,
+          size: 7,
+          colour: MUTED,
+          lineHeight: 4,
+        });
+      }
       sheet.paragraph(point.text, { indent: TEXT_INDENT });
       // The accent bar beside the point, in the colour its list carries on
       // screen: it is what tells the two lists apart once they are printed.
-      doc.setDrawColor(...(kind === "strength" ? SUCCESS : CAUTION));
+      doc.setDrawColor(...tone);
       doc.setLineWidth(0.8);
       if (sheet.y > top) doc.line(MARGIN.left + 13, top - 3.4, MARGIN.left + 13, sheet.y - 3.4);
       sheet.y += 3.5;
@@ -208,7 +212,7 @@ export async function buildFeedbackPdf({
    * Never a judgement, only a reading (ADR 0004/0051), which is what the
    * closing line says. */
   function metrics() {
-    const all = withDerived(measurements);
+    const all = outline.metricGroups.flatMap((group) => group.measurements);
     if (all.length === 0) return;
 
     // The heading, the first half's name and its first row of figures in one
@@ -218,18 +222,16 @@ export async function buildFeedbackPdf({
     sheet.keep(HEADING_HEIGHT + 18 + TILE.height);
     sheet.heading("Ergänzende Auswertung", "Kennzahlen zum Gespräch");
 
-    for (const aspect of METRIC_ASPECTS) {
-      const group = all.filter(
-        (measurement) => metricAspect(measurement) === aspect && measurement.key !== "loudness",
-      );
+    for (const { label, lead, measurements } of outline.metricGroups) {
+      const group = measurements.filter((measurement) => measurement.key !== "loudness");
       if (group.length === 0) continue;
 
       // The half's name, its lead and one row of figures: the name alone at
       // the foot of a page announces a group that is on the next one.
       sheet.keep(18 + TILE.height);
-      sheet.paragraph(ASPECT_LABELS[aspect], { size: 10.5, style: "bold", colour: NAVY });
+      sheet.paragraph(label, { size: 10.5, style: "bold", colour: NAVY });
       sheet.y += 0.5;
-      sheet.paragraph(ASPECT_LEADS[aspect], { size: 8.5, colour: MUTED, lineHeight: 4.2 });
+      sheet.paragraph(lead, { size: 8.5, colour: MUTED, lineHeight: 4.2 });
       sheet.y += 4;
 
       const column = CONTENT_WIDTH / TILE.columns;
@@ -466,7 +468,7 @@ export async function buildFeedbackPdf({
   // reader will look for. No Persona in it — two trainings on one day with the
   // same partner would collide, and the browser's "(1)" says less than the
   // date does.
-  const kind = feedback ? "Feedback" : "Protokoll";
+  const kind = wrapUp ? "Feedback" : "Protokoll";
   return { doc, filename: `Calltrainer_${kind}_${stamp(date)}.pdf` };
 }
 
