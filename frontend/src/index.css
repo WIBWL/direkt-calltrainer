@@ -222,6 +222,21 @@ body {
     gap: 14px;
   }
 
+  /* The focus onboarding has no training stepper, so its mobile header can
+     keep the brand and account on one row instead of using the stacked layout
+     that the training screens need for their progress indicator. */
+  .focus-onboarding .app-header {
+    height: 76px;
+  }
+
+  .focus-onboarding .app-header-inner {
+    min-height: 76px;
+    padding: 0;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+  }
+
   .training-progress {
     width: 100%;
     justify-content: space-between;
