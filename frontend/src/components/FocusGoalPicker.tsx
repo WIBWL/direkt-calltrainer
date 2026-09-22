@@ -18,14 +18,14 @@ export function toggleGoal(selected: string[], key: string, max: number): string
  * The catalogue as a set of tickable cards, grouped by heading (F-62,
  * ADR 0076).
  *
- * One component for both places it appears — the first-run dialog and the
- * profile section. They differ in what surrounds them and in nothing else, and
- * two copies of the card list would drift on the first catalogue change.
+ * One component for both places it appears — the first-run focus screen and
+ * the profile section. They differ in what surrounds them and in nothing else,
+ * and two copies of the card list would drift on the first catalogue change.
  *
  * The card is the app's own selection idiom (`.choice-check`) over a real
  * checkbox: this is a pick-up-to-five, so the input stays and only its
  * rendering changes. The circle carries the pick's position rather than a tick,
- * tying a card to a slot in the dialog's tally.
+ * making the order of the selected goals visible directly on the cards.
  *
  * The limit disables what cannot be picked rather than refusing the click
  * afterwards — a checkbox that turns out not to have worked is worse than one
@@ -33,9 +33,9 @@ export function toggleGoal(selected: string[], key: string, max: number): string
  * always to untick something; locked cards go quiet rather than faint, since
  * ten faded cards in a grid read as broken.
  *
- * A responsive grid, two columns in the dialog and one in the narrower profile
- * card: a title of 15 to 31 characters does not need a full row, and a row per
- * goal is what made the first screen long.
+ * A responsive grid, two columns on the first-run screen and one in the narrower
+ * profile card: a title of 15 to 31 characters does not need a full row, and a
+ * row per goal is what made the first screen long.
  */
 export default function FocusGoalPicker({
   goals,
