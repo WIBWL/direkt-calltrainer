@@ -6521,8 +6521,9 @@ button.calendar-day {
   margin: 0 auto;
 }
 
-/* Role and call types (F-62): chips, since there are few and each is a word
-   or two. The real control stays for the keyboard; the chip is what shows. */
+/* Role and call types (F-62): compact choice controls, since there are only a
+   few short options. The native controls remain available to the keyboard;
+   the styled labels provide the visible interaction surface. */
 .focus-profile {
   margin-top: 1.25rem;
   padding-bottom: 1.25rem;
@@ -6540,9 +6541,9 @@ button.calendar-day {
   position: relative;
   display: inline-flex;
   align-items: center;
-  padding: 7px 14px;
+  padding: 7px 12px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: 9px;
   background: var(--color-surface);
   font-size: 0.9rem;
   cursor: pointer;
