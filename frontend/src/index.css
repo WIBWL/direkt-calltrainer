@@ -1409,14 +1409,14 @@ h2 {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 20px;
-  height: 20px;
-  margin-top: 2px;
+  width: 28px;
+  height: 28px;
+  margin-top: 1px;
   border-radius: 50%;
   background: var(--color-surface-filter);
   color: var(--color-blue-600);
   font-family: var(--font-sans);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0;
@@ -2133,7 +2133,10 @@ h2 {
   }
 
   .setup-section-index {
+    width: 26px;
+    height: 26px;
     margin-top: 1px;
+    font-size: 12px;
   }
 
   .scenario-library-controls-top {
