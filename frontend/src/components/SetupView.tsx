@@ -192,7 +192,7 @@ export default function SetupView({
         )}
 
         <button
-          className="start-call-button"
+          className="start-call-button setup-start-button"
           type="button"
           disabled={selectedPersona === null || (selectedScenario === null && !randomPicked)}
           onClick={onStart}

@@ -1450,17 +1450,18 @@ h2 {
 .selection-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
+  gap: 8px;
   margin: 0 0 14px;
   padding: 8px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--color-surface-filter);
 }
 
 .selection-summary-item {
   min-width: 0;
   padding: 11px 12px;
+  border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
   background: var(--color-surface);
 }
@@ -1547,6 +1548,23 @@ h2 {
 .start-call-button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* The setup keeps its prominent full-width final action, but its shape and
+   colours follow the same control language as the focus onboarding page. */
+.setup-section .setup-start-button {
+  border-radius: 9px;
+  background: var(--color-navy-900);
+  color: var(--color-surface);
+}
+
+.setup-section .setup-start-button:hover {
+  background: var(--color-navy-700);
+}
+
+.setup-section .setup-start-button:focus-visible {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
 }
 
 .end-call-button {
