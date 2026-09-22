@@ -116,7 +116,7 @@ export default function SetupView({
       </section>
 
       <SetupSection
-        index="01"
+        index="1"
         title="Gesprächssituation wählen"
         description="Welche Situation möchten Sie trainieren?"
       >
@@ -140,7 +140,7 @@ export default function SetupView({
       </SetupSection>
 
       <SetupSection
-        index="02"
+        index="2"
         title="Gesprächspartner wählen"
         description="Jede Persona besitzt eine eigene Sprache, Stimme und Persönlichkeit."
       >
@@ -162,7 +162,7 @@ export default function SetupView({
         </div>
       </SetupSection>
 
-      <SetupSection index="03" title="Auswahl prüfen" description="Ihre Trainingsauswahl steht fest.">
+      <SetupSection index="3" title="Auswahl prüfen" description="Ihre Trainingsauswahl steht fest.">
         <SelectionSummary
           scenario={
             randomPicked

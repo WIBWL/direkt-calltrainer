@@ -1419,26 +1419,32 @@ h2 {
   width: 100%;
 }
 
-/* The heading aligns the section number with its title and description. */
+/* The setup headings use the same compact numbered marker as the focus page.
+   This keeps the three setup cards visually distinct without introducing a
+   second prominent step navigation below the training progress header. */
 .setup-section-heading {
   display: flex;
   align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 22px;
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
-/* The number is set exactly like the title beside it -- same face, colour, size,
-   weight, line height and tracking -- so the two read as one heading with a
-   number in front of it. It was 14px mono in blue before, which read as a label
-   stuck to the heading rather than as part of it. */
 .setup-section-index {
-  flex-shrink: 0;
-  color: var(--color-navy-900);
-  font-family: var(--font-display);
-  font-size: 25px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--color-surface-filter);
+  color: var(--color-blue-600);
+  font-family: var(--font-sans);
+  font-size: 10px;
   font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .setup-section-heading-text {
@@ -1448,17 +1454,17 @@ h2 {
 .setup-section-heading-text h2 {
   margin: 0 0 4px;
   color: var(--color-navy-900);
-  font-size: 25px;
+  font-size: 20px;
   font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
 }
 
 .setup-section-heading-text p {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 /* The summary groups all confirmed choices into one compact panel. */
