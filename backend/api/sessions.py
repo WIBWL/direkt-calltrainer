@@ -44,7 +44,7 @@ from sqlalchemy.orm import Session as DbSession, selectinload
 
 from backend import deletion, library
 from backend.api import served
-from backend.api._loading import SESSION_SUBTREE
+from backend.api._loading import SESSION_SUBTREE, WITH_WRAPUP, owned_session
 from backend.api.deps import current_tenant_id
 from backend.auth import AuthContext, require_user
 from backend.db import models as db_models
@@ -142,19 +142,15 @@ def list_sessions(
 def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user)) -> dict:
     """One finished Session: Transcript, measurements, Feedback."""
     with session_scope() as db:
-        session = (
-            db.query(db_models.Session)
-            .filter_by(extern_id=extern_id)
-            .options(
-                *SESSION_SUBTREE,
-                selectinload(db_models.Session.jobs),
-                selectinload(db_models.Session.findings),
-            )
-            .one_or_none()
+        session = owned_session(
+            db, caller.sub, extern_id,
+            *SESSION_SUBTREE,
+            selectinload(db_models.Session.jobs),
+            selectinload(db_models.Session.findings),
         )
         # Absent and not-yours are deliberately the same answer: anything
         # else would confirm that an id exists (ADR 0050).
-        if session is None or session.subject_id != caller.sub:
+        if session is None:
             raise HTTPException(status_code=404, detail="Unknown session")
         return served.detail(session, follow_up=_follow_up(db, session.session_id))
 
@@ -223,11 +219,7 @@ def retry_feedback(
     client goes back to polling the read route for it.
     """
     with session_scope() as db:
-        session = (
-            db.query(db_models.Session)
-            .filter_by(extern_id=extern_id, subject_id=caller.sub)
-            .one_or_none()
-        )
+        session = owned_session(db, caller.sub, extern_id)
         if session is None:
             raise HTTPException(status_code=404, detail="Unknown session")
 
@@ -375,32 +367,6 @@ def _reverse_response(scenario) -> dict:
     }
 
 
-def _owned_with_wrapup(
-    db: DbSession, extern_id: uuid.UUID, subject: str
-) -> db_models.Session | None:
-    """The caller's Session with its Scenario and wrap-up points loaded, or None
-    for one that is absent or someone else's -- the same answer either way
-    (ADR 0050).
-
-    The one read the reverse and the follow-up share, and the one where a
-    divergence would matter most: it is the ownership check for both routes that
-    turn a Session into a Scenario. The rest of the two stays two on purpose
-    (ADR 0100).
-    """
-    # Ownership in the WHERE clause, so someone else's row and its subtree
-    # are never loaded only to be thrown away.
-    return (
-        db.query(db_models.Session)
-        .filter_by(extern_id=extern_id, subject_id=subject)
-        .options(
-            selectinload(db_models.Session.scenario),
-            selectinload(db_models.Session.feedback)
-            .selectinload(db_models.Feedback.points),
-        )
-        .one_or_none()
-    )
-
-
 @dataclass(frozen=True)
 class _ReverseMaterial:
     """What a reverse is built from, read out before the database handle is
@@ -421,7 +387,7 @@ class _ReverseMaterial:
 def _reverse_material(extern_id: uuid.UUID, subject: str) -> _ReverseMaterial | None:
     """This Session's material, or None if it is not the caller's."""
     with session_scope() as db:
-        session = _owned_with_wrapup(db, extern_id, subject)
+        session = owned_session(db, subject, extern_id, *WITH_WRAPUP)
         if session is None:
             return None
         scenario = session.scenario
@@ -546,7 +512,7 @@ def _follow_up_material(extern_id: uuid.UUID, subject: str) -> _FollowUpMaterial
     here the two are one case, because the input is missing either way.
     """
     with session_scope() as db:
-        session = _owned_with_wrapup(db, extern_id, subject)
+        session = owned_session(db, subject, extern_id, *WITH_WRAPUP)
         if session is None:
             return None
         scenario = session.scenario

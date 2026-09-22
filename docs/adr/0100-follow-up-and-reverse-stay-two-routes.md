@@ -16,7 +16,7 @@ Every architecture review of this code found the pair, and they disagreed about 
 
 **What must not drift is shared, and only that:**
 
-- the ownership read — `_owned_with_wrapup` in `api/sessions.py`, the one query that decides whether the caller may build anything from this Session;
+- the ownership read — the one query that decides whether the caller may build anything from this Session. Written as `_owned_with_wrapup` in `api/sessions.py`; since 22 September 2026 it is `owned_session` in `api/_loading.py`, taking its eager loads as an argument (`WITH_WRAPUP` here), because the detail route and the retry route asked the same question and one of them still compared the owner after loading the row;
 - the length precondition — `MIN_USER_UTTERANCES` and `_too_short`, pinned against the client's `MIN_USER_TURNS`;
 - what a prompt asking for JSON forbids — `llm.JSON_ANSWER_NEVER`;
 - how a field a model wrote is held to its cap — `authored_text.fit`, at a word boundary with an ellipsis.
