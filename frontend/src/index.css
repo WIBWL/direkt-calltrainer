@@ -1683,13 +1683,24 @@ h2 {
   align-items: center;
 }
 
-.call-persona-details h1,
-.call-persona-details p {
+/* The Persona's name is the primary identity in the live call, while the role
+   stays deliberately quieter so both pieces of information are easy to scan. */
+.call-persona-details h1 {
   margin: 0;
   color: #000000;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1.3;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.call-persona-details p {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
   text-align: center;
   overflow-wrap: anywhere;
 }
