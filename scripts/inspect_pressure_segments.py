@@ -62,7 +62,6 @@ _EXCERPT = 90
 class _Row:
     """One Session, reduced to what this script reports about it."""
 
-    # pylint: disable=too-few-public-methods  # a record, printed and discarded
     # pylint: disable=too-many-instance-attributes  # one field per printed column
 
     def __init__(self, session: db_models.Session) -> None:
@@ -188,7 +187,7 @@ def _summary(rows: list[_Row]) -> None:
         )
         # A single `%`, not a doubled one: logging only escapes when it is given
         # arguments to format with, and this line has none.
-        logger.info(  # pylint: disable=logging-too-few-args
+        logger.info(
             "Nahe 0% oder nahe 100% ist das Warnzeichen: Dann vergleicht die Anzeige "
             "zwei Abschnitte, die keine zwei sind."
         )

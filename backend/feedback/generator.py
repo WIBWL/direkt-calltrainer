@@ -176,7 +176,7 @@ async def _generate(session_id: int) -> None:
             segments.store(db, session_id, wrapup.pressure_turns)
             jobs.mark(db, session_id, db_models.JOB_DONE)
         logger.info("Feedback stored for session %d (%d points)", session_id, len(wrapup.points))
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except Exception as e:
         logger.exception("Feedback generation failed for session %d", session_id)
         # `jobs.mark` creates the row where it finds none, so a Session that
         # does not exist must not reach it.
@@ -869,7 +869,7 @@ def _looks_like_json(text: str) -> bool:
     `"summary":`."""
     if text[:1] in ("{", "["):
         return True
-    fields: tuple[str, ...] = tuple(_Wrapup.model_fields)  # pylint: disable=not-an-iterable
+    fields: tuple[str, ...] = tuple(_Wrapup.model_fields)
     return any(f'"{field}"' in text[:200] for field in fields)
 
 

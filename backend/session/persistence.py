@@ -45,7 +45,7 @@ _STATUS = {
 
 
 @dataclass(frozen=True)
-class FinishedCall:  # pylint: disable=too-many-instance-attributes  # one call's facts, by design
+class FinishedCall:
     """Everything the write needs to know about a call that has ended.
 
     Named rather than passed as seven positional arguments, which two callers

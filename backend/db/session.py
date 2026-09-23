@@ -126,7 +126,7 @@ def reset_engine() -> None:
     # too many arguments.
     if get_engine.cache_info().currsize:  # pylint: disable=too-many-function-args
         get_engine().dispose()
-    get_engine.cache_clear()  # pylint: disable=too-many-function-args
+    get_engine.cache_clear()
     _session_factory.cache_clear()
 
 

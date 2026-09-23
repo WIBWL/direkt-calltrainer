@@ -20,8 +20,6 @@ from sqlalchemy.exc import OperationalError
 
 from backend.db.session import build_database_url
 
-# pylint: disable=missing-function-docstring
-
 
 def test_plain_tests_get_the_placeholder_settings():
     """The values conftest claims, not the ones in .env."""

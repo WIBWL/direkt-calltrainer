@@ -19,7 +19,6 @@ route the feature would actually take, or it only guards a spelling.
 
 from pathlib import Path
 
-# pylint: disable=missing-function-docstring
 
 REPO = Path(__file__).resolve().parent.parent
 

@@ -41,7 +41,7 @@ from backend.feedback.generator import (
 from backend.session.language_packs import LANGUAGE_PACKS
 
 # The prompt builder and the response model are the units under test.
-# pylint: disable=protected-access,redefined-outer-name
+# pylint: disable=redefined-outer-name
 
 
 @pytest.fixture

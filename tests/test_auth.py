@@ -15,7 +15,7 @@ from jwt.exceptions import PyJWKClientConnectionError
 
 from backend import auth
 
-# pylint: disable=missing-function-docstring,redefined-outer-name,too-few-public-methods
+# pylint: disable=missing-function-docstring,too-few-public-methods
 
 _KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 

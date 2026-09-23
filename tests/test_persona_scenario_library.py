@@ -40,7 +40,7 @@ from backend.session.language_packs import LANGUAGE_PACKS
 from tests.conftest import load_seed_module
 
 # _to_persona/_to_scenario are the mapping this module is about.
-# pylint: disable=missing-function-docstring,protected-access
+# pylint: disable=missing-function-docstring
 # pylint: disable=use-implicit-booleaness-not-comparison
 
 SEED = load_seed_module()

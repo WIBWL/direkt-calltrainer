@@ -20,7 +20,7 @@ from backend.session import orchestrator as orchestrator_module
 from backend.session.orchestrator import HISTORY_WINDOW, SessionOrchestrator
 from tests.conftest import collect
 
-# pylint: disable=missing-function-docstring,protected-access
+# pylint: disable=missing-function-docstring
 
 USER = [
     "Worum geht es denn genau?",

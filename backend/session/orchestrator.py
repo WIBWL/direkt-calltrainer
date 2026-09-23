@@ -111,7 +111,7 @@ class _ReplyFilters(NamedTuple):
 _NO_FILTERS = _ReplyFilters(guard=False, filter_repeats=False, said=frozenset(), cut_off="")
 
 
-class _ReplyProgress:  # pylint: disable=too-many-instance-attributes  # one reply's state bag, by design
+class _ReplyProgress:
     """Mutable state threaded through one reply's synthesis: chunks sent, whether
     any was, whether the reply ends the call, the voiced text (for barge-in),
     what the filters took out, and the filters themselves."""

@@ -30,7 +30,7 @@ from backend.session.prompting import build_system_prompt, opening_instruction
 from tests.conftest import TEST_PERSONAS, TEST_SCENARIOS
 
 # build_system_prompt is the unit under test here.
-# pylint: disable=missing-function-docstring,redefined-outer-name,protected-access
+# pylint: disable=missing-function-docstring,redefined-outer-name
 
 GERMAN = get_pack("de")
 

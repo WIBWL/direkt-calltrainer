@@ -235,7 +235,7 @@ def retry_feedback(
 
         try:
             queue.enqueue_feedback(session_pk)
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception as e:
             logger.warning("Could not queue a wrap-up for session %s: %s", extern_id, e)
             raise HTTPException(
                 status_code=503,
