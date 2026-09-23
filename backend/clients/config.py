@@ -30,12 +30,6 @@ def _required_env(name: str) -> str:
     return value
 
 
-def _flag(name: str) -> bool:
-    """An optional on/off variable, default off. `.env` turns a blank line into
-    an empty string rather than an absent name, so both read as off here."""
-    return os.environ.get(name, "").lower() in ("1", "true", "yes")
-
-
 # The model gateway (ADR 0011): any OpenAI-compatible endpoint, named in `.env`.
 # A named constant because `lifespan` in app.py checks this same URL at boot.
 DIREKT_URL = _required_env("DIREKT_URL")
@@ -62,18 +56,6 @@ DIREKT_API_KEY = _required_env("DIREKT_API_KEY")
 TIMEOUT = httpx.Timeout(120.0, connect=5.0)
 
 CLIENT = AsyncOpenAI(base_url=f"{DIREKT_URL}/v1", api_key=DIREKT_API_KEY, timeout=TIMEOUT)
-
-# Optional, default off, and deliberately its own switch rather than a second
-# meaning for another: it decides whether what people say aloud is written into
-# the log file.
-#
-# Off, the pipeline logs how long an utterance was and nothing about what was
-# in it. On, it logs the text — which is personal data, sitting in a file that
-# no deletion path reaches (ADR 0066). That is defensible while diagnosing a
-# model, and indefensible in a running pilot, so it is opt-in, named for what
-# it does, and announced at boot (`app.py`'s lifespan) so it cannot be left on
-# unnoticed.
-LOG_TRANSCRIPTS = _flag("LOG_TRANSCRIPTS")
 
 # STT config.
 STT_CLIENT = CLIENT

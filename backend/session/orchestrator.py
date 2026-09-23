@@ -35,7 +35,6 @@ from kugelaudio.exceptions import KugelAudioError
 from openai import OpenAIError
 
 from backend.clients import llm, stt, tts
-from backend.clients.config import LOG_TRANSCRIPTS
 from backend.feedback.acoustics import analyze
 from backend.personas import Persona
 from backend.scenarios import Scenario
@@ -697,14 +696,12 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             return
         if len(cut.heard) >= len(turn.persona_text):
             return  # heard all of it, or a stale re-entry -- nothing to trim
-        # Same switch as the pipeline's (clients/config.py): the trimmed line is
+        # Same rule as the pipeline's (clients/stt.py): the trimmed line is
         # spoken content, and the log file is outside every deletion path
-        # (ADR 0066). The length still says the trim happened and by how much.
-        if LOG_TRANSCRIPTS:
-            logger.info("Turn %d reply trimmed to the heard part: %r", turn.seq, cut.heard)
-        else:
-            logger.info("Turn %d reply trimmed to the heard part (%d of %d characters)",
-                        turn.seq, len(cut.heard), len(turn.persona_text))
+        # (ADR 0066). The length says the trim happened and by how much, which
+        # is the whole of what this line is read for.
+        logger.info("Turn %d reply trimmed to the heard part (%d of %d characters)",
+                    turn.seq, len(cut.heard), len(turn.persona_text))
         self._commit_heard(turn, cut, played_ms, self.history.revise_reply)
 
     def _commit_heard(

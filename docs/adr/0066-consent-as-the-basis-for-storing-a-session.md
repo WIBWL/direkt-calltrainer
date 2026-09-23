@@ -57,3 +57,13 @@ The cost lands on the product. A user who declines gets a trainer without feedba
 **On the processors.** The user's audio and its transcript go to the DiReKT gateway (STT and LLM). KugelAudio receives only the *generated persona text* for synthesis — no user data reaches it. Recorded here so that a change to either arrangement is noticed as a change.
 
 This decision is expected to be revisited if the legal basis is reconsidered. Consent is not obviously the right basis for a training tool people may be expected to use, and Art. 6(1)(e)/(f) may fit a university research deployment better. That determination is not the code's to make; if it changes, the gate stays useful but the withdrawal semantics above would need rethinking.
+
+## Amendment (2026-09-23): the switch is gone, the silence is by construction
+
+The second limit above named itself: a default, not a guarantee. `LOG_TRANSCRIPTS` is removed — the variable, its boot warning, and the four branches that read it in `clients/stt.py`, `clients/tts.py` (both synthesis paths) and `session/orchestrator.py`. Every one of those lines now logs a length and nothing else, unconditionally, and there is no name to set in `.env` that brings the text back.
+
+What the switch was for was diagnosing a model against its actual words. That is a smaller need than it looked: a leg that fails logs its own error with the failure in it, a transcript that is empty or is Whisper's near-silence phantom shows up in the length the line still carries, and the words themselves are in the database for every stored Session, behind a route, inside every deletion path — which is where a reader should be looking at them anyway. Against that stands a variable that a pilot deployment can hold in the on position for a day without anyone noticing, writing what people said into a file that no withdrawal, no single deletion and no six-month sweep can reach.
+
+The removal is pinned rather than assumed: `tests/test_transcript_logging.py` asserts the text is absent from the log at DEBUG as well as INFO, and that no module in the pipeline carries the name again.
+
+Beside it, the same pass took the per-Turn logging down in volume where a line was saying what another already said: the STT leg logged an announcement before the call and a result after it, and now logs the result alone; the LLM leg did the same and now logs its time to first token alone, which names the model; and the KugelAudio synthesis line, the one line in the pipeline that fires per *chunk* rather than per Turn, moved to DEBUG. That is a legibility change rather than a data-protection one, and it is recorded here only because it touched the same lines.

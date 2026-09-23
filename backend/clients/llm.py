@@ -77,7 +77,6 @@ async def stream_reply(
     which is right for a Turn -- a call should survive a blip -- and wrong for a
     liveness probe, where those attempts run inside the probe's own deadline and
     a rate-limited model reports as a timeout instead of as a rate limit."""
-    logger.info("Generating persona reply via LLM (%s)...", LLM_MODEL)
     started = time.monotonic()
     client = LLM_CLIENT if retries is None else LLM_CLIENT.with_options(max_retries=retries)
     stream = await client.chat.completions.create(
@@ -99,7 +98,10 @@ async def stream_reply(
     # Time to first token, logged per Turn rather than measured once in a
     # benchmark: it is the leg that moves when the model or its thinking level
     # changes, and the one whose cost is invisible from the outside -- a reply
-    # that thinks before it speaks looks exactly like a slow network.
+    # that thinks before it speaks looks exactly like a slow network. It is
+    # also the whole of what this leg logs per Turn: the announcement that went
+    # before it said nothing this line does not say afterwards, with the model
+    # named, and a reply that never arrives is logged where it fails.
     first = True
     async for chunk in stream:
         delta = chunk.choices[0].delta.content if chunk.choices else None

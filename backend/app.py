@@ -26,7 +26,7 @@ from backend.api.sessions import router as sessions_router
 from backend.api.tenant import router as tenant_router
 from backend.auth import check_realm
 from backend.clients import tts
-from backend.clients.config import DIREKT_URL, LOG_TRANSCRIPTS
+from backend.clients.config import DIREKT_URL
 from backend.clients.health import check_backends
 from backend.db.provision import provision
 from backend.db.session import session_scope
@@ -46,16 +46,6 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     The DiReKT gateway is only reachable from its own network; off it, every
     pipeline call 403s like a credentials problem, so the hint names the real
     cause."""
-    if LOG_TRANSCRIPTS:
-        # Loud, once, at boot. The switch writes what people say aloud into a
-        # file that no deletion path reaches (ADR 0066), which is fine while
-        # diagnosing a model and not fine in a running pilot — so the one thing
-        # it must never be is quiet.
-        logger.warning(
-            "LOG_TRANSCRIPTS is on: spoken content is being written to the log file. "
-            "That log is personal data and is not covered by any deletion path. "
-            "Turn it off for anything but local debugging."
-        )
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             await client.get(DIREKT_URL)

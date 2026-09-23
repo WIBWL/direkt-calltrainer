@@ -60,7 +60,7 @@ from collections.abc import AsyncIterator
 from kugelaudio.exceptions import KugelAudioError
 from kugelaudio.models import AudioChunk
 
-from backend.clients.config import KUGELAUDIO_CLIENT, KUGELAUDIO_MODEL, LOG_TRANSCRIPTS
+from backend.clients.config import KUGELAUDIO_CLIENT, KUGELAUDIO_MODEL
 from backend.clients.speech_text import for_speech
 from backend.personas import PersonaVoice
 
@@ -105,23 +105,18 @@ async def synthesize_stream(text: str, voice: PersonaVoice, language_id: str) ->
     # full stop that both the chunker and the TTS read as a sentence end.
     # Done here so the Transcript keeps the digits.
     text = for_speech(text, language_id)
-    # Behind the switch: the Persona's line is generated rather than spoken by
+    # Never the text: the Persona's line is generated rather than spoken by
     # anybody, but it is one half of a recorded conversation and routinely
-    # carries the name and the facts the user has just said. This line ran
-    # unconditionally while `config.py` promised that with the switch off "the
-    # pipeline logs how long an utterance was and nothing about what was in
-    # it" -- and it fires per chunk, so it wrote the whole Persona side of
-    # every call into a file no deletion path reaches (ADR 0066).
-    if LOG_TRANSCRIPTS:
-        logger.info(
-            "Synthesizing (streaming) via KugelAudio (%s, voice=%s, language=%s): %r",
-            KUGELAUDIO_MODEL, voice.kugelaudio_voice_id, language_id, text,
-        )
-    else:
-        logger.info(
-            "Synthesizing (streaming) via KugelAudio (%s, voice=%s, language=%s, %d characters)",
-            KUGELAUDIO_MODEL, voice.kugelaudio_voice_id, language_id, len(text),
-        )
+    # carries the name and the facts the user has just said, into a file no
+    # deletion path reaches (ADR 0066). At debug rather than info because this
+    # is the one line in the pipeline that fires per *chunk* -- several times a
+    # reply, where every other leg logs once a Turn -- and what it says when
+    # nothing is wrong is that synthesis was attempted, which the audio the
+    # user hears already says. A failure raises and is logged where it lands.
+    logger.debug(
+        "Synthesizing (streaming) via KugelAudio (voice=%s, language=%s, %d characters)",
+        voice.kugelaudio_voice_id, language_id, len(text),
+    )
     try:
         async with contextlib.aclosing(_pooled_request(text, voice, language_id)) as chunks:
             async for chunk in chunks:
@@ -204,13 +199,9 @@ async def synthesize(text: str, voice: PersonaVoice, language_id: str) -> bytes:
     # full stop that both the chunker and the TTS read as a sentence end.
     # Done here so the Transcript keeps the digits.
     text = for_speech(text, language_id)
-    # Same switch as the streaming path above, for the same reason.
-    if LOG_TRANSCRIPTS:
-        logger.info("Synthesizing via KugelAudio (%s, voice=%s, language=%s): %r",
-                    KUGELAUDIO_MODEL, voice.kugelaudio_voice_id, language_id, text)
-    else:
-        logger.info("Synthesizing via KugelAudio (%s, voice=%s, language=%s, %d characters)",
-                    KUGELAUDIO_MODEL, voice.kugelaudio_voice_id, language_id, len(text))
+    # Same rule as the streaming path above, for the same reasons.
+    logger.debug("Synthesizing via KugelAudio (voice=%s, language=%s, %d characters)",
+                 voice.kugelaudio_voice_id, language_id, len(text))
     pcm = bytearray()
     sample_rate = 24000
     async with contextlib.aclosing(_pooled_request(text, voice, language_id)) as chunks:
