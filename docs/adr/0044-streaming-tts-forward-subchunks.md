@@ -4,6 +4,13 @@
 
 Accepted (refines ADR 0033's TTS leg; builds on ADR 0040)
 
+**Status update (ADR 0103):** the DiReKT fallback named under *Failure
+handling* below is gone. A KugelAudio failure now ends the Turn with
+`tts_failed` whether or not audio had already been sent — the second half of
+that paragraph is the whole rule. Everything else here stands, and the pooled
+connection's `final`-frame invariant (the amendment) matters more without a
+fallback to mask an unfinished stream.
+
 ## Context
 
 ADR 0033 made the Session pipeline stream: the dialogue model's tokens are

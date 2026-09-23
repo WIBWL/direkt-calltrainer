@@ -2,6 +2,17 @@
 
 ## Status
 
+**Superseded by ADR 0103.** `GEMINI` and the five variables behind it are
+removed: STT and dialogue generation are back on the gateway ADR 0011 names,
+on one model for the spoken reply and the written wrap-up alike, and
+`_backend_kwargs` is one request shape again. The precondition this ADR states
+under its own consequences — the privacy statement naming Google, covered by
+the DPO review — was never met, so the path was never usable where real
+Sessions are stored. ADR 0075, which this ADR made possible, is narrowed with
+it: the caller's notes are always kept. What is recorded below stays worth
+reading as the measurement of two models and as the reason a second vendor on
+the dialogue leg would be a deployment decision rather than a switch.
+
 Accepted (reverses ADR 0040's removal of the Gemini path; narrows ADR 0011 to STT)
 
 ## Context
