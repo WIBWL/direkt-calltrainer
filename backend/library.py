@@ -59,10 +59,7 @@ def _to_persona(row: models.Persona) -> Persona:
         name=row.name,
         language_id=row.language_code,
         language_name=row.language.name,
-        voice=PersonaVoice(
-            tts_voice=row.tts_voice,
-            kugelaudio_voice_id=row.kugelaudio_voice_id,
-        ),
+        voice=PersonaVoice(kugelaudio_voice_id=row.kugelaudio_voice_id),
         role_label=row.role_label,
         traits_label=row.traits_label,
         training_goal=row.training_goal,

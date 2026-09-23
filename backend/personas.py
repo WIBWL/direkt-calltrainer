@@ -18,7 +18,10 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class PersonaVoice:
-    tts_voice: str
+    """How this Persona sounds. One field, because there is one speech
+    backend (ADR 0103); it stays a value type rather than a bare int so a
+    second voice parameter has somewhere to go."""
+
     kugelaudio_voice_id: int
 
 

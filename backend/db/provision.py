@@ -203,7 +203,6 @@ def _seed_personas(db: DbSession) -> int:
              # sanitiser's business is prompt text (ADR 0059).
              "avatar_url": p.get("avatar_url"),
              "active": p.get("active", True), "language_code": p["language_id"],
-             "tts_voice": p["tts_voice"],
              "kugelaudio_voice_id": p["kugelaudio_voice_id"],
              # A shipped built-in belongs to nobody and everybody (ADR 0058).
              "created_by": None, "visibility": VISIBILITY_PUBLIC})

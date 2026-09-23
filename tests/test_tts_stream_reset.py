@@ -24,7 +24,7 @@ from backend.session.orchestrator import SessionOrchestrator
 
 # pylint: disable=missing-function-docstring,protected-access
 
-VOICE = PersonaVoice(tts_voice="de_male", kugelaudio_voice_id=1885)
+VOICE = PersonaVoice(kugelaudio_voice_id=1885)
 
 
 class _Chunk:

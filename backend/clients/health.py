@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # The values a Session would use, kept as a literal rather than read from
 # the Persona library: this checks whether the backends answer, and must
 # not fail merely because the database is empty or unreachable (ADR 0041).
-_CHECK_VOICE = PersonaVoice(tts_voice="de_male", kugelaudio_voice_id=1885)
+_CHECK_VOICE = PersonaVoice(kugelaudio_voice_id=1885)
 _CHECK_LANGUAGE = "de"
 _CHECK_TIMEOUT = 20.0
 # One attempt, against the client's default of two retries. Retrying is right

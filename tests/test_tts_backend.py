@@ -26,9 +26,9 @@ from backend.personas import PersonaVoice
 # tts's internals are the unit here.
 # pylint: disable=missing-function-docstring,redefined-outer-name,protected-access
 
-# A Persona's voice, built here rather than read from the library, which is
-# database-backed since ADR 0041.
-VOICE = PersonaVoice(tts_voice="de_male", kugelaudio_voice_id=1885)
+# A Persona's voice (ADR 0041/0103), built here rather than read from the
+# library, which is database-backed since ADR 0041.
+VOICE = PersonaVoice(kugelaudio_voice_id=1885)
 
 
 class _FakeStreamingTTS:

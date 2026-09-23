@@ -343,9 +343,11 @@ class Persona(AuthoredContent, Base):
     training_goal: Mapped[str] = mapped_column(Text)
     difficulty: Mapped[str] = mapped_column(String(40))
     language_code: Mapped[str] = mapped_column(ForeignKey("language.code"), index=True)
-    # The voice on the DiReKT fallback backend.
-    tts_voice: Mapped[str] = mapped_column(String(60))
-    # Only used when TTS runs on KugelAudio (ADR 0040), hence nullable.
+    # The Persona's voice, and the only one since KugelAudio became the whole
+    # of the speech output (ADR 0103) -- a second column held the retired
+    # fallback backend's voice until then. Still nullable: a Persona without a
+    # voice cannot be played, and what says so is `active` below, which the
+    # seed pairs with this column.
     kugelaudio_voice_id: Mapped[int | None] = mapped_column(Integer)
     # Retired Personas are deactivated, never deleted: Session rows reference
     # them, and a past Session has to stay readable.

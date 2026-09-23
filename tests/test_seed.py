@@ -96,7 +96,8 @@ def test_seed_fills_language_and_voice_on_every_persona(migrated_database: str) 
             incomplete = conn.execute(
                 text(
                     "SELECT count(*) FROM persona "
-                    "WHERE language_code IS NULL OR tts_voice IS NULL OR tts_voice = ''"
+                    "WHERE language_code IS NULL "
+                    "OR (active AND kugelaudio_voice_id IS NULL)"
                 )
             ).scalar_one()
     finally:
@@ -115,10 +116,10 @@ def test_seed_deactivates_personas_it_no_longer_contains(migrated_database: str)
             conn.execute(
                 text(
                     "INSERT INTO persona (key, extern_id, name, role_label, role, traits,"
-                    " behavior, training_goal, difficulty, language_code, tts_voice,"
-                    " active, visibility)"
+                    " behavior, training_goal, difficulty, language_code,"
+                    " kugelaudio_voice_id, active, visibility)"
                     " VALUES ('retired-persona', gen_random_uuid(), 'Alt', 'Alt', 'Alt',"
-                    " 'alt', 'alt', '', 'mittel', 'de', 'de_male', true, 'public')"
+                    " 'alt', 'alt', '', 'mittel', 'de', 1885, true, 'public')"
                 )
             )
 
