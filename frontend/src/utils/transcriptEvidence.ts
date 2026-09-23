@@ -54,8 +54,9 @@ export function questionsIn(text: string): string[] {
   return found.filter((question) => question.length > 0);
 }
 
-/** The sentences of one stretch of transcript, punctuation kept. */
-export function sentencesOf(text: string): string[] {
+/** The sentences of one stretch of transcript, punctuation kept. Used by
+ * `fillerHits` below and by nothing outside this module. */
+function sentencesOf(text: string): string[] {
   const parts = text.split(/(?<=[.!?])\s+/);
   return parts.map((part) => part.trim()).filter((part) => part.length > 0);
 }

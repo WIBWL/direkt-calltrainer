@@ -99,7 +99,11 @@ export interface FeedbackPdfOptions {
 
 /** The document and the name to save it under, without saving it. Separate
  * from the download so the layout can be built and looked at outside a
- * browser — which is how it was designed. */
+ * browser — which is how it was designed.
+ *
+ * Exported with no caller in this repository on purpose: the caller is a
+ * throwaway render script at the point somebody changes the layout. An
+ * unused-export sweep will flag it; it is not dead. */
 export async function buildFeedbackPdf({
   transcript,
   personaName,

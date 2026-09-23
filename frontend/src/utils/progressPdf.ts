@@ -98,7 +98,11 @@ export interface ProgressPdfOptions {
 
 /** The document and the name to save it under, without saving it — separate
  *  from the download so the layout can be built and looked at outside a
- *  browser, the way the feedback file's is. */
+ *  browser, the way the feedback file's is.
+ *
+ *  Exported with no caller in this repository on purpose, exactly as
+ *  `buildFeedbackPdf` is: an unused-export sweep will flag it, and it is not
+ *  dead. */
 export async function buildProgressPdf({
   sessions,
   selected,

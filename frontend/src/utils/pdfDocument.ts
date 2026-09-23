@@ -39,7 +39,10 @@ export const NAVY: [number, number, number] = [3, 37, 62];
 export const BLUE: [number, number, number] = [50, 95, 127];
 export const MUTED: [number, number, number] = [91, 107, 120];
 export const RULE: [number, number, number] = [215, 226, 235];
-export const WHITE: [number, number, number] = [255, 255, 255];
+/** Not exported, unlike its neighbours: white is only ever drawn by the
+ * banner in this module, and nothing outside it has asked for a paper
+ * colour. */
+const WHITE: [number, number, number] = [255, 255, 255];
 export const INK: [number, number, number] = [30, 40, 50];
 /** The two tones the feedback page gives its point lists (`is-success` /
  * `is-danger` in index.css). Taken from there rather than invented, so a
