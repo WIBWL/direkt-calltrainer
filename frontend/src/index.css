@@ -2880,6 +2880,12 @@ p.follow-up-error {
 
 /* --- Feedback page --- */
 
+/* Feedback needs more horizontal room than the live call because it combines
+   narrative feedback, paired findings and metric grids on the same page. */
+.feedback-page {
+  width: min(1040px, calc(100% - 32px));
+  padding: 48px 0 72px;
+}
 .feedback-intro {
   margin-bottom: 20px;
 }
@@ -2899,7 +2905,7 @@ p.follow-up-error {
    section — the two offers in the next-steps block are things you can pick,
    not sections of the page. */
 .feedback-section {
-  margin-bottom: 28px;
+  margin-bottom: 32px;
 }
 
 .feedback-section-head {
@@ -2997,8 +3003,8 @@ p.follow-up-error {
 .feedback-details {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 28px;
+  gap: 18px;
+  margin-bottom: 32px;
 }
 
 .feedback-details .feedback-section {
@@ -3452,6 +3458,10 @@ p.follow-up-error {
 }
 
 @media (max-width: 720px) {
+  .feedback-page {
+    padding: 32px 0 48px;
+  }
+
   .feedback-title {
     font-size: 36px;
   }

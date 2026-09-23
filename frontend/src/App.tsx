@@ -659,7 +659,11 @@ export default function App() {
 
   if (screen === "analysing") {
     return (
-      <AppLayout step="feedback" onHome={handleRestart}>
+      <AppLayout
+        step="feedback"
+        onHome={handleRestart}
+        pageClassName="feedback-page"
+      >
         <FeedbackWaiting state={feedbackState} onDone={handleAnalysed} />
       </AppLayout>
     );
@@ -670,7 +674,11 @@ export default function App() {
       // The brand in the header leaves for the same place the home button at
       // the foot does, and has to do the same thing to get there: these two
       // screens are a state under the training route, not a route of their own.
-      <AppLayout step="feedback" onHome={handleRestart}>
+      <AppLayout
+        step="feedback"
+        onHome={handleRestart}
+        pageClassName="feedback-page"
+        >
         <FeedbackScreen
           transcript={transcript}
           personaName={personaName}

@@ -123,7 +123,7 @@ export default function PastSessionView() {
   }
 
   return (
-    <AppLayout>
+    <AppLayout pageClassName="feedback-page">
       {topBackLink}
       <FeedbackScreen
         transcript={transcriptFromTurns(detail.turns)}
