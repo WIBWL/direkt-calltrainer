@@ -2024,7 +2024,6 @@ h2 {
 .mic-test-status {
   margin: 0;
   color: var(--color-text-muted);
-  font-family: var(--font-mono);
   font-size: 12px;
 }
 
