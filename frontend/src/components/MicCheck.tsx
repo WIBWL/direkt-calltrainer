@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { MicDevice } from "../hooks/useMicrophoneDevices";
 import { useMicrophoneLevel } from "../hooks/useMicrophoneLevel";
 
 const HEARD_THRESHOLD = 0.02;
+const REQUIRED_HEARD_DURATION_MS = 450;
 
 /** The states of the test, as one value: the pairs of booleans this replaces
  * could express combinations that never exist ("passed but not started"), and
@@ -44,18 +45,35 @@ export default function MicCheck({
   const { level, error, start, stop } = useMicrophoneLevel(deviceId);
 
   const [phase, setPhase] = useState<TestPhase>("idle");
+  const heardDurationRef = useRef(0);
+  const lastLevelTimestampRef = useRef<number | null>(null);
 
   // Scale the small RMS input range to a percentage for visual and accessible feedback.
   const meterPercentage = Math.min(Math.round(level * 400), 100);
 
   useEffect(() => {
-    if (phase !== "running" || level < HEARD_THRESHOLD) return;
+    if (phase !== "running") {
+      lastLevelTimestampRef.current = null;
+      return;
+    }
+
+    const now = performance.now();
+    const previousTimestamp = lastLevelTimestampRef.current;
+    lastLevelTimestampRef.current = now;
+
+    if (level >= HEARD_THRESHOLD && previousTimestamp !== null) {
+      heardDurationRef.current += Math.min(now - previousTimestamp, 100);
+    }
+
+    if (heardDurationRef.current < REQUIRED_HEARD_DURATION_MS) return;
 
     setPhase("passed");
     stop();
   }, [phase, level, stop]);
 
   const startTest = async () => {
+    heardDurationRef.current = 0;
+    lastLevelTimestampRef.current = null;
     setPhase("running");
     if (await start()) {
       onDevicesRefresh(); // labels are only real once permission was granted
