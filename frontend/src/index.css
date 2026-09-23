@@ -1751,6 +1751,15 @@ h2 {
   transition: background 0.2s, border-color 0.2s, color 0.2s;
 }
 
+/* The microphone icon reinforces the action without replacing the explicit
+   text label, so the control remains immediately understandable. */
+.mute-call-icon {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  margin-right: 8px;
+}
+
 .mute-call-button {
   border: 1px solid var(--color-blue-600);
   background: var(--color-surface);

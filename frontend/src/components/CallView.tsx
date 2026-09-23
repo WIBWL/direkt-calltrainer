@@ -141,9 +141,36 @@ export default function CallView({
               aria-pressed={isMicrophoneMuted}
               onClick={onToggleMicrophone}
             >
-              {isMicrophoneMuted
-                ? "Mikrofon einschalten"
-                : "Mikrofon stummschalten"}
+              {/* Decorative because the adjacent text already names the control. */}
+              <svg
+                className="mute-call-icon"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M18 11a6 6 0 0 1-12 0M12 17v4M9 21h6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+
+              <span>
+                {isMicrophoneMuted
+                  ? "Mikrofon einschalten"
+                  : "Mikrofon stummschalten"}
+              </span>
             </button>
 
             <button
