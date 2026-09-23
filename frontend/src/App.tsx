@@ -613,17 +613,19 @@ export default function App() {
 
   if (screen === "call") {
     // A real answer and not "an element exists": `CaseBriefPanel` renders
-    // nothing when there are no facts, and the page widens to two columns on
-    // this, so asking the element would leave an empty second column.
+    // nothing when there are no facts, so asking the element alone would not say
+    // whether there is supporting information to show during the call. A reverse
+    // keeps its briefing beside the call; ordinary case facts follow below it.
     const hasBrief = committed?.reverse === true || Boolean(committedCase?.facts.trim());
+    const briefBesideCall = committed?.reverse === true;
     const brief = hasBrief ? briefPanel("call") : null;
     return (
       <AppLayout
         step="call"
         navigationLocked
-        // Wider only while a briefing is beside the call: the 800px column is
-        // right for a screen whose whole content is one animation.
-        pageClassName={hasBrief ? "call-page call-page-wide" : "call-page"}
+        // Wider only while a reverse briefing is beside the call. Ordinary case
+        // facts follow below the live conversation and keep the standard call width.
+        pageClassName={briefBesideCall ? "call-page call-page-wide" : "call-page"}
       >
         <CallView
           personaName={personaName}
@@ -642,6 +644,7 @@ export default function App() {
           onToggleMicrophone={handleToggleMicrophone}
           onEndCall={call.endCall}
           brief={brief}
+          briefBesideCall={briefBesideCall}
         />
       </AppLayout>
     );

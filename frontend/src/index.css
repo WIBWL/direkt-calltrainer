@@ -2777,10 +2777,9 @@ p.follow-up-error {
   white-space: pre-line;
 }
 
-/* Beside the animation, with no scroll box of its own -- a fact hidden behind
-   a gesture is a fact not found, which is the one thing that must not happen
-   mid-call. Below the two-column breakpoint it goes back to being a block
-   under the call. */
+/* Shown below the live conversation with no scroll box of its own -- a fact
+   hidden behind a gesture is a fact not found, which is the one thing that
+   must not happen mid-call. */
 .case-brief-call {
   margin: 0 auto;
   background: var(--color-surface);

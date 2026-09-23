@@ -11,8 +11,8 @@ import ScenarioBriefing from "./ScenarioBriefing";
  * is `call_goal`, which is the answer key.
  *
  * Two variants, like `ReverseBriefPanel`: "prepare" is the screen between the
- * microphone check and the ringing phone and carries both halves; "call" sits
- * beside the state animation and carries the *facts* alone, since what one
+ * microphone check and the ringing phone and carries both halves; "call"
+ * follows the live conversation and carries the *facts* alone, since what one
  * reaches back for mid-call is a number, a date or a name.
  *
  * The "call" variant is the same deliberate exception to ADR 0033 that ADR 0070

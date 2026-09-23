@@ -19,11 +19,14 @@ interface CallViewProps {
   error: string | null;
   onToggleMicrophone: () => void;
   onEndCall: () => void;
-  /** The panel beside the call — a reverse's briefing (ADR 0070) or an
-   * ordinary call's facts — or null. Passed in rather than fetched here: this
-   * screen stays presentational, and the panel is the one the briefing screen
-   * already showed. */
+  /** Supporting information shown during the call — a reverse's briefing
+   * (ADR 0070) or an ordinary call's facts — or null. Passed in rather than
+   * fetched here so this screen stays presentational. */
   brief?: ReactNode;
+
+  /** A reverse briefing remains beside the conversation because the trainee
+   * actively works from it. Ordinary case facts follow below the call instead. */
+  briefBesideCall?: boolean;
 }
 
 /**
@@ -46,6 +49,7 @@ export default function CallView({
   onToggleMicrophone,
   onEndCall,
   brief = null,
+  briefBesideCall = false,
 }: CallViewProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   // The end-call button asks first. A call cannot be resumed once it is over —
@@ -83,9 +87,15 @@ export default function CallView({
           in the panel itself. It also means a random Scenario's case cannot
           leak here by construction rather than by a condition (F-62). */}
 
-      {/* One column, or two once there is a briefing to keep in view: reading
-          it must not mean scrolling the animation off the screen (ADR 0070). */}
-      <div className={cx("call-layout", brief ? "call-layout-with-brief" : null)}>
+      {/* Ordinary case facts follow the conversation so the live call keeps visual
+          priority. A reverse briefing remains beside it because the trainee works
+          from that information throughout the conversation (ADR 0070). */}
+      <div
+        className={cx(
+          "call-layout",
+          briefBesideCall ? "call-layout-with-brief" : null,
+        )}
+      >
         <section className="call-panel" aria-labelledby="call-persona-name">
           <div className="call-persona">
             <PersonaAvatar
