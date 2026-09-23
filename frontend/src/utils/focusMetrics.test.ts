@@ -68,7 +68,7 @@ describe("the catalogue's shape", () => {
     const kinds = Object.values(FOCUS_BACKING).map((backing) => backing.kind);
     const count = (kind: string) => kinds.filter((k) => k === kind).length;
 
-    // docs/dashboard-konzept.md section 4.2. Pinned as a count because the
+    // docs/dashboard-concept.md section 4.2. Pinned as a count because the
     // honest answer differs per goal, and a goal quietly moving between
     // buckets is what changes what the screen claims.
     expect(count("metric")).toBe(8);

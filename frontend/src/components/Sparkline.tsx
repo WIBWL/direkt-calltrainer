@@ -7,7 +7,7 @@ import { formatDate } from "../utils/time";
 
 /**
  * One metric over the trainings in the period (F-13,
- * docs/dashboard-konzept.md).
+ * docs/dashboard-concept.md).
  *
  * The user's own values as a line over their own usual range (median widened by
  * their own spread). No target band, no colour meaning good or bad, no arrow,

@@ -14,7 +14,7 @@ import SegmentComparison from "./SegmentComparison";
 
 /**
  * One focus goal across the trainings, the dashboard's second level for the
- * other half of the overview (docs/dashboard-konzept.md, section 7, which puts
+ * other half of the overview (docs/dashboard-concept.md, section 7, which puts
  * a metric and a Focus Goal on the same level here).
  *
  * The tiles in block B were a dead end until this existed, and for the goals

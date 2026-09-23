@@ -8,7 +8,7 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 
 | Wert | Bedeutung |
 |---|---|
-| `R-xx` | aus einer Erhebung abgeleitet, siehe initial_requirements.md |
+| `R-xx` | aus einer Erhebung abgeleitet, siehe initial-requirements.md |
 | `Q-xx` | dient einem Qualitätsziel, siehe arc42 Kapitel 10 |
 | `C-xx` | folgt aus einer Randbedingung, siehe arc42 Kapitel 2 |
 | `Systementwurf` | folgt aus dem Systementwurf, ohne Beleg aus einer Erhebung |

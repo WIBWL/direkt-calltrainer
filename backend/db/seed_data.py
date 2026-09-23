@@ -1618,7 +1618,7 @@ FOCUS_GOALS = [
     {
         "id": "articulation",
         # `interpretive` and not `mixed`: no measurement is planned for this one
-        # any more (docs/dashboard-konzept.md, section 4.2). Indistinctness sits
+        # any more (docs/dashboard-concept.md, section 4.2). Indistinctness sits
         # in the spectral sharpness of the signal, which is the microphone and
         # the distance to it as much as the speaker -- the argument that retired
         # the loudness goal, and harder here, because there is no comparison

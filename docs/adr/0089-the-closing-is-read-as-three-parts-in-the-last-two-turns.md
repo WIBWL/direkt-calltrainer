@@ -8,7 +8,7 @@ Accepted. Introduces the `closing` metric (Gesprächsabschluss, F-65) and gives 
 
 The catalogue text for the goal is as specific as the opening's: "Ein guter Abschluss sichert Verbindlichkeit. Er fasst kurz zusammen, hält eine klare Vereinbarung fest und verabschiedet freundlich. Offene oder abrupte Enden hinterlassen Unsicherheit." Three parts, named in the text the user picked the goal by.
 
-Until now the goal was one of the four with no measurement at all (ADR 0080, docs/dashboard-konzept.md section 4.2). What it had was the wrap-up's prose and F-42's phase paragraph — which says whether the *register* moved with the phase of the call, not whether anything was settled at its end.
+Until now the goal was one of the four with no measurement at all (ADR 0080, docs/dashboard-concept.md section 4.2). What it had was the wrap-up's prose and F-42's phase paragraph — which says whether the *register* moved with the phase of the call, not whether anything was settled at its end.
 
 Unlike the articulation, which stays unmeasured on purpose (three independent reasons, section 4.2), nothing about the closing is out of reach: whether a recap was given and a next step named is in the words, and the words are stored.
 

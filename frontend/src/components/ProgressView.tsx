@@ -35,7 +35,7 @@ import Sparkline from "./Sparkline";
 import VarietyGrid from "./VarietyGrid";
 
 /**
- * The progress dashboard (F-13, docs/dashboard-konzept.md).
+ * The progress dashboard (F-13, docs/dashboard-concept.md).
  *
  * Top to bottom: what I did (the counted figures, calendar and variety grid,
  * over every stored training), the period switch, then Hattie & Timperley's
@@ -43,7 +43,7 @@ import VarietyGrid from "./VarietyGrid";
  * returning to with the one thing to practise beside it, and every metric over
  * time — read over the trainings the switch selects. The block that leads back
  * into training stays high: a dashboard whose only way out is at the foot of
- * its longest page ends in looking (dashboard-konzept.md section 3).
+ * its longest page ends in looking (dashboard-concept.md section 3).
  *
  * The switch sits *under* the activity block deliberately: everything above it
  * counts every stored training, everything below is read over the selection, so
@@ -309,7 +309,7 @@ export default function ProgressView() {
  * The dashboard is what somebody takes into a conversation with a trainer or an
  * instructor, and the only way to take it was a screenshot per block. Built in
  * the browser on the numbers the page already holds: a server route would be a
- * second path to the same figures, which `docs/dashboard-konzept.md` section 9
+ * second path to the same figures, which `docs/dashboard-concept.md` section 9
  * rules out by name.
  *
  * Styled as the feedback screen's actions row, and sharing its classes rather
@@ -372,7 +372,7 @@ function Frame({ children }: { children: ReactNode }) {
       {/* What the page is, first, and that nothing on it is a grade, in one
           sentence -- that half cannot move behind the "i": a reader who is not
           told that no figure is judged fills the gap in and assumes higher is
-          better (dashboard-konzept.md section 2). The reason why belongs
+          better (dashboard-concept.md section 2). The reason why belongs
           behind it. */}
       <p className="page-lead">
         Woran Sie arbeiten, was Ihre Auswertungen wiederholt nennen und wie Sie über Ihre

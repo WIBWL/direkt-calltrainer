@@ -11,7 +11,7 @@ export const ROUTES = {
   training: "/",
   /** Account, privacy notice, deletion path and the history (F-31, F-49, F-48). */
   profile: "/profil",
-  /** The progress dashboard (F-13, docs/dashboard-konzept.md). */
+  /** The progress dashboard (F-13, docs/dashboard-concept.md). */
   progress: "/fortschritt",
   /** One metric over time, the dashboard's second level. A route rather than
    *  a panel, so the view can be linked and Back is the browser's. */

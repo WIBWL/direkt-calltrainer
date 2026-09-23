@@ -48,7 +48,7 @@ import { formatDate } from "./time";
  *
  * Built in the browser, from the numbers the page already holds. A server route
  * would be a second path to the same figures, which is the one thing
- * `docs/dashboard-konzept.md` section 9 rules out by name; jsPDF and the fonts
+ * `docs/dashboard-concept.md` section 9 rules out by name; jsPDF and the fonts
  * are fetched on the press, exactly as the feedback file's are.
  *
  * The page chrome is shared with that file (`pdfDocument.ts`), so the two
