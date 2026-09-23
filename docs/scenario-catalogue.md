@@ -366,7 +366,7 @@ Alle Szenarien dieses Abschnitts sind **Vorschläge**. Für Profil B fehlt eine 
 
 > **Kein eigenes Szenario.** Die Sprache hängt seit ADR 0043 an der **Persona**, nicht am Szenario — Szenarien sind sprachneutral. „Englisches Szenario" ist damit keine Kategorie: Man wählt eine englischsprachige Persona zu einem beliebigen Szenario. S-14 bleibt als *Hinweis* im Katalog stehen, wird aber **nicht** als eigener Datensatz angelegt.
 >
-> **C-01 verbietet Englisch nicht — im Gegenteil.** Die Randbedingung heißt „Sprache konfigurierbar" und führt Englisch ausdrücklich als belegt (R-35). Die frühere Beschränkung auf Deutsch stand in **ADR 0006, und die ist abgelöst** (0006 → 0022 → 0043). Es gibt bereits eine englischsprachige Persona und ein englisches Language Pack. Die verbleibende Einschränkung ist rein technisch: Der DiReKT-Fallback hält nur deutsche Stimmen vor, eine englische Persona hängt damit an der Verfügbarkeit des primären TTS-Backends.
+> **C-01 verbietet Englisch nicht — im Gegenteil.** Die Randbedingung heißt „Sprache konfigurierbar" und führt Englisch ausdrücklich als belegt (R-35). Die frühere Beschränkung auf Deutsch stand in **ADR 0006, und die ist abgelöst** (0006 → 0022 → 0043). Es gibt bereits zwei englischsprachige Personas und ein englisches Language Pack. Eine technische Einschränkung bleibt nicht: Seit ADR 0103 spricht jede Persona über KugelAudio und über nichts anderes, deutsch wie englisch — die frühere Rückfallebene, die nur deutsche Stimmen vorhielt, ist entfernt.
 >
 > Ein Feature „Training auf Englisch" existiert nicht; die in einer früheren Fassung genannte ID **F-25 gibt es im Feature-Katalog nicht**. Die Sprache wird über C-01 und R-35 geführt, die Umschaltung der *Oberfläche* getrennt davon über F-56.
 
@@ -434,7 +434,7 @@ Das Verhältnis ist bei den **Szenarien gut und bei den Personas schlecht**. Gen
 | Eintrag | Blockiert durch |
 |---|---|
 | S-06 | sitzungsübergreifendes Gedächtnis (F-23, COULD, nicht gebaut) |
-| S-14 | **nicht** durch C-01 — dort ist Englisch belegt (R-35). Einzige echte Hürde: der DiReKT-Fallback hält keine englischen Stimmen vor |
+| S-14 | **nicht** durch C-01 — dort ist Englisch belegt (R-35); seit ADR 0043 hängt die Sprache an der Persona, also ist S-14 kein eigenes Szenario |
 | P-07 | Auslegung von R-04 (siehe 7) |
 
 ---

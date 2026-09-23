@@ -1,6 +1,7 @@
 import { MicVAD } from "@ricky0123/vad-web";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { microphoneErrorMessage } from "../utils/microphoneError";
 import { encodeWav } from "../utils/wav";
 
 const SAMPLE_RATE = 16000;
@@ -95,8 +96,12 @@ export function useMicrophoneVAD(
         .then((vad) => {
           vadRef.current = vad;
         })
-        .catch((e: Error) => {
-          setMicError(e.message);
+        .catch((e: unknown) => {
+          // A refused microphone reads as it does on the microphone check;
+          // anything else here is the voice detection failing to start.
+          setMicError(
+            microphoneErrorMessage(e, "Die Spracherkennung konnte nicht gestartet werden."),
+          );
         });
     }
     await initRef.current;

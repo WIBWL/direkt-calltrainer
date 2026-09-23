@@ -7,6 +7,10 @@ import CallAnimation from "./CallAnimation";
 import ConfirmDialog from "./ConfirmDialog";
 import PersonaAvatar from "./PersonaAvatar";
 
+/** A reverse's briefing stays beside the call, since the trainee works from
+ * it throughout; an ordinary call's facts follow below it. */
+export type BriefPlacement = "beside" | "below";
+
 interface CallViewProps {
   personaName: string;
   personaRole: string;
@@ -20,13 +24,10 @@ interface CallViewProps {
   onToggleMicrophone: () => void;
   onEndCall: () => void;
   /** Supporting information shown during the call — a reverse's briefing
-   * (ADR 0070) or an ordinary call's facts — or null. Passed in rather than
-   * fetched here so this screen stays presentational. */
-  brief?: ReactNode;
-
-  /** A reverse briefing remains beside the conversation because the trainee
-   * actively works from it. Ordinary case facts follow below the call instead. */
-  briefBesideCall?: boolean;
+   * (ADR 0070) or an ordinary call's facts — with where it goes, or null.
+   * Passed in rather than fetched here so this screen stays presentational;
+   * one prop so the panel and its position cannot disagree. */
+  brief?: { content: ReactNode; placement: BriefPlacement } | null;
 }
 
 /**
@@ -49,7 +50,6 @@ export default function CallView({
   onToggleMicrophone,
   onEndCall,
   brief = null,
-  briefBesideCall = false,
 }: CallViewProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   // The end-call button asks first. A call cannot be resumed once it is over —
@@ -93,7 +93,7 @@ export default function CallView({
       <div
         className={cx(
           "call-layout",
-          briefBesideCall ? "call-layout-with-brief" : null,
+          brief?.placement === "beside" ? "call-layout-with-brief" : null,
         )}
       >
         <section className="call-panel" aria-labelledby="call-persona-name">
@@ -196,7 +196,7 @@ export default function CallView({
           </div>
         </section>
 
-        {brief}
+        {brief?.content}
       </div>
 
       {/* Its own scrim rather than the panel's: the question is about the call

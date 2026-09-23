@@ -77,7 +77,9 @@ export default function MicCheck({
     lastLevelTimestampRef.current = null;
     setPhase("starting");
 
-    if (await start()) {
+    const opened = await start();
+    if (opened === null) return; // a device change restarted the test meanwhile
+    if (opened) {
       onDevicesRefresh(); // labels are only real once permission was granted
       setPhase("running");
     } else {

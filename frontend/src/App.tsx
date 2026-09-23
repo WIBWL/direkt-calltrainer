@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { apiFetch } from "./api";
 import AppLayout from "./components/AppLayout";
-import CallView from "./components/CallView";
+import CallView, { type BriefPlacement } from "./components/CallView";
 import CaseBriefPanel from "./components/CaseBriefPanel";
 import DiceRoll from "./components/DiceRoll";
 import IncomingCall from "./components/IncomingCall";
@@ -615,17 +615,21 @@ export default function App() {
     // A real answer and not "an element exists": `CaseBriefPanel` renders
     // nothing when there are no facts, so asking the element alone would not say
     // whether there is supporting information to show during the call. A reverse
-    // keeps its briefing beside the call; ordinary case facts follow below it.
-    const hasBrief = committed?.reverse === true || Boolean(committedCase?.facts.trim());
-    const briefBesideCall = committed?.reverse === true;
-    const brief = hasBrief ? briefPanel("call") : null;
+    // keeps its briefing beside the call, because the trainee works from it
+    // throughout; ordinary case facts follow below it, so the live call keeps
+    // visual priority.
+    const briefPlacement: BriefPlacement | null = committed?.reverse
+      ? "beside"
+      : committedCase?.facts.trim()
+        ? "below"
+        : null;
     return (
       <AppLayout
         step="call"
         navigationLocked
-        // Wider only while a reverse briefing is beside the call. Ordinary case
-        // facts follow below the live conversation and keep the standard call width.
-        pageClassName={briefBesideCall ? "call-page call-page-wide" : "call-page"}
+        // Wider only while a briefing is beside the call: facts below it keep
+        // the standard call width.
+        pageClassName={briefPlacement === "beside" ? "call-page call-page-wide" : "call-page"}
       >
         <CallView
           personaName={personaName}
@@ -643,8 +647,11 @@ export default function App() {
           error={call.error ?? vad.micError}
           onToggleMicrophone={handleToggleMicrophone}
           onEndCall={call.endCall}
-          brief={brief}
-          briefBesideCall={briefBesideCall}
+          brief={
+            briefPlacement
+              ? { content: briefPanel("call"), placement: briefPlacement }
+              : null
+          }
         />
       </AppLayout>
     );
