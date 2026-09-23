@@ -77,6 +77,10 @@ export function useMicrophoneLevel(deviceId: string | null) {
       const ctx = new AudioContext();
       audioContextRef.current = ctx;
 
+      if (ctx.state === "suspended") {
+        await ctx.resume();
+      }
+
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 1024;
       ctx.createMediaStreamSource(stream).connect(analyser);

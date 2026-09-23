@@ -8,10 +8,11 @@ const REQUIRED_HEARD_DURATION_MS = 450;
 
 /** The states of the test, as one value: the pairs of booleans this replaces
  * could express combinations that never exist ("passed but not started"), and
- * every panel below had to spell out which pair it meant. "failed" is a state
- * of its own because a microphone that never opened has no level to wait for —
- * without it the running panel waits forever. */
-type TestPhase = "idle" | "running" | "failed" | "passed";
+ * every panel below had to spell out which pair it meant. "starting" keeps the
+ * microphone initialization separate from active level detection, while
+ * "failed" is a state of its own because a microphone that never opened has no
+ * level to wait for — without it the running panel waits forever. */
+type TestPhase = "idle" | "starting" | "running" | "failed" | "passed";
 
 interface MicCheckProps {
   /** null = browser default. */
@@ -74,9 +75,11 @@ export default function MicCheck({
   const startTest = async () => {
     heardDurationRef.current = 0;
     lastLevelTimestampRef.current = null;
-    setPhase("running");
+    setPhase("starting");
+
     if (await start()) {
       onDevicesRefresh(); // labels are only real once permission was granted
+      setPhase("running");
     } else {
       setPhase("failed");
     }
@@ -85,7 +88,7 @@ export default function MicCheck({
   // Picking a different device while the meter is live must not keep the old
   // stream open — restart against the new one instead of silently ignoring it.
   useEffect(() => {
-    if (phase === "running") void startTest();
+    if (phase === "starting" || phase === "running") void startTest();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a deviceId change (not every re-render) should restart the running test
   }, [deviceId]);
 
@@ -142,12 +145,17 @@ export default function MicCheck({
           </div>
         )}
 
-        {phase === "running" && (
+        {(phase === "starting" || phase === "running") && (
           <div className="mic-test-panel">
             <div className="mic-test-panel-copy">
-              <h3>Mikrofontest läuft</h3>
+              <h3>
+                {phase === "starting" ? "Mikrofon wird vorbereitet" : "Mikrofontest läuft"}
+              </h3>
+
               <p className="mic-check-hint">
-                Sagen Sie ein paar Worte, um Ihr Mikrofon zu testen.
+                {phase === "starting"
+                  ? "Das Mikrofon wird initialisiert. Einen Moment bitte."
+                  : "Sagen Sie ein paar Worte, um Ihr Mikrofon zu testen."}
               </p>
             </div>
 
@@ -163,7 +171,7 @@ export default function MicCheck({
             </div>
 
             <p className="mic-test-status" role="status" aria-live="polite">
-              Warte auf Audiosignal …
+              {phase === "starting" ? "Mikrofon wird initialisiert …" : "Warte auf Audiosignal …"}
             </p>
           </div>
         )}
