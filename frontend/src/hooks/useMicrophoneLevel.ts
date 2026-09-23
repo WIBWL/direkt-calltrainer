@@ -2,6 +2,36 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAudioLevelMeter } from "./useAudioLevelMeter";
 
+/** Converts browser microphone errors into stable German user-facing messages.
+ * Browser-provided error text is intentionally not exposed because it differs
+ * between browsers and may not match the application's language. */
+function microphoneErrorMessage(error: unknown): string {
+  if (!(error instanceof DOMException)) {
+    return "Das Mikrofon konnte nicht geöffnet werden.";
+  }
+
+  switch (error.name) {
+    case "NotAllowedError":
+    case "SecurityError":
+      return "Der Mikrofonzugriff wurde blockiert.";
+
+    case "NotFoundError":
+      return "Es wurde kein verfügbares Mikrofon gefunden.";
+
+    case "NotReadableError":
+      return "Das Mikrofon kann derzeit nicht verwendet werden. Möglicherweise wird es von einer anderen Anwendung verwendet.";
+
+    case "OverconstrainedError":
+      return "Das ausgewählte Mikrofon ist nicht mehr verfügbar.";
+
+    case "AbortError":
+      return "Der Mikrofonzugriff wurde unterbrochen. Starten Sie den Test erneut.";
+
+    default:
+      return "Das Mikrofon konnte nicht geöffnet werden.";
+  }
+}
+
 /**
  * Measures the input level of the active microphone independently of the
  * conversation VAD used during a real training session. The metering itself
@@ -55,7 +85,7 @@ export function useMicrophoneLevel(deviceId: string | null) {
       return true;
     } catch (e) {
       stop(); // the failure may have come after getUserMedia handed over a live stream
-      setError(e instanceof Error ? e.message : String(e));
+      setError(microphoneErrorMessage(e));
       return false;
     }
   }, [deviceId, startMeter, stop]);
