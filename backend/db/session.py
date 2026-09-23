@@ -22,6 +22,18 @@ from sqlalchemy.orm import sessionmaker
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = "5432"
 
+# The role and database the `db` service creates (compose.yaml names the same
+# two). Nobody changes them between development and deployment, so they are not
+# in .env; POSTGRES_USER/POSTGRES_DB still override them, which is how the tests
+# and scripts/stress_db.py aim the app at a throwaway database.
+#
+# Why "trainer" and not the image's own default "postgres": every existing
+# volume was created with this name, and Postgres applies the name only when a
+# volume is first initialised -- switching would point the app at a database
+# that does not exist in any of them.
+DEFAULT_USER = "trainer"
+DEFAULT_DATABASE = "trainer"
+
 # Any process that provisions the database takes this lock first, so two of
 # them starting together serialise instead of racing: the app scaled past one
 # instance, or an instance booting while someone runs
@@ -40,7 +52,8 @@ CONNECT_TIMEOUT_SECONDS = 5
 
 
 def build_database_url() -> URL:
-    """Assembles the connection URL from the POSTGRES_* settings.
+    """Assembles the connection URL from the POSTGRES_* settings. Only the
+    password is required; everything else has a default above.
 
     Kept out of the environment as a ready-made DATABASE_URL: it would only
     repeat user, password and database name that are already configured
@@ -53,26 +66,21 @@ def build_database_url() -> URL:
     Read here rather than at import time so that importing this module -- which
     models.py and the migrations do -- never requires an environment.
     """
-    missing = [
-        k for k in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB")
-        if not os.environ.get(k)
-    ]
-    if missing:
+    if not os.environ.get("POSTGRES_PASSWORD"):
         raise RuntimeError(
-            f"Database settings missing: {', '.join(missing)}. Inside the container "
-            "they come from the env_file (.env); locally, call load_dotenv() first."
+            "Database settings missing: POSTGRES_PASSWORD. Inside the container "
+            "it comes from the env_file (.env); locally, call load_dotenv() first."
         )
     return URL.create(
         "postgresql+psycopg",
-        username=os.environ["POSTGRES_USER"],
-        password=os.environ["POSTGRES_PASSWORD"],
         # `or`, not a get() default: an .env that names the variable without
         # a value ("POSTGRES_PORT=") yields "", which is not missing as far as
-        # get() is concerned -- and int("") then raises where the check above
-        # would have said what was wrong.
+        # get() is concerned -- and int("") would then raise.
+        username=os.environ.get("POSTGRES_USER") or DEFAULT_USER,
+        password=os.environ["POSTGRES_PASSWORD"],
         host=os.environ.get("POSTGRES_HOST") or DEFAULT_HOST,
         port=int(os.environ.get("POSTGRES_PORT") or DEFAULT_PORT),
-        database=os.environ["POSTGRES_DB"],
+        database=os.environ.get("POSTGRES_DB") or DEFAULT_DATABASE,
     )
 
 

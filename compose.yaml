@@ -16,10 +16,9 @@ services:
       platforms:
         - linux/amd64
       args:
-        # The SPA needs these at `npm run build` time (see Dockerfile). Same
-        # names the backend reads below, from the same .env line.
+        # The SPA needs the issuer at `npm run build` time (see Dockerfile).
+        # Same name the backend reads below, from the same .env line.
         OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:18081/realms/direkt}
-        OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-calltrainer-frontend}
     env_file:
       - .env
     environment:
@@ -159,9 +158,14 @@ services:
     # exactly how a dead worker went unnoticed for hours.
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
+      # Role and database name are fixed, the same as DEFAULT_USER and
+      # DEFAULT_DATABASE in backend/db/session.py; only the password is a
+      # setting. Postgres applies all three only when the volume is created,
+      # which is why this stays "trainer" rather than the image's default
+      # "postgres": every existing volume already carries this name.
+      POSTGRES_USER: trainer
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: trainer
     ports:
       # Loopback only. The application never uses this: app and worker reach
       # the database as `db` over the compose network. It is published for
@@ -173,14 +177,14 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U trainer -d trainer"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   # Local identity provider (ADR 0009). `start-dev` keeps realms in an embedded
   # H2 file, so no DB of its own. `--import-realm` reads keycloak/direkt-realm.json
-  # at boot: the calltrainer-frontend client and the dev users
+  # at boot: the direkt-calltrainer client and the dev users
   # niklas/mathias/eberhard (password = username). Import is SKIPPED if the
   # realm already exists, so after editing the JSON:
   # `docker compose down -v && docker compose up`.

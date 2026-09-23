@@ -53,6 +53,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # scripts/seed_reference_data.py.
 # pylint: disable=wrong-import-position,import-outside-toplevel
 from backend import consent, library  # noqa: E402
+from backend.db.session import DEFAULT_DATABASE, DEFAULT_USER  # noqa: E402
 from backend.feedback.acoustics import Pause  # noqa: E402
 from backend.session.models import Turn  # noqa: E402
 
@@ -72,17 +73,16 @@ _DB_SETTINGS = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
 
 def server_url() -> URL:
     """The configured database server, from .env."""
-    missing = [k for k in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB")
-               if not _ENV.get(k)]
+    missing = [k for k in ("POSTGRES_PASSWORD",) if not _ENV.get(k)]
     if missing:
         sys.exit(f"Missing from .env: {', '.join(missing)}")
     return URL.create(
         "postgresql+psycopg",
-        username=_ENV["POSTGRES_USER"],
+        username=_ENV.get("POSTGRES_USER") or DEFAULT_USER,
         password=_ENV["POSTGRES_PASSWORD"],
         host=_ENV.get("POSTGRES_HOST") or "localhost",
         port=int(_ENV.get("POSTGRES_PORT") or 5432),
-        database=_ENV["POSTGRES_DB"],
+        database=_ENV.get("POSTGRES_DB") or DEFAULT_DATABASE,
     )
 
 

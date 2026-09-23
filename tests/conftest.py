@@ -87,7 +87,7 @@ from backend.scenarios import Scenario  # noqa: E402
 # objects the app passes around, and both names would otherwise collide here.
 from backend.db import models as db_models  # noqa: E402
 from backend.db.seed_data import FOCUS_GOALS  # noqa: E402
-from backend.db.session import reset_engine, session_scope  # noqa: E402
+from backend.db.session import DEFAULT_DATABASE, DEFAULT_USER, reset_engine, session_scope  # noqa: E402
 from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted  # noqa: E402
 from backend.session.models import Turn  # noqa: E402
 
@@ -405,18 +405,17 @@ def _render(url: URL) -> str:
 
 def _server_url() -> URL:
     """The configured database server, or a skip if .env is incomplete."""
-    missing = [k for k in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB")
-               if not _ENV.get(k)]
+    missing = [k for k in ("POSTGRES_PASSWORD",) if not _ENV.get(k)]
     if missing:
         # `return` only so every path returns an expression: skip() raises.
         return pytest.skip(f"Database settings missing from .env: {', '.join(missing)}")
     return URL.create(
         "postgresql+psycopg",
-        username=_ENV["POSTGRES_USER"],
+        username=_ENV.get("POSTGRES_USER") or DEFAULT_USER,
         password=_ENV["POSTGRES_PASSWORD"],
         host=_loopback(_ENV.get("POSTGRES_HOST") or "localhost"),
         port=int(_ENV.get("POSTGRES_PORT") or 5432),
-        database=_ENV["POSTGRES_DB"],
+        database=_ENV.get("POSTGRES_DB") or DEFAULT_DATABASE,
     )
 
 

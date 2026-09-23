@@ -1,0 +1,94 @@
+# Production override. Used on top of compose.yaml, never on its own:
+#
+#   docker compose -f compose.yaml -f compose.prod.yaml up -d --build
+#
+# compose.yaml stays the description of local development; this file changes
+# only what a deployment must not inherit from it -- the local Keycloak and the
+# localhost issuer, the app published on every interface, plain HTTP -- and
+# puts Caddy in front for TLS. The steps around it are in docs/deployment.md.
+#
+# `!reset` and `!override` need Docker Compose 2.24.4 or later. Without them a
+# list or map here would be *merged* into compose.yaml's, which is exactly
+# wrong for ports and depends_on.
+
+x-logging: &logging
+  # Docker's own json-file log grows without limit unless told otherwise.
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  app:
+    build:
+      args:
+        # Baked into the SPA at build time. `:?` makes the build fail outright
+        # instead of silently falling back to compose.yaml's localhost default,
+        # which would produce an image whose login points at nothing.
+        OIDC_ISSUER: ${OIDC_ISSUER:?set OIDC_ISSUER in .env}
+    environment:
+      # compose.yaml pins both to the local Keycloak, and `environment` wins
+      # over `env_file` -- so the .env value would never arrive without this.
+      OIDC_ISSUER: ${OIDC_ISSUER:?set OIDC_ISSUER in .env}
+      # Empty means unset (backend/auth.py): the keys are found through the
+      # issuer's own discovery document, which the container can reach.
+      OIDC_JWKS_URL: ""
+    # Not published at all: Caddy reaches the app over the compose network.
+    ports: !reset []
+    # The deployed Keycloak is external, so the local one is not a dependency.
+    depends_on: !override
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    develop: !reset {}
+    logging: *logging
+
+  worker:
+    develop: !reset {}
+    logging: *logging
+
+  redis:
+    logging: *logging
+
+  db:
+    # Nothing on the host needs it; `docker compose exec db psql` still works.
+    ports: !reset []
+    logging: *logging
+
+  # The local development Keycloak (start-dev, admin/admin, issuer pinned to
+  # localhost) is never started here. The deployment uses the realm at
+  # OIDC_ISSUER. Starting it anyway takes `--profile local-keycloak`.
+  keycloak:
+    profiles: ["local-keycloak"]
+
+  # TLS termination and the only thing listening on the network. Caddy fetches
+  # and renews the certificate itself, passes the WebSocket upgrade through
+  # without configuration and sets no read timeout or body size limit, so a
+  # long call and a 20 MB PDF upload both need nothing extra. The browser only
+  # grants the microphone over HTTPS, so this is not optional.
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      CALLTRAINER_DOMAIN: ${CALLTRAINER_DOMAIN:?set CALLTRAINER_DOMAIN in .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    logging: *logging
+
+volumes:
+  # Holds the TLS certificates and the ACME account. Losing it means asking
+  # Let's Encrypt again, which is rate-limited per domain.
+  caddy-data:
+    name: direkt-calltrainer-caddy-data
+  caddy-config:
+    name: direkt-calltrainer-caddy-config

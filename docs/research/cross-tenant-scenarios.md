@@ -71,7 +71,7 @@ Keycloak 26 provides **Organizations**: multiple tenants *inside* one realm, eac
 with its own members, invitation flows, and optionally its own identity provider.
 
 - One Organization per company in the `direkt` realm (`solox`, `appollo`).
-- Assign the optional `organization` client scope to `calltrainer-frontend`; the
+- Assign the optional `organization` client scope to `direkt-calltrainer`; the
   access token then carries an `organization` claim, shaped
   `"organization": { "solox": {} }` (alias → attributes).
 - The backend reads the organization from the JWT — **exactly the way it reads

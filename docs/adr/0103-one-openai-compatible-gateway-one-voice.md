@@ -35,3 +35,7 @@ The quality ceiling is the gateway's again, and `docs/research/model-parameters.
 Losing KugelAudio now breaks calls instead of degrading them quietly. That is the point: the boot check says `TTS FAILED (kugel-3)`, `scripts/check_backends.py` exits non-zero, and a Turn that cannot be synthesised ends as `tts_failed` rather than being spoken in a voice the User did not choose. The operational cost is real and is accepted — the alternative was a pilot that ran all day in the fallback voice without anyone noticing, which is what happened.
 
 `ADR 0017` still holds and is no longer strained: there is no provider abstraction, no registry, no runtime selection, and now no boolean either.
+
+## Status update (September 2026)
+
+`OIDC_CLIENT_ID` is gone from `.env` again: the client is named `direkt-calltrainer` in every realm, so the SPA carries it as a constant in `frontend/src/oidcConfig.ts`. Only `OIDC_ISSUER` is still read through the widened `envPrefix`. The model names stay in `.env` as decided above.

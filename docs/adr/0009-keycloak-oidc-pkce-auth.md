@@ -31,3 +31,7 @@ Built for this stack (FastAPI) and its WebSocket data path.
 **Local dev.** `compose.yaml` runs its own Keycloak (`start-dev --import-realm`, host port 18081, `KC_HOSTNAME` fixing the issuer). `KC_HOSTNAME`/`--hostname-strict=false` plus `OIDC_JWKS_URL` resolve the browser-vs-container host mismatch.
 
 **Out of scope, deliberately:** forwarding the JWT onward to the Data Platform (no such call exists yet); F-49's data-protection notice and the consent gate ADR 0034 ties to an identified user.
+
+## Status update (September 2026)
+
+The client and the audience are both named `direkt-calltrainer` now, replacing `calltrainer-frontend` and `calltrainer` above, so the application is referred to by one name in Keycloak. The decision itself is unchanged.
