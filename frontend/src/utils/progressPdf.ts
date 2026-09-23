@@ -19,11 +19,10 @@ import {
 import {
   MIN_SESSIONS_FOR_SERIES,
   activity,
-  durationSeries,
   formatBand,
   formatPoint,
   partsSummary,
-  toSeries,
+  selectionSeries,
   variety,
   type MetricSeries,
 } from "./progressStats";
@@ -112,10 +111,9 @@ export async function buildProgressPdf({
   const sheet = await openSheet("Ihr Fortschritt");
 
   const counts = activity(sessions);
-  const duration = durationSeries(selected);
-  const series = [...toSeries(selected), ...(duration ? [duration] : [])].filter((s) =>
-    showsInOverview(s.key),
-  );
+  // The same list the screen reads (`selectionSeries`), so the file cannot
+  // show a row the page does not, or miss one it does.
+  const series = selectionSeries(selected).filter((s) => showsInOverview(s.key));
 
   sheet.facts([
     ["Ausgewertet", `${selected.length} von ${sessions.length}`],
