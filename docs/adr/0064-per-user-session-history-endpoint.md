@@ -48,7 +48,7 @@ Nothing here decides what the progress view may *say* about the values it plots.
 
 Since ADR 0080 every `feedback_point` carries the focus goal it is about, and the listing carries those tags as `feedback_goals`. They went on the wire without their text, on the reading of "it does not carry the wrap-up text" above.
 
-That reading is narrowed here: **a tagged point travels with the sentence it was written as.** The progress view's second level has to say what the wrap-ups wrote about a goal, not only how often they wrote it (`docs/dashboard-konzept.md`, section 7), and six of the fourteen focus goals have nothing else behind them at all — for them the counted mentions *are* the content, and a count with no way to read what was counted asks the user to take a number on trust.
+That reading is narrowed here: **a tagged point travels with the sentence it was written as.** The progress view's second level has to say what the wrap-ups wrote about a goal, not only how often they wrote it (`docs/dashboard-concept.md`, section 7), and six of the fourteen focus goals have nothing else behind them at all — for them the counted mentions *are* the content, and a count with no way to read what was counted asks the user to take a number on trust.
 
 The payload argument does not apply at this size. What the original decision keeps off the listing is `detail_json`, a sampled curve per metric per Session, which is three orders of magnitude larger than a tagged point and which no cross-Session view plots. A wrap-up carries a handful of points, each a sentence or two.
 

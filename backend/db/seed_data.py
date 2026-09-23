@@ -47,7 +47,8 @@ tables, so provision.py writes them straight through without mapping.
 # the transcript contradicting the label above it.
 # "avatar_url" is the path the Persona's portrait is served from. The images
 # are ordinary frontend assets in `frontend/public/personas/`, named after the
-# Persona's "id"; only the pairing lives in the table. A Persona seeded without
+# Persona's "name" as first-last in lower case and nothing else (not after the
+# "id", which carries the role too); only the pairing lives in the table. A Persona seeded without
 # one plays exactly the same and shows its initials instead.
 LANGUAGE_NAMES = {"de": "Deutsch", "en": "Englisch"}
 
@@ -64,7 +65,7 @@ TENANTS = [
 PERSONAS = [
     {
         "id": "andreas-kastner-ceo",
-        "avatar_url": "/personas/andreas-kastner-ceo.webp",
+        "avatar_url": "/personas/andreas-kastner.webp",
         "name": "Andreas Kastner",
         "role_label": "Geschäftsführer",
         "role": "Managing director of a mid-sized company",
@@ -123,7 +124,7 @@ PERSONAS = [
     },
     {
         "id": "phoebe-johnson-marketing",
-        "avatar_url": "/personas/phoebe-johnson-marketing.webp",
+        "avatar_url": "/personas/phoebe-johnson.webp",
         "name": "Phoebe Johnson",
         "role_label": "Marketing-Managerin",
         "role": "Marketing manager at a company that is a customer of the user's",
@@ -181,7 +182,7 @@ PERSONAS = [
     # pairing.
     {
         "id": "patrick-lohberg-it-lead",
-        "avatar_url": "/personas/patrick-lohberg-it-lead.webp",
+        "avatar_url": "/personas/patrick-lohberg.webp",
         "name": "Patrick Lohberg",
         "role_label": "IT-Leitung",
         "role": "IT lead at a mid-sized company",
@@ -237,7 +238,7 @@ PERSONAS = [
     },
     {
         "id": "kerstin-kaser-clerk",
-        "avatar_url": "/personas/kerstin-kaser-clerk.webp",
+        "avatar_url": "/personas/kerstin-kaser.webp",
         "name": "Kerstin Kaser",
         "role_label": "Sachbearbeiterin",
         "role": "clerk at a customer company",
@@ -290,7 +291,7 @@ PERSONAS = [
     },
     {
         "id": "marcel-kropp-cost-critical",
-        "avatar_url": "/personas/marcel-kropp-cost-critical.webp",
+        "avatar_url": "/personas/marcel-kropp.webp",
         "name": "Marcel Kropp",
         "role_label": "Bestandskunde",
         "role": "long-standing customer of the company the user works for",
@@ -345,7 +346,7 @@ PERSONAS = [
     },
     {
         "id": "floyd-jenkins-non-technical",
-        "avatar_url": "/personas/floyd-jenkins-non-technical.webp",
+        "avatar_url": "/personas/floyd-jenkins.webp",
         "name": "Floyd Jenkins",
         "role_label": "Anwender im Fachbereich",
         "role": "employee in a department at a customer company",
@@ -1618,7 +1619,7 @@ FOCUS_GOALS = [
     {
         "id": "articulation",
         # `interpretive` and not `mixed`: no measurement is planned for this one
-        # any more (docs/dashboard-konzept.md, section 4.2). Indistinctness sits
+        # any more (docs/dashboard-concept.md, section 4.2). Indistinctness sits
         # in the spectral sharpness of the signal, which is the microphone and
         # the distance to it as much as the speaker -- the argument that retired
         # the loudness goal, and harder here, because there is no comparison

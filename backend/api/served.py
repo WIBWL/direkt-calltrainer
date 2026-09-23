@@ -235,7 +235,7 @@ def _feedback_goals(feedback: db_models.Feedback | None) -> list[dict[str, str]]
 
     `text` rides along since the progress view's second level, which has to say
     what the wrap-ups actually wrote about a goal and not only how often they
-    wrote it (docs/dashboard-konzept.md, section 7). ADR 0064's amendment has
+    wrote it (docs/dashboard-concept.md, section 7). ADR 0064's amendment has
     the reasoning: what that decision keeps off the listing is `detail_json`,
     a curve per metric per Session, and a tagged point is two sentences.
     """

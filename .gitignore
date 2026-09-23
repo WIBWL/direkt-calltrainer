@@ -1,7 +1,6 @@
-.DS_Store
 .agents/
 .claude/
-docs/plans/
+.DS_Store
 .env
 .env.*
 !.env.example
@@ -9,10 +8,11 @@ docs/plans/
 .venv
 .vscode
 __pycache__
+benchmark/
+docs/diagrams/
 frontend/dist
 frontend/node_modules
 frontend/public/vad
-benchmark/
 logs/
 site/
 skills-lock.json

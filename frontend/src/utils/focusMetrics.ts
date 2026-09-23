@@ -5,7 +5,7 @@
  * differs per goal: eight of the fourteen have a measured series today, one is
  * answered by a comparison between two stretches of a call, two by activity
  * figures alone, and three have nothing but the wrap-up texts (see
- * docs/dashboard-konzept.md, section 4.2). This map is what lets the tile say
+ * docs/dashboard-concept.md, section 4.2). This map is what lets the tile say
  * which of the four it is instead of rendering an empty box or inventing a
  * figure.
  *
@@ -78,7 +78,7 @@ export const FOCUS_BACKING: Record<string, FocusBacking> = {
   // landing in the "no measurement" bucket.
   //
   // Articulation has a note of its own: no measurement is *planned* for it
-  // either (docs/dashboard-konzept.md, section 4.2), and the wrap-up has less
+  // either (docs/dashboard-concept.md, section 4.2), and the wrap-up has less
   // to go on here than for the two below, where what was said is what the goal
   // is about.
   articulation: { kind: "text", metrics: [], note: NO_MEASUREMENT_PLANNED },

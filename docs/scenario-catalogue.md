@@ -2,7 +2,7 @@
 
 ## 1 Zweck und Geltungsbereich
 
-Dieser Katalog beschreibt Trainingsfälle auf fachlicher Ebene, bevor sie als Datensätze angelegt werden. Er ist die Zwischenstufe zwischen der Anforderungsliste (`initial_requirements.md`) und dem Inhalt der Bibliothek.
+Dieser Katalog beschreibt Trainingsfälle auf fachlicher Ebene, bevor sie als Datensätze angelegt werden. Er ist die Zwischenstufe zwischen der Anforderungsliste (`initial-requirements.md`) und dem Inhalt der Bibliothek.
 
 Für jeden Eintrag ist ausgewiesen, **worauf er zurückgeht**: eine Anforderung (`R-xx`), eine Randbedingung (`C-xx`) oder — wenn kein Beleg vorliegt — `Systementwurf`. Das ist dieselbe Konvention wie in der Spalte *Herkunft* des Feature-Katalogs, und sie ist der Grund, warum dieser Katalog überhaupt geführt wird: Ein Trainingsfall ohne Belegkette ist eine Erfindung, und das soll man ihm ansehen.
 

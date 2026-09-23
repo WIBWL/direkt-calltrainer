@@ -12,6 +12,9 @@ default).
 Usage (from the project root, with the .venv active):
     python scripts/generate_erd.py
 
+Writes docs/diagrams/er_model.svg. That folder is gitignored: the
+diagram is generated on demand and never committed, so no stale copy exists.
+
 Prerequisites:
     pip install -r requirements.txt          (sqlalchemy-schemadisplay, pydot)
     brew install graphviz                    (the "dot" binary)
@@ -30,8 +33,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from backend.db.models import Base  # noqa: E402
 
-OUTPUT_PNG = os.path.join(PROJECT_ROOT, "docs", "er_modell.png")
-OUTPUT_SVG = os.path.join(PROJECT_ROOT, "docs", "er_modell.svg")
+OUTPUT_SVG = os.path.join(PROJECT_ROOT, "docs", "diagrams", "er_model.svg")
 
 # --- Design tokens (blue ramp) -------------------------------------------
 NAVY    = "#03253E"   # Blue 900 -> headers
@@ -43,8 +45,8 @@ FONT    = "IBM Plex Mono"
 
 
 def main() -> None:
-    """Renders docs/er_modell.png and .svg from the ORM metadata (ADR 0030)."""
-    os.makedirs(os.path.dirname(OUTPUT_PNG), exist_ok=True)
+    """Renders docs/diagrams/er_model.svg from the ORM metadata (ADR 0030)."""
+    os.makedirs(os.path.dirname(OUTPUT_SVG), exist_ok=True)
 
     engine = create_engine("sqlite://")  # empty -> only the Python models count
 
@@ -75,9 +77,8 @@ def main() -> None:
         edge.set_taillabel("")
         edge.set_color(BLUE600)
 
-    graph.write_png(OUTPUT_PNG)
     graph.write_svg(OUTPUT_SVG)
-    print(f"Geschrieben:\n  {OUTPUT_PNG}\n  {OUTPUT_SVG}")
+    print(f"ER diagram saved to {OUTPUT_SVG}")
 
 
 if __name__ == "__main__":

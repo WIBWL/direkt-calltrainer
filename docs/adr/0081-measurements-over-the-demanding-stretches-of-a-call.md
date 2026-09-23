@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Amends ADR 0051 on two points, both named below; everything else in that decision stands, the refusal of target ranges above all. Introduces migration `f3a5c81be47d`. Closes the gap `docs/dashboard-konzept.md` section 4.2 records against F-62's "Souveränität unter Druck".
+Accepted. Amends ADR 0051 on two points, both named below; everything else in that decision stands, the refusal of target ranges above all. Introduces migration `f3a5c81be47d`. Closes the gap `docs/dashboard-concept.md` section 4.2 records against F-62's "Souveränität unter Druck".
 
 ## Context
 

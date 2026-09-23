@@ -36,12 +36,12 @@ from backend.session.language_packs import LANGUAGE_PACKS, signals_closing
 ACCEPT, PULL_FACTS, VAGUE, CONCRETE, SETTLE, FAREWELL = range(6)
 
 PROBE_PURPOSE = {
-    ACCEPT: "Annahme des Gesprächs",
-    PULL_FACTS: "Fakten ziehen",
-    VAGUE: "vage Zusage, muss zurückgewiesen werden",
-    CONCRETE: "konkrete Antwort, muss die Erfolgsbedingung erfüllen",
-    SETTLE: "neutraler Anschluss, lässt der Persona einen zweiten Zug zum Selbstbeenden",
-    FAREWELL: "Verabschiedung, muss den Anruf beenden",
+    ACCEPT: "answers the call",
+    PULL_FACTS: "draws out the facts",
+    VAGUE: "vague promise, must be rejected",
+    CONCRETE: "concrete answer, must meet the success condition",
+    SETTLE: "neutral follow-up, gives the persona a second turn to close on its own",
+    FAREWELL: "farewell, must end the call",
 }
 
 # The four generic slots, per language. Deliberately role-neutral: depending on

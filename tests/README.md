@@ -2,7 +2,7 @@
 
 Feature-traceable tests for the Calltrainer backend. Every test file names the
 `F-xx` features (`docs/features.md`), `R-xx` requirements
-(`docs/initial_requirements.md`) and ADRs (`docs/adr/`) it exercises, in its
+(`docs/initial-requirements.md`) and ADRs (`docs/adr/`) it exercises, in its
 module docstring and per-test docstrings.
 
 ## Running

@@ -336,14 +336,14 @@ def _flow_flags(run: RunRecord) -> list[str]:
     found: list[str] = []
     by_slot = {t.slot: t for t in run.turns}
     if any(t.ended for t in run.turns[:2]):
-        found.append("bricht bei Sonde 1 oder 2 ab")
+        found.append("ends at probe 1 or 2")
     vague = by_slot.get(VAGUE)
     if vague is not None and (vague.ended or vague.model_ended):
-        found.append("gibt sich mit der vagen Zusage zufrieden")
+        found.append("accepts the vague promise")
     if run.turns and not any(t.model_ended for t in run.turns):
-        found.append("sagt nie selbst [CALL_END], endet nur über den Backstop")
+        found.append("never emits [CALL_END] itself, ends only through the backstop")
     if any(t.ended and not t.model_ended and not t.forced for t in run.turns):
-        found.append("Wiederholungswächter hat abgebrochen")
+        found.append("ended by the repetition guard")
     return found
 
 
@@ -354,16 +354,16 @@ def _content_flags(run: RunRecord) -> list[str]:
 
     wanted = _numbers(run.scenario.case_facts)
     if wanted and not wanted & _numbers(spoken):
-        found.append("nennt keine Zahl aus den Fallfakten")
+        found.append("mentions no figure from the case facts")
 
     marker = _LANGUAGE_MARKERS.get(run.persona.language_id)
     if marker is not None and len(spoken) >= _MIN_TEXT_TO_JUDGE:
         distinct = {m.group().lower() for m in marker.finditer(spoken)}
         if len(distinct) < _MIN_LANGUAGE_MARKERS:
-            found.append(f"womöglich nicht auf {run.persona.language_id}")
+            found.append(f"possibly not in {run.persona.language_id}")
 
     if run.used_fallback_probe:
-        found.append("generische Sonde 4 (kein eigener Eintrag)")
+        found.append("generic probe 4 (no entry of its own)")
     return found
 
 
@@ -375,7 +375,7 @@ def flags_for(run: RunRecord) -> list[str]:
     systemic observation (`_systemic_markdown`) and not a per-row finding.
     """
     if run.failure:
-        return [f"LAUF ABGEBROCHEN ({run.failure})"]
+        return [f"RUN FAILED ({run.failure})"]
     return _flow_flags(run) + _content_flags(run)
 
 
@@ -399,51 +399,51 @@ def _run_markdown(run: RunRecord, flags: list[str]) -> str:
         f"# {run.scenario.name}",
         "",
         f"- Persona: **{run.persona.name}** ({run.persona.language_id})",
-        f"- Kategorie: {run.scenario.category or 'ohne'}",
-        f"- Kurzbeschreibung: {run.scenario.short_description}",
+        f"- Category: {run.scenario.category or 'none'}",
+        f"- Short description: {run.scenario.short_description}",
         "",
-        "## Flaggen",
+        "## Flags",
         "",
     ]
-    lines += [f"- {f}" for f in flags] or ["- keine"]
-    lines += ["", "## System-Prompt", "", "```", run.system_prompt, "```", "", "## Verlauf", ""]
-    lines += [f"**Persona (Eröffnung):** {run.opening}", ""]
+    lines += [f"- {f}" for f in flags] or ["- none"]
+    lines += ["", "## System prompt", "", "```", run.system_prompt, "```", "", "## Conversation", ""]
+    lines += [f"**Persona (opening):** {run.opening}", ""]
     for turn in run.turns:
         marks = []
         if turn.model_ended:
-            marks.append("[CALL_END] vom Modell")
+            marks.append("[CALL_END] from the model")
         if turn.forced:
             marks.append("Backstop (signals_closing)")
         if turn.ended:
-            marks.append("Anruf beendet")
+            marks.append("call ended")
         suffix = f"  _{', '.join(marks)}_" if marks else ""
         lines += [
-            f"**Nutzer, Sonde {turn.slot + 1}** ({PROBE_PURPOSE[turn.slot]}): {turn.user_text}",
+            f"**User, probe {turn.slot + 1}** ({PROBE_PURPOSE[turn.slot]}): {turn.user_text}",
             "",
             f"**Persona:** {turn.reply}{suffix}",
             "",
         ]
         if turn.failure:
-            lines += [f"> Fehler: {turn.failure}", ""]
+            lines += [f"> Error: {turn.failure}", ""]
     return "\n".join(lines)
 
 
 def _summary_markdown(results: list[tuple[RunRecord, list[str]]], started: datetime) -> str:
     lines = [
-        "# Szenario-Durchlauf",
+        "# Scenario run",
         "",
-        f"Gestartet {started.isoformat(timespec='seconds')}, {len(results)} Paarungen.",
+        f"Started {started.isoformat(timespec='seconds')}, {len(results)} pairings.",
         "",
-        "Flaggen sind mechanische Auffälligkeiten, kein Qualitätsurteil. Ein Szenario",
-        "ohne Flagge ist nicht geprüft, es ist nur nicht offensichtlich kaputt.",
+        "Flags are mechanical anomalies, not a judgement of quality. A scenario",
+        "without a flag has not been checked; it is merely not obviously broken.",
         "",
-        "| Szenario | Persona | Turns | Schließt bei | Flaggen |",
+        "| Scenario | Persona | Turns | Closes at | Flags |",
         "|---|---|---|---|---|",
     ]
     for run, flags in results:
         cell = "; ".join(flags) if flags else "-"
         slot = closing_slot(run)
-        closes = f"Sonde {slot + 1}" if slot is not None else "nie"
+        closes = f"probe {slot + 1}" if slot is not None else "never"
         lines.append(
             f"| {run.scenario.name} | {run.persona.name} | {len(run.turns)} "
             f"| {closes} | {cell} |"
@@ -467,20 +467,20 @@ def _systemic_markdown(results: list[tuple[RunRecord, list[str]]]) -> str:
     never = sum(1 for r, _ in results if closing_slot(r) is None)
     return "\n".join([
         "",
-        "## Systemische Beobachtung",
+        "## Systemic observation",
         "",
-        "Wann beendet die Persona den Anruf von sich aus (`[CALL_END]`)?",
+        "When does the persona end the call on its own (`[CALL_END]`)?",
         "",
         "| | |",
         "|---|---|",
-        f"| bei erfüllter Erfolgsbedingung (Sonde 4 oder 5) | {satisfied} von {total} |",
-        f"| erst auf die Verabschiedung (Sonde 6) | {farewell} von {total} |",
-        f"| nie, Ende über Backstop oder Wiederholungswächter | {never} von {total} |",
+        f"| once the success condition is met (probe 4 or 5) | {satisfied} of {total} |",
+        f"| only at the farewell (probe 6) | {farewell} of {total} |",
+        f"| never, ended by the backstop or the repetition guard | {never} of {total} |",
         "",
-        "Der Prompt verlangt den ersten Fall ausdrücklich (`Once it has been"
+        "The prompt asks for the first case explicitly (`Once it has been"
         " given you are done ... and end the call`, backend/session/"
-        "orchestrator.py). Eine niedrige Zahl dort ist ein Befund über den"
-        " Prompt-Rahmen und das Modell, nicht über einzelne Szenarien.",
+        "orchestrator.py). A low count there is a finding about the prompt"
+        " frame and the model, not about individual scenarios.",
         "",
     ])
 
@@ -524,11 +524,11 @@ def _load_slugs() -> None:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--only", action="append", metavar="SCENARIO_KEY",
-                        help="Nur dieses Szenario (mehrfach angebbar).")
+                        help="Only this scenario (may be repeated).")
     parser.add_argument("--persona", action="append", metavar="PERSONA_KEY",
-                        help="Nur diese Persona (mehrfach angebbar).")
+                        help="Only this persona (may be repeated).")
     parser.add_argument("--out", metavar="DIR",
-                        help="Zielverzeichnis (Vorgabe: logs/scenario-runs/<Zeitstempel>).")
+                        help="Output directory (default: logs/scenario-runs/<timestamp>).")
     return parser.parse_args()
 
 
@@ -549,7 +549,7 @@ async def _main() -> int:
 
     problems = check_probes()
     if problems:
-        print("Sondenprüfung fehlgeschlagen, kein LLM-Aufruf gemacht:", file=sys.stderr)
+        print("Probe check failed, no LLM call was made:", file=sys.stderr)
         for problem in problems:
             print(f"  {problem}", file=sys.stderr)
         return 2
@@ -557,7 +557,7 @@ async def _main() -> int:
     personas, scenarios = _load_library()
     personas, scenarios = _select(personas, scenarios, args)
     if not personas or not scenarios:
-        print("Auswahl ist leer.", file=sys.stderr)
+        print("The selection is empty.", file=sys.stderr)
         return 2
 
     started = datetime.now(UTC)
@@ -568,7 +568,7 @@ async def _main() -> int:
 
     results = await _play_all(personas, scenarios, out)
     (out / "summary.md").write_text(_summary_markdown(results, started), encoding="utf-8")
-    print(f"\nGeschrieben nach {out}")
+    print(f"\nResults saved to {out}")
     return 1 if any(run.failure for run, _ in results) else 0
 
 

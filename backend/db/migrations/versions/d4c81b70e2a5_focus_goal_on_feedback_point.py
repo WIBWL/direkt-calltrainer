@@ -3,7 +3,7 @@
 Revision ID: d4c81b70e2a5
 Revises: b6e2d914f70a
 
-Stage 2 of the dashboard (docs/dashboard-konzept.md, section D). The wrap-up
+Stage 2 of the dashboard (docs/dashboard-concept.md, section D). The wrap-up
 already writes points of two kinds; what it could not do is say what a point
 was *about*, so nothing could be counted across a user's trainings and the
 recurring-strengths block stood on the page as a labelled placeholder.

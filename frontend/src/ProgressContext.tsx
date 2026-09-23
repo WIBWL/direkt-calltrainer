@@ -80,7 +80,7 @@ export const OCCASIONS = [
 export type OccasionKey = (typeof OCCASIONS)[number]["key"];
 
 /**
- * Everything by default, as dashboard-konzept.md section 10 decided: the first
+ * Everything by default, as dashboard-concept.md section 10 decided: the first
  * look should show all there is, and narrowing is one click away.
  *
  * Also what an unknown value in the URL falls back to. A hand-typed
@@ -146,7 +146,7 @@ const ProgressContext = createContext<ProgressContextValue | null>(null);
  * And the period switch reached only the overview. A tile said "aus 5
  * Trainings" and the page it linked to was drawn over every stored one —
  * two screens describing the same metric differently, which is exactly what
- * section 7 of dashboard-konzept.md rules out when it asks the detail level for
+ * section 7 of dashboard-concept.md rules out when it asks the detail level for
  * "alle Punkte des Zeitraums".
  *
  * The selection lives in the URL rather than in state here, so it survives a

@@ -314,7 +314,7 @@ class Persona(AuthoredContent, Base):
     key: Mapped[str | None] = mapped_column(String(60), unique=True)
     name: Mapped[str] = mapped_column(String(120))
     # Display field: where this Persona's portrait is served from, e.g.
-    # /personas/andreas-kastner-ceo.webp. A path, not the image: the file is a
+    # /personas/andreas-kastner.webp. A path, not the image: the file is a
     # frontend build asset like every other one, and the row only says which of
     # them belongs to this Persona -- so a new Persona still arrives as a seed
     # change plus a file, with no code to touch. Nullable, and the UI falls back

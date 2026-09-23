@@ -5043,7 +5043,7 @@ a.consent-button {
   opacity: 0.8;
 }
 
-/* --- Progress dashboard (F-13, docs/dashboard-konzept.md) ---------------- */
+/* --- Progress dashboard (F-13, docs/dashboard-concept.md) ---------------- */
 /* One rule governs everything below: nothing here may encode a judgement.
    No red, no green, no arrows. A value is drawn in the same blue whether it
    is high or low, because nobody has established which of the two is better

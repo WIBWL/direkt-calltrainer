@@ -10,7 +10,7 @@ import {
 
 /**
  * Turning the training history into the series the dashboard draws
- * (F-13, docs/dashboard-konzept.md).
+ * (F-13, docs/dashboard-concept.md).
  *
  * Pure functions over what `GET /api/sessions` already returns, deliberately:
  * every value here was measured server-side and stored with its Session

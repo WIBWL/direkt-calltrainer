@@ -3,7 +3,7 @@ import type { SessionSummary } from "../protocol";
 /**
  * What the wrap-ups keep coming back to, counted across a user's trainings.
  *
- * The dashboard's block D (docs/dashboard-konzept.md). It invents nothing: the
+ * The dashboard's block D (docs/dashboard-concept.md). It invents nothing: the
  * wrap-ups already wrote points of two kinds, and since each point carries the
  * focus goal it is about, they can be counted. What comes out is a **frequency
  * of statements**, never a measurement of a person, which is the distinction

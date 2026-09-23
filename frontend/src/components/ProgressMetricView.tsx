@@ -20,7 +20,7 @@ import Sparkline from "./Sparkline";
 
 /**
  * One metric across the trainings, the dashboard's second level
- * (docs/dashboard-konzept.md, section 7).
+ * (docs/dashboard-concept.md, section 7).
  *
  * The table is not a fallback for the chart, it is the other half of it. Which
  * Scenario and which Persona a value came from is what makes it readable at
@@ -41,7 +41,7 @@ export default function ProgressMetricView() {
   // The trainings the switch on the overview selected, not everything stored:
   // this page and the tile that links here have to describe the same set, or
   // the tile's "aus 5 Trainings" and the chart below disagree about what they
-  // are about (dashboard-konzept.md section 7, ProgressContext.tsx).
+  // are about (dashboard-concept.md section 7, ProgressContext.tsx).
   const { selected: sessions, series: all, periodPhrase, state, withPeriod } =
     useProgressContext();
   const series = all.find((s) => s.key === metricKey);

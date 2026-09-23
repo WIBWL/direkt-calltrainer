@@ -465,9 +465,10 @@ _PORTRAIT_DIR = pathlib.Path(__file__).resolve().parents[1] / "frontend" / "publ
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_every_seeded_persona_carries_a_portrait_named_after_it(entry):
-    """The path is derived from the Persona's own id, so renaming one — which
-    is a new row anyway (see seed_data.py) — renames its picture too."""
-    assert entry["avatar_url"] == f"/personas/{entry['id']}.webp"
+    """The file is named after the Persona's name, first-last in lower case
+    and nothing else -- not after its id, which carries the role as well."""
+    slug = entry["name"].lower().replace(" ", "-")
+    assert entry["avatar_url"] == f"/personas/{slug}.webp"
 
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
