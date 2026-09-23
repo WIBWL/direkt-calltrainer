@@ -13,8 +13,9 @@ this test meaningful in a checkout where the frontend was never built.
 import httpx
 import pytest
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app import SinglePageApp
+from backend.app import SinglePageApp, app
 
 INDEX_HTML = "<!doctype html><title>Calltrainer</title><div id=root></div>"
 BUNDLE_JS = "console.log('bundle')"
@@ -28,14 +29,14 @@ def spa_client(tmp_path):
     assets.mkdir()
     (assets / "index-abc123.js").write_text(BUNDLE_JS, encoding="utf-8")
 
-    app = FastAPI()
+    bare = FastAPI()
 
-    @app.get("/api/personas")
+    @bare.get("/api/personas")
     def _personas() -> list[str]:
         return []
 
-    app.mount("/", SinglePageApp(directory=str(tmp_path), html=True), name="frontend")
-    transport = httpx.ASGITransport(app=app)
+    bare.mount("/", SinglePageApp(directory=str(tmp_path), html=True), name="frontend")
+    transport = httpx.ASGITransport(app=bare)
     return httpx.AsyncClient(transport=transport, base_url="http://testserver")
 
 
@@ -109,3 +110,24 @@ async def test_a_real_api_route_is_unaffected(spa_client) -> None:
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+@pytest.mark.parametrize("path", ["/openapi.json", "/docs", "/redoc"])
+async def test_the_api_schema_is_not_published(path: str) -> None:
+    """FastAPI serves its schema and two documentation pages by default, open
+    to anyone and outside the login. Nothing reads them, so the deployed app
+    must not hand out every route and payload shape: whatever the path answers
+    (the SPA's fallback, or a 404 in a checkout without a built frontend), it
+    is not the schema."""
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get(path)
+
+    assert "openapi" not in response.text.lower()
+    assert "swagger" not in response.text.lower()
+
+
+def test_no_cors_middleware() -> None:
+    """The SPA is served same-origin, so no origin needs allowing; a leftover
+    allow-list is one more thing to reason about on a deployed server."""
+    assert all(m.cls is not CORSMiddleware for m in app.user_middleware)

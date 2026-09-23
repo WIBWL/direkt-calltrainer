@@ -9,7 +9,6 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -113,16 +112,19 @@ def _provision_database() -> None:
         logger.exception("Database provisioning failed - Sessions will not be persisted")
 
 
-app = FastAPI(title="CallTrainer API", lifespan=lifespan)
-
-# For a Vite dev server on :5173 against a host `uvicorn` — not a supported
-# workflow (the app runs via Docker, SPA served same-origin), so nothing depends
-# on this; kept only to spare a developer who tries it an opaque CORS wall.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+# No interactive API docs and no published schema: `/docs`, `/redoc` and
+# `/openapi.json` are open by default and would hand every route and payload
+# shape to anyone who asks, without a login. Nothing reads them — the SPA's
+# wire types are hand-written in `frontend/src/protocol.ts`.
+#
+# No CORS middleware either: the SPA is served from the same origin as the API
+# (the only supported setup), so the browser never makes a cross-origin call.
+app = FastAPI(
+    title="CallTrainer API",
+    lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 app.include_router(personas_router)
