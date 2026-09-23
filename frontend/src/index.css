@@ -1888,15 +1888,19 @@ h2 {
   margin-bottom: 40px;
 }
 
-/* The device picker above the test area. One element now: the box the <dd>
-   used to draw, with the label's row gone.
+.mic-device-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
 
-   The 16px below it is what the old stack left between this box and the test
-   panel (6px of the list's own padding plus a 10px margin), so removing the
-   label changed the gap under the field by nothing. The 4px of side padding
-   went with it, which lines the field up with the panel below instead of
-   insetting it by four pixels — the reason it was inset was the label, which
-   needed to start where text starts. */
+/* The device picker above the test area. The visible label identifies the
+   control, while the select keeps the compact box treatment used here.
+
+   The 16px below it preserves the spacing between the picker and the test
+   panel, while the field itself stays aligned with the panel below. */
 .mic-device-information {
   box-sizing: border-box;
   width: 100%;

@@ -87,18 +87,16 @@ export default function MicCheck({
       {/* No SetupSection here: this screen has one box and no numbered steps to
           count off, and the page heading above already names it. */}
       <section className="setup-section">
-        {/* No visible label over it: the page heading already says this is the
-            microphone test and the control's own value names the device, so the
-            word only repeated what stood under it. The <dl> went with it — a
-            description list with nothing to describe is markup for a pairing
-            that no longer exists — and the accessible name moved onto the
-            <select>, so it is gone from the screen and not from the screen
-            reader. */}
+        {/* The visible label makes the device selector easier to identify while the
+            selected option continues to name the active microphone. */}
+        <label className="mic-device-label" htmlFor="mic-device-select">
+          Mikrofon auswählen
+        </label>
+
         <div className="mic-device-information">
           <select
             id="mic-device-select"
             className="mic-device-select"
-            aria-label="Mikrofon"
             value={deviceId ?? ""}
             onChange={(e) => onDeviceChange(e.target.value || null)}
           >
