@@ -9,14 +9,14 @@ exchange, never on the path to a reply), and the last few exchanges verbatim.
 The full history is still kept: the repetition guards, the barge-in trims and
 the Transcript work on it, not on the model's view.
 
-Everything above is the default and is what the tests here assert. The last
-two assert the other shape (ADR 0075): with `CALL_STATE_NOTES` off the model
-is handed the conversation itself and no summarisation call is made at all.
+There was a second shape for a while (ADR 0075): on a backend that could read
+its own history the notes were switched off and the conversation handed over
+whole. With one backend left (ADR 0103) there is nothing to switch, and what is
+left is what these tests assert.
 """
 
 from backend.session.models import TurnCompleted
 from backend.session.nudges import STATE_NOTES_FRAME
-from backend.session import orchestrator as orchestrator_module
 from backend.session.orchestrator import HISTORY_WINDOW, SessionOrchestrator
 from tests.conftest import collect
 
@@ -46,12 +46,6 @@ async def _run(orch, fake_pipeline, turns):
         events = await collect(orch.run_turn(bytes([i]), "turn.webm", "audio/webm"))
         await orch.notes.settle()
     return events
-
-
-def test_the_suite_runs_with_the_notes_on():
-    """The guard behind every assertion in this file: conftest claims GEMINI so
-    the developer's own .env cannot decide which shape is under test."""
-    assert orchestrator_module.CALL_STATE_NOTES is True
 
 
 async def test_the_model_reads_notes_plus_a_window_not_the_whole_history(persona, scenario, fake_pipeline):
@@ -137,37 +131,6 @@ async def test_the_guards_still_see_the_whole_history(persona, scenario, fake_pi
 
     assert any(isinstance(e, TurnCompleted) and e.ends_call for e in events)
     assert PERSONA[0] not in str(fake_pipeline.llm.calls[-2][2:]), "it was outside the window"
-
-
-async def test_without_notes_the_model_is_handed_the_whole_conversation(
-    persona, scenario, fake_pipeline, monkeypatch
-):
-    """ADR 0075: on a backend that reads its own history, the window and the
-    summary both go -- the first exchange is still there verbatim on Turn 5."""
-    monkeypatch.setattr(orchestrator_module, "CALL_STATE_NOTES", False)
-    orch = SessionOrchestrator(persona, scenario)
-    await _run(orch, fake_pipeline, 5)
-
-    view = fake_pipeline.llm.calls[-1]
-    assert view[0]["role"] == "system", "the system prompt first"
-    assert not any(m["content"].startswith(STATE_NOTES_FRAME) for m in view), "no summary"
-    history = [m for m in view if m["role"] in ("user", "assistant")]
-    assert len(history) > HISTORY_WINDOW, "not a window any more"
-    assert USER[0] in [m["content"] for m in history], "the opening exchange, verbatim"
-    assert PERSONA[0] in [m["content"] for m in history]
-
-
-async def test_without_notes_no_summarisation_request_is_made(
-    persona, scenario, fake_pipeline, monkeypatch
-):
-    """The point of ADR 0075 is not only fidelity: the refresh is one LLM
-    request per exchange, half of what a Turn spends."""
-    monkeypatch.setattr(orchestrator_module, "CALL_STATE_NOTES", False)
-    orch = SessionOrchestrator(persona, scenario)
-    await _run(orch, fake_pipeline, 3)
-
-    assert fake_pipeline.llm.state_calls == [], "nothing is spent filling notes nothing reads"
-    assert orch.notes.text == ""
 
 
 def _summarising_llm(monkeypatch, fake_pipeline):

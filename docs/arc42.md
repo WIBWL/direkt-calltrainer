@@ -125,8 +125,8 @@ Dieses Kapitel fasst die tragenden Entscheidungen des ersten Prototyps zusammen.
 | Frontend | Single-Page-Anwendung in React und TypeScript, vom Backend mit ausgeliefert | 0008 |
 | Backend | Python mit FastAPI | 0012 |
 | Architekturstil | Geschichteter modularer Monolith für den Echtzeitpfad, asynchroner Worker für die Nachbereitung | 0018 |
-| Sprach- und Dialogmodelle | Uni-gehostetes DiReKT-Gateway für STT und LLM; getrennt selbst gehostete lokale Modelle statt eines externen Anbieters | 0011, 0021 |
-| Sprachsynthese | KugelAudio als Standard, DiReKT als Rückfallebene | 0040 |
+| Sprach- und Dialogmodelle | Uni-gehostetes DiReKT-Gateway für STT und LLM, je ein Modellname in `.env`; getrennt selbst gehostete lokale Modelle statt eines externen Anbieters | 0011, 0021, 0103 |
+| Sprachsynthese | KugelAudio, ohne Rückfallebene | 0040, 0103 |
 | Sprecherwechsel | Silero-VAD im Browser; das Turn-Ende wird erkannt, nicht per Knopfdruck gesetzt | 0036 |
 | Transport | Eine WebSocket-Verbindung je Session, Audio in Chunks in beide Richtungen | 0033, 0044 |
 | Persistenz | Eigene PostgreSQL-Instanz, SQLAlchemy 2.0, Alembic-Migrationen aus den ORM-Metadaten | 0010, 0025, 0026, 0027 |
@@ -330,7 +330,7 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0037 | Closing-Intent Detection Is Regex-Based, Not an LLM Classifier | angenommen | Q-07, F-01 |
 | ADR 0038 | Guard Against Degenerate Repetition; Guarantee a Closing Line on Backstopped Endings | angenommen | Q-07, F-01 |
 | ADR 0039 | Centralized Logging — Colored Console, Per-Session-Truncated File, Not Committed | angenommen (Datei-Truncation überarbeitet durch ADR 0055) | |
-| ADR 0040 | TTS Defaults to KugelAudio with a DiReKT Fallback; Gemini Removed | angenommen (grenzt die TTS-Hälfte von ADR 0021 ein) | Q-03, Q-07, C-04, F-01 |
+| ADR 0040 | TTS Defaults to KugelAudio with a DiReKT Fallback; Gemini Removed | angenommen, Rückfallebene später entfernt (ADR 0103); grenzt die TTS-Hälfte von ADR 0021 ein | Q-03, Q-07, C-04, F-01 |
 | ADR 0041 | Personas and Scenarios Loaded from the Database | angenommen | F-03, F-04 |
 | ADR 0042 | Opening Turn Pre-Warmed at Session Commitment, Not on Selection | angenommen | Q-03, F-01 |
 | ADR 0043 | English Prompt Content, Session Language Bound to the Persona | angenommen (löst ADR 0022 ab) | C-01, R-35, F-03, F-04 |
@@ -358,7 +358,7 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0071 | The Model Reads Its Notes and the Last Exchanges, Not the Whole History | angenommen (eingeschränkt durch ADR 0075) | Q-03, Q-07 |
 | ADR 0072 | The Scenario Category as a Closed Vocabulary | angenommen | F-03, F-43, F-44 |
 | ADR 0073 | The Settlement Check Rides on the Per-Turn Nudge | angenommen (verfeinert ADR 0037 und ADR 0038) | Q-01, Q-03 |
-| ADR 0074 | Dialogue Generation May Run on Gemini, Under One Switch and on Two Models | angenommen (kehrt ADR 0040s Entfernung des Gemini-Pfads um, schränkt ADR 0011 auf STT ein) | Q-03, Q-08, C-04 |
+| ADR 0074 | Dialogue Generation May Run on Gemini, Under One Switch and on Two Models | ersetzt durch ADR 0103 | Q-03, Q-08, C-04 |
 | ADR 0075 | The Caller’s Notes Are Kept Only Where the Model Cannot Read Its Own History | angenommen (schränkt ADR 0071 auf das Gateway ein) | Q-03, Q-08 |
 | ADR 0076 | Focus Goals as a Stored Selection | angenommen, ergänzt (das Ziel zur Lautstärke ist zurückgezogen; die Auswahl steuert die Szenario-Empfehlungen) | F-62, F-13, C-04 |
 | ADR 0077 | The Liveliness Reading Moves to the Pitch Variation Quotient | angenommen (ändert ADR 0051s Ausnahme für F-35) | F-35, Q-01, Q-04 |
@@ -447,7 +447,7 @@ Stand: erster lauffähiger Prototyp. Die Spalte *Art* unterscheidet, ob eine Sch
 | TS-08 | Eine Tabelle für Einzelbefunde besteht im Schema, hat aber weder Schreiber noch Leser. | bewusst | Totes Schema. Es kostet nichts im Betrieb, täuscht aber eine Funktion vor, die es nicht gibt. | Entweder mit dem Pilotbetrieb befüllen oder entfernen. |
 | TS-09 | Die Python-Version ist festgenagelt, weil die verwendete ORM-Fassung auf neueren Fassungen nicht mehr lädt. | aufgefallen | Sicherheitsaktualisierungen der Sprachumgebung sind blockiert. | ORM anheben, danach die Festlegung nachziehen. |
 | TS-10 | Für die Zeilenenden gibt es keine im Projekt hinterlegte Konvention, obwohl auf verschiedenen Betriebssystemen gearbeitet wird. | aufgefallen | Änderungen erscheinen größer, als sie sind; Zeilenenden verrauschen die Historie. | Konvention hinterlegen. |
-| TS-11 | Für die Sprachsynthese besteht nur auf Deutsch eine funktionierende Rückfallebene. | aufgefallen | Fällt der Standardanbieter aus, liest bei einer englischsprachigen Persona ein deutsches Stimmmodell den englischen Text. Es kommt Audio, es wird kein Fehler gemeldet, und auffallen würde es nur am Klang. | Englische Rückfallebene beschaffen oder den Ausfall hörbar machen, statt still falsch zu synthetisieren. |
+| TS-11 | Für die Sprachsynthese besteht nur auf Deutsch eine funktionierende Rückfallebene — **abgetragen** | aufgefallen | Fiel der Standardanbieter aus, las bei einer englischsprachigen Persona ein deutsches Stimmmodell den englischen Text. Es kam Audio, es wurde kein Fehler gemeldet, und auffallen wäre es nur am Klang. | **Abgetragen durch ADR 0103: die Rückfallebene ist entfernt.** Von den beiden vorgeschlagenen Wegen — englische Rückfallebene beschaffen oder den Ausfall hörbar machen — ist der zweite gegangen: Ein Ausfall von KugelAudio beendet den Turn mit `tts_failed`, statt ihn still in der falschen Stimme zu synthetisieren. |
 
 ### Inhalt
 

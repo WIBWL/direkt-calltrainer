@@ -2,6 +2,14 @@
 
 ## Status
 
+**Narrowed by ADR 0103.** The second backend this ADR distinguishes is gone,
+so `CALL_STATE_NOTES` is gone with it and the notes are always kept: the model
+in service is the one that cannot read its own transcript. The argument below
+— that a summary rewritten from the previous summary has no source left to
+correct it against — is the one to re-read if a model that can ever becomes the
+one deployed.
+
+
 Accepted (narrows ADR 0071 to the gateway backend)
 
 ## Context

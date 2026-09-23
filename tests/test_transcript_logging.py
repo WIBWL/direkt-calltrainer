@@ -158,7 +158,7 @@ def test_the_switch_is_off_unless_it_is_set(monkeypatch) -> None:
 # back to them, and the file is outside every deletion path all the same.
 
 SPOKEN_BY_PERSONA = "Guten Tag Frau Example, es geht um Vertrag 4711."
-_VOICE = PersonaVoice(tts_voice="alloy", kugelaudio_voice_id="1")
+_VOICE = PersonaVoice(kugelaudio_voice_id=1)
 
 
 class _Chunk:
@@ -189,7 +189,6 @@ def tts_logged(monkeypatch):
     """Everything `tts` logs while synthesizing one chunk through KugelAudio."""
     from backend.clients import tts  # pylint: disable=import-outside-toplevel
 
-    monkeypatch.setattr(tts, "SKIP_KUGELAUDIO", False)
     monkeypatch.setattr(tts, "AudioChunk", _Chunk)
     monkeypatch.setattr(tts, "KUGELAUDIO_CLIENT", type("C", (), {"tts": _StreamingTTS()})())
     recorder = _Recorder()

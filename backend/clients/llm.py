@@ -1,10 +1,10 @@
 """Dialogue generation: the persona's reply, streamed token by token.
 
-One backend, no fallback (ADR 0011). Streaming lets the orchestrator chunk the
-reply and synthesise audio before it finishes (ADR 0033). The sampling
-parameters below are Qwen3-specific, tuned by measurement (docs/model-parameters.md);
-`_backend_kwargs` is the one place that knows they are, and holds back the ones
-Gemini would either ignore or badly misapply (ADR 0074).
+One backend, no fallback (ADR 0011, ADR 0103). Streaming lets the orchestrator
+chunk the reply and synthesise audio before it finishes (ADR 0033). The
+sampling parameters below are Qwen3-on-vLLM specific, tuned by measurement
+(docs/research/model-parameters.md); `_sampling_kwargs` is the one place that
+knows they are.
 """
 
 import logging
@@ -15,9 +15,7 @@ from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from backend.clients.config import (
-    GEMINI, LLM_CLIENT, LLM_FEEDBACK_MODEL, LLM_MODEL, LLM_REASONING_EFFORT,
-)
+from backend.clients.config import LLM_CLIENT, LLM_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -39,35 +37,26 @@ _THINK_BLOCK_RE = re.compile(r"\s*<think>.*?</think>\s*", re.DOTALL)
 _MAX_REPLY_TOKENS = 180
 
 
-def _backend_kwargs(
+def _sampling_kwargs(
     *, think: bool, qwen_sampling: bool, presence_penalty: float | None
 ) -> dict[str, object]:
-    """The parts of a request the two backends (GEMINI) do not share.
-    Everything else -- the messages, `max_tokens`, `temperature`, `top_p` -- is
-    the same call on both.
+    """The parts of a request that belong to the model rather than to the call.
 
-    The difference that must not be got wrong is thinking. vLLM takes Qwen3's
-    switch inside `chat_template_kwargs`, a passthrough into the chat template
-    rather than part of the OpenAI API; Gemini 2.5 and later think by default
-    and take `reasoning_effort` instead. Leave it on either way and the whole
+    The one that must not be got wrong is thinking. Qwen3's switch travels in
+    `chat_template_kwargs`, a vLLM passthrough into the chat template rather
+    than part of the OpenAI API. Leave it on for a spoken reply and the whole
     `max_tokens` budget goes into a trace that `delta.content` never surfaces:
-    3.2 s to first token and nothing to speak (docs/research/model-parameters.md
-    measured that on Qwen3; the shape of the failure is the backend's, not the
-    model's). Sending vLLM's switch to Gemini does not raise -- its
-    compatibility layer silently ignores what it does not know -- which is
-    precisely why this has to be decided here rather than left to be noticed.
+    3.2 s to first token and nothing to speak
+    (docs/research/model-parameters.md).
 
-    The rest is Qwen3-specific tuning, withheld from Gemini rather than sent
-    and hoped for. `top_k`/`min_p` are vLLM extensions it drops on the floor.
-    `presence_penalty` it does honour -- and Qwen3's recommended 1.5 is a dose
-    meant for a 4B model that repeats whole paragraphs (ADR 0038); on a large
-    model it pushes the reply off its own vocabulary into stilted German. The
-    repetition guards in code stay the backstop, as they already are here.
+    The rest is Qwen3-specific tuning. `top_k`/`min_p` are vLLM extensions, and
+    `presence_penalty` 1.5 is Qwen3's recommended dose for a 4B model that
+    repeats whole paragraphs (ADR 0038); the repetition guards in code stay the
+    backstop either way. A gateway serving something else through the same
+    OpenAI-compatible API ignores what it does not know rather than failing, so
+    a different model is an `.env` edit -- but these numbers were measured
+    against this one, and a change of model is the moment to re-measure them.
     """
-    if GEMINI:
-        # LLM_REASONING_EFFORT, not a literal: every Gemini model has a
-        # different floor and none of them can be asked what it is.
-        return {"reasoning_effort": "low" if think else LLM_REASONING_EFFORT}
     return {
         **({"presence_penalty": presence_penalty} if presence_penalty is not None else {}),
         "extra_body": {
@@ -88,13 +77,7 @@ async def stream_reply(
     which is right for a Turn -- a call should survive a blip -- and wrong for a
     liveness probe, where those attempts run inside the probe's own deadline and
     a rate-limited model reports as a timeout instead of as a rate limit."""
-    # The thinking level goes in the line too: an unsupported one is a bare
-    # 400 that names no parameter, so this is what makes the next line
-    # readable when it is an error.
-    logger.info(
-        "Generating persona reply via LLM (%s, reasoning=%s)...",
-        LLM_MODEL, LLM_REASONING_EFFORT or "off",
-    )
+    logger.info("Generating persona reply via LLM (%s)...", LLM_MODEL)
     started = time.monotonic()
     client = LLM_CLIENT if retries is None else LLM_CLIENT.with_options(max_retries=retries)
     stream = await client.chat.completions.create(
@@ -109,9 +92,9 @@ async def stream_reply(
         top_p=0.8,
         # Thinking off, and presence_penalty 1.5 -- Qwen3's recommended
         # anti-repetition knob, which beat frequency_penalty 0.5 in cross-Turn
-        # tests. Both, and the sampling extensions, are per-backend: see
-        # `_backend_kwargs`. The in-code guard (ADR 0038) backstops either way.
-        **_backend_kwargs(think=False, qwen_sampling=True, presence_penalty=1.5),
+        # tests. See `_sampling_kwargs`; the in-code guard (ADR 0038) backstops
+        # it either way.
+        **_sampling_kwargs(think=False, qwen_sampling=True, presence_penalty=1.5),
     )
     # Time to first token, logged per Turn rather than measured once in a
     # benchmark: it is the leg that moves when the model or its thinking level
@@ -176,31 +159,22 @@ async def complete(
     follow-up draft, and the wrap-up, whose German grammar breaks down without
     it.
 
-    Always on LLM_FEEDBACK_MODEL, with no way to ask for the live one: since
-    ADR 0075 every caller of this function is off the live path. The call-state
-    notes were the exception -- a `complete` by shape, running beside a
-    conversation -- and they exist only on the backend where the two models are
-    the same name anyway.
+    One model for this and for the spoken reply (ADR 0103): the two were
+    briefly a fast one and a strong one under a switch (ADR 0074), and the
+    switch is gone. Since ADR 0075 every caller of this function is off the
+    live path anyway -- the call-state notes were the exception, a `complete`
+    by shape, running beside a conversation.
 
     `retries` is the same override `stream_reply` carries, for the same one
     caller: the boot check, which wants a single attempt so a 429 reports as a
     429 rather than as its own deadline expiring.
     """
-    # The thinking level belongs in this line for the reason config.py states:
-    # its floor belongs to the model, a value underneath it is an HTTP 400 that
-    # names no parameter, and this path is reached only from the worker -- so
-    # the log is the only place the pairing is ever visible. `stream_reply`
-    # logs it; this did not.
-    logger.info(
-        "LLM completion (%s, max_tokens=%s, think=%s, effort=%s)...",
-        LLM_FEEDBACK_MODEL, max_tokens, think,
-        _backend_kwargs(
-            think=think, qwen_sampling=think, presence_penalty=None
-        ).get("reasoning_effort", "-"),
-    )
+    # This path is reached only from the worker, so the log line is the one
+    # place its parameters are ever visible. `stream_reply` logs its own.
+    logger.info("LLM completion (%s, max_tokens=%s, think=%s)...", LLM_MODEL, max_tokens, think)
     client = LLM_CLIENT if retries is None else LLM_CLIENT.with_options(max_retries=retries)
     completion = await client.chat.completions.create(
-        model=LLM_FEEDBACK_MODEL,
+        model=LLM_MODEL,
         messages=messages,
         # Per request, overriding the client's own: see _FEEDBACK_TIMEOUT_S.
         timeout=_FEEDBACK_TIMEOUT_S,
@@ -210,7 +184,7 @@ async def complete(
         # output reads naturally while staying close to its input.
         temperature=0.6 if think else 0.3,
         **({"top_p": 0.95} if think else {}),
-        **_backend_kwargs(think=think, qwen_sampling=think, presence_penalty=None),
+        **_sampling_kwargs(think=think, qwen_sampling=think, presence_penalty=None),
     )
     text = completion.choices[0].message.content or ""
     return _strip_reasoning(text) if think else text

@@ -19,9 +19,9 @@ The backend reads a handful of environment variables at import time
 module is imported. Values are dummies: no test in this suite makes a real
 network call — every pipeline backend (STT / LLM / TTS) is faked.
 
-`SKIP_KUGELAUDIO=true` keeps TTS config fully offline (no KugelAudio client is
-constructed); the KugelAudio-default / DiReKT-fallback dispatch is still
-covered in `test_tts_fallback.py` by patching the tts module directly.
+The KugelAudio client is constructed with a dummy key and never reaches the
+network: every call into it is patched, in `test_tts_fallback.py` by standing
+in for the SDK object itself.
 """
 
 # The env vars below must be set before backend imports run, so those imports
@@ -35,21 +35,9 @@ os.environ.setdefault("DIREKT_URL", "http://direkt.test.invalid")
 os.environ.setdefault("DIREKT_API_KEY", "test-direkt-key")
 os.environ.setdefault("STT_MODEL", "test-stt-model")
 os.environ.setdefault("LLM_MODEL", "test-llm-model")
-os.environ.setdefault("TTS_MODEL", "test-tts-model")
 os.environ.setdefault("KUGELAUDIO_MODEL", "test-kugelaudio-model")
 os.environ.setdefault("KUGELAUDIO_API_KEY", "test-kugelaudio-key")
-os.environ.setdefault("SKIP_KUGELAUDIO", "true")
 os.environ.setdefault("OIDC_ISSUER", "http://keycloak.test.invalid/realms/direkt")
-
-# Assigned rather than setdefault, for the reason spelled out for POSTGRES_*
-# below: this one decides *behaviour*, not just an endpoint. With GEMINI on, the
-# request shape changes (ADR 0074) and the caller's notes are not kept at all
-# (ADR 0075) -- so a developer whose own .env has it set, or a run inside the
-# app container where compose puts .env into the environment before pytest
-# starts, would silently exercise the other half of the code and fail the tests
-# that assert the documented default. The Gemini shape is covered on purpose
-# instead, by patching the constant where it is read.
-os.environ["GEMINI"] = ""
 
 # Deliberately unusable credentials, and the reason they are set here at all:
 # backend/clients/config.py calls load_dotenv() when the backend is first
@@ -114,7 +102,7 @@ TEST_PERSONAS = [
         name="Thomas Brandt",
         language_id="de",
         language_name="Deutsch",
-        voice=PersonaVoice(tts_voice="de_male", kugelaudio_voice_id=1885),
+        voice=PersonaVoice(kugelaudio_voice_id=1885),
         role_label="Geschäftsführer, Fokus auf Strategie & Budget",
         traits_label="Sachlich, auf die Zeit bedacht, verhandlungserfahren.",
         training_goal="Einwandbehandlung unter Zeitdruck und Verbindlichkeit.",
@@ -127,7 +115,7 @@ TEST_PERSONAS = [
         name="Samantha Ferris",
         language_id="en",
         language_name="Englisch",
-        voice=PersonaVoice(tts_voice="de_female", kugelaudio_voice_id=1071),
+        voice=PersonaVoice(kugelaudio_voice_id=1071),
         role_label="Marketing-Managerin bei einem Kundenunternehmen",
         traits_label="Sehr höflich, ruhig und gefasst, nie drängend.",
         training_goal="Bedarfsermittlung und Konkretheit.",
@@ -291,12 +279,12 @@ class FakeTTS:
     """Stand-in for `backend.clients.tts.synthesize_stream` (+ one-shot
     `synthesize`).
 
-    `synthesize_stream` mimics the real KugelAudio->DiReKT fallback as a
-    two-attempt sequence: a `fail_times` of 1 is "KugelAudio blipped, DiReKT
-    covered it" (absorbed, 2 recorded calls); a higher count exhausts both and
-    raises (-> `tts_failed`). Set `.hang` to an `asyncio.Event` to park
-    synthesis (barge-in tests). `.chunks_per_call` controls how many audio
-    sub-chunks one text chunk yields.
+    One attempt per chunk, like the real one since ADR 0103: any `fail_times`
+    raises `KugelAudioError` (-> `tts_failed`), because there is no second
+    backend to cover a blip. It mimicked a two-attempt KugelAudio->DiReKT
+    sequence until that fallback was removed. Set `.hang` to an
+    `asyncio.Event` to park synthesis (barge-in tests). `.chunks_per_call`
+    controls how many audio sub-chunks one text chunk yields.
     """
 
     def __init__(self):
@@ -306,17 +294,14 @@ class FakeTTS:
         self.chunks_per_call = 1
 
     async def synthesize_stream(self, text, voice, language_id):
-        for _ in range(2):  # KugelAudio attempt, then the DiReKT fallback
-            self.calls.append((text, voice, language_id))
-            if self.hang is not None:
-                await self.hang.wait()
-            if self.fail_times > 0:
-                self.fail_times -= 1
-                continue
-            for _ in range(self.chunks_per_call):
-                yield b"AUDIO:" + text.encode("utf-8")
-            return
-        raise KugelAudioError("simulated TTS failure")
+        self.calls.append((text, voice, language_id))
+        if self.hang is not None:
+            await self.hang.wait()
+        if self.fail_times > 0:
+            self.fail_times -= 1
+            raise KugelAudioError("simulated TTS failure")
+        for _ in range(self.chunks_per_call):
+            yield b"AUDIO:" + text.encode("utf-8")
 
     async def synthesize(self, text, voice, language_id):
         self.calls.append((text, voice, language_id))
@@ -622,7 +607,6 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
         training_goal="",
         difficulty="mittel",
         language_code="de",
-        tts_voice="de_male",
         active=True,
         visibility=db_models.VISIBILITY_PUBLIC,
     )

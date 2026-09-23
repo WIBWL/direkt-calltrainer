@@ -66,7 +66,6 @@ def _persona_row(**overrides):
         "training_goal": "",
         "difficulty": "mittel",
         "language_code": "de",
-        "tts_voice": "de_male",
         "kugelaudio_voice_id": 1885,
         "active": True,
         "language": models.Language(code="de", name="Deutsch"),
@@ -97,13 +96,12 @@ def test_persona_mapping_keeps_display_and_prompt_fields_apart():
 
 
 def test_persona_mapping_carries_language_and_both_voices():
-    """ADR 0041/0043: the language is the Persona's own, and it names a voice
-    for each TTS backend (ADR 0040: KugelAudio default, EFRE fallback)."""
+    """ADR 0041/0043: the language is the Persona's own, and so is its one
+    voice (ADR 0103: KugelAudio, and nothing behind it)."""
     persona = _to_persona(_persona_row())
     assert persona.language_id == "de"
     assert persona.language_name == "Deutsch"
     assert isinstance(persona.voice, PersonaVoice)
-    assert persona.voice.tts_voice == "de_male"
     assert persona.voice.kugelaudio_voice_id == 1885
 
 
@@ -195,13 +193,12 @@ def test_every_seeded_persona_speaks_a_language_that_has_a_pack(entry):
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_every_offered_persona_has_its_own_voice(entry):
-    """ADR 0040/0041: voice is a per-Persona property, and both backends need
-    an identity — KugelAudio by default, the DiReKT model as fallback.
+    """ADR 0041/0103: the voice is a per-Persona property and there is one of
+    them, KugelAudio's.
 
-    A Persona still waiting for a KugelAudio voice is seeded `active: False`
-    and is the one case where the id may be missing; the test below is what
-    keeps that from turning into a Persona on offer that cannot speak."""
-    assert entry["tts_voice"]
+    A Persona still waiting for a voice is seeded `active: False` and is the
+    one case where the id may be missing; the test below is what keeps that
+    from turning into a Persona on offer that cannot speak."""
     if entry.get("active", True):
         assert isinstance(entry["kugelaudio_voice_id"], int)
 
@@ -499,7 +496,7 @@ def test_every_seeded_portrait_is_a_file_that_exists(entry):
 _PERSONA_COLUMNS = {
     "id": "key", "name": "name", "role_label": "role_label", "role": "role",
     "traits": "traits", "avatar_url": "avatar_url", "difficulty": "difficulty",
-    "language_id": "language_code", "tts_voice": "tts_voice",
+    "language_id": "language_code",
 }
 _SCENARIO_COLUMNS = {
     "id": "key", "name": "title", "short_description": "short_description",

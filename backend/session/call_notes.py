@@ -1,17 +1,16 @@
 """The caller's notes on the call so far (ADR 0071, narrowed by ADR 0075).
 
 Past a handful of exchanges the small gateway model misread its own raw
-transcript, so on that backend it reads a five-line summary of the call in
-place of everything but the last few exchanges. This module keeps that summary:
-one background `llm.complete` per completed exchange, never on the path to a
-reply, and a failure keeps the notes that were there -- stale notes beat none,
-and the call must not depend on this leg.
+transcript, so it reads a five-line summary of the call in place of everything
+but the last few exchanges. This module keeps that summary: one background
+`llm.complete` per completed exchange, never on the path to a reply, and a
+failure keeps the notes that were there -- stale notes beat none, and the call
+must not depend on this leg.
 
 It lived inside `SessionOrchestrator` as four attributes nothing else read and
 five methods with one caller each, and the one method only tests needed. It
 needs nothing from the orchestrator but the Turn it is told about, so it is a
-class of its own; *whether* notes are kept at all is still the orchestrator's
-`CALL_STATE_NOTES`, which decides whether it is asked.
+class of its own.
 
 The one rule that makes this more than a cache: the notes may only ever record
 what the user heard. A barge-in trims the reply after the notes may already have

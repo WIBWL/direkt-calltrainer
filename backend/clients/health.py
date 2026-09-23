@@ -1,14 +1,11 @@
 """Startup health checks for the pipeline backends.
 
 Fires one minimal real request at each backend (STT, LLM, TTS) so a dead model
-surfaces at boot, not mid-call. Uses the exact prod code paths, including TTS's
-KugelAudio-then-DiReKT fallback (see `SKIP_KUGELAUDIO` in `backend.clients.config`).
+surfaces at boot, not mid-call. Uses the exact prod code paths.
 
-A fourth check appears when the wrap-up runs on a model of its own (ADR 0074).
-It has to: that model is reached only from the RQ worker, so a name that 404s
-breaks nothing a caller would notice -- the calls keep working and the wrap-ups
-simply never arrive, which is exactly how a dead worker once went unnoticed for
-hours.
+Three checks and no more: one backend per leg (ADR 0103), so there is no second
+model to probe. The wrap-up runs on the same model as the spoken reply, and the
+LLM check covers both.
 """
 
 import asyncio
@@ -21,9 +18,7 @@ from kugelaudio.exceptions import KugelAudioError
 from openai import DEFAULT_MAX_RETRIES, OpenAIError
 
 from backend.clients import llm, stt, tts
-from backend.clients.config import (
-    SKIP_KUGELAUDIO, KUGELAUDIO_MODEL, LLM_FEEDBACK_MODEL, LLM_MODEL, STT_MODEL, TTS_MODEL,
-)
+from backend.clients.config import KUGELAUDIO_MODEL, LLM_MODEL, STT_MODEL
 from backend.personas import PersonaVoice
 
 logger = logging.getLogger(__name__)
@@ -31,7 +26,7 @@ logger = logging.getLogger(__name__)
 # The values a Session would use, kept as a literal rather than read from
 # the Persona library: this checks whether the backends answer, and must
 # not fail merely because the database is empty or unreachable (ADR 0041).
-_CHECK_VOICE = PersonaVoice(tts_voice="de_male", kugelaudio_voice_id=1885)
+_CHECK_VOICE = PersonaVoice(kugelaudio_voice_id=1885)
 _CHECK_LANGUAGE = "de"
 _CHECK_TIMEOUT = 20.0
 # One attempt, against the client's default of two retries. Retrying is right
@@ -41,8 +36,8 @@ _CHECK_TIMEOUT = 20.0
 # check that hides why it failed is worth less than one that fails honestly, and
 # nothing downstream depends on this passing: it only logs.
 #
-# Only the two LLM checks take it. STT and TTS go through clients this cannot
-# reach from here -- the DiReKT one is shared with STT's own path, and
+# Only the LLM check takes it. STT and TTS go through clients this cannot
+# reach from here -- the gateway one is shared with STT's own path, and
 # KugelAudio is a different SDK entirely.
 _CHECK_RETRIES = 0
 
@@ -70,39 +65,16 @@ async def _check_llm() -> None:
             break  # one delta is enough to prove the model responds
 
 
-async def _check_feedback_llm() -> None:
-    # `think=True` because that is how all three of its callers use it, and the
-    # thinking level is the parameter most likely to be wrong for a given model
-    # -- an unsupported one is a 400 that names nothing (ADR 0074).
-    await llm.complete([{"role": "user", "content": "ping"}], think=True, retries=_CHECK_RETRIES)
-
-
 async def _check_tts() -> None:
-    """The backend that is actually configured, not whatever answers.
-
-    `tts.synthesize` catches a KugelAudio failure and returns DiReKT audio, so
-    checking through it reported "TTS OK (kugel-3)" while KugelAudio was dead --
-    an expired key, say -- and the pilot then ran all day in the fallback voice,
-    which is 2-3x slower (ADR 0040), with a green boot log and a zero exit code
-    from scripts/check_backends.py. The check names KugelAudio, so it has to be
-    KugelAudio that answered.
-    """
-    if SKIP_KUGELAUDIO:
-        await tts.synthesize("Hallo.", _CHECK_VOICE, _CHECK_LANGUAGE)
-        return
-    # pylint: disable=protected-access  # no public one-shot that skips the fallback
-    await tts._synthesize_kugelaudio("Hallo.", _CHECK_VOICE, _CHECK_LANGUAGE)
+    """One real KugelAudio request, through the code path a call uses."""
+    await tts.synthesize("Hallo.", _CHECK_VOICE, _CHECK_LANGUAGE)
 
 
 _CHECKS: dict[str, tuple] = {
     "STT": (_check_stt, STT_MODEL),
     "LLM": (_check_llm, LLM_MODEL),
-    "TTS": (_check_tts, TTS_MODEL if SKIP_KUGELAUDIO else KUGELAUDIO_MODEL),
+    "TTS": (_check_tts, KUGELAUDIO_MODEL),
 }
-if LLM_FEEDBACK_MODEL != LLM_MODEL:
-    # Only when they actually differ: on the gateway they are one name, and a
-    # second identical request would spend a boot request to learn nothing.
-    _CHECKS["LLM (wrap-up)"] = (_check_feedback_llm, LLM_FEEDBACK_MODEL)
 
 
 async def _run_check(name: str, check_fn, model: str) -> bool:

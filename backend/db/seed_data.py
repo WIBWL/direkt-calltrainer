@@ -16,15 +16,11 @@ tables, so provision.py writes them straight through without mapping.
 """
 
 # --- Personas -----------------------------------------------------------
-# Every Persona has exactly one Language and one voice (ADR 0041). Two voice
-# values per Persona: kugelaudio_voice_id for the default TTS backend,
-# tts_voice for the DiReKT fallback (ADR 0040).
-#
-# Known gap: the DiReKT fallback model only carries German voices. de_male and
-# de_female work, every English voice name it was probed with returns a 500.
-# An English Persona therefore has no usable fallback voice and effectively
-# depends on KugelAudio being up; its tts_voice is set to a German voice only
-# so the NOT NULL column has a value.
+# Every Persona has exactly one Language and one voice (ADR 0041):
+# `kugelaudio_voice_id`, which is the whole of it since KugelAudio became the
+# only speech output (ADR 0103). A Persona without one cannot be played and is
+# seeded inactive; there is no second voice column any more, and no second
+# backend to carry one.
 #
 # Two kinds of text per entry (ADR 0043): "role_label" is the label shown on
 # the selection card and is written in the UI language; "role"/"traits"/
@@ -109,7 +105,6 @@ PERSONAS = [
         ),
         "difficulty": "medium",
         "language_id": "de",
-        "tts_voice": "de_male",
         "kugelaudio_voice_id": 972,
         # R-12 / ADR 0045: moves, not quotable lines -- the model reuses quoted
         # examples verbatim, and these have to work in any Scenario.
@@ -159,9 +154,6 @@ PERSONAS = [
         ),
         "difficulty": "easy",
         "language_id": "en",
-        # tts_voice is a German voice because the DiReKT fallback has no
-        # English one; see the note above.
-        "tts_voice": "de_female",
         "kugelaudio_voice_id": 1071,
         "objections": [
             "apologises, then returns to the question that was not answered",
@@ -183,10 +175,10 @@ PERSONAS = [
     #
     # `active` is spelled out here because it is the flag that decides whether a
     # Persona is offered: `library.list_personas` filters on it, and a Persona
-    # without a `kugelaudio_voice_id` has to stay False -- the default TTS
-    # backend has nothing to synthesise with, and every Turn would fall through
-    # to the fallback model. Seed a new one inactive until its voice is picked;
-    # `tests/test_persona_scenario_library.py` enforces that pairing.
+    # without a `kugelaudio_voice_id` has to stay False -- there is nothing to
+    # synthesise its lines with (ADR 0103). Seed a new one inactive until its
+    # voice is picked; `tests/test_persona_scenario_library.py` enforces that
+    # pairing.
     {
         "id": "patrick-lohberg-it-lead",
         "avatar_url": "/personas/patrick-lohberg-it-lead.webp",
@@ -227,7 +219,6 @@ PERSONAS = [
         ),
         "difficulty": "hard",
         "language_id": "de",
-        "tts_voice": "de_male",
         "kugelaudio_voice_id": 1657,
         "active": True,
         "objections": [
@@ -281,7 +272,6 @@ PERSONAS = [
         ),
         "difficulty": "medium",
         "language_id": "de",
-        "tts_voice": "de_female",
         "kugelaudio_voice_id": 1887,
         "active": True,
         "objections": [
@@ -337,7 +327,6 @@ PERSONAS = [
         ),
         "difficulty": "medium",
         "language_id": "de",
-        "tts_voice": "de_male",
         "kugelaudio_voice_id": 980,
         "active": True,
         "objections": [
@@ -392,9 +381,6 @@ PERSONAS = [
         ),
         "difficulty": "easy",
         "language_id": "en",
-        # tts_voice is a German voice because the DiReKT fallback has no
-        # English one; see the note above.
-        "tts_voice": "de_male",
         "kugelaudio_voice_id": 1655,
         "active": True,
         "objections": [
