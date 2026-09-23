@@ -5,6 +5,13 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   envDir: "../",
+  // The SPA reads the login settings under the backend's own names
+  // (OIDC_ISSUER, OIDC_CLIENT_ID) rather than VITE_-prefixed copies of them:
+  // the issuer has to match the `iss` the backend checks, and one value under
+  // two names in .env is a pair that can drift apart. Nothing else in .env
+  // starts with OIDC_ at build time -- OIDC_JWKS_URL is set on the running
+  // container, not on the build.
+  envPrefix: ["VITE_", "OIDC_"],
   server: {
     port: 5173,
   },

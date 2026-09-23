@@ -5,12 +5,14 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
-# OIDC config is baked into the SPA at build time (see frontend/src/oidcConfig.ts).
-# compose.yaml passes these; a bare `docker build` falls back to the local defaults.
-ARG VITE_OIDC_ISSUER=http://localhost:18081/realms/direkt
-ARG VITE_OIDC_CLIENT_ID=calltrainer-frontend
-ENV VITE_OIDC_ISSUER=$VITE_OIDC_ISSUER
-ENV VITE_OIDC_CLIENT_ID=$VITE_OIDC_CLIENT_ID
+# OIDC config is baked into the SPA at build time (see frontend/src/oidcConfig.ts
+# and `envPrefix` in frontend/vite.config.ts -- the SPA reads the backend's own
+# variable names, not VITE_-prefixed copies of them). compose.yaml passes these;
+# a bare `docker build` falls back to the local defaults.
+ARG OIDC_ISSUER=http://localhost:18081/realms/direkt
+ARG OIDC_CLIENT_ID=calltrainer-frontend
+ENV OIDC_ISSUER=$OIDC_ISSUER
+ENV OIDC_CLIENT_ID=$OIDC_CLIENT_ID
 RUN npm run build
 
 # Pinned, not "python:3-slim": that floating tag silently follows new Python
