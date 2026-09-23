@@ -279,12 +279,12 @@ class FakeTTS:
     """Stand-in for `backend.clients.tts.synthesize_stream` (+ one-shot
     `synthesize`).
 
-    `synthesize_stream` mimics the real KugelAudio->DiReKT fallback as a
-    two-attempt sequence: a `fail_times` of 1 is "KugelAudio blipped, DiReKT
-    covered it" (absorbed, 2 recorded calls); a higher count exhausts both and
-    raises (-> `tts_failed`). Set `.hang` to an `asyncio.Event` to park
-    synthesis (barge-in tests). `.chunks_per_call` controls how many audio
-    sub-chunks one text chunk yields.
+    One attempt per chunk, like the real one since ADR 0103: any `fail_times`
+    raises `KugelAudioError` (-> `tts_failed`), because there is no second
+    backend to cover a blip. It mimicked a two-attempt KugelAudio->DiReKT
+    sequence until that fallback was removed. Set `.hang` to an
+    `asyncio.Event` to park synthesis (barge-in tests). `.chunks_per_call`
+    controls how many audio sub-chunks one text chunk yields.
     """
 
     def __init__(self):
@@ -294,17 +294,14 @@ class FakeTTS:
         self.chunks_per_call = 1
 
     async def synthesize_stream(self, text, voice, language_id):
-        for _ in range(2):  # KugelAudio attempt, then the DiReKT fallback
-            self.calls.append((text, voice, language_id))
-            if self.hang is not None:
-                await self.hang.wait()
-            if self.fail_times > 0:
-                self.fail_times -= 1
-                continue
-            for _ in range(self.chunks_per_call):
-                yield b"AUDIO:" + text.encode("utf-8")
-            return
-        raise KugelAudioError("simulated TTS failure")
+        self.calls.append((text, voice, language_id))
+        if self.hang is not None:
+            await self.hang.wait()
+        if self.fail_times > 0:
+            self.fail_times -= 1
+            raise KugelAudioError("simulated TTS failure")
+        for _ in range(self.chunks_per_call):
+            yield b"AUDIO:" + text.encode("utf-8")
 
     async def synthesize(self, text, voice, language_id):
         self.calls.append((text, voice, language_id))
