@@ -778,6 +778,18 @@ h2 {
   background: var(--color-surface-selected);
 }
 
+/* The random Scenario keeps a subtle rose surface so it remains visually
+   distinct while following the flat card treatment used across the setup page. */
+.scenario-grid .persona-card.library-random-card {
+  background: #fff5f8;
+}
+
+/* The selected state keeps the rose identity while selection itself remains
+   visible through the shared blue border and check indicator. */
+.scenario-grid .persona-card.library-random-card.selected {
+  background: #fdf0f5;
+}
+
 /* The "i" on a selection card, Personas and Scenarios alike. Bottom-right, on
    the same 12px right edge and at the same 24px size as the check bubble above
    it, so the two sit in one column down the card's right gutter -- the gutter
