@@ -1619,6 +1619,14 @@ h2 {
   gap: 24px;
 }
 
+/* An ordinary live call stays slightly narrower than the surrounding page so
+   the conversation remains the visual focus. Reverse calls are excluded
+   because their briefing intentionally shares the available width. */
+.call-layout:not(.call-layout-with-brief) .call-panel {
+  max-width: 720px;
+  margin-inline: auto;
+}
+
 /* Side by side only where both columns are genuinely readable; below that the
    briefing goes back under the call, which is the one case where reading it
    means scrolling. An even split rather than a main column with a sidebar:
