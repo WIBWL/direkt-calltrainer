@@ -26,9 +26,11 @@ whole point of it.
 """
 
 # pylint: disable=duplicate-code
-# What is left once `_backfill_cli` took the command line is this module's own
-# entry point: `main()` delegating, and the `if __name__` guard. A script
-# cannot share its own entry point.
+# What is left, once `_backfill_cli` took the command line, the inventory
+# lookup and the table scan, is what a script cannot hand away: the preamble
+# that makes `backend` and `scripts` importable at all -- the `sys.path`
+# insert has to run before the import that would share it -- and this module's
+# own entry point, `main()` delegating plus the `if __name__` guard.
 
 
 from __future__ import annotations
@@ -48,7 +50,6 @@ load_dotenv()
 # pylint: disable=wrong-import-position
 # The sys.path insert above has to run before the backend is importable, and
 # load_dotenv() before it reads the environment -- so these cannot move up.
-from backend.db import models as db_models  # noqa: E402
 from backend.db.session import session_scope  # noqa: E402
 from backend.feedback import metrics, stored  # noqa: E402
 from backend.session.language_packs import LANGUAGE_PACKS  # noqa: E402
@@ -75,16 +76,15 @@ def backfill(apply: bool) -> int:
     """Re-read every stored opening. Returns how many came out differently."""
     changed = 0
     with session_scope() as db:
-        opening_id = (
-            db.query(db_models.MetricType.metric_type_id)
-            .filter(db_models.MetricType.key == "opening")
-            .scalar()
-        )
-        if opening_id is None:
-            logger.error("Metric inventory not seeded; run the app once first")
+        ids = _backfill_cli.metric_ids(db, logger, "opening")
+        if ids is None:
             return 0
+        opening_id = ids["opening"]
 
-        for session in db.query(db_models.Session).order_by(db_models.Session.session_id):
+        for session in _backfill_cli.each_session(db):
+            # The other way round from the three backfills beside this one: no
+            # row means nothing to rewrite, because this run corrects a figure
+            # the call already got rather than supplying one it never had.
             existing = next(
                 (m for m in session.measurements if m.metric_type_id == opening_id), None
             )

@@ -21,9 +21,11 @@ generation of figures in place.
 """
 
 # pylint: disable=duplicate-code
-# What is left once `_backfill_cli` took the command line is this module's own
-# entry point: `main()` delegating, and the `if __name__` guard. A script
-# cannot share its own entry point.
+# What is left, once `_backfill_cli` took the command line, the inventory
+# lookup and the table scan, is what a script cannot hand away: the preamble
+# that makes `backend` and `scripts` importable at all -- the `sys.path`
+# insert has to run before the import that would share it -- and this module's
+# own entry point, `main()` delegating plus the `if __name__` guard.
 
 
 from __future__ import annotations
@@ -85,15 +87,14 @@ def backfill(apply: bool) -> int:
     """Write the figures for every Session that has none. Returns how many."""
     written = 0
     with session_scope() as db:
-        metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType)}
-        count_id = metric_ids.get(interruptions.COUNT_KEY)
-        if count_id is None:
-            logger.error("Metric inventory not seeded; run the app once first")
+        ids = _backfill_cli.metric_ids(db, logger, interruptions.COUNT_KEY)
+        if ids is None:
             return 0
+        count_id = ids[interruptions.COUNT_KEY]
 
-        for session in db.query(db_models.Session).order_by(db_models.Session.session_id):
-            existing = {m.metric_type_id for m in session.measurements}
-            if count_id in existing:
+        for session in _backfill_cli.each_session(db):
+            # Skip what already carries the figure: this one fills a gap.
+            if count_id in {m.metric_type_id for m in session.measurements}:
                 continue
             timeline = _timeline(session)
             if not timeline:
