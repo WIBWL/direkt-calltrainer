@@ -1760,6 +1760,12 @@ h2 {
   margin-right: 8px;
 }
 
+/* The mute slash is slightly stronger than the microphone outline so the
+   disabled state remains legible at the small control-icon size. */
+.mute-call-icon-slash {
+  stroke-width: 2.2;
+}
+
 .mute-call-button {
   border: 1px solid var(--color-blue-600);
   background: var(--color-surface);

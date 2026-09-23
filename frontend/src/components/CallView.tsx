@@ -164,6 +164,19 @@ export default function CallView({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
+
+                {/* The slash appears only while muted, so the icon mirrors the button state
+                    without relying on colour alone. */}
+                {isMicrophoneMuted && (
+                  <path
+                    className="mute-call-icon-slash"
+                    d="M4 4 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                )}
               </svg>
 
               <span>
