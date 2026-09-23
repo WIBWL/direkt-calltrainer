@@ -3091,21 +3091,29 @@ p.follow-up-error {
 /* This section keeps a class of its own only for how its background note is
    set — the white box is `.feedback-box` inside it, and the spacing comes from
    `.feedback-section`, like every other section on the page. */
+.feedback-phase-card .feedback-box {
+  padding: 24px 26px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(3, 37, 62, 0.04);
+}
+
 .feedback-phase-text {
-  margin: 0 0 14px;
-  font-size: 14px;
-  line-height: 1.6;
+  margin: 0 0 18px;
   color: var(--color-navy-900);
+  font-size: 15px;
+  line-height: 1.65;
 }
 
 .feedback-phase-note {
   margin: 0;
-  padding-top: 14px;
-  border-top: 1px solid var(--color-border-subtle);
-  font-size: 12px;
-  line-height: 1.5;
+  padding: 12px 14px;
+  border-left: 3px solid var(--color-blue-300);
+  border-radius: 8px;
+  background: var(--color-blue-100);
+  color: var(--color-navy-900);
+  font-size: 13px;
   font-weight: 600;
-  color: var(--color-text-muted-secondary);
+  line-height: 1.5;
 }
 
 /* The background behind that sentence sits in the shared "i" (InfoDetails).
@@ -3113,11 +3121,11 @@ p.follow-up-error {
    card right above already carries a left accent and a second one reads as a
    second kind of thing, and a tighter type scale to match the card's own. */
 .feedback-phase-card .info-details {
-  margin-top: 10px;
+  margin-top: 14px;
 }
 
 .feedback-phase-card .info-summary {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .feedback-phase-card .info-body {
@@ -3140,7 +3148,7 @@ p.follow-up-error {
 .feedback-phase-phases {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 4px 8px;
+  gap: 6px 10px;
   margin: 0 0 10px;
 }
 
