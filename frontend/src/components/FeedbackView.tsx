@@ -229,7 +229,7 @@ export function FeedbackReport({
   // under the title of both screens instead.
   return (
     <>
-      <section className="feedback-section">
+      <section className="feedback-section feedback-summary-section">
         <SectionHeading eyebrow="QUALITATIVE EINORDNUNG" title="Zusammenfassung" />
         <div className="feedback-box">
           <p className="feedback-summary-text">{outline.summary}</p>

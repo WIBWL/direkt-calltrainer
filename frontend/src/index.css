@@ -2886,16 +2886,19 @@ p.follow-up-error {
   width: min(1040px, calc(100% - 32px));
   padding: 48px 0 72px;
 }
+
+/* The finished-training heading uses the same restrained hierarchy as the
+   other training screens instead of dominating the report below it. */
 .feedback-intro {
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
 .feedback-title {
   margin: 0;
-  font-size: 48px;
-  line-height: 1.08;
-  letter-spacing: -0.02em;
   color: var(--color-navy-900);
+  font-size: 40px;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
 }
 
 /* Every section of the feedback page has the same shape: a heading row above,
@@ -2991,11 +2994,21 @@ p.follow-up-error {
   border-color: #e8c8a8;
 }
 
+/* The summary is the first substantive reading of the call, so it gets a
+   little more breathing room than the denser evidence cards below it. */
+.feedback-summary-section .feedback-box {
+  padding: 26px 30px;
+  border-color: var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(3, 37, 62, 0.045);
+}
+
 .feedback-summary-text {
+  max-width: 900px;
   margin: 0;
-  font-size: 14px;
-  line-height: 1.57;
   color: var(--color-text-muted-secondary);
+  font-size: 15px;
+  line-height: 1.7;
 }
 
 /* The two halves of the wrap-up side by side. Each is a section of its own
@@ -3463,7 +3476,7 @@ p.follow-up-error {
   }
 
   .feedback-title {
-    font-size: 36px;
+    font-size: 32px;
   }
 
   .feedback-details {
@@ -3485,17 +3498,18 @@ p.follow-up-error {
   .feedback-section-aside {
     margin-top: 2px;
   }
-
 }
 
+/* The call identity belongs directly to the page heading and stays visually
+   quieter than the actual feedback that follows. */
 .feedback-meta {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: -8px 0 20px;
-  font-size: 13px;
-  line-height: 1.4;
+  margin: 10px 0 32px;
   color: var(--color-text-muted-secondary);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .feedback-meta-separator {
