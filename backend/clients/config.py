@@ -5,11 +5,10 @@ Required variables have no default and throw before the app can listen: a wrong
 or missing value should fail now, not surface later as a 403 that looks like bad
 credentials.
 
-STT and dialogue generation run on the OpenAI-compatible gateway named here,
-with no alternative and no fallback (ADR 0011): pointing them somewhere else is
-an `.env` edit -- a URL, a key and one model name per step -- not a switch in
-the code. TTS defaults to KugelAudio with the gateway's model as fallback
-(ADR 0040), or that model always under SKIP_KUGELAUDIO.
+One backend per leg and no alternatives (ADR 0011, ADR 0103): STT and dialogue
+generation run on the OpenAI-compatible gateway named here, speech output on
+KugelAudio. Pointing the gateway somewhere else is an `.env` edit -- a URL, a
+key and one model name per step -- not a switch in the code.
 """
 
 import os
@@ -64,16 +63,6 @@ TIMEOUT = httpx.Timeout(120.0, connect=5.0)
 
 CLIENT = AsyncOpenAI(base_url=f"{DIREKT_URL}/v1", api_key=DIREKT_API_KEY, timeout=TIMEOUT)
 
-# Optional, default off. When truthy, TTS skips KugelAudio and uses the DiReKT
-# model on every call -- which is what lets the app run without KugelAudio
-# credentials at all.
-#
-# Named for the leg it moves. It was called DEBUG, which said nothing about TTS
-# and read like a general verbosity switch: the one thing an operator might
-# plausibly set on a whim, while it silently swaps a hosted voice for a fallback
-# that measures 2-3x slower (ADR 0040).
-SKIP_KUGELAUDIO = _flag("SKIP_KUGELAUDIO")
-
 # Optional, default off, and deliberately its own switch rather than a second
 # meaning for another: it decides whether what people say aloud is written into
 # the log file.
@@ -91,22 +80,15 @@ STT_CLIENT = CLIENT
 STT_MODEL = _required_env("STT_MODEL")
 
 # LLM config: the same client and the same model for the spoken reply and for
-# everything written after the call. There was a second model behind a switch
-# for a while (ADR 0074) and no fallback either way; what is left is the name in
-# `.env`, because which model runs is a deployment fact and one buried in Python
-# is one nobody checks before wondering why a call feels slow.
+# everything written after the call (ADR 0103). There was a second model behind
+# a switch for a while (ADR 0074) and no fallback either way; what is left is
+# the name in `.env`, because which model runs is a deployment fact and one
+# buried in Python is one nobody checks before wondering why a call feels slow.
 LLM_CLIENT = CLIENT
 LLM_MODEL = _required_env("LLM_MODEL")
 
-# TTS config: KugelAudio is the default; TTS_MODEL (the DiReKT model) is only the
-# fallback, or always under SKIP_KUGELAUDIO.
-TTS_MODEL = _required_env("TTS_MODEL")
-if SKIP_KUGELAUDIO:
-    # No KugelAudio client under SKIP_KUGELAUDIO, so its credentials aren't required.
-    KUGELAUDIO_CLIENT = None
-    KUGELAUDIO_MODEL = None
-else:
-    # region="eu" pins to api.eu.kugelaudio.com; the EU endpoint is used because
-    # the app is deployed in the EU (ADR 0020).
-    KUGELAUDIO_CLIENT = KugelAudio(api_key=_required_env("KUGELAUDIO_API_KEY"), region="eu")
-    KUGELAUDIO_MODEL = _required_env("KUGELAUDIO_MODEL")
+# TTS config: KugelAudio, and nothing else (ADR 0103). region="eu" pins to
+# api.eu.kugelaudio.com; the EU endpoint is used because the app is deployed in
+# the EU (ADR 0020).
+KUGELAUDIO_CLIENT = KugelAudio(api_key=_required_env("KUGELAUDIO_API_KEY"), region="eu")
+KUGELAUDIO_MODEL = _required_env("KUGELAUDIO_MODEL")

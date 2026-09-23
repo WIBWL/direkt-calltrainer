@@ -1,12 +1,11 @@
 """Startup health checks for the pipeline backends.
 
 Fires one minimal real request at each backend (STT, LLM, TTS) so a dead model
-surfaces at boot, not mid-call. Uses the exact prod code paths, including TTS's
-KugelAudio-then-DiReKT fallback (see `SKIP_KUGELAUDIO` in
-`backend.clients.config`).
+surfaces at boot, not mid-call. Uses the exact prod code paths.
 
-Three checks and no more: the wrap-up runs on the same model as the spoken
-reply, so the LLM check covers both.
+Three checks and no more: one backend per leg (ADR 0103), so there is no second
+model to probe. The wrap-up runs on the same model as the spoken reply, and the
+LLM check covers both.
 """
 
 import asyncio
@@ -19,9 +18,7 @@ from kugelaudio.exceptions import KugelAudioError
 from openai import DEFAULT_MAX_RETRIES, OpenAIError
 
 from backend.clients import llm, stt, tts
-from backend.clients.config import (
-    SKIP_KUGELAUDIO, KUGELAUDIO_MODEL, LLM_MODEL, STT_MODEL, TTS_MODEL,
-)
+from backend.clients.config import KUGELAUDIO_MODEL, LLM_MODEL, STT_MODEL
 from backend.personas import PersonaVoice
 
 logger = logging.getLogger(__name__)
@@ -69,26 +66,14 @@ async def _check_llm() -> None:
 
 
 async def _check_tts() -> None:
-    """The backend that is actually configured, not whatever answers.
-
-    `tts.synthesize` catches a KugelAudio failure and returns DiReKT audio, so
-    checking through it reported "TTS OK (kugel-3)" while KugelAudio was dead --
-    an expired key, say -- and the pilot then ran all day in the fallback voice,
-    which is 2-3x slower (ADR 0040), with a green boot log and a zero exit code
-    from scripts/check_backends.py. The check names KugelAudio, so it has to be
-    KugelAudio that answered.
-    """
-    if SKIP_KUGELAUDIO:
-        await tts.synthesize("Hallo.", _CHECK_VOICE, _CHECK_LANGUAGE)
-        return
-    # pylint: disable=protected-access  # no public one-shot that skips the fallback
-    await tts._synthesize_kugelaudio("Hallo.", _CHECK_VOICE, _CHECK_LANGUAGE)
+    """One real KugelAudio request, through the code path a call uses."""
+    await tts.synthesize("Hallo.", _CHECK_VOICE, _CHECK_LANGUAGE)
 
 
 _CHECKS: dict[str, tuple] = {
     "STT": (_check_stt, STT_MODEL),
     "LLM": (_check_llm, LLM_MODEL),
-    "TTS": (_check_tts, TTS_MODEL if SKIP_KUGELAUDIO else KUGELAUDIO_MODEL),
+    "TTS": (_check_tts, KUGELAUDIO_MODEL),
 }
 
 
