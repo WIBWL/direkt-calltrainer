@@ -31,7 +31,7 @@ For development, add `--watch` (`docker compose up --build --watch`) to have the
 
 ## 3. Login (Keycloak)
 
-`docker compose up` brings its own Keycloak on `http://localhost:18081` and imports `keycloak/direkt-realm.json` — the `calltrainer-frontend` client and three fixed users:
+`docker compose up` brings its own Keycloak on `http://localhost:18081` and imports `keycloak/direkt-realm.json` — the `direkt-calltrainer` client and three fixed users:
 
 | user | password | company (`tenant`) |
 |---|---|---|

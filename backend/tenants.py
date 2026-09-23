@@ -2,7 +2,7 @@
 
 The tenant is resolved for each request from the verified token: a `tenant`
 claim — a Keycloak user attribute an admin sets when creating the account,
-mapped into the access token by the `calltrainer tenant` protocol mapper. It
+mapped into the access token by the `direkt-calltrainer tenant` protocol mapper. It
 matches `tenant.extern_ref` directly. A token without it, or with an unknown
 value (a typo'd attribute), resolves to the seeded `default` tenant rather than
 erroring.

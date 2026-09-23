@@ -49,7 +49,7 @@ OIDC_JWKS_URL = os.environ.get("OIDC_JWKS_URL", "").rstrip("/") or None
 # rather than a boot failure, so hard-coding it is safer than an env var nobody
 # would notice was wrong. This is the audience the realm's audience-mapper adds
 # to Calltrainer tokens (keycloak/direkt-realm.json).
-OIDC_AUDIENCE = "calltrainer"
+OIDC_AUDIENCE = "direkt-calltrainer"
 
 _ALGORITHMS = ["RS256"]
 
