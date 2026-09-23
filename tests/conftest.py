@@ -41,16 +41,6 @@ os.environ.setdefault("KUGELAUDIO_API_KEY", "test-kugelaudio-key")
 os.environ.setdefault("SKIP_KUGELAUDIO", "true")
 os.environ.setdefault("OIDC_ISSUER", "http://keycloak.test.invalid/realms/direkt")
 
-# Assigned rather than setdefault, for the reason spelled out for POSTGRES_*
-# below: this one decides *behaviour*, not just an endpoint. With GEMINI on, the
-# request shape changes (ADR 0074) and the caller's notes are not kept at all
-# (ADR 0075) -- so a developer whose own .env has it set, or a run inside the
-# app container where compose puts .env into the environment before pytest
-# starts, would silently exercise the other half of the code and fail the tests
-# that assert the documented default. The Gemini shape is covered on purpose
-# instead, by patching the constant where it is read.
-os.environ["GEMINI"] = ""
-
 # Deliberately unusable credentials, and the reason they are set here at all:
 # backend/clients/config.py calls load_dotenv() when the backend is first
 # imported, which would otherwise put the developer's real POSTGRES_* into the
@@ -620,9 +610,9 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
         traits="sachlich",
         behavior="Verhalten",
         training_goal="",
+        tts_voice="de_male",
         difficulty="mittel",
         language_code="de",
-        tts_voice="de_male",
         active=True,
         visibility=db_models.VISIBILITY_PUBLIC,
     )

@@ -2,13 +2,11 @@
 
 Fires one minimal real request at each backend (STT, LLM, TTS) so a dead model
 surfaces at boot, not mid-call. Uses the exact prod code paths, including TTS's
-KugelAudio-then-DiReKT fallback (see `SKIP_KUGELAUDIO` in `backend.clients.config`).
+KugelAudio-then-DiReKT fallback (see `SKIP_KUGELAUDIO` in
+`backend.clients.config`).
 
-A fourth check appears when the wrap-up runs on a model of its own (ADR 0074).
-It has to: that model is reached only from the RQ worker, so a name that 404s
-breaks nothing a caller would notice -- the calls keep working and the wrap-ups
-simply never arrive, which is exactly how a dead worker once went unnoticed for
-hours.
+Three checks and no more: the wrap-up runs on the same model as the spoken
+reply, so the LLM check covers both.
 """
 
 import asyncio
@@ -22,7 +20,7 @@ from openai import DEFAULT_MAX_RETRIES, OpenAIError
 
 from backend.clients import llm, stt, tts
 from backend.clients.config import (
-    SKIP_KUGELAUDIO, KUGELAUDIO_MODEL, LLM_FEEDBACK_MODEL, LLM_MODEL, STT_MODEL, TTS_MODEL,
+    SKIP_KUGELAUDIO, KUGELAUDIO_MODEL, LLM_MODEL, STT_MODEL, TTS_MODEL,
 )
 from backend.personas import PersonaVoice
 
@@ -41,8 +39,8 @@ _CHECK_TIMEOUT = 20.0
 # check that hides why it failed is worth less than one that fails honestly, and
 # nothing downstream depends on this passing: it only logs.
 #
-# Only the two LLM checks take it. STT and TTS go through clients this cannot
-# reach from here -- the DiReKT one is shared with STT's own path, and
+# Only the LLM check takes it. STT and TTS go through clients this cannot
+# reach from here -- the gateway one is shared with STT's own path, and
 # KugelAudio is a different SDK entirely.
 _CHECK_RETRIES = 0
 
@@ -70,13 +68,6 @@ async def _check_llm() -> None:
             break  # one delta is enough to prove the model responds
 
 
-async def _check_feedback_llm() -> None:
-    # `think=True` because that is how all three of its callers use it, and the
-    # thinking level is the parameter most likely to be wrong for a given model
-    # -- an unsupported one is a 400 that names nothing (ADR 0074).
-    await llm.complete([{"role": "user", "content": "ping"}], think=True, retries=_CHECK_RETRIES)
-
-
 async def _check_tts() -> None:
     """The backend that is actually configured, not whatever answers.
 
@@ -99,10 +90,6 @@ _CHECKS: dict[str, tuple] = {
     "LLM": (_check_llm, LLM_MODEL),
     "TTS": (_check_tts, TTS_MODEL if SKIP_KUGELAUDIO else KUGELAUDIO_MODEL),
 }
-if LLM_FEEDBACK_MODEL != LLM_MODEL:
-    # Only when they actually differ: on the gateway they are one name, and a
-    # second identical request would spend a boot request to learn nothing.
-    _CHECKS["LLM (wrap-up)"] = (_check_feedback_llm, LLM_FEEDBACK_MODEL)
 
 
 async def _run_check(name: str, check_fn, model: str) -> bool:
