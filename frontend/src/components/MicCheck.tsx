@@ -206,7 +206,7 @@ export default function MicCheck({
       </section>
 
       <button className="back-to-start-button" type="button" onClick={onCancel}>
-        Zur Startseite
+        Zurück zur Vorbereitung
       </button>
     </>
   );
