@@ -2,18 +2,11 @@ site_name: Calltrainer
 site_description: AI-powered phone conversation trainer
 docs_dir: docs
 
-# Regenerates the ER diagram from backend/db/models.py before every build, so
-# that docs/datenmodell.md never goes stale. If that fails (no Graphviz), the
-# docs are built with the checked-in diagram instead.
-hooks:
-  - scripts/mkdocs_hooks.py
-
 nav:
   - Home: index.md
   - Initial Requirements: initial-requirements.md
   - Features: features.md
   - Szenario- und Persona-Katalog: scenario-catalogue.md
-  - Datenmodell: datenmodell.md
   - Dashboard-Konzept: dashboard-concept.md
   - Architecture Decisions:
       - ADR 0000 - Record Architecture Decisions: adr/0000-record-architecture-decisions.md
