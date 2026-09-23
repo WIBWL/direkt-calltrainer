@@ -2813,12 +2813,19 @@ p.follow-up-error {
   white-space: pre-line;
 }
 
-/* Shown below the live conversation with no scroll box of its own -- a fact
-   hidden behind a gesture is a fact not found, which is the one thing that
-   must not happen mid-call. */
+/* Shown below the live conversation as a supporting reference with no scroll
+   box of its own. A little more horizontal space and breathing room improve
+   readability without giving the facts more visual weight than the call. */
 .case-brief-call {
   margin: 0 auto;
+  padding: 1.4rem 1.6rem;
   background: var(--color-surface);
+}
+
+/* Longer case descriptions benefit from slightly more leading during the
+   live call, while the shared pre-call typography remains unchanged. */
+.case-brief-call .case-brief-body {
+  line-height: 1.65;
 }
 
 @media (min-width: 1080px) {
