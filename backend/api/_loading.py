@@ -26,8 +26,16 @@ SESSION_SUBTREE = (
     selectinload(db_models.Session.turns),
     selectinload(db_models.Session.measurements)
     .selectinload(db_models.Measurement.metric_type),
+    # Down to the focus goal, not only to the points: `served._detail_feedback`
+    # reads `point.focus_goal.key` for every point, and that relationship is a
+    # plain lazy one, so without this a wrap-up costs a query per tagged point.
+    # The listing route carries the same load for the same reason -- it is the
+    # one place this was noticed, and having it there and not here is exactly
+    # the drift this module exists to prevent. The export pays one batched
+    # query it does not read, which is a query, not a query per point.
     selectinload(db_models.Session.feedback)
-    .selectinload(db_models.Feedback.points),
+    .selectinload(db_models.Feedback.points)
+    .selectinload(db_models.FeedbackPoint.focus_goal),
     selectinload(db_models.Session.persona),
     selectinload(db_models.Session.scenario),
 )
@@ -37,6 +45,20 @@ SESSION_SUBTREE = (
 WITH_WRAPUP = (
     selectinload(db_models.Session.scenario),
     selectinload(db_models.Session.feedback).selectinload(db_models.Feedback.points),
+)
+
+#: Exactly what `jobs.retry_blocked` walks, and nothing else: the wrap-up it
+#: refuses a second one for, the Turns it needs at least one of, and the jobs
+#: whose newest it reads. The route asked without any of them and paid three
+#: lazy loads for a single decision.
+#:
+#: The Turns come back in full to answer `not session.turns`. An EXISTS would
+#: be cheaper, but the same function serves `requeue_feedback.py`, and a
+#: transcript is tens of rows -- not worth splitting one rule into two shapes.
+FOR_RETRY = (
+    selectinload(db_models.Session.feedback),
+    selectinload(db_models.Session.turns),
+    selectinload(db_models.Session.jobs),
 )
 
 

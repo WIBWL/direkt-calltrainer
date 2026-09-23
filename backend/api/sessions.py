@@ -44,7 +44,7 @@ from sqlalchemy.orm import Session as DbSession, selectinload
 
 from backend import deletion, library
 from backend.api import served
-from backend.api._loading import SESSION_SUBTREE, WITH_WRAPUP, owned_session
+from backend.api._loading import FOR_RETRY, SESSION_SUBTREE, WITH_WRAPUP, owned_session
 from backend.api.deps import current_tenant_id
 from backend.auth import AuthContext, require_user
 from backend.db import models as db_models
@@ -219,7 +219,7 @@ def retry_feedback(
     client goes back to polling the read route for it.
     """
     with session_scope() as db:
-        session = owned_session(db, caller.sub, extern_id)
+        session = owned_session(db, caller.sub, extern_id, *FOR_RETRY)
         if session is None:
             raise HTTPException(status_code=404, detail="Unknown session")
 
