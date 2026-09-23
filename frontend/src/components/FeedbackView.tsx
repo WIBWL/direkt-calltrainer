@@ -853,7 +853,7 @@ function PointList({
 
   if (points.length === 0) return null;
   return (
-    <section className="feedback-section">
+    <section className={`feedback-section feedback-point-section ${tone}`}>
       <SectionHeading
         eyebrow={eyebrow}
         title={title}
@@ -861,7 +861,7 @@ function PointList({
         icon={tone === "success" ? "✓" : "!"}
       />
 
-      <div className={`feedback-box feedback-point-list ${tone}`}>
+      <div className={`feedback-box feedback-point-list feedback-point-card ${tone}`}>
         {points.map((point, i) => {
           const at = point.offsetMs;
           return (

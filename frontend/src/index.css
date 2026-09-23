@@ -3024,51 +3024,68 @@ p.follow-up-error {
   margin-bottom: 0;
 }
 
+/* Strengths and improvements are individual coaching cards rather than a card
+   containing smaller cards. The tone stays subtle and semantic. */
+.feedback-point-card {
+  padding: 18px 20px 20px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(3, 37, 62, 0.04);
+}
+
+.feedback-point-section.success .feedback-point-card {
+  border-color: #c8e3d5;
+}
+
+.feedback-point-section.danger .feedback-point-card {
+  border-color: #f0d2ae;
+}
+
+.feedback-point-section .feedback-section-head {
+  margin-bottom: 12px;
+}
+
 .feedback-point-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.feedback-point-item {
-  padding: 12px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
-  background: #f8fbfd;
-}
-
-.feedback-point-item p {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--color-navy-900);
+  gap: 0;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .feedback-point-item {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 16px;
+  padding: 16px 0 0;
+  background: transparent;
+}
+
+.feedback-point-item + .feedback-point-item {
+  margin-top: 16px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.feedback-point-item p {
+  margin: 0;
+  color: var(--color-navy-900);
+  font-size: 14px;
+  line-height: 1.55;
 }
 
 .feedback-point-time {
-  flex-shrink: 0;
-  padding: 4px 6px;
-  border-radius: 6px;
-  background: #eaf4fa;
+  flex: 0 0 52px;
+  padding-top: 1px;
+  background: transparent;
   color: var(--color-blue-600);
-  font-size: 11px;
-  line-height: 1.2;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
-/* The text and, above it, the goal it was filed under. A column of its own so
-   the timestamp keeps its place at the left edge of the row while the label
-   sits over the sentence rather than beside it. */
 .feedback-point-body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 5px;
 }
 
 /* This section keeps a class of its own only for how its background note is
