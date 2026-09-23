@@ -1,4 +1,6 @@
-# pylint: disable=too-many-lines  # a data module: splitting it by line count would scatter the seed
+# pylint: disable=too-many-lines  # a data module: literals, not logic. Splitting it
+# by line count would put the Personas and the Scenarios that exercise them in
+# different files without making either shorter, and provision.py imports the set.
 """Initial content for the `persona`, `scenario` and `focus_goal` reference tables.
 
 ADR 0041 made the database the source of truth for the first two, so this
@@ -12,10 +14,6 @@ Field names here are English and match both the value types in
 `backend/personas.py` / `backend/scenarios.py` and the columns of the library
 tables, so provision.py writes them straight through without mapping.
 """
-
-# pylint: disable=too-many-lines  # A data module: literals, not logic. Splitting
-# it would put the Personas and the Scenarios that exercise them in different
-# files without making either shorter, and provision.py imports the whole set.
 
 # --- Personas -----------------------------------------------------------
 # Every Persona has exactly one Language and one voice (ADR 0041). Two voice

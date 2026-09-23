@@ -128,8 +128,8 @@ GENERIC_CRITERION = "what you came for has been given"
 GENERIC_CRITERION_REVERSE = "the caller has what they rang about"
 
 # Replies the persona has to have given -- its opening plus two answers --
-# before the settlement check is attached at all. See
-# `SessionOrchestrator._settlement_check`.
+# before the settlement check is attached at all. See `settlement_check`
+# below, which is where that decision moved.
 SETTLEMENT_CHECK_AFTER_REPLIES = 3
 
 # Sent when a reply was caught opening with a greeting again and is being

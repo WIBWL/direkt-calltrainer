@@ -15,11 +15,13 @@ the user asks to hear something again, the guards ease off once -- the persona
 is nudged to say it again, shorter -- then snap back if asked twice. Retry
 policy: one retry per leg, then end the Session cleanly (ADR 0016, ADR 0033).
 """
-# pylint: disable=too-many-lines  # what is left after the seams were cut: the
-# prose lives in prompting.py (the system prompt) and nudges.py (the per-turn
-# pushes, each with the comment naming the observed failure it catches), the
-# reply's heard-text record in heard.py, the pure helpers in measuring.py. This is one call's control flow,
-# and carving it further would split a single flow across files to buy lines.
+# No `too-many-lines` exception any more: cutting the seams out -- the system
+# prompt to prompting.py, the per-turn pushes to nudges.py, the heard-text
+# record to heard.py, the verdicts to reply_checks.py -- brought this back
+# under pylint's 1000-line ceiling on its own. What is left is one call's
+# control flow, and carving it further would split a single flow across files
+# to buy lines. If the ceiling is reached again, that is the warning doing its
+# job rather than something to mute.
 
 import asyncio
 import contextlib
