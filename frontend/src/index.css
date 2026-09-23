@@ -1639,13 +1639,15 @@ h2 {
   }
 }
 
+/* Keep the live conversation compact enough that the Persona, call state and
+   controls read as one unit without making the panel feel crowded. */
 .call-panel {
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
-  padding: 34px;
+  gap: 20px;
+  padding: 30px 34px;
   overflow: hidden;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-card);
