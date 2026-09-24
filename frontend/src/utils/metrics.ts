@@ -27,7 +27,15 @@ export type MetricKey =
   | "run_length"
   | "loudness"
   | "intonation"
-  | "interruptions";
+  | "interruptions"
+  /** The call length: derived in the browser from the Session's two timestamps
+   *  (`progressStats.durationSeries`), not measured, but in the union because it
+   *  sits in the progress table beside the measured metrics and opens its own
+   *  page. Left out it fell to `UNKNOWN` and inherited every display fact by
+   *  accident, which the compile error protecting the others could not reach.
+   *  `tests/test_metrics.py` checks only the other direction, so it is added by
+   *  hand here. */
+  | "duration";
 
 /** `line` is every ordinary metric: a value per training, a course, a band.
  * `parts` is a checklist, drawn as marks rather than a line — a course of
@@ -42,6 +50,12 @@ interface MetricDescriptor {
    * depends on the microphone (ADR 0076's amendment).
    */
   comparableAcrossCalls: boolean;
+  /** True for a series the browser works out itself, with no `metric_type` row
+   *  and so no Measurement on any call (the call length). It keeps `METRIC_KEYS`
+   *  to the metrics a call can carry, which the post-call screen counts its
+   *  measurements against — a never-measured key would add one uncollected
+   *  metric to every call. */
+  derived?: boolean;
   /**
    * Whether it earns a row in the progress overview. Required for the same
    * reason; a metric can be worth measuring yet repeat the row above it.
@@ -159,13 +173,27 @@ const CATALOGUE: Record<MetricKey, MetricDescriptor> = {
     inOverview: true,
     openHint: "Einzelne Stellen ansehen",
   },
+  // Derived in the browser, not measured (see `MetricKey`). It earns its overview
+  // row as the context every count needs: a longer call has more occasion for a
+  // question or an interruption, which is why the concept puts it beside them.
+  duration: {
+    derived: true,
+    comparableAcrossCalls: true,
+    inOverview: true,
+    decimals: 0,
+    openHint: "Die einzelnen Gespräche ansehen",
+  },
 };
 
 /**
- * Every metric the catalogue knows, in inventory order, so a screen can notice
- * a measurement that could not be taken (it leaves no row at all).
+ * Every metric a call can carry, in inventory order, so a screen can notice a
+ * measurement that could not be taken (it leaves no row at all). `derived`
+ * entries are left out: they have no `metric_type` row and are never measured,
+ * so counting them would report one uncollected metric on every call.
  */
-export const METRIC_KEYS = Object.keys(CATALOGUE) as MetricKey[];
+export const METRIC_KEYS = (Object.keys(CATALOGUE) as MetricKey[]).filter(
+  (key) => !CATALOGUE[key].derived,
+);
 
 /**
  * An unknown key, rendered plainly rather than crashing: the detail route serves

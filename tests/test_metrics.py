@@ -805,25 +805,46 @@ CATALOGUE_TS = (
 )
 
 
-def _catalogue_keys() -> set[str]:
-    """The keys of the frontend's private metric catalogue.
+def _catalogue_entries() -> dict[str, str]:
+    """The frontend's private metric catalogue: key to the body of its entry.
 
     Read from the source as text: there is no Node in the pytest run.
     """
     text = CATALOGUE_TS.read_text(encoding="utf-8")
     body = text.split("const CATALOGUE: Record<MetricKey, MetricDescriptor> = {", 1)[1]
     body = body.split("\n};", 1)[0]
-    return set(re.findall(r"^  ([a-z_]+):", body, re.MULTILINE))
+    # Each entry starts at column 2 and runs to the next one, which is what lets
+    # a multi-line entry's own fields be read (`derived` below).
+    starts = list(re.finditer(r"^  ([a-z_]+):", body, re.MULTILINE))
+    entries: dict[str, str] = {}
+    for index, match in enumerate(starts):
+        end = starts[index + 1].start() if index + 1 < len(starts) else len(body)
+        entries[match.group(1)] = body[match.start():end]
+    return entries
+
+
+def _measured_catalogue_keys() -> set[str]:
+    """The catalogue keys that stand for a metric the backend measures.
+
+    `derived` entries are left out -- the call length is the one today. It needs
+    the display facts every other key has, so an entry saying what it is beats
+    an absence, which is what let it inherit them from the unknown-key fallback.
+    """
+    return {
+        key for key, body in _catalogue_entries().items() if "derived: true" not in body
+    }
 
 
 def test_frontend_catalogue_covers_every_metric():
     """Every active metric is described on the frontend, and nothing else is.
 
     A new metric otherwise renders as "4.0" or never reaches a focus goal, silently.
-    Inactive metrics are absent: they never produce a Measurement.
+    Inactive metrics are absent: they never produce a Measurement. So are
+    `derived` entries, the other direction -- a series the browser works out with
+    no backend metric behind it (see `_measured_catalogue_keys`).
     """
     active = {m.key for m in METRICS if m.active}
-    described = _catalogue_keys()
+    described = _measured_catalogue_keys()
 
     assert described - active == set(), (
         "frontend/src/utils/metrics.ts describes metrics the backend does not "
