@@ -2473,21 +2473,23 @@ h2 {
 .next-steps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
   align-items: stretch;
-  /* The spacing the cards used to bring themselves, now that they do not. */
-  margin-top: 1.5rem;
+  gap: 18px;
+  margin-top: 18px;
 }
 
+/* Both next-step offers use the same calm card treatment. The narrow accent
+   identifies the option without making either card look more important. */
 .card.next-step {
-  border-left: 3px solid var(--blue);
-  /* A column so the button can be pushed to the bottom: side by side, two
-     leads of different lengths would otherwise leave the buttons at different
-     heights, which reads as one card being unfinished. */
   display: flex;
   flex-direction: column;
-  /* The grid's own gap does the spacing between them. */
   margin-top: 0;
+  padding: 22px 24px;
+  border: 1px solid var(--color-border-subtle);
+  border-left: 3px solid var(--color-blue-600);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px rgba(3, 37, 62, 0.04);
 }
 
 /* The lead is what gives way, so what follows it lines up across the two. */
@@ -2502,22 +2504,24 @@ h2 {
 }
 
 .next-step-eyebrow {
-  font-size: 0.7rem;
+  color: var(--color-blue-600);
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.09em;
-  color: var(--text-muted);
+  letter-spacing: 0.08em;
 }
 
 .card h2.next-step-title {
-  margin: 0.3rem 0 0.5rem;
-  font-size: 1.1rem;
+  margin: 5px 0 8px;
+  color: var(--color-navy-900);
+  font-size: 20px;
+  line-height: 1.2;
 }
 
 .card p.next-step-lead {
-  margin: 0 0 1rem;
-  color: var(--text-muted);
-  font-size: 0.92rem;
-  line-height: 1.55;
+  margin: 0 0 18px;
+  color: var(--color-text-muted-secondary);
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .card p.follow-up-name {
@@ -2554,6 +2558,20 @@ h2 {
   background: var(--navy-light);
 }
 
+/* Actions inside the feedback offers follow the compact control shape used
+   throughout the training flow rather than the older pill treatment. */
+.next-steps .follow-up-button {
+  min-height: 40px;
+  padding: 9px 16px;
+  border-radius: 9px;
+  background: var(--color-navy-900);
+  font-size: 14px;
+}
+
+.next-steps .follow-up-button:hover {
+  background: var(--color-navy-700);
+}
+
 .card p.follow-up-note {
   margin: 0.6rem 0 0;
   font-size: 0.82rem;
@@ -2579,19 +2597,11 @@ p.follow-up-error {
 /* The offer under the feedback. Same card as the follow-up, other accent, so
    the two read as two options rather than as one thing said twice. */
 .card.reverse-offer {
-  border-left-color: #c98a2b;
+  border-left-color: var(--color-brand-accent);
 }
 
 .card.reverse-offer .next-step-eyebrow {
-  color: #8a5200;
-}
-
-.card.reverse-offer .follow-up-button {
-  background: #c98a2b;
-}
-
-.card.reverse-offer .follow-up-button:hover {
-  background: #b0761f;
+  color: #a94b0a;
 }
 
 /* The reverse's pre-call screen: the briefing and the button, nothing else.
