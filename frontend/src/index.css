@@ -2915,11 +2915,12 @@ p.follow-up-error {
 
 /* --- Feedback page --- */
 
-/* Feedback needs more horizontal room than the live call because it combines
-   narrative feedback, paired findings and metric grids on the same page. */
+/* The feedback reads as one report rather than a wide dashboard. The outer
+   width and desktop inset leave an 800px reading column, matching the compact
+   composition used throughout the report. */
 .feedback-page {
-  width: min(1040px, calc(100% - 32px));
-  padding: 48px 0 72px;
+  width: min(896px, calc(100% - 32px));
+  padding: 48px 48px 72px;
 }
 
 /* The finished-training heading uses the same restrained hierarchy as the
@@ -2931,7 +2932,7 @@ p.follow-up-error {
 .feedback-title {
   margin: 0;
   color: var(--color-navy-900);
-  font-size: 40px;
+  font-size: 42px;
   line-height: 1.1;
   letter-spacing: -0.025em;
 }
@@ -2943,14 +2944,14 @@ p.follow-up-error {
    section — the two offers in the next-steps block are things you can pick,
    not sections of the page. */
 .feedback-section {
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .feedback-section-head {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .feedback-section-heading {
@@ -3051,8 +3052,8 @@ p.follow-up-error {
 .feedback-details {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  margin-bottom: 32px;
+  gap: 14px;
+  margin-bottom: 24px;
 }
 
 .feedback-details .feedback-section {
@@ -3636,7 +3637,7 @@ p.follow-up-error {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 10px 0 32px;
+  margin: 10px 0 28px;
   color: var(--color-text-muted-secondary);
   font-size: 14px;
   line-height: 1.5;
