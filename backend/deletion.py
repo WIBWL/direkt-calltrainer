@@ -1,38 +1,8 @@
-"""Deleting a subject's stored trainings (ADR 0066).
+"""Deleting a subject's stored trainings (ADR 0066) -- the one place that removes user data.
 
-The one place that removes user data, so that every entry point — the consent
-withdrawal today, a "delete this training" button later — goes through the same
-code rather than each growing its own idea of what belongs to a person.
-
-It is deliberately small, because the schema already does the work. Everything
-a Session owns hangs off it with `ON DELETE CASCADE` and `passive_deletes=True`
-(ADR 0026/0052), so deleting the Session rows removes their Turns, Measurements,
-Findings, Feedback, FeedbackPoints and AnalysisJobs with them, by raw SQL as
-well as through the ORM — which `tests/test_cascade_delete.py` already pins
-down. Reference data (Persona, Scenario, Language, MetricType) is untouched by
-construction: those foreign keys carry no `ondelete` at all. The one Scenario
-that belongs to a Session — the follow-up drafted from its feedback (ADR 0069)
-— is deactivated rather than deleted, for the reason `retire_follow_ups` gives.
-
-One exception: a reverse Scenario (ADR 0070) is content about the subject's own
-call rather than reference data — it carries a briefing written from that call's
-wrap-up — so it is removed rather than left standing. Two of the three paths do
-that: the withdrawal (`delete_subject_sessions`) and the retention sweep.
-Deleting a *single* training deliberately does not, and the profile screen says
-so: there a person is deciding about that one training and can remove the
-reverse herself, where the other two paths run with nobody deciding anything.
-
-All three go through `remove`, which owns the order the steps have to run in —
-follow-ups retired, reverses read while the link to them still exists, the
-Sessions deleted, the reverses nothing plays any more deleted after them. The
-sweep used to spell that sequence out itself, with the reason for the order
-written as a comment in both files.
-
-What this module does *not* do is claim to be a complete erasure. Two limits
-are known and named rather than papered over: backups are not reached (there is
-no surgical delete from a snapshot), and the transcript that STT logged in
-plaintext is not reached either. Both are recorded in ADR 0066.
-"""
+Cascades take a Session's subtree (ADR 0026/0052); reference data is untouched. Follow-ups
+are deactivated (ADR 0069); reverses (ADR 0070) are hard-deleted by withdrawal and sweep,
+not by a single hand deletion. All paths go through `remove` (ADR 0102). Backups: ADR 0066."""
 from __future__ import annotations
 
 import logging
@@ -51,18 +21,11 @@ def remove(
 ) -> None:
     """Delete these Sessions and what goes with them, in the one order that works.
 
-    Their follow-ups are retired first (`retire_follow_ups`). With
-    `with_reverses`, the reverses replaying them are read next -- *before* the
-    delete, because `origin_session_id` is `ON DELETE SET NULL` and nothing ties
-    a reverse to its training afterwards -- and deleted once the Sessions are
-    gone, except one a Session left standing is still played on
-    (`delete_unreferenced_reverses`). Without it the reverses stay: deleting one
-    training by hand is a person deciding about that one row (ADR 0070's
-    addendum).
-
-    Flushed before it returns, so a caller that goes on to write in the same
-    transaction cannot observe rows this call has logically already removed.
-    """
+    1. retire follow-ups; 2. with `with_reverses`, read the reverses *before* the
+    delete (`origin_session_id` is `ON DELETE SET NULL`, so the link vanishes);
+    3. delete the Sessions; 4. delete those reverses nothing still plays on.
+    Without `with_reverses` they stay (a single hand deletion, ADR 0070 addendum).
+    Flushed before returning, so later writes in the transaction see the removal."""
     retire_follow_ups(db, sessions)
     reverse_ids = reverses_of(db, sessions) if with_reverses else []
     for session in sessions:
@@ -75,18 +38,9 @@ def remove(
 def retire_follow_ups(db: DbSession, sessions: list[db_models.Session]) -> None:
     """Deactivate the follow-up Scenarios drafted from these Sessions (ADR 0069).
 
-    Deactivated rather than deleted, and this is the one place that decides it:
-    a later Session may have been played on such a Scenario, `session.scenario_id`
-    is NOT NULL and carries no `ondelete` (ADR 0026), and that training has to
-    stay readable. `active = False` is what reference rows retired from the seed
-    already use — it takes the row out of the library and leaves everything that
-    points at it intact.
-
-    Called before the Sessions go, by `remove`, which every path that removes
-    one goes through. The column's `ON DELETE SET NULL` then clears the
-    provenance, so this is not a place a raw-SQL delete can leave inconsistent —
-    only one where it would leave the Scenario on offer.
-    """
+    Not deleted: a later Session may have been played on one, and
+    `session.scenario_id` is NOT NULL with no `ondelete` (ADR 0026). Called by
+    `remove` before the Sessions go; `ON DELETE SET NULL` then clears provenance."""
     session_ids = [session.session_id for session in sessions]
     if not session_ids:
         return
@@ -98,15 +52,9 @@ def retire_follow_ups(db: DbSession, sessions: list[db_models.Session]) -> None:
 def reverses_of(db: DbSession, sessions: list[db_models.Session]) -> list[int]:
     """The reverse Scenarios replaying these Sessions, by primary key.
 
-    Has to be read *before* the Sessions go: `origin_session_id` carries
-    `ON DELETE SET NULL` (ADR 0070), so the moment they are deleted nothing
-    connects the two any more and the reverse looks like any other row.
-
-    Split from the delete below because the two sit on either side of the
-    Sessions' own delete in `remove`, and because what can go is not decided
-    here — see `delete_unreferenced_reverses`. Public for the retention
-    script's dry run, which counts them without deleting anything.
-    """
+    Must be read *before* the Sessions go: `origin_session_id` is
+    `ON DELETE SET NULL` (ADR 0070). Public for the retention dry run; what may
+    actually be deleted is `delete_unreferenced_reverses`'s decision."""
     session_ids = [session.session_id for session in sessions]
     if not session_ids:
         return []
@@ -121,19 +69,9 @@ def reverses_of(db: DbSession, sessions: list[db_models.Session]) -> list[int]:
 def orphaned_reverses(db: DbSession, boundary: datetime) -> list[int]:
     """Reverse Scenarios older than `boundary` whose origin Session is gone.
 
-    `origin_session_id` is `ON DELETE SET NULL`, so a reverse loses its one link
-    to the training it replays the moment that training is deleted. Every sweep
-    finds its candidates through that link, which means a reverse that survived
-    one run -- because a younger Session was still played on it -- was invisible
-    to every run after it. So was one whose origin the User deleted by hand, a
-    path that deliberately leaves the reverse behind.
-
-    Both were promised to go "on a later run". Neither did, and what outlives
-    the period is `reverse_brief`: German prose written from that person's own
-    wrap-up (ADR 0067/0070). Found here by their own age instead, and handed to
-    `delete_unreferenced_reverses` like any other candidate, so one still being
-    played is still spared.
-    """
+    With the origin deleted the link-based lookup cannot find them, and their
+    `reverse_brief` would outlive the period (ADR 0067/0070). Found by age instead;
+    `delete_unreferenced_reverses` still spares one being played."""
     return [
         row.scenario_id
         for row in db.query(db_models.Scenario)
@@ -149,24 +87,9 @@ def orphaned_reverses(db: DbSession, boundary: datetime) -> list[int]:
 def delete_unreferenced_reverses(db: DbSession, scenario_ids: list[int]) -> int:
     """Delete those of `scenario_ids` no Session points at any more.
 
-    The retention counterpart of `_delete_reverses` (ADR 0070's addendum). The
-    withdrawal can delete every reverse outright because it has just removed all
-    of that subject's Sessions; the sweep removes only the *expired* ones, so a
-    reverse played more recently than its origin still has a live
-    `session.scenario_id` pointing at it — and that column carries no `ondelete`
-    at all (ADR 0052), so deleting the row would be refused and would take the
-    whole sweep down with it.
-
-    Those rows are left for a later run rather than special-cased: once the
-    younger Session expires too, nothing references the reverse and it goes --
-    which is what `orphaned_reverses` is for. A reverse somebody keeps playing
-    therefore outlives the period, which is the right answer: it is in use, not
-    merely lying around.
-
-    Hard-deleted, not deactivated, for the reason `_delete_reverses` gives: the
-    briefing is written from that person's own wrap-up, and deactivation keeps
-    the text.
-    """
+    A reverse may still carry a live `session.scenario_id` (no `ondelete`, ADR 0052);
+    deleting it would be refused and abort the whole sweep, so it waits for a later
+    run. Hard-deleted: deactivation would keep the briefing text."""
     if not scenario_ids:
         return 0
     still_played = {
@@ -192,18 +115,9 @@ def delete_unreferenced_reverses(db: DbSession, scenario_ids: list[int]) -> int:
 def delete_subject_sessions(db: DbSession, subject_id: str) -> int:
     """Delete every stored Session of one subject. Returns how many went.
 
-    Idempotent: a second call finds nothing and returns 0. That matters more
-    than it looks — a withdrawal that is retried after a timeout must not
-    become an error, and a user who clicks twice must not see a failure for
-    work that already succeeded.
-
-    Loaded and deleted through the ORM rather than issued as one bulk
-    `DELETE ... WHERE subject_id = ...`. A bulk delete bypasses the ORM's
-    cascade handling and would lean entirely on the database's, which happens
-    to be correct here — but the two are declared as a pair on purpose
-    (ADR 0026), and quietly relying on only one of them is how the other stops
-    being maintained.
-    """
+    Idempotent, so a retried or double-clicked withdrawal is not an error.
+    Through the ORM rather than a bulk DELETE: ORM and database cascades are
+    declared as a pair (ADR 0026), and relying on only one lets the other rot."""
     sessions = db.query(db_models.Session).filter_by(subject_id=subject_id).all()
     remove(db, sessions, with_reverses=True)
     # Every other reverse of this subject's too: one whose training was deleted
@@ -215,22 +129,10 @@ def delete_subject_sessions(db: DbSession, subject_id: str) -> int:
 
 
 def _delete_reverses(db: DbSession, subject_id: str) -> None:
-    """Remove the subject's reverse Scenarios (ADR 0070).
-
-    The one place where a withdrawal reaches beyond the `session` table, and
-    deliberately: a reverse carries a briefing written from that person's own
-    wrap-up, so leaving the row would leave a reading of feedback whose
-    conversation has just been deleted. An ordinary authored Scenario is not
-    touched — it is the User's own work about a case, not a record of a call
-    they had.
-
-    After the Sessions, never before: a reverse Session points at its Scenario
-    through `session.scenario_id`, which carries no `ondelete` at all
-    (ADR 0052), so this delete would be refused while such a row still stood.
-
-    Hard-deleted rather than deactivated, unlike every other Scenario retirement
-    (ADR 0058): deactivation keeps the text, and the text is what has to go.
-    """
+    """Remove the subject's reverse Scenarios (ADR 0070): their briefing comes from
+    the person's own wrap-up. Must run *after* the Sessions (`session.scenario_id`
+    has no `ondelete`, ADR 0052). Hard-deleted, unlike other retirements (ADR 0058),
+    because the text itself is what has to go."""
     reverses = (
         db.query(db_models.Scenario)
         .filter_by(created_by=subject_id, reverse=True)
@@ -246,16 +148,8 @@ def _delete_reverses(db: DbSession, subject_id: str) -> None:
 def delete_session(db: DbSession, subject_id: str, extern_id: uuid.UUID) -> bool:
     """Delete one of the subject's Sessions. True if there was one to delete.
 
-    Ownership is part of the query, not a check on its result — the same shape
-    the history uses (ADR 0064), and for the same reason: a filter cannot be
-    forgotten on one path the way a comparison can, and there is no version of
-    this call that should ever reach somebody else's row.
-
-    Returns False rather than raising for an id that is absent *or* not the
-    caller's. The two are deliberately indistinguishable (ADR 0031/0050), and
-    the route turns this into the same 404 a stale link gets — telling the
-    caller that an id exists but is not theirs is exactly what the unguessable
-    id is there to withhold.
+    Ownership is in the query (as in ADR 0064's history). Absent and not-yours
+    both return False -- deliberately indistinguishable (ADR 0031/0050).
     """
     session = (
         db.query(db_models.Session)

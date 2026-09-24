@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { ApiError, getPersona } from "../api";
+import { ApiError } from "../api";
+import { getPersona } from "../personas";
 import type { PersonaDetail } from "../protocol";
 import Modal from "./Modal";
 import PersonaAvatar from "./PersonaAvatar";
@@ -27,19 +28,9 @@ const SECTIONS: {
 ];
 
 /**
- * Read-only portrait of a Persona, opened by the "i" on its selection card.
- *
- * Deliberately the same modal shell as ScenarioEditor (`Modal`: Escape and
- * click-outside to dismiss), so the two panels on the setup screen read as one
- * thing. What it does *not* borrow is the form: Personas are curated, not
- * User-authored (ADR 0058), so there is nothing to edit and no Save — the
- * fields are static text, and the only action is closing. There is no
- * unsaved-changes guard for the same reason; dismissing can never lose
- * anything.
- *
- * Everything shown is German display text (ADR 0043). The English `role`,
- * `traits` and `behavior` that brief the model stay on the server, and so does
- * an objection's English `text`; what arrives here are their display twins.
+ * Read-only portrait of a Persona, opened by the "i" on its card, in the same `Modal` shell as ScenarioEditor.
+ * Personas are curated (ADR 0058), so nothing is editable and dismissing can lose nothing. Everything shown is
+ * German display text (ADR 0043); the English prompt fields stay on the server.
  */
 export default function PersonaInfo({ personaId, personaName, onClose }: PersonaInfoProps) {
   const [detail, setDetail] = useState<PersonaDetail | null>(null);

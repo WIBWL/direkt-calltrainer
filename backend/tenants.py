@@ -1,16 +1,8 @@
 """Which company a caller belongs to (ADR 0060, R-58).
 
-The tenant is resolved for each request from the verified token: a `tenant`
-claim — a Keycloak user attribute an admin sets when creating the account,
-mapped into the access token by the `direkt-calltrainer tenant` protocol mapper. It
-matches `tenant.extern_ref` directly. A token without it, or with an unknown
-value (a typo'd attribute), resolves to the seeded `default` tenant rather than
-erroring.
-
-The client never supplies a tenant. `resolve_tenant_id` is the one entry point
-the API and the WebSocket handshake call; `backend/library.py` then scopes every
-read and stamps every authored row with the id it returns.
-"""
+From the token's `tenant` claim -- an admin-set Keycloak attribute -- matched against
+`tenant.extern_ref`; missing or unknown means the seeded `default` tenant. The client
+never supplies one; `resolve_tenant_id` is the single entry point."""
 from __future__ import annotations
 
 from dataclasses import dataclass

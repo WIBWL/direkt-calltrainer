@@ -20,12 +20,8 @@ import SetupSection from "./SetupSection";
 
 const NOT_SELECTED = "Noch nicht ausgewählt";
 
-/** What the summary says about a case that has not been drawn yet (F-62): the
- * choice that was made, and not its outcome, because there is none yet — plus
- * the category it will be drawn from, which is the one thing about it that is
- * already settled. With no category chosen the word stands alone: pairing it
- * with the unfiltered row would name a filter rather than a subject, and there
- * would be nothing to narrow. */
+/** Summary label for a case not yet drawn (F-62): the choice, plus the category it will be drawn from.
+ * With no category the word stands alone. */
 function randomSelectedLabel(category: CategoryFilter): string {
   return category === "all"
     ? "Zufallsszenario"
@@ -67,11 +63,8 @@ interface SetupViewProps {
 }
 
 /**
- * Presentational: the three-step selection screen. A Session is committed to
- * only by the button at the end — picking a Persona or Scenario connects
- * nothing (ADR 0042), which is why this component holds no state of its own
- * beyond what App.tsx passes in (the Scenario filter and library included,
- * ADR 0058/0060).
+ * Presentational three-step selection screen. Only the final button commits a Session; picking connects
+ * nothing (ADR 0042), so all state comes from App.tsx (ADR 0058/0060).
  */
 export default function SetupView({
   scenarioItems,
@@ -210,18 +203,9 @@ export default function SetupView({
   );
 }
 
-/** One selectable card. The Persona step is a plain grid (Personas are
- * curated, not User-authored); the Scenario step uses LibraryPicker instead,
- * which adds filtering and authoring.
- *
- * The info affordance sits *outside* the card button rather than inside it —
- * a button cannot be nested in a button — using the same `card-wrap` shell
- * LibraryPicker puts its "i" in. Reading about a Persona and
- * choosing one are separate acts: the "i" does not select the card.
- *
- * The portrait sits left of the text, which is why the three lines are wrapped
- * in an element of their own: the card is a row, and they are its second
- * column. */
+/** One selectable card (the Persona step; Scenarios use LibraryPicker). The "i" sits outside the card button
+ * — buttons cannot nest — in the same `card-wrap` shell, and reading does not select. The text lines are
+ * wrapped as the row's second column, beside the portrait. */
 function ChoiceCard({
   title,
   subtitle,
@@ -261,12 +245,8 @@ function ChoiceCard({
         <span className="persona-card-body">
           <span className="persona-name">{title}</span>
           <span className="card-subtitle">{subtitle}</span>
-          {/* The flag sits with the word it illustrates rather than with the
-              name: beside the name it competed for a column barely wide enough
-              for the name alone, and it was never saying anything about the
-              name. Ahead of the word, so that every card in a row has its flag
-              at the same x — "Deutsch" and "Englisch" are not the same
-              length. */}
+          {/* The flag goes ahead of the language word, not beside the name, so every card's flag sits at the
+              same x. */}
           <span className="card-meta">
             <LanguageFlag code={languageCode} />
             {language}

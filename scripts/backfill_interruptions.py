@@ -3,29 +3,13 @@
     python scripts/backfill_interruptions.py            # show what would change
     python scripts/backfill_interruptions.py --apply    # write it
 
-Possible at all because the *timeline* is persisted, unlike the audio: a Turn
-row carries its speaker, its offset and its duration, which is everything
-`interruptions.classify` reads. That makes this metric unusual in this project.
-Speaking pace or loudness can never be recomputed for a past Session, because
-ADR 0048 discards the recording the moment it has been measured; an overlap can,
-because it is a property of when people spoke rather than of how they sounded.
-
-Runs against the database in `.env`, so a host shell will do; nothing here needs
-Redis or a model.
-
-Idempotent. Sessions that already carry the figures are skipped, so a second run
-reports nothing and changes nothing. Anything already written is left alone
-rather than recomputed: a stored measurement is what the user has already been
-shown, and quietly moving it under them would be worse than leaving one
-generation of figures in place.
-"""
+Possible because the Turn timeline is stored (the audio is not, ADR 0048). Uses the
+database in `.env` (no Redis, no model). Idempotent; figures already written are
+never recomputed, since the user has already been shown them."""
 
 # pylint: disable=duplicate-code
-# What is left, once `_backfill_cli` took the command line, the inventory
-# lookup and the table scan, is what a script cannot hand away: the preamble
-# that makes `backend` and `scripts` importable at all -- the `sys.path`
-# insert has to run before the import that would share it -- and this module's
-# own entry point, `main()` delegating plus the `if __name__` guard.
+# The sys.path preamble and the main()/__name__ guard cannot move into
+# `_backfill_cli`: the preamble must run before that import.
 
 
 from __future__ import annotations
@@ -55,22 +39,11 @@ logger = logging.getLogger("backfill_interruptions")
 
 
 def _timeline(session: db_models.Session) -> tuple[interruptions.Segment, ...]:
-    """The stored Turn rows as the classifier's segments.
+    """The stored Turn rows as the classifier's segments, in `seq_index` order.
 
-    Rows without a duration are dropped: an overlap cannot be established
-    against a segment whose end is unknown, and assuming one would invent the
-    measurement. Ordered by `seq_index`, which is the order they were spoken in
-    and is unique per Session by constraint.
-
-    No `dispatched_ms`: the schema keeps one duration per utterance, so the
-    audio a trimmed reply *would* have run to is not recoverable from a stored
-    Session, and `Segment` falls back to the stored one. For every Session this
-    script is for -- recorded before the live path measured any of this -- that
-    stored duration *is* the dispatched end, so the reading is the intended one.
-    For a Session recorded since, the live path has already written the figures
-    from the in-memory Turns, where both ends exist, and this script skips any
-    Session that has them.
-    """
+    Rows without a duration are dropped rather than guessed. No `dispatched_ms`: it is
+    not stored, but for Sessions recorded before the live path measured this, the
+    stored duration *is* the dispatched end; newer Sessions already have figures."""
     return tuple(
         interruptions.Segment(
             speaker=turn.speaker,

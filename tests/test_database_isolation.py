@@ -1,17 +1,8 @@
-"""No test may reach the development database.
+"""No test may reach the development database (ADR 0034).
 
-This is a guard on the test setup itself, not on the application. It is easy to
-lose by accident: `backend/clients/config.py` calls `load_dotenv()` at import
-time, so the developer's real POSTGRES_* would be in the environment for the
-whole session unless conftest claims those names first with unusable values.
-If that ordering is ever disturbed, a test that calls `session_scope()` without
-asking for a database fixture writes into the database someone is developing
-against — silently, and only on their machine.
-
-Covers:
-  ADR 0034  a Session is written once, to a real database — which is what makes
-            an accidental connection from a test destructive rather than inert
-"""
+Guards the test setup: conftest must claim POSTGRES_* with unusable values before
+`backend/clients/config.py`'s `load_dotenv()` runs, or a stray `session_scope()`
+writes silently into the developer's database."""
 import os
 
 import pytest

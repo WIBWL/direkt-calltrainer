@@ -1,19 +1,8 @@
 """The /ws/session wire protocol: handshake and event forwarding.
 
-Covers:
-  F-46  Live-Call-Interface (one WebSocket per session, state + audio frames)
-  ADR 0033  streamed protocol: a JSON 'chunk' message then a raw binary frame
-  ADR 0035  a 'turn.interrupt' control message is understood
-  ADR 0041  the handshake resolves the ids through the database-backed
-            library, faked here so the test needs no database
-  Handshake robustness: a missing/!= 'session.start' or an unknown
-  persona/scenario id closes the socket with protocol-error code 1002; a
-  missing/invalid token closes with 1008 (F-50/ADR 0009).
-
-starlette's TestClient can't be used here (the repo pins httpx 0.28, whose
-Client rejects TestClient's `app=` kwarg), so the ASGI-level helpers are
-driven directly through a fake WebSocket.
-"""
+Covers F-46, ADR 0033 (JSON 'chunk' then binary frame), ADR 0035 ('turn.interrupt'), ADR 0041
+(library faked); a bad handshake or unknown id closes with 1002, a bad token with 1008
+(F-50/ADR 0009). Driven through a fake WebSocket, since TestClient breaks on httpx 0.28."""
 
 import asyncio
 import json
@@ -233,13 +222,10 @@ async def test_a_barge_in_over_the_goodbye_ends_the_session_instead_of_reviving_
 
 
 async def test_a_disconnect_mid_call_is_not_read_as_the_user_ending_it():
-    """A dropped connection reaches `session_ws` as `WebSocketDisconnect`.
+    """A dropped connection reaches `session_ws` as `WebSocketDisconnect`, not None.
 
-    `_receive_json` used to swallow it and answer None, which `_run_session`
-    reads as "the user pressed end call" -- so a walked-away call was stored
-    with the same status as a finished one and counted as a training in the
-    history and the activity calendar. It is stored, because the training
-    happened, but as `aborted` (ADR 0034's amendment).
+    None reads as "the user ended the call"; a walked-away call must be stored as
+    `aborted` (ADR 0034's amendment), not counted as a training.
     """
     ws = FakeWebSocket([_DISCONNECT])
     with pytest.raises(WebSocketDisconnect):
@@ -261,14 +247,10 @@ def test_a_disconnected_session_is_stored_as_aborted():
 
 
 class FrameWebSocket:
-    """A socket that speaks uvicorn's ASGI message shape rather than the
-    suite's convenience one.
+    """A socket with uvicorn's ASGI message shape (exactly one of "text"/"bytes").
 
-    `FakeWebSocket` hands objects back from `receive_json` and re-encodes for
-    `receive_text`, so it can only ever produce well-formed input. The real
-    thing carries exactly one of "text" or "bytes", and reading the wrong one
-    is a KeyError -- which is how a binary frame in a text position used to
-    tear the whole handler down.
+    `FakeWebSocket` only produces well-formed input; this one lets a binary frame
+    arrive where text is expected.
     """
 
     def __init__(self, frame):
@@ -297,10 +279,8 @@ class FrameWebSocket:
 async def test_only_a_json_object_counts_as_a_control_message(frame):
     """Everything else answers None and is skipped.
 
-    A scalar and an array parse cleanly and then have no `.get()`; a binary
-    frame is a KeyError before that. Mid-call each of them used to leave the
-    handler on an unhandled exception: no `_record`, no `session.ended`, the
-    training gone without even an `aborted` row to show for it.
+    A scalar, an array or a binary frame must not raise mid-call, or the training is
+    lost without even an `aborted` row.
     """
     assert await session_ws._receive_json(FrameWebSocket(frame)) is None
 
@@ -320,16 +300,10 @@ async def test_a_handshake_that_is_not_json_closes_the_socket(fake_library):  # 
 
 
 async def test_a_disconnect_during_a_turn_still_tears_the_turn_down():
-    """The teardown runs before the disconnect travels on.
+    """The teardown (cancel, `aclose`) runs before the disconnect travels on.
 
-    `control_task.result()` re-raises here, and it used to do so before the
-    cancel and the `aclose` below it. The forwarder then outlived the handler:
-    it went on driving the turn generator, which appends to and pops from
-    `orchestrator.turns` -- the very list `_record` reads from a worker thread
-    to write the Session (ADR 0034's amendment). The generator also stayed
-    parked inside the TTS stream, whose `finally` is what drops the pooled
-    KugelAudio socket, so that was left to the garbage collector instead
-    (ADR 0044's amendment).
+    Otherwise the forwarder outlives the handler, mutating `orchestrator.turns` while
+    `_record` reads it (ADR 0034), and the pooled TTS socket is left to the GC (ADR 0044).
     """
     closed = asyncio.Event()
     forwarded = []
@@ -368,15 +342,8 @@ async def test_a_disconnect_during_a_turn_still_tears_the_turn_down():
 async def test_a_forwarder_that_already_failed_still_closes_the_turn():
     """The teardown closes the generator however the forwarder ended.
 
-    A disconnect usually surfaces on the *send* side, so by the time the
-    teardown runs the forwarder has already finished with a RuntimeError.
-    `await forward_task` re-raises it, and the close that follows was simply
-    skipped -- the generator chain was left to the event loop's own
-    finalisation, which closes each one from a task nobody awaits and logs six
-    `aclose(): asynchronous generator is already running` errors per tab close
-    (seen live). The exception still has to travel: it is what tells
-    `session_ws` the client is gone, and therefore what stores the Session as
-    aborted rather than completed.
+    A send-side RuntimeError must not skip the close (else the loop finalises it and logs
+    `aclose()` errors), yet must still propagate so the Session is stored as aborted.
     """
     closed = asyncio.Event()
 

@@ -1,20 +1,8 @@
 """The order in which a barge-in reaches the orchestrator (ADR 0035).
 
-`SessionOrchestrator._finalize_interrupted` reads `_barge_in_played_ms` to
-decide how much of the reply the user actually heard. `note_barge_in()` is what
-puts it there, and `_run_turn_interruptible` is the only caller -- so the
-contract between them is an ordering one: **note_barge_in must land before the
-turn generator is finalized**, or the finalizer sees `None` and falls back to
-committing every chunk that was ever dispatched, including the ones the client
-never played.
-
-tests/test_barge_in.py exercises the orchestrator side of that contract by
-calling `note_barge_in()` by hand and then closing the generator. Nothing
-exercises the caller's side, which is where the ordering is actually decided --
-and it is decided differently depending on where the forwarding task happened
-to be suspended when the interrupt arrived. These two tests are the same
-barge-in twice, distinguished only by that.
-"""
+`note_barge_in()` must land before the turn generator is finalized, or the
+finalizer sees no played position and commits every dispatched chunk, heard or
+not. The two tests are one barge-in, differing in where the forwarding task sat."""
 
 # pylint: disable=duplicate-code
 # Fixture data is repeated per test module on purpose: a test carrying its own
@@ -159,13 +147,10 @@ class _RealTurnWs:
 async def test_only_the_heard_sentence_is_committed_when_the_turn_is_cut_mid_synthesis(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """The whole point of ADR 0035, through the real orchestrator and the real
-    interrupt path.
+    """ADR 0035 end to end: only the played sentence enters the history.
 
-    Three sentences go out as audio; the client reports it played 700 ms which,
-    with the 300 ms grace, covers exactly the first one. The other two were
-    streamed ahead and never heard, so they must not enter the history --
-    otherwise the next reply picks up from words the persona never spoke aloud.
+    700 ms played plus the 300 ms grace covers exactly the first of three sentences;
+    the other two were never heard and must not shape the next reply.
     """
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
     s1 = "Der erste Satz meiner Antwort ist inhaltlich vollstaendig und lang genug fuer seinen eigenen Chunk."
@@ -220,15 +205,10 @@ class _TailWs:
 async def test_a_barge_in_on_the_tail_trims_the_committed_reply_to_what_was_heard(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """A barge-in that arrives after the reply is already finished.
+    """A barge-in after the reply was already committed (the client lags playback).
 
-    The server streams ahead of playback, so when it finishes a turn the client
-    is still playing the tail of it -- and a user who talks over that tail sends
-    the interrupt *after* _generate_reply has committed the reply to history.
-    The Transcript must still show only what was played, so the history and
-    persona_text are trimmed to the heard part *together* -- never one without
-    the other (ADR 0035). The reply is committed exactly once, and the finished
-    turn stays closed.
+    History and persona_text are trimmed to the heard part together, never one
+    without the other (ADR 0035); the reply is committed once and the turn stays closed.
     """
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
     s1 = "Der erste Satz meiner Antwort ist inhaltlich vollstaendig und lang genug fuer seinen eigenen Chunk."

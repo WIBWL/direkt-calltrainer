@@ -1,19 +1,8 @@
 """What the user heard of a reply the server streamed ahead (ADR 0035).
 
-The client reports how many milliseconds of the reply it played; the server
-knows, per fully-synthesized chunk, where that chunk's audio ends and what
-text it carried. `SpokenReply` keeps that record as the reply is voiced and
-answers the one question a barge-in asks of it -- `cut(played_ms)`: every chunk
-played to its end, plus a word-prefix of the one the user cut off, and what
-was synthesized but never played.
-
-The record and the arithmetic are one module because the bug this code has
-had was in how the two met: a checkpoint is written only once a chunk is fully
-synthesized, and measured against the finished ones alone, a barge-in during
-the first sentence found nothing heard (ADR 0035's amendment). The pending
-chunk is now part of the record's own answer rather than something each caller
-has to remember to add.
-"""
+`SpokenReply` records where each chunk's audio ends and its text; `cut(played_ms)`
+returns the chunks played through, a word-prefix of the one cut off, and the unheard
+rest. The pending chunk counts too, else a first-sentence barge-in finds nothing heard."""
 
 from dataclasses import dataclass
 
@@ -72,13 +61,9 @@ class SpokenReply:
     def _with_pending(self) -> list[Checkpoint]:
         """The checkpoints plus the chunk still being synthesized, if any.
 
-        A checkpoint is written only when a chunk is *fully* synthesized, but
-        its audio goes out sub-chunk by sub-chunk as KugelAudio produces it
-        (ADR 0044) -- so the client is already playing the opening sentence
-        while that sentence has no checkpoint. The pending entry ends at the
-        audio actually dispatched, which is the honest span to measure a prefix
-        against.
-        """
+        A checkpoint is written only once a chunk is fully synthesized, but its
+        audio is already playing (ADR 0044); the pending entry ends at the audio
+        actually dispatched."""
         done = self._checkpoints[-1][1] if self._checkpoints else ""
         spoken = self.text.strip()
         pending = spoken[len(done):].strip()

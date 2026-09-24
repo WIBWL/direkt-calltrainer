@@ -1,55 +1,17 @@
 # pylint: disable=too-many-lines  # a data module: literals, not logic. Splitting it
 # by line count would put the Personas and the Scenarios that exercise them in
 # different files without making either shorter, and provision.py imports the set.
-"""Initial content for the `persona`, `scenario` and `focus_goal` reference tables.
+"""Seed state for the `persona`, `scenario` and `focus_goal` tables (ADR 0041/0076).
 
-ADR 0041 made the database the source of truth for the first two, so this
-content is seed state and not a runtime source: `backend/library.py` reads the
-tables, never this module. The focus-goal catalogue (ADR 0076) follows the same
-rule and is read through `backend/focus.py`. `backend/db/provision.py` writes
-all of it on startup and `scripts/seed_reference_data.py` on demand, both
-idempotently.
-
-Field names here are English and match both the value types in
-`backend/personas.py` / `backend/scenarios.py` and the columns of the library
-tables, so provision.py writes them straight through without mapping.
+Not a runtime source: the app reads the tables. Written idempotently by
+`backend/db/provision.py`; field names match the columns one to one.
 """
 
 # --- Personas -----------------------------------------------------------
-# Every Persona has exactly one Language and one voice (ADR 0041):
-# `kugelaudio_voice_id`, which is the whole of it since KugelAudio became the
-# only speech output (ADR 0103). A Persona without one cannot be played and is
-# seeded inactive; there is no second voice column any more, and no second
-# backend to carry one.
-#
-# Two kinds of text per entry (ADR 0043): "role_label" is the label shown on
-# the selection card and is written in the UI language; "role"/"traits"/
-# "behavior" are read only by the model and are English, so that the language
-# the Persona speaks is decided by language_id alone. The two role fields name
-# the same position in two languages, but the label is the shorter of the two:
-# it is read beside the Persona's name, on a screen that is already about
-# calling a customer, so it carries the title alone. Whose company it is, how
-# big it is and how long the contract has run are context the model needs and
-# the card does not -- they stay in "role".
-#
-# A role is the position and nothing else -- a job title and where it is held.
-# Everything descriptive belongs to the character (ADR 0045): a focus, a remit,
-# a reason for being on this call are all "traits"/"traits_label", conduct is
-# "behavior". Written the other way round, the card says twice over what the
-# traits line says once, and the model reads a disposition where it was given
-# a job.
-#
-# Renaming a Persona means renaming its "id" too, since the slug carries the
-# name. That is a new row: "id" is the natural key `provision._upsert` matches
-# on, and `_deactivate_missing` deactivates the old one. Deliberate -- a stored
-# Session keeps pointing at the row it was played on, so its history entry goes
-# on naming the Persona the User actually heard introduce itself, instead of
-# the transcript contradicting the label above it.
-# "avatar_url" is the path the Persona's portrait is served from. The images
-# are ordinary frontend assets in `frontend/public/personas/`, named after the
-# Persona's "name" as first-last in lower case and nothing else (not after the
-# "id", which carries the role too); only the pairing lives in the table. A Persona seeded without
-# one plays exactly the same and shows its initials instead.
+# One voice per Persona (ADR 0041/0103; seeded inactive without one). "role_label"
+# is the German card title; "role"/"traits"/"behavior" are English model text
+# (ADR 0043), the role only the position (ADR 0045). A rename needs a new "id".
+# Portrait: frontend/public/personas/<first>-<last>.webp, or initials without one.
 LANGUAGE_NAMES = {"de": "Deutsch", "en": "Englisch"}
 
 # Tenants (ADR 0060, R-58). The two pilot companies plus a `default` tenant that
@@ -104,7 +66,6 @@ PERSONAS = [
             "muss eine Zahl, einen Termin oder einen Namen liefern, statt "
             "allgemein zu bleiben."
         ),
-        "difficulty": "medium",
         "language_id": "de",
         "kugelaudio_voice_id": 972,
         # R-12 / ADR 0045: moves, not quotable lines -- the model reuses quoted
@@ -153,7 +114,6 @@ PERSONAS = [
             "auch wenn sie nichts bekommt. Der Nutzer muss selbst merken, "
             "dass die Frage noch offen ist."
         ),
-        "difficulty": "easy",
         "language_id": "en",
         "kugelaudio_voice_id": 1071,
         "objections": [
@@ -169,17 +129,10 @@ PERSONAS = [
         ],
     },
     # --- From the persona catalogue ---------------------------------------
-    # The four below come from the persona catalogue (docs/scenario-catalogue.md,
-    # P-02 / P-06 / P-01 / P-03). P-01 is the one customer type the interviews
-    # described in so many words (R-07); P-02 is the technical half of R-08,
-    # whose other half is Andreas Kastner.
-    #
-    # `active` is spelled out here because it is the flag that decides whether a
-    # Persona is offered: `library.list_personas` filters on it, and a Persona
-    # without a `kugelaudio_voice_id` has to stay False -- there is nothing to
-    # synthesise its lines with (ADR 0103). Seed a new one inactive until its
-    # voice is picked; `tests/test_persona_scenario_library.py` enforces that
-    # pairing.
+    # From docs/scenario-catalogue.md (P-02 / P-06 / P-01 / P-03); P-01 is R-07,
+    # P-02 the technical half of R-08 (Andreas Kastner is the other). `active`
+    # must stay False without a `kugelaudio_voice_id` (ADR 0103), which
+    # tests/test_persona_scenario_library.py enforces.
     {
         "id": "patrick-lohberg-it-lead",
         "avatar_url": "/personas/patrick-lohberg.webp",
@@ -218,7 +171,6 @@ PERSONAS = [
             "Der Nutzer muss präzise antworten, statt zusammenzufassen, und "
             "akzeptieren, dass die Zusage von einer zweiten Instanz abhängt."
         ),
-        "difficulty": "hard",
         "language_id": "de",
         "kugelaudio_voice_id": 1657,
         "active": True,
@@ -271,7 +223,6 @@ PERSONAS = [
             "nichts. Der Nutzer muss den Bedarf selbst erfragen, sonst "
             "versandet das Gespräch."
         ),
-        "difficulty": "medium",
         "language_id": "de",
         "kugelaudio_voice_id": 1887,
         "active": True,
@@ -326,7 +277,6 @@ PERSONAS = [
             "statt über den Betrag zu verhandeln. Die Persona verhandelt "
             "nicht."
         ),
-        "difficulty": "medium",
         "language_id": "de",
         "kugelaudio_voice_id": 980,
         "active": True,
@@ -380,7 +330,6 @@ PERSONAS = [
             "Fachbegriffe in Bilder übersetzen, statt sie mit weiteren "
             "Fachbegriffen zu erklären."
         ),
-        "difficulty": "easy",
         "language_id": "en",
         "kugelaudio_voice_id": 1655,
         "active": True,
@@ -401,73 +350,15 @@ PERSONAS = [
 ]
 
 # --- Scenarios -----------------------------------------------------------
-# Scenarios carry no language of their own (ADR 0043). "name" and
-# "short_description" are the display texts in the UI language; the rest is the
-# English call context the model reads, which is what lets any Persona run any
-# Scenario regardless of the language that Persona speaks.
-#
-# Three prompt fields (ADR 0045): "description" is the situation, and
-# "case_facts"/"call_goal" are the case. "call_goal" says both what the caller
-# wants and the bar they judge it by -- they were two fields until the split
-# proved to be one the editor imposed and nothing else read. Two authoring
-# rules hold them together:
-#   * The facts are about the *case*, never about the caller (no name, no
-#     employer, no motive), because both Personas have to be able to carry
-#     them (ADR 0001, ADR 0015).
-#   * "call_goal" is what the *caller* wants. What the user is meant to achieve
-#     is not part of the Persona's prompt; it used to be, and the caller was
-#     being told to keep itself as a customer.
-#
-# "briefing" (ADR 0054) is the third audience: display text addressed to the
-# *trainee*, never to the model. The three fields above brief the caller; this
-# one briefs whoever picks up the phone, and it says three things and stops --
-# the role they answer in, the room they have (what may be offered, promised or
-# escalated), and what counts as a good outcome. What to say is not its
-# business: told that, the trainee reads a script and the exercise stops being
-# a conversation (R-43). It has to agree with the bar inside "call_goal",
-# because the two describe one case from two sides -- a briefing that offers
-# what the caller would not accept makes the call unwinnable in a way neither
-# field reveals on its own.
-#
-# "description_label" and "case_facts_label" are the German twins of the two
-# prompt fields the read view shows (ADR 0062). Every Scenario carries its
-# situation and its case *twice*: once in English for the model, once in German
-# for the panel behind the card. Nothing checks that the two say the same thing
-# -- the tests assert only that both exist and differ from the prompt text,
-# because content agreement is not machine-checkable. Change one and forget the
-# other and the panel promises a case the caller does not play, in a way no test
-# run reveals. Write both in the same pass, and read them side by side after.
-#
-# "category" (ADR 0072) is display and filter only, never prompt input: one of
-# `models.SCENARIO_CATEGORIES`. The four refine F-03's three call contexts --
-# operations (short support cases), requirements (consultative project talks),
-# and pricing / closing, which split F-03's offer-and-pricing calls. Every
-# seeded Scenario carries one, because a shipped Scenario that no category
-# filter finds is a Scenario nobody selects.
-#
-# The twelve entries below the built-in five come from the scenario catalogue
-# (S-01..S-05, S-07..S-13). Two of its fourteen are deliberately not here:
-# S-06 needs a memory across Sessions (F-23, not built), and S-14 is not a
-# Scenario at all -- since ADR 0043 the language belongs to the Persona, so
-# "the same call in English" is an English Persona, not a row of its own.
-#
-# Every case is concrete and invented: a named product on the vendor's side
-# ("Kontura Flow", "Kontura Archive", "Kontura Connect"), figures, dates, ticket
-# numbers, and third parties on the user's side by name. That is what ADR 0045
-# asks case_facts for -- "product, figures, dates, history" -- and what the
-# original five have always done; the twelve from the catalogue were written
-# abstract by a misreading of the catalogue's anonymisation rule, corrected in
-# its section 1.1. The rule that stands is narrower and unchanged in substance:
-#   * Nothing identifies a real company, product, brand or place.
-#   * Nothing about the *caller* -- no name, no employer, no motive -- so any
-#     Persona can carry any case (ADR 0001, ADR 0015).
-#   * The case brings its own facts, so nothing outside the call has to be
-#     known to play it. That is C-05 (R-40/R-41), and an abstract case serves
-#     it worse: a gap in the facts gets filled from the trainee's own
-#     workplace, which is the customer-specific knowledge C-05 keeps out.
-# The figures are internally consistent within a Scenario and across the
-# library (80 euros per user, 1,600 a day), because a Persona that presses for
-# specifics will surface it if they do not add up.
+# Authoring rules (ADR 0043/0045/0054/0062/0072). Display text is German, prompt
+# text English. The case is concrete and invented, never a real company, and
+# never about the caller (no name, employer, motive: ADR 0001/0015); it brings
+# all its own facts (C-05); figures agree across the library. "call_goal" is the
+# *caller's* aim and bar. "briefing" addresses the trainee (role, room, good
+# outcome -- never what to say, R-43) and must agree with "call_goal".
+# "description_label"/"case_facts_label" are German twins no test can compare:
+# write both in one pass. Every Scenario has a "category". S-06 and S-14 of the
+# catalogue are deliberately not seeded.
 SCENARIOS = [
     {
         "id": "cold-call-followup",
@@ -693,12 +584,9 @@ SCENARIOS = [
         ),
     },
     # --- Closing after handover (the User is on the sales side) -----------
-    # The point of this one is the information gap: the Persona holds facts
-    # from a call the user was not on and has no notes for. It trains asking
-    # over agreeing, which is why `description` says outright that the user
-    # has nothing in writing. The 68 euros the Persona remembers sits below
-    # the 72-euro tier in `upsell-seat-expansion` on purpose -- a figure that
-    # may or may not have been promised is the whole hook.
+    # An information gap: the Persona remembers a call the user was not on, so
+    # it trains asking over agreeing. The 68 euros sits below the 72-euro tier
+    # in `upsell-seat-expansion` on purpose -- a maybe-promised figure is the hook.
     {
         "id": "closing-after-handover",
         "category": "closing",
@@ -1139,12 +1027,8 @@ SCENARIOS = [
         ),
     },
     # --- From the scenario catalogue: profile B, advice and onboarding ----
-    # The catalogue marks these as proposals: they are derived from the pilot's
-    # activity profile, not from a recorded call. The cases are sound to train
-    # against, but they have not been checked back with the customer.
-    #
-    # S-08. Listening and ordering, the mirror image of S-02: here the caller
-    # supplies too much detail, not too little.
+    # Proposals derived from the pilot's activity profile, not checked with the
+    # customer. S-08: listening and ordering, the mirror of S-02 (too much detail).
     {
         "id": "process-capture-interview",
         "category": "requirements",
@@ -1530,26 +1414,10 @@ SCENARIOS = [
 ]
 
 # --- Focus goals ----------------------------------------------------------
-# The catalogue a User picks their training focus from (F-62, ADR 0076). All
-# text here is German and user-facing: it is content, like a Scenario's title,
-# and the interface shows it unchanged. Only "id" is English, because it is the
-# key on the wire (ADR 0057/0061).
-#
-# "evidence" records how far a goal can be derived from a recording today:
-#   measured     -- derived from the audio or the transcript
-#   mixed        -- a measurable part plus an interpreted one
-#   interpretive -- an appraisal, not a measurement
-# It is planning information for the analysis work and is deliberately *not*
-# served to the client or shown on a card. The aim is that every goal becomes
-# measurable; asking a user to weigh up how far each one already is would make
-# them carry an implementation detail while picking.
-#
-# The texts say what a goal is about, never what the system will do with it:
-# nothing reads a selection yet (ADR 0076's scope), and a promise here would be
-# one this release does not keep.
-#
-# "position" is the display order across the whole catalogue; "group" only
-# decides which heading a card sits under.
+# The focus-goal catalogue (F-62, ADR 0076): German display text, English "id".
+# "evidence" (measured / mixed / interpretive) is internal planning information,
+# deliberately never served or shown. Texts say what a goal is about, never what
+# the system does with it. "position" orders the catalogue; "group" the heading.
 FOCUS_GROUP_NAMES = {
     "paraverbal": "Stimme und Sprechweise",
     "phases": "Gesprächsverlauf",
@@ -1568,13 +1436,9 @@ TRAINING_ROLE_CATALOGUE = [
     {"key": "other", "name": "Sonstiges", "categories": []},
 ]
 
-# `practised_in` is the kinds of call a goal is practised in (ADR 0072's
-# vocabulary), an editorial judgement written down where the goal is defined.
-# The library suggests Scenarios of every kind named (`recommendations.py`); the
-# progress view's one practice offer uses the first (`practiceRoutes.ts`, pinned
-# to this by `tests/test_recommendations.py`). Absent means the goal binds to no
-# kind of call: every Scenario trains the voice, every call has an opening, and
-# a habit goal is about how often somebody trains rather than about a call.
+# `practised_in`: the call kinds a goal is practised in (ADR 0072), read by
+# `recommendations.py`; the first is the progress view's offer (`practiceRoutes.ts`,
+# pinned by tests/test_recommendations.py). Absent: the goal binds to no kind.
 FOCUS_GOALS = [
     # --- A. Paraverbal: the measurable core of the voice.
     {
@@ -1610,23 +1474,14 @@ FOCUS_GOALS = [
             "hörbar hervortreten."
         ),
     },
-    # "the retired loudness goal" stood here and is retired: the figure behind it is
-    # the recorded level, which says as much about the microphone and how far
-    # away it sits as about the speaker, so two calls of the same person are not
-    # comparable and a goal would have promised a reading the data cannot give.
-    # The row is deactivated by the seeding, not deleted -- selections reference
-    # it (ADR 0076). The metric `loudness` itself stays, with the same caveat.
+    # The loudness goal is retired: the recorded level depends on the microphone,
+    # so calls are not comparable. Deactivated, not deleted -- selections
+    # reference it (ADR 0076); the `loudness` metric stays.
     {
         "id": "articulation",
-        # `interpretive` and not `mixed`: no measurement is planned for this one
-        # any more (docs/dashboard-concept.md, section 4.2). Indistinctness sits
-        # in the spectral sharpness of the signal, which is the microphone and
-        # the distance to it as much as the speaker -- the argument that retired
-        # the loudness goal, and harder here, because there is no comparison
-        # *within* one recording to fall back on. Whisper normalises swallowed
-        # endings into correct words on top of that, so the transcript does not
-        # carry it either. `mixed` was a promise of a measurement that is not
-        # coming.
+        # `interpretive`: no measurement is planned (docs/dashboard-concept.md,
+        # 4.2). Sharpness depends on the microphone, and Whisper normalises
+        # swallowed endings away, so neither audio nor transcript carries it.
         "group": "paraverbal",
         "evidence": "interpretive",
         "position": 3,

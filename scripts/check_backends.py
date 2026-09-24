@@ -1,15 +1,8 @@
-"""Check the pipeline backends (STT, LLM, TTS) from the host.
-
-Runs the same check the app runs at startup
-(`backend.clients.health.check_backends`), on its own, so you can tell whether
-a model is down without booting the app. One check per leg: there is one
-backend each (ADR 0103).
+"""Check the pipeline backends (STT, LLM, TTS) from the host, with the same check
+the app runs at startup (`backend.clients.health.check_backends`, ADR 0103).
 
 Usage:
-    python scripts/check_backends.py
-
-Exit code is 0 only if every configured backend responds.
-"""
+    python scripts/check_backends.py      # exit 0 only if every backend responds"""
 
 import asyncio
 import os

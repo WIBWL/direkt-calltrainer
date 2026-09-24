@@ -11,27 +11,9 @@ import { formatDayMonth } from "../utils/time";
 import InfoDetails from "./InfoDetails";
 
 /**
- * Block E of the dashboard: one thing to practise next.
- *
- * One suggestion and not a list. The decision about what to train next should
- * end in a click, and a stack of options is the same screen again with the
- * decision handed back to the reader.
- *
- * It always names where it comes from — naming the goal and how many wrap-ups
- * raised it is what makes this a suggestion; the same button without that
- * sentence is an instruction, and this screen has no standing to give one
- * (ADR 0004, ADR 0065).
- *
- * Three routes, in the order section 5.E of the concept sets out: the follow-up
- * (F-60) written from the training where the point was last named, else a
- * Scenario of the kind that goal is practised in (`PRACTICE_CATEGORY`, an
- * editorial table, unplayed preferred), else — for goals binding to no kind of
- * call — any unplayed one.
- *
- * The partner is the Persona from that same training, not chosen and not
- * varied: holding the voice constant is what makes the next call an exercise on
- * the point. The wire carries no difficulty on a Persona, so "a more demanding
- * partner" is not something this could pick even if it should.
+ * Block E: one thing to practise next, always naming its ground, else it is an instruction (ADR 0004, ADR 0065).
+ * Routes (concept 5.E): the follow-up (F-60) from the training that last named it, else a Scenario of the goal's
+ * kind (`PRACTICE_CATEGORY`, unplayed first), else any unplayed one. Persona held constant from that training.
  */
 export default function ProgressPractice({
   sessions,
@@ -93,18 +75,8 @@ export default function ProgressPractice({
         Als Nächstes üben
       </h3>
 
-      {/* The ground, then the offer, then the button, stacked down one column
-          of reading width. That order is the argument: a suggestion whose
-          ground the reader has not seen is an instruction, and this screen has
-          no standing to give one.
-
-          The ground used to sit in a column beside the offer, which put four
-          lines of prose in 240 pixels next to a bordered, gradient-filled
-          panel — a card inside a card, with the two halves centred against
-          each other so that nothing lined up. Stacked, the prose gets a
-          readable measure and the offer needs no box of its own to be found:
-          the name of the call in the display face and the one dark button on
-          the screen are enough. */}
+      {/* Ground, then offer, then button, in one column: a suggestion whose ground the reader has not seen
+          is an instruction. */}
       <div className="progress-practice-band">
         <p className="progress-practice-why">
           <span className="progress-practice-chip">Vorschlag</span>
@@ -115,18 +87,8 @@ export default function ProgressPractice({
         </p>
 
         {since && (
-          // The other half of Zimmerman's cycle. Until this existed the block
-          // only ever pointed forwards: it proposed a call, the user made it,
-          // and nothing on the screen ever referred back — so the dashboard
-          // served the reflection phase and led into planning without the
-          // planning ever being answered.
-          //
-          // Nothing is stored to do it and nothing is claimed by it. Two
-          // statements in the order they were written: the wrap-ups raised
-          // this, and afterwards a wrap-up said this. Whether the second
-          // follows from the first is not asserted anywhere — the user played
-          // whatever they played, and a sentence claiming their training
-          // caused it would be the measurement ADR 0080 refuses.
+          // Looks back (Zimmerman's cycle): the wrap-ups raised this, and afterwards a wrap-up said this.
+          // Causation is never claimed — that would be the measurement ADR 0080 refuses.
           <p className="progress-practice-since">
             <span className="progress-practice-chip">Seither</span>
             In Ihrem Training am {formatDayMonth(since.at) ?? since.at} („{since.scenario}“)
@@ -205,20 +167,9 @@ function lastNaming(sessions: SessionSummary[], goal: string): SessionSummary | 
 }
 
 /**
- * What a wrap-up has said about this goal since the training the suggestion
- * rests on, or null.
- *
- * Derived, never stored. The alternative was to remember that the button had
- * been pressed — in `localStorage`, which would make the same account read
- * differently on a laptop and at home, or in a column, which would make a UI
- * preference into training data with a consent gate (ADR 0066) and an entry in
- * `deletion.py`. Neither buys anything this does not: what matters is not that
- * a button was pressed but that the wrap-ups have since had something to say.
- *
- * `statementsFor` is newest first, and `source` is by construction the newest
- * training that named the goal as an improvement. So the newest statement is
- * either from that same training — nothing has happened since — or from a
- * later one, which is the case worth showing.
+ * What a wrap-up has said about this goal since the suggestion's training, or null. Derived, never stored (a
+ * stored press would be per-device or training data, ADR 0066). `source` is the newest training naming the goal,
+ * so a newest statement from a later training is the case worth showing.
  */
 function wordSince(
   sessions: SessionSummary[],
@@ -231,17 +182,8 @@ function wordSince(
 }
 
 /**
- * A Scenario of the right kind, preferring one the user has not played.
- *
- * Unplayed first because repeating the same case tests recall as much as
- * delivery, and because it widens their practice at no cost. Where everything
- * of that kind has been played, the least recently played one is still a
- * better answer than none.
- *
- * Matched on the title, which is what both the history row and the library card
- * carry. An id on the history row would be sturdier; the title is what is on
- * the wire today and a duplicate title would only cost this block a slightly
- * worse suggestion.
+ * A Scenario of the right kind, unplayed first (else the least recently played). Matched on the title, the one
+ * thing both the history row and the library card carry; a duplicate title only costs a worse suggestion.
  */
 function pickScenario(
   library: ScenarioCard[] | null,

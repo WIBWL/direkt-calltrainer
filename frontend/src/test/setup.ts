@@ -1,12 +1,7 @@
 /**
- * Test-only fakes for the two browser APIs the live-call audio path is built
- * on: Web Audio (useStreamedAudioPlayback) and WebSocket (useSessionSocket).
- * jsdom ships neither, and the real ones can't be driven frame-by-frame — the
- * barge-in races only show up when decode timing and socket delivery are under
- * the test's control.
- *
- * Both fakes expose a small manual-control surface (resolve this decode now,
- * deliver this frame now) on top of the shape the hooks actually use.
+ * Fakes for Web Audio (useStreamedAudioPlayback) and WebSocket (useSessionSocket),
+ * which jsdom lacks. Barge-in races only show when the test controls decode timing
+ * and socket delivery, hence the manual controls (resolve decode, deliver frame).
  */
 
 // --- Web Audio -------------------------------------------------------------

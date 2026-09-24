@@ -1,26 +1,8 @@
-"""A stored Session as it goes out on the wire -- the listing's row, the detail
-route's whole Session, and the subject's export.
-
-Three shapes, and they are deliberately three: the listing drops
-`detail_json` and the wrap-up text (ADR 0064), the detail route serves the
-Reading beside each figure (ADR 0091), the export carries every row the
-subject owns (ADR 0066). What they share is here once -- how a metric is
-named, how Turns and Findings are ordered, which rows are the whole call and
-what the wrap-up's state is -- so a field added to one of those reaches every
-route that serves it, instead of three edits of which nothing fails when one
-is forgotten.
-
-Plain functions over loaded ORM rows. The routes load (and decide what to
-eager-load, `_loading.py`), check ownership and answer; nothing here queries,
-which is also what makes the wire shape testable without a database.
-
-The two `_feedback` shapes stay two: the export serves `created_at` and plain
-points, the detail route `turn_id` and the focus goal. Merging them would need
-a flag, and a serializer with a flag is worse than two honest ones.
-
-The wire matches the schema (ADR 0057): the ORM's own English column values
-pass straight through to frontend/src/protocol.ts, with no translation step.
-"""
+"""A stored Session on the wire: the history row (ADR 0064), the detail route
+(ADR 0091) and the export (ADR 0066) -- three shapes, with what they share
+written once here. Plain functions over loaded ORM rows that never query, so
+the shapes are testable without a database. Values pass straight through to
+frontend/src/protocol.ts (ADR 0057)."""
 
 from __future__ import annotations
 
@@ -41,17 +23,11 @@ def _findings(session: db_models.Session) -> list[db_models.Finding]:
 
 
 def summary(session: db_models.Session) -> dict:
-    """One row of the history. `status` is `session.status` here -- completed
-    or aborted (ADR 0057) -- not the feedback status the detail route reports
-    under the same key; that one is `feedback_status`.
+    """One row of the history. `status` is `session.status` (completed/aborted),
+    not the feedback status the detail route serves under that key.
 
-    Both wrap-up fields are present because they answer different questions.
-    `has_feedback` is "is there something to open", which is what the row's
-    link is worth; `feedback_status` is why not, which is what distinguishes a
-    wrap-up still being generated from one that will never arrive. Deriving
-    either from the other would be a guess: a job reading `done` whose feedback
-    row is missing is exactly the case the reader must not paper over.
-    """
+    `has_feedback` and `feedback_status` are both sent and never derived from
+    each other: a `done` job with no feedback row must not be papered over."""
     return {
         "session_id": str(session.extern_id),
         "persona": session.persona.name,
@@ -59,53 +35,30 @@ def summary(session: db_models.Session) -> dict:
         # Whether this training was a reverse (ADR 0070), so the history can
         # say so on the row. The Scenario is already loaded for its title.
         "reverse": session.scenario.reverse,
-        # The kind of call this was (ADR 0072's vocabulary), so the dashboard
-        # can read a course over one kind rather than over everything.
-        #
-        # It answers the concept's own objection to its charts: Scenario and
-        # Persona move talk share, pace and question count more than a change
-        # in behaviour does, so a line across every training shows scatter
-        # where it looks like development. Nullable, as the column is, and the
-        # frontend treats an uncategorised training as its own bucket rather
-        # than dropping it.
+        # The kind of call (ADR 0072), so the dashboard can draw a course over
+        # one kind: across all of them the Scenario moves the figures more than
+        # behaviour does. Nullable, as the column is.
         "category": session.scenario.category,
         "status": session.status,
         "has_feedback": session.feedback is not None,
         "feedback_status": _feedback_status(session),
-        # The wrap-up's tagged points: kind, focus-goal key and the sentence
-        # itself. Enough for the dashboard to say "the closing came up as an
-        # improvement in 4 of your last 8 wrap-ups" *and* to show what was
-        # written each time, which is what its second level asks for.
-        #
-        # Here and not on an aggregate route of its own, for the reason the
-        # progress view adds no endpoint at all: a second path to the same
-        # numbers is a second place for them to drift. The summary and the
-        # untagged points stay on the detail route -- this carries what can be
-        # counted, not the wrap-up.
+        # The tagged points (kind, goal, sentence) the progress view counts and
+        # quotes. Here rather than on an aggregate route, which would be a
+        # second path to the same numbers; untagged points stay on the detail.
         "feedback_goals": _feedback_goals(session.feedback),
-        # Explicit isoformat rather than leaving it to the serializer: the wire
-        # format is part of what the frontend parses, not an incidental
-        # property of how this dict happens to be encoded.
+        # Explicit isoformat: the wire format is part of the contract.
         "started_at": session.started_at.isoformat(),
         "ended_at": session.ended_at.isoformat() if session.ended_at else None,
         "measurements": [
             {
                 **_metric(m.metric_type),
-                # Which half of the metrics the metric belongs to (ADR 0064's
-                # `aspect`). The detail route has carried it since the post-call
-                # screen split its grid in two; the dashboard needs the same
-                # split, and a copy of the mapping in the frontend would drift
-                # from the column the moment a metric is added.
+                # The metric's half (`aspect`), so the frontend keeps no copy
+                # of the mapping.
                 "aspect": m.metric_type.aspect,
                 "value": float(m.value),
-                # Whether this metric is still part of the current inventory
-                # (`backend/feedback/metrics.py`). A Session measured before a
-                # metric was renamed keeps pointing at the retired row, and
-                # nothing else on the wire would let a caller tell the two
-                # apart: both carry the same display name. The progress view
-                # (F-13) needs to, or one renamed metric becomes two identical
-                # cards. The detail route deliberately does not filter -- a past
-                # Session shows what was measured then.
+                # A renamed metric's old rows point at the retired row with the
+                # same display name; without this the progress view (F-13)
+                # draws it twice. The detail route deliberately does not filter.
                 "active": m.metric_type.active,
             }
             # Whole-call rows only. `toSeries` builds one series per metric key
@@ -221,24 +174,11 @@ def export(session: db_models.Session) -> dict:
 
 
 def _feedback_goals(feedback: db_models.Feedback | None) -> list[dict[str, str]]:
-    """The focus goals this wrap-up's points were assigned to, with their kind
-    and the point itself.
+    """The tagged points of this wrap-up: kind, focus goal and text.
 
-    Untagged points are left out rather than sent with a null goal. They cannot
-    be counted, so a caller would have to filter them anyway, and a row of
-    nulls invites somebody to treat "not assigned" as a category of its own.
-
-    Order follows `feedback.points`, which is `position`, so a caller that
-    wants the most prominent point of a kind can take the first. Duplicates are
-    kept: two improvements about the closing in one call are two points, and
-    collapsing them here would decide something the reader should.
-
-    `text` rides along since the progress view's second level, which has to say
-    what the wrap-ups actually wrote about a goal and not only how often they
-    wrote it (docs/dashboard-concept.md, section 7). ADR 0064's amendment has
-    the reasoning: what that decision keeps off the listing is `detail_json`,
-    a curve per metric per Session, and a tagged point is two sentences.
-    """
+    Untagged points are left out, not sent with a null goal. Order is
+    `position`; duplicates are kept. `text` is allowed on the listing by
+    ADR 0064's amendment."""
     if feedback is None:
         return []
     return [
@@ -253,8 +193,7 @@ def _feedback_status(session: db_models.Session) -> str:
 
     The job row is written in the same transaction as the Session, so its
     absence means nothing will ever generate a wrap-up -- which is "failed"
-    from the client's side, and saves it a fifth status to handle.
-    """
+    from the client's side, and saves it a fifth status to handle."""
     jobs = [j for j in session.jobs if j.kind == db_models.JOB_KIND_FEEDBACK]
     if not jobs:
         return db_models.JOB_FAILED
@@ -264,12 +203,10 @@ def _feedback_status(session: db_models.Session) -> str:
 
 def _abandoned(job: db_models.AnalysisJob) -> bool:
     """True for a `running` row that has not moved in longer than a job may run.
-
     Read as failed rather than left spinning; the row itself is not touched,
     because this is the reader's judgement and not a repair. A *queued* row is
     not abandoned, it is waiting, which is why the question is asked without
-    it -- `jobs.is_live` owns the window and both answers.
-    """
+    it -- `jobs.is_live` owns the window and both answers."""
     return job.status == db_models.JOB_RUNNING and not is_live(job, include_queued=False)
 
 
@@ -303,16 +240,10 @@ def _finding(finding: db_models.Finding) -> dict:
 
 
 def _segments(session: db_models.Session) -> list[dict]:
-    """The per-segment figures of one Session (ADR 0081), whole-call rows left
-    out because they are the list beside this one.
+    """The per-segment figures of one Session (ADR 0081), whole-call rows left out.
 
-    No `detail`, for ADR 0064's reason one level down: the loudness curve of a
-    segment is a curve like any other, nothing plots it, and it would outweigh
-    everything else here. The figure and which stretch it describes is the
-    whole of what the comparison needs.
-
-    Ordered by metric and then segment, so the two halves of a comparison
-    arrive next to each other however the database happened to return them.
+    No `detail` (ADR 0064): nothing plots a segment's curve. Ordered by metric,
+    then segment, so the two halves of a comparison arrive side by side.
     """
     return [
         {

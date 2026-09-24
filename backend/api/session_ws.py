@@ -1,9 +1,7 @@
 """The `/ws/session` route: wire protocol on one side, `SessionOrchestrator` on
-the other.
-
-A WebSocket, not REST, because the live call streams audio both ways and the
-user can talk over the persona (ADR 0033, ADR 0035). The token rides in the
-first message — a browser cannot header a WebSocket (ADR 0009).
+the other. A WebSocket because audio streams both ways and the user can barge
+in (ADR 0033/0035); the token rides in the first message, since a browser
+cannot header a WebSocket (ADR 0009).
 """
 
 import asyncio
@@ -83,44 +81,22 @@ async def session_ws(websocket: WebSocket) -> None:
                 # and "user" carry over unchanged.
                 reason = "error" if outcome == "failed" else outcome
         except (WebSocketDisconnect, RuntimeError, OSError) as e:
-            # Nobody ended this call: the tab was closed, or the connection
-            # dropped. The training still happened and its Turns are in memory,
-            # so it is stored -- as `aborted`, never as `completed` (ADR 0034's
-            # amendment). ADR 0034 originally discarded it; that threw away ten
-            # minutes of training for a network blip, and storing it as
-            # completed instead -- which is what the swallowed disconnect in
-            # `_receive_json` used to do -- counted a walked-away call as a
-            # finished one in the history and the activity calendar.
-            #
-            # Three exception types, because a lost connection looks different
-            # depending on which side noticed. The receive side raises
-            # WebSocketDisconnect. A *send* into a socket the client already
-            # dropped raises uvicorn's ClientDisconnected, which subclasses
-            # OSError -- caught by its base rather than by importing a server
-            # internal -- or RuntimeError ("send after close") once the close
-            # has been processed. Only the first was caught here, so a
-            # disconnect that surfaced on the send side tore the handler down
-            # and lost the Session entirely, which is the state the amendment
-            # exists to remove. The same insight is already written out 30
-            # lines below, for the final send.
-            #
-            # The breadth is deliberate and its cost is bounded: anything else
-            # reaching here is stored as an aborted Session and logged with its
-            # type, where it used to be an unhandled error and a lost training.
+            # Nobody ended this call: store it as `aborted`, never `completed`
+            # (ADR 0034's amendment). Three types because a lost connection shows
+            # differently by side: WebSocketDisconnect on receive, uvicorn's
+            # ClientDisconnected (an OSError) or RuntimeError ("send after close")
+            # on send. Catching only the first loses the Session.
             logger.warning("Session ended without a client (%s: %s); storing it as aborted",
                            type(e).__name__, e)
             reason = "disconnected"
 
-        # Flattened by the same function the persisted Turn rows come from, so
-        # the log the user sees cannot disagree with the one that was stored --
-        # and carries the offsets that make it a timestamped transcript.
+        # Same flattening as the persisted Turn rows, so the two cannot disagree.
         transcript = [
             {"speaker": u.speaker, "text": u.text, "offset_ms": u.offset_ms}
             for u in utterances(orchestrator.turns)
         ]
-        # Before session.ended, so the row exists by the time the client can
-        # ask for its Feedback -- a 404 then means the write genuinely failed,
-        # not that the client was merely early.
+        # Before session.ended, so a 404 on the Feedback means the write
+        # failed, not that the client was early.
         await _record(persistence.FinishedCall(
             extern_id=session_id,
             subject_id=auth.sub,
@@ -135,11 +111,8 @@ async def session_ws(websocket: WebSocket) -> None:
             await websocket.send_json({"type": "session.ended", "reason": reason, "transcript": transcript})
             await websocket.close()
         except (WebSocketDisconnect, RuntimeError):
-            # The client can drop before this final send; Starlette then raises
-            # RuntimeError ("send after close"), not WebSocketDisconnect. The
-            # transcript is lost with the connection, but the Session itself is
-            # not: `_record` above has already written it (ADR 0034's
-            # amendment), so it is readable from the history.
+            # A client gone before this send raises RuntimeError ("send after
+            # close"), not WebSocketDisconnect; `_record` already stored it.
             logger.info("Client disconnected before session.ended could be sent")
             return
         logger.info("Session ended (%s)", reason)
@@ -148,17 +121,12 @@ async def session_ws(websocket: WebSocket) -> None:
 async def _record(call: persistence.FinishedCall) -> None:
     """Persist the finished Session and queue its wrap-up (ADR 0034, ADR 0019).
 
-    Dispatched off the event loop because the ORM is synchronous, and never
-    allowed to raise: the call is already over, and neither a database nor a
-    Redis outage may cost the user the transcript they are waiting for.
+    Off the event loop (the ORM is synchronous) and never raises: no database
+    or Redis outage may cost the user their transcript.
     """
-    # Consent is checked inside `persist_session`'s own transaction (ADR 0066),
-    # not here: it is the last point at which unconsented data can be prevented
-    # from existing, and the check only holds if it commits with the write it
-    # authorises. Asked from out here it was minutes newer than the handshake
-    # and still milliseconds older than the INSERT. `None` means it said no and
-    # nothing was written. The call itself is unaffected either way — the
-    # transcript has already been sent.
+    # Consent is checked inside `persist_session`'s own transaction (ADR 0066):
+    # only there does the check commit with the write it authorises. `None`
+    # means it said no and nothing was written.
     try:
         db_id = await asyncio.to_thread(persistence.persist_session, call)
     except Exception:  # pylint: disable=broad-exception-caught
@@ -167,10 +135,8 @@ async def _record(call: persistence.FinishedCall) -> None:
     if db_id is None:
         return
     try:
-        # Imported here, not at module scope: the live path must not need
-        # Redis to be importable, let alone reachable. `jobs` stays at module
-        # scope -- it touches only the database, and the handler below needs it
-        # bound even when this import is what failed.
+        # Imported here: the live path must not need Redis to be importable.
+        # `jobs` stays at module scope because the handler needs it when this fails.
         from backend.feedback import queue  # pylint: disable=import-outside-toplevel
 
         await asyncio.to_thread(queue.enqueue_feedback, db_id)
@@ -185,31 +151,22 @@ async def _record(call: persistence.FinishedCall) -> None:
 def _load_selection(
     persona_id: str | None, scenario_id: str | None, auth: AuthContext
 ) -> tuple[Persona | None, Scenario | None]:
-    """The Persona and Scenario the handshake names, read together in one worker
-    thread -- `session_scope()` is synchronous and nothing blocking may run on
-    the event loop that streams live audio (CLAUDE.md, ADR 0034).
+    """The Persona and Scenario the handshake names, read in one worker thread
+    (nothing blocking may run on the event loop, ADR 0034).
 
-    The Scenario is scoped to the caller and their company (ADR 0060): a
-    built-in, one shared with their tenant, or one of their own -- never another
-    User's private Scenario. Personas are all built-ins, so they are not scoped.
-    """
+    The Scenario is scoped to the caller and their tenant (ADR 0060); Personas
+    are all built-ins and not scoped."""
     persona = library.get_persona(persona_id)
     scenario = library.get_scenario(scenario_id, auth.sub, resolve_tenant_id(auth))
     return persona, scenario
 
 
 async def _session_start_frame(websocket: WebSocket) -> dict | None:
-    """The first frame, if it is the `session.start` object the protocol asks
-    for. Otherwise None, with the socket closed -- except on a disconnect,
-    where there is nothing left to close.
+    """The first frame if it is a `session.start` object, else None with the
+    socket closed (unless it disconnected).
 
-    Every shape the socket can carry needs an answer here, because all of this
-    is reachable before anything has been authenticated: a binary frame reads
-    as a KeyError (Starlette passes the ASGI message through, and it carries
-    "bytes" rather than "text"), text that is not JSON as a decode error, and a
-    JSON scalar or array parses and then has no `.get()`. Each of those used to
-    leave the handler on an unhandled exception.
-    """
+    Reachable unauthenticated, so every shape needs an answer: a binary frame
+    is a KeyError, non-JSON a decode error, a JSON scalar/array has no `.get()`."""
     try:
         start = await websocket.receive_json()
     except WebSocketDisconnect:
@@ -283,13 +240,8 @@ async def _next_turn_request(
     """Handle control messages until one asks for a turn.
 
     Returns that `turn.audio.meta` envelope, or None when the user ended the
-    Session. Anything else is handled and the wait continues: a frame that is
-    not a control message at all, an unrecognised type (client and server
-    versions need not match exactly), `session.activate`, and the barge-in over
-    the tail of a reply that had already finished on this side -- the server
-    streams audio ahead of playback, so that interrupt lands here, between
-    turns, and trims the just-finished reply to what was heard (ADR 0035).
-    """
+    Session. Unknown frames are skipped; a late barge-in (audio is streamed
+    ahead of playback) lands here and trims the finished reply (ADR 0035)."""
     while True:
         envelope = await _receive_json(websocket)
         if envelope is None:
@@ -308,14 +260,11 @@ async def _next_turn_request(
 async def _run_session(
     websocket: WebSocket, orchestrator: SessionOrchestrator, on_activate: Callable[[], None]
 ) -> _SessionEndReason:
-    """Session runs until the user ends the session, a turn fails, or the
-    persona ends the call naturally ("user", "error", or "completed").
+    """Run until the user ends the session ("user"), a turn fails ("error") or
+    the persona ends the call ("completed").
 
-    Takes `on_activate` for the same reason _wait_for_control_message does:
-    session.activate lands in whichever receive loop happens to own the socket
-    at that moment. The opening turn is usually already forwarded by the time
-    the user leaves the mic check, so that is normally this loop, not that one.
-    """
+    Takes `on_activate` because session.activate lands in whichever receive
+    loop owns the socket at that moment -- usually this one."""
     while True:
         envelope = await _next_turn_request(websocket, orchestrator, on_activate)
         if envelope is None:
@@ -335,10 +284,7 @@ async def _run_session(
             websocket, turn, orchestrator.start_playback, orchestrator.note_barge_in
         )
         if outcome == "interrupted":
-            # A barge-in over the tail of the reply that ended the call: the
-            # goodbye is in the history and the decision stands. Carrying on
-            # here ran a whole further Turn, and a second goodbye, on a call
-            # that was already over (ADR 0035).
+            # A barge-in over the goodbye: the call is still over (ADR 0035).
             if orchestrator.ended:
                 return "completed"
             continue
@@ -362,26 +308,15 @@ async def _run_turn_interruptible(
         try:
             kind, played_ms = control_task.result()
         except WebSocketDisconnect:
-            # The client went away while this was parked in its receive. The
-            # turn still has to be torn down before that travels on: left
-            # alone, the forwarder outlives this handler and goes on mutating
-            # `orchestrator.turns` while `_record` reads the same list from a
-            # worker thread, and the turn generator stays parked at its yield
-            # inside the TTS stream -- whose `finally` is what drops the pooled
-            # KugelAudio socket, so it would be dropped by the garbage
-            # collector instead of now (ADR 0044's amendment).
+            # Tear the turn down before re-raising: otherwise the forwarder keeps
+            # mutating `orchestrator.turns` while `_record` reads it, and the
+            # pooled KugelAudio socket is dropped by the GC, not now (ADR 0044).
             await _tear_down_turn(forward_task, events)
             raise
-        # Hand the played-through position to the orchestrator before *any* of
-        # the teardown below, because either half of it can finalize the turn.
-        # Cancelling forward_task delivers the CancelledError into whatever it
-        # is suspended in -- and while the reply is being generated that is the
-        # turn generator itself, parked on the TTS gateway, whose own handler
-        # then runs _finalize_interrupted immediately. That is the common case:
-        # synthesis is a network round trip, forwarding a chunk to the socket is
-        # not. Setting the position after the cancel therefore lost it exactly
-        # when it mattered, and the finalizer fell back to committing every
-        # dispatched chunk -- the behaviour ADR 0035 exists to prevent.
+        # Hand over the played position *before* any teardown: the cancel
+        # usually lands in the turn generator (parked on TTS), which finalizes
+        # the turn at once. Set afterwards, the position is lost and every
+        # dispatched chunk is committed -- what ADR 0035 exists to prevent.
         if kind == "interrupt":
             on_barge_in(played_ms)
         await _tear_down_turn(forward_task, events)
@@ -391,12 +326,9 @@ async def _run_turn_interruptible(
             return "interrupted"
         return "user"
 
-    # forward_task finished first. control_task is almost always still parked in
-    # its receive, but a barge-in over the tail of a reply that just completed
-    # can land in the gap between the wait returning and this cancel -- in which
-    # case control_task resolves with the interrupt instead of raising. Honour
-    # it, or the played-through position is lost and the whole reply stays in
-    # the transcript (ADR 0035).
+    # forward_task finished first, but a barge-in can land between the wait
+    # and this cancel; honour it, or the whole reply stays in the transcript
+    # (ADR 0035).
     control_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         late = await control_task
@@ -413,24 +345,10 @@ async def _run_turn_interruptible(
 
 async def _tear_down_turn(forward_task: asyncio.Task, events: AsyncIterator[TurnEvent]) -> None:
     """Stop forwarding this turn and close its generator, in that order.
-
-    Cancelling delivers the CancelledError into whatever the forwarder is
-    suspended in, which while a reply is being generated is the turn generator
-    itself. Where it was suspended in a socket send instead, the cancel unwinds
-    only the forwarder and leaves the generator parked at its yield, which is
-    what `aclose` is for.
-
-    The `finally` is load-bearing. A forwarder that has *already failed* -- a
-    send into a socket the client dropped, which is the ordinary way a
-    disconnect surfaces -- re-raises its own exception out of `await
-    forward_task`, and the close below was then never reached. The generator
-    chain was left to the event loop's own finalisation instead, which closes
-    each of them from a task nobody awaits: six `Task exception was never
-    retrieved` lines per disconnect, every one of them
-    `aclose(): asynchronous generator is already running`. Nothing was damaged
-    by it -- the TTS stream still reset -- but ERROR-level noise on a path that
-    runs whenever somebody closes a tab is exactly what stops a log from being
-    read (ADR 0055)."""
+    `aclose` covers a forwarder cancelled inside a socket send, which leaves the
+    generator parked at its yield. The `finally` is load-bearing: a forwarder
+    that already failed re-raises from `await forward_task`, and without it the
+    loop's finaliser logs ERROR noise on every disconnect (ADR 0055)."""
     forward_task.cancel()
     try:
         with contextlib.suppress(asyncio.CancelledError):
@@ -442,13 +360,10 @@ async def _tear_down_turn(forward_task: asyncio.Task, events: AsyncIterator[Turn
 async def _wait_for_control_message(
     websocket: WebSocket, on_activate: Callable[[], None]
 ) -> _Control:
-    """Waits for a client message that should interrupt the in-flight turn:
-    session.end/disconnect ends the session, turn.interrupt is a barge-in
-    (carrying how many ms of the reply the client played, ADR 0035).
-
-    session.activate is neither -- it usually arrives *during* the opening
-    turn, which is exactly the point (ADR 0051) -- so it starts the clock and
-    the wait continues.
+    """Wait for a message that interrupts the in-flight turn: session.end or a
+    disconnect ends it, turn.interrupt is a barge-in (with played ms, ADR 0035).
+    session.activate usually arrives during the opening turn (ADR 0051); it
+    starts the clock and the wait continues.
     """
     while True:
         envelope = await _receive_json(websocket)
@@ -496,21 +411,10 @@ async def _forward_turn_events(
 
 async def _receive_json(websocket: WebSocket) -> dict | None:
     """Receives one JSON control message, or None for anything that is not one.
-
-    A disconnect is *not* caught here. Swallowing it made the caller read a
-    dropped connection as the user pressing "end call", and the Session was
-    stored as completed -- the one thing ADR 0034 says it must not be. It now
-    travels up to `session_ws`, which is the only place that knows how a call
-    that nobody ended is stored.
-
-    Everything else the socket can carry answers None, and the callers skip it
-    the way they skip an unknown message type. Three shapes got past the old
-    guard and tore the whole handler down mid-call -- no `_record`, no
-    `session.ended`, the training gone: a binary frame where a control message
-    was expected (Starlette hands the ASGI message through and it carries
-    "bytes", not "text", so reading it is a KeyError), and a JSON scalar or
-    array, which parses cleanly and then has no `.get()`.
-    """
+    A disconnect is deliberately *not* caught: swallowed, it reads as the user
+    ending the call and the Session is stored as completed (ADR 0034). A binary
+    frame (KeyError) and a JSON scalar or array (no `.get()`) answer None, since
+    either would otherwise tear the handler down mid-call."""
     try:
         raw = await websocket.receive_text()
     except KeyError:

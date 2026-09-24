@@ -3,12 +3,9 @@ import { describe, expect, it } from "vitest";
 import { FOCUS_BACKING, backingOf, goalsForMetric } from "./focusMetrics";
 
 /**
- * What a focus tile is allowed to claim (F-62, F-13).
- *
- * Pure lookups whose every failure renders perfectly: a goal that silently
- * falls into the wrong bucket puts an empty chart on the dashboard, or worse,
- * a sentence claiming a measurement behind a goal that has none — which is the
- * one thing ADR 0004/0051 rule out. Nothing here throws.
+ * What a focus tile is allowed to claim (F-62, F-13). A goal in the wrong bucket
+ * renders fine but may claim a measurement that does not exist, which
+ * ADR 0004/0051 rule out.
  */
 
 describe("backingOf", () => {

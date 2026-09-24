@@ -1,21 +1,8 @@
-"""A stored Session on the wire (`backend/api/served.py`).
+"""A stored Session on the wire (`backend/api/served.py`): history row, detail, export.
 
-Covers:
-  ADR 0051  the measurement list carries the whole call only, one entry per
-            metric; the segment rows (ADR 0081) travel under their own key
-  ADR 0064  the listing drops `detail_json` and the wrap-up text
-  ADR 0066  the export carries every row the subject owns, as stored
-  ADR 0091  the detail route serves the Reading beside the stored facts
-
-Three shapes built from one Session, which used to be written out in two route
-modules -- so a field added to a Measurement needed three edits and nothing
-failed where one was forgotten. The shared parts are one place now; these pin
-what each shape keeps and what it leaves out.
-
-No database: the ORM rows are built in memory and never flushed. The HTTP
-tests (`test_api.py`, `test_data_rights.py`) still run the same shapes
-end to end.
-"""
+Covers ADR 0051 (measurements are whole-call only; segments under their own key, ADR 0081),
+ADR 0064 (listing drops `detail_json` and wrap-up text), ADR 0066 (export carries every owned
+row), ADR 0091 (detail serves the Reading). In-memory ORM rows; HTTP tests run these end to end."""
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal

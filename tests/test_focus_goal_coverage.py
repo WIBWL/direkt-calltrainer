@@ -1,26 +1,8 @@
 """Every focus goal reaches the dashboard, and only the real ones do (F-62, F-13).
 
-Covers:
-  F-62      the shipped catalogue of focus goals a User picks from
-  F-13      the progress view shows something per picked goal
-  ADR 0076  a retired goal keeps its row; the catalogue is the seed's
-  ADR 0080  the two habit goals are never assigned to a feedback point
-
-A goal is added in one place, `seed_data.FOCUS_GOALS`, and read in three: the
-dialog that offers it, `FOCUS_BACKING` for what its tile shows, and
-`PRACTICE_CATEGORY` for what it is practised in (pinned in
-`test_recommendations.py`). Only the first fails loudly when it is forgotten.
-
-`backingOf` answers an unknown key with "no measurement", which is right for a
-key the catalogue no longer has and wrong for one just added: a goal whose
-metrics were built the same week then shows mentions instead of its fresh
-series, on a tile the User picked themselves, and nothing anywhere fails. This
-file is what fails instead.
-
-Read out of the TypeScript source rather than executed, the way
-`test_metrics.py` reads the metric catalogue: there is no Node in the pytest
-run.
-"""
+Also ADR 0076 (retired goals keep their row) and ADR 0080 (habit goals never tagged).
+A goal missing from `FOCUS_BACKING` silently shows mentions instead of its series;
+this file fails instead. Reads the TypeScript as text: no Node in the pytest run."""
 import re
 from pathlib import Path
 
@@ -39,9 +21,7 @@ KINDS = {"metric", "activity", "text", "segment"}
 def _focus_backing() -> dict[str, str]:
     """The goal -> evidence kind table, as written in the source.
 
-    Entries run over one line or several, so the keys are found by their
-    indentation and each one's `kind` by searching forward from it -- `kind` is
-    the first field of every entry.
+    Keys are found by indentation; `kind` is the first field of every entry.
     """
     text = FOCUS_METRICS_TS.read_text(encoding="utf-8")
     body = text.split("export const FOCUS_BACKING", 1)[1].split("= {", 1)[1]
@@ -90,14 +70,10 @@ def test_the_backing_table_names_no_goal_that_is_not_shipped() -> None:
 
 
 def test_the_goals_without_a_call_of_their_own_are_the_habit_goals() -> None:
-    """`activity` on a tile and `_NEVER_ASSIGNED` in the generator are the same
-    judgement: this goal is about the training itself and not about any one
-    call.
+    """`activity` on a tile and `_NEVER_ASSIGNED` in the generator mark the same goals.
 
-    Held together because they fail in opposite directions. A goal marked
-    `activity` that the wrap-up does assign loses those sentences, which reach
-    no screen; one left out of `_NEVER_ASSIGNED`'s counterpart shows a tally
-    over a denominator nobody can open.
+    They fail in opposite directions: an `activity` goal the wrap-up tags loses those
+    sentences; a habit goal left assignable shows a tally nobody can open.
     """
     by_activity = {goal for goal, kind in _focus_backing().items() if kind == "activity"}
 

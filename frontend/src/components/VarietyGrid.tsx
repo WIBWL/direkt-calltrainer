@@ -10,23 +10,9 @@ import TrainingLinks from "./TrainingLinks";
 const COLLAPSED_ROWS = 5;
 
 /**
- * Which Scenario the user played against which Persona (F-13, the
- * training-variety focus goal).
- *
- * A real table, not a drawing: the rows and columns carry names, screen readers
- * get the header association for free, and the same markup is the accessible
- * form of the information. The shading of a cell only repeats its number.
- *
- * Played combinations only: a full library grid with empty cells reads as a
- * list of homework, and what somebody has not trained yet is not a deficit.
- * What this says instead is where their training has concentrated, which is
- * what the variety goal asks.
- *
- * Rows and columns come most played first (`progressStats.variety`), cut after
- * `COLLAPSED_ROWS` with a show-more button under the table — the same idiom the
- * training history and the Scenario grid use. With a dozen Scenarios played the
- * card had become the longest thing on the page, beside a calendar a third of
- * its height.
+ * Which Scenario was played against which Persona (F-13, training variety). A real table, so it is its own
+ * accessible form. Played combinations only — empty cells would read as homework. Most played first
+ * (`progressStats.variety`), cut after `COLLAPSED_ROWS` with a show-more button.
  */
 export default function VarietyGrid({
   variety,

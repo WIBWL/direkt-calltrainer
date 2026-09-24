@@ -1,19 +1,7 @@
-"""REST routes for the Persona library (ADR 0041).
+"""REST routes for the Persona library (ADR 0041), read-only (ADR 0058).
 
-`GET /api/personas` feeds the selection screen with display fields only
-(ADR 0043) -- the English prompt fields stay on the server.
-
-`GET /api/personas/{id}` is the same rule applied to the info panel behind
-a card: it serves the German *display* twins of the prompt fields
-(`role_label`, `traits_label`, the objections' `text_label`) and the German
-`training_goal`, never `role`, `traits`, `behavior` or an objection's English
-`text`. Split off the card route rather than folded into it, the way
-`GET /api/scenarios/{id}` is: the list stays a list, and the panel is opened
-for one Persona at a time.
-
-Personas are curated, not User-authored: unlike Scenarios (ADR 0058), there is
-no create/edit here. The `persona` table still carries the authored-content
-columns for schema symmetry with `scenario`, but nothing writes them.
+Both routes serve display fields only, the German twins on the info panel;
+the English prompt fields stay on the server (ADR 0043).
 """
 from __future__ import annotations
 
@@ -29,14 +17,9 @@ router = APIRouter(prefix="/api/personas", dependencies=[Depends(require_user)])
 def list_personas() -> list[dict]:
     """Cards for every selectable Persona.
 
-    `id` on the wire is the `extern_id` (ADR 0050); the client sends it straight
-    back in `session.start`. The language comes along because it is the
-    Persona's own, not a separate choice (ADR 0043).
-
-    `avatar_url` is a path into the frontend's own static files, not an
-    external URL, and may be null -- the card then shows the Persona's
-    initials.
-    """
+    `id` is the `extern_id` (ADR 0050), sent back in `session.start`.
+    `avatar_url` is a path into the frontend's static files, or null (the card
+    then shows initials)."""
     return [
         {
             "id": p.id,
@@ -58,15 +41,9 @@ def list_personas() -> list[dict]:
 def get_persona(extern_id: str) -> dict:
     """Everything the info panel shows about one Persona, in German.
 
-    Read-only: Personas are curated, not User-authored (ADR 0058), so there
-    is no PATCH beside this. An unknown or inactive id is a 404 -- the same
-    answer `library.get_persona` gives for either, since an inactive Persona
-    is not on offer.
-
-    `objections` carries the display labels, not the English moves the
-    prompt gets. A seeded Persona always has one per objection; the filter
-    drops any that is missing rather than showing an empty bullet.
-    """
+    An unknown or inactive id is a 404. `objections` carries the display
+    labels, not the English moves the prompt gets; a missing label is dropped
+    rather than shown as an empty bullet."""
     persona = library.get_persona(extern_id)
     if persona is None:
         raise HTTPException(status_code=404, detail="Persona not found")

@@ -1,24 +1,9 @@
 import { formatClock } from "./time";
 
-/**
- * The reading behind F-37's loudness course, as the server derived it, plus the
- * arithmetic of drawing it.
- *
- * What is *read* off the curve — the band from the call's own samples, the
- * smoothing, the at most two stretches that left the band — is derived on every
- * read by `backend/feedback/readings.py` and arrives in the Measurement's
- * detail (ADR 0091). It used to be computed here as well, in a second
- * implementation in a second language, while the backend computed the same
- * thing to put one sentence about it into the wrap-up prompt. The two agreed by
- * care alone: a drawing that marked no quieter stretch under a sentence that
- * named one would have been nobody's fault in particular.
- *
- * What stays here is what the server has no business knowing: the extent of the
- * plot, where the line breaks for a silence, the clock under the axis, and the
- * words for a reader who cannot see it. The course is drawn twice — as SVG on
- * the feedback page (`LoudnessCourse.tsx`) and into the downloadable report
- * (`utils/feedbackPdf.ts`) — so those stay shared too.
- */
+/** Drawing F-37's loudness course. The reading (band, smoothing, stretches) comes
+ * from `backend/feedback/readings.py` (ADR 0091) — do not recompute it here.
+ * This holds only the drawing: extent, line breaks, axis clock and text
+ * alternative, shared by `LoudnessCourse.tsx` and `utils/feedbackPdf.ts`. */
 
 /** acoustics.py's `_SAMPLE_INTERVAL_MS` — the curve's only time base. */
 const MS_PER_POINT = 100;
@@ -71,14 +56,9 @@ interface ServedCourse {
 }
 
 /**
- * The course in one loudness Measurement's served detail, or null where there
- * is none to draw:
- * a Session stored before this was served, or a call with too little audible
- * speech for the server to read anything off.
- *
- * The plot's extent is worked out here rather than served: the floor, the
- * ceiling and the point count are the raw curve's own, and scaling a drawing is
- * not a judgement about the call.
+ * The course in a loudness Measurement's served detail, or null (an older
+ * Session, or too little audible speech). The plot's extent is computed here:
+ * scaling a drawing is no judgement about the call.
  */
 export function loudnessCourse(detail: Record<string, unknown> | null): LoudnessCurve | null {
   const values = detail?.["curve_db"] as (number | null)[] | undefined;
@@ -109,14 +89,9 @@ export function loudnessCourse(detail: Record<string, unknown> | null): Loudness
 }
 
 /**
- * The line's runs of indices, drawn across the breathing pauses but not across
- * the silences.
- *
- * Gaps up to `BRIDGE_POINTS` are joined through: those are pauses inside an
- * utterance, and breaking at every one shattered the course into fragments. A
- * longer silence still ends the run — nothing was measured there, and a segment
- * across it would assert a level nobody spoke at. A run of one point is dropped
- * rather than returned: a line needs two.
+ * The line's runs of indices: gaps up to `BRIDGE_POINTS` (pauses inside an
+ * utterance) are joined; a longer silence ends the run, since nothing was
+ * measured there. Single-point runs are dropped: a line needs two.
  */
 export function loudnessRuns(smoothed: (number | null)[]): number[][] {
   const out: number[][] = [];

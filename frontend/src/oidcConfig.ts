@@ -1,13 +1,7 @@
-// OIDC configuration. The issuer is read from build-time Vite env (repo-root
-// .env, via vite.config's `envDir`), under the backend's own name rather than a
-// VITE_-prefixed copy: it is the same value the backend checks `iss` against,
-// and two copies of it in .env under two names is a pair that can disagree, so
-// vite.config widens `envPrefix` to let the SPA read it. The client id is not a
-// setting at all -- it is the same in every realm.
-//
-// A one-image-many-hosts deployment would need this resolved at runtime
-// instead; Calltrainer builds one image per deploy, so a build-time value is
-// enough.
+// OIDC configuration. The issuer is build-time Vite env (repo-root .env) under
+// the backend's own name, not a VITE_ copy, so the two cannot disagree —
+// vite.config widens `envPrefix` for it. The client id is the same in every
+// realm, so not a setting. Build-time is enough: one image per deploy.
 
 // Required, deliberately without a default: every candidate value is wrong in
 // some environment, and getting it wrong does not fail at build — the app just
@@ -27,14 +21,9 @@ export const oidcAuthority: string = issuer;
 export const oidcClientId = "direkt-calltrainer";
 
 /**
- * Where Keycloak sends the user back: always the SPA origin, never the page the
- * user was on. Keeping it to one URL means the realm needs one registered
- * redirect URI no matter how many routes the app grows.
- *
- * Getting back to the requested page is therefore the app's job, not Keycloak's
- * — `onSigninCallback` in main.tsx strips the `?code=&state=` and hands the
- * stored path to the router, which has to perform the navigation itself
- * (`history.replaceState` fires no event the router would hear).
+ * Where Keycloak sends the user back: always the SPA origin, so the realm needs
+ * one redirect URI. Returning to the requested page is the app's job
+ * (`onSigninCallback` in main.tsx).
  */
 export const oidcRedirectUri: string =
   typeof window === "undefined" ? "" : window.location.origin + "/";

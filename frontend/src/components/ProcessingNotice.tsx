@@ -1,17 +1,7 @@
 /**
- * Where the data goes (F-49).
- *
- * The feature asks for a notice covering the *kind*, the *purpose* and the
- * *place* of processing. The first two are said wherever this is used; the
- * place is here, because it is the part a user cannot guess and the part this
- * app was silent about: speech leaves the machine.
- *
- * One component rather than a paragraph repeated in the consent dialog and on
- * the profile. Those two must not drift, and a claim about where personal data
- * travels is the worst possible thing to keep two copies of.
- *
- * The full privacy statement is its own page (`ROUTES.privacy`); this is the
- * short version shown in context, and it should not become the long one.
+ * Where the data goes (F-49): the *place* of processing, the part a user cannot guess — speech leaves the
+ * machine. One component shared by the consent dialog and the profile, because a claim about where personal
+ * data travels must not exist in two copies. The short version; the full statement is `ROUTES.privacy`.
  */
 export default function ProcessingNotice({ compact = false }: { compact?: boolean }) {
   return (

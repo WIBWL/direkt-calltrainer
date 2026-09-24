@@ -1,21 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { apiFetch } from "../api";
+import { forgetStoredSessions } from "../sessions";
 import type { ConsentState } from "../protocol";
 
 export type ConsentLoadState = "loading" | "ready" | "failed";
 
 /**
- * The signed-in user's storage consent (ADR 0066).
- *
- * Held once, near the root, and passed down: the dialog that asks, the notice
- * on the setup screen and the profile's revocation all describe the same fact,
- * and fetching it in three places would let them disagree on screen.
- *
- * A failure to load is deliberately not treated as "no consent". The backend
- * decides what may be stored and fails closed on its own (`consent.py`); a
- * frontend that guessed here would either block a user who has agreed or
- * promise storage to one who has not, and it is not the side that knows.
+ * The signed-in user's storage consent (ADR 0066), held once near the root so
+ * the dialog, setup notice and profile cannot disagree. A failed load is not
+ * "no consent": the backend decides and fails closed on its own (`consent.py`).
  */
 export function useConsent() {
   const [consent, setConsent] = useState<ConsentState | null>(null);
@@ -50,6 +44,7 @@ export function useConsent() {
         "/api/consent",
         { method: "POST", body: JSON.stringify({ granted }) },
       );
+      if (!granted) forgetStoredSessions();
       setConsent(data);
       setState("ready");
       return data.deleted_sessions;

@@ -64,12 +64,9 @@ MIGRATION_LOCK_KEY = PROVISION_LOCK_KEY
 def run_migrations_online() -> None:
     """Run the migrations against a live database.
 
-    Guarded by an advisory lock: the app migrates on startup
-    (backend/db/provision.py), scaling it past one instance means several do,
-    and scripts/seed_reference_data.py is a second way in, so without it two
-    would apply the same revision concurrently. The others wait here and then
-    find nothing left to do. Not the worker -- it runs no migration.
-    """
+    Under an advisory lock, so app instances and scripts/seed_reference_data.py
+    never apply the same revision concurrently; the others wait, then find
+    nothing to do."""
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

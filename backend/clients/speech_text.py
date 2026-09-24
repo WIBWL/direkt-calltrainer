@@ -1,24 +1,8 @@
-"""Rewrites a reply into the form a TTS backend should read aloud.
+"""Rewrites a reply into the form a TTS backend should read aloud; the Transcript keeps the digits.
 
-Applied at the boundary in `tts.py`, so it changes only what is spoken. The
-Transcript keeps the digits, which is what a reader wants -- "1.400 Euro" and
-"6. Juli" are correct German, they are just unspeakable as written.
-
-German marks both a thousands separator and an ordinal with a full stop, and
-both reach the pipeline looking exactly like the end of a sentence. That costs
-twice over: `session/chunking.py` flushes a chunk at a sentence end, so the
-reply is cut into two synthesis calls with an audible gap between them, and
-within a chunk the TTS drops into a falling, end-of-sentence intonation.
-
-Removing the character fixes both. The digits are deliberately *not* spelled
-out as words: once the full stop is gone a bare "1400" is read correctly, and
-a German number-to-words conversion would be a large amount of code whose
-errors would be heard on every call. Ordinals are the exception -- "6 Juli" is
-not German -- so those become words, and only those.
-
-Unknown languages pass through untouched: a missing rule must never be able to
-fail a synthesis.
-"""
+German full stops in "1.400" and "6. Juli" look like sentence ends to `chunking.py`
+(an audible gap) and to the TTS (falling intonation), so they are removed; only
+ordinals become words. Unknown languages pass through untouched."""
 
 import re
 
@@ -57,14 +41,9 @@ _THOUSANDS_RE = re.compile(r"(?<=\d)\.(?=\d{3}(?!\d))")
 _ORDINAL_MONTH_RE = re.compile(rf"(\b\w+\s+)?(\d{{1,2}})\.(\s+(?:{_MONTHS})\b)")
 
 # "am 6." with no month behind it -- still an ordinal, still a full stop.
-#
-# `der`/`des` are here because the model puts a date in subject position often
-# enough to matter: scanned across 734 recorded persona replies, every stop this
-# module left standing mid-sentence was one of these ("Der 14. ist also der
-# Fix?"). `der` is the one article whose ending is not decidable from the word
-# alone -- nominative "der vierzehnte" against dative "in der dritten Woche" --
-# so it takes the plain form, which is the reading that actually turned up. That
-# is the blemish the module docstring allows for; a stop left in is worse.
+# `der`/`des` because the model often puts a date in subject position ("Der 14.
+# ist also der Fix?"). `der` is ambiguous (nominative vs dative), so it takes the
+# plain form, the reading that actually turned up.
 _ORDINAL_BARE_RE = re.compile(
     r"\b(am|im|vom|zum|beim|seit|bis|ab|den|dem|der|des)(\s+)(\d{1,2})\.(?!\s*\d)",
     re.IGNORECASE,

@@ -1,16 +1,8 @@
 """Overlapping speech, classified (F-51, focus goal C1 "Aktives Zuhören").
 
-The rules are ordered and the first match wins, so most of this file is about
-the order rather than about any single rule. One property carries the rest: a
-backchannel must never be counted as an interruption. Getting that wrong would
-mean the trainer punishes the thing it is trying to teach, and it would do so
-silently, because the figure would still look plausible.
-
-Constructed timelines throughout: two speakers, milliseconds, no database and
-no audio. The thresholds are imported rather than written out, so the tests
-follow a recalibration instead of pinning yesterday's numbers -- except where a
-test is explicitly about the value of a constant.
-"""
+First matching rule wins, so most tests pin the order. Above all a backchannel is
+never an interruption, or the trainer silently punishes good listening. Built
+timelines, no database or audio; thresholds imported so recalibration is followed."""
 from backend.feedback.calls import timeline
 from backend.session.models import Turn
 from backend.feedback.interruptions import (
@@ -31,17 +23,8 @@ from backend.feedback.interruptions import (
 def _persona(offset: int, duration: int, interrupted: bool = False) -> Segment:
     """One Persona segment. `duration` is the audio it had to say.
 
-    On an interrupted one that is the *dispatched* length and the part that was
-    heard is shorter -- which is what a trimmed reply is (ADR 0035), and what
-    `calls.timeline` now builds. Written with a single length, as this was, the
-    fixture described a segment the timeline cannot produce: a reply marked as
-    cut off that lost nothing. Every rule in this file was being checked against
-    that shape.
-
-    The heard part is put a third of the way in. Where exactly does not matter
-    to any rule here -- the classification reads the dispatched end throughout,
-    which is the point -- so a fixed fraction says "shorter, and by an amount
-    nothing depends on" more honestly than a number that looks calculated.
+    When interrupted that is the *dispatched* length, and the heard part is shorter
+    (a trimmed reply, ADR 0035). A third is arbitrary: the rules read the dispatched end.
     """
     if not interrupted:
         return Segment("persona", offset, duration)
@@ -212,9 +195,8 @@ def test_an_overlap_that_cost_nothing_leaves_the_light_green() -> None:
 def test_the_light_turns_at_the_configured_counts() -> None:
     """n hard interruptions, either side of each boundary.
 
-    On a count and not on a share of Persona turns: dividing was tried and, at
-    the length these calls actually run, put a single interruption on the top
-    step. The call length now travels as context instead of into the figure.
+    A count, not a share of Persona turns: at these call lengths a share put a single
+    interruption on the top step.
     """
     def light_for(hard: int) -> TrafficLight:
         timeline: list[Segment] = []
@@ -273,23 +255,14 @@ def test_the_light_steps_are_built_from_the_thresholds() -> None:
 
 # --- The timeline a real call produces ---------------------------------------
 #
-# Everything above constructs Segments by hand. That is deliberate and stays,
-# but it cannot notice when the thing that *builds* a Segment changes meaning --
-# and it did: trimming a Persona reply back to the heard part for F-53's
-# Redeanteil shortened the very window these rules measure against. Every test
-# in this file kept passing, because none of them goes through `calls.timeline`.
+# The hand-built Segments above cannot notice when `calls.timeline` changes
+# meaning, as it did when F-53 trimmed Persona replies to the heard part.
 
 def test_a_trimmed_reply_is_measured_against_the_audio_that_was_sent() -> None:
-    """`remaining_ms` is what the Persona still had to say, not how long the
-    client took to notice the user.
+    """`remaining_ms` is what the Persona still had to say, not the client's delay.
 
-    A barge-in leaves two different ends on the Turn: where playback stopped,
-    and where the audio would have run to. Read off the first, this figure
-    becomes the browser's voice-detection delay plus the upload -- a few hundred
-    milliseconds whatever the reply's length -- and the drill-down tells the
-    User their partner "had 0.4 seconds left" about nine seconds of audio. It
-    also decides the classification: the same interruption lands on TERMINAL or
-    HARD depending on how quickly the client reported it.
+    Read off the heard end it becomes the VAD delay plus upload, whatever the reply's
+    length, and would also flip the class between TERMINAL and HARD.
     """
     turns = [
         Turn(
@@ -352,13 +325,8 @@ def test_a_turn_that_knows_only_one_end_reads_it_as_both() -> None:
 def test_a_cut_reported_slightly_early_is_still_found() -> None:
     """The overlap is looked for against the dispatched end, not the heard one.
 
-    A trimmed reply stops playing a moment *after* the user began -- that is
-    what trimmed it -- and the two numbers come off different clocks: the user's
-    start is their recording's arrival minus its duration, carrying the VAD's
-    padding, while the heard end is the client's playback position. When the
-    error goes the wrong way the start falls past the heard end, and searched
-    for there the overlap is not found at all. The hardest interruptions, which
-    trim the most, are the ones that would vanish.
+    User start and heard end come off different clocks; when the error goes the wrong
+    way the start falls past the heard end and the hardest interruptions vanish.
     """
     # 12 s dispatched, playback stopped at 2.9 s, the user's start derived as 3 s.
     cut_early = Segment("persona", 0, 2_900, interrupted=True, dispatched_ms=12_000)

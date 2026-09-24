@@ -1,21 +1,8 @@
-"""The Persona's system prompt, the opening instruction, and the call-state
-prompt, assembled from a Persona, a Scenario and a language pack.
+"""The Persona's system prompt, the opening instruction, and the call-state prompt.
 
-Prose, not control flow: every sentence here was written against a transcript
-in which Qwen3-4B did the wrong thing without it (ADR 0037, ADR 0038, ADR
-0043, ADR 0045, ADR 0071), and is read and revised the same way. Moved out of
-`orchestrator.py` for the same reason as `nudges.py`: that module is at its
-line ceiling, and these builders share nothing with the Turn machinery but
-the names it imports.
-
-The system prompt is deliberately short and sectioned (ADR 0071). The earlier
-version ran to ~1.5k tokens of English rules, and a 4B model does not follow
-forty rules -- it copies phrases out of them, and it turned the case facts it
-was handed into questions for the user ("Haben Sie den Callback versprochen?").
-Each section below says one thing; the repetition and ending machinery the
-model kept ignoring is enforced in code (ADR 0037, ADR 0038) and only *named*
-here.
-"""
+Every sentence was written against a transcript where Qwen3-4B went wrong without
+it (ADR 0037, ADR 0038, ADR 0043, ADR 0045, ADR 0071). Short and sectioned (ADR 0071):
+a 4B model copies phrases out of long rule lists, so the machinery is enforced in code."""
 
 from datetime import date
 
@@ -26,17 +13,10 @@ from backend.session.language_packs import LanguagePack
 
 
 def opening_instruction(pack: LanguagePack, reverse: bool = False) -> str:
-    """Asks the Persona for the line that opens the call.
-
-    The openers come from the language pack rather than the frame: a single
-    English example here was copied verbatim into every call, German ones
-    included.
-
-    In a reverse (ADR 0070) the Persona still speaks first, it just says less:
-    it is answering a phone, so it may say who picked up and nothing else. The
-    reason for the call is the User's to give, and a callee who guesses at it
-    has answered the exercise before it started.
-    """
+    """Asks the Persona for the line that opens the call. Openers come from the
+    pack, since a single English example was copied verbatim into every call.
+    In a reverse (ADR 0070) it only answers the phone: a callee who guesses the
+    reason has answered the exercise before it started."""
     if reverse:
         return (
             "The phone is ringing and you are picking it up. Say only what "
@@ -79,23 +59,11 @@ def opening_instruction(pack: LanguagePack, reverse: bool = False) -> str:
 
 
 def _case_block(scenario: Scenario) -> str:
-    """The case the Scenario carries (ADR 0045), or nothing.
-
-    Each of the three is optional on its own: a Scenario predating ADR 0045,
-    or a user-authored one (ADR 0024), can leave any of them blank, and an
-    empty field must not produce a dangling heading. The facts carry an
-    ownership line: handed over bare, the model turned "a callback was
-    promised" into "Haben Sie den Callback versprochen?" and asked the user
-    about its own case for eight Turns (ADR 0071). The success condition
-    carries a usage rule: handed over bare, the model read it out as a demand
-    every Turn instead of weighing the call against it.
-
-    A reverse (ADR 0070) gets the same three fields relabelled, not a second
-    case: the goal and the settlement condition are the *caller's* there, and
-    the caller is the User. Saying so is what stops the model from adopting
-    them — handed "What you want from this call" while playing the callee, it
-    started making the User's demands at the User.
-    """
+    """The case the Scenario carries (ADR 0045), or nothing; each field optional.
+    The facts carry an ownership line, else the model asked the user about its own
+    case for eight Turns (ADR 0071); the goal a usage rule, else it was recited as a
+    demand every Turn. A reverse (ADR 0070) relabels them, or the model makes the
+    User's demands at the User."""
     if scenario.reverse:
         return _reverse_case_block(scenario)
     parts = []
@@ -125,13 +93,9 @@ def _case_block(scenario: Scenario) -> str:
 
 
 def _reverse_case_block(scenario: Scenario) -> str:
-    """The same case from the other side of the phone (ADR 0070).
-
-    Each field keeps its own optionality, exactly as above. The ownership line
-    turns around with the casting: what the caller must not be asked about
-    becomes what is on file with you, and the settlement condition stops being
-    yours to hold and becomes theirs to be met.
-    """
+    """The same case from the other side of the phone (ADR 0070): the facts become
+    what is on file with the Persona, and the settlement condition becomes the
+    caller's to be met rather than the Persona's to hold."""
     parts = []
     if scenario.case_facts:
         parts.append(
@@ -210,13 +174,9 @@ def _improvisation_rule(scenario: Scenario) -> str:
 
 
 def _casting(scenario: Scenario, today: date) -> str:
-    """Who rang whom, and what that makes the Persona's job.
-
-    The first thing the prompt says, because everything after it is read in
-    its light — and the one part a reverse (ADR 0070) replaces outright. The
-    two halves are the same two claims either way: which end of the line the
-    Persona is on, and whether solutions come from it or from the user.
-    """
+    """Who rang whom, and what that makes the Persona's job: which end of the line
+    it is on, and whether solutions come from it or the user. Said first since
+    everything after is read in its light; a reverse (ADR 0070) replaces it outright."""
     if scenario.reverse:
         return (
             "You are playing a character in a phone-call training exercise, "
@@ -250,15 +210,9 @@ def _casting(scenario: Scenario, today: date) -> str:
 
 def _persona_block(persona: Persona, scenario: Scenario) -> str:
     """Who the Persona is. Name, traits and behaviour always; role and
-    objections only when the Persona is the caller.
-
-    A reverse (ADR 0070) drops both, and not for brevity: every seeded `role`
-    describes a customer ("marketing manager at a company that is a customer
-    of the user's") and every objection is a customer's objection, so handing
-    them to a Persona now working the support line casts it as both sides of
-    the call at once. Its character survives that — an impatient agent is a
-    fair counterpart, which is the whole reason traits and behaviour stay.
-    """
+    objections only when the Persona is the caller. A reverse (ADR 0070) drops
+    both because every seeded role and objection is a customer's, which would
+    cast the support-side Persona as both sides of the call."""
     identity = (
         f"Your name: {persona.name} — introduce yourself by that name and "
         "never invent a different one. It is yours and nobody else's: never "
@@ -291,15 +245,9 @@ def _no_restart_rule(scenario: Scenario) -> str:
 
 
 def _closing_rules(scenario: Scenario, pack: LanguagePack) -> str:
-    """When the call is over, and how to end it.
-
-    Enforced in code as well (ADR 0037/0038); this is the half the model has to
-    get right on its own. Reversed, the test turns around with the casting: the
-    Persona is no longer waiting to be satisfied but deciding whether the
-    caller has been — and the "never hang up too early" rule stops being about
-    its own unmet concern and becomes the plain fact that you do not hang up on
-    a caller.
-    """
+    """When the call is over, and how to end it: the half the model must get right
+    itself (enforced in code too, ADR 0037/0038). Reversed, the Persona decides
+    whether the caller is satisfied, and simply does not hang up on a caller."""
     if scenario.reverse:
         return (
             "Before every reply, check first whether the caller now has what "
@@ -344,23 +292,11 @@ def _closing_rules(scenario: Scenario, pack: LanguagePack) -> str:
 def build_system_prompt(
     persona: Persona, scenario: Scenario, pack: LanguagePack, today: date | None = None
 ) -> str:
-    """Builds the LLM system prompt.
-
-    Instructions are English throughout; only the Persona's language decides
-    what the model speaks, and only `pack` carries what has to follow it
-    (ADR 0043). `today` is named because a caller knows the date: without it
-    the persona asked for a status check "bis zum 29.8." on 6 September.
-
-    The case itself is written in English (Scenarios are language-neutral,
-    ADR 0043), and the 4B model carried single words of it over unchanged --
-    "was actually los ist" -- so the language rule is stated once more where
-    the case is, not only at the end.
-
-    A reverse Scenario (ADR 0070) swaps the casting here rather than in a
-    second prompt of its own. Four of the pieces below have a reversed form and
-    the rest are shared, which is the point: a rule that has to hold in both
-    castings is written once, and a guard test pins the ordinary prompt
-    byte-identical so the reverse cannot quietly rewrite it."""
+    """Builds the LLM system prompt. Instructions are English; only `pack` follows the
+    Persona's language (ADR 0043), and the language rule is repeated beside the case
+    because the 4B model carried its English words over. `today` because a caller knows
+    the date. A reverse (ADR 0070) swaps four pieces here rather than a second prompt;
+    guard tests assert the ordinary prompt keeps its casting."""
     today = today or date.today()
     return (
         f"{_casting(scenario, today)}"
@@ -397,12 +333,8 @@ def build_state_prompt(
     previous_notes: str, user_text: str, persona_text: str, persona: Persona, scenario: Scenario
 ) -> list[dict[str, str]]:
     """The messages for one refresh of the notes the Persona keeps (ADR 0071).
-
-    Turned around for a reverse (ADR 0070) as well. These notes are most of
-    what the model still sees of the call, so a frame that names the wrong side
-    as the caller undoes the system prompt one exchange at a time — and the
-    three lines asked for only make sense from the side actually taking them.
-    """
+    Turned around for a reverse (ADR 0070): the notes are most of what the model
+    sees of the call, so naming the wrong side as caller undoes the system prompt."""
     if scenario.reverse:
         return _reverse_state_prompt(previous_notes, user_text, persona_text, persona, scenario)
     # One line, since the bar the caller judges by now sits in the goal.
@@ -444,12 +376,9 @@ def build_state_prompt(
 def _reverse_state_prompt(
     previous_notes: str, user_text: str, persona_text: str, persona: Persona, scenario: Scenario
 ) -> list[dict[str, str]]:
-    """The same notes kept by the person who answered the phone (ADR 0070).
-
-    The exchange keeps the labels the transcript uses -- the user speaks as
-    "User" and the Persona as "Agent" -- so the two sides stay distinguishable
-    without the word "Caller" being attached to the machine.
-    """
+    """The same notes kept by the person who answered the phone (ADR 0070). The
+    exchange keeps the transcript's labels ("User", "Agent") so the machine is
+    never called "Caller"."""
     # One line, since the bar the caller judges by now sits in the goal.
     settled = ""
     goal = (

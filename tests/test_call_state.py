@@ -1,19 +1,8 @@
-"""The caller's notes and the history window (ADR 0071), and their absence
-where the model can read its own transcript (ADR 0075).
+"""The caller's notes and the history window (ADR 0071, ADR 0075, ADR 0103).
 
-Past a handful of exchanges the 4B model misread the raw transcript -- it
-attributed its own case to the user and asked about it for eight Turns. So on
-that backend the model does not read the whole history: it reads the system
-prompt, its notes on the call (one background summarisation call per completed
-exchange, never on the path to a reply), and the last few exchanges verbatim.
-The full history is still kept: the repetition guards, the barge-in trims and
-the Transcript work on it, not on the model's view.
-
-There was a second shape for a while (ADR 0075): on a backend that could read
-its own history the notes were switched off and the conversation handed over
-whole. With one backend left (ADR 0103) there is nothing to switch, and what is
-left is what these tests assert.
-"""
+The 4B model misread long raw transcripts, so it reads the system prompt, its
+notes (one background summarisation per exchange) and the last few exchanges.
+The full history is still kept for the guards, the trims and the Transcript."""
 
 from backend.session.models import TurnCompleted
 from backend.session.nudges import STATE_NOTES_FRAME
@@ -134,13 +123,10 @@ async def test_the_guards_still_see_the_whole_history(persona, scenario, fake_pi
 
 
 def _summarising_llm(monkeypatch, fake_pipeline):
-    """Point the notes refresh at a summariser that behaves like a real one: it
-    carries forward everything it was handed, notes and exchange alike.
+    """A summariser that carries forward everything it is handed, like a real one.
 
-    The canned `states` the other tests use cannot show this defect. Those
-    strings never contain the Persona's words, so an assertion that the unheard
-    part stayed out of the notes holds however the notes were built -- it is
-    the fake that guarantees it, not the code under test.
+    The canned `states` never contain the Persona's words, so with them the
+    "unheard part stays out" assertions would hold however the notes were built.
     """
     async def summarise(messages, **_kwargs):
         fake_pipeline.llm.state_calls.append(messages)
@@ -152,16 +138,11 @@ def _summarising_llm(monkeypatch, fake_pipeline):
 async def test_a_trimmed_reply_is_summarised_from_the_notes_that_predate_it(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """A re-refresh after a barge-in starts from the notes as they stood
-    *before* this exchange, never from the current ones.
+    """A re-refresh after a barge-in starts from the notes as they stood *before*.
 
-    Notes are rewritten from the previous notes rather than from the history
-    (ADR 0075), so by the time the barge-in lands the first refresh may already
-    have absorbed the unheard sentence -- and nothing in a second pass built on
-    that text could contradict it. ADR 0071 promises the notes never record
-    words the user did not hear; that holds only if the second pass starts
-    from before them.
-    """
+    Notes are rewritten from the previous notes (ADR 0075), so the first refresh may
+    already hold the unheard sentence; ADR 0071's "never record unheard words" holds
+    only if the second pass starts from before them."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 10000)
     _summarising_llm(monkeypatch, fake_pipeline)
 
@@ -183,13 +164,10 @@ async def test_a_trimmed_reply_is_summarised_from_the_notes_that_predate_it(
 async def test_a_reply_nobody_heard_leaves_the_notes_as_they_were(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """The barge-in dropped the reply whole: the exchange never happened, so the
-    notes go back to what they said before it.
+    """A reply dropped whole by a barge-in: the notes revert to before the exchange.
 
-    The refresh for that exchange is already in flight when the interrupt lands
-    and was started with the full reply. Left alone it finished, wrote the
-    Persona's words into the notes, and no second refresh ever followed --
-    there was no longer an exchange to summarise.
+    The refresh for it was already in flight with the full reply; left alone it wrote
+    the Persona's unheard words into the notes and nothing later replaced them.
     """
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 10000)
     _summarising_llm(monkeypatch, fake_pipeline)

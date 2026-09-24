@@ -3,22 +3,9 @@ import { useState } from "react";
 import type { ReverseBrief } from "../scenarioLibrary";
 
 /**
- * What the User holds while playing a reverse (F-61, ADR 0070): the briefing
- * the Persona had for the original call, plus the goals to get through it with.
- *
- * The one deliberate exception to ADR 0033's "no text during the live call".
- * That rule exists so the trainee listens instead of reading back what was just
- * said; this text says nothing about the conversation in progress, is fixed
- * before the call, and without it the exercise is impossible — you cannot argue
- * a case you have not been told.
- *
- * It sits *beside* the state animation rather than under it, so ticking a goal
- * off never scrolls the call away; on a narrow screen the two stack.
- *
- * The goals are the call's agenda and tick off locally, stored nowhere: a place
- * to keep your finger while talking, not a record. Progress that outlived the
- * call would be a score by the back door (ADR 0004), which is also why the
- * counter says how many are done and never how well.
+ * The User's briefing and goals while playing a reverse (F-61, ADR 0070): the deliberate exception to ADR 0033,
+ * fixed before the call. Beside the state animation, so ticking never scrolls it away. Goals tick locally and are
+ * stored nowhere; the counter says how many, never how well (ADR 0004).
  */
 export default function ReverseBriefPanel({
   brief,
@@ -39,7 +26,7 @@ export default function ReverseBriefPanel({
       return next;
     });
 
-  const goals = brief.goals ?? brief.watch_points ?? [];
+  const { goals } = brief;
   const done = goals.filter((_, index) => ticked.has(index)).length;
 
   return (
@@ -58,13 +45,7 @@ export default function ReverseBriefPanel({
       <dl className="reverse-brief-fields">
         <Field label="Situation" text={brief.situation} />
         <Field label="Was Sie wissen" text={brief.facts} />
-        {/* One field: what is wanted and what settles it were two, and a
-            briefing written before the merge still carries the second half
-            separately — appended here so nothing stored goes unread. */}
-        <Field
-          label="Was Sie erreichen wollen"
-          text={[brief.goal, brief.settled].filter(Boolean).join(" ")}
-        />
+        <Field label="Was Sie erreichen wollen" text={brief.goal} />
       </dl>
 
       {goals.length > 0 && (

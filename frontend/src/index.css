@@ -24,19 +24,26 @@
   --color-text-muted-secondary: #5f7180;
   --color-success: #2e8064;
   --color-danger: #b4453a;
+  /* Shared tints outside the brand scale: the green of a positive status, the
+     amber of the traffic light's middle step and the Rollentausch's own palette. */
+  --color-success-ink: #226048;
+  --color-success-tint: #f1f8f5;
+  --color-success-border: #bfd8cb;
+  --color-warning: #b57a12;
+  --color-reverse-ink: #8a5200;
+  --color-reverse-accent: #c98a2b;
+  --color-reverse-tint: #f0e2cc;
+  --color-surface-tint: #f8fbfd;
+  --color-avatar: #eaf5fc;
   /* The wordmark's "ai". Below 4.5:1 on white on purpose -- WCAG 1.4.3 exempts
      brand names, so this may be the vivid orange and not a muted one. Do not
      reuse it for ordinary text. */
   --color-brand-accent: #ff6a00;
 
-  /* Chart identity hues (F-13, utils/metricGroups.ts). Slots 1, 5 and 7 of the
-     documented categorical palette, in that order, validated as an all-pairs
-     set against a white card: CVD ΔE 13.0, normal-vision ΔE 16.3.
-
-     Identity, never judgement. The hue belongs to a family of metrics and
-     never moves with a value, and none of the three is red, amber or green --
-     those are spent on ADR 0078's traffic light, and a dashboard that reused
-     one would invite exactly the reading ADR 0065 forbids. */
+  /* Chart identity hues (F-13, utils/metricGroups.ts): slots 1, 5, 7 of the
+     categorical palette, validated all-pairs on white (CVD ΔE 13.0, normal 16.3).
+     Identity, never judgement: never moves with a value, and none is red, amber or
+     green -- those belong to ADR 0078's traffic light (ADR 0065). */
   --series-speech: #2a78d6;
   --series-content: #e87ba4;
   --series-activity: #4a3aa7;
@@ -48,19 +55,7 @@
 
   /* Frequently used border radii */
   --radius-card: 22px;
-  --radius-choice: 16px;
   --radius-control: 10px;
-
-  /* Compatibility aliases for the existing styles */
-  --navy: var(--color-navy-900);
-  --navy-light: var(--color-blue-600);
-  --blue: var(--color-blue-600);
-  --blue-light: var(--color-blue-300);
-  --bg: var(--color-background);
-  --border: var(--color-border);
-  --text-muted: var(--color-text-muted);
-  --success: var(--color-success);
-  --danger: var(--color-danger);
 }
 
 * {
@@ -69,8 +64,8 @@
 
 body {
   font-family: var(--font-sans);
-  background: var(--bg);
-  color: var(--navy);
+  background: var(--color-background);
+  color: var(--color-navy-900);
   margin: 0;
 }
 
@@ -263,7 +258,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.18em;
   font-size: 0.7rem;
-  color: var(--blue);
+  color: var(--color-blue-600);
   margin-bottom: 0.5rem;
 }
 
@@ -280,7 +275,7 @@ h2 {
   font-size: 1rem;
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: var(--navy-light);
+  color: var(--color-blue-600);
   margin: 0 0 0.35rem;
 }
 
@@ -297,8 +292,8 @@ h2 {
   flex-direction: column;
   gap: 0.35rem;
   text-align: left;
-  background: #fff;
-  border: 2px solid var(--border);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
   border-radius: 16px;
   padding: 1rem 3.25rem 1rem 1rem;
   cursor: pointer;
@@ -307,12 +302,9 @@ h2 {
   transition: border-color 0.2s;
 }
 
-/* The indicator remains visible as an empty circle for unselected choices.
-   18px, the same as the "i" ring in the corner below it: the two are the only
-   marks in a card's right margin and a difference in size between them reads
-   as a difference in importance that is not there. Nothing to weigh against
-   here the way there was for the "i" — this is a `span`, not a target, so
-   WCAG 2.5.8 has nothing to say about it. */
+/* The indicator stays visible as an empty circle when unselected. 18px, the same
+   as the "i" ring below, so neither reads as more important; a `span`, not a
+   target, so WCAG 2.5.8 does not apply. */
 .choice-check {
   position: absolute;
   top: 12px;
@@ -330,11 +322,11 @@ h2 {
 }
 
 .persona-card:hover {
-  border-color: var(--blue-light);
+  border-color: var(--color-blue-300);
 }
 
 .persona-card.selected {
-  border-color: var(--blue);
+  border-color: var(--color-blue-600);
   background: var(--color-surface-selected);
 }
 
@@ -360,7 +352,7 @@ h2 {
 
 .card-subtitle {
   font-size: 0.8rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
@@ -604,19 +596,10 @@ h2 {
 }
 
 .persona-card-portrait {
-  /* Flex so the initials fallback centres itself.
-     Width is fixed and the height stretches to the card's, rather than the
-     other way round: in a flex row the main size is resolved before the cross
-     size, so an `aspect-ratio` with a stretched height has nothing to compute
-     from and the slot blows up to its content's width. 72px is deliberately
-     narrower than the 3:4 the portraits are cropped for: three cards to a row
-     leave the body barely 90px of text once the check and the "i" have their
-     corner, which is what wrapped two-word names onto two lines and pushed
-     every role to the clamp. The slot gives that width back. Nothing is lost
-     by it — the source is square and `object-fit: cover` trims the sides
-     anyway, and at this width the zoom below still leaves the widest head in
-     the set (hair included) a clear margin either side; the picture is the
-     same size, there is just less room beside the face. */
+  /* Flex so the initials fallback centres itself. Width fixed, height stretched:
+     in a flex row the main size resolves first, so an `aspect-ratio` on a stretched
+     height has nothing to compute from. 72px (narrower than 3:4) leaves the text
+     room for two-word names; the square source is trimmed by `object-fit` anyway. */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -634,13 +617,10 @@ h2 {
   overflow: hidden;
 }
 
-/* The slot is taller than it is wide and the source is square, so `object-fit:
-   cover` already trims the sides. The zoom on top of that is what brings the
-   face up to a size one Persona can be told from another at: unzoomed, the card
-   would show too much of the half-body shot at this size. Every picture is framed
-   the same way — square, subject centred, face in the upper third — which is
-   what lets one origin serve all of them. The two large square slots show the
-   pose whole and need neither: their box matches the source. */
+/* The slot is taller than wide, so `object-fit: cover` trims the square source's
+   sides; the zoom brings the face up to a recognisable size. Works because every
+   portrait is framed alike (square, face in the upper third). The large square
+   slots need neither. */
 .persona-card-portrait > img {
   transform: scale(1.5);
   transform-origin: center 18%;
@@ -707,7 +687,7 @@ h2 {
      The card surface itself stays neutral; origin is communicated explicitly by
      the labelled badge rather than by tinting the whole choice. */
   background: var(--origin-tint, var(--color-blue-100));
-  color: var(--origin-ink, var(--navy));
+  color: var(--origin-ink, var(--color-navy-900));
 }
 
 /* One colour pair per Scenario origin. The variables are consumed by the
@@ -719,18 +699,10 @@ h2 {
   --origin-ink: var(--color-blue-600);
 }
 
-/* Own Scenario, hand-authored or shared with the company — the same colour
-   either way, and nothing on the badge to tell them apart but the label. A ring
-   around the shared one made it read as a kind of its own, when it is the same
-   Scenario of the User's with one more place it can be seen from.
-
-   Olive, not the green it used to be: that green sat 28° from the follow-up's
-   teal, the closest two hues in the whole set, and on a pale wash 28° is not a
-   difference anyone reads. This sits in the one gap the other five leave — 38°
-   clear of its nearest neighbour — at the same lightness as the green it
-   replaces, so only the hue moved. It also fixes the badge, whose text was the
-   only one in the set under the 4.5:1 small-text minimum (4.17); this pairing
-   is 6.0. */
+/* Own Scenario, hand-authored or shared -- same colour, only the label differs
+   (a shared one is not a kind of its own). Olive sits 38° clear of its nearest
+   hue (the old green was 28° from the follow-up's teal), and the badge text
+   reaches 6.0:1. */
 .card-origin-own,
 .card-origin-shared {
   --origin-tint: #ecf3d6;
@@ -749,7 +721,7 @@ h2 {
    are the other way round, which is not a degree of ownership. */
 .card-origin-reverse {
   --origin-tint: #fdf0dd;
-  --origin-ink: #8a5200;
+  --origin-ink: var(--color-reverse-ink);
 }
 
 .card-origin-tenant {
@@ -790,19 +762,11 @@ h2 {
   background: #fdf0f5;
 }
 
-/* The "i" on a selection card, Personas and Scenarios alike. Bottom-right, on
-   the same 12px right edge and at the same 24px size as the check bubble above
-   it, so the two sit in one column down the card's right gutter -- the gutter
-   both grids' padding already keeps clear of text. Round and quiet: it must
-   read as an aside to the choice, not as a second way of making it. It replaced
-   the Scenario card's edit link, which moved into the panel (ADR 0062),
-   so a card carries one secondary affordance rather than two. */
-/* The button keeps its 24px box and the ring inside it is drawn on the span,
-   so the affordance can be quieter than its target: the "i" is the smaller of
-   the two things in a card's corner and should look it, but shrinking the
-   button itself would take the tap target under the 24px WCAG 2.5.8 asks for,
-   and the card behind it is a target too, so the spacing exception does not
-   apply. `place-items` centres the ring in that box. */
+/* The "i" on a selection card, bottom-right in one column with the check bubble
+   (same 12px edge, 24px size). Round and quiet: an aside to the choice, not a
+   second way of making it. The one secondary affordance a card carries (ADR 0062). */
+/* The button keeps its 24px box (WCAG 2.5.8; the card behind is a target too,
+   so the spacing exception does not apply); the smaller ring is drawn on the span. */
 .card-info {
   position: absolute;
   right: 12px;
@@ -896,7 +860,7 @@ h2 {
 
 /* What an <img> would have covered, the initials get instead. */
 .persona-avatar-fallback {
-  background: #eaf5fc;
+  background: var(--color-avatar);
   color: var(--color-blue-600);
   font-weight: 600;
 }
@@ -957,15 +921,9 @@ h2 {
   line-height: 1.5;
 }
 
-/* Bordered like the cases beside it. It was dashed for a while, to set it
-   apart as the one tile that is not a case — but it is the selection the
-   screen opens on, and a dashed box in the first place of the grid reads as a
-   placeholder for something missing rather than as the choice already made.
-   Its colour still comes from `card-origin-random` like every other card's,
-   and that, its badge and its text are enough to set it apart.
-
-   The control that opens the rest of the grid is `.library-more`, styled with
-   the training history's `.session-more` further down. */
+/* Bordered like the cases beside it, not dashed: it is the opening selection,
+   and a dashed first tile reads as a placeholder. `card-origin-random`, its badge
+   and text set it apart. The "show more" control is `.library-more`. */
 
 /* --- Scenario editor modal --- */
 
@@ -1159,14 +1117,6 @@ h2 {
   outline-offset: 2px;
 }
 
-.pdf-dropzone input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-}
-
 .pdf-dropzone-cloud {
   width: 38px;
   height: 38px;
@@ -1282,14 +1232,14 @@ h2 {
    panel that otherwise only closes. Shape comes from `.editor-actions button`
    so it lines up with the close button beside it; only the colour is its own. */
 .editor-edit {
-  border-color: var(--navy) !important;
-  background: var(--navy) !important;
+  border-color: var(--color-navy-900) !important;
+  background: var(--color-navy-900) !important;
   color: var(--color-surface);
   font-weight: 600;
 }
 
 .editor-edit:hover {
-  background: var(--navy-light) !important;
+  background: var(--color-blue-600) !important;
 }
 
 /* In-panel replacement for window.confirm when a click outside would discard
@@ -1500,7 +1450,7 @@ h2 {
   font-family: var(--font-mono);
   font-size: 0.8rem;
   letter-spacing: 0.02em;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   margin-top: 1rem;
   min-height: 1.2em;
 }
@@ -1512,12 +1462,12 @@ h2 {
 }
 
 #status.error {
-  color: var(--danger);
+  color: var(--color-danger);
 }
 
 .card {
-  background: #fff;
-  border: 1px solid var(--border);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 20px;
   padding: 1.5rem;
   margin-top: 1.5rem;
@@ -1544,13 +1494,13 @@ h2 {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  background: var(--navy);
-  color: #fff;
+  background: var(--color-navy-900);
+  color: var(--color-surface);
   transition: background 0.2s, opacity 0.2s;
 }
 
 .start-call-button:hover {
-  background: var(--navy-light);
+  background: var(--color-blue-600);
 }
 
 .start-call-button:disabled {
@@ -1576,7 +1526,7 @@ h2 {
 }
 
 .end-call-button {
-  background: var(--danger);
+  background: var(--color-danger);
   margin-top: 2.5rem;
 }
 
@@ -1592,13 +1542,13 @@ h2 {
   padding: 0.9rem 1.5rem;
   margin-top: 0.75rem;
   font: inherit;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   cursor: pointer;
   text-decoration: underline;
 }
 
 .cancel-button:hover {
-  color: var(--navy);
+  color: var(--color-navy-900);
 }
 
 /* The desktop call screen follows the centered 800px layout from Figma. */
@@ -1670,7 +1620,7 @@ h2 {
   justify-content: center;
   flex-shrink: 0;
   border-radius: 50%;
-  background: #eaf5fc;
+  background: var(--color-avatar);
   color: var(--color-blue-600);
   font-size: 40px;
   font-weight: 600;
@@ -1711,10 +1661,10 @@ h2 {
   justify-content: center;
   margin: 0;
   padding: 6px 10px;
-  border: 1px solid #bfd8cb;
+  border: 1px solid var(--color-success-border);
   border-radius: 999px;
-  background: #f1f8f5;
-  color: #226048;
+  background: var(--color-success-tint);
+  color: var(--color-success-ink);
   font-size: 12px;
   font-weight: 500;
   line-height: 1.2;
@@ -1997,8 +1947,8 @@ h2 {
 
 .mic-test-panel-success {
   min-height: 220px;
-  border-color: #bfd8cb;
-  background: #f1f8f5;
+  border-color: var(--color-success-border);
+  background: var(--color-success-tint);
 }
 
 .mic-test-panel-copy,
@@ -2087,7 +2037,7 @@ h2 {
   flex-shrink: 0;
   border: 1px solid #0c2f24;
   border-radius: 50%;
-  background: #226048;
+  background: var(--color-success-ink);
   color: var(--color-surface);
   font-size: 16px;
   font-weight: 600;
@@ -2214,7 +2164,7 @@ h2 {
 }
 
 .muted {
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 /* Very narrow screens use one content column and keep controls easy to scan
@@ -2340,12 +2290,12 @@ h2 {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 .metric-value {
   font-size: 1.05rem;
-  color: var(--navy);
+  color: var(--color-navy-900);
 }
 
 /* The loudness course (F-37). No value beside it -- the dB span behind the curve
@@ -2360,6 +2310,14 @@ h2 {
   width: 100%;
   height: auto;
   overflow: visible;
+}
+
+/* On the feedback overview the plot gets its own quiet surface so the curve
+   reads as a visualization inside the metric card rather than as decoration. */
+.feedback-metrics-section .loudness-course-plot {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-surface-tint);
 }
 
 /* The range the speaker held for most of the call. A pale tint, not a traffic
@@ -2384,6 +2342,10 @@ h2 {
   stroke-linejoin: round;
 }
 
+.feedback-metrics-section .loudness-course-line {
+  stroke-width: 2;
+}
+
 .loudness-course-marker circle {
   fill: var(--color-blue-600);
 }
@@ -2402,6 +2364,12 @@ h2 {
   color: var(--color-text-muted-secondary);
 }
 
+.feedback-metrics-section .loudness-course-axis {
+  margin-top: 6px;
+  padding: 0 4px;
+  font-size: 11px;
+}
+
 /* Named, not left as a bare mm:ss range: the axis is the user's own speaking
    time, not the call clock (backend/session/models.py). */
 .loudness-course-axis-name {
@@ -2415,14 +2383,37 @@ h2 {
   color: var(--color-text-muted-secondary);
 }
 
+.feedback-metrics-section .loudness-course-legend {
+  margin-top: 10px;
+  max-width: none;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 /* The note under the statistics saying they carry no target range (ADR 0048).
    Kept visually quieter than the narrative -- it qualifies, it does not claim. */
 .metric-disclaimer {
   margin: 8px 0 0;
   padding-left: 12px;
-  border-left: 3px solid var(--blue-light);
+  border-left: 3px solid var(--color-blue-300);
   font-size: 0.9rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
+}
+
+.feedback-metrics-section .metric-progress-link {
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 12px;
+}
+
+.feedback-metrics-section .metric-progress-link a {
+  color: var(--color-blue-600);
+  text-decoration: none;
+}
+
+.feedback-metrics-section .metric-progress-link a:hover {
+  text-decoration: underline;
 }
 
 /* Out from under the disclaimer's rule: it is an offer and not part of the
@@ -2448,21 +2439,23 @@ h2 {
 .next-steps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
   align-items: stretch;
-  /* The spacing the cards used to bring themselves, now that they do not. */
-  margin-top: 1.5rem;
+  gap: 14px;
+  margin-top: 14px;
 }
 
+/* The two follow-up options use the same flat report surface as the sections
+   above them; the narrow accent is enough to distinguish their purpose. */
 .card.next-step {
-  border-left: 3px solid var(--blue);
-  /* A column so the button can be pushed to the bottom: side by side, two
-     leads of different lengths would otherwise leave the buttons at different
-     heights, which reads as one card being unfinished. */
   display: flex;
   flex-direction: column;
-  /* The grid's own gap does the spacing between them. */
   margin-top: 0;
+  padding: 20px 22px;
+  border: 1px solid var(--color-border-subtle);
+  border-left: 4px solid var(--color-blue-600);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: none;
 }
 
 /* The lead is what gives way, so what follows it lines up across the two. */
@@ -2477,22 +2470,24 @@ h2 {
 }
 
 .next-step-eyebrow {
-  font-size: 0.7rem;
+  color: var(--color-blue-600);
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.09em;
-  color: var(--text-muted);
+  letter-spacing: 0.08em;
 }
 
 .card h2.next-step-title {
-  margin: 0.3rem 0 0.5rem;
-  font-size: 1.1rem;
+  margin: 5px 0 8px;
+  color: var(--color-navy-900);
+  font-size: 20px;
+  line-height: 1.2;
 }
 
 .card p.next-step-lead {
-  margin: 0 0 1rem;
-  color: var(--text-muted);
-  font-size: 0.92rem;
-  line-height: 1.55;
+  margin: 0 0 18px;
+  color: var(--color-text-muted-secondary);
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .card p.follow-up-name {
@@ -2502,7 +2497,7 @@ h2 {
 
 .card p.follow-up-teaser {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 .follow-up-actions {
@@ -2520,19 +2515,33 @@ h2 {
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
-  background: var(--navy);
-  color: #fff;
+  background: var(--color-navy-900);
+  color: var(--color-surface);
   transition: background 0.2s;
 }
 
 .follow-up-button:hover {
-  background: var(--navy-light);
+  background: var(--color-blue-600);
+}
+
+/* Actions inside the feedback offers follow the compact control shape used
+   throughout the training flow rather than the older pill treatment. */
+.next-steps .follow-up-button {
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  background: var(--color-navy-900);
+  font-size: 12px;
+}
+
+.next-steps .follow-up-button:hover {
+  background: var(--color-navy-700);
 }
 
 .card p.follow-up-note {
   margin: 0.6rem 0 0;
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 /* A request that failed: writing a follow-up or a reverse under its offer, or
@@ -2554,19 +2563,11 @@ p.follow-up-error {
 /* The offer under the feedback. Same card as the follow-up, other accent, so
    the two read as two options rather than as one thing said twice. */
 .card.reverse-offer {
-  border-left-color: #c98a2b;
+  border-left-color: var(--color-brand-accent);
 }
 
 .card.reverse-offer .next-step-eyebrow {
-  color: #8a5200;
-}
-
-.card.reverse-offer .follow-up-button {
-  background: #c98a2b;
-}
-
-.card.reverse-offer .follow-up-button:hover {
-  background: #b0761f;
+  color: #a94b0a;
 }
 
 /* The reverse's pre-call screen: the briefing and the button, nothing else.
@@ -2590,15 +2591,15 @@ p.follow-up-error {
   margin: 0 auto 1.5rem;
   max-width: 720px;
   width: 100%;
-  border: 1px solid var(--border);
-  border-left: 3px solid #c98a2b;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-reverse-accent);
   border-radius: var(--radius-card);
   background: #fffaf2;
   padding: 1.25rem 1.4rem;
 }
 
 .reverse-brief-eyebrow {
-  color: #8a5200;
+  color: var(--color-reverse-ink);
 }
 
 .reverse-brief-title {
@@ -2609,7 +2610,7 @@ p.follow-up-error {
 .reverse-brief-lead {
   margin: 0.3rem 0 1rem;
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 .reverse-brief-fields {
@@ -2623,7 +2624,7 @@ p.follow-up-error {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #8a5200;
+  color: var(--color-reverse-ink);
 }
 
 .reverse-brief-field dd {
@@ -2634,7 +2635,7 @@ p.follow-up-error {
 
 .reverse-brief-watch {
   margin-top: 1.2rem;
-  border-top: 1px solid #f0e2cc;
+  border-top: 1px solid var(--color-reverse-tint);
   padding-top: 1rem;
 }
 
@@ -2658,14 +2659,14 @@ p.follow-up-error {
   flex: none;
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
-  color: #8a5200;
+  color: var(--color-reverse-ink);
 }
 
 .reverse-brief-progress {
   height: 4px;
   margin-bottom: 0.8rem;
   border-radius: 999px;
-  background: #f0e2cc;
+  background: var(--color-reverse-tint);
   overflow: hidden;
 }
 
@@ -2673,7 +2674,7 @@ p.follow-up-error {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #c98a2b;
+  background: var(--color-reverse-accent);
   transition: width 160ms ease-out;
 }
 
@@ -2721,7 +2722,7 @@ p.follow-up-error {
   height: 18px;
   border: 1.5px solid #d9c19b;
   border-radius: 5px;
-  background: #fff;
+  background: var(--color-surface);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2729,18 +2730,18 @@ p.follow-up-error {
 }
 
 .reverse-brief-watch-list input:focus-visible + .reverse-brief-watch-box {
-  outline: 2px solid var(--navy);
+  outline: 2px solid var(--color-navy-900);
   outline-offset: 2px;
 }
 
 .reverse-brief-watch-list label.is-ticked {
   background: #fdf3e4;
-  border-color: #f0e2cc;
+  border-color: var(--color-reverse-tint);
 }
 
 .reverse-brief-watch-list label.is-ticked .reverse-brief-watch-box {
-  background: #c98a2b;
-  border-color: #c98a2b;
+  background: var(--color-reverse-accent);
+  border-color: var(--color-reverse-accent);
 }
 
 /* The tick itself, drawn rather than a glyph so it cannot pick up a font. */
@@ -2749,7 +2750,7 @@ p.follow-up-error {
   width: 5px;
   height: 9px;
   margin-top: -2px;
-  border: solid #fff;
+  border: solid var(--color-surface);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
@@ -2763,19 +2764,15 @@ p.follow-up-error {
 .reverse-brief-watch-note {
   margin: 0.7rem 0 0;
   font-size: 0.72rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
-/* Beside the call rather than under it (ADR 0070), and at its full length: no
-   scroll box of its own. A panel with an inner scrollbar hides part of the
-   briefing behind a gesture, and the one thing that must never happen mid-call
-   is the User not finding a fact they were told they have. The column simply
-   grows; the page scrolls if it has to, which on a briefing this size it
-   rarely does. Below the two-column breakpoint this goes back to being a block
-   under the call. */
+/* Beside the call (ADR 0070), at full length with no scroll box of its own: an
+   inner scrollbar hides part of the briefing, and the User must never miss a fact
+   mid-call. Below the two-column breakpoint it stacks under the call. */
 .reverse-brief-call {
   margin: 0 auto;
-  background: #fff;
+  background: var(--color-surface);
 }
 
 @media (min-width: 1080px) {
@@ -2795,7 +2792,7 @@ p.follow-up-error {
   margin: 0 auto 1.5rem;
   max-width: 720px;
   width: 100%;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-blue-600);
   border-radius: var(--radius-card);
   background: var(--color-surface-filter);
@@ -2836,12 +2833,9 @@ p.follow-up-error {
 
 /* --- One type scale for the three pre-call panels ----------------------- */
 
-/* The Briefing (ADR 0054), the case facts and a reverse's own brief are read
-   one under the other on the same screen, and the first two always are. Their label and their prose are therefore one declaration
-   each rather than three copies: they had drifted to two different scales, and
-   two blocks of the same kind set differently read as two kinds of thing.
-   Only what genuinely differs — the colour, the spacing, the `pre-line` on the
-   facts — stays with each panel. */
+/* The Briefing (ADR 0054), case facts and a reverse's brief share one label and
+   one prose declaration, so blocks of one kind cannot drift to different scales.
+   Only colour, spacing and the facts' `pre-line` differ per panel. */
 .scenario-briefing-title,
 .case-brief-eyebrow,
 .reverse-brief-eyebrow {
@@ -2875,38 +2869,44 @@ p.follow-up-error {
   flex: 0 0 3rem;
   font-variant-numeric: tabular-nums;
   font-size: 0.8rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 /* --- Feedback page --- */
 
+/* The feedback reads as one report rather than a wide dashboard. The outer
+   width and desktop inset leave an 800px reading column, matching the compact
+   composition used throughout the report. */
+.feedback-page {
+  width: min(896px, calc(100% - 32px));
+  padding: 48px 48px 72px;
+}
+
+/* The finished-training heading uses the same restrained hierarchy as the
+   other training screens instead of dominating the report below it. */
 .feedback-intro {
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
 .feedback-title {
   margin: 0;
-  font-size: 48px;
-  line-height: 1.08;
-  letter-spacing: -0.02em;
   color: var(--color-navy-900);
+  font-size: 42px;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
 }
 
-/* Every section of the feedback page has the same shape: a heading row above,
-   a white box below. Half of them used to carry the heading inside the box,
-   which made two blocks of the same kind look like two different kinds of
-   thing. A box may still hold a title, but only for an *item* within a
-   section — the two offers in the next-steps block are things you can pick,
-   not sections of the page. */
+/* Every feedback section is a heading row above a white box. A box holds a title
+   only for an *item* within a section (the offers under next steps). */
 .feedback-section {
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .feedback-section-head {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .feedback-section-heading {
@@ -2944,11 +2944,11 @@ p.follow-up-error {
 
 .feedback-section-head.is-success .feedback-section-icon {
   background: #eaf7f0;
-  color: #226048;
+  color: var(--color-success-ink);
 }
 
 .feedback-section-head.is-success .feedback-section-eyebrow {
-  color: #226048;
+  color: var(--color-success-ink);
 }
 
 .feedback-section-head.is-danger .feedback-section-icon {
@@ -2985,91 +2985,137 @@ p.follow-up-error {
   border-color: #e8c8a8;
 }
 
-.feedback-summary-text {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.57;
-  color: var(--color-text-muted-secondary);
+/* The qualitative overview is one report module: heading and narrative belong
+   to the same surface, with the left rule providing the section accent. */
+.feedback-summary-card {
+  padding: 24px 28px;
+  border-left: 4px solid var(--color-blue-600);
+  border-radius: 14px;
+  box-shadow: none;
 }
 
+.feedback-summary-card .feedback-section-head {
+  margin-bottom: 14px;
+}
+
+.feedback-summary-text {
+  max-width: none;
+  margin: 0;
+  color: var(--color-text-muted-secondary);
+  font-size: 14px;
+  line-height: 1.65;
+}
 /* The two halves of the wrap-up side by side. Each is a section of its own
    with its own heading, so the grid holds sections rather than boxes. */
 .feedback-details {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 28px;
+  gap: 14px;
+  margin-bottom: 24px;
 }
 
 .feedback-details .feedback-section {
+  height: 100%;
   margin-bottom: 0;
+}
+
+/* Strengths and improvements are report modules with smaller evidence cards
+   inside them, matching the visual hierarchy of the qualitative summary. */
+.feedback-point-card {
+  height: 100%;
+  padding: 20px;
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.feedback-point-section.success .feedback-point-card {
+  border-color: #c8e3d5;
+}
+
+.feedback-point-section.danger .feedback-point-card {
+  border-color: #f0d2ae;
+}
+
+.feedback-point-section .feedback-section-head {
+  margin-bottom: 14px;
 }
 
 .feedback-point-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .feedback-point-item {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
   padding: 12px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
-  background: #f8fbfd;
+  border-radius: 10px;
+  background: var(--color-surface-tint);
+}
+
+.feedback-point-item + .feedback-point-item {
+  margin-top: 0;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .feedback-point-item p {
   margin: 0;
-  font-size: 12px;
+  color: var(--color-text-muted-secondary);
+  font-size: 13px;
   line-height: 1.5;
-  color: var(--color-navy-900);
-}
-
-.feedback-point-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
 }
 
 .feedback-point-time {
-  flex-shrink: 0;
-  padding: 4px 6px;
-  border-radius: 6px;
-  background: #eaf4fa;
+  width: max-content;
+  padding: 5px 7px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  background: var(--color-surface);
   color: var(--color-blue-600);
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 700;
   line-height: 1.2;
-  font-weight: 500;
 }
 
-/* The text and, above it, the goal it was filed under. A column of its own so
-   the timestamp keeps its place at the left edge of the row while the label
-   sits over the sentence rather than beside it. */
 .feedback-point-body {
-  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 5px;
 }
 
-/* This section keeps a class of its own only for how its background note is
-   set — the white box is `.feedback-box` inside it, and the spacing comes from
-   `.feedback-section`, like every other section on the page. */
+/* Phase language stays deliberately flat: the explanation, rule of thumb and
+   optional background information belong to one report module. */
+.feedback-phase-card .feedback-box {
+  padding: 22px 24px;
+  border-radius: 14px;
+  box-shadow: none;
+}
+
 .feedback-phase-text {
-  margin: 0 0 14px;
+  margin: 0;
+  color: var(--color-text-muted-secondary);
   font-size: 14px;
-  line-height: 1.6;
-  color: var(--color-navy-900);
+  line-height: 1.65;
 }
 
+/* The rule of thumb is separated by a simple divider rather than another
+   coloured callout, keeping the report visually quiet. */
 .feedback-phase-note {
-  margin: 0;
-  padding-top: 14px;
+  margin: 16px 0 0;
+  padding: 14px 0 0;
   border-top: 1px solid var(--color-border-subtle);
-  font-size: 12px;
+  border-left: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 13px;
   line-height: 1.5;
   font-weight: 600;
-  color: var(--color-text-muted-secondary);
+  color: var(--color-navy-900);
 }
 
 /* The background behind that sentence sits in the shared "i" (InfoDetails).
@@ -3104,7 +3150,7 @@ p.follow-up-error {
 .feedback-phase-phases {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 4px 8px;
+  gap: 6px 10px;
   margin: 0 0 10px;
 }
 
@@ -3132,20 +3178,34 @@ p.follow-up-error {
   margin-bottom: 32px;
 }
 
+/* The metric switch behaves like a compact segmented control instead of a
+   separate dashboard panel. */
 .feedback-metrics-filter {
-  margin-bottom: 18px;
+  margin-bottom: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.feedback-metrics-filter .filter-slider {
+  padding: 4px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-surface);
 }
 
 .feedback-metrics-filter .filter-slider-option {
   flex: 1;
   justify-content: center;
+  min-height: 34px;
 }
 
 .feedback-metrics-lead {
-  margin: 10px 0 0;
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--color-text-muted);
+  margin: 8px 2px 0;
+  color: var(--color-text-muted-secondary);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .feedback-metrics-section .metric-grid {
@@ -3154,32 +3214,59 @@ p.follow-up-error {
   gap: 12px;
 }
 
+/* Metric tiles stay compact and flat so the figures read as part of the
+   report rather than as separate dashboard widgets. */
 .feedback-metrics-section .metric {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   min-height: 112px;
-  padding: 18px;
+  padding: 17px 18px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--color-surface);
+  box-shadow: none;
 }
 
 .feedback-metrics-section .metric-name {
-  font-size: 11px;
-  line-height: 1.3;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: 0;
   color: var(--color-text-muted-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .feedback-metrics-section .metric-value {
-  margin-top: 12px;
-  font-size: 24px;
-  line-height: 1.1;
-  font-weight: 700;
+  margin-top: 15px;
   color: var(--color-navy-900);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.feedback-metrics-section .metric-subline,
+.feedback-metrics-section .metric-context,
+.feedback-metrics-section .metric-light-label {
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-text-muted-secondary);
+}
+
+/* Detail links remain discoverable but do not compete with the measurement. */
+.feedback-metrics-section .metric-open-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: var(--color-blue-600);
+  opacity: 0.85;
+}
+
+.feedback-metrics-section .metric-open:hover .metric-open-hint {
+  text-decoration: underline;
+  opacity: 1;
 }
 
 .feedback-metrics-section .metric-disclaimer {
@@ -3191,13 +3278,18 @@ p.follow-up-error {
   color: var(--color-text-muted-secondary);
 }
 
+/* The loudness course spans the complete grid because the time course needs
+   horizontal room that a regular metric tile cannot provide. */
 .feedback-metrics-section .metric-loudness {
   grid-column: 1 / -1;
-  min-height: 140px;
+  min-height: 0;
+  padding: 18px;
 }
 
 .feedback-metrics-section .metric-loudness .loudness-course {
-  margin-top: 14px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 /* The empty state stands in for a line, so it takes a line's inset. Without
@@ -3401,15 +3493,22 @@ p.follow-up-error {
   min-width: 0;
 }
 
-/* The way back and the file to take away. `wrap` because the second label is
-   long: on a narrow page it drops to its own line rather than squeezing the
-   first. */
+/* Final actions sit outside the report content and stay intentionally compact. */
 .feedback-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-start;
-  gap: 12px;
-  margin-top: 28px;
+  gap: 8px;
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.feedback-actions .back-to-start-button {
+  min-height: 40px;
+  padding: 9px 14px;
+  border-radius: 9px;
+  font-size: 12px;
 }
 
 /* The quiet way back to the setup screen. Shared by the wrap-up and the
@@ -3452,20 +3551,73 @@ p.follow-up-error {
 }
 
 @media (max-width: 720px) {
+  .feedback-page {
+    padding: 32px 0 48px;
+  }
+
   .feedback-title {
-    font-size: 36px;
+    font-size: 32px;
+  }
+
+  .feedback-meta {
+    flex-wrap: wrap;
   }
 
   .feedback-details {
     grid-template-columns: 1fr;
   }
 
+  .feedback-summary-section .feedback-box,
+  .feedback-phase-card .feedback-box,
+  .feedback-point-card {
+    padding: 20px;
+  }
+
+  .feedback-point-item {
+    gap: 12px;
+  }
+
+  .feedback-point-time {
+    flex-basis: 44px;
+    font-size: 13px;
+  }
+
+  .feedback-metrics-filter {
+    padding: 10px 12px 12px;
+  }
+
   .feedback-metrics-section .metric-grid {
     grid-template-columns: 1fr;
   }
 
+  .feedback-metrics-section .metric {
+    min-height: auto;
+    padding: 18px;
+  }
+
   .feedback-metrics-section .metric-loudness {
     grid-column: auto;
+    min-height: 0;
+    padding: 18px;
+  }
+
+  .next-steps {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .card.next-step {
+    padding: 18px 20px;
+  }
+
+  .feedback-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .feedback-actions .back-to-start-button {
+    width: 100%;
+    text-align: center;
   }
 
   .feedback-section-head {
@@ -3475,17 +3627,18 @@ p.follow-up-error {
   .feedback-section-aside {
     margin-top: 2px;
   }
-
 }
 
+/* The call identity belongs directly to the page heading and stays visually
+   quieter than the actual feedback that follows. */
 .feedback-meta {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: -8px 0 20px;
-  font-size: 13px;
-  line-height: 1.4;
+  margin: 10px 0 28px;
   color: var(--color-text-muted-secondary);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .feedback-meta-separator {
@@ -3693,12 +3846,8 @@ p.follow-up-error {
   min-width: 0;
 }
 
-/* Small state labels on a history row. Tinted rather than solid, and stating
-   a fact rather than raising an alarm: a call that was abandoned, or one whose
-   wrap-up never got written, is a thing that happened, not the user's mistake.
-   Colour is a second channel here, never the only one -- each chip says in
-   words what its colour repeats, so it survives being read in greyscale or by
-   someone who does not separate green from red. */
+/* State labels on a history row: tinted, stating a fact rather than an alarm.
+   Colour is never the only channel -- each chip says it in words too. */
 .chip {
   margin-left: 8px;
   padding: 1px 9px;
@@ -3753,12 +3902,10 @@ p.follow-up-error {
   border-color: var(--color-blue-600);
 }
 
-/* The bin, and the check and cross that replace it. The box widens from one
-   button to two while the bin slides out to the right, clipped at the box's
-   edge so it leaves rather than fades, and the two answers come in from the
-   left a moment after. Every button stays mounted; `visibility` hides the ones
-   not in play, and flips only at the end of a hiding transition (its own delay)
-   so the slide is still seen. */
+/* The bin, and the check and cross that replace it: the box widens, the bin
+   slides out right (clipped, not faded), the answers come in from the left.
+   All stay mounted; `visibility` flips only at the end of a hiding transition
+   so the slide is seen. */
 .session-row-actions {
   position: relative;
   flex: 0 0 auto;
@@ -3987,12 +4134,9 @@ p.follow-up-error {
   inset: 0;
   z-index: 50;
   display: flex;
-  /* NOT align-items: center. On a scroll container, a centered flex item that
-     is taller than the viewport overflows equally in both directions, and the
-     part above the top edge cannot be scrolled to: scrolling never goes above
-     the origin, so the head of a long dialog is simply lost. The dialog below
-     centers itself with `margin: auto` instead, which resolves to zero once
-     there is no free space left. */
+  /* NOT align-items: center. A centred flex item taller than a scroll container
+     overflows upwards where it cannot be scrolled to, losing the dialog's head.
+     The dialog centres itself with `margin: auto`, which collapses to zero instead. */
   align-items: flex-start;
   justify-content: center;
   padding: 24px;
@@ -4055,12 +4199,8 @@ p.follow-up-error {
   transition: background 0.2s, border-color 0.2s, opacity 0.2s;
 }
 
-/* A link wearing the button's clothes — picking focus goals, starting a
-   training. An `<a>` is inline, and an inline box's vertical padding takes up
-   no line height: it paints over the line above instead, which is how the
-   button came to sit on top of the sentence it answers. `inline-flex` makes the
-   padding count, and the underline a link would carry does not belong on a
-   button. */
+/* A link styled as a button. `inline-flex` because an inline `<a>`'s vertical
+   padding takes no line height and paints over the line above; no underline. */
 a.consent-button {
   display: inline-flex;
   align-items: center;
@@ -4202,7 +4342,7 @@ a.consent-button {
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: var(--color-surface);
   background: var(--color-danger);
   cursor: pointer;
   transition: background 0.2s;
@@ -4213,33 +4353,18 @@ a.consent-button {
 }
 
 /* --- The traffic light on a classification (ADR 0078) -------------------- */
-/* The only colour in this application that says something about a value. It
-   exists so a reader gets an impression before the reading starts: the wrap-up
-   hands them nine figures at equal weight, and nothing else on that screen says
-   which one is worth their attention first. Colour is seen rather than read,
-   which is the whole property being used here.
-
-   It points, it does not grade. Green means nothing here needs attention today,
-   red means look here first. Two metrics carry one, F-51's interruptions and
-   F-35's intonation, and ADR 0078 holds the seven conditions any further one
-   has to meet.
-
-   It colours the classification and nothing else. Never a whole tile, which
-   would shout an orientation the thresholds cannot support and drown out the
-   neighbouring metrics that carry no reading at all. Never a raw figure
-   either: on F-35 the step is read from the liveliness while the tile's
-   number is the range, so the colour goes on the word.
-
-   Colour is never the only channel: the step is written out beside it, the word
-   "assessment" follows, the scale it came from sits on the metric's own
-   page, and the three tints differ in lightness so they survive greyscale. */
+/* The only colour in the app that says something about a value (ADR 0078): it
+   points, it does not grade -- green: nothing needs attention, red: look here first.
+   Only on the classification word, never a whole tile or raw figure. Never the only
+   channel: the step is written out, "assessment" follows, the scale is on the metric's
+   page, and the tints differ in lightness to survive greyscale. */
 
 .metric-value-green {
   color: var(--color-success);
 }
 
 .metric-value-yellow {
-  color: #b57a12;
+  color: var(--color-warning);
 }
 
 .metric-value-red {
@@ -4381,7 +4506,7 @@ a.consent-button {
 }
 
 .metric-step.metric-step-yellow {
-  border-left-color: #b57a12;
+  border-left-color: var(--color-warning);
 }
 
 .metric-step.metric-step-red {
@@ -4510,12 +4635,9 @@ a.consent-button {
 }
 
 /* --- What a figure was read off (MetricEvidence.tsx) ---------------------- */
-/* Every Kennzahl tile on the wrap-up screen opens its own page, so every page
-   has to show more than the tile did: the words that were counted, the
-   passages that were found, the pauses that were measured. Nothing in this
-   block may encode a direction -- no colour for a value, no target mark. The
-   one accent it uses sits on a *quoted word*, to say "this is the one that was
-   counted", never on a number. */
+/* Every Kennzahl page shows what its tile's figure was read off. Nothing here may
+   encode a direction -- no value colour, no target mark; the one accent marks a
+   *quoted counted word*, never a number. */
 
 .evidence-quote {
   margin: 0 0 0.75rem;
@@ -4822,13 +4944,8 @@ a.consent-button {
 
 /* --- intonation (F-35) ------------------------------------------------- */
 /* The contour and the five figures live on the metric's own page
-   (`SessionMetricView`); the wrap-up carries the tile like every other.
-
-   The arrangement is deliberate and replaced one that buried its own point: a
-   paragraph of method under every figure meant the sentence a reader acts on
-   sat in the middle of six hundred words about measurement. Now the lead
-   sentence carries the classification, the figures are figures, and the method
-   is behind the "i". Nothing was deleted, only moved. */
+   (`SessionMetricView`); the wrap-up carries a tile. Lead sentence first, figures
+   as figures, method behind the "i" (ADR 0077). */
 
 /* The one sentence this block is built around. Larger than body text and above
    the figures, because a reader who stops after it should still leave with the
@@ -5072,12 +5189,9 @@ a.consent-button {
 }
 
 /* --- Ihr Training: the band that opens the page ---------------------------- */
-/* Three columns on a wide screen: the counted figures stacked on the left, the
-   calendar at its natural width beside them, and the rest to the variety table,
-   which is the one that runs out of room first (a Persona's name gets clipped
-   otherwise). The calendar is sized to the calendar rather than to a share of
-   the page: one month of seven columns has a natural width, and a larger share
-   only stretched the card, not the grid in it. */
+/* Three columns on a wide screen: counted figures, the calendar at its natural
+   width (one month of seven columns), and the rest to the variety table, which
+   runs out of room first. */
 /* The first block on the page follows the lead and its "i", not another
    block, so it needs less than a section's usual distance. */
 .progress-training-section {
@@ -5091,21 +5205,9 @@ a.consent-button {
   align-items: start;
 }
 
-/* In the ordinary view the three cards end level.
-
-   They did not, and it showed: the counted figures are three short boxes and
-   the calendar is a month grid, so the left column stopped some fifty pixels
-   above its neighbours and the row read as three unrelated blocks instead of
-   as one band.
-
-   Not while the variety table is expanded, which is what the guard is for and
-   what the rule here used to say in place of stretching at all: opened to
-   twenty Scenarios that card runs to twice the height of the calendar, and
-   pulling the other two up to it would draw a border around half a screen of
-   nothing. The expanded state is read off the show-more button's own
-   `aria-expanded` rather than from a second class, so there is no copy of it
-   to keep in step — and where the table is short enough to need no button,
-   there is nothing to expand and the cards level for good. */
+/* In the ordinary view the three cards end level -- except while the variety
+   table is expanded (it runs to twice the calendar's height). Read off the
+   show-more button's own `aria-expanded`, so there is no second copy of the state. */
 .progress-training:not(:has(.session-more[aria-expanded="true"])) {
   align-items: stretch;
 }
@@ -5745,16 +5847,9 @@ a.consent-button {
 }
 
 /* --- When the user trained ------------------------------------------------ */
-/* Counting what somebody did needs no norm, which is why this is the one block
-   here that carries no caveat (ADR 0065). The shading is magnitude on a single
-   hue, three steps, and the number is printed in the cell -- so the colour is a
-   second reading of what the cell already says, never the only one.
-
-   Derived from --series-activity by mixing it with the surface at 45 % and
-   70 %, validated as an ordinal ramp against a white card: monotone lightness,
-   adjacent gaps over 0.06, light end 2.23:1, one hue. A darker light end than
-   the eye would pick, because the first step has to stay visible against the
-   card at all. */
+/* Counting needs no norm, so no caveat here (ADR 0065). Three steps of one hue
+   (--series-activity mixed with the surface at 45 %/70 %), validated as an ordinal
+   ramp; the number is printed in the cell, so colour is never the only reading. */
 
 .calendar {
   margin: 0;
@@ -6339,12 +6434,8 @@ button.calendar-day {
 }
 
 /* --- What recurs, and what to practise next (blocks D and E) ------------- */
-/* These two were a dashed, half-transparent example until each feedback point
-   carried the goal it was about (ADR 0080). The example styling is gone with
-   it: the content is the user's own now, and anything that still whispered
-   "placeholder" would undersell it. `progress-preview-note` is the last name
-   left over from that phase; the rest were renamed when the two lists became
-   two cards. */
+/* The user's own tagged points (ADR 0080), so no placeholder styling.
+   `progress-preview-note` is a leftover name from the preview phase. */
 
 .progress-preview-note {
   margin: 0 0 1rem;
@@ -6513,28 +6604,10 @@ a.recurring-item:focus-visible {
   font-size: 0.82rem;
 }
 
-/* The single practice suggestion. The ground first and small, the thing to
-   play next under it and large, the button at its end, the caveat last. That
-   order is the argument: a suggestion whose ground the reader has not seen is
-   an instruction, so the ground comes before the offer.
-
-   Across the full width under the two lists rather than as a third card in
-   their row: the same content in a 450px column ran three times their height,
-   and the row read as lopsided.
-
-   One column and not two. The ground used to sit beside the offer, which put
-   four lines of prose in 240 pixels next to a bordered, gradient-filled panel
-   — a card inside a card — with the two halves centred against each other, so
-   the chip and the name of the call missed each other by nine pixels and
-   nothing on the band lined up with anything else. Stacked, the prose gets a
-   measure it can be read at and the offer needs no box to be found.
-
-   The measure is on the prose and not on the band: this card runs the full
-   width of a 1440px page, and a paragraph set across it is 180 characters to
-   the line — but capping the whole band left the right two fifths of the card
-   empty, which reads as a layout that broke rather than as a column somebody
-   chose. So the two sentences get a width they can be read at, and the rows
-   that carry a structure — the rule, the offer, the foot — keep the card's. */
+/* The single practice suggestion: ground first and small, then the offer large,
+   button at its end, caveat last -- a suggestion without its ground is an
+   instruction. Full width under the two lists, one column. The measure caps the
+   prose only: capping the whole band left two fifths of the card empty. */
 
 .progress-practice-band {
   display: flex;
@@ -6567,13 +6640,8 @@ a.recurring-item:focus-visible {
   color: var(--color-navy-900);
 }
 
-/* The chip over the sentence that gives the ground. It says what kind of thing
-   this block is before the reader has read a word of it, which is the same job
-   the closing caveat does at the other end.
-
-   On a line of its own. Inline at the head of the paragraph it set the first
-   line ninety pixels in while the two under it started at the margin, which
-   reads as a broken first-line indent rather than as a label. */
+/* The chip over the ground sentence, on a line of its own: inline it read as a
+   broken first-line indent. */
 .progress-practice-chip {
   display: block;
   width: fit-content;
@@ -6588,16 +6656,9 @@ a.recurring-item:focus-visible {
   text-transform: uppercase;
 }
 
-/* The offer itself: the name of the call on the left, the button at the end of
-   the measure, wrapping under it where there is no room.
-
-   No box. It had a border and a 135-degree gradient inside a card that has a
-   border of its own, and the gradient ran out to the card's own white before
-   the panel's right edge did — so the fill dissolved while the border stayed,
-   which looks like a mistake rather than like a panel. What makes the offer
-   findable without one is the name set in the display face and the only dark
-   button on the screen; the rule above it is what separates it from the ground
-   it follows from. */
+/* The offer: the call's name left, the button at the end, wrapping when needed.
+   No box (a bordered gradient inside a card looked broken); the display face,
+   the only dark button and the rule above make it findable. */
 .progress-practice-offer {
   display: flex;
   flex-wrap: wrap;
@@ -6784,14 +6845,6 @@ a.recurring-item:focus-visible {
   font-weight: 600;
 }
 
-.focus-chip input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-}
-
 .focus-chip:has(input:focus-visible) {
   outline: 2px solid var(--color-blue-600);
   outline-offset: 2px;
@@ -6821,13 +6874,20 @@ a.recurring-item:focus-visible {
 }
 
 /* What to play next (F-64): one row per offer, the button on the right. */
+/* Existing library suggestions remain visually subordinate to the two main
+   next-step offers while using the same card language as the feedback page. */
 .next-calls {
-  margin-top: 16px;
+  margin-top: 14px;
+  padding: 18px 20px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: none;
 }
 
 .next-calls-list {
   list-style: none;
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   padding: 0;
 }
 
@@ -6835,7 +6895,7 @@ a.recurring-item:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   padding: 12px 0;
   border-top: 1px solid var(--color-border-subtle);
 }
@@ -6848,17 +6908,50 @@ a.recurring-item:focus-visible {
 }
 
 .next-call-title {
-  font-weight: 600;
   color: var(--color-navy-900);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .next-call-reason {
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
+  color: var(--color-text-muted-secondary);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .next-call .follow-up-button {
   flex: none;
+}
+
+.next-calls .follow-up-button {
+  min-height: 36px;
+  padding: 7px 12px;
+  border-radius: 9px;
+  background: var(--color-navy-900);
+  font-size: 12px;
+}
+
+.next-calls .follow-up-button:hover {
+  background: var(--color-navy-700);
+}
+
+/* Library suggestions stack vertically on narrow screens so the scenario text
+   keeps enough room and the start action remains easy to reach. */
+@media (max-width: 720px) {
+  .next-calls {
+    padding: 18px 20px;
+  }
+
+  .next-call {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .next-call .follow-up-button {
+    width: 100%;
+  }
 }
 
 /* Why a suggested card is suggested (F-62). */
@@ -6953,16 +7046,6 @@ a.recurring-item:focus-visible {
 .focus-goal-selected {
   border-color: var(--color-blue-600);
   background: var(--color-surface-selected);
-}
-
-/* The real control, kept for the keyboard and the screen reader and drawn as
-   the circle below. */
-.focus-goal-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
 }
 
 /* Both halves of the text are labels for the same box, so either one ticks it. */
@@ -7242,8 +7325,12 @@ a.recurring-item:focus-visible {
    short. What a decision turns on stays in the open; the background lives in
    here. Native <details>, so it opens on find-in-page and prints expanded. */
 
-/* Present to a screen reader, absent to the eye. */
-.visually-hidden {
+/* Present to a screen reader, absent to the eye. The inputs are the real
+   controls behind a drawn chip, circle or drop zone, kept for the keyboard. */
+.visually-hidden,
+.pdf-dropzone input,
+.focus-chip input,
+.focus-goal-input {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -7898,7 +7985,7 @@ a.recurring-item:focus-visible {
   gap: 11px;
   border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
-  background: #f8fbfd;
+  background: var(--color-surface-tint);
   color: var(--color-text-muted-secondary);
   font-size: 12.5px;
   line-height: 1.5;
@@ -8082,7 +8169,7 @@ a.recurring-item:focus-visible {
   font-weight: 600;
 }
 
-.auth-status-card span {
+.auth-status-card > div > span {
   color: var(--color-text-muted-secondary);
   font-size: 12px;
 }
@@ -8394,22 +8481,18 @@ a.recurring-item:focus-visible {
   margin: 0.2rem 0 0;
   font-family: var(--font-display);
   font-size: 1.6rem;
-  color: var(--navy);
+  color: var(--color-navy-900);
 }
 
 .rolling-lead {
   margin: 0;
   max-width: 34ch;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
-/* The stage owns the perspective, so the cube's own transform stays a plain
-   rotation and the keyframes below read as one.
-
-   The height is headroom, not the die: the throw opens 44px above where the
-   die comes to rest, and a box drawn tight around the resting position lets
-   that first frame overlap the heading. So the die sits low in a tall box and
-   the throw happens inside it. */
+/* The stage owns the perspective, so the cube's transform stays a plain rotation.
+   The height is headroom: the throw opens 44px above the resting position, and a
+   tight box let the first frame overlap the heading. */
 .dice-stage {
   position: relative;
   width: 96px;
@@ -8445,7 +8528,7 @@ a.recurring-item:focus-visible {
 
 .dice-pip {
   border-radius: 50%;
-  background: var(--navy);
+  background: var(--color-navy-900);
 }
 
 .dice-pip.is-empty {
@@ -8561,14 +8644,9 @@ a.recurring-item:focus-visible {
 
 /* --- Screen transitions ---------------------------------------------------- */
 
-/* The film cut between two screens: the screen dims to opaque, changes behind
-   the cover, and comes back. Two phases, driven from ScreenTransition.tsx —
-   which also sets --cover-ms/--reveal-ms, so the timers that fire the actual
-   screen change and these animations are the same numbers rather than two
-   copies of them.
-
-   Deliberately above everything and untouchable: a transition the user can
-   click through is a transition that lands them on a half-built screen. */
+/* The film cut between two screens, driven from ScreenTransition.tsx, which sets
+   --cover-ms/--reveal-ms so timers and animations share one number. Above
+   everything and unclickable: clicking through would land on a half-built screen. */
 .screen-transition {
   position: fixed;
   inset: 0;
@@ -8815,15 +8893,10 @@ a.recurring-item:focus-visible {
   background: linear-gradient(180deg, #b45309, #f59e0b, #b45309);
 }
 
-/* The control for it: an arm reaching in from the left of the device, with the
-   label and the arrow inside the button rather than beside it. That is the
-   whole point of the shape — a 3px sliver is far under the 24px a target needs
-   (WCAG 2.5.8), and this makes the target 210px wide without drawing the
-   switch any bigger than a switch.
-
-   `top`/`height` centre it on the sliver (74px + 20/2 = 84; 62 + 44/2 = 84),
-   and the right edge lands 6px inside the frame, so the arrowhead stops just
-   short of the switch and the press area still covers it. */
+/* An arm reaching in from the left, label and arrow inside the button: a 3px
+   sliver is far under WCAG 2.5.8's 24px, so this makes a 210px target without
+   drawing a bigger switch. `top`/`height` centre it on the sliver (74 + 20/2 = 84;
+   62 + 44/2 = 84); the right edge lands 6px inside the frame. */
 .incoming-mute-switch {
   position: absolute;
   top: 62px;
@@ -8855,7 +8928,7 @@ a.recurring-item:focus-visible {
 }
 
 .incoming-mute-switch:hover {
-  color: var(--navy);
+  color: var(--color-navy-900);
 }
 
 /* The switch lights up with its own control, so the arm and the sliver read as
@@ -8989,7 +9062,7 @@ a.recurring-item:focus-visible {
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  color: #fff;
+  color: var(--color-surface);
   transition: transform 0.12s ease-out, filter 0.2s;
 }
 
@@ -9035,7 +9108,7 @@ a.recurring-item:focus-visible {
   margin: 2.4rem 0 0;
   max-width: 34ch;
   text-align: center;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 /* The arm reaches 204px left of a device that is centred in the page, so it

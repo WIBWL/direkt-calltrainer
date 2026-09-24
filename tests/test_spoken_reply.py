@@ -1,10 +1,7 @@
 """What the user heard of a reply streamed ahead of playback (ADR 0035).
 
-`SpokenReply.cut` is the one question both barge-in paths ask -- a reply still
-being generated and one already committed -- so the cases ADR 0035 and its
-amendment describe are pinned here directly, with chunks and a played position
-in and the heard and unheard text out, rather than only through a faked Turn
-(`test_barge_in.py` covers the Turn).
+`SpokenReply.cut` answers both barge-in paths (still generating, already committed); pinned
+here directly with chunks and a played position (`test_barge_in.py` covers the Turn).
 """
 
 # pylint: disable=missing-function-docstring

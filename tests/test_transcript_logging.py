@@ -1,24 +1,8 @@
 """Spoken content stays out of the log, with no way to put it back (ADR 0066).
 
-The log file is outside every deletion path this application has: a transcript
-written there survives a withdrawn consent and a deleted training, and no route
-can reach it. It was going in at INFO on every Turn, so this is a leak that was
-running rather than a feature that was missing — which is why it gets a test of
-its own rather than a line in the deletion suite.
-
-It was closed by default and re-openable through `LOG_TRANSCRIPTS` for a while.
-That switch is gone: a default is not a guarantee, and the one thing it bought —
-reading a model's actual words while diagnosing it — is bought again by the leg
-that fails, which logs its own error. So these tests no longer pin a default;
-they pin that the text has nowhere to go.
-
-Records are captured by a handler attached to the module's own logger rather
-than through `caplog`. `configure_logging()` clears the root handlers when the
-backend is first imported, which takes pytest's with it — under the full suite
-`caplog` then saw nothing, and the assertion that matters most here ("the text
-is absent") passed for the worst possible reason. A handler on the logger being
-tested cannot be cleared out from under it by import order.
-"""
+The log is outside every deletion path, so these pin that the text has nowhere to go.
+Captured by a handler on the module's own logger, not `caplog`: `configure_logging()` clears
+the root handlers at import, so under the full suite `caplog` saw nothing and "absent" passed."""
 import logging
 
 import pytest
@@ -111,12 +95,8 @@ async def test_the_length_is_still_logged(
 
 # --- The other half of the pipeline -----------------------------------------
 #
-# One rule for the whole pipeline, and until the switch existed only the STT leg
-# kept it. The TTS leg logged the Persona's line unconditionally, once per
-# chunk, so the whole Persona side of every call went into the file. It is
-# generated text rather than recorded speech, but it carries the name and the
-# facts the user has just said back to them, and the file is outside every
-# deletion path all the same.
+# The TTS leg follows the same rule: the Persona's line carries back the name and
+# facts the user just said, and the log is outside every deletion path.
 
 SPOKEN_BY_PERSONA = "Guten Tag Frau Example, es geht um Vertrag 4711."
 _VOICE = PersonaVoice(kugelaudio_voice_id=1)

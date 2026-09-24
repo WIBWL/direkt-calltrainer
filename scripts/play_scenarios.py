@@ -1,50 +1,14 @@
 """Play every seeded Scenario against every Persona and write the transcripts.
 
-An inspection tool, not a test. It cannot say whether a Scenario is *good*; it
-says which pairings are obviously broken, so the ones worth listening to by hand
-are a short list instead of all of them. Deliberately not under `tests/`: that
-suite is network-free by construction (`tests/conftest.py` fakes the pipeline
-and claims the POSTGRES_* names with unusable values before the backend is
-imported, and `test_database_isolation.py` guards that ordering), and a
-non-deterministic run has no honest pass/fail anyway.
+An inspection tool, not a test. Only the LLM leg is real; STT returns the scripted probe
+(`scripts/scenario_probes.py` -- read its docstring first), TTS silence, acoustics nothing.
 
-What is real and what is not:
-
-  * The LLM leg is real, and so is everything around it -- prompt assembly
-    (ADR 0045), the repetition guards (ADR 0038), closing detection (ADR 0037)
-    and the `[CALL_END]` marker. That is where Scenario content lives.
-  * STT is stubbed and returns the scripted probe, so no audio is synthesised
-    only to be recognised again.
-  * TTS is stubbed and returns silence sized from the text, so the timeline
-    stays plausible without a second round trip per chunk.
-  * The acoustic analysis is stubbed to "not measurable", which is a path the
-    orchestrator already handles and never treats as fatal.
-
-So this exercises the dialogue, not the audio path. `scripts/check_backends.py`
-covers STT and TTS.
-
-The trainee is scripted in `scripts/scenario_probes.py`: six turns, five of
-them the same everywhere, the fourth written per Scenario to satisfy that
-Scenario's `success_condition`, and the fifth a neutral follow-up that gives the
-persona a second Turn to close on its own before the farewell forces the issue.
-Read that module's docstring before changing a probe; a probe that trips
-`signals_closing` ends the call early and looks like a clean short run.
-
-Usage:
     docker compose exec app python scripts/play_scenarios.py
     docker compose exec app python scripts/play_scenarios.py --only closing-recap-mismatch
-    docker compose exec app python scripts/play_scenarios.py --persona thomas-brandt-ceo
+    docker compose exec app python scripts/play_scenarios.py --persona andreas-kastner-ceo
 
-Output goes to logs/scenario-runs/<timestamp>/, which compose mounts from the
-repository, so the files land next to the checkout. One Markdown file per
-pairing, carrying the rendered system prompt and the transcript, plus a
-summary.md with one row each.
-
-Exit codes: 2 if the probes fail their own check or the selection is empty (no
-LLM call is made in either case), 1 if a run failed outright (a leg gave up past
-its retry), 0 otherwise. Red flags are findings for a human, not verdicts, so
-they do not change the exit code.
-"""
+Writes per-pairing Markdown plus summary.md to logs/scenario-runs/<timestamp>/. Exit 2: bad
+probes or empty selection; 1: a run failed; else 0 (red flags never change it)."""
 from __future__ import annotations
 
 import argparse
@@ -94,14 +58,9 @@ END_MARKER_RE = re.compile(r"\[\s*call[_\s]?end\s*\]", re.IGNORECASE)
 # plausible instead of a constant. Only the report's timings depend on it.
 _MS_PER_CHAR = 66
 
-# Function words common enough that a whole call in that language is certain to
-# contain several. A crude signal, not a language detector: it only has to catch
-# a Persona answering wholly in the wrong language.
-#
-# Judged over the whole call rather than per reply, and against a count rather
-# than a single hit: one German sentence can easily miss any given word
-# ("Brandt hier, bei uns bleibt seit drei Tagen alles liegen" contains none of
-# the obvious ones), which made the per-reply version cry wolf.
+# Function words any whole call in that language is certain to contain several
+# of -- a crude check for a Persona answering in the wrong language. Counted over
+# the whole call: a single reply can easily contain none of them.
 _LANGUAGE_MARKERS = {
     "de": re.compile(
         r"\b(ich|nicht|und|das|der|ist|sind|sie|wir|uns|noch|haben|ein|eine|einen|"
@@ -168,14 +127,9 @@ class RunRecord:
 
 
 class _Pipeline:
-    """The stubs, and the tap on the LLM.
-
-    STT hands back whatever probe is due. TTS returns silence. The LLM is not
-    replaced, only wrapped, so the raw stream can be kept: `[CALL_END]` is
-    stripped before it reaches the Turn, and telling a model that ended the call
-    itself from one that was ended by the user's goodbye is the whole point of
-    the report.
-    """
+    """The stubs, and the tap on the LLM. STT hands back the due probe, TTS silence;
+    the LLM is only wrapped, to keep the raw stream -- `[CALL_END]` is stripped
+    before the Turn, and who ended the call is the point of the report."""
 
     def __init__(self) -> None:
         self.next_user_text = ""
@@ -218,12 +172,8 @@ class _Pipeline:
 
 @contextmanager
 def _stubbed(pipeline: _Pipeline):
-    """Swap the pipeline's edges for the duration of a run.
-
-    `analyze` is patched on the orchestrator module, not on
-    `backend.feedback.acoustics`: the orchestrator imported the name directly,
-    so rebinding it at its source would not reach the call site.
-    """
+    """Swap the pipeline's edges for the duration of a run. `analyze` is patched on
+    the orchestrator module, which imported the name directly."""
     saved = {
         (stt, "transcribe"): stt.transcribe,
         (tts, "synthesize_stream"): tts.synthesize_stream,
@@ -306,14 +256,9 @@ async def play(persona: Persona, scenario: Scenario) -> RunRecord:
 
 
 def scenario_key_of(scenario: Scenario) -> str | None:
-    """The seed slug a probe set is keyed by.
-
-    Looked up by `extern_id`, which is what the value object carries as `id`
-    (ADR 0050). Matching on the title instead would be silently wrong the first
-    time a Scenario is renamed: the run would drop to the fallback probe and
-    still look like a reasonable run. An authored Scenario has no slug and gets
-    the fallback on purpose.
-    """
+    """The seed slug a probe set is keyed by, looked up by `extern_id` (ADR 0050) --
+    matching titles would silently fall back after a rename. Authored Scenarios
+    have no slug and get the fallback probe."""
     return _SCENARIO_SLUGS.get(scenario.id)
 
 
@@ -327,12 +272,8 @@ def _numbers(text: str) -> set[str]:
 
 
 def _flow_flags(run: RunRecord) -> list[str]:
-    """How the call ran: where it ended and why.
-
-    `ended` without `model_ended` and without `forced` means neither the model
-    nor the user closed it, which leaves the repetition guards (ADR 0038) as the
-    only thing that could have.
-    """
+    """How the call ran: where it ended and why. `ended` without `model_ended` or
+    `forced` means only the repetition guards (ADR 0038) could have closed it."""
     found: list[str] = []
     by_slot = {t.slot: t for t in run.turns}
     if any(t.ended for t in run.turns[:2]):
@@ -368,12 +309,8 @@ def _content_flags(run: RunRecord) -> list[str]:
 
 
 def flags_for(run: RunRecord) -> list[str]:
-    """The mechanical red flags. None of them judges quality.
-
-    Deliberately absent: whether the Persona closed once its `success_condition`
-    was met. That turned out to be uniform across the whole library, so it is a
-    systemic observation (`_systemic_markdown`) and not a per-row finding.
-    """
+    """The mechanical red flags. None of them judges quality. Closing on
+    `success_condition` is uniform across the library, so `_systemic_markdown` reports it."""
     if run.failure:
         return [f"RUN FAILED ({run.failure})"]
     return _flow_flags(run) + _content_flags(run)
@@ -382,12 +319,7 @@ def flags_for(run: RunRecord) -> list[str]:
 def closing_slot(run: RunRecord) -> int | None:
     """The probe after which the model closed the call itself, or None.
 
-    Kept apart from the flags on purpose. Whether a Persona closes because its
-    own `success_condition` was met, or only once the user says goodbye, turned
-    out to be uniform across the whole library rather than a property of any one
-    Scenario, so it belongs in the summary as one observation and not on every
-    row as a finding. `_systemic_markdown` counts it.
-    """
+    Not a flag: it is uniform across the library, so `_systemic_markdown` counts it once."""
     for turn in run.turns:
         if turn.model_ended:
             return turn.slot
@@ -452,13 +384,8 @@ def _summary_markdown(results: list[tuple[RunRecord, list[str]]], started: datet
 
 
 def _systemic_markdown(results: list[tuple[RunRecord, list[str]]]) -> str:
-    """Observations that hold across the library rather than per Scenario.
-
-    A finding that fires on nearly every pairing says nothing about which
-    Scenario to look at, which is what the per-row flags are for. It can still
-    be the most important thing in the run, so it is stated once, here rather
-    than on every row where it would bury the findings that do discriminate.
-    """
+    """Observations that hold across the library rather than per Scenario, stated
+    once so they do not bury the per-row findings that do discriminate."""
     total = len(results)
     if not total:
         return ""
@@ -486,16 +413,9 @@ def _systemic_markdown(results: list[tuple[RunRecord, list[str]]]) -> str:
 
 
 def _load_library() -> tuple[list[Persona], list[Scenario]]:
-    """The seeded built-ins, read the way the app reads them (ADR 0041).
-
-    A subject that owns nothing and a tenant id that matches none: the built-ins
-    are `public`, so `_visible_to`'s first branch returns them and neither of
-    the other two can add anything (ADR 0058, ADR 0060).
-
-    The same trip fills the slug maps. The value objects carry `extern_id` as
-    `id` and not the `key` slug, and the slug is what the probe sets and the
-    output filenames are keyed by.
-    """
+    """The seeded built-ins, read the way the app reads them (ADR 0041): a subject
+    owning nothing and a matching-no-tenant id see only `public` rows (ADR 0058/0060).
+    Also fills the slug maps, since the value objects carry `extern_id`, not `key`."""
     scenarios = [s for s in library.list_scenarios("__harness__", -1) if s.created_by is None]
     _load_slugs()
     return library.list_personas(), scenarios

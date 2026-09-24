@@ -6,17 +6,9 @@ import type { FocusChoice, FocusState } from "../protocol";
 export type FocusLoadState = "loading" | "ready" | "failed";
 
 /**
- * The signed-in user's training focus and the catalogue it comes from
- * (F-62, ADR 0076).
- *
- * Held once, near the root, and passed down: the first-run dialog and the
- * profile section show the same catalogue and the same ticks, and fetching it
- * twice would let the two disagree on screen after one of them has just saved.
- *
- * A failed load is deliberately not treated as "undecided". Blocking the app
- * with a dialog because a request timed out would ask a user who answered
- * months ago to answer again, and the answer they give under that dialog would
- * overwrite the one they already had.
+ * The signed-in user's training focus and its catalogue (F-62, ADR 0076), held
+ * once near the root so dialog and profile agree. A failed load is not
+ * "undecided": re-asking would overwrite an answer given months ago.
  */
 export function useFocus() {
   const [focus, setFocus] = useState<FocusState | null>(null);

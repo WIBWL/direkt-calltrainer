@@ -3,34 +3,13 @@
     python scripts/backfill_opening.py            # show what would change
     python scripts/backfill_opening.py --apply    # write it
 
-Unlike the other backfills this one does not fill a gap: every stored Session
-already carries an opening. What it does is read that opening *again*, because
-the patterns behind it have changed -- the frames a name is said in were
-widened after "Guten Tag, hier ist die Anna" came back as no introduction, and
-every call recorded before that still says so on screen.
-
-That is only possible for the three parts, and only they are rewritten. They
-are read from words, and the words are on the `turn` table
-(`metrics.opening_parts` is the same function the live path runs). The tempo of
-the opening against the rest of the call is acoustic, the recording is gone
-(ADR 0048), and the stored `pace_ratio` is therefore carried over untouched
-rather than recomputed or dropped.
-
-Runs against the database in `.env`, so a host shell will do; nothing here needs
-Redis or a model.
-
-Idempotent in the sense that matters: a Session whose parts come out exactly as
-they are stored is left alone and not reported, so a second run after --apply
-reports nothing. It is *not* idempotent across a pattern change, which is the
-whole point of it.
-"""
+Rewrites rather than fills: only the three word-based parts (`metrics.opening_parts`);
+the acoustic `pace_ratio` is carried over (no audio, ADR 0048). Uses `.env`'s database
+(no Redis, no model). Unchanged Sessions are skipped, so a second run reports nothing."""
 
 # pylint: disable=duplicate-code
-# What is left, once `_backfill_cli` took the command line, the inventory
-# lookup and the table scan, is what a script cannot hand away: the preamble
-# that makes `backend` and `scripts` importable at all -- the `sys.path`
-# insert has to run before the import that would share it -- and this module's
-# own entry point, `main()` delegating plus the `if __name__` guard.
+# The sys.path preamble and the main()/__name__ guard cannot move into
+# `_backfill_cli`: the preamble must run before that import.
 
 
 from __future__ import annotations

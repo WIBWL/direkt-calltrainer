@@ -1,30 +1,16 @@
-"""The Scenario value object the backend works with.
-
-The Scenarios themselves live in the database and are loaded through
-`backend/library.py` (ADR 0041); this module only defines their shape.
-
-A Scenario has no language of its own (ADR 0043): the prompt fields are the
-English call context handed to the model, `short_description` the teaser shown
-in the UI. That is what lets any Persona run any Scenario regardless of the
-language the Persona speaks -- and ADR 0045 keeps it that way by putting the
-case here, stated about the case rather than about whoever is calling.
-
-A *reverse* (ADR 0070) is one of these rows too, not a mode: the same fields,
-copied from a played Scenario, plus the marker that swaps the casting and the
-briefing the User reads while the call runs.
-"""
+"""The Scenario value object the backend works with (loaded via `backend/library.py`,
+ADR 0041). No language of its own (ADR 0043) and the case stated about the case (ADR
+0045), so any Persona can run any Scenario. A *reverse* (ADR 0070) is one of these rows
+too, copied from a played Scenario, plus the casting marker and the briefing."""
 from dataclasses import dataclass
 from datetime import datetime
 
 
 @dataclass(frozen=True)
 class OriginSession:
-    """The conversation a reverse replays, as much of it as a card needs
-    (ADR 0070). None on the row once that Session has been deleted -- the
-    reverse outlives it, so every reader has to allow for its absence.
-
-    `id` is the Session's `extern_id` (ADR 0050), the same id the history and
-    the detail route use.
+    """The conversation a reverse replays, as much as a card needs (ADR 0070).
+    None once that Session is deleted -- the reverse outlives it. `id` is the
+    Session's `extern_id` (ADR 0050).
     """
 
     id: str
@@ -42,13 +28,9 @@ class Scenario:
     short_description: str
     # Prompt: English call context -- the situation alone (ADR 0045).
     description: str
-    # Prompt: the case itself (ADR 0045). Facts of the case, and what the
-    # caller wants out of the call together with the condition under which
-    # they count the matter settled -- one field since the two were merged:
-    # a goal without a bar is half a case, and the prompt weighs both the same
-    # way. Empty is allowed and means "improvise", which is
-    # what a Scenario predating ADR 0045 -- or a user-authored one (ADR 0024)
-    # -- looks like.
+    # Prompt: the case itself (ADR 0045) -- facts, and the caller's goal with the
+    # condition under which it counts as settled (one merged field). Empty means
+    # "improvise", as for pre-ADR-0045 or user-authored (ADR 0024) Scenarios.
     case_facts: str = ""
     call_goal: str = ""
     # Display: the same situation and case facts in the UI language, for the

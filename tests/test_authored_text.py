@@ -1,18 +1,8 @@
 """Sanitising User-authored Scenario text before it becomes prompt content.
 
-Covers:
-  ADR 0059  authored Scenario text is information, not instructions: control
-            tokens and fence runs are stripped on the way in, and each field is
-            length-capped at the API boundary. Seed content (Personas included)
-            passes through the same `clean()` and is expected to be unchanged.
-  ADR 0024  user-authored Scenarios
-
-  ADR 0063  the editor's field limits come from the backend; the frontend's
-            fallback copy is pinned to them
-
-No infrastructure -- `clean` is a pure function and the seed content imports
-without a database.
-"""
+Covers ADR 0059 (control tokens and fence runs stripped, fields length-capped;
+seed content passes `clean()` unchanged), ADR 0024 and ADR 0063 (the frontend's
+fallback field limits are pinned to the backend's). No infrastructure."""
 import re
 from pathlib import Path
 

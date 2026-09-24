@@ -3,15 +3,9 @@ import { describe, expect, it } from "vitest";
 import { briefingFollows, nextScreen, type FlowContext, type FlowEvent } from "./trainingFlow";
 
 /**
- * The training flow's transition table.
- *
- * Worth testing where the rest of the frontend is not: the machine has nine
- * screens and ten events, it used to be fourteen `setScreen` calls that could
- * only be read by finding every one of them, and `tsc` can see that a
- * transition returns *a* screen but not that it returns the right one.
- *
- * No React, no harness: everything the flow routes on is passed in, which is
- * the whole point of keeping it pure.
+ * The training flow's transition table. `tsc` sees that a transition returns
+ * *a* screen, not the right one. No React, no harness: everything the flow
+ * routes on is passed in.
  */
 
 /** An ordinary call: not a reverse, not drawn, a case with something in it. */
@@ -120,12 +114,9 @@ describe("confirming the microphone check", () => {
 
 describe("the button's label", () => {
   /**
-   * The defect this module was extracted to remove.
-   *
-   * The router read the briefing off the *committed case*; the label read it
-   * off the *library card*. A Scenario carrying facts but no card briefing
-   * therefore promised a call and delivered a page of text — the exact failure
-   * `MicCheck`'s own docstring names. Both now ask this function.
+   * The defect this module was extracted to remove: label and router read
+   * different sources, so the label promised a call and delivered a page of
+   * text (see `MicCheck`). Both now ask this function.
    */
   it("agrees with where the press actually leads, for every context", () => {
     const cases: FlowContext[] = [

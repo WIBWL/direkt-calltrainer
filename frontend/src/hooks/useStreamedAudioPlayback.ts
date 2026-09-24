@@ -12,19 +12,9 @@ interface ScheduledChunk {
 }
 
 /**
- * Plays back incoming TTS audio chunks back-to-back, gapless, as they arrive.
- * Each chunk is a small, complete WAV file (not a continuously-appended
- * stream), so scheduled AudioBufferSourceNodes are enough — no need for
- * MediaSource Extensions (see ADR 0033).
- *
- * Starts "held": chunks arriving before `activate()` is called are buffered,
- * not played — the opening Turn is generated in the background while the
- * user is still on the mic-check screen (see App.tsx), and should only
- * start playing once the call screen actually appears. `activate()` flushes
- * whatever's buffered and switches to playing chunks live from then on.
- *
- * `audioLevel` is the amplitude of what is coming out of the speakers right
- * now, so the call wave can follow real speech instead of animating blindly.
+ * Plays incoming TTS chunks (each a complete WAV) gapless as they arrive (ADR 0033).
+ * Starts held: chunks before `activate()` are buffered (the opening line is generated
+ * during the mic check). `audioLevel` is the output amplitude, for the call wave.
  */
 export function useStreamedAudioPlayback() {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -36,12 +26,9 @@ export function useStreamedAudioPlayback() {
   const audioRef = useRef<{
     ctx: AudioContext;
     analyser: AnalyserNode;
-    // A master gain the whole graph passes through, so a barge-in can cut all
-    // output in one move regardless of what each individual source does — see
-    // stopActiveSources: `AudioBufferSourceNode.stop()` does not reliably
-    // cancel a source scheduled to start in the future (Firefox throws, and
-    // the server streams whole sentences ahead), which left the rest of the
-    // interrupted reply playing out loud.
+    // Master gain so a barge-in cuts all output at once: `stop()` does not
+    // reliably cancel a source scheduled in the future (Firefox throws), which
+    // left the rest of an interrupted reply playing (see stopActiveSources).
     gain: GainNode;
   } | null>(null);
   const nextStartTimeRef = useRef(0);
@@ -55,13 +42,10 @@ export function useStreamedAudioPlayback() {
   // speakers. Each source carries its own scheduled start and length so a
   // barge-in can tell how much of the current chunk was actually heard.
   const activeSourcesRef = useRef<Map<AudioBufferSourceNode, ScheduledChunk>>(new Map());
-  // Bumped by every stopActiveSources() (interrupt/reset). A chunk carries the
-  // epoch it was queued under into the async decode chain; a decode that
-  // resolves after the epoch moved on belongs to a reply the user already cut
-  // off, and must not be scheduled — reassigning scheduleChainRef alone does
-  // not unhook the .then() callbacks already chained behind an in-flight decode
-  // (they would otherwise start() straight away, playing the rest of the
-  // interrupted reply out loud).
+  // Bumped by every stopActiveSources(). A decode that resolves under an older
+  // epoch belongs to a cut-off reply and must not be scheduled: reassigning
+  // scheduleChainRef does not unhook .then() callbacks already chained behind
+  // an in-flight decode, which would otherwise play the interrupted reply.
   const epochRef = useRef(0);
   // Milliseconds of the *current* persona reply that have actually played.
   // Reset when a fresh reply's first chunk arrives (below) and read by

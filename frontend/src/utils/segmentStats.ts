@@ -1,21 +1,10 @@
 import type { SegmentMeasurement, SessionSummary } from "../protocol";
 import { comparableAcrossCalls } from "./metrics";
 
-/**
- * The demanding stretches of a call against the rest of it (ADR 0081).
- *
- * The data behind F-62's "composure under pressure", which until now had none:
- * every metric described a whole call, and a whole call contains both
- * stretches averaged into each other. The wrap-up marks which exchanges were
- * demanding, the backend measures the two stretches separately, and this pairs
- * them up for display.
- *
- * What it does not compute, anywhere: a difference, a ratio, a direction or a
- * verdict. Two figures are put beside each other and the reader draws the
- * comparison. How large a gap means something is exactly the norm ADR 0051
- * declines to invent, and a derived "stability" number would be that norm
- * wearing a different name.
- */
+/** A call's demanding stretches against the rest (ADR 0081), for F-62's
+ * "composure under pressure". Pairs the backend's two figures for display and
+ * never computes a difference, ratio, direction or "stability" number: that
+ * would be the norm ADR 0051 declines to invent. */
 
 /** One metric's two figures for one training. */
 export interface SegmentPair {
@@ -66,22 +55,10 @@ export interface SegmentTraining {
   pairs: SegmentPair[];
 }
 
-/**
- * The trainings that have a comparison in them, newest first.
- *
- * A training is absent when nobody pushed back in it, when the stretches were
- * too short to measure, and for every call recorded before the per-utterance
- * facts were kept (ADR 0048 — those cannot be recomputed, their audio is
- * gone). All three are the same answer on screen: this call has no comparison,
- * which is not a gap in the data but a fact about the call.
- *
- * The same rule the dashboard uses, so the metrics it never reads across
- * trainings (the loudness) are left out here too. Within one call the
- * comparison would still be sound -- same microphone on both sides -- and the
- * single call's own page keeps it through `pairFor`; but a column of dB spans
- * running down this page, one training under the next, invites exactly the
- * reading across calls the rest of the dashboard refuses.
- */
+/** The trainings with a comparison, newest first (absent: no pressure, stretches
+ * too short, or recorded before ADR 0081 — unrecomputable, ADR 0048). Loudness is
+ * left out as on the dashboard; the single call keeps it through `pairFor`, where
+ * the microphone is the same on both sides. */
 export function segmentTrainings(sessions: SessionSummary[]): SegmentTraining[] {
   return sessions
     .map((session) => ({

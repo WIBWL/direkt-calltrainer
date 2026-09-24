@@ -28,32 +28,10 @@ import {
 } from "./progressStats";
 import { formatDate } from "./time";
 
-/**
- * The progress screen as a PDF (F-13), the counterpart of the feedback file
- * F-64 offers after one call.
- *
- * Why it exists: the dashboard is what somebody takes into a conversation with
- * a trainer, an instructor or a supervisor, and the only way to take it was a
- * screenshot per block. It carries what the page carries, in the page's own
- * order — the record of what was trained, the focus goals, what the wrap-ups
- * keep naming, and every metric over time — read over the trainings the page's
- * switches select, which the first page states in words.
- *
- * What it must not become, and what the page may not either: a report card.
- * No target, no colour meaning good or bad, no arrow, no difference between an
- * earlier figure and a later one, no aggregate (ADR 0004, ADR 0051, ADR 0065).
- * The rule bites harder on paper than on screen: a sheet handed to somebody
- * else is read as an assessment of the person unless it says otherwise, so it
- * says otherwise twice, once under the title and once at the foot.
- *
- * Built in the browser, from the numbers the page already holds. A server route
- * would be a second path to the same figures, which is the one thing
- * `docs/dashboard-concept.md` section 9 rules out by name; jsPDF and the fonts
- * are fetched on the press, exactly as the feedback file's are.
- *
- * The page chrome is shared with that file (`pdfDocument.ts`), so the two
- * documents look like one application.
- */
+/** The progress screen as a PDF (F-13), in the page's order over the selected
+ * trainings. Never a report card: no target, good/bad colour, arrow, difference or
+ * aggregate (ADR 0004/0051/0065), and it says so twice, since paper reads as an
+ * assessment. Built in the browser from the page's numbers (concept, section 9). */
 
 /** One course beside a metric's figures, in millimetres. Small on purpose: it
  *  is the shape of the row, and the figures beside it are the reading. */
@@ -96,13 +74,9 @@ export interface ProgressPdfOptions {
   date?: Date;
 }
 
-/** The document and the name to save it under, without saving it — separate
- *  from the download so the layout can be built and looked at outside a
- *  browser, the way the feedback file's is.
- *
- *  Exported with no caller in this repository on purpose, exactly as
- *  `buildFeedbackPdf` is: an unused-export sweep will flag it, and it is not
- *  dead. */
+/** The document and its file name, without saving it, so the layout can be
+ *  rendered outside a browser. No caller in the repository on purpose, like
+ *  `buildFeedbackPdf`: an unused-export sweep will flag it wrongly. */
 export async function buildProgressPdf({
   sessions,
   selected,
@@ -165,13 +139,9 @@ export async function downloadProgressPdf(options: ProgressPdfOptions): Promise<
 }
 
 /**
- * What was trained, over every stored training.
- *
- * The calendar itself does not travel: a month grid is a shape for scanning,
- * and twelve of them would be four pages of squares. What a reader takes from
- * it — how many trainings fell in which month — is a list, and a list is what a
- * sheet of paper is good at. The variety table does travel, as pairings with
- * their counts, because on screen it is already a list.
+ * What was trained, over every stored training. The calendar becomes a list of
+ * trainings per month (twelve grids would be pages of squares); the variety
+ * table travels as pairings with counts.
  */
 function record(
   sheet: Sheet,
@@ -355,13 +325,8 @@ function recurring(sheet: Sheet, selected: SessionSummary[], catalogue: FocusGoa
 }
 
 /**
- * Every metric over the selection, one row each, in the two families the
- * screen groups them under.
- *
- * The same list in the same order, with the course drawn beside the figures
- * rather than dropped: the shape of a series is half the reading, and a sheet
- * with the numbers and no shape would be the accessible half of the screen
- * instead of the screen.
+ * Every metric over the selection, one row each, grouped as on screen, with
+ * the course drawn beside the figures: the shape is half the reading.
  */
 function metrics(sheet: Sheet, series: MetricSeries[], trainings: number) {
   if (series.length === 0) return;
@@ -394,12 +359,9 @@ function metrics(sheet: Sheet, series: MetricSeries[], trainings: number) {
         top,
       );
 
-      // A checklist has no usual range and no course (see `SeriesShape`): what
-      // it says instead is how often every part was there, the same sentence
-      // the table on screen puts in its range column. It is given the course
-      // column as well, which is empty for such a row and which the sentence
-      // needs — squeezed into the range column alone it came out at six point
-      // and still ran into the count.
+      // A checklist has no range or course (see `SeriesShape`): its sentence
+      // gets the course column too, since the range column alone squeezed it
+      // to six point and into the count.
       if (row.shape === "parts") {
         fitted(sheet, partsSummary(row) ?? "–", MARGIN.left + COLUMN.course, top);
       } else {

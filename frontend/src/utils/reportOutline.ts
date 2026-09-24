@@ -8,21 +8,10 @@ import type {
 } from "../protocol";
 import { ASPECT_LABELS, ASPECT_LEADS, METRIC_ASPECTS, metricAspect, withDerived } from "./metrics";
 
-/**
- * What the feedback report says, before anybody lays it out (F-64).
- *
- * The page and the downloaded file are two renderings of one report, and the
- * file promises to say nothing the page does not. While each decided for
- * itself which sections exist and how a point finds its moment, they drifted:
- * the file lost the focus goal a point was filed under and never said the call
- * was a Rollentausch. Everything a reader is *told* is therefore decided here,
- * and `FeedbackView`/`FeedbackScreen` and `feedbackPdf` only draw it — JSX in
- * one, jsPDF in the other.
- *
- * Pure and derived on every render, not stored: without consent there is no
- * stored Session at all (ADR 0066), and the outline is then the meta line and
- * nothing else — which is not the joined record ADR 0101 declined.
- */
+/** What the feedback report says, before layout (F-64, ADR 0102): decided here so
+ * `FeedbackView`/`FeedbackScreen` and `feedbackPdf` only draw it and cannot drift.
+ * Pure and derived on every render; without consent (ADR 0066) it is the meta
+ * line alone. */
 
 /** One wrap-up point, with what it cites already looked up. */
 export interface OutlinePoint {

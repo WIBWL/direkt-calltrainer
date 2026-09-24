@@ -1,8 +1,7 @@
 """Which Scenarios to suggest first, from what a User said about their work (F-62).
 
-Rule-based, and every suggestion says why it was made, so the screen can show
-the reason rather than ask to be trusted. Suggesting a Scenario to practise a
-goal claims nothing about how the User does at it (ADR 0076).
+Rule-based; every suggestion carries its reason. Suggesting a Scenario claims
+nothing about how the User does at a goal (ADR 0076).
 """
 
 from __future__ import annotations
@@ -17,12 +16,9 @@ from backend.db.session import session_scope
 # One row of the grid in front of the "show all" tile.
 MAX_RECOMMENDATIONS = 5
 
-# The call context that exercises a focus goal, read off the catalogue, where
-# each goal names the kinds of call it is practised in (`practised_in` in
-# `seed_data.FOCUS_GOALS`). The voice goals name none on purpose: every Scenario
-# trains the voice, so they cannot steer the choice -- and neither does
-# `opening`, for the same reason one step on: every call has one, and no
-# category is about openings.
+# The call context that exercises a focus goal (`practised_in` in
+# `seed_data.FOCUS_GOALS`). Voice goals and `opening` name none on purpose:
+# every call trains the voice and has an opening, so they cannot steer.
 GOAL_CATEGORIES: dict[str, tuple[str, ...]] = {
     goal["id"]: tuple(goal["practised_in"]) for goal in FOCUS_GOALS if goal.get("practised_in")
 }
@@ -53,9 +49,8 @@ def recommend(
 ) -> dict[str, Recommendation]:
     """The Scenarios to suggest, by id, at most MAX_RECOMMENDATIONS.
 
-    A call type counts 2, each goal the context exercises 1; a Scenario not yet
-    played wins a tie, then the listing order. A reverse replays one particular
-    call and an uncategorised Scenario has no context, so neither is suggested.
+    Call type scores 2, each exercised goal 1; ties go to unplayed, then listing
+    order. Reverses and uncategorised Scenarios are never suggested.
     """
     kinds, picked = set(categories), tuple(goals)
     scored = []

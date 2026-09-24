@@ -6,10 +6,8 @@ import { loadFinishedSession, saveFinishedSession } from "../utils/finishedSessi
 import { useTrainingRun } from "./useTrainingRun";
 
 /**
- * The training run's rules, which lived as comments beside five handlers in
- * `App.tsx` ("after `beginSession`, which clears it"). The detail route is the
- * one thing faked: what is under test is which Session asks it what, and what
- * survives a commit, an end and a reload.
+ * The training run's rules. Only the detail route is faked: under test is which
+ * Session asks it what, and what survives a commit, an end and a reload.
  */
 
 const fake = vi.hoisted(() => ({ getScenario: vi.fn() }));

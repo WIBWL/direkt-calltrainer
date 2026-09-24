@@ -1,25 +1,13 @@
 """The caller's notes on the call so far (ADR 0071, narrowed by ADR 0075).
 
-Past a handful of exchanges the small gateway model misread its own raw
-transcript, so it reads a five-line summary of the call in place of everything
-but the last few exchanges. This module keeps that summary: one background
-`llm.complete` per completed exchange, never on the path to a reply, and a
-failure keeps the notes that were there -- stale notes beat none, and the call
-must not depend on this leg.
+The small model misread its own raw transcript, so it reads a five-line summary
+in place of all but the last few exchanges. One background `llm.complete` per
+exchange, never on the reply path; a failure keeps the stale notes.
 
-It lived inside `SessionOrchestrator` as four attributes nothing else read and
-five methods with one caller each, and the one method only tests needed. It
-needs nothing from the orchestrator but the Turn it is told about, so it is a
-class of its own.
-
-The one rule that makes this more than a cache: the notes may only ever record
-what the user heard. A barge-in trims the reply after the notes may already have
-been refreshed from all of it, and notes are rewritten from the previous notes
-rather than from the history (ADR 0075), so the unheard sentence cannot be
-summarised back out of them. Every refresh for one exchange therefore starts
-from the notes as they stood *before* that exchange -- `_base` -- and a reply
-dropped whole puts them back there.
-"""
+The notes may only record what the user heard. A barge-in may trim a reply after
+the notes were refreshed from all of it, and notes are rewritten from the previous
+notes (ADR 0075), so every refresh for one exchange starts from the notes as they
+stood before it (`_base`), and a reply dropped whole puts them back there."""
 
 from __future__ import annotations
 
@@ -79,10 +67,8 @@ class CallNotes:
         """The reply was dropped whole (nothing of it was heard): no refresh may
         land for it, and the notes go back to what they said before it.
 
-        Without this the one request already in flight carried the full reply,
-        finished after the barge-in and wrote a sentence into the notes that the
-        user never heard -- with no second refresh to follow it, because the
-        exchange no longer exists."""
+        Otherwise a refresh already in flight would write the unheard reply into
+        the notes, with no later refresh to correct it."""
         if self._turn != turn.seq:
             return
         self._cancel()

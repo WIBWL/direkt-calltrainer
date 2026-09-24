@@ -6,12 +6,8 @@ import { useMicrophoneLevel } from "../hooks/useMicrophoneLevel";
 const HEARD_THRESHOLD = 0.02;
 const REQUIRED_HEARD_DURATION_MS = 450;
 
-/** The states of the test, as one value: the pairs of booleans this replaces
- * could express combinations that never exist ("passed but not started"), and
- * every panel below had to spell out which pair it meant. "starting" keeps the
- * microphone initialization separate from active level detection, while
- * "failed" is a state of its own because a microphone that never opened has no
- * level to wait for — without it the running panel waits forever. */
+/** The test's states as one value, so impossible boolean pairs cannot arise. "failed" is its own state
+ * because a microphone that never opened has no level to wait for — the running panel would wait forever. */
 type TestPhase = "idle" | "starting" | "running" | "failed" | "passed";
 
 interface MicCheckProps {

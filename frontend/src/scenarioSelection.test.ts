@@ -12,13 +12,9 @@ import {
 } from "./scenarioSelection";
 
 /**
- * What the selection screen shows, and what stays picked.
- *
- * Every rule here serves one promise the screen makes without saying so: the
- * summary under the grid names a case that is on the screen above it. None of
- * these fail loudly — a wrong one renders a perfectly good screen whose
- * summary points at a card the User cannot see, or a random tile that draws
- * from cases the chips exclude.
+ * What the selection screen shows, and what stays picked. Every rule serves one
+ * promise: the summary names a case that is on screen. None fails loudly — a
+ * wrong one renders a fine screen pointing at an invisible card.
  */
 
 function card(id: string, overrides: Partial<ScenarioCard> = {}): ScenarioCard {

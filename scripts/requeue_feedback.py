@@ -1,36 +1,11 @@
-"""Re-queue wrap-ups for Sessions that never got one.
-
-A Session's wrap-up is generated in the RQ worker (ADR 0018/0019), and the job
-lives in Redis while the row that tracks it lives in Postgres (ADR 0032). The
-two can come apart: if the worker is down when a call ends, or Redis loses the
-job, the database keeps saying `queued` and nothing will ever pick it up. The
-history then shows "Feedback wird erstellt" forever, which is the one thing
-that screen must not say untruthfully.
-
-This puts those Sessions back on the queue. Nothing needs regenerating from
-audio -- the wrap-up is written from the stored Transcript and Measurements
-(ADR 0049), both of which are still there, which is why a Session from days ago
-can still be analysed.
+"""Re-queue wrap-ups for Sessions that never got one (e.g. worker down, Redis lost the job).
 
     docker compose exec app python scripts/requeue_feedback.py           # dry run
     docker compose exec app python scripts/requeue_feedback.py --apply   # queue them
 
-Run it **inside the app container**. Redis is only reachable on the compose
-network -- compose.yaml deliberately does not publish it to the host -- so the
-reporting half of this script works from a host shell and the `--apply` half
-does not.
-
-Safe to run twice: a Session that already has a wrap-up is never selected, and
-neither is one whose job may still be working -- `queued` or `running` inside
-JOB_TIMEOUT_S, the same window `api/sessions.py` believes a running job for. It
-did select those, so a wrap-up two minutes into its model call was queued a
-second time and the two runs raced for the same Session.
-
-Both refusals are `jobs.retry_blocked`, which is also what the route behind the
-User's own "erneut erstellen" asks. One rule, two callers: this one sweeps a
-backlog after downtime, that one answers one person looking at one failed
-wrap-up.
-"""
+Run **inside the app container**: Redis is not published to the host. Written from the
+stored Transcript and Measurements (ADR 0049), so old Sessions work. Safe to run twice;
+eligibility is `jobs.retry_blocked`, shared with `POST /api/sessions/{id}/feedback`."""
 
 from __future__ import annotations
 
@@ -57,22 +32,13 @@ from backend.logging_config import configure_logging  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-# Which Sessions may be put back on the queue is decided in
-# `backend/feedback/jobs.py` and no longer here. The rule used to live in this
-# script alone, and then the User got a button for the same thing
-# (`POST /api/sessions/{id}/feedback`) -- two copies of a rule that had already
-# been wrong once here, when a job two minutes into its model call was queued a
-# second time and both runs wrote the same Session.
+# Eligibility lives in `backend/feedback/jobs.py`, shared with the User's retry
+# route, so the two cannot drift (a copy here once re-queued a running job).
 
 
 def _candidates(db) -> list[tuple[int, str, int]]:
     """(session_id, extern_id, turn count) for every Session worth retrying.
-
-    A Session with no Turns is skipped: there is nothing to write a wrap-up
-    about, and asking a model to summarise an empty conversation produces a
-    paragraph that describes nothing. Those rows are left as they are — their
-    status is accurate.
-    """
+    Sessions with no Turns are skipped -- there is nothing to write about."""
     found = []
     for session in db.query(db_models.Session).order_by(db_models.Session.session_id).all():
         # No job row at all qualifies too: api/sessions.py reads that as

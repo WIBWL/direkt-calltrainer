@@ -13,22 +13,9 @@ import GoalStatements from "./GoalStatements";
 import SegmentComparison from "./SegmentComparison";
 
 /**
- * One focus goal across the trainings, the dashboard's second level for the
- * other half of the overview (docs/dashboard-concept.md, section 7, which puts
- * a metric and a Focus Goal on the same level here).
- *
- * The tiles in block B were a dead end until this existed, and for the goals
- * with no measurement they were the *only* thing on screen about that goal — a
- * bare count with no way to see what was said. A count the reader cannot check
- * is worse than none, because it looks like a measurement.
- *
- * So, in order: what the goal is, how often it was named and out of how many,
- * then every sentence quoted and linking into its call. Where a metric stands
- * behind the goal it links there rather than redrawing the chart — one chart,
- * one page, or the two start disagreeing about what "in this period" means.
- *
- * No verdict anywhere. The wording is ADR 0080's throughout, because this is
- * the page where a frequency is most likely to be read as a grade.
+ * One focus goal across trainings, the dashboard's second level (docs/dashboard-concept.md, section 7): the goal,
+ * how often it was named out of how many, every sentence quoted and linked. A backing metric is linked, not
+ * redrawn. No verdict; ADR 0080's wording, since a frequency is easily read as a grade here.
  */
 export default function ProgressGoalView() {
   const { goalKey } = useParams<{ goalKey: string }>();
@@ -164,14 +151,8 @@ export default function ProgressGoalView() {
 }
 
 /**
- * The comparison behind "composure under pressure", one block per training
- * (ADR 0081).
- *
- * Per training and not aggregated across them. Averaging the pressure figures
- * of six calls against their calm figures would hide that the pressure in each
- * call was a different thing -- a price objection in one, a complaint in
- * another -- and would produce the single number this goal must not have. The
- * trainings are listed newest first and each links into itself.
+ * The "composure under pressure" comparison, one block per training, newest first (ADR 0081). Never aggregated:
+ * each call's pressure was a different thing, and an average would be the single number this goal must not have.
  */
 function PressureSection({ sessions }: { sessions: SessionSummary[] }) {
   const trainings = segmentTrainings(sessions);

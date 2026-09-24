@@ -1,11 +1,8 @@
 """Dialogue generation: the persona's reply, streamed token by token.
 
-One backend, no fallback (ADR 0011, ADR 0103). Streaming lets the orchestrator
-chunk the reply and synthesise audio before it finishes (ADR 0033). The
-sampling parameters below are Qwen3-on-vLLM specific, tuned by measurement
-(docs/research/model-parameters.md); `_sampling_kwargs` is the one place that
-knows they are.
-"""
+One backend, no fallback (ADR 0011, ADR 0103); streaming lets audio start before
+the reply finishes (ADR 0033). Sampling is Qwen3-on-vLLM specific and lives in
+`_sampling_kwargs` (docs/research/model-parameters.md)."""
 
 import logging
 import re
@@ -42,21 +39,9 @@ def _sampling_kwargs(
 ) -> dict[str, object]:
     """The parts of a request that belong to the model rather than to the call.
 
-    The one that must not be got wrong is thinking. Qwen3's switch travels in
-    `chat_template_kwargs`, a vLLM passthrough into the chat template rather
-    than part of the OpenAI API. Leave it on for a spoken reply and the whole
-    `max_tokens` budget goes into a trace that `delta.content` never surfaces:
-    3.2 s to first token and nothing to speak
-    (docs/research/model-parameters.md).
-
-    The rest is Qwen3-specific tuning. `top_k`/`min_p` are vLLM extensions, and
-    `presence_penalty` 1.5 is Qwen3's recommended dose for a 4B model that
-    repeats whole paragraphs (ADR 0038); the repetition guards in code stay the
-    backstop either way. A gateway serving something else through the same
-    OpenAI-compatible API ignores what it does not know rather than failing, so
-    a different model is an `.env` edit -- but these numbers were measured
-    against this one, and a change of model is the moment to re-measure them.
-    """
+    Thinking must be off for a spoken reply (Qwen3's `chat_template_kwargs`): left on,
+    `max_tokens` goes into a trace `delta.content` never surfaces. The rest is Qwen3
+    tuning (ADR 0038); re-measure on a model change (docs/research/model-parameters.md)."""
     return {
         **({"presence_penalty": presence_penalty} if presence_penalty is not None else {}),
         "extra_body": {
@@ -71,12 +56,8 @@ async def stream_reply(
 ) -> AsyncIterator[str]:
     """Stream the persona's reply as it's generated, one token delta at a time.
 
-    `retries` overrides the client's own retry count for this one request, and
-    exists for a single caller: the boot check (`clients/health.py`), which
-    passes 0. The client retries a 429 or a 5xx twice with backoff by default,
-    which is right for a Turn -- a call should survive a blip -- and wrong for a
-    liveness probe, where those attempts run inside the probe's own deadline and
-    a rate-limited model reports as a timeout instead of as a rate limit."""
+    `retries` overrides the client's retry count; the boot check passes 0 so a
+    rate-limited model reports as a 429, not as its probe's deadline expiring."""
     started = time.monotonic()
     client = LLM_CLIENT if retries is None else LLM_CLIENT.with_options(max_retries=retries)
     stream = await client.chat.completions.create(
@@ -95,13 +76,8 @@ async def stream_reply(
         # it either way.
         **_sampling_kwargs(think=False, qwen_sampling=True, presence_penalty=1.5),
     )
-    # Time to first token, logged per Turn rather than measured once in a
-    # benchmark: it is the leg that moves when the model or its thinking level
-    # changes, and the one whose cost is invisible from the outside -- a reply
-    # that thinks before it speaks looks exactly like a slow network. It is
-    # also the whole of what this leg logs per Turn: the announcement that went
-    # before it said nothing this line does not say afterwards, with the model
-    # named, and a reply that never arrives is logged where it fails.
+# Time to first token, logged per Turn: it moves with the model or its thinking
+# level, and a reply that thinks before speaking looks just like a slow network.
     first = True
     async for chunk in stream:
         delta = chunk.choices[0].delta.content if chunk.choices else None
@@ -112,26 +88,15 @@ async def stream_reply(
             yield delta
 
 
-# The wrap-up is a whole document rather than one spoken line, so it needs a
-# far larger budget than _MAX_REPLY_TOKENS -- and it is generated after the
-# call, where latency costs nobody anything.
-# It runs in thinking mode, so this covers the trace as well as the answer;
-# sized for the worst case, because running out inside the trace yields no
-# answer at all. Capped rather than None so a repetition loop cannot run to the
-# RQ job timeout.
+# The wrap-up is a whole document, generated in thinking mode, so this covers the
+# trace too; running out inside the trace yields no answer. Capped rather than
+# None so a repetition loop cannot run to the RQ job timeout.
 _MAX_FEEDBACK_TOKENS = 4000
 
-# And its own read timeout, longer than the client-wide TIMEOUT the live path
-# runs on. That one bounds the wait *between* streamed chunks; this call is not
-# streamed, so the whole document has to arrive inside it -- 4000 tokens plus a
-# thinking trace, which on the gateway's 4B model is minutes rather than
-# seconds. Under the shared 120 s the wrap-up would have been cut off on a busy
-# gateway and reported as a timeout, which is the opposite of what putting a
-# timeout there was for.
-#
-# Below `queue.JOB_TIMEOUT_S` (300 s) on purpose, and not imported from it: this
-# module must not depend on the queue. The request should give up inside the job
-# so the failure is recorded as one, rather than be killed with it.
+# Its own read timeout: the client-wide TIMEOUT bounds the gap between streamed
+# chunks, but this call is not streamed, and 4000 tokens plus a trace on the 4B
+# model takes minutes. Kept below `queue.JOB_TIMEOUT_S` (300 s, not imported: no
+# dependency on the queue) so the request fails inside the job and is recorded.
 _FEEDBACK_TIMEOUT_S = 240.0
 
 
@@ -142,35 +107,10 @@ async def complete(
     think: bool = False,
     retries: int | None = None,
 ) -> str:
-    """One non-streamed completion — the post-call wrap-up (ADR 0049), the
-    document summary for an authored Scenario (F-58) and the follow-up Scenario
-    drafted from a Session's Feedback (F-60).
-
-    Nothing is waiting on the first token here, unlike stream_reply, so the
-    caller gets the finished text in one piece and can validate it as a whole.
-
-    `max_tokens=None` leaves the output bounded only by the model's context
-    window — the document summary uses it, because its own length rule is a
-    character cap, not a token one, and thinking mode needs unpredictable room
-    for its trace.
-
-    `think=True` runs the model in reasoning mode: it is slower and spends part
-    of the budget on a hidden trace, but extracts and writes markedly better.
-    Only safe off the live path, where latency costs nobody anything and the
-    reply is not streamed. All three callers use it: the document summary, the
-    follow-up draft, and the wrap-up, whose German grammar breaks down without
-    it.
-
-    One model for this and for the spoken reply (ADR 0103): the two were
-    briefly a fast one and a strong one under a switch (ADR 0074), and the
-    switch is gone. Since ADR 0075 every caller of this function is off the
-    live path anyway -- the call-state notes were the exception, a `complete`
-    by shape, running beside a conversation.
-
-    `retries` is the same override `stream_reply` carries, for the same one
-    caller: the boot check, which wants a single attempt so a 429 reports as a
-    429 rather than as its own deadline expiring.
-    """
+    """One non-streamed completion off the live path: wrap-up (ADR 0049), document
+    summary (F-58), follow-up draft (F-60). `max_tokens=None` leaves only the context
+    window as a bound; `think=True` is slower but writes markedly better (the wrap-up's
+    German needs it); `retries` as in `stream_reply`. Same model as the reply (ADR 0103)."""
     # This path is reached only from the worker, so the log line is the one
     # place its parameters are ever visible. `stream_reply` logs its own.
     logger.info("LLM completion (%s, max_tokens=%s, think=%s)...", LLM_MODEL, max_tokens, think)
@@ -195,10 +135,8 @@ async def complete(
 def _strip_reasoning(text: str) -> str:
     """The answer out of a thinking-mode reply, or "" if there is no answer yet.
 
-    A `<think>` that never closes means the budget ran out mid-reasoning, so
-    nothing after it was written. Returning the trace would be worse than
-    returning nothing: it is full of `{`, and the wrap-up's caller scrapes JSON
-    out of the reply, the model's deliberation would become its answer.
+    An unclosed `<think>` means the budget ran out mid-reasoning. Never return the
+    trace: it is full of `{`, and a JSON-scraping caller would take it as the answer.
     """
     stripped = _THINK_BLOCK_RE.sub("", text)
     if "<think>" in stripped:
@@ -209,10 +147,8 @@ def _strip_reasoning(text: str) -> str:
 
 # --- Reading a structured reply -------------------------------------------
 #
-# Three callers ask for JSON off the live path -- the wrap-up (ADR 0049), the
-# follow-up draft (F-60) and the reverse briefing (F-61, ADR 0070) -- and a
-# small model (ADR 0011) fences its output however plainly it is told not to.
-# So the unwrapping lives here, once, next to the call that produced the text.
+# JSON callers off the live path (wrap-up, follow-up draft, reverse briefing):
+# a small model (ADR 0011) fences its output however plainly told not to.
 
 _FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
 
@@ -254,22 +190,11 @@ def without_fenced_blocks(raw: str) -> str:
 async def complete_json(
     messages: list[dict[str, str]], model: type[_Model], what: str
 ) -> _Model | None:
-    """One structured answer off the live path, retried once. None if neither
-    attempt produced something that parsed.
+    """One structured answer off the live path, retried once; None if neither parsed.
 
-    Thinking mode and no token cap: the fields are bounded by the caller's own
-    limits, and running out inside the reasoning trace yields no answer at all
-    (see `_strip_reasoning`). Only safe where nothing is waiting — the reverse
-    briefing (F-61) asks for it here, never the live reply.
-
-    Returns None rather than raising, because what an unusable answer means is
-    the caller's to decide: the briefing has nothing worth storing and turns it
-    into a 503, and the wrap-up would rather keep the prose than nothing. The
-    wrap-up does not use this helper for exactly that reason — it needs the raw
-    text for its fallback, which this deliberately does not hand back. The
-    follow-up draft (F-60) keeps its own loop too: it re-asks on a draft whose
-    required fields came back empty, which is a judgement this cannot make.
-    """
+    Thinking mode and no token cap, since running out inside the trace yields no
+    answer (see `_strip_reasoning`). Returns None rather than raising: what an
+    unusable answer means is the caller's to decide (the reverse briefing: a 503)."""
     for attempt in range(2):  # initial attempt + one retry
         raw = await complete(messages, max_tokens=None, think=True)
         try:

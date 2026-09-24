@@ -5,13 +5,9 @@ import { GROUPS, colorOf, groupOf } from "./metricGroups";
 import { PRACTICE_CATEGORY, PRACTICE_REASON } from "./practiceRoutes";
 
 /**
- * Colour as identity on the progress view, and the editorial table behind the
- * one practice suggestion.
- *
- * Both are pure lookups, and both carry a rule that is a property of the
- * module rather than of any one value: a hue here must never be readable as a
- * verdict (ADR 0065/0078), and a goal absent from the practice table must
- * yield no suggestion rather than a default one.
+ * Colour as identity on the progress view, and the practice suggestion's table.
+ * A hue must never read as a verdict (ADR 0065/0078), and a goal absent from
+ * the practice table yields no suggestion rather than a default one.
  */
 
 describe("groupOf", () => {

@@ -28,32 +28,10 @@ import { formatMetricValue, METRIC_DISCLAIMER, metricParts, metricSubline } from
 import { reportOutline, type OutlinePoint } from "./reportOutline";
 import { formatLongDate, formatOffset } from "./time";
 
-/**
- * The whole feedback document as a PDF, built in the browser (F-64).
- *
- * Carries everything the feedback page shows, in the page's own order —
- * summary, strengths, improvements, phase-appropriate register, metrics — with
- * the transcript last, for the same reason it is collapsed on screen: it is
- * read closely or not at all, and a document opening with it buries everything
- * that comments on it.
- *
- * The next-steps block is deliberately absent: those two offers write a new
- * Scenario when pressed, and a sheet of paper cannot press them.
- *
- * Built in the browser and not on the server for the one reason that decides
- * it: a training run without consent is never stored (ADR 0066) and still shows
- * its transcript, so the one case where this download is the *only* copy is the
- * one case a server route could not serve.
- *
- * jsPDF and the fonts are fetched on the press — together the largest thing the
- * frontend can pull, and most trainings end without anyone wanting a file.
- *
- * The page chrome — geometry, palette, the app's own faces, the banner, the
- * section heading, the wrapped paragraph and the page break — is
- * `pdfDocument.ts`, shared with the progress report so that the two documents
- * this application writes look like one application. What the report *says* is
- * `reportOutline.ts`, shared with the page, so this file only lays it out.
- */
+/** The feedback page as a PDF (F-64), in the page's order with the transcript last;
+ * no next steps (paper cannot press them). Built in the browser because an
+ * unconsented run is never stored (ADR 0066), so this may be the only copy.
+ * Chrome is `pdfDocument.ts`, content `reportOutline.ts`; this file only lays out. */
 
 /** Where a speaker's text starts, leaving the left column to the timestamp.
  * A feedback point that cites an utterance is set on the same two columns, so
@@ -97,13 +75,9 @@ export interface FeedbackPdfOptions {
   date?: Date;
 }
 
-/** The document and the name to save it under, without saving it. Separate
- * from the download so the layout can be built and looked at outside a
- * browser — which is how it was designed.
- *
- * Exported with no caller in this repository on purpose: the caller is a
- * throwaway render script at the point somebody changes the layout. An
- * unused-export sweep will flag it; it is not dead. */
+/** The document and its file name, without saving it, so the layout can be
+ * rendered outside a browser. No caller in the repository on purpose (a
+ * throwaway render script uses it); an unused-export sweep will flag it wrongly. */
 export async function buildFeedbackPdf({
   transcript,
   personaName,
@@ -306,11 +280,8 @@ export async function buildFeedbackPdf({
     sheet.y += 9;
   }
 
-  /** F-37's loudness course, drawn the way `LoudnessCourse.tsx` draws it and
-   * from the same numbers (`utils/loudness.ts`): the band the call spent most
-   * of its time in, the median through it, the smoothed line, and the at most
-   * two stretches that left the band for longer than two seconds. No figure
-   * accompanies it — the Measurement's value is a dB span that reads like a
+  /** F-37's loudness course, drawn as `LoudnessCourse.tsx` draws it from the same
+   * numbers (`utils/loudness.ts`). No figure beside it: the dB span reads like a
    * level without being one (ADR 0004/0051). */
   function course(name: string, curve: LoudnessCurve) {
     // Label, plot, axis and legend in one piece: split across a page the band

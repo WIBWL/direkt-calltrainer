@@ -1,12 +1,7 @@
 """Stored Sessions expire after six months (F-49, ADR 0067).
 
-Two properties carry this file. The sweep has to delete what is over the line
-and nothing else, which is the ordinary case; and it has to leave a subject who
-suspended it entirely alone, which is the case nobody would notice being broken
-until someone lost data they had asked to keep.
-
-Time is injected rather than waited for: `sweep(db, now=...)` places the
-boundary, so the tests are about the rule and not about the clock.
+The sweep deletes what is over the line and nothing else, and leaves a subject who
+suspended it alone. `sweep(db, now=...)` injects the time, so tests are about the rule.
 """
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -232,12 +227,9 @@ async def test_the_retention_route_needs_a_token(api_client: httpx.AsyncClient) 
 
 
 def _reverse_of(db: DbSession, session_id: int, created_at: datetime | None = None) -> int:
-    """A reverse Scenario replaying that Session, shaped as reversals.py writes
-    one: no key, private, and a briefing derived from the call's own wrap-up.
+    """A reverse Scenario replaying that Session, shaped as reversals.py writes one.
 
-    `created_at` because the sweep finds an orphaned reverse by its own age: its
-    origin is gone, so there is nothing else left to date it by.
-    """
+    `created_at` matters: an orphaned reverse is found by its own age."""
     row = Scenario(
         key=None,
         title="Rollentausch",
@@ -262,12 +254,8 @@ def _reverse_of(db: DbSession, session_id: int, created_at: datetime | None = No
 def test_an_expired_session_takes_its_reverse_with_it(
     db_session: DbSession, app_database: str  # pylint: disable=unused-argument
 ) -> None:
-    """A reverse carries a briefing written from that call's own wrap-up, so it
-    expires with the call (ADR 0070's addendum to ADR 0067).
-
-    Without this the six-month promise was incomplete in the direction users
-    care about: transcript, measurements and feedback went, and a text about how
-    the person had argued stayed behind with its origin nulled out.
+    """A reverse's briefing comes from the call's wrap-up, so it expires with the call
+    (ADR 0070's addendum to ADR 0067) instead of outliving its origin.
     """
     extern_id = persist(turns=TURNS, started_at=LONG_EXPIRED)
     origin = db_session.query(Session).filter_by(extern_id=extern_id).one()
@@ -284,11 +272,8 @@ def test_a_reverse_someone_still_plays_survives_the_sweep(
 ) -> None:
     """The origin expires, a younger Session played on the reverse does not.
 
-    `session.scenario_id` carries no `ondelete` (ADR 0052), so deleting the row
-    here would be refused and would take the whole sweep down with it — every
-    subject's, not just this one's. The row is left for a later run instead: it
-    goes when the younger Session expires too, and a reverse somebody keeps
-    playing outlives the period because it is in use.
+    `session.scenario_id` has no `ondelete` (ADR 0052), so deleting the reverse now
+    would fail the whole sweep for every subject; it is left for a later run.
     """
     extern_id = persist(turns=TURNS, started_at=LONG_EXPIRED)
     origin = db_session.query(Session).filter_by(extern_id=extern_id).one()
@@ -315,14 +300,10 @@ def test_a_reverse_someone_still_plays_survives_the_sweep(
 def test_a_spared_reverse_goes_once_nothing_plays_it_any_more(
     db_session: DbSession, app_database: str  # pylint: disable=unused-argument
 ) -> None:
-    """The second half of the promise the test above makes.
+    """The later run does remove it (ADR 0067/0070).
 
-    "Left for a later run: it goes when the younger Session expires too" was
-    never true. Every sweep found its candidates through `origin_session_id`,
-    which the first run had already nulled out by deleting the origin, so the
-    row was invisible to every run after it and the briefing -- German prose
-    from that person's own wrap-up -- outlived the period indefinitely
-    (ADR 0067/0070).
+    Found by `origin_session_id` alone, the reverse became invisible once the first
+    run nulled that link, and its briefing outlived the period indefinitely.
     """
     extern_id = persist(turns=TURNS, started_at=LONG_EXPIRED)
     origin = db_session.query(Session).filter_by(extern_id=extern_id).one()
@@ -353,13 +334,9 @@ def test_a_spared_reverse_goes_once_nothing_plays_it_any_more(
 def test_a_reverse_whose_origin_was_deleted_by_hand_still_expires(
     db_session: DbSession, app_database: str  # pylint: disable=unused-argument
 ) -> None:
-    """Deleting a single training deliberately leaves its reverse behind: a
-    person is deciding about that one row and is told so.
+    """A single deletion leaves its reverse behind, but that reverse must still expire.
 
-    That decision is about the row staying *now*, not about it never expiring.
-    With its origin gone the reverse had no link left for any sweep to find it
-    by, so "the six-month period applies to everyone" quietly stopped covering
-    it. It is found by its own age instead.
+    With its origin gone no link remains, so it is found by its own age.
     """
     extern_id = persist(turns=TURNS, started_at=LONG_EXPIRED)
     origin = db_session.query(Session).filter_by(extern_id=extern_id).one()

@@ -1,25 +1,8 @@
 """Bringing an empty database up to a usable state: migrate, then seed.
 
-Run at application startup and by scripts/seed_reference_data.py, so a fresh
-`docker compose up` needs no manual step. Before the Session write of ADR 0034
-existed, an unmigrated database was harmless because nothing touched it; now it
-silently costs the user their Feedback, so provisioning belongs with the app.
-
-Both halves are idempotent: Alembic skips migrations already applied, and every
-seeded record is looked up by its natural key and either created or brought
-back to the seed state.
-
-Content sources:
-    Persona/Scenario -> backend/db/seed_data.py (ADR 0041: the database is the
-                        source of truth and that module carries its initial
-                        content; neither is hardcoded in the backend anymore)
-    Language         -> the language_id values the seeded Personas use
-    MetricType       -> backend/feedback/metrics.py (METRICS), which also
-                        derives the measurement rows, so the seeded inventory
-                        and the analysis cannot drift apart.
-    FocusGoal        -> backend/db/seed_data.py (FOCUS_GOALS, ADR 0076), read
-                        at runtime through backend/focus.py
-"""
+Run at startup and by scripts/seed_reference_data.py; both halves idempotent.
+Content comes from backend/db/seed_data.py (ADR 0041/0076) and, for MetricType,
+backend/feedback/metrics.py, so inventory and analysis cannot drift apart."""
 
 from __future__ import annotations
 
@@ -67,16 +50,10 @@ def provision() -> dict[str, int]:
     # Keep our logging setup; see the note in migrations/env.py.
     config.attributes["configure_logging"] = False
     command.upgrade(config, "head")
-    # Seeding needs the same guard the migration has. `_upsert` reads a row,
-    # then writes it; two processes starting together both read "not there"
-    # and the second insert fails on the natural key. The transaction rolls
-    # back, so nothing is corrupted -- but the loser logs "Database
-    # provisioning failed", which is the message a real outage produces too.
-    #
-    # The same key as the migration, taken only now: migrations/env.py has
-    # released it by the time command.upgrade returns. Holding both at once
-    # would be this process waiting on itself, since each takes it on its own
-    # connection.
+    # Locked like the migration: two `_upsert`s racing would fail on the natural
+    # key and log "Database provisioning failed". Same key, taken only now --
+    # env.py has released it; holding both would make this process wait on
+    # itself, since each takes it on its own connection.
     logger.info("Seeding reference data...")
     with advisory_lock():
         with session_scope() as db:
@@ -93,22 +70,16 @@ def seed(db: DbSession) -> dict[str, int]:
         "MetricType": _seed_metric_types(db),
         "FocusGoal": _seed_focus_goals(db),
     }
-    # Deactivate, never delete: `session` references these rows by foreign key,
-    # so a Persona dropped from the seed has to stay readable for the Sessions
-    # that already ran with it. /api/personas and /api/scenarios filter on
-    # `active`, which is what actually removes it from the selection.
+    # Deactivate, never delete: `session` references these rows, and the
+    # routes filter on `active`.
     _deactivate_missing(db, Persona, {p["id"] for p in PERSONAS})
     _deactivate_missing(db, Scenario, {s["id"] for s in SCENARIOS})
     # The same rule for the focus catalogue (ADR 0076): `focus_selection_goal`
     # references it, so a retired goal stays readable for the selections that
     # already name it, and /api/focus filters on `active`.
     _deactivate_missing(db, FocusGoal, {g["id"] for g in FOCUS_GOALS})
-    # And for the metric inventory. ADR 0057 states this already happens ("the
-    # old key is deactivated and the new one inserted"), but the call was never
-    # made, so every German key from before that rename stayed active beside its
-    # English replacement -- two rows with the same display name, and a Session
-    # measured before the rename pointing at the older one. Measurements
-    # reference these rows, hence deactivation and not a delete.
+    # The metric inventory too (ADR 0057): retired keys must not stay active
+    # beside their replacements; measurements reference them, so no delete.
     _deactivate_missing(db, MetricType, {m.key for m in METRICS})
     # Languages are deliberately absent: a closed code list, never retired, and
     # a Session keeps pointing at the code it ran in.
@@ -127,22 +98,11 @@ def _seed_tenants(db: DbSession) -> int:
 def _deactivate_missing(db: DbSession, model, seeded_keys: set[str]) -> None:
     """Sets `active` to False on every row *the seed created* and no longer contains.
 
-    The scoping is the load-bearing part. Two of the four tables swept here carry
-    `AuthoredContent` (ADR 0058) -- `scenario` and `persona` -- which is exactly
-    the statement that they hold User-owned rows beside the shipped ones: an
-    authored Scenario, a Folgeszenario, a Rollentausch. Reading "not in the seed"
-    as "retired" over those would deactivate every one of them, on a path that
-    runs at every application start.
-
-    It does not today, and the reason is not a rule: an authored row carries no
-    `key`, and `NULL NOT IN (...)` is NULL rather than TRUE in SQL's three-valued
-    logic, so the UPDATE passes it by. Nothing said so and no test covered it, so
-    giving `key` a default or backfilling it -- an ordinary-looking change, two
-    tables away from this one -- would empty every User's library on the next
-    boot, with no error and nothing failing. `created_by IS NULL` is the rule
-    ADR 0058 actually states for "shipped", so that is what this asks, and the
-    mixin that lets a table hold User rows is the same thing that takes them out
-    of the sweep. A fifth table inherits the protection by inheriting the mixin.
+    The `created_by IS NULL` scope is load-bearing: `AuthoredContent` tables
+    (ADR 0058) hold User rows beside the shipped ones, and this runs at every
+    start. Without it they survive only because an authored row has no `key`
+    and `NULL NOT IN (...)` is not TRUE -- giving `key` a default or backfilling
+    it would silently deactivate every User's library on the next boot.
     """
     query = db.query(model).filter(model.key.notin_(seeded_keys), model.active.is_(True))
     if issubclass(model, AuthoredContent):
@@ -160,10 +120,7 @@ def inventory(db: DbSession) -> dict[str, int]:
 
 
 def _upsert(db: DbSession, model, natural_key: dict, values: dict):
-    """Create the record or bring it back to the seed state.
-
-    Returns (object, created).
-    """
+    """Create the record or bring it back to the seed state; returns (object, created)."""
     obj = db.query(model).filter_by(**natural_key).one_or_none()
     if obj is None:
         obj = model(**natural_key, **values)
@@ -194,18 +151,12 @@ def _seed_personas(db: DbSession) -> int:
              "role": clean(p["role"]), "traits": clean(p["traits"]),
              "traits_label": clean(p["traits_label"]),
              "behavior": clean(p["behavior"]),
-             "training_goal": clean(p["training_goal"]), "difficulty": p["difficulty"],
-             # Defaults to True: a Persona is only seeded inactive while
-             # something it needs to run is still missing -- today a KugelAudio
-             # voice id. Written to the table either way, so filling the id in
-             # and dropping the flag is the whole change.
-             # Not run through `clean()`: a path is not authored prose, and the
-             # sanitiser's business is prompt text (ADR 0059).
+             "training_goal": clean(p["training_goal"]),
+             # Not cleaned: a path, not prompt text (ADR 0059). `active` is
+             # False only while something the Persona needs (a voice id) is missing.
              "avatar_url": p.get("avatar_url"),
              "active": p.get("active", True), "language_code": p["language_id"],
-             "kugelaudio_voice_id": p["kugelaudio_voice_id"],
-             # A shipped built-in belongs to nobody and everybody (ADR 0058).
-             "created_by": None, "visibility": VISIBILITY_PUBLIC})
+             "kugelaudio_voice_id": p["kugelaudio_voice_id"]})
         created += was_created
         _seed_objections(db, row, p["objections"], p["objection_labels"])
     return created
@@ -214,21 +165,10 @@ def _seed_personas(db: DbSession) -> int:
 def _seed_objections(db: DbSession, persona: Persona, objections, labels) -> None:
     """Bring one Persona's objections to the seed state (R-12, ADR 0045).
 
-    Replaced wholesale rather than upserted: the list is what carries meaning,
-    and `position` gives a single objection no natural key to match on. Not
-    counted as created rows -- `inventory()` already reports the table.
-
-    These rows are therefore recreated on every seed run and their ids are not
-    stable: nothing may reference an objection by id, because the row it names
-    is gone after the next startup. A feature that needs to cite one has to
-    give objections a stable key first, or address them by persona and
-    position. The same absence of a natural key that forces the rewrite is
-    what makes the ids unusable as a reference.
-
-    `objections` is the English prompt text and `labels` the German display
-    text for the same move, one per objection and in the same order. They
-    are written in a single pass so the two cannot drift apart;
-    `tests/test_persona_scenario_library.py` pins the lengths in the seed.
+    Replaced wholesale (no natural key), so their ids change on every startup:
+    never reference an objection by id -- use persona and position, or add a
+    stable key first. English `objections` and German `labels` are written in one
+    pass so they cannot drift; tests/test_persona_scenario_library.py pins them.
     """
     db.flush()  # a freshly created Persona needs its id before rows point at it
     db.query(PersonaObjection).filter_by(
@@ -253,13 +193,9 @@ def _seed_scenarios(db: DbSession) -> int:
                  # Not cleaned: a closed vocabulary, not authored prose, and
                  # the CHECK constraint is what validates it (ADR 0072).
                  "category": s["category"],
-                 # Written on every run, like the three other swept tables.
-                 # Without it `_deactivate_missing` is one-way: a built-in that
-                 # dropped out of SCENARIOS once (a shorter branch, a renamed
-                 # key) stays invisible after it comes back, because the upsert
-                 # matches on `key` and leaves `active` False. Only rows the
-                 # seed owns are reached here -- an authored one carries no
-                 # `key` -- so this cannot revive a Scenario a User deleted.
+                 # Written every run, or a built-in that once dropped out of the
+                 # seed stays inactive after it returns. Only seed rows (with a
+                 # `key`) are reached, so no User-deleted Scenario is revived.
                  "active": True,
                  "created_by": None, "visibility": VISIBILITY_PUBLIC})[1]
         for s in SCENARIOS

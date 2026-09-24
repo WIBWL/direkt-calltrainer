@@ -1,18 +1,9 @@
 import type { CSSProperties } from "react";
 
 /**
- * The die thrown between the microphone check and a random Scenario's call
- * (F-62).
- *
- * Theatre, and deliberately so: the Scenario was drawn the moment the User
- * committed to the call, because the connection and the Persona's opening line
- * are already being prepared while the microphone check is on screen
- * (ADR 0042) — the case has to be settled before any of that starts. What this
- * screen adds is the *moment* of it. A draw that happens silently between two
- * button presses is a draw the User has no reason to believe in.
- *
- * The number it lands on means nothing and is never read: there are seventeen
- * Scenarios and six faces. It is a die, not a result.
+ * The die thrown between the mic check and a random Scenario's call (F-62). Theatre:
+ * the Scenario was drawn at commit time, since the connection and opening line are
+ * prepared during the check (ADR 0042). The face it lands on means nothing.
  */
 
 /** Each face by the pips it fills, numbered 1-9 across a three-by-three grid.

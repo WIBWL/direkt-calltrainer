@@ -12,29 +12,9 @@ import {
 import TrainingLinks from "./TrainingLinks";
 
 /**
- * When the user trained, on a calendar (F-13).
- *
- * A calendar rather than the bar-per-day that stood here first: the numbers are
- * the same, but only a calendar carries the shape of a week — whether trainings
- * sit on workdays, whether a fortnight went untouched, whether they cluster
- * before a deadline.
- *
- * One month at a time, paged back to the oldest stored training. Six months as
- * small multiples was a wall of grids in which the wanted month was the hardest
- * to find, and it left the block beside it against half a metre of border.
- *
- * The period switch deliberately does not reach this block, and says so by
- * standing *below* it: a calendar carries its own range in the grid, so cutting
- * months off it would state the same thing twice, as a hole in a chart.
- *
- * The one block here needing no caveat — counting what somebody did implies no
- * norm (ADR 0065). The shading is magnitude, one hue in three steps because a
- * day holds one, two or a handful of calls; the count is printed in the cell,
- * so colour is redundant rather than the carrier.
- *
- * A real `<table>` with a caption per month: a calendar *is* tabular, so a
- * screen reader gets the weekday and the count from the markup rather than from
- * a label somebody has to keep in step.
+ * When the user trained, one month at a time (F-13). The period switch deliberately does
+ * not reach it: the grid carries its own range. Counting implies no norm (ADR 0065), and
+ * the printed count makes the shading redundant. A real `<table>` for screen readers.
  */
 
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];

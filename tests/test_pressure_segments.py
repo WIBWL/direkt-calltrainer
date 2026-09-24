@@ -1,21 +1,8 @@
-"""The same metrics over the demanding stretches of a call and over the rest
-(F-62 "composure under pressure", ADR 0081).
+"""The same metrics over the demanding stretches of a call and over the rest (F-62, ADR 0081).
 
-Three things have to hold together for this to mean anything, and each is a
-quiet failure on its own:
-
-* the raw facts of every user utterance survive the end of the call, because
-  the audio does not (ADR 0048) and the split is decided afterwards;
-* the split uses only the partner's utterances, from this Session, as the
-  wrap-up marked them -- a user id or a foreign one would silently move the
-  boundary;
-* the whole-call figures are never touched by any of it. They were measured
-  when the call ended, and a model opinion about which exchanges were demanding
-  has no business rewriting a measurement.
-
-Postgres has to be running (`docker compose up -d db`); without it the database
-fixtures skip.
-"""
+Pins: per-utterance raw facts survive the call (the audio does not, ADR 0048); the split uses
+only this Session's partner utterances as marked; whole-call figures are never rewritten.
+Needs Postgres (`docker compose up -d db`); the database fixtures skip without it."""
 
 import asyncio
 import json
@@ -42,12 +29,9 @@ pytestmark = pytest.mark.usefixtures("reference_data")
 # in bursts rather than throughout.
 _EXCHANGES = 8
 
-# One user utterance's worth of measured audio. The numbers are arbitrary but
-# not empty: a segment with no loudness samples yields no loudness figure, and
-# a test that asserted on an absent metric would pass for the wrong reason.
-# Two frames are silent, because `metrics._silence_found` withholds every
-# figure that rests on telling speech from silence when a curve has almost none
-# of it -- a curve of nothing but speech is a recording over a noise floor.
+# One user utterance of measured audio. Non-empty, so an absent metric cannot pass for
+# the wrong reason; two silent frames, because `metrics._silence_found` withholds
+# silence-based figures for a curve with almost none.
 _LOUDNESS = (62.0, 64.5, None, 61.0, 66.0, 63.5, None, 62.5)
 
 
@@ -170,23 +154,15 @@ def test_the_marked_exchanges_become_their_own_measurements(
 
     generate_feedback(session_id)
 
-    # The fixture seeds one metric type (`METRIC_KEY`), and a measurement whose
-    # metric the inventory does not hold is dropped rather than written against
-    # a guessed reference row -- the rule `_write_analysis` follows for the
-    # whole call. So what this can assert is that the metric which *is* seeded
-    # came out for both stretches, which is the behaviour under test; that the
-    # set of segment metrics is the intended one is pinned separately below.
+    # Only `METRIC_KEY` is seeded, and unknown metrics are dropped (as `_write_analysis`
+    # does), so assert that one came out for both stretches; the key set is pinned below.
     assert METRIC_KEY in _segment_values(db_session, db_models.SEGMENT_PRESSURE)
     assert METRIC_KEY in _segment_values(db_session, db_models.SEGMENT_REST)
 
 
 def test_the_segment_metrics_are_the_ones_that_stay_defined_on_a_part() -> None:
-    """Not every metric survives being computed over a stretch. A count is
-    smaller on a shorter stretch by construction; reaction time is measured
-    from the previous partner line, which at a boundary lies in the other
-    stretch; the intonation needs more voiced speech than a stretch usually
-    holds (F-35). Pinned here so adding a metric to the inventory is a decision
-    about this list rather than a silent inclusion."""
+    """Counts shrink with the stretch, reaction time straddles the boundary, intonation needs
+    more voiced speech (F-35): pinned so adding a metric here is a decision, not a silent inclusion."""
     assert set(segments.SEGMENT_METRIC_KEYS) == {
         "talk_share", "pace", "pauses", "run_length", "loudness",
     }
@@ -297,13 +273,9 @@ def test_a_stretch_too_short_to_describe_is_not_measured(
 def test_the_answer_to_a_pressing_line_is_what_is_measured(
     db_session: DbSession, app_database: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The marks are on the partner's lines, but the figures are about the
-    trainee, so a marked line puts the utterance that *answers* it into the
-    pressing stretch.
+    """A marked partner line puts the utterance that *answers* it into the pressing stretch.
 
-    Off by one in either direction and the feature measures the wrong
-    sentences while looking entirely healthy: the same metrics come out, for
-    the same call, with numbers nobody can check by hand.
+    Off by one, the feature measures the wrong sentences while looking healthy.
     """
     persist(turns=_call(pressing={1, 2, 3, 4}))
     session_id = db_session.query(Session).one().session_id

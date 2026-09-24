@@ -1,13 +1,9 @@
 import type { TranscriptEntry } from "../protocol";
 
 /**
- * The finished Session the post-call screen is showing, kept in
- * `sessionStorage`.
- *
- * Survives a reload but not the tab closing, which is exactly the scope the
- * wrap-up has: it is reachable while this tab is, and is not linkable or
- * listed anywhere. Without it, refreshing the results page — the natural
- * reaction to a wrap-up that is taking a while — silently discarded it.
+ * The finished Session the post-call screen shows, kept in `sessionStorage` so
+ * a reload (the natural reaction to a slow wrap-up) does not discard it, while
+ * closing the tab does.
  */
 const STORAGE_KEY = "calltrainer.finishedSession";
 

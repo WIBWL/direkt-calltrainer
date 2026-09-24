@@ -13,17 +13,9 @@ import {
 } from "../scenarioSelection";
 
 /**
- * The Scenario library as the selection screen holds it: the cards, the two
- * filter rows, which case is picked, and the reload after a row changed.
- *
- * It used to be ten pieces of state, two effects and two memos in `App.tsx`,
- * handed to `SetupView` as a dozen props under names that changed on the way.
- * The rules they follow are pure functions in `scenarioSelection.ts`; this is
- * the state those functions are asked about, and nothing that belongs to the
- * training flow.
- *
- * `preselect` is false while a restored wrap-up owns the screen: nothing is
- * picked or filtered behind it.
+ * The selection screen's Scenario library state: cards, both filter rows, the
+ * pick and the reload. The rules live in `scenarioSelection.ts`. `preselect`
+ * is false while a restored wrap-up owns the screen: nothing is picked behind it.
  */
 export function useScenarioLibrary(preselect: boolean) {
   const [scenarios, setScenarios] = useState<ScenarioCard[]>([]);
@@ -31,32 +23,38 @@ export function useScenarioLibrary(preselect: boolean) {
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Reloaded after the user creates, edits, shares or deletes a row, so a
-  // refetch shows the change without a full page reload. `select` (when passed)
-  // is the id to select next — the saved row, or the first remaining one if it
-  // was deleted.
-  const reload = useCallback(
-    (select?: string | null) =>
+  // One fetch for both the first load and every reload; `then` decides what the
+  // new list does to the selection.
+  const load = useCallback(
+    (then: (data: ScenarioCard[]) => void) =>
       listScenarios()
         .then((data) => {
           setScenarios(data);
-          if (select !== undefined) setScenarioId(select ?? data[0]?.id ?? null);
+          then(data);
         })
         .catch((e) => setError(`Szenarien konnten nicht geladen werden: ${e.message}`)),
     [],
   );
 
+  // Reloaded after the user creates, edits, shares or deletes a row. `select`
+  // (when passed) is the id to select next — the saved row, or the first
+  // remaining one if it was deleted.
+  const reload = useCallback(
+    (select?: string | null) =>
+      load((data) => {
+        if (select !== undefined) setScenarioId(select ?? data[0]?.id ?? null);
+      }),
+    [load],
+  );
+
   useEffect(() => {
-    listScenarios()
-      .then((data) => {
-        setScenarios(data);
-        if (preselect) {
-          setFilters(startingFilters(data));
-          setScenarioId(firstSelectable(data));
-        }
-      })
-      .catch((e) => setError(`Szenarien konnten nicht geladen werden: ${e.message}`));
-  }, [preselect]);
+    void load((data) => {
+      if (preselect) {
+        setFilters(startingFilters(data));
+        setScenarioId(firstSelectable(data));
+      }
+    });
+  }, [load, preselect]);
 
   const remove = useCallback(
     (id: string) => {

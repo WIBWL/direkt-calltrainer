@@ -1,24 +1,9 @@
 import ScenarioBriefing from "./ScenarioBriefing";
 
 /**
- * What the trainee holds for an ordinary call: their own briefing (ADR 0054)
- * and the facts of the case.
- *
- * The facts are the caller's own material — they are what the model playing
- * the caller is briefed with. Showing them is not a leak: the read-only info
- * panel behind a card's "i" already serves them for every Scenario, on the
- * argument that the situation comes up in the call anyway. What stays withheld
- * is `call_goal`, which is the answer key.
- *
- * Two variants, like `ReverseBriefPanel`: "prepare" is the screen between the
- * microphone check and the ringing phone and carries both halves; "call"
- * follows the live conversation and carries the *facts* alone, since what one
- * reaches back for mid-call is a number, a date or a name.
- *
- * The "call" variant is the same deliberate exception to ADR 0033 that ADR 0070
- * takes for a reverse: the text says nothing about the conversation in
- * progress, is fixed before the call, and is never the Persona's lines. Not
- * shown for a random Scenario — there not knowing is the exercise (F-62).
+ * The trainee's briefing (ADR 0054) and the case facts, which the info panel already
+ * serves; `call_goal`, the answer key, stays withheld. "prepare" shows both; "call" shows
+ * the facts alone mid-call (ADR 0070's exception to ADR 0033). Not for a random Scenario (F-62).
  */
 export default function CaseBriefPanel({
   briefing,

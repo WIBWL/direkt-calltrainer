@@ -1,12 +1,8 @@
-"""
-Migrates the database to head and fills the reference tables.
-
-Thin CLI over backend/db/provision.py, which the application also runs at
-startup -- so the manual and automatic paths cannot drift apart.
+"""Migrates the database to head and fills the reference tables -- a thin CLI over
+backend/db/provision.py, which the app also runs at startup.
 
 Run from the project root, with an active .venv and a running Postgres:
-    python scripts/seed_reference_data.py
-"""
+    python scripts/seed_reference_data.py"""
 import os
 import sys
 

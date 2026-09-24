@@ -1,18 +1,7 @@
 /**
- * The flag on a Persona's language line: which language this one speaks.
- *
- * Drawn as SVG rather than written as a flag emoji, because Windows ships no
- * glyphs for those — Chrome and Edge there render 🇩🇪 as the letters "DE",
- * which is precisely the audience this app is built for.
- *
- * The flag says the *language*, not a country: English is shown as the US flag
- * because that is what was asked for, and because a Persona's language is a
- * voice and an accent rather than a nationality. A further language means one
- * more case here and one more `LanguagePack` on the server.
- *
- * Decorative on purpose: every place this appears already carries the language
- * as text ("Deutsch"), so an alt text would have a screen reader say the same
- * thing twice.
+ * The flag on a Persona's language line. SVG, not a flag emoji: Windows has no glyphs and
+ * renders "DE" as letters. It stands for the language, not a country (English → US flag).
+ * Decorative: the language is always written beside it.
  */
 
 /** A uniform 3:2 box for every flag. Neither flag's true proportions, but a row

@@ -1,19 +1,7 @@
 """The two readings of a finished call, and the record the statistics come from.
-
-`utterances` puts what was said on a timeline; `conversation` folds the same
-Turns into the facts every derivation in this package reads. Both are questions
-about a *sequence* of Turns, which a Turn's own fields cannot answer.
-
-Here rather than in `backend/session/models.py`, where both used to live. That
-module belongs to the live call -- the orchestrator writes into a `Turn` while
-the conversation is running -- and keeping the fold there put its result type,
-`Conversation`, in `metrics.py`, the consumer. Neither module owned the record
-that is the entire interface between them, and the live turn loop imported the
-ORM and the whole analysis package to reach one dataclass. Dependencies run one
-way now: this package reads `Turn`, and `Turn` knows nothing about this package.
-
-`Turn` stays where it is on purpose. It is the accumulator a running call fills
-in, and moving it here would point the dependency back the way it came.
+`utterances` puts what was said on a timeline; `conversation` folds the Turns
+into the facts every derivation reads. `Turn` stays in `session/models.py` and
+knows nothing about this package, so the dependency runs one way.
 """
 
 from __future__ import annotations
@@ -48,26 +36,17 @@ class Utterance:
     # F-53, see `session.models.Turn`). None where the Turn predates the
     # distinction, and every reader falls back to `duration_ms` there.
     dispatched_ms: int | None = None
-    # The raw paraverbal facts of this utterance, on a user line only (ADR
-    # 0081). Carried through the flattening because the row is written from an
-    # Utterance: without it the facts would stop at `conversation()`, which
-    # folds the whole call into one set and is the only other reader of a Turn.
-    #
-    # None on a Persona line and on a user line with no measurement behind it.
+    # The raw paraverbal facts of a user line (ADR 0081), carried because the
+    # stored row is written from an Utterance. None on a Persona line and on a
+    # user line with no measurement behind it.
     acoustics: TurnFacts | None = None
 
 
 def utterances(turns: Sequence[Turn]) -> list[Utterance]:
     """The exchanges flattened into single-speaker utterances, in the order spoken.
-
-    Within one Turn the user speaks first: their text is the reply to the
-    *previous* Turn's Persona line, and this Turn's Persona line answers it.
-    Empty sides are skipped -- the opening Turn has no user text, and an
-    interrupted one may have no Persona text. A Persona line the user cut off
-    ends with a visible "[unterbrochen]" marker (ADR 0035).
-
-    The single place that knows this ordering: both the Transcript sent over
-    the WebSocket and the persisted Turn rows are built from it.
+    Within one Turn the user speaks first (replying to the previous Persona line);
+    empty sides are skipped, a cut-off Persona line ends with "[unterbrochen]"
+    (ADR 0035). The one place that knows this ordering.
     """
     spoken: list[Utterance] = []
     for turn in turns:
@@ -93,11 +72,8 @@ def utterances(turns: Sequence[Turn]) -> list[Utterance]:
 
 def facts(turn: Turn) -> TurnFacts | None:
     """The raw paraverbal facts of one Turn's user side, or None if there was
-    no measurement behind it (ADR 0081).
-
-    "No measurement" is a Turn with no speaking time and no curve, which is
-    what an unmeasurable recording leaves. `complete` is a different statement
-    and is carried: the Turn *was* measured, and part of it failed.
+    no measurement behind it (ADR 0081). `complete` is a different statement:
+    the Turn *was* measured, and part of it failed.
     """
     if not turn.user_speech_ms and not turn.loudness_db and not turn.pauses:
         return None
@@ -113,11 +89,8 @@ def facts(turn: Turn) -> TurnFacts | None:
 @dataclass(frozen=True)
 class Reaction:
     """One silence between the Persona falling silent and the user replying.
-
-    `at_ms` is where the reply began on the Session's timeline, which is the
-    offset the stored transcript carries for that utterance -- so a reader can
-    be shown the exchange this silence sat in without anything having to match
-    two clocks against each other.
+    `at_ms` is where the reply began, the same offset the stored transcript
+    carries, so the exchange can be shown without matching two clocks.
     """
 
     at_ms: int
@@ -127,11 +100,8 @@ class Reaction:
 @dataclass(frozen=True)
 class Conversation:  # pylint: disable=too-many-instance-attributes  # a record of measured facts, one field per fact
     """One finished call, reduced to the facts the statistics are derived from.
-
-    Assembled by `conversation()` below, which keeps the machine's latency out
-    of both speakers' windows (ADR 0051). The one input every derivation in
-    this package takes, so a new field here is a new fact about a call and
-    not a new argument threaded through twenty functions.
+    Built by `conversation()`, which keeps the machine's latency out of both
+    speakers' windows (ADR 0051); the one input every derivation takes.
     """
 
     user_text: str = ""
@@ -186,14 +156,9 @@ def conversation(
     turns: Sequence[Turn], language_id: str | None = None, reverse: bool = False
 ) -> Conversation:
     """Fold the finished call into the facts its statistics are derived from.
-
-    `language_id` is the Persona's. Optional: without it only the readings
-    that need a vocabulary drop out.
-
-    Reaction time is the one measure that spans two Turns: the user's reply in
-    Turn N answers the Persona line of Turn N-1, so it is counted from that
-    line's end. Everything the machine did in between -- generating, then
-    synthesizing -- is outside the window by construction (ADR 0051).
+    `language_id` is the Persona's; without it the vocabulary readings drop out.
+    Reaction time runs from the end of Turn N-1's Persona line, so the machine's
+    latency is outside the window (ADR 0051).
     """
     reactions: list[Reaction] = []
     pauses: list[Pause] = []
@@ -216,13 +181,9 @@ def conversation(
         pauses.extend(turn.pauses)
         loudness.extend(turn.loudness_db)
         pitch.extend(turn.pitch_hz)
-        # Gated on the text like `persona_turns` and `utterances()`, not
-        # counted unconditionally: a reply the user talked over before hearing
-        # any of it is dropped from the history and the Transcript (ADR 0035),
-        # and its dispatched audio must not stay behind in the one figure that
-        # is the denominator of Redeanteil. The window of a *trimmed* reply is
-        # cut back to the played position where it is trimmed, so what is
-        # counted here is heard speech in both cases.
+        # Gated on the text: a reply talked over before any of it was heard is
+        # dropped from the Transcript (ADR 0035) and must not count towards
+        # Redeanteil's denominator. Trimmed replies already end where played.
         if turn.persona_text:
             persona_ms += _span(turn.persona_offset_ms, turn.persona_end_ms) or 0
             persona_turns += 1
@@ -259,10 +220,8 @@ def conversation(
 
 def timeline(turns: Sequence[Turn]) -> tuple[Segment, ...]:
     """The call as bare segments, for the overlap classification (F-51).
-
-    The same flattening `utterances()` does, minus the text and with unmeasured
-    sides dropped: a segment with no duration cannot be tested for overlap, and
-    guessing one would invent the very thing being measured.
+    Unmeasured sides are dropped: guessing a duration would invent the very
+    overlap being measured.
     """
     return tuple(
         Segment(

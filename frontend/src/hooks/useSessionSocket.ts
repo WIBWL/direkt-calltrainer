@@ -38,13 +38,9 @@ interface UseSessionSocketOptions {
 }
 
 /**
- * Owns the per-Session WebSocket connection (see ADR 0033's wire protocol):
- * sends the initial handshake, forwards Turn audio, and translates incoming
- * state/audio-chunk/error/session.ended messages into hook state. Connects
- * as soon as a Session is committed to — which per ADR 0042 is the moment
- * the user leaves the selection screen, not the moment a Persona/Scenario
- * is picked — so the Persona's opening line generates in the background
- * while the user is still on the microphone check.
+ * Owns the per-Session WebSocket (ADR 0033's wire protocol). Connects as soon
+ * as a Session is committed to (ADR 0042), so the opening line generates in
+ * the background while the user is still on the microphone check.
  */
 export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionSocketOptions) {
   const [callState, setCallState] = useState<CallState>("thinking");
@@ -52,20 +48,14 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
   const wsRef = useRef<WebSocket | null>(null);
   const turnSeqRef = useRef(0);
   const sessionIdRef = useRef<string | null>(null);
-  // The server streams a reply's audio well ahead of playback, so after a
-  // barge-in whole sentences of the cut-off reply are still in transit and
-  // keep arriving here. Playing them out would speak the rest of the
-  // interrupted reply before the answer to the interruption (the transcript
-  // side of this is ADR 0035; this is the audio side). Closed on sendInterrupt,
-  // reopened when the server starts the next reply (`state: "speaking"`), which
-  // the wire order guarantees comes after every stale chunk.
+  // After a barge-in, sentences of the cut-off reply are still in transit and
+  // must not be played (audio side of ADR 0035). Closed on sendInterrupt,
+  // reopened on the next `state: "speaking"`, which the wire order puts after
+  // every stale chunk.
   const acceptingAudioRef = useRef(true);
-  // Set when `sendActivate` was called before the handshake went out, which is
-  // the ordinary case for a Session begun straight from a finished training
-  // (F-60/F-61): there is no microphone check in front of it to spend the
-  // connection's first moment on. Sent from `onopen` instead of dropped —
-  // dropping it leaves the server holding the opening line and the Session
-  // clock unstarted, with nothing on screen to say so.
+  // `sendActivate` called before the socket opened (usual for F-60/F-61, which
+  // skip the mic check). Sent from `onopen`: dropping it would leave the server
+  // holding the opening line forever, with nothing on screen to say so.
   const pendingActivateRef = useRef(false);
 
   useEffect(() => {
@@ -81,12 +71,9 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     ws.binaryType = "arraybuffer";
     wsRef.current = ws;
 
-    // React (StrictMode, or any effect re-run) can tear this effect down and
-    // re-run it before this specific socket ever opens — its own onerror/
-    // onclose then fire asynchronously afterwards, once wsRef.current already
-    // points at the *next* socket. Without this guard, that stale socket's
-    // error would still overwrite state and show a permanent, misleading
-    // "connection lost" message even though the real connection is fine.
+    // An effect re-run (e.g. StrictMode) can replace this socket before it
+    // opens; its onerror/onclose then fire late. Without this guard the stale
+    // socket would show a permanent, false "connection lost".
     const isCurrent = () => wsRef.current === ws;
 
     ws.onopen = async () => {
@@ -227,11 +214,8 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
   );
 
   /** Marks t=0 on the Session's timeline: the opening line starts playing now.
-   *
-   * Held back rather than lost when the socket is not open yet — see
-   * `pendingActivateRef`. Every other message either has a fallback for a
-   * closed socket (`endSession`) or belongs to a call that is already running,
-   * and so cannot arrive this early. */
+   * Held back rather than lost when the socket is not open yet (see
+   * `pendingActivateRef`); no other message can arrive that early. */
   const sendActivate = useCallback(() => {
     if (!send({ type: "session.activate" })) pendingActivateRef.current = true;
   }, [send]);

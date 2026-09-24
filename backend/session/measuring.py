@@ -1,9 +1,7 @@
 """Attaching one utterance's paraverbal measurements to its Turn (ADR 0048).
 
-`analyze` (backend/feedback/acoustics.py) measures the audio on a worker
-thread while the STT round trip runs; this is the other half -- placing what
-it measured on the Session's timeline. Moved out of `orchestrator.py`, which
-sits at its line ceiling, and unchanged in what it does.
+`analyze` (backend/feedback/acoustics.py) measures the audio on a worker thread
+during the STT round trip; this places the result on the Session's timeline.
 """
 
 import asyncio
@@ -20,15 +18,9 @@ async def attach_measurements(
 ) -> None:
     """Record the Turn's paraverbal measurements, on the Session's timeline.
 
-    The audio arrived once the user had stopped talking, so `ended_ms` is where
-    this fragment ends and the measured duration walks it back to its start. A
-    Turn reopened after a barge-in is measured once per fragment, each placed by
-    its own arrival -- so pauses are rebased here, needing no per-fragment origin.
-
-    Never fatal: unlike STT, dialogue generation and TTS, this leg is not one
-    the conversation depends on, so a Turn that cannot be measured simply
-    carries no measurements and the call continues.
-    """
+    `ended_ms` is where this fragment ends; the measured duration walks back to
+    its start, so each fragment of a reopened Turn is placed by its own arrival.
+    Never fatal: the conversation does not depend on this leg."""
     try:
         measured = await acoustics
     except AcousticsError as e:

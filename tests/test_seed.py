@@ -1,15 +1,8 @@
-"""The reference tables the application seeds itself (ADR 0041, ADR 0057,
-ADR 0058, ADR 0076).
+"""The reference tables the application seeds itself (ADR 0041, 0057, 0058, 0076).
 
-The seed runs on every application start (backend/db/provision.py, called
-from the lifespan handler), so running it twice must not change anything the
-first run produced.
-
-Exercised through scripts/seed_reference_data.py as a subprocess rather than by
-importing provision(), because the script is the path a human takes — including
-its `load_dotenv` and its module-level `sys.path` juggling, both of which only
-behave that way as a script. The application calls the same provision().
-"""
+The seed runs on every start, so a second run must change nothing. Run through
+scripts/seed_reference_data.py as a subprocess, the path a human takes (its `load_dotenv`
+and `sys.path` setup only behave that way as a script); the app calls the same provision()."""
 import os
 import subprocess
 import sys
@@ -116,10 +109,10 @@ def test_seed_deactivates_personas_it_no_longer_contains(migrated_database: str)
             conn.execute(
                 text(
                     "INSERT INTO persona (key, extern_id, name, role_label, role, traits,"
-                    " behavior, training_goal, difficulty, language_code,"
-                    " kugelaudio_voice_id, active, visibility)"
+                    " behavior, training_goal, language_code,"
+                    " kugelaudio_voice_id, active)"
                     " VALUES ('retired-persona', gen_random_uuid(), 'Alt', 'Alt', 'Alt',"
-                    " 'alt', 'alt', '', 'mittel', 'de', 1885, true, 'public')"
+                    " 'alt', 'alt', '', 'de', 1885, true)"
                 )
             )
 
@@ -136,14 +129,10 @@ def test_seed_deactivates_personas_it_no_longer_contains(migrated_database: str)
 
 
 def test_seed_deactivates_metric_types_it_no_longer_contains(migrated_database: str) -> None:
-    """The same rule for the metric inventory, which ADR 0057 already claims it
-    follows: when a metric key was renamed, the old row is deactivated.
+    """ADR 0057 for the metric inventory: a renamed metric key's old row is deactivated.
 
-    It was not, for a long time. Every German key from before that rename stayed
-    active beside its English replacement, and both carry the same display name
-    ("Redeanteil" for `redeanteil` and for `talk_share`), so anything reading the
-    inventory saw each renamed metric twice. Measurements reference these rows,
-    which is why this is a flag and not a delete.
+    Otherwise old and new keys share a display name and every reader sees the metric
+    twice. Measurements reference these rows, hence a flag and not a delete.
     """
     _run_seed(migrated_database)
 
@@ -171,10 +160,8 @@ def test_seed_deactivates_metric_types_it_no_longer_contains(migrated_database: 
 
 # --- The sweep must not reach User-owned rows (ADR 0058) ---------------------
 #
-# `scenario` holds authored Scenarios, Folgeszenarien and Rollentausch rows
-# beside the shipped ones, and the seed runs at every application start. The
-# three tests below pin the two halves of that: the sweep still retires a
-# built-in, and it does not touch a row somebody wrote.
+# `scenario` also holds authored, follow-up and reverse rows, and the seed runs at
+# every start: the sweep retires a built-in but never a row somebody wrote.
 
 _AUTHORED_SCENARIO = (
     "INSERT INTO scenario (key, extern_id, title, short_description, description,"
@@ -220,31 +207,19 @@ def test_seed_leaves_an_authored_scenario_alone(migrated_database: str) -> None:
 def test_seed_leaves_an_authored_scenario_alone_even_when_it_has_a_key(
     migrated_database: str,
 ) -> None:
-    """The one that bites.
+    """The one that bites: an authored row *with* a key must survive the sweep.
 
-    An authored row carries no `key` today, so the sweep passes it by through
-    SQL's three-valued logic alone -- `NULL NOT IN (...)` is NULL, not TRUE --
-    and the previous test would pass with no guard in `_deactivate_missing` at
-    all. Give `scenario.key` a default or backfill it, two tables away from the
-    sweep, and every User's library would be deactivated on the next boot with
-    no error and nothing failing.
-
-    So this one states the rule the sweep is supposed to follow -- the seed
-    retires what the seed created, and authorship is what says so -- rather than
-    the accident that currently enforces it.
-    """
+    Keyless rows survive only by accident (`NULL NOT IN (...)` is NULL). Give `scenario.key`
+    a default or backfill it and every User's library is silently deactivated on the next
+    boot. Pins the rule itself: the seed retires only what the seed created."""
     assert _seed_twice_with(migrated_database, "user-picked-a-key", "keycloak-sub-1") is True
 
 
 # --- The other half of the sweep: bringing a row back ------------------------
 #
-# `_deactivate_missing` writes `active = False`, and the upsert has to write it
-# back, or a table is swept one way only. `_seed_scenarios` was the one of the
-# four that left the column out of its values, so a built-in that had dropped
-# out of SCENARIOS once -- a shorter branch, a key renamed and renamed back --
-# stayed invisible after it returned: the upsert found the row by `key`,
-# refreshed its text and left `active` False. No error, no log line, and
-# nothing short of SQL to repair it.
+# The upsert must write `active` back, or a built-in that once dropped out of the seed
+# (a branch, a key renamed back) stays invisible for good: text refreshed, `active`
+# still False, no error. `_seed_scenarios` once left the column out.
 
 _SWEPT_TABLES = [
     ("persona", "persona_id"),
@@ -258,14 +233,10 @@ _SWEPT_TABLES = [
 def test_seed_brings_a_deactivated_row_back(
     migrated_database: str, table: str, primary_key: str
 ) -> None:
-    """The module docstring of backend/db/provision.py promises every seeded
-    record is "created or brought back to the seed state". All four swept
-    tables, so adding a fifth cannot quietly repeat this.
+    """Every swept table's seeded row is "brought back to the seed state" (provision.py),
+    including `active`, so a fifth table cannot quietly repeat the bug.
 
-    The row is picked rather than named: any row the seed owns (`key` is not
-    NULL) and seeds as active. That keeps the test off the seed's content, which
-    changes, and on the one thing that must not -- a Scenario seeded active is
-    active after the next start, whatever happened to it in between.
+    The row is picked (any seed-owned, seeded-active row), keeping the test off the content.
     """
     _run_seed(migrated_database)
     engine = create_engine(migrated_database)

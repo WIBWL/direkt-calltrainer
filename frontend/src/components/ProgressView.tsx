@@ -35,33 +35,9 @@ import Sparkline from "./Sparkline";
 import VarietyGrid from "./VarietyGrid";
 
 /**
- * The progress dashboard (F-13, docs/dashboard-concept.md).
- *
- * Top to bottom: what I did (the counted figures, calendar and variety grid,
- * over every stored training), the period switch, then Hattie & Timperley's
- * feed up, feed forward and feed back — focus goals, what the wrap-ups keep
- * returning to with the one thing to practise beside it, and every metric over
- * time — read over the trainings the switch selects. The block that leads back
- * into training stays high: a dashboard whose only way out is at the foot of
- * its longest page ends in looking (dashboard-concept.md section 3).
- *
- * The switch sits *under* the activity block deliberately: everything above it
- * counts every stored training, everything below is read over the selection, so
- * placement says what would otherwise need a caveat. What it selects reaches
- * the two detail levels as well, through the URL rather than through state
- * here (`ProgressContext.tsx`): a tile that says "aus 5 Trainings" and a page
- * behind it drawn over every stored one are two screens describing the same
- * metric differently.
- *
- * Nothing here is evaluated — no target band, no colour meaning good, no arrow,
- * no aggregate score (ADR 0065), because nobody has established what a good
- * talk share or speaking pace is for this population. The figures were measured
- * when each call ended (ADR 0051); this view only groups them and describes
- * their spread.
- *
- * Read-only and about one account. No comparison with colleagues, though the
- * tenant model (ADR 0060) would allow it: ranking employees against each other
- * is a different product with a different legal footing.
+ * Progress dashboard (F-13, docs/dashboard-concept.md): activity over every training, then the period switch
+ * (placed where its reach begins; kept in the URL, `ProgressContext`), then goals, recurring themes and metrics
+ * over the selection. Nothing evaluated (ADR 0065, ADR 0051); no comparison with colleagues (ADR 0060 would allow).
  */
 export default function ProgressView() {
   // The trainings and the selection both come from the provider, which the two
@@ -145,12 +121,8 @@ export default function ProgressView() {
         </p>
       )}
 
-      {/* First, and above the switch: what was done, over every stored
-          training. Activity needs no norm to be readable (ADR 0065 says so
-          outright), so it is the one block that can open the page with a figure
-          and no caveat. It stood last for a while, as context; at the top it is
-          the ground the rest of the page stands on, and it is the part a
-          returning User checks first ("when did I last train?"). */}
+      {/* First, above the switch: activity over every stored training. It needs no norm (ADR 0065) and is
+          what a returning User checks first. */}
       <section className="progress-section progress-training-section" aria-labelledby="activity-title">
         <SectionHeading id="activity-title" eyebrow="WAS SIE GETAN HABEN" title="Ihr Training" />
 
@@ -217,14 +189,9 @@ export default function ProgressView() {
           ))}
         </div>
 
-        {/* The second row, and the same control as the first, so the two
-            cannot read as different kinds of choice. It answers the objection
-            the concept raises against its own charts (section 4.3): a course
-            across a complaint, a price negotiation and an advisory call is
-            scatter, and across one kind of call it is a series. Each option
-            carries how many trainings it would yield, and an occasion with
-            none cannot be pressed — a filter leading to an empty page is a
-            dead end nobody meant to offer. */}
+        {/* Occasion filter, the same control as the period row. A course across different kinds of call is
+            scatter, across one kind a series (concept section 4.3). Options carry their counts; an empty one
+            cannot be pressed. */}
         <div
           className="progress-periods progress-occasions"
           role="group"
@@ -303,18 +270,9 @@ export default function ProgressView() {
 }
 
 /**
- * The whole screen as a PDF (F-13), the counterpart of the feedback file F-64
- * offers after one call (`utils/progressPdf.ts`).
- *
- * The dashboard is what somebody takes into a conversation with a trainer or an
- * instructor, and the only way to take it was a screenshot per block. Built in
- * the browser on the numbers the page already holds: a server route would be a
- * second path to the same figures, which `docs/dashboard-concept.md` section 9
- * rules out by name.
- *
- * Styled as the feedback screen's actions row, and sharing its classes rather
- * than copying its rules: it is the same kind of row in the same place doing
- * the same thing, and two rules that have to stay identical eventually do not.
+ * The whole screen as a PDF (F-13; `utils/progressPdf.ts`), counterpart of F-64's feedback file. Built in the
+ * browser from the page's own numbers — a server route would be a second path to them (concept section 9).
+ * Shares the feedback screen's actions-row classes rather than copying its rules.
  */
 function DownloadReport() {
   const { sessions, selected, periodPhrase, truncated } = useProgressContext();
@@ -447,13 +405,9 @@ function FocusSection({
 }
 
 /**
- * One focus goal.
- *
- * Four shapes, because the honest answer differs per goal (see
- * `utils/focusMetrics.ts`): metrics with their course, a comparison of two
- * stretches of a call, an activity figure, or what the wrap-ups said where
- * there is no measurement. The last is deliberately not hidden. A tile that
- * quietly disappears would let the user believe the goal is being tracked.
+ * One focus goal, in one of four shapes (`utils/focusMetrics.ts`): metrics with their course, a two-stretch
+ * comparison, an activity figure, or wrap-up mentions. A goal with no measurement is shown, not hidden, or
+ * the user would believe it is being tracked.
  */
 function FocusTile({
   goal,
@@ -500,12 +454,8 @@ function FocusTile({
         <GoalMentionBody goal={goal.key} sessions={sessions} note={backing.note} />
       )}
 
-      {/* One drill-down per tile, and it is the goal's own page rather than a
-          metric's: a tile stands for a goal, and the goals with no
-          measurement need the level most. That page links on to the chart
-          where there is one, and the metrics table below still reaches the
-          charts in one click. Activity goals have none -- what answers them is
-          the calendar and the variety grid on this very screen. */}
+      {/* One drill-down per tile: the goal's own page (which links on to a chart where one exists). Activity
+          goals have none — the calendar and variety grid on this screen answer them. */}
       {backing.kind !== "activity" && (
         <Link className="progress-detail-link" to={withPeriod(progressGoalPath(goal.key))}>
           Was dazu gesagt wurde
@@ -521,14 +471,8 @@ function FocusTile({
 const MAX_SUPPORTING = 2;
 
 /**
- * The goal's other metrics, one line each: name, the last value, a small
- * course.
- *
- * The first metric alone told half the story. speaking pace, pauses and
- * run length are together the rhythm of somebody's speaking, and each
- * can look unchanged while the rhythm moves (`focusMetrics.FOCUS_BACKING`). So
- * the tile carries the rest too, smaller, in the same hue and on the same
- * terms: no band, no colour for a value, the figure printed beside the line.
+ * The goal's other metrics, one small line each (`focusMetrics.FOCUS_BACKING`): for rhythm-like goals the
+ * combination is the goal. Same terms as the main figure — no band, no value colour.
  */
 function SupportingMetrics({ series }: { series: MetricSeries[] }) {
   return (
@@ -566,14 +510,8 @@ function regularityText(sessions: SessionSummary[]): string {
 }
 
 /**
- * The tile of a goal answered by a comparison rather than by a series
- * (ADR 0081): how somebody spoke while the other side pushed back, against the
- * rest of the call.
- *
- * A count of trainings and nothing else here. The comparison itself is two
- * figures per metric per training, which is a table and not a tile, so it
- * lives one level down; and any single number this tile could show instead --
- * an average gap, a "stability" -- would be the composite ADR 0051 refuses.
+ * Tile of a goal answered by a comparison rather than a series (ADR 0081): only a count of trainings. The
+ * comparison is a table one level down; any single number here would be the composite ADR 0051 refuses.
  */
 function SegmentBody({ sessions }: { sessions: SessionSummary[] }) {
   const withComparison = segmentTrainings(sessions).length;
@@ -600,18 +538,9 @@ function SegmentBody({ sessions }: { sessions: SessionSummary[] }) {
 }
 
 /**
- * A goal that has no measurement of its own, answered by what the wrap-ups
- * said about it.
- *
- * Three of the fourteen goals are like this (`utils/focusMetrics.ts`): whether
- * an objection was handled or empathy shown is in what was said, and no
- * acoustic figure reaches it. Counting the mentions is the honest substitute,
- * and the wording keeps it a count of statements rather than a verdict.
- *
- * No threshold here, unlike the recurring block, which needs two mentions
- * before it calls something a pattern. On a tile the user picked themselves,
- * "once so far" is a legitimate answer to "how is this going"; in a list of
- * recurring themes it would be noise.
+ * A goal with no measurement (`utils/focusMetrics.ts`), answered by counting what the wrap-ups said — a count
+ * of statements, not a verdict. No two-mention threshold as in the recurring block: on a tile the user picked,
+ * "once so far" is a legitimate answer.
  */
 function GoalMentionBody({
   goal,
@@ -715,13 +644,8 @@ function MetricBody({ series, sessionCount }: { series: MetricSeries; sessionCou
     );
   }
 
-  // How many of the selected trainings carry no value for this metric. A
-  // course drawn from 6 of 10 trainings says "6" beside it and nothing about
-  // the other four, which reads as a complete record with a short memory. Two
-  // things produce a gap and the sentence claims neither: a call recorded
-  // before the metric existed (ADR 0048 — the audio is gone, so it can never
-  // be filled in), and one whose recording was too noisy to tell speech from
-  // silence, which withholds five metrics at once (ADR 0085).
+  // Selected trainings with no value for this metric, so a course from 6 of 10 does not read as complete.
+  // The cause is not claimed: recorded before the metric existed (ADR 0048) or too noisy (ADR 0085).
   const missing = Math.max(0, sessionCount - series.points.length);
 
   return (
@@ -747,13 +671,8 @@ function MetricBody({ series, sessionCount }: { series: MetricSeries; sessionCou
 const OVERVIEW_COUNT = 3;
 
 /**
- * What stands where the focus goals would be when none are set.
- *
- * Not an empty box and not a nag. The three metrics that moved most across
- * the period are the ones where there is something to look at, so they earn the
- * space; the invitation to pick goals sits beside them as an offer. Choosing
- * goals is voluntary (F-62) and a screen that withholds content until you do
- * would make it less so.
+ * Stands in for the focus goals when none are set: the three metrics that moved most, beside an offer to pick
+ * goals. Choosing goals is voluntary (F-62), so no content is withheld until you do.
  */
 function OverviewSection({ series }: { series: MetricSeries[] }) {
   const { withPeriod } = useProgressContext();

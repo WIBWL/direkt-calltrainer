@@ -4,26 +4,9 @@ import { RINGTONE_CYCLE_MS, useRingtone } from "../hooks/useRingtone";
 import PersonaAvatar from "./PersonaAvatar";
 
 /**
- * The phone ringing between the microphone check and an ordinary call (F-63).
- *
- * The call has to be *accepted*, not merely arrived at: in an ordinary Session
- * the Persona is the one who rang (`_casting` in `session/prompting.py`), so
- * picking up is what the user actually does.
- *
- * The wait on it is real rather than staged: the Session is connected and the
- * opening line generated and held back until `session.activate` (ADR 0042),
- * which accepting is what sends.
- *
- * Not shown for a reverse (ADR 0070): there the user is the caller, and asking
- * them to take an incoming call would have the roles the wrong way round on the
- * one feature that is about roles.
- *
- * The ringtone switch is not a nicety: sound that starts by itself and runs
- * past three seconds has to be stoppable (WCAG 1.4.2). The choice is
- * remembered — someone who turns it off in an open-plan office should not have
- * to again before every call. It is the phone's own silent switch rather than a
- * link, the place a person already reaches for; its hit area is far larger than
- * the 3px sliver it draws, since a target has to be 24px (WCAG 2.5.8).
+ * The phone ringing before an ordinary call (F-63): the Persona rang (`_casting`), so the
+ * user accepts, which sends `session.activate` (ADR 0042). Not for a reverse (ADR 0070).
+ * The ringtone is stoppable (WCAG 1.4.2) and remembered; the switch's target is 24px (2.5.8).
  */
 
 /** Where the ringtone preference lives. Per browser, per person, and of no
@@ -167,19 +150,10 @@ export default function IncomingCall({
           </div>
         </div>
 
-        {/* The silent switch's control: the label and the arrow are the target
-            as much as the switch is, which is what makes a 3px sliver
-            clickable without drawing it any bigger.
-
-            A sibling of the phone rather than a child of it, because the phone
-            shakes: 200px out from its centre, a 2° tilt swings text by about
-            7px, and a label that bobs is a label nobody reads. The sliver it
-            points at stays inside the device, where it belongs.
-
-            The name is on the button as well as on screen — the same words, so
-            WCAG 2.5.3 is satisfied either way — because the label is hidden on
-            narrow screens where the arm does not fit, and a hidden <span> takes
-            its text out of the accessibility tree with it. */}
+        {/* The silent switch's control; label and arrow are part of the target. A sibling
+            of the phone, not a child, because the phone shakes and a bobbing label is
+            unreadable. The name is on the button too (WCAG 2.5.3): the label is hidden
+            on narrow screens, and a hidden <span> leaves the accessibility tree. */}
         <button
           type="button"
           className="incoming-mute-switch"

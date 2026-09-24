@@ -1,31 +1,8 @@
-"""The Session's statistics, derived from a finished call.
+"""The Session's statistics, derived from a finished call; pure, no database, audio or Praat.
 
-Covers:
-  F-24  talk share, and the unit it is a share *of*
-  F-36  speaking pace, and the unit it is a rate *over*
-  F-53  reaction time: only from Turns whose start was actually measured
-  F-37  the loudness curve, and the words the wrap-up gets instead of its
-        dB span
-  ADR 0047/0048  a Turn's acoustics are measured inline and never load-bearing,
-                 so a failed measurement stays visible downstream
-  ADR 0051  no figure the user could take for measured when it was not
-  F-53      every metric belongs to one half of the metrics slider (ADR 0082)
-  F-51      phonation share: how much of the recording was speech
-  F-41      open and closed questions, split off the same question marks
-  F-51      lexical fillers, counted from the transcript per language (ADR 0083)
-  F-08      passages said again word for word, one repeated sentence counting once
-  ADR 0085  a recording with no detectable silence drops what rests on silence
-  F-63      the opening (ADR 0086): greeting, own name and an offer of help (the concern,
-            when the user rang), and its tempo
-  F-65      the closing (ADR 0089): a recap, a concrete next step and a goodbye in the
-            user's last two turns, the same whoever rang
-  ADR 0082  the frontend's metric catalogue describes exactly the metrics this
-            inventory serves -- see `test_frontend_catalogue_covers_every_metric`
-
-`conversation()` and `measure()` are pure functions over in-memory Turns: no
-database, no audio and no Praat -- the acoustic facts are handed in as the
-numbers `analyze()` would have produced.
-"""
+Covers F-24 talk share, F-36 pace, F-53 reaction time / run length / aspect halves (ADR 0082), F-37 loudness,
+F-51 phonation share and fillers (ADR 0083), F-41 questions, F-08 repetitions, F-63 opening (ADR 0086),
+F-65 closing (ADR 0089), ADR 0047/0048 (failed acoustics stay visible), ADR 0051, ADR 0085 (no silence)."""
 
 import re
 from pathlib import Path
@@ -74,7 +51,7 @@ def test_every_metric_belongs_to_one_half_of_the_grid() -> None:
 
 
 def test_both_halves_of_the_grid_are_measured() -> None:
-    """The slider hides itself when one half is empty (FeedbackView.tsx)."""
+    """The slider hides itself when one half is empty (MetricSection.tsx)."""
     assert {metric.aspect for metric in METRICS if metric.active} == set(METRIC_ASPECTS)
 
 
@@ -234,15 +211,10 @@ def test_stammering_does_not_repeat_itself() -> None:
 
 
 def test_a_recording_without_silence_drops_what_rests_on_silence() -> None:
-    """A noise floor above the threshold leaves nothing silent: pauses, phonation
-    share, pace, the loudness span and the mean length of runs would report the
-    noise as speech. Talk share rests on the recording's length and stays.
+    """No detectable silence drops what rests on silence (ADR 0085).
 
-    `run_length` was added to this list after the fact. It divides phonation by
-    the number of runs, and a call the threshold could not split gets both terms
-    wrong the same way -- too much phonation over too few pauses -- so it was the
-    figure this rule missed by the widest margin while looking like a bare
-    number nobody would question."""
+    Pauses, phonation share, pace, loudness span and run length would report noise as
+    speech; `run_length` is wrong twice over (phonation and runs). Talk share stays."""
     turns = _measured_call()
     turns[1].loudness_db = [60.0] * 100
 
@@ -443,15 +415,9 @@ def test_a_question_about_how_is_no_agreement() -> None:
 
 
 def test_a_deadline_given_as_a_window_is_an_agreement() -> None:
-    """A commitment can name a span instead of a day, and it is no less
-    concrete for it.
+    """A deadline given as a window ("innerhalb der nächsten halben Stunde") is an agreement.
 
-    Found by reading the stored closings rather than by reasoning about the
-    pattern: these two forms are what trainees actually said while promising
-    something, and both went unrecognised where the English pack caught the
-    same commitment through "I will send you". A closing marked as having no
-    next step when it plainly had one is the false negative that matters here,
-    because the tile then reports a gap the call did not have.
+    Found in stored closings; missing it reports a next step the call did have as absent.
     """
     for said in (
         "Es sollte innerhalb der nächsten halben Stunde fertig sein.",
@@ -549,11 +515,8 @@ def test_pauses_come_from_the_same_segmentation_as_phonation() -> None:
 
 
 # --- F-53: how long the user speaks before breaking off ---------------------
-# Mean length of runs. A run is bounded by a pause inside an utterance or by
-# the utterance itself, so the runs of a call are its pauses plus its
-# utterances. The tests below pin that arithmetic, because it is the whole
-# metric and it is off by one in either direction if the boundaries are counted
-# wrong.
+# Mean length of runs; runs = pauses inside utterances + utterances. The tests
+# pin that arithmetic, which is off by one either way if boundaries are miscounted.
 
 
 def test_an_uninterrupted_utterance_is_one_run() -> None:
@@ -624,19 +587,10 @@ def test_the_run_length_carries_no_step_and_no_colour() -> None:
 
 
 def _call_with_a_barge_in() -> list[Turn]:
-    """A call where the user genuinely cut in: their utterance starts while the
-    Persona's line still had seconds of audio outstanding, and that line was
-    trimmed back to the heard part.
+    """A call where the user genuinely cut in, with the reply trimmed to the heard part.
 
-    Both halves are needed. A trimmed reply on its own says nothing about
-    timing, and an overlap on its own may have cost the Persona nothing.
-
-    The two ends are what a real trimmed Turn carries since the Redeanteil fix:
-    `persona_end_ms` is where the client stopped playing, `persona_dispatched_
-    end_ms` where the audio would have run to. Written with one end, as this
-    was, the fixture describes a Turn the orchestrator can no longer produce --
-    which is how a regression in exactly this measurement got through the
-    suite.
+    Carries both ends a real trimmed Turn has (`persona_end_ms` heard,
+    `persona_dispatched_end_ms` sent); a one-end fixture let a regression through.
     """
     return [
         Turn(seq=1, persona_text="Guten Tag, ich rufe an wegen der offenen Rechnung ...",
@@ -684,13 +638,10 @@ def test_a_call_nobody_interrupted_reports_zero_rather_than_nothing() -> None:
 
 
 def test_the_count_carries_its_context_without_dividing_by_it() -> None:
-    """A count, with the number of Persona replies beside it rather than under
-    it. A rate was built and dropped: at the length these calls run, dividing
-    turned a single interruption into the top step of the scale, which said
-    more about the denominator than about the call.
+    """A count, with the number of Persona replies beside it rather than dividing it.
 
-    The offsets travel too, so the interface can point at them in the
-    transcript without recomputing anything.
+    A rate put a single interruption on the top step. The offsets travel too, so the
+    interface can point at them in the transcript.
     """
     detail = next(
         m.detail for m in measure(conversation(_call_with_a_barge_in()))
@@ -744,14 +695,10 @@ def test_a_handful_of_voiced_frames_is_not_a_range() -> None:
 
 
 def test_the_curve_carries_the_seams_between_the_users_turns() -> None:
-    """The drawn curve is the user's speaking time with the Persona's turns
-    taken out, so the point where one of their utterances ends and the next
-    begins is not recoverable from the curve itself. Without it a seam would be
-    read as a movement of the voice.
+    """The curve carries the seams between the user's turns.
 
-    No step is stored beside it: which step of the scale the figure lands on is
-    derived when the Session is read (`api/sessions.py::_served_detail`), so a
-    recalibration reaches trainings whose audio is long gone.
+    Persona turns are cut out of the curve, so without seams a boundary reads as a
+    voice movement. No step is stored: it is derived on read.
     """
     turns = _measured_call()
     turns[1].pitch_hz = [120.0] * 60
@@ -861,9 +808,7 @@ CATALOGUE_TS = (
 def _catalogue_keys() -> set[str]:
     """The keys of the frontend's private metric catalogue.
 
-    Read out of the source rather than executed: there is no Node in the pytest
-    run, and the alternative -- trusting a comment to keep the two lists in step
-    -- is what let six separate lookup tables drift apart in the first place.
+    Read from the source as text: there is no Node in the pytest run.
     """
     text = CATALOGUE_TS.read_text(encoding="utf-8")
     body = text.split("const CATALOGUE: Record<MetricKey, MetricDescriptor> = {", 1)[1]
@@ -874,14 +819,8 @@ def _catalogue_keys() -> set[str]:
 def test_frontend_catalogue_covers_every_metric():
     """Every active metric is described on the frontend, and nothing else is.
 
-    The catalogue carries what a metric looks like on screen -- its decimals,
-    whether it is a checklist, whether it may be set beside another call. Those
-    facts used to live in six tables across seven files, where a new metric
-    simply went unmentioned: it rendered as "4.0", or never reached a focus
-    goal, and nothing failed. Here it fails.
-
-    An inactive metric is deliberately absent: it has no deriver, so it never
-    produces a Measurement for a screen to render.
+    A new metric otherwise renders as "4.0" or never reaches a focus goal, silently.
+    Inactive metrics are absent: they never produce a Measurement.
     """
     active = {m.key for m in METRICS if m.active}
     described = _catalogue_keys()

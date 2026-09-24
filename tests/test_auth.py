@@ -1,8 +1,7 @@
-"""Keycloak bearer-token verification (backend/auth.py).
+"""Keycloak bearer-token verification (backend/auth.py; F-31, F-50, ADR 0009).
 
-Covers F-31 (Accountsystem), F-50 (Login/Authentifizierung), ADR 0009: a valid
-realm token is accepted and its `sub` / client roles surfaced; every kind of
-bad token is a 401, not a 500; a JWKS/infra failure is *not* masked as a 401.
+A valid token is accepted and its `sub`/roles surfaced; a bad token is a 401,
+not a 500; a JWKS/infra failure is *not* masked as a 401.
 """
 
 import time
@@ -98,11 +97,8 @@ def test_tampered_signature_is_401():
 def test_jwks_infra_failure_is_not_masked_as_401(monkeypatch):
     """ADR 0009: an unreachable Keycloak is a 5xx, never a 401.
 
-    The exception is the one PyJWT's own client raises, and that is the whole
-    point of this test. It used to raise a bare `ConnectionError`, which no
-    real path produces -- and which is not a `PyJWTError`, so it sailed through
-    a handler that in fact caught the real one and answered 401. The test was
-    green while asserting the opposite of what the code did.
+    Raises the exception PyJWT's own client raises: a bare `ConnectionError` is not a
+    `PyJWTError` and would pass a handler that answers the real one with 401.
     """
     def boom():
         raise PyJWKClientConnectionError("keycloak down")

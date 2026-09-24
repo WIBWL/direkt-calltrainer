@@ -1,10 +1,7 @@
 """Central logging setup: colored console + a log file, both stamping every
 line with its Session (ADR 0039, ADR 0055). Call `configure_logging()` once at startup.
 
-The file is opened fresh (truncated) once per process, then appended to for the
-rest of that run — it holds every Session since the last restart, not just the
-current call (ADR 0055 revised ADR 0039's per-Session truncation). The Session
-id on every line is what separates one call's lines from another's.
+The file is truncated once per process and holds every Session since (ADR 0055).
 """
 
 import contextlib
@@ -86,14 +83,8 @@ def configure_logging(log_file: str | Path = "logs/calltrainer.log") -> None:
     """Sets up console (colored) and file (plain) handlers on the root
     logger; safe to call more than once (later calls are a no-op).
 
-    Replaces any handlers already on the root logger (e.g. gunicorn's own
-    default "console" handler, installed on the root logger before this
-    module is even imported) so this is the only thing writing our output.
-
-    The file is opened in `w` mode: one fresh log per process, kept for the
-    whole run (ADR 0055). A restart -- `docker compose up`, a reload -- starts
-    it over; nothing rotates or truncates it in between.
-    """
+    Replaces any existing root handlers (e.g. gunicorn's own), so this is the
+    only thing writing our output. The file is opened in `w` mode (ADR 0055)."""
     if _state.configured:
         return
     _state.configured = True

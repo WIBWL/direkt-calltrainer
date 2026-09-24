@@ -6,24 +6,9 @@ import FocusGoalPicker, { toggleGoal } from "./FocusGoalPicker";
 import FocusProfilePicker from "./FocusProfilePicker";
 
 /**
- * The training focus, asked once at the first start (F-62, ADR 0076).
- *
- * Two things have to be true of this screen or it does harm. Picking nothing
- * must be a real option, offered as plainly as picking something, which is why
- * the continue-without-a-focus button sits beside the save button and not below
- * it as an afterthought. And it must be clear that a focus *adds* emphasis
- * rather than switching the rest off, because a user who believes they are
- * turning ten goals off will pick none out of caution and the feature will
- * have cost them something.
- *
- * Fifteen cards is a lot for a first screen, which is why the captions carry
- * the meaning and the paragraphs sit behind an "i". Whoever wants to decide in
- * ten seconds can; whoever wants the detail has it. They sit two to a row for
- * the same reason, and the action bar stays put while the list scrolls: how
- * many are left and how to go on must not be a scroll away.
- *
- * Answerable later either way: the profile section changes the selection, and
- * the screen says so, so nobody has to get this right on the first day.
+ * The training focus, asked once at first start (F-62, ADR 0076). Picking nothing is
+ * offered as plainly as picking something, and a focus *adds* emphasis rather than
+ * switching the rest off. The action bar stays put while the list scrolls.
  */
 export default function FocusDialog({
   focus,

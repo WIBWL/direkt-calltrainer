@@ -6,20 +6,9 @@ import InfoDetails from "./InfoDetails";
 import ProcessingNotice from "./ProcessingNotice";
 
 /**
- * The storage decision, asked once and answerable either way (ADR 0066).
- *
- * Blocking, because it must be answered before the first training can be
- * stored — but *not* a wall in front of the product. Declining leaves the
- * trainer fully usable, which is the point: a consent that has to be given
- * before anything works is not freely given, and would be the weaker legal
- * basis for exactly the data it covers.
- *
- * The two buttons therefore carry equal weight; a greyed-out "no" beside a
- * bright "yes" is a dark pattern that would undermine the consent it collects.
- *
- * Short on purpose: what the decision turns on sits above the buttons in four
- * lines and the background one click away. A notice long enough to be skipped
- * informs nobody, and an unread wall of text is the weaker consent.
+ * The storage decision, asked once, answerable either way (ADR 0066). Declining leaves
+ * the trainer fully usable, which keeps the consent freely given; hence both buttons
+ * carry equal weight, and the notice stays short enough to be read.
  */
 export default function ConsentDialog({
   onDecide,

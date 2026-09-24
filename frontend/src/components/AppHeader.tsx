@@ -17,10 +17,8 @@ interface AppHeaderProps {
   /** Omitted outside the training flow — the profile screen is not a step. */
   activeStep?: TrainingStep | undefined;
   /**
-   * Suppresses every link in the header. Set while a call is live: leaving the
-   * page tears down the WebSocket, and an abandoned Session is deliberately
-   * never persisted (ADR 0034), so a stray click would destroy the recording
-   * with no way to get it back.
+   * Suppresses every link in the header while a call is live: leaving the page tears
+   * down the WebSocket and an abandoned Session is stored as `aborted` (ADR 0034).
    */
   navigationLocked?: boolean | undefined;
   /** Marks the account chip and its Profil entry as the current page. */
@@ -28,11 +26,9 @@ interface AppHeaderProps {
   /** Marks the account chip and its Fortschritt entry as the current page (F-13). */
   progressActive?: boolean | undefined;
   /**
-   * Resets the training flow when the brand is clicked. Every training screen
-   * lives under the one route, so from the feedback screen the brand's link
-   * points at the path already on display: the router renders nothing new and
-   * the click does nothing at all. The screens that are a state rather than a
-   * route hand the reset in here; everywhere else the plain link is right.
+   * Resets the training flow when the brand is clicked. From a screen that is a state
+   * rather than a route, the brand's link points at the path already shown, so the
+   * router renders nothing new and the click would do nothing.
    */
   onHome?: (() => void) | undefined;
 }
@@ -157,10 +153,8 @@ interface AccountMenuProps {
 
 /**
  * The account chip and the short list it opens: Profil, Fortschritt, Abmelden.
- *
- * A disclosure, not an ARIA `menu`: the entries are ordinary links and one
- * button, reached with Tab like any others, and `role="menu"` would promise the
- * arrow-key handling a menu bar has and this list does not need.
+ * A disclosure, not an ARIA `menu`: the entries are plain links reached with Tab,
+ * and `role="menu"` would promise arrow-key handling this list does not have.
  */
 function AccountMenu({
   initials,

@@ -1,27 +1,8 @@
-"""The Persona and Scenario library, read from the database (ADR 0041).
+"""The Persona and Scenario library, read from the database (ADR 0041), uncached.
 
-The one place where the `persona` and `scenario` reference tables are read,
-written and mapped onto the frozen value objects the rest of the backend uses.
-Callers get plain dataclasses, so nothing outside this module has to know about
-SQLAlchemy sessions or detached instances.
-
-Since ADR 0058 the `scenario` table also holds User-authored rows, so every read
-is scoped to the caller (`subject`) and, since ADR 0060, their company
-(`tenant_id`, resolved in `backend/tenants.py`): a row is visible if it is
-`public` (every shipped built-in), shared with the caller's tenant, or authored
-by the caller. The client addresses a row by its `extern_id` (ADR 0050), never
-by the internal id or the `key` slug, which an authored row does not have.
-Authored text is run through `backend.authored_text.clean` on the way in
-(ADR 0059).
-
-Deliberately uncached: an edited Persona or Scenario takes effect on the next
-Session, which is the whole point of loading them from the database.
-
-Both readers filter on `active`. Retired rows are deactivated rather than
-deleted, because a stored Session references them (ADR 0026, provision.py), so
-this filter is the entire mechanism that removes one from the selection --
-skipping it here would leave a retired row on offer.
-"""
+The one place the `persona`/`scenario` tables are read, written and mapped to dataclasses.
+Reads are scoped to the caller's `sub` and `tenant_id` (ADR 0058/0060), rows addressed by
+`extern_id` (ADR 0050). The `active` filter is the only thing hiding a retired row."""
 from __future__ import annotations
 
 import uuid
@@ -197,12 +178,8 @@ def get_persona(extern_id: str) -> Persona | None:
 
 
 def list_scenarios(subject: str, tenant_id: int) -> list[Scenario]:
-    """Every Scenario this caller may select, oldest first.
-
-    By creation time rather than by title: the caller sees them grouped by
-    category (`backend/api/scenarios.py` sorts on top of this order), and within
-    a category the order a User can predict is the one they were made in.
-    """
+    """Every Scenario this caller may select, oldest first (creation order is the
+    one a User can predict; `backend/api/scenarios.py` groups on top of it)."""
     with session_scope() as db:
         rows = db.scalars(
             select(models.Scenario)
@@ -255,12 +232,8 @@ def create_scenario(
     """Author a private Scenario (ADR 0058), stamped with the caller's tenant so
     sharing is later a `visibility` flip (ADR 0060).
 
-    The single write path into `scenario`, the drafted follow-up included
-    (ADR 0069, through `create_follow_up` below) — which is what keeps
-    sanitising, caps and ownership in one place. A caller with no tenant claim
-    to stamp with passes None; `set_scenario_visibility` stamps such a row when
-    it is first shared.
-    """
+    The single write path into `scenario`, follow-ups included (ADR 0069). No
+    tenant claim passes None; `set_scenario_visibility` stamps it on first share."""
     with session_scope() as db:
         row = models.Scenario(
             created_by=subject,
@@ -289,15 +262,9 @@ _AUTHORED_ONLY = (
 def update_scenario(extern_id: str, data: dict, subject: str) -> Scenario | None:
     """Edit a Scenario the caller authored. None if it is not theirs.
 
-    Neither of the two kinds written from a Session is among them. A reverse
-    (ADR 0070) is a copy of a case that was played, and editing it would leave
-    a row claiming to replay a conversation it no longer matches. A follow-up
-    (ADR 0069) is the same argument one step on: it is the *next call in that
-    matter*, drafted to sit exactly at the improvement point the wrap-up found,
-    and an edited one is no longer the exercise that reading produced. Both are
-    excluded in the WHERE clause rather than checked afterwards, so they answer
-    exactly like a row that is not the caller's.
-    """
+    Reverses (ADR 0070) and follow-ups (ADR 0069) are excluded in the WHERE clause:
+    an edited one is no longer the call or the exercise it was built from, and
+    they answer exactly like a row that is not the caller's."""
     ref = _as_extern_id(extern_id)
     if ref is None:
         return None
@@ -328,15 +295,8 @@ def set_scenario_visibility(
 ) -> Scenario | None:
     """Share the caller's Scenario with their tenant, or make it private again
     (ADR 0060). Only `private` <-> `tenant`. None if the row is not theirs.
-
-    Both kinds written from a Session are excluded for a second reason on top
-    of the one in `update_scenario`: a reverse's briefing is derived from the
-    author's own wrap-up (ADR 0070) and a follow-up is drafted from that same
-    wrap-up's improvement points (ADR 0069), so sharing either row would hand
-    colleagues a reading of that person's feedback.
-
-    A row that somehow has no `tenant_id` (created before tenant stamping) is
-    stamped with the caller's tenant here, so sharing still works."""
+    Reverses and follow-ups are excluded -- sharing one would hand colleagues a
+    reading of the author's feedback. A row without `tenant_id` is stamped here."""
     ref = _shareable_ref(extern_id, visibility)
     if ref is None:
         return None
@@ -358,25 +318,16 @@ def set_scenario_visibility(
 
 
 # --- Written from a Session (ADR 0069, ADR 0070) ---------------------------
-#
-# Two kinds of Scenario are not authored but built out of a finished Session:
-# the follow-up drafted from its Feedback and the reverse that replays it. Both
-# are asked for by the User, both are stored, and both are at most one per
-# Session -- a UNIQUE column each says so. They live here for the reason
-# everything else does: this is the only module that writes the table.
+# The follow-up and the reverse: asked for by the User, at most one per Session
+# (a UNIQUE column each), and here because this module is the table's only writer.
 
 
 def _restore(where) -> Scenario | None:
-    """The row this Session already produced, made selectable again if the User
-    had removed it. None if there is none.
+    """The row this Session already produced, reactivated if the User had removed
+    it. None if there is none.
 
-    Shared by the two lookups below because the reason is shared: the create
-    routes ask for the existing row *before* they call a model, so pressing the
-    button twice costs nothing and yields the same Scenario. Reactivating
-    rather than returning the retired row is what keeps that answer usable -- a
-    deactivated Scenario is absent from the library, so handing back its id
-    would name something the selection screen cannot show.
-    """
+    The create routes ask this *before* calling a model, so a second press costs
+    nothing; reactivating matters because a retired row is absent from the library."""
     with session_scope() as db:
         row = db.scalars(
             select(models.Scenario).options(_WITH_ORIGIN).where(where)
@@ -403,17 +354,9 @@ def create_follow_up(
 ) -> Scenario | None:
     """Store one drafted follow-up as the caller's own Scenario (ADR 0069).
 
-    `create_scenario` with the provenance filled in, plus the same answer to
-    the same race the reverse has below: `derived_from_session_id` is UNIQUE,
-    so two overlapping requests for one Session end with one row, and the
-    loser reads it rather than raising. Nothing else differs -- a follow-up is
-    an authored Scenario in every respect the rest of this module knows about,
-    which is why it goes through the ordinary write path.
-
-    None only where the row the loser went looking for has itself gone in the
-    meantime, which the route answers exactly as it answers a Session that is
-    no longer there.
-    """
+    `create_scenario` plus provenance. `derived_from_session_id` is UNIQUE, so of
+    two overlapping requests the loser reads the winner's row instead of raising;
+    None only if that row has meanwhile gone too."""
     try:
         return create_scenario(draft, subject, tenant_id, derived_from_session_id=session_id)
     except IntegrityError:
@@ -425,24 +368,9 @@ def create_reverse(
 ) -> Scenario | None:
     """Write the reverse of one Session (ADR 0070). None if that Session is gone.
 
-    The case is copied from the Scenario that was actually played, here rather
-    than in the caller: this module already owns what a Scenario row is made
-    of, and a copy assembled outside it would be a second place to update when
-    a field is added.
-
-    Lands private and owned by the caller, like an authored Scenario -- but
-    unlike one it can never be shared or edited (see the two guards above). The
-    text is not run through `clean()` on the way in: the case is a copy of a
-    row that was cleaned when it was written, and the briefing is sanitised by
-    `backend/reversals.py` as it comes out of the model.
-
-    The route looks for an existing reverse before it gets here, so the UNIQUE
-    constraint is only reached when two requests for the same Session overlap
-    -- a second tab, or a double click that outran the button's disabled state.
-    That is answered with the row that won rather than with a 500: both callers
-    asked for the same thing and there is exactly one of it. The briefing the
-    loser generated is dropped, which costs a model call and nothing else.
-    """
+    Copies the played case here, where the row's shape is owned. Not re-cleaned (the
+    case was cleaned when written; `reversals.py` sanitises the briefing). On a UNIQUE
+    race the winner's row is returned rather than a 500."""
     try:
         return _insert_reverse(origin_session_id, subject, tenant_id, brief)
     except IntegrityError:
@@ -472,12 +400,8 @@ def _insert_reverse(
             description=played.description,
             case_facts=played.case_facts,
             call_goal=played.call_goal,
-            # The German display twins travel with the fields they belong to.
-            # Without them a reverse of a built-in kept the English prompt text
-            # and nothing to show instead, and `_detail`'s
-            # `case_facts_label or case_facts` fell back to it -- so the info
-            # panel read the played case out in English. NULL on a reverse of
-            # an authored Scenario, which has no twins and needs none.
+            # The German display twins travel with their fields; without them the
+            # info panel showed a built-in's case in English. NULL for an authored one.
             description_label=played.description_label,
             case_facts_label=played.case_facts_label,
             # Carried over so a reverse sits under the same category filter as

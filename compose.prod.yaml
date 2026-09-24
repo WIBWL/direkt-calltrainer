@@ -1,15 +1,9 @@
-# Production override. Used on top of compose.yaml, never on its own:
-#
+# Production override, only ever on top of compose.yaml:
 #   docker compose -f compose.yaml -f compose.prod.yaml up -d --build
-#
-# compose.yaml stays the description of local development; this file changes
-# only what a deployment must not inherit from it -- the local Keycloak and the
-# localhost issuer, the app published on every interface, plain HTTP -- and
-# puts Caddy in front for TLS. The steps around it are in docs/deployment.md.
-#
-# `!reset` and `!override` need Docker Compose 2.24.4 or later. Without them a
-# list or map here would be *merged* into compose.yaml's, which is exactly
-# wrong for ports and depends_on.
+# Drops the local Keycloak, the localhost issuer and the public app port, and puts
+# Caddy in front for TLS. Steps around it: docs/deployment.md.
+# `!reset`/`!override` need Docker Compose >= 2.24.4; without them a list or map here
+# would be *merged* into compose.yaml's, which is wrong for ports and depends_on.
 
 x-logging: &logging
   # Docker's own json-file log grows without limit unless told otherwise.

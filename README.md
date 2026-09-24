@@ -54,6 +54,6 @@ The Keycloak admin console is at <http://localhost:18081> with `admin` / `admin`
 The full architecture documentation - arc42 and every Architecture Decision Record (ADR) - is served via [MkDocs](https://www.mkdocs.org):
 
 ```powershell
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 mkdocs serve
 ```

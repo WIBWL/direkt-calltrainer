@@ -12,14 +12,8 @@ import {
 import { prefersReducedMotion } from "../utils/motion";
 
 /**
- * The film cut between two screens: the screen dims to opaque, changes behind
- * the cover, and comes back.
- *
- * Lives above the router (see `main.tsx`) rather than in whoever triggers it,
- * because the trigger may be the thing that disappears: an overlay rendered by
- * a page that navigates away would unmount halfway through its own animation.
- * Mounted once at the top, it plays out regardless of what the cut did
- * underneath.
+ * The film cut between two screens. Mounted above the router (`main.tsx`) because the trigger may be what
+ * disappears: an overlay in a page that navigates away would unmount mid-animation.
  */
 
 /** How long each phase runs. Long enough to read as a cut, short enough not to

@@ -1,29 +1,8 @@
-"""The wrap-up prompt, and F-42's phase block inside it.
+"""The wrap-up prompt, and F-42's phase block inside it: the text handed to the model, not its output.
 
-Covers:
-  F-09  the qualitative wrap-up asked for as structured output
-  F-42  phasengerechte Sprache: the register is supposed to move warm ->
-        factual -> warm again across Opening, Core Business and Closing, and
-        the block that says whether it did
-  ADR 0049  the model interprets, it never produces a figure
-  F-10  a point names a moment by its timestamp, never by its turn id
-  F-37  loudness reaches the model described rather than measured, so the
-        text cannot quote a figure the chart deliberately does not show
-  ADR 0004 / ADR 0051  no score, and no figure judged against a norm
-
-Asserts the text handed to the model and the shape of the answer it is asked
-for -- not what the model then does with it, which is the distinction
-tests/README.md draws for every prompt test in this suite.
-
-F-42 is the newest part of that prompt and the part with the most ways to go
-wrong: the block has to name all three phases, has to give the closing more
-room than the middle (the peak-end effect the feature rests on), and must not
-quietly turn into the score ADR 0004 rules out.
-
-No database and no network: `_messages` is a pure function, `_Wrapup` is a
-pydantic model, and the two tests that reach `_ask`/`_strip_reasoning` stub or
-bypass the model call.
-"""
+Covers F-09 (structured output), F-42 (warm -> factual -> warm; all three phases, closing gets
+more room, never a score), ADR 0049 (the model never produces a figure), F-10 (moments by
+timestamp), F-37 (loudness described, not quoted), ADR 0004/0051 (no score, no norm). No database."""
 
 from types import SimpleNamespace
 
@@ -86,12 +65,8 @@ def test_phase_block_stays_off_the_score_ladder(system_prompt: str) -> None:
 def test_prompt_asks_for_six_keys_including_the_phase_and_tone_blocks(
     system_prompt: str,
 ) -> None:
-    """The keys are identifiers on the wire (protocol.ts reads `phase_language`
-    and `tone_fit`), so each is named in the rule, in the shape, and in the
-    closing reminder: the three places a small model reads a key name from.
-
-    `pressure_turns` (ADR 0081) is the sixth and the only one nobody reads: it
-    decides which exchanges the segment measurements are computed over.
+    """Wire keys (protocol.ts) are named in the rule, the shape and the closing reminder,
+    where a small model reads key names. `pressure_turns` (ADR 0081) picks the segment stretches.
     """
     assert (
         "summary, phase_language, tone_fit, pressure_turns, strengths, improvements"
@@ -107,17 +82,10 @@ def test_prompt_asks_for_six_keys_including_the_phase_and_tone_blocks(
 
 
 def test_the_prose_blocks_carry_no_figures(system_prompt: str) -> None:
-    """The summary and the phase paragraph say it in words.
+    """The summary and the phase paragraph carry no figures (rule F5).
 
-    The wrap-up used to drop measured values into both, usually in brackets
-    after the statement they were meant to support ("sachlich (62 %)"). Every
-    one of those figures already stands on the same screen, in the Kennzahlen
-    grid, next to what it was measured from and to the scale it belongs to; in
-    a sentence it has none of that and reads as the verdict on the call that
-    F2 forbids in the next line.
-
-    Pinned by rule number and by the ban itself, not by the whole wording: the
-    two blocks are prose, and the sentence explaining why may be reworded.
+    A bare figure in a sentence reads as a verdict (F2); it already stands in the grid
+    with its context. Pinned by rule number and ban, not the whole wording.
     """
     assert "F5. The summary and the phase_language block carry no figures" in system_prompt
     assert "never one in brackets after a statement" in system_prompt
@@ -202,16 +170,10 @@ def test_the_habit_goals_are_ruled_out_in_the_prompt(system_prompt: str) -> None
 
 
 def test_the_dossier_withholds_the_success_condition() -> None:
-    """It says what would have ended the call well, which is a result and not
-    an occasion. Handed over, it invites the model to grade the outcome under
-    the heading of tone (ADR 0079).
+    """`success_condition` is a result, not an occasion; handed over it invites grading
+    under the heading of tone (ADR 0079).
 
-    Read off the Scenario the fixture actually carries. `success_condition` was
-    its own column when this was written and the test asserted against an
-    attribute of that name -- which migration `3ce81b27af40` merged into
-    `call_goal` and `_dossier` therefore cannot read. The assertion held for
-    the wrong reason, while the criterion itself was going into the dossier
-    inside the goal, which is the state it was written to prevent.
+    Read off the fixture's `call_goal`, where migration 3ce81b27af40 merged the criterion.
     """
     dossier, _ = _dossier(_session_with())
 
@@ -258,12 +220,8 @@ def test_narrative_fallback_carries_no_phase_text() -> None:
 
 
 def test_every_supported_language_has_a_name_for_the_prompt() -> None:
-    """ADR 0043. The prompt is English and names the language the wrap-up is to
-    be written in, so every language a Persona can speak needs an entry here.
-
-    Asserted against LANGUAGE_PACKS, the set a Persona's `language_code` is
-    resolved through, so a pack added without a name fails here rather than
-    reaching the model as a bare code.
+    """ADR 0043: every language pack needs an English name for the prompt, or the model
+    gets a bare code.
     """
     assert set(LANGUAGE_PACKS) <= set(_LANGUAGE_NAMES_EN)
 
@@ -276,11 +234,9 @@ def test_the_language_name_is_what_the_model_is_told_to_write_in() -> None:
 
 
 async def test_the_wrapup_is_asked_in_thinking_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    """ADR 0011/0043: paragraphs of German prose from an English brief on a 4B
-    model, where a single pass loses agreement and word order.
+    """ADR 0011/0043: German prose from an English brief on a 4B model needs thinking mode.
 
-    Asserted on the call, not the output -- what the trace does to the German is
-    the one thing a test cannot check.
+    Asserted on the call; what the trace does to the German cannot be tested.
     """
     calls: list[dict] = []
     # Tells "left at llm.complete's default" apart from "explicitly None",
@@ -304,12 +260,9 @@ async def test_the_wrapup_is_asked_in_thinking_mode(monkeypatch: pytest.MonkeyPa
 
 
 def test_an_unfinished_reasoning_trace_yields_no_answer() -> None:
-    """A `<think>` that never closes means the budget ran out mid-trace, so
-    nothing after it was written.
+    """An unclosed `<think>` means the budget ran out mid-trace, so nothing was written.
 
-    Returning the trace would be worse than nothing: `_unwrap` scrapes the first
-    `{` out of the reply, and a trace deliberating about JSON is full of them --
-    the model's reasoning would be stored and shown as its feedback.
+    Returning the trace would let `_unwrap` scrape its first `{` and store reasoning as feedback.
     """
     assert _strip_reasoning("<think>Let me consider {\"summary\": ...") == ""
     assert _strip_reasoning("<think>done</think>\n{\"summary\": \"Kurz.\"}") == '{"summary": "Kurz."}'
@@ -324,10 +277,7 @@ def _measurement(  # pylint: disable=too-many-arguments,too-many-positional-argu
 ):
     """One Measurement as `_dossier` reads it -- no database needed.
 
-    `segment` carries its real default: since ADR 0081 a Session also holds
-    rows measured over the demanding stretches and over the rest, and the
-    dossier speaks for the whole call only. A fixture without the field cannot
-    show that difference, and the dossier read all three as the call's own.
+    `segment` carries its real default so the dossier's whole-call filter (ADR 0081) is exercised.
     """
     return SimpleNamespace(
         value=value,
@@ -338,14 +288,9 @@ def _measurement(  # pylint: disable=too-many-arguments,too-many-positional-argu
 
 
 def _session_with(*measurements) -> SimpleNamespace:
-    # The Scenario is stood in for as well: `_dossier` reads its `reverse` flag
-    # to decide what to call the simulated side (ADR 0070) and its situation for
-    # the tone_fit block. A real Session always has one -- `session.scenario_id`
-    # is NOT NULL.
-    #
-    # `call_goal` is here although the dossier no longer reads it, and that is
-    # the point: it carries the settlement criterion, and a test asserting the
-    # criterion stays out needs a Scenario that actually holds one.
+    # `_dossier` reads the Scenario's `reverse` flag (ADR 0070) and its situation
+    # (tone_fit). `call_goal` is set although unread: it holds the settlement criterion,
+    # which the test that keeps it out needs to exist.
     return SimpleNamespace(
         measurements=list(measurements),
         turns=[],
@@ -462,13 +407,8 @@ def test_a_language_without_a_sentence_gets_the_german_one() -> None:
 
 
 def test_only_the_whole_calls_statistics_reach_the_dossier() -> None:
-    """The block is headed "for this call" and rule M3 tells the model to treat
-    what is in it as established fact.
-
-    Since ADR 0081 a Session also carries the same metrics measured over the
-    demanding stretches and over the rest. Unfiltered, a regenerated wrap-up
-    read one metric three times with three different values -- the segment rows
-    are written by the previous run and are still there on the next one.
+    """The block is "for this call" and M3 treats it as fact, so segment rows (ADR 0081)
+    must stay out; unfiltered, a regenerated wrap-up read one metric three times.
     """
     session = _session_with(
         _measurement("pace", "Sprechtempo", "Wörter/min", 145.0),
@@ -500,13 +440,10 @@ def test_the_loudness_course_is_the_whole_calls_curve() -> None:
 
 
 def test_a_reply_that_never_validated_is_not_shown_as_the_summary() -> None:
-    """ADR 0049's degraded path is "a summary with no evidence links" -- the
-    prose the model wrote, without its structure.
+    """ADR 0049's degraded path keeps prose, not an invalid answer.
 
-    An answer that fails to validate is very often not prose at all: JSON cut
-    off in the token budget, or a field of the wrong type. Stored raw, that
-    reached the User as their summary, and `scripts/requeue_feedback.py` skips
-    a Session that already has a Feedback row, so it could never be replaced.
+    A failed validation is usually cut-off JSON; stored raw it became the User's summary,
+    and `requeue_feedback.py` skips Sessions with Feedback, so it was never replaced.
     """
     cut_off = '{"summary": "Sie haben klar nachgefragt.", "phase_language": "Sach'
 
@@ -523,13 +460,8 @@ def test_real_prose_still_becomes_the_fallback_summary() -> None:
 
 
 def test_every_seeded_goal_marks_where_its_criterion_starts() -> None:
-    """The split rests on a seed convention, so the seed has to keep it.
-
-    `_goal_without_criterion` cuts the goal at "The matter is settled when",
-    which is how all 17 shipped Scenarios mark the half ADR 0079 withholds.
-    Reword one without the sentence and its criterion goes back into the
-    dossier, silently -- which is exactly how it got there in the first place,
-    when migration 3ce81b27af40 merged the two columns.
+    """`_goal_without_criterion` cuts at "The matter is settled when" (ADR 0079), so every
+    shipped Scenario must keep that sentence, or its criterion silently re-enters the dossier.
     """
     from backend.db.seed_data import SCENARIOS  # pylint: disable=import-outside-toplevel
 

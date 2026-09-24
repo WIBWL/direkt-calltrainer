@@ -5,29 +5,10 @@ import { useBargeIn } from "./useBargeIn";
 import { useSessionSocket, type CommittedSession } from "./useSessionSocket";
 import { useStreamedAudioPlayback } from "./useStreamedAudioPlayback";
 
-/**
- * The live call as one thing: the connection, the audio it plays and the
- * three rules that bind the two together.
- *
- * Those rules used to be held by comments in `App.tsx`, each one beside an
- * effect that had to agree with another effect somewhere else:
- *
- * - the buffered opening line is dropped whenever the *connection* is
- *   replaced, so the reset has to key on exactly what the socket keys on;
- * - revealing that opening line and starting the server's clock are one act,
- *   so `activate()` must never run without `sendActivate()`;
- * - a call the Persona ended waits for its goodbye to finish playing, a call
- *   the User ended does not.
- *
- * Here the first holds by construction — both effects read the one
- * `committed` this hook was given — the second is the one function `accept`,
- * and the third is `endIsDue`, a pure function with its own tests.
- * `useBargeIn` is composed in rather than called beside it, since it needs the
- * same socket and playback and nothing else does.
- *
- * What stays outside: which screen follows, what is kept of the call and
- * where. The ended call is handed to `onCallOver` and this hook forgets it.
- */
+/** The live call and the three rules binding connection to playback: the opening-line
+ * reset keys on the same `committed` as the socket; `accept` is the only way to run
+ * `activate()` and always sends `sendActivate()`; a Persona-ended call waits for its
+ * goodbye to play out (`endIsDue`). The ended call is handed to `onCallOver`. */
 
 /** A call the server has said is over, with what it left behind. */
 export interface EndedCall {
@@ -38,13 +19,9 @@ export interface EndedCall {
 }
 
 /**
- * Whether an ended call may be torn down now.
- *
- * `session.ended` can arrive while the Persona's closing line is still playing
- * out — the server sends it the moment the reply's Turn completes, independent
- * of local playback. Tearing down then cuts the goodbye off mid-sentence, so a
- * natural or failed ending waits for the audio. A User who pressed the button
- * wants the call to stop, and it does.
+ * Whether an ended call may be torn down now. `session.ended` can arrive while
+ * the closing line still plays, so a natural or failed ending waits for the
+ * audio; a User's hang-up stops at once.
  */
 export function endIsDue(end: EndedCall, isPlaying: boolean): boolean {
   return end.reason === "user" || !isPlaying;

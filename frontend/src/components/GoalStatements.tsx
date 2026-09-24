@@ -5,24 +5,9 @@ import type { GoalStatement } from "../utils/goalMentions";
 import { formatDate } from "../utils/time";
 
 /**
- * What the wrap-ups wrote about a goal, quoted, newest training first.
- *
- * The dashboard's second level owes the reader this. Block D counts mentions
- * and a focus tile reports how many wrap-ups mentioned a goal, which is a
- * number the user cannot check unless the sentences behind it are reachable;
- * and for the goals with no measurement of their own the sentences are the
- * whole of what exists (docs/dashboard-concept.md, section 7).
- *
- * Deliberately a quotation and nothing else: no summary across entries, no "is
- * getting better", no count in a heading that would read as a score. The
- * counting happens on the overview under wording ADR 0080 settled, and a second
- * form of it here would be a second claim. Each entry names the training it
- * came from and links into it, since a sentence about a call is only readable
- * next to the call.
- *
- * Strength and improvement are both shown and labelled: only the improvements
- * would turn a record of what was said into a list of faults, which is the
- * reading ADR 0004 and ADR 0065 refuse.
+ * What the wrap-ups wrote about a goal, quoted, newest first, each linking to its
+ * training (docs/dashboard-concept.md, section 7). Quotation only: no summary, trend or
+ * count beside ADR 0080's; strengths and improvements both, labelled (ADR 0004/0065).
  */
 export default function GoalStatements({
   statements,

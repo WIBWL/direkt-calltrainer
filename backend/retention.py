@@ -1,15 +1,8 @@
-"""Sessions expire after six months unless the subject says otherwise
-(ADR 0067).
+"""Sessions expire after six months unless the subject says otherwise (ADR 0067).
 
-Consent answers whether data may be stored; this answers how long. Without it
-a training recorded today is still there in four years, and "we keep it until
-someone asks us not to" is not a retention period, it is the absence of one.
-
-The sweep is driven from Postgres, not from a timer: it asks which Sessions are
-older than the period every time it runs, so a missed run delays a deletion but
-never cancels it. A job scheduled six months ahead in Redis would be gone after
-one restart, and nothing would ever notice.
-"""
+Consent answers whether data may be stored; this answers how long. The sweep
+asks Postgres what is expired each run, so a missed run delays a deletion but
+never cancels it (a Redis job scheduled months ahead would not survive a restart)."""
 from __future__ import annotations
 
 import logging
@@ -29,22 +22,16 @@ RETENTION = timedelta(days=182)
 
 
 def cutoff(now: datetime | None = None) -> datetime:
-    """Sessions that started before this are due for deletion.
-
-    `now` is injectable so a test can place the boundary rather than wait for
-    it, and so a caller sweeping several subjects uses one instant for all of
-    them instead of drifting across the loop.
-    """
+    """Sessions that started before this are due for deletion. `now` is
+    injectable for tests and so one sweep uses a single instant."""
     return (now or datetime.now(UTC)) - RETENTION
 
 
 def auto_delete_enabled(db: DbSession, subject_id: str) -> bool:
     """Whether the sweep applies to this subject. True unless they said no.
 
-    The default lives here, in the absence of a row, rather than in a row
-    written at first login: a subject who never touched the setting is covered
-    by the retention period, which is what makes it a policy rather than an
-    opt-in.
+    The default is the *absence* of a row, which makes retention a policy
+    rather than an opt-in.
     """
     row = (
         db.query(db_models.RetentionPreference)
@@ -96,23 +83,11 @@ def next_expiry(db: DbSession, subject_id: str) -> datetime | None:
 
 
 def sweep(db: DbSession, now: datetime | None = None) -> int:
-    """Delete every expired Session whose subject has not opted out.
+    """Delete every expired Session whose subject has not opted out. Returns how many.
 
-    Returns how many went. Idempotent, and safe to run as often as anyone
-    likes: a second run finds nothing left over the line.
-
-    Subjects are resolved from the expired Sessions themselves rather than from
-    the preference table, because most subjects have no preference row at all:
-    that absence is the default, and iterating the table would sweep only the
-    people who had already thought about it.
-
-    Deletes through the ORM, like `deletion.py`, so the same ownership cascades
-    take the Turns, Measurements, Feedback and jobs with each Session
-    (ADR 0026/0052), and the follow-up Scenario drafted from one leaves the
-    library with it (ADR 0069). A reverse of an expired Session goes too, unless
-    a Session that has not expired is still played on it — see
-    `deletion.remove`.
-    """
+    Idempotent. Subjects come from the expired Sessions, not the preference table,
+    since most subjects have no row there. Goes through `deletion.remove` (ORM
+    cascades, follow-ups retired, reverses removed unless still played on)."""
     boundary = cutoff(now)
     expired = (
         db.query(db_models.Session)
@@ -131,20 +106,13 @@ def sweep(db: DbSession, now: datetime | None = None) -> int:
         if not auto_delete_enabled(db, subject_id):
             suspended += 1
             continue
-        # One savepoint per subject. The sweep is one transaction, so without
-        # this a single failure -- a lock timeout, a foreign key that was not
-        # there a moment ago -- rolls back every other subject's deletion too,
-        # and the next run meets the same row and does the same thing. ADR 0067
-        # leans on a missed run delaying a deletion rather than cancelling it,
-        # and all-or-nothing turns one stuck subject into no retention at all.
+        # One savepoint per subject: otherwise one failure rolls back every
+        # subject's deletion, and the next run hits the same row -- turning one
+        # stuck subject into no retention at all (ADR 0067).
         try:
             with db.begin_nested():
-                # A reverse replays one of these calls and carries a briefing
-                # written from that call's own wrap-up, so it expires with the
-                # training it came from -- the same reason a withdrawal removes
-                # it (ADR 0070's addendum). Deleting a *single* training
-                # deliberately does not: there a person is deciding about that
-                # one row. Nobody decides anything here.
+                # Reverses carry a briefing from the call's own wrap-up, so they
+                # expire with it (ADR 0070's addendum); nobody decides here.
                 deletion.remove(db, sessions, with_reverses=True)
         except Exception:  # pylint: disable=broad-except
             logger.exception(
@@ -154,12 +122,8 @@ def sweep(db: DbSession, now: datetime | None = None) -> int:
             continue
         deleted += len(sessions)
 
-    # The reverses nothing points at any more, on every run -- a day on which
-    # nothing else expired included. `origin_session_id` is cleared when the
-    # origin goes, so a reverse spared by one run -- because a younger Session
-    # was still played on it -- was invisible to every run after it, and so was
-    # one whose origin the User deleted by hand. Both were promised to go on a
-    # later run and never did.
+    # Orphaned reverses, on every run: once `origin_session_id` is cleared, a
+    # reverse spared earlier or left by a hand deletion is found only by age.
     deletion.delete_unreferenced_reverses(db, deletion.orphaned_reverses(db, boundary))
     if deleted or suspended:
         logger.info(
@@ -172,9 +136,8 @@ def sweep(db: DbSession, now: datetime | None = None) -> int:
 def sweep_now() -> int:
     """Run one sweep in its own transaction. For the scheduled caller.
 
-    Failures are raised, not swallowed: unlike the live path, nothing here is
-    waiting on an answer, and a sweep that silently stops running is a
-    retention period that silently stops existing.
+    Raises rather than swallowing: a sweep that silently stops is a retention
+    period that silently stops existing.
     """
     # Imported here so importing this module never requires a database.
     from backend.db.session import session_scope  # pylint: disable=import-outside-toplevel

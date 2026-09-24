@@ -1,12 +1,7 @@
 """Reading a stored Session back as the call it was (ADR 0051, ADR 0081).
 
-`backend/feedback/stored.py` is the one reader every consumer of a stored
-Session goes through -- the served shapes, the wrap-up's dossier, the segment
-pass and the backfills. These pin the three rules each of them used to write
-out for itself, plus the one the segment pass got wrong: a slice of a reverse is
-folded as a reverse.
-
-Transient ORM objects, never flushed, so no database is needed.
+`backend/feedback/stored.py` is the one reader for every consumer; this pins its rules,
+including that a slice of a reverse is folded as a reverse. Transient ORM objects, no database.
 """
 
 # pylint: disable=missing-function-docstring

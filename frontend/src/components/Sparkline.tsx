@@ -6,23 +6,9 @@ import { formatPoint } from "../utils/progressStats";
 import { formatDate } from "../utils/time";
 
 /**
- * One metric over the trainings in the period (F-13,
- * docs/dashboard-concept.md).
- *
- * The user's own values as a line over their own usual range (median widened by
- * their own spread). No target band, no colour meaning good or bad, no arrow,
- * no regression line: a trend through nine points from nine different Scenarios
- * would assert a direction the data cannot carry, which ADR 0065 rules out for
- * this view.
- *
- * Colour is the metric's family and never its value (`utils/metricGroups`),
- * which is the whole of what makes colour admissible here.
- *
- * Inline SVG, like LoudnessCourse: a band, a line and a few dots do not warrant
- * shipping a charting library.
- *
- * The accessible name carries the numbers, and the hover adds to that rather
- * than replacing it — the detail view repeats every point as a real table.
+ * One metric over the trainings in the period (F-13): the user's values over their own usual range. No target,
+ * good/bad colour, arrow or trend line (ADR 0065); colour is the family, never the value (`utils/metricGroups`).
+ * Inline SVG like LoudnessCourse. The accessible name carries the numbers; hover only adds to it.
  */
 export default function Sparkline({
   series,
@@ -122,16 +108,9 @@ export default function Sparkline({
           ))}
       </svg>
 
-      {/* Not a floating tooltip: a line under the chart, which cannot cover the
-          marks beside it and needs no positioning arithmetic. It says what the
-          caller does not already print above the chart -- which training this
-          point was -- so the figure appears here only under the pointer.
-
-          The line is kept even when empty, because a tile that grows on hover
-          nudges every tile after it. `aria-hidden`, since the chart's own
-          accessible name already carries the numbers and the detail page
-          repeats every point as a table: this is a convenience for the mouse,
-          never the only place a value exists. */}
+      {/* A line under the chart rather than a tooltip: it cannot cover marks and needs no positioning. Kept
+          when empty so tiles do not shift on hover. `aria-hidden`: the accessible name and the detail table
+          already carry every value. */}
       {interactive && (
         <p className="sparkline-readout" aria-hidden="true">
           {active !== null && point && (

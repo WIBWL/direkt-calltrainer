@@ -8,13 +8,9 @@ import {
 } from "./loudness";
 
 /**
- * The arithmetic of drawing F-37's loudness course.
- *
- * What is *read* off the curve comes from the server (ADR 0091). What is
- * pinned here is what the server has no business knowing: where the line
- * breaks, the clock under the axis and the words for a reader who cannot see
- * it. A bridge one point too long draws a segment across a silence, which
- * asserts a level nobody spoke at — and renders as a perfectly ordinary line.
+ * The drawing arithmetic of F-37's loudness course (the reading is the server's,
+ * ADR 0091). A bridge one point too long draws a line across a silence,
+ * asserting a level nobody spoke at, and looks perfectly ordinary.
  */
 
 describe("loudnessRuns", () => {
