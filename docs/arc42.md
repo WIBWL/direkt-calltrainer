@@ -206,16 +206,19 @@ Die Authentifizierung liegt außerhalb des eigentlichen Trainingsablaufs. `AuthG
 
 # 6. Laufzeitsicht
 
-*Hinweis: Die Laufzeitsicht baut methodisch auf der Bausteinsicht (Kapitel 5) auf, die noch nicht ausgearbeitet ist. Die technischen Grundentscheidungen stehen inzwischen fest und sind in Kapitel 4 beschrieben; die Szenarien hier sind aber weiterhin auf funktionaler Ebene formuliert und nicht an konkrete Bausteine gebunden. Sobald Kapitel 5 vorliegt, sind sie entsprechend zu binden (siehe TS-01).*
+*Die Laufzeitsicht baut auf der Bausteinsicht aus Kapitel 5 auf. Für den Frontend-Anteil werden die dort beschriebenen Komponenten und Hooks den einzelnen Schritten des Trainingsablaufs zugeordnet. Die Backend-seitige Verarbeitung wird weiterhin auf funktionaler Ebene beschrieben.*
 
 ## 6.1 Szenario 1: Start und Ablauf eines Trainingsgesprächs
 
-- Der Nutzer startet ein neues Training und wählt (minimal) eine Persona bzw. ein Szenario aus (z. B. Support-Fall oder Beratungsgespräch, F-03, Q-02: möglichst wenige Pflichtangaben).
-- Das System initiiert die Gesprächssimulation: Der Nutzer spricht über PC/Headset, die Sprache wird in Echtzeit in Text umgewandelt (Speech-to-Text).
-- Das KI-Backend generiert eine Antwort der simulierten Persona (F-01, F-04), die per Text-to-Speech in gesprochene Sprache umgewandelt und ausgegeben wird.
-- Dieser Zyklus (Sprechen → Erkennen → Antworten → Aussprechen) wiederholt sich fortlaufend, bis der Nutzer das Gespräch beendet. Sowohl kurze Support-Calls als auch längere Beratungsgespräche werden dabei unterstützt (F-03).
+- Der Nutzer öffnet die Trainingsvorbereitung. `SetupView` stellt die verfügbaren Szenarien und Personas dar und übergibt die Auswahl an den in `App.tsx` gehaltenen Trainingszustand.
+- Erst mit dem bewussten Start des Trainings wird über `useTrainingRun` eine Session gebunden (ADR 0042). Die reine Auswahl von Szenario und Persona erzeugt noch keine Gesprächsverbindung.
+- Vor dem Gespräch führt `MicCheck` die Prüfung des Mikrofonzugriffs und des ausgewählten Eingabegeräts durch. Das ausgewählte Gerät wird anschließend in den laufenden Trainingszustand übernommen.
+- Der Wechsel zwischen Vorbereitung, Mikrofonprüfung und Gespräch wird über die in `trainingFlow.ts` definierte Ablaufsteuerung koordiniert (ADR 0096).
+- Im laufenden Gespräch stellt `CallView` den Gesprächszustand dar. `useLiveCall` bündelt dabei die WebSocket-Kommunikation, die Audiowiedergabe und das Unterbrechen der Persona.
+- Die Sprache des Nutzers wird an das Backend übertragen und dort per Speech-to-Text verarbeitet. Das KI-Backend generiert anschließend die Antwort der simulierten Persona (F-01, F-04), die per Text-to-Speech erzeugt und über die bestehende WebSocket-Verbindung an das Frontend zurückgegeben wird.
+- Dieser Zyklus aus Sprechen, Erkennen, Antworten und Ausgeben wiederholt sich, bis die Session beendet wird. Nach Gesprächsende übernimmt `useTrainingRun` das Transkript und die Kennung der abgeschlossenen Session für die anschließende Auswertung.
 
-Besonderheiten: Der gesamte Zyklus muss in Echtzeit ablaufen (Q-03), da Verzögerungen den natürlichen Gesprächsfluss stören. Parallel zur eigentlichen Konversation läuft die Analyse des Sprechverhaltens (Szenario 2) mit.
+Besonderheiten: Der gesamte Zyklus muss in Echtzeit ablaufen (Q-03), da Verzögerungen den natürlichen Gesprächsfluss stören. Die sichtbaren Zustände und die technische Gesprächslogik sind im Frontend getrennt: `CallView` übernimmt die Darstellung, während `useLiveCall` und die darunterliegenden Hooks die laufende Kommunikation und Audiowiedergabe steuern. Parallel zur Gesprächssimulation läuft die Analyse des Sprechverhaltens aus Szenario 2.
 
 ## 6.2 Szenario 2: Analyse des Sprechverhaltens während des Gesprächs
 
