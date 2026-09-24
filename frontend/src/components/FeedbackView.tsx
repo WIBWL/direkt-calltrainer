@@ -230,8 +230,8 @@ export function FeedbackReport({
   return (
     <>
       <section className="feedback-section feedback-summary-section">
-        <SectionHeading eyebrow="QUALITATIVE EINORDNUNG" title="Zusammenfassung" />
-        <div className="feedback-box">
+        <div className="feedback-box feedback-summary-card">
+          <SectionHeading eyebrow="QUALITATIVE EINORDNUNG" title="Zusammenfassung" />
           <p className="feedback-summary-text">{outline.summary}</p>
         </div>
       </section>
@@ -854,36 +854,37 @@ function PointList({
   if (points.length === 0) return null;
   return (
     <section className={`feedback-section feedback-point-section ${tone}`}>
-      <SectionHeading
-        eyebrow={eyebrow}
-        title={title}
-        tone={tone}
-        icon={tone === "success" ? "✓" : "!"}
-      />
+      <div className={`feedback-box feedback-point-card ${tone}`}>
+        <SectionHeading
+          eyebrow={eyebrow}
+          title={title}
+          tone={tone}
+          icon={tone === "success" ? "✓" : "!"}
+        />
 
-      <div className={`feedback-box feedback-point-list feedback-point-card ${tone}`}>
-        {points.map((point, i) => {
-          const at = point.offsetMs;
-          return (
-            <div className="feedback-point-item" key={i}>
-              {/* The moment this was written about, as something to press.
+        <div className="feedback-point-list">
+          {points.map((point, i) => {
+            const at = point.offsetMs;
+            return (
+              <div className="feedback-point-item" key={i}>
+                {/* The moment this was written about, as something to press.
                   A timestamp alone is checkable only by somebody who still
                   remembers the call; the line it names sits collapsed a little
                   further down, and one press opens it there. */}
-              {at !== null &&
-                (focus ? (
-                  <button
-                    type="button"
-                    className="feedback-point-time feedback-point-jump"
-                    onClick={() => focus.reveal(at)}
-                    aria-label={`Die Stelle bei ${formatOffset(at)} im Transkript zeigen`}
-                  >
-                    {formatOffset(at)}
-                  </button>
-                ) : (
-                  <span className="feedback-point-time">{formatOffset(at)}</span>
-                ))}
-              {/* The goal sits *above* the sentence, as an eyebrow over it.
+                {at !== null &&
+                  (focus ? (
+                    <button
+                      type="button"
+                      className="feedback-point-time feedback-point-jump"
+                      onClick={() => focus.reveal(at)}
+                      aria-label={`Die Stelle bei ${formatOffset(at)} im Transkript zeigen`}
+                    >
+                      {formatOffset(at)}
+                    </button>
+                  ) : (
+                    <span className="feedback-point-time">{formatOffset(at)}</span>
+                  ))}
+                {/* The goal sits *above* the sentence, as an eyebrow over it.
                   Beside it, in the row the timestamp is in, it competed with
                   the sentence for the same line and read as a second remark;
                   over it, it says what the paragraph below is about before the
@@ -897,13 +898,14 @@ function PointList({
                   only for the User's own five: the wrap-up writes about the
                   call it read, and a point about something they are not
                   currently working on is still about that thing. */}
-              <div className="feedback-point-body">
-                {point.goal && <span className="feedback-point-goal">{point.goal}</span>}
-                <p>{point.text}</p>
+                <div className="feedback-point-body">
+                  {point.goal && <span className="feedback-point-goal">{point.goal}</span>}
+                  <p>{point.text}</p>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </section>
   );
