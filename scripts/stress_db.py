@@ -1,23 +1,12 @@
-"""Load test for the Postgres schema, driven through the application's own
-write and read paths.
-
-Why not pgbench alone: pgbench measures the server, not this application. What
-can actually fall over here is the shape of our own access -- one fat
-transaction per finished Session (backend/session/persistence.py), a wide
-eager-loaded read per wrap-up poll (backend/api/sessions.py), and a connection
-pool of POOL_SIZE + POOL_MAX_OVERFLOW shared by every request. This script
-exercises exactly those, so a number it produces means something about the app.
-
-Safety: it refuses to touch the database named in .env. It creates its own
-throwaway database, migrates and seeds it the way the app would, and drops it
-afterwards -- the same approach the persistence tests take.
+"""Load test for the Postgres schema through the app's own write and read paths
+(persist_session, the wrap-up poll's eager read, the shared pool) -- not pgbench.
+Refuses the database named in .env; creates, migrates and drops a throwaway one.
 
     python scripts/stress_db.py --sessions 300 --writers 16
     python scripts/stress_db.py --volume 5000 --readers 32 --duration 20
     python scripts/stress_db.py --sessions 200 --writers 32 --pool-size 20
 
-Exit code is 0 only if no operation failed.
-"""
+Exit code is 0 only if no operation failed."""
 # duplicate-code: this script deliberately re-implements the throwaway-database
 # helpers from tests/conftest.py (which it cannot import) and copies the wrap-up
 # read from backend/api/sessions.py verbatim -- benchmarking the *exact* query is
@@ -180,12 +169,8 @@ _SENTENCES = (
 
 
 def synthetic_turns(count: int, rng: random.Random) -> list[Turn]:
-    """A Session of `count` exchanges, shaped like a real one.
-
-    Alternating speech windows on a rising timeline, plus the paraverbal facts
-    the live path measures per Turn (ADR 0048). Values are plausible, not real:
-    the point is row count and column width, not acoustic truth.
-    """
+    """A Session of `count` exchanges, shaped like a real one (alternating speech
+    windows, per-Turn paraverbal facts, ADR 0048). Plausible, not real values."""
     turns: list[Turn] = []
     clock = 0
     for seq in range(count):

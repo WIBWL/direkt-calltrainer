@@ -1,15 +1,8 @@
 """Keycloak / OIDC bearer-token authentication (ADR 0009).
 
-The SPA logs in against Keycloak directly (Authorization Code + PKCE, public
-client) and sends the access token as a bearer token — in the `Authorization`
-header on REST, and inside the `session.start` message on the WebSocket
-(browsers can't header a `WebSocket`). This module verifies it against the
-realm's JWKS.
-
-Deliberately no role *check* (docs/adr/0009): any valid realm token may use
-the app. `roles` is still carried so a check can be added later without
-reshaping this.
-"""
+The SPA sends the access token in the `Authorization` header on REST and inside
+the `session.start` message on the WebSocket; this verifies it against the JWKS.
+No role *check* (ADR 0009); `roles` is carried so one can be added later."""
 
 import asyncio
 import logging
@@ -60,13 +53,10 @@ _bearer = HTTPBearer(auto_error=False)
 
 @dataclass(frozen=True)
 class AuthContext:
-    """The verified caller. `sub` is the Keycloak user id — the value written
-    as `session.subject_id` when the Session is persisted (ADR 0031/0034).
-
-    `tenant` is a Keycloak user attribute (set at account creation) mapped into
-    the access token as a `tenant` claim; it decides which company's shared
-    Scenarios the caller sees (ADR 0060, `backend/tenants.py`). Optional — a
-    token without it falls through to the `default` tenant."""
+    """The verified caller. `sub` is the Keycloak user id, written as
+    `session.subject_id` (ADR 0031/0034). `tenant` is an admin-set Keycloak
+    attribute mapped into the token; it picks whose shared Scenarios the caller
+    sees (ADR 0060, `backend/tenants.py`). Missing means the `default` tenant."""
 
     sub: str
     roles: list[str]
@@ -109,13 +99,9 @@ def verify_token(token: str) -> AuthContext:
             options={"require": ["exp"]},
         )
     except (PyJWKClientConnectionError, httpx.HTTPError) as e:
-        # Before the PyJWTError branch, which this inherits from. A JWKS fetch
-        # that could not reach Keycloak is infrastructure, not the caller's
-        # token, and ADR 0009 says it must surface as a 5xx. Masked as a 401 it
-        # told every client its session had expired: `apiFetch` sends a 401 to
-        # the login screen, so a Keycloak outage looked exactly like every
-        # token in the pilot expiring at once. The comment that used to stand
-        # here claimed this already happened.
+        # Before the PyJWTError branch, which this inherits from. An unreachable
+        # JWKS is infrastructure and must be a 5xx (ADR 0009): as a 401 the SPA
+        # sends everyone to login, so a Keycloak outage looks like mass expiry.
         logger.error("JWKS unavailable, cannot verify tokens: %s", e)
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE, "authentication backend unavailable"

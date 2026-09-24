@@ -2,14 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { fillerHits, questionsIn } from "./transcriptEvidence";
 
-/**
- * What a metric's page quotes as the evidence behind its figure (ADR 0098).
- *
- * These reproduce the backend's own counting rule, and the module says so: a
- * count and a list of quotations that disagree is worse than either alone. The
- * failure mode is silent — the page shows four quotes under a figure of five
- * and looks perfectly healthy — so the arithmetic is pinned here.
- */
+/** What a metric's page quotes as evidence (ADR 0098). Must reproduce the backend's
+ * counting rule; the failure is silent (four quotes under a figure of five), so
+ * the arithmetic is pinned here. */
 
 describe("questionsIn", () => {
   it("quotes the question alone, not the sentence before it", () => {

@@ -1,20 +1,7 @@
-"""Delete Sessions past the retention period, by hand (ADR 0067).
-
-The app runs this sweep itself, daily, from its lifespan. This script is for
-the times that is not enough: checking what the period would take before it
-does, running it once after the period is changed, or clearing a backlog on an
-instance that was down for a while.
+"""Delete Sessions past the retention period by hand (ADR 0067); idempotent, no Redis needed.
 
     python scripts/apply_retention.py            # show what is over the line
     python scripts/apply_retention.py --apply    # delete it
-
-Runs against the database in `.env`, so it works from a host shell as well as
-inside the container -- unlike `requeue_feedback.py`, nothing here needs Redis.
-
-Safe to run at any time and as often as anyone likes: it asks the database what
-is expired, deletes that, and finds nothing on the second pass. It cannot
-collide with the app's own sweep beyond one of the two finding the work already
-done.
 """
 
 from __future__ import annotations

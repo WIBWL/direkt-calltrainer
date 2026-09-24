@@ -3,12 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { FocusGoal, Measurement, SessionFeedback, SessionTurn } from "../protocol";
 import { callMeta, metricGroups, reportOutline } from "./reportOutline";
 
-/**
- * The feedback report's outline — what the page and the downloaded file both
- * say (F-64). These pin the parts the two used to decide separately and got
- * wrong in one of them: a point's moment, its focus goal, which side of the
- * call the User was on, and which half a metric is read in.
- */
+/** The feedback report's outline, shared by page and PDF (F-64): a point's moment,
+ * its focus goal, which side of the call the User was on, and which half a metric
+ * is read in. */
 
 function turn(turn_id: number, start_offset_ms: number): SessionTurn {
   return {

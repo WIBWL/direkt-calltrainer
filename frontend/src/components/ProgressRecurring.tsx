@@ -10,28 +10,9 @@ import MentionTally from "./MentionTally";
 import SectionHeading from "./SectionHeading";
 
 /**
- * Block D of the dashboard: what the wrap-ups keep coming back to.
- *
- * The only part of this screen that goes beyond plain display, and the reason
- * it is allowed to: it invents nothing. The wrap-ups already wrote points of
- * two kinds, and each point now carries the focus goal it is about, so this
- * counts what the wrap-ups said. "The closing was named as an improvement in 4
- * of 8" is a frequency of statements, not a measurement of a person and not a
- * mark across trainings, which is what keeps it inside ADR 0004 and ADR 0065.
- *
- * That distinction is fragile in the reading even when sound in the data, so
- * the wording carries it: the verb is always "mentioned", never "was" or "is";
- * a count over a named denominator, never a percentage; and no ordering
- * language beyond most-mentioned first.
- *
- * The practice suggestion (block E) follows the two lists as a full-width band.
- * As a third card in their row it ran three times their height — a paragraph,
- * an offer and a button beside two cards of two lines each. What it must not
- * become again is a section of its own at the foot of the page, which is where
- * it started and where nobody reached it.
- *
- * It is handed in rather than built here because it has its own data to fetch
- * and its own reasons to render nothing, in which case nothing is drawn.
+ * Block D: what the wrap-ups keep coming back to, counted from each point's focus goal. A frequency of
+ * statements, not a measurement (ADR 0004, ADR 0065): "genannt", over a named denominator, never a percentage.
+ * The practice suggestion (block E) is handed in and drawn as a full-width band under the lists.
  */
 export default function ProgressRecurring({
   sessions,
@@ -85,30 +66,13 @@ export default function ProgressRecurring({
             />
           </div>
 
-          {/* Under the two lists rather than beside them, and across the full
-              width: a third column held a paragraph, an offer and a button
-              where its neighbours hold two lines each, so it ran three times
-              their height and the row read as lopsided. It still follows
-              directly from what the lists say, which is the adjacency that
-              mattered — the ground and the offer are one glance either way.
-
-              Directly under them, too. The note on how the counting works used
-              to sit here, between the lists and the offer, and two lines of
-              prose plus an "i" pushed the one block that leads back into
-              training a screen further down while holding the two halves of
-              one glance apart. */}
+          {/* Full width, directly under the lists: it follows from what they say, and as a third column it ran
+              three times their height. */}
           {practice}
 
-          {/* Under everything rather than under the cards it describes: it
-              explains the counting behind both lists, and the counting is the
-              same on either side, so it is a footnote to the section and not a
-              caption to a card. One sentence stays in view -- that this is what
-              was written and not what was measured is the half a reader must
-              not miss -- and the rules of the count move behind the "i", as on
-              every other screen of the app. */}
-          {/* It names the two lists now that it no longer stands under them:
-              directly below the suggestion card, "gezählt wird" would read as
-              a note about the suggestion, which counts nothing. */}
+          {/* A footnote to the whole section, naming both lists: directly under the suggestion, "gezählt wird"
+              would read as about the suggestion. The written-not-measured sentence stays in view; the rules of
+              the count go behind the "i". */}
           <p className="progress-preview-note recurring-note">
             In den beiden Listen oben ist gezählt, was Ihre Auswertungen geschrieben haben,
             nicht was gemessen wurde.
@@ -134,13 +98,8 @@ export default function ProgressRecurring({
 }
 
 /**
- * What stands here before there is anything to count.
- *
- * Three different reasons for an empty block, and they are worth telling
- * apart: no trainings analysed at all, some analysed but nothing said twice,
- * and wrap-ups that predate the assignment. The third is invisible in the data
- * (an old wrap-up and one where nothing fitted both carry no tags), so it is
- * folded into the first sentence rather than claimed.
+ * The empty-block text. Distinguishes nothing analysed from nothing said twice; wrap-ups predating the goal
+ * tags are indistinguishable in the data, so they are folded into the first sentence rather than claimed.
  */
 function emptyText(total: number): string {
   if (total === 0) {
@@ -202,18 +161,9 @@ function Column({
 
             return (
               <li key={entry.goal}>
-                {/* Each row opens the goal's own page, which is where the
-                    sentences behind the count are quoted. The row had the
-                    hover of something you can press and did nothing when you
-                    did — and this is the reading a count most needs, because
-                    "in 3 von 9 genannt" asks the reader to take a number on
-                    trust unless they can see what was written.
-
-                    Not for a goal the catalogue no longer knows: its page can
-                    only say that there is nothing under that name, and a link
-                    into a dead end is worse than a row that stays a row. That
-                    row keeps no hover either, so nothing on this screen looks
-                    pressable without being so. */}
+                {/* Each row opens the goal's page, where the sentences behind the count are quoted. Not for a
+                    goal the catalogue no longer knows — that page would be a dead end — and such a row gets
+                    no hover either. */}
                 {title ? (
                   <Link className="recurring-item" to={withPeriod(progressGoalPath(entry.goal))}>
                     {body}

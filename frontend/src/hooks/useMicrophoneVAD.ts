@@ -49,36 +49,19 @@ export function useMicrophoneVAD(
         startOnLoad: false,
         getStream: () => getMicStream(deviceIdRef.current),
         resumeStream: () => getMicStream(deviceIdRef.current),
-        // vad-web's own defaults (0.3 / 0.25) leave only a 0.05 gap between
-        // the positive/negative thresholds — narrower than Silero's own
-        // authors recommend (a 0.15 gap, per vad-web's frame-processor
-        // typedoc). With that narrow a gap, real-room background noise
-        // (headset hiss, faint hum) can keep nudging the speech probability
-        // back above negativeSpeechThreshold, so the end-of-speech
-        // "redemption" countdown never completes and onSpeechEnd never
-        // fires — the mic just never registers the user as done talking.
-        // Widening the gap back to Silero's recommended spacing trades a
-        // little sensitivity to very quiet speech for reliably detecting
-        // end-of-speech in a normal (not dead-silent) room.
+        // vad-web's defaults (0.3 / 0.25) leave a 0.05 gap, narrower than
+        // Silero's recommended 0.15: room noise then keeps the probability
+        // above the negative threshold, so onSpeechEnd never fires and the
+        // turn is never sent. The wider gap costs a little quiet-speech
+        // sensitivity.
         positiveSpeechThreshold: 0.5,
         negativeSpeechThreshold: 0.35,
         // Raised from vad-web's 400ms default to filter out quiet/brief "hmm"s.
         minSpeechMs: 500,
-        // How long the silence after a sentence has to last before the turn is
-        // sent. vad-web's default is 1400 ms, and it was never chosen here --
-        // it is simply what the library does. It is also the single largest
-        // piece of the delay between the user finishing and hearing a reply:
-        // the whole server pipeline (STT + reply + first audio) was measured at
-        // about a second, so the browser was waiting longer than everything
-        // else together.
-        //
-        // 1000 ms is short enough to stop the pause feeling like a hang and
-        // long enough to sit out a breath in the middle of a sentence, which is
-        // what this guards: cut it too fine and a user who pauses to think has
-        // their turn sent half-finished, and the persona answers a fragment.
-        // Raised here from 700 for exactly that reason -- someone working out
-        // what to say next needs a moment to do it, and being cut off mid-
-        // thought is the failure that costs a turn rather than a second.
+        // Silence before the turn is sent; the largest piece of reply latency
+        // (vad-web's 1400 ms outlasted the whole server pipeline). Do not go
+        // much lower: 700 ms cut users off mid-thought, sending half a turn
+        // that the persona then answers — a lost turn, not a lost second.
         redemptionMs: 1000,
         onSpeechStart: () => console.debug("[VAD] speech start (unconfirmed)"),
         // Fires once sustained past minSpeechMs -- use this for barge-in, not onSpeechStart above.

@@ -19,25 +19,14 @@ export function formatOffset(offsetMs: number): string {
 }
 
 /**
- * The timezone the interface reads in.
- *
- * Pinned rather than left to the browser. The training runs in Germany and its
- * records are read there, so a session should carry the same clock time
- * whoever opens it — a trainee on holiday, or a supervisor on a machine whose
- * timezone was never set, should not see a call drift by an hour. Without this
- * the displayed time is a property of the reader's laptop rather than of the
- * training.
+ * The timezone the interface reads in, pinned rather than left to the browser,
+ * so a training shows the same clock time whoever opens it, wherever.
  */
 const DISPLAY_TIMEZONE = "Europe/Berlin";
 
 /**
- * Day and time, e.g. "6. Sep 2026, 13:17". Null when there is nothing to
- * format.
- *
- * Null rather than a placeholder on purpose: a caller that renders a row only
- * when it has a value cannot do that if the formatter hands back a dash, and
- * a phantom row saying "—" is worse than no row. Callers that do want a
- * placeholder add their own.
+ * Day and time, e.g. "6. Sep 2026, 13:17". Null, not a placeholder, when there is
+ * nothing to format, so a caller can skip the row; placeholders are the caller's.
  */
 export function formatDateTime(iso: string | null | undefined): string | null {
   const at = parse(iso);

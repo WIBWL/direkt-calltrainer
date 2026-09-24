@@ -1,12 +1,8 @@
 """Startup health checks for the pipeline backends.
 
-Fires one minimal real request at each backend (STT, LLM, TTS) so a dead model
-surfaces at boot, not mid-call. Uses the exact prod code paths.
-
-Three checks and no more: one backend per leg (ADR 0103), so there is no second
-model to probe. The wrap-up runs on the same model as the spoken reply, and the
-LLM check covers both.
-"""
+Fires one minimal real request at each backend (STT, LLM, TTS) through the prod
+code paths, so a dead model surfaces at boot, not mid-call. One backend per leg
+(ADR 0103); the LLM check covers the wrap-up too."""
 
 import asyncio
 import contextlib
@@ -29,16 +25,9 @@ logger = logging.getLogger(__name__)
 _CHECK_VOICE = PersonaVoice(kugelaudio_voice_id=1885)
 _CHECK_LANGUAGE = "de"
 _CHECK_TIMEOUT = 20.0
-# One attempt, against the client's default of two retries. Retrying is right
-# for a Turn -- a call should survive a blip -- and wrong here: the retries and
-# their backoff run inside _CHECK_TIMEOUT, so a model answering 429 gets its
-# answer thrown away and the probe reports the deadline instead. A liveness
-# check that hides why it failed is worth less than one that fails honestly, and
-# nothing downstream depends on this passing: it only logs.
-#
-# Only the LLM check takes it. STT and TTS go through clients this cannot
-# reach from here -- the gateway one is shared with STT's own path, and
-# KugelAudio is a different SDK entirely.
+# One attempt, not the client's default two retries: their backoff runs inside
+# _CHECK_TIMEOUT, so a 429 would be reported as a timeout. Only the LLM check
+# takes it; STT and TTS go through clients this cannot reach.
 _CHECK_RETRIES = 0
 
 
@@ -80,14 +69,9 @@ _CHECKS: dict[str, tuple] = {
 async def _run_check(name: str, check_fn, model: str) -> bool:
     try:
         await asyncio.wait_for(check_fn(), timeout=_CHECK_TIMEOUT)
-    # Before OSError, which it is a subclass of -- and said in words, because
-    # asyncio's TimeoutError carries no message: `str(e)` is empty and the line
-    # used to end in a bare dash, which reads like a backend that answered with
-    # nothing rather than one that did not answer. The retries are named in it
-    # because they are the usual reason a *working* model lands here: the
-    # OpenAI client retries a 429 or a 5xx with backoff before it raises, and
-    # those attempts run inside this window, so a rate-limited model times out
-    # here instead of reporting its 429.
+    # Before OSError, its superclass. Spelled out because asyncio's TimeoutError
+    # has an empty message; the retries are named since a rate-limited model's
+    # retried 429s run inside this window and end up here.
     except TimeoutError:
         logger.error(
             "Startup check: %s FAILED (%s) — no answer within %.0f s; a 429 or a 5xx is "
@@ -100,13 +84,9 @@ async def _run_check(name: str, check_fn, model: str) -> bool:
         logger.error("Startup check: %s FAILED (%s) — %s", name, model, str(e) or type(e).__name__)
         return False
     except Exception as e:  # pylint: disable=broad-except  # see `check_backends`
-        # `check_backends` promises never to raise, and `lifespan` calls it
-        # without a try: anything escaping here would stop the app from booting
-        # over a dead dependency, which is the opposite of what the promise is
-        # for. The list above does not cover everything these round trips can
-        # produce -- the TTS check runs through a third-party SDK that parses
-        # server frames, so a non-JSON frame from a proxy error page is a
-        # ValueError and nothing here would have caught it.
+        # `check_backends` promises never to raise and `lifespan` calls it without
+        # a try. The TTS SDK parses server frames, so e.g. a proxy error page
+        # surfaces as a ValueError the list above does not cover.
         logger.error("Startup check: %s FAILED (%s) — %s: %s",
                      name, model, type(e).__name__, str(e) or "no message")
         return False
@@ -118,9 +98,7 @@ async def check_backends() -> bool:
     """Check every configured pipeline backend concurrently, one log line
     each; returns True only if all passed.
 
-    Never raises — it runs from `lifespan`, which logs a dead dependency rather
-    than failing the boot. The return value is for `scripts/check_backends.py`,
-    which does exit non-zero on it.
+    Never raises: `lifespan` logs a dead dependency rather than failing the boot.
     """
     results = await asyncio.gather(*(_run_check(name, check_fn, model) for name, (check_fn, model) in _CHECKS.items()))
     failing = results.count(False)

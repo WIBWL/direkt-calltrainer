@@ -1,46 +1,7 @@
 """Overlapping speech, classified (F-51, focus goal "Aktives Zuhören").
-
-Pure functions over one Session's timeline: no database, no audio, no model
-call, so the whole classification can be tested against constructed timings and
-can be re-run over Sessions that were stored long ago.
-
-The question this answers is narrow. Not "was the user rude", which nobody can
-read off a timeline, but "how often did they start speaking while the Persona
-still had something to say, and did the Persona lose words over it". Everything
-else is left to the wrap-up's prose.
-
-Three things about this architecture shape the rules, and none of them is
-obvious from the timeline alone:
-
-* A Persona utterance's end is **modelled from the audio that was sent**, not
-  observed. The server never learns when the client finished playing
-  (`orchestrator._note_persona_audio`). So "the Persona stopped within half a
-  second" cannot be read off the data: the window runs on regardless. What *is*
-  observable is whether the reply was trimmed back to the heard part, which is
-  precisely the event of interest -- the Persona had more to say and did not
-  get to say it.
-
-  A barge-in does shorten a Persona segment's `duration_ms`, which is the one
-  thing this list used to say it did not. That is F-53 counting heard speech
-  and nothing else (ADR 0035), and it is right -- but every figure here is
-  about the audio that was *sent*, so the classification reads
-  `dispatched_end_ms` instead. Read off the heard end, "how much the Persona
-  still had to say" becomes the delay between the user starting to speak and
-  the client's cut reaching the server: a few hundred milliseconds whatever the
-  reply's length, which is also what the empirical calibration below would then
-  have been measuring.
-* Short backchannels never reach the server at all. ADR 0036 raised the
-  client's VAD threshold to 500 ms of sustained speech, and anything below that
-  is absorbed in the browser. The backchannel rule below is therefore a second
-  net rather than the primary one, and it is kept because losing it would mean
-  punishing good listening the day that threshold changes.
-* The user's own start is derived from the arrival of their recording minus its
-  measured duration, so it carries the VAD's padding as error, a few hundred
-  milliseconds at most.
-
-Empirically, across the Sessions stored when this was written, the depth of the
-eleven overlapping starts fell into a clean gap: three at 34, 58 and 158 ms,
-then nothing until 696 ms. TERMINAL_WINDOW_MS sits in that gap.
+Pure functions over a stored timeline, so they can be re-run on old Sessions.
+A Persona's end is modelled from *dispatched* audio; `turn.interrupted` is the
+reliable sign it lost words. Backchannels under 500 ms never arrive (ADR 0036).
 """
 
 from __future__ import annotations
@@ -70,19 +31,9 @@ YIELD_WINDOW_MS = 500
 # and today largely pre-empted by ADR 0036's client-side VAD threshold.
 BACKCHANNEL_MAX_MS = 1000
 
-# Where the traffic light changes, in hard interruptions per call.
-#
-# Counts and not a share, deliberately. A rate divided by Persona turns was
-# tried first and produced nonsense at the length these calls actually run: with
-# six to nine Persona turns, a single interruption already gives 0.11 to 0.17,
-# so any interruption at all landed on the top step and green was unreachable
-# except at exactly zero. A count says the same thing without the arithmetic
-# pretending to a precision the denominator cannot carry.
-#
-# PROVISIONAL, and the weakest numbers in this module: nothing has established
-# how many interruptions a call of this kind usually holds, so these are
-# invented working values. They are why the interface has to speak of an
-# orientation rather than a verdict. See the note on `TrafficLight`.
+# Where the traffic light changes, in hard interruptions per call. A count, not
+# a rate per Persona turn: with 6-9 turns one interruption already hit the top
+# step. PROVISIONAL, invented working values -- hence "orientation", not verdict.
 GREEN_MAX_COUNT = 0
 YELLOW_MAX_COUNT = 2
 
@@ -108,28 +59,10 @@ EXPLANATION = (
 
 
 class TrafficLight(str, Enum):
-    """The three-step reading of the count.
-
-    Governed by ADR 0078, which says what a light on a metric may claim and
-    under which conditions. This one was built before that ADR existed and was
-    described here as an unrecorded exception; it is now one of two instances of
-    a written pattern, and it meets the conditions: the colour sits on a named
-    step, the whole scale travels with it (`steps()`), the step is written out
-    in words, the interface says "Einschätzung", and none of it reaches the
-    progress view.
-
-    What the colours claim, per ADR 0078's sixth condition. They point, they do
-    not grade:
-
-        green    Nothing here needs your attention today. Not "well done".
-        yellow   Worth a second look at how the call went.
-        red      This is where to look first.
-
-    The weak part is not the pattern but the numbers: GREEN_MAX_COUNT and
-    YELLOW_MAX_COUNT are invented working values with nothing behind them, which
-    is why the wording stays at an orientation. Nothing else in this module
-    depends on the class, so it can be removed by deleting it and its two
-    constants.
+    """The three-step reading of the count, governed by ADR 0078. The colours
+    point, they do not grade (ADR 0078's sixth condition): green = nothing needs
+    attention today (not "well done"), yellow = worth a second look, red = look
+    here first.
     """
 
     GREEN = "green"
@@ -145,17 +78,9 @@ LABELS: dict[TrafficLight, str] = {
 
 
 def light_steps() -> list[dict[str, str | None]]:
-    """The three steps, written out, so the interface can show the scale the
-    colour comes from.
-
-    A boundary the user cannot see is a judgement they cannot argue with, which
-    is the worst form for a threshold that nothing has validated to take. Built
-    from the constants rather than written twice, so a recalibration reaches the
-    legend as well as the logic.
-
-    The shape is shared with `intonation.liveliness_steps`: `step` is the
-    machine-readable name, `label` how it is said, `range` where it applies and
-    `light` a colour where the scale has a direction, null where it has none.
+    """The three steps written out, so the interface can show the whole scale.
+    Built from the constants so a recalibration reaches the legend too. Same
+    shape as `intonation.liveliness_steps`: `step`, `label`, `range`, `light`.
     """
     return [
         _step(TrafficLight.GREEN, _step_label(0, GREEN_MAX_COUNT)),
@@ -188,12 +113,8 @@ class Kind(str, Enum):
 
 @dataclass(frozen=True)
 class Segment:
-    """One utterance on the Session's timeline, as this module needs it.
-
-    Its own type rather than `calls.Utterance`: that one carries the transcript
-    and lives in a module which imports this one, so reaching for it would
-    close an import cycle. This is also exactly the four fields the
-    classification reads, which keeps the test fixtures honest.
+    """One utterance on the Session's timeline, as this module needs it. Not
+    `calls.Utterance`: that module imports this one, so it would be a cycle.
     """
 
     speaker: str          # "user" or "persona"
@@ -217,12 +138,9 @@ class Segment:
 
     @property
     def dispatched_end_ms(self) -> int:
-        """Where this segment's audio would have stopped. What "the Persona
-        still had this much to say" is measured against, and the reason it is
-        a second field: `end_ms` was cut back to the heard part for F-53's
-        Redeanteil, and read from here that turned every remaining-audio figure
-        into the delay between the user starting to speak and the client's cut
-        arriving -- a few hundred milliseconds, whatever the reply's length."""
+        """Where this segment's audio would have stopped; what "the Persona
+        still had this much to say" is measured against. Not `end_ms`, which is
+        cut back to the heard part and would measure only the barge-in delay."""
         return self.offset_ms + (self.duration_ms if self.dispatched_ms is None else self.dispatched_ms)
 
 
@@ -245,9 +163,7 @@ class Report:
 
     events: tuple[Event, ...]
     persona_turns: int
-    # (start, end) of every segment, for the call's length. Kept rather than a
-    # single duration so the report stays a description of the timeline it was
-    # built from.
+    # (start, end) of every segment, for the call's length.
     spans: tuple[tuple[int, int], ...] = ()
 
     @property
@@ -262,52 +178,26 @@ class Report:
 
     @property
     def backchannels(self) -> tuple[Event, ...]:
-        """Short signals given while the other side kept the floor.
-
-        Reported alongside the interruptions and never against them. They are
-        listening made audible, which is the other half of the goal this metric
-        serves, and a figure that only ever counted the failures would describe
-        an attentive call and an absent one identically.
-
-        They are not offset against the count either. That would invent a trade
-        ("two signals make up for one interruption") which nothing supports.
+        """Short signals given while the other side kept the floor. Reported
+        beside the interruptions, never offset against them -- that would invent
+        a trade nothing supports.
         """
         return tuple(e for e in self.events if e.kind is Kind.BACKCHANNEL)
 
     @property
     def call_ms(self) -> int:
-        """How long the call ran, from the first segment to the last.
-
-        Context for the count and nothing more: the figure is per call, and how
-        long that call was is exactly what a reader needs to weigh it. It stays
-        out of the traffic light on purpose -- dividing by it was tried and put
-        a single interruption on the top step of a short call.
+        """How long the call ran, first segment to last. Context for the count
+        only; kept out of the traffic light on purpose (see the thresholds).
         """
         if not self.spans:
             return 0
         return max(end for _, end in self.spans) - min(start for start, _ in self.spans)
 
     def detail(self) -> dict:
-        """Everything that travels with the measurement besides its value.
-
-        One function rather than a dict built at each write site: the live path
-        and the backfill script both store this, and when they were written
-        separately the second silently lacked two of the fields, which showed up
-        as blank context in the interface.
-
-        Nothing in here enters the figure or the traffic light. It is what lets
-        a reader weigh the count: how long the call ran, how many replies there
-        were to cut into, and how much listening was audible.
-
-        The light itself is deliberately **not** in here. It is a reading, and
-        ADR 0091 says a reading is derived on every read: the two numbers behind
-        it are described in this module as invented working values meant to be
-        calibrated once the pilot has data, and a stored colour would survive
-        that calibration. It did, until this was removed -- a Session stored at
-        three interruptions kept `red` while the legend beside it, built from
-        the constants, put three in the yellow band. `backend/feedback/
-        readings.py` derives both colour and word from `hard_offsets_ms`, whose
-        length is exactly the count the light reads.
+        """Everything stored with the measurement besides its value, for the live
+        path and the backfill alike. The light is deliberately **not** stored: a
+        reading is derived on every read (ADR 0091), by `readings.py` from
+        `hard_offsets_ms`, so a recalibration reaches old Sessions.
         """
         return {
             "persona_turns": self.persona_turns,
@@ -319,29 +209,17 @@ class Report:
 
     @property
     def light(self) -> TrafficLight:
-        """The provisional reading, on the count. See `TrafficLight`.
-
-        `persona_turns` is kept on this report and travels in the measurement's
-        detail as context -- three interruptions in a four-turn call and three
-        in a forty-turn call are different situations, and a reader can see
-        that for themselves. It is deliberately not divided into the figure:
-        that was tried and produced a scale on which one interruption was
-        already the top step (see the note on the thresholds above).
-
-        Not stored with the measurement -- see `detail`. This property is the
-        live reading; `light_for` is the same rule for a count read back later.
+        """The provisional live reading, on the count (see `TrafficLight`).
+        `persona_turns` travels as context, never as a divisor. Not stored --
+        see `detail`.
         """
         return light_for(len(self.hard))
 
 
 def light_for(count: int) -> TrafficLight:
-    """Which step a count of hard interruptions lands on.
-
-    Beside the two constants, and the only place the comparison is written: the
-    live path reads it through `Report.light`, a stored Session through
-    `readings.py` on every read. Both go through here so a recalibration
-    reaches a call measured last month and one measured just now alike, which
-    is the whole of ADR 0091."""
+    """Which step a count of hard interruptions lands on. The only place the
+    comparison is written, for the live path and `readings.py` alike, so a
+    recalibration reaches old and new calls alike (ADR 0091)."""
     if count <= GREEN_MAX_COUNT:
         return TrafficLight.GREEN
     if count <= YELLOW_MAX_COUNT:
@@ -350,12 +228,9 @@ def light_for(count: int) -> TrafficLight:
 
 
 def classify(timeline: tuple[Segment, ...]) -> Report:
-    """Find every overlapping user start and say what it was.
-
-    The rules are applied in order and the first match wins, so a short
-    utterance that cost the Persona nothing is a backchannel before it can be
-    anything else. That order is the part that must not be rearranged: it is
-    what keeps good listening from being counted as interruption.
+    """Find every overlapping user start and say what it was. First rule wins,
+    and the order must not change: a backchannel is checked first so that good
+    listening is never counted as interruption.
     """
     persona = [s for s in timeline if s.speaker == "persona"]
     events: list[Event] = []
@@ -381,34 +256,18 @@ def classify(timeline: tuple[Segment, ...]) -> Report:
 
 
 def _overlapped(user: Segment, persona: list[Segment]) -> Segment | None:
-    """The Persona segment the user started inside of, if any.
-
-    The last one, in the event of several: Persona windows are modelled from
-    dispatched audio and can abut, and the user started inside the one that was
-    still running.
-
-    Against the dispatched end, like `remaining_ms`. The question is whether the
-    Persona was still speaking when the user came in, and its window is the
-    audio that was sent. Measured against the *heard* end, a trimmed reply ends
-    a few hundred milliseconds after the user's start -- that is what trimmed it
-    -- and the two figures come off different clocks: the user's start is
-    derived from their recording's arrival minus its duration, carrying the
-    VAD's padding as error, while the heard end is the client's playback
-    position. When the error goes the wrong way the user's start falls just
-    outside the segment, the overlap is not found at all, and the hardest
-    interruptions are the ones that vanish.
+    """The Persona segment the user started inside of (the last, if windows abut).
+    Tested against the *dispatched* end, never the heard one: the heard end sits
+    just after the user's start on a different clock, so VAD padding error would
+    push the start outside and the hardest interruptions would vanish unnoticed.
     """
     inside = [p for p in persona if p.offset_ms <= user.offset_ms < p.dispatched_end_ms]
     return inside[-1] if inside else None
 
 
 def finding_description(event: Event) -> str:
-    """The Finding's text for one hard interruption.
-
-    Here rather than at the two call sites -- `session.persistence` writes it
-    when a call ends and `scripts/backfill_interruptions.py` writes it for
-    Sessions recorded earlier. Reworded in one place, the two would disagree
-    about calls that are otherwise the same.
+    """The Finding's text for one hard interruption. One place for both writers
+    (`session.persistence` and `scripts/backfill_interruptions.py`).
     """
     return (
         f"Sie haben zu sprechen begonnen, während Ihr Gegenüber noch "

@@ -6,12 +6,8 @@ import { formatDate } from "../utils/time";
 import RetentionSettings from "./RetentionSettings";
 
 /**
- * How much is stored about the caller, and a copy of it to take away
- * (ADR 0066).
- *
- * Counts rather than content: the point is to make the *extent* of what is
- * held visible at a glance, which the history below already fails to do — a
- * list of twenty rows does not tell you it holds four hundred utterances.
+ * How much is stored about the caller, and a copy to take away (ADR 0066). Counts
+ * rather than content, so the *extent* of what is held is visible at a glance.
  */
 export default function DataOverview() {
   const [data, setData] = useState<DataOverviewPayload | null>(null);
@@ -91,12 +87,9 @@ export default function DataOverview() {
 }
 
 /**
- * Fetch the export and hand it to the browser as a file.
- *
- * Not a plain link: the route needs the bearer token, and an `<a href>` sends
- * no Authorization header. So it is fetched, turned into a blob and clicked
- * programmatically — which also keeps a page of transcripts out of a browser
- * tab that the next person at the machine could page back to.
+ * Fetch the export and hand it to the browser as a file. Not a plain link: an
+ * `<a href>` sends no bearer token. The blob download also keeps a page of transcripts
+ * out of a browser tab the next person could page back to.
  */
 async function download(
   setDownloading: (value: boolean) => void,

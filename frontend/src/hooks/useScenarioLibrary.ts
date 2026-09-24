@@ -13,17 +13,9 @@ import {
 } from "../scenarioSelection";
 
 /**
- * The Scenario library as the selection screen holds it: the cards, the two
- * filter rows, which case is picked, and the reload after a row changed.
- *
- * It used to be ten pieces of state, two effects and two memos in `App.tsx`,
- * handed to `SetupView` as a dozen props under names that changed on the way.
- * The rules they follow are pure functions in `scenarioSelection.ts`; this is
- * the state those functions are asked about, and nothing that belongs to the
- * training flow.
- *
- * `preselect` is false while a restored wrap-up owns the screen: nothing is
- * picked or filtered behind it.
+ * The selection screen's Scenario library state: cards, both filter rows, the
+ * pick and the reload. The rules live in `scenarioSelection.ts`. `preselect`
+ * is false while a restored wrap-up owns the screen: nothing is picked behind it.
  */
 export function useScenarioLibrary(preselect: boolean) {
   const [scenarios, setScenarios] = useState<ScenarioCard[]>([]);

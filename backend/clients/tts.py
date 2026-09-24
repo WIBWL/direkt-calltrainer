@@ -1,53 +1,17 @@
-"""Text-to-speech client calls.
+"""Text-to-speech on KugelAudio, the only speech output (ADR 0103): a failure ends the Turn.
 
-Two shapes:
+``synthesize_stream`` (live path) yields WAV pieces as generated, one ``stream_async``
+per chunk over a pooled WebSocket; ``synthesize`` returns one WAV (health check,
+fallback closing line). See docs/model-parameters.md for the measurements.
 
-* ``synthesize_stream`` — the live path. Streams one text chunk through
-  KugelAudio and yields WAV pieces **as they are generated**, so the first
-  audio reaches the client ~0.3 s after the chunk is ready instead of ~0.9 s
-  (measured; see ``docs/model-parameters.md``). One ``stream_async`` call per
-  chunk over a pooled WebSocket (``reuse_connection`` + ``prewarm``); the
-  KugelAudio doc's persistent ``streaming_session`` was measured *slower* to
-  first audio with this SDK because its per-``send`` poll defers synthesis to
-  the final flush.
-* ``synthesize`` — one-shot, returns the whole chunk as a single WAV. Used by
-  the startup health check and the fixed fallback-closing line, where first-
-  audio latency does not matter.
+**Never leave a stream short of its ``final`` frame on the pooled socket** (ADR 0044
+amendment): frames carry no request id, so the leftover audio and ``final`` are read
+by the *next* request -- a one-chunk offset for the life of the connection. Both
+paths therefore drop and re-warm the connection on any unfinished exit.
 
-KugelAudio is the only speech output there is (ADR 0103). It had the gateway's
-own model behind it as a fallback until then (ADR 0040), which meant a dead
-KugelAudio produced a call in a different voice, 2-3x slower, and a boot log
-that said nothing was wrong. A failure now ends the Turn, which is the honest
-answer and the one an operator notices.
-
-**A stream left before its ``final`` frame poisons the pooled socket** (ADR
-0044 amendment). ``stream_async`` sends the request on the shared connection
-and reads frames until ``final`` -- with no request id to tell one request's
-frames from the next. A barge-in closes the Turn generator mid-stream, so that
-request's remaining audio *and* its ``final`` stay queued on the socket; the
-next ``stream_async`` then yields that stale audio as its own, ends on the stale
-``final``, and leaves its own frames for the call after it -- a one-chunk
-offset that persists for the life of the connection. Live, that was the
-persona's last sentence arriving at the start of the *next* Turn, every Turn,
-once a call had been interrupted mid-sentence. So both paths drop the pooled
-connection whenever they are left short of ``final`` and re-warm a fresh one
-off the critical path (``kugelaudio==1.9.0`` has no public call for this;
-``_close_ws_connection`` is the one it uses internally).
-
-*Both* paths: the one-shot one did not, for a while -- and that is the harder
-of the two to notice, since the abandoned request's frames simply sit on the
-shared socket and reach the *next call in the process*.
-
-**And one request at a time** (``_pool_lock``). The connection is a process-wide
-singleton, so two Sessions synthesizing at once put two requests on one wire and
-call ``recv()`` on it from two tasks. ``websockets`` answers the second with a
-``ConcurrencyError``, which is a ``RuntimeError`` and matches none of the
-handlers along the TTS path: one call ends on ``tts_failed`` and the other is
-stored as an aborted Session and logged as a client that went away. ADR 0044
-weighed the pooled connection against *successive* requests and called low
-concurrency a cost argument; it is a correctness precondition, and this lock is
-what supplies it. A chunk's synthesis is short and faster than the audio it
-produces, so the wait is bounded by one sentence.
+**One request at a time** (``_pool_lock``): two Sessions on the singleton socket get
+a ``websockets`` ``ConcurrencyError`` that no TTS handler catches. The wait is one
+sentence's synthesis at most.
 """
 
 import asyncio
@@ -69,7 +33,7 @@ logger = logging.getLogger(__name__)
 # Held for the whole of one request on the pooled connection -- the send, every
 # frame read back, and the drop-and-re-warm that follows an unfinished one. See
 # the module docstring. Everything that touches `KUGELAUDIO_CLIENT.tts` takes
-# it, and nothing takes it twice: `_drop_pooled_connection` is the lock-free
+# it, and nothing takes it twice: `_drop_and_rewarm` is the lock-free
 # half of the reset, called from inside a held lock.
 _pool_lock = asyncio.Lock()
 
@@ -96,23 +60,15 @@ async def prewarm() -> None:
 async def synthesize_stream(text: str, voice: PersonaVoice, language_id: str) -> AsyncIterator[bytes]:
     """Synthesize one text chunk, yielding WAV audio pieces as they arrive.
 
-    Raises `KugelAudioError` on any failure, before or after the first piece:
-    there is nothing else to ask (ADR 0103), and re-synthesising after a
-    partial reply would diverge from audio the user has already heard
-    (ADR 0033). The caller ends the Turn.
+    Raises `KugelAudioError` on any failure, even after the first piece: there is
+    no fallback (ADR 0103) and re-synthesising would diverge from heard audio (ADR 0033).
     """
     # Spoken form, not written: German writes "1.400" and "6. Juli" with a
     # full stop that both the chunker and the TTS read as a sentence end.
     # Done here so the Transcript keeps the digits.
     text = for_speech(text, language_id)
-    # Never the text: the Persona's line is generated rather than spoken by
-    # anybody, but it is one half of a recorded conversation and routinely
-    # carries the name and the facts the user has just said, into a file no
-    # deletion path reaches (ADR 0066). At debug rather than info because this
-    # is the one line in the pipeline that fires per *chunk* -- several times a
-    # reply, where every other leg logs once a Turn -- and what it says when
-    # nothing is wrong is that synthesis was attempted, which the audio the
-    # user hears already says. A failure raises and is logged where it lands.
+    # Never the text: the Persona's line carries the user's name and facts into a
+    # file no deletion path reaches (ADR 0066). Debug, since this fires per chunk.
     logger.debug(
         "Synthesizing (streaming) via KugelAudio (voice=%s, language=%s, %d characters)",
         voice.kugelaudio_voice_id, language_id, len(text),
@@ -130,17 +86,11 @@ async def synthesize_stream(text: str, voice: PersonaVoice, language_id: str) ->
 async def _pooled_request(text: str, voice: PersonaVoice, language_id: str) -> AsyncIterator[AudioChunk]:
     """One request on the pooled KugelAudio connection, and the only way onto it.
 
-    Both guards the module docstring describes live here, once, for both
-    callers: the lock is held for the whole request -- across the yields, on
-    purpose, since the connection is in use until `final` and a second Session
-    sending meanwhile is the `ConcurrencyError` -- and any exit short of the
-    `final` frame drops the socket and re-warms a fresh one. They were written
-    out twice, and the one-shot path went without them for a while.
-
-    Consume it under `contextlib.aclosing`: a caller that stops early (a
-    barge-in closing the stream) must reach the `finally` below *now*, not when
-    the garbage collector gets round to it, or the next request reads this
-    one's frames.
+    Holds the lock for the whole request, across the yields (the connection is
+    in use until `final`), and drops and re-warms the socket on any exit short
+    of `final` (module docstring). Consume it under `contextlib.aclosing`: a
+    caller that stops early must reach the `finally` now, not at GC time, or the
+    next request reads this one's frames.
     """
     finished = False  # the request's `final` frame was read: the socket is clean
     async with _pool_lock:
@@ -169,12 +119,10 @@ _background: set[asyncio.Task[None]] = set()
 async def _drop_and_rewarm() -> None:
     """Drop the pooled streaming socket and warm a fresh one in the background.
 
-    Call with `_pool_lock` held -- it is the pooled connection this closes, and
-    the re-warm it schedules takes the lock for itself. The next chunk pays a
-    cold handshake only if it arrives before that re-warm completes; after a
-    barge-in that is the next *Turn*, seconds away."""
+    Call with `_pool_lock` held; the re-warm it schedules takes the lock itself.
+    """
     try:
-        # No public equivalent in kugelaudio 1.9.0 (module docstring).
+        # kugelaudio 1.9.0 has no public call for this; this is the one it uses internally.
         await KUGELAUDIO_CLIENT.tts._close_ws_connection()  # pylint: disable=protected-access
     except Exception as e:  # pylint: disable=broad-exception-caught  # a dead socket must not fail the Turn
         logger.warning("KugelAudio pooled connection could not be closed: %s", e)
@@ -185,15 +133,10 @@ async def _drop_and_rewarm() -> None:
 
 
 async def synthesize(text: str, voice: PersonaVoice, language_id: str) -> bytes:
-    """One-shot: the whole chunk as a single WAV.
+    """One-shot: the whole chunk as a single WAV, through the same guarded `_pooled_request`.
 
-    On the same pooled connection as the streaming path and through the same
-    `_pooled_request`, so it carries the same two guards. It once had neither,
-    and that was the harder of the two to notice (module docstring).
-
-    KugelAudio wants the bare language code ("de", "en") here, not a full
-    locale tag -- it rejects "de-DE"/"en-GB" with "Invalid request", which used
-    to degrade silently into the fallback voice and now fails outright.
+    KugelAudio wants the bare language code ("de", "en"); it rejects "de-DE"
+    with "Invalid request".
     """
     # Spoken form, not written: German writes "1.400" and "6. Juli" with a
     # full stop that both the chunker and the TTS read as a sentence end.
@@ -228,10 +171,8 @@ def _pcm16_to_wav(pcm_bytes: bytes, sample_rate: int) -> bytes:
 def duration_ms(wav_bytes: bytes) -> int:
     """Playback length of one synthesized chunk.
 
-    KugelAudio's headerless PCM is wrapped above, so the header is always
-    there to read. 0 for anything unreadable: the
-    caller uses this to place the Persona on the Session's timeline (ADR 0051),
-    which must not be able to fail a call.
+    0 for anything unreadable: it places the Persona on the Session's timeline
+    (ADR 0051), which must not be able to fail a call.
     """
     try:
         with wave.open(io.BytesIO(wav_bytes)) as wav:

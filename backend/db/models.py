@@ -1,41 +1,9 @@
-"""
-Persistence schema of the Calltrainer (ADR 0026).
+"""Persistence schema of the Calltrainer (ADR 0026); migrations and the ER
+diagram are generated from it. Ownership edges cascade via `ondelete` *and*
+`passive_deletes=True`; FKs into reference tables carry no `ondelete`; every FK
+column is indexed (ADR 0052). Defaults are Python-side only: a row inserted
+from `psql` must name `active`, `attempts` and `extern_id` itself."""
 
-Single source of truth: both the Alembic migrations and the ER diagram are
-derived from these classes, so neither can drift from the schema.
-
-Conventions: one concept is one class is one table; table and column names are
-English and follow the domain glossary in CONTEXT.md, so a term means the same
-thing in the schema as it does in the code around it. German remains only in
-user-facing content and in the documentation.
-
-Deletes are declared twice on purpose: `ondelete` on the foreign key so the
-database enforces them even for raw SQL, and `passive_deletes=True` on the
-matching relationship so the ORM lets it do the work instead of issuing one
-statement per child row. Ownership edges cascade. The optional back-references
-from a FeedbackPoint into rows the Session owns — the Turn and the Finding it
-came from — are set to NULL, because the point still says something without
-them. Every foreign key into a reference table carries no ondelete at all, the
-optional ones included: a Persona or a MetricType with rows behind it must not
-be deletable, and a rule that holds for one such column but not its neighbour
-would be no rule at all.
-
-Column defaults (`active`, `attempts`, `extern_id`) are Python-side only, with
-no `server_default`. They apply to writes through the ORM, which is the only
-writer the application has -- but unlike the deletes above, this rule does not
-reach raw SQL: a row inserted by hand in `psql` has to name them itself.
-
-Every foreign-key column is indexed. Postgres indexes the referenced primary
-key but never the referencing side, so without this a delete of one Session
-sequentially scans every child table looking for rows to reject — exactly the
-delete path ADR 0034 promises. It is the same default Django and Rails apply,
-and the write cost is irrelevant at this volume.
-"""
-
-# pylint: disable=too-many-lines
-# One module on purpose: the Alembic migrations and the ER diagram are both
-# generated from these classes, so splitting them would put the schema's single
-# source of truth in two files (ADR 0026).
 from __future__ import annotations
 
 import uuid
@@ -79,17 +47,10 @@ POINT_STRENGTH = "strength"
 POINT_IMPROVEMENT = "improvement"
 POINT_KINDS = (POINT_STRENGTH, POINT_IMPROVEMENT)
 
-# Measurement.segment (ADR 0081): which stretch of the call a figure describes.
-#
-# `call` is the whole conversation and is what ADR 0051 has always written; the
-# other two split it by whether the simulated caller was pressing at that point,
-# so that F-62's "composure under pressure" has something behind it other than
-# an opinion. A row is about exactly one of the three.
-#
-# A value and not a NULL for the whole call, deliberately: Postgres does not
-# collapse NULLs in a unique index, so `UNIQUE(session, metric, segment)` with a
-# nullable column would let two whole-call speaking rates exist side by side --
-# exactly the invariant ADR 0051 put that constraint there to protect.
+# Measurement.segment (ADR 0081): the whole call, or the pressing stretches and
+# the rest. The whole call is a value, not NULL: Postgres treats NULLs as
+# distinct in a unique index, so `UNIQUE(session, metric, segment)` would admit
+# two whole-call rows for one metric.
 SEGMENT_CALL = "call"
 SEGMENT_PRESSURE = "pressure"
 SEGMENT_REST = "rest"
@@ -136,19 +97,9 @@ VISIBILITY_TENANT = "tenant"
 VISIBILITY_PUBLIC = "public"
 VISIBILITIES = (VISIBILITY_PRIVATE, VISIBILITY_TENANT, VISIBILITY_PUBLIC)
 
-# Scenario.category (ADR 0072): what kind of call a Scenario is, and the
-# vocabulary the library's category filter runs on. A closed CHECK-enforced
-# list, unlike the free-text `scenario_type` it replaces -- that one had no
-# vocabulary and no reader, and both are why it went.
-#
-# Four values refining F-03's three call contexts: `operations` is F-03's short
-# support cases, `requirements` its consultative project talks, and `pricing` /
-# `closing` split its offer-and-pricing calls, because negotiating a rate and
-# getting a signature are different exercises.
-#
-# NULL is allowed and means "not categorised": an authored row from before this
-# column existed has no value to backfill with, and inventing one would file it
-# under a context nobody chose. Such a row shows under "Alle" and nowhere else.
+# Scenario.category (ADR 0072): the kind of call, for the library filter. Four
+# values refining F-03's three contexts (pricing and closing split its offer
+# calls). NULL means "not categorised" and shows only under "Alle".
 CATEGORY_OPERATIONS = "operations"
 CATEGORY_REQUIREMENTS = "requirements"
 CATEGORY_PRICING = "pricing"
@@ -197,11 +148,8 @@ METRIC_ASPECTS = (ASPECT_HOW, ASPECT_WHAT)
 
 
 def _one_of(column: str, values: tuple[str, ...]) -> CheckConstraint:
-    """A CHECK restricting `column` to `values`.
-
-    Plain columns with a CHECK rather than a Postgres ENUM type: adding a value
-    later is a one-line constraint swap instead of an ALTER TYPE that cannot run
-    inside a transaction.
+    """A CHECK restricting `column` to `values`. Not a Postgres ENUM: adding a
+    value is a constraint swap, not an ALTER TYPE outside a transaction.
     """
     allowed = ", ".join(f"'{v}'" for v in values)
     return CheckConstraint(f"{column} IN ({allowed})", name=f"{column}_valid")
@@ -219,11 +167,8 @@ def _tenant_visibility_needs_a_tenant() -> CheckConstraint:
 def _brief_only_on_a_reverse() -> CheckConstraint:
     """The briefing belongs to a reverse and to nothing else (ADR 0070).
 
-    Deliberately not the stronger `reverse => origin_session_id IS NOT NULL`:
-    the origin Session is `ON DELETE SET NULL`, so a reverse whose original
-    conversation has been deleted is a legitimate row that such a constraint
-    would forbid the database from producing.
-    """
+    Not `reverse => origin_session_id IS NOT NULL`: the origin is SET NULL on
+    delete, so a reverse outliving its Session is a legitimate row."""
     return CheckConstraint(
         "reverse OR reverse_brief IS NULL",
         name="brief_only_on_a_reverse",
@@ -231,17 +176,11 @@ def _brief_only_on_a_reverse() -> CheckConstraint:
 
 
 class AuthoredContent:
-    """The columns shared by the `scenario` table and, for schema symmetry, the
-    `persona` table. A mixin so the set is defined once and cannot drift between
-    the two.
+    """Authorship columns shared by `scenario` and, for symmetry, `persona`.
 
-    Three independent axes: `created_by` is authorship (ADR 0058), `tenant_id`
-    is ownership by a company (ADR 0060, NULL for a shipped built-in),
-    `visibility` is who may see the row. Only `scenario` rows are ever written
-    with non-default values here — Personas are curated (ADR 0058). Each table
-    still adds the CHECKs to its own `__table_args__`; they cannot live on the
-    mixin.
-    """
+    `created_by` (ADR 0058), `tenant_id` (ADR 0060) and `visibility` are
+    independent. Each table adds the CHECKs itself; they cannot live on a mixin.
+    Also what exempts a row from provision's deactivation sweep."""
 
     # Keycloak `sub` of the author, NULL on a shipped built-in. A plain string
     # with no foreign key, for the same reason `session.subject_id` is one
@@ -276,12 +215,9 @@ class AuthoredContent:
 
 
 class Tenant(Base):
-    """A company whose members share the Scenarios they author (ADR 0060,
-    R-58). Seeded by hand for the pilot (`solox`, `appollo`) plus a `default`
-    tenant for Users with no company. `extern_ref` is the stable key a request
-    resolves to — a Keycloak Organization alias once that is enabled (phase 2),
-    the seed key until then. Not deactivated: an authored row keeps pointing at
-    the tenant it belonged to."""
+    """A company whose members share the Scenarios they author (ADR 0060, R-58).
+    Seeded: the pilot tenants plus `default`. `extern_ref` is the key a request
+    resolves to. Never deactivated: authored rows keep pointing at it."""
 
     __tablename__ = "tenant"
     tenant_id: Mapped[int] = mapped_column(primary_key=True)
@@ -290,13 +226,9 @@ class Tenant(Base):
 
 
 class Persona(AuthoredContent, Base):
-    """The simulated conversation partner. This table — not `backend/personas.py`
-    — is the source of truth (ADR 0041); that module only seeds it.
-
-    Personas are curated, not User-authored (ADR 0058) — the `AuthoredContent`
-    columns are here only for schema symmetry with `scenario` and never get a
-    non-default value. A Persona has exactly one Language and one voice per TTS
-    backend (ADR 0043).
+    """The simulated conversation partner; this table is the source of truth
+    (ADR 0041). Curated, not User-authored (ADR 0058): the `AuthoredContent`
+    columns are only for symmetry. One Language and one voice (ADR 0043).
     """
 
     __tablename__ = "persona"
@@ -309,27 +241,19 @@ class Persona(AuthoredContent, Base):
         Index("ix_persona_tenant_id_visibility", "tenant_id", "visibility"),
     )
     persona_id: Mapped[int] = mapped_column(primary_key=True)
-    # e.g. thomas-brandt-ceo. Nullable for symmetry with `scenario.key`
+    # e.g. andreas-kastner-ceo. Nullable for symmetry with `scenario.key`
     # (ADR 0058), though every Persona is a built-in and does carry a slug.
     key: Mapped[str | None] = mapped_column(String(60), unique=True)
     name: Mapped[str] = mapped_column(String(120))
-    # Display field: where this Persona's portrait is served from, e.g.
-    # /personas/andreas-kastner.webp. A path, not the image: the file is a
-    # frontend build asset like every other one, and the row only says which of
-    # them belongs to this Persona -- so a new Persona still arrives as a seed
-    # change plus a file, with no code to touch. Nullable, and the UI falls back
-    # to the Persona's initials without one.
+    # A path into the frontend's static files (e.g. /personas/andreas-kastner.webp),
+    # not the image. Nullable; the UI then shows initials.
     avatar_url: Mapped[str | None] = mapped_column(String(200))
     # Display field: the label on the selection card, in the UI language. The
     # prompt fields below are English (ADR 0043), so the two audiences this one
     # column used to serve at once are two columns now.
     role_label: Mapped[str] = mapped_column(String(120))
     role: Mapped[str] = mapped_column(String(120))
-    # Text, not a capped column, and for the same reason `traits_label` below is:
-    # this is prose about a character, and 120 characters was a guess that the
-    # seed outgrew the moment a Persona's role was trimmed to the position alone
-    # and what the role implied moved in here. A cap that silently decides how a
-    # Persona may be described is worse than no cap.
+    # Text, not capped: prose about a character.
     traits: Mapped[str] = mapped_column(Text)
     # Display counterpart of `traits`, in the UI language, for the info panel on
     # the selection card. Nullable because it is display-only: a Persona without
@@ -405,21 +329,13 @@ class Scenario(AuthoredContent, Base):
     # in the UI language. Deliberately short -- read at a glance, not by the
     # model.
     short_description: Mapped[str] = mapped_column(String(240))
-    # Prompt fields, English (ADR 0043). `description` is the situation alone;
-    # the three below carry the case (ADR 0045) -- what is true of it, what the
-    # caller wants out of the call, and when the caller counts the matter as
-    # settled. They are about the *case*, never about the caller, which is what
-    # lets any Persona run any Scenario (ADR 0001, ADR 0015). All three may be
-    # empty: a Scenario without them falls back to the improvisation the frame
-    # asked for before, which is what ADR 0024's user-authored ones will be.
+    # Prompt fields, English (ADR 0043): the situation, then the case (ADR 0045).
+    # About the case, never the caller, so any Persona can run any Scenario
+    # (ADR 0001/0015). May be empty; the model then improvises.
     description: Mapped[str] = mapped_column(Text)
     case_facts: Mapped[str] = mapped_column(Text)
-    # Display twins of the two above, in the UI language, for the read view
-    # behind a card (ADR 0062). The prompt fields stay English so a Persona's
-    # language decides the call's (ADR 0043); these are the same content
-    # written for a person. Only the seed writes them: an authored Scenario
-    # is already in its author's language, so both are NULL there and the
-    # API falls back to the prompt field itself.
+    # German display twins of the two above (ADR 0062). Seed-only: an authored
+    # Scenario is NULL here and the API falls back to the prompt field.
     description_label: Mapped[str | None] = mapped_column(Text)
     case_facts_label: Mapped[str | None] = mapped_column(Text)
     # What the caller wants *and* the bar they judge it by, in one field. They
@@ -428,26 +344,18 @@ class Scenario(AuthoredContent, Base):
     # same way anyway -- silently, against what has actually been said, never
     # recited back.
     call_goal: Mapped[str] = mapped_column(Text)
-    # Display field, in the UI language, addressed to the *trainee* and never
-    # to the model (ADR 0054): the role they answer in, the room they have, and
-    # what counts as a good outcome. It is the counterpart of the four fields
-    # above -- one case from two sides -- and the reason it must stay out of the
-    # prompt is the defect ADR 0045 removed: handing the trainee's objective to
-    # the caller had the caller pursuing it. Empty is allowed; a Scenario
-    # without one briefs nobody, which is where every row stood before ADR 0054.
+    # Display text for the *trainee* (ADR 0054): role, room, good outcome. Never
+    # put it in the prompt -- a caller handed the trainee's objective pursues it
+    # (ADR 0045). May be empty.
     briefing: Mapped[str] = mapped_column(Text, default="")
     # Display/filter field, never read by the prompt (ADR 0072): one of
     # SCENARIO_CATEGORIES, or NULL for a Scenario that was never categorised.
     # The CHECK above is NULL-tolerant, which is what allows that.
     category: Mapped[str | None] = mapped_column(String(20))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-    # The Session whose Feedback this Scenario was drafted from (ADR 0069),
-    # NULL for every hand-authored row and every built-in. Unique, so the
-    # worker cannot draft a second one for the same Session -- which is what
-    # scripts/requeue_feedback.py would otherwise cause.
-    # `SET NULL` rather than a cascade: a later Session may have been played on
-    # this row, and `session.scenario_id` is NOT NULL with no `ondelete`
-    # (ADR 0026), so the row outlives its source, deactivated (deletion.py).
+    # The Session this follow-up was drafted from (ADR 0069); UNIQUE, one per
+    # Session. SET NULL, not cascade: later Sessions may reference this row via
+    # the NOT NULL `session.scenario_id`, so it outlives its source (deletion.py).
     derived_from_session_id: Mapped[int | None] = mapped_column(
         # use_alter: this edge and `session.scenario_id` point at each other, and
         # without it SQLAlchemy cannot order the two tables and warns on every
@@ -458,30 +366,13 @@ class Scenario(AuthoredContent, Base):
     )
 
     # --- Reverse (ADR 0070) -------------------------------------------------
-    # A reverse replays one finished Session with the roles swapped: the User
-    # calls and the Persona answers. A column rather than a convention in the
-    # Scenario text because four readers branch on it -- the prompt casting
-    # (`session/prompting.py`), the wrap-up's speaker labels, the library
-    # filter and the briefing panel. That is exactly what the free-text
-    # `scenario_type` label had never had (removed by migration `e4a9c07b2f31`;
-    # ADR 0072's closed `category` replaces it).
-    #
-    # Distinct from `derived_from_session_id` above, which is the follow-up's
-    # provenance (ADR 0069): that one says a Scenario was *written from* a
-    # Session, this one says it *replays* one, and only this one changes how
-    # the call is cast. A row is at most one of the two.
+    # Replays one finished Session with the roles swapped. A column because the
+    # prompt casting, the wrap-up, the library filter and the briefing panel
+    # branch on it. A row is a reverse or a follow-up, never both.
     reverse: Mapped[bool] = mapped_column(Boolean, default=False)
-    # The Session this replays. UNIQUE, so the button is idempotent: one
-    # reverse per Session, and a second press finds the row rather than making
-    # a second one. `SET NULL` and not `CASCADE` -- the exception ADR 0052
-    # names for a back-reference, and the direction matters here: a *reverse
-    # Session* points at this row through `session.scenario_id`, so the row has
-    # to outlive the conversation it came from. What it keeps is the case and a
-    # briefing, never the original transcript.
-    #
-    # No `index=True` beside the unique constraint (ADR 0052): the unique index
-    # is already an index on this column, and a second one would be dead weight
-    # on every write.
+    # The Session this replays. UNIQUE, so the button is idempotent. SET NULL,
+    # not CASCADE: reverse Sessions reference this row, so it must outlive its
+    # origin (ADR 0052). No `index=True`: the unique index already is one.
     origin_session_id: Mapped[int | None] = mapped_column(
         # use_alter for the same reason as the provenance edge above: three
         # foreign keys now run between these two tables, and without it
@@ -549,28 +440,18 @@ class MetricType(Base):
 
 class Session(Base):
     """One simulated conversation. Written once, after it has ended (ADR 0034);
-    a Session that the client abandoned mid-call never reaches this table."""
+    one the client abandoned mid-call is stored as `aborted`."""
 
     __tablename__ = "session"
     __table_args__ = (_one_of("status", SESSION_STATUSES),)
 
     session_id: Mapped[int] = mapped_column(primary_key=True)
-    # The id the client sees and later names the Session by (ADR 0050). Random
-    # rather than the primary key: the wire never exposes a guessable sequence
-    # number, and being unguessable is what keeps one user's Session from
-    # another's. Defaulted so a caller without one still gets a valid id; the
-    # live path passes its own, because session_ws.py hands the id to the
-    # client when the socket opens, long before this row is written.
+    # The unguessable id the client sees (ADR 0050). The live path passes its
+    # own: session_ws.py hands it out long before this row is written.
     extern_id: Mapped[uuid.UUID] = mapped_column(Uuid, unique=True, default=uuid.uuid4)
-    # The caller's Keycloak "sub" claim (ADR 0009/0031), taken from the
-    # WebSocket handshake. Indexed although it is not a foreign key. ADR 0052
-    # left it unindexed while nothing queried it; the Session history reads by
-    # this column and nothing else (F-13/F-48), which is the condition ADR 0028
-    # named for revisiting. Three columns stand in that exception today, each
-    # for a named read path and none on suspicion: this one, `consent.subject_id`
-    # (the newest decision per subject) and `AuthoredContent.created_by` (a
-    # User's own Scenarios). Keep the list here complete -- a rule with an
-    # unmaintained exception list stops being checkable.
+    # Keycloak "sub" (ADR 0009/0031). Indexed though not an FK, for the history
+    # (F-13/F-48). ADR 0052's exceptions, each for a named read path: this,
+    # `consent.subject_id` and `AuthoredContent.created_by` -- keep the list complete.
     subject_id: Mapped[str] = mapped_column(String(64), index=True)
     persona_id: Mapped[int] = mapped_column(ForeignKey("persona.persona_id"), index=True)
     scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id"), index=True)
@@ -614,12 +495,8 @@ class Session(Base):
 class Turn(Base):
     """One utterance by one speaker, in the order it was spoken.
 
-    A Turn in the domain sense is an exchange (see CONTEXT.md), and that is how
-    backend/session/models.py holds it in memory — but it is stored flattened,
-    one row per speaker, because that is what makes the Gesprächsprotokoll
-    timestamped: each row carries its own offset into the Session.
-    `utterances()` is the single place that performs the flattening.
-    """
+    A domain Turn is an exchange (CONTEXT.md); stored flattened, one row per
+    speaker with its own offset, by `feedback/calls.py`'s `utterances()`."""
 
     __tablename__ = "turn"
     __table_args__ = (
@@ -651,46 +528,16 @@ class Turn(Base):
     # could not be analysed, or a Persona line whose synthesis failed.
     duration_ms: Mapped[int | None] = mapped_column(Integer)
     transcript: Mapped[str] = mapped_column(Text)
-    # True on a Persona utterance that was cut back to the part the user
-    # actually heard (ADR 0035). The transcript already carries a visible
-    # "... [unterbrochen]" for the reader, but that is a display decision;
-    # anything computing on it -- the interruption classification of F-51 --
-    # needs a field, not a string match on a marker somebody may reword.
-    # Always False on a user utterance: the Persona never talks over the user.
+    # True on a Persona utterance cut back to what the user heard (ADR 0035).
+    # F-51 computes on this, never on the "[unterbrochen]" display marker.
     interrupted: Mapped[bool] = mapped_column(Boolean, default=False)
-    # What had been synthesized but not yet played when the user cut in (F-51),
-    # so the wrap-up can show what the Persona had been about to say. NULL
-    # everywhere else, including on an interrupted line recorded before this
-    # column existed.
-    #
-    # Deliberately kept out of `transcript`: that column is what was actually
-    # said in the call, and ADR 0035 keeps it and the model's history to the
-    # heard words exactly. This is the counterfactual beside it, never part of
-    # it.
+    # Synthesized but unplayed when the user cut in (F-51). Kept out of
+    # `transcript`, which holds the heard words only (ADR 0035).
     unheard_text: Mapped[str | None] = mapped_column(Text)
-    # The raw paraverbal facts measured while this utterance's audio was still
-    # in memory: speaking and phonation time, the pauses inside it, its stretch
-    # of the loudness curve, and whether the measurement succeeded at all
-    # (ADR 0048). User rows only; NULL on a Persona row and on every row
-    # recorded before ADR 0081.
-    #
-    # This is the one place the schema keeps a number per utterance, and it is
-    # the exception ADR 0081 takes to ADR 0051 -- narrowly. These are *raw
-    # facts*, not statistics: no rate, no share, nothing derived and nothing
-    # anybody is shown. ADR 0051's rule is that a figure the user reads
-    # describes the whole call, and that is untouched; every Measurement still
-    # spans a stretch of conversation rather than one utterance.
-    #
-    # It exists because the audio is gone by the end of the call (ADR 0048) and
-    # which stretch of a call was demanding is decided later, by the wrap-up.
-    # Without these the worker would have nothing left to measure, and any
-    # later change to how a call is divided would reach no stored Session --
-    # the recurring cost this codebase pays elsewhere for not keeping them.
-    #
-    # JSON and not six columns: nothing queries inside it, Python is its only
-    # reader (`feedback/segments.py` folds it straight back into the in-memory
-    # `Turn` the derivations already take), and its shape follows what
-    # `acoustics.py` measures, which is where it belongs.
+    # Raw per-utterance acoustic facts, kept because the audio is gone after the
+    # call (ADR 0048) and the stretches are split later. ADR 0081's narrow
+    # exception to ADR 0051: raw facts only, never statistics, never shown.
+    # User rows only. JSON: nothing queries inside it (`feedback/segments.py`).
     acoustics_json: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
     # True on a Persona utterance the wrap-up marked as pressing: an objection,
     # a demand, a question the trainee was under pressure to answer (ADR 0081).
@@ -706,29 +553,13 @@ class Turn(Base):
 class Measurement(Base):
     """One metric measured over one stretch of the Session (ADR 0051, ADR 0081).
 
-    Not per Turn: none of the metrics (talk share, questions, speaking pace,
-    word count, reaction time, pauses) is meaningful for a single
-    utterance, and the frame of reference of every figure shown is a stretch of
-    conversation.
-
-    `segment` says which stretch. `call` is the whole of it and is the only
-    value ADR 0051 knew; `pressure` and `rest` are the same metric over the
-    exchanges the wrap-up marked as demanding and over the remainder, which is
-    what gives "composure under pressure" a measurement instead of an opinion.
-    Exactly one row per Session, metric and segment.
-    """
+    Never per Turn. `segment` is the whole `call`, or the `pressure`/`rest`
+    stretches; exactly one row per Session, metric and segment."""
 
     __tablename__ = "measurement"
     __table_args__ = (
-        # "Exactly one set per Session" is the invariant the docstring above
-        # states; this is what enforces it. Without it a second writer -- a
-        # retried job, a future "recalculate" -- would store a second speaking
-        # rate for the same call and the wrap-up would show both.
-        #
-        # Widened by ADR 0081 to include the segment, which is why that column
-        # is NOT NULL with a real value for the whole call: a nullable one
-        # would take the whole-call rows out of the constraint's reach, since
-        # Postgres treats two NULLs as distinct.
+        # Keeps a retried writer from storing a second figure. `segment` is
+        # NOT NULL for this reason: NULLs are distinct in a unique constraint.
         UniqueConstraint("session_id", "metric_type_id", "segment"),
         _one_of("segment", MEASUREMENT_SEGMENTS),
     )
@@ -752,23 +583,9 @@ class Measurement(Base):
 
 
 class Finding(Base):
-    """A noteworthy observation about the Session — the qualitative counterpart
-    to a Measurement.
-
-    Written since F-51: one row per hard interruption, by
-    `session/persistence.py` when a call ends and by
-    `scripts/backfill_interruptions.py` for Sessions recorded earlier. Read back
-    on the Session detail route (`api/sessions.py`) and in the subject's export
-    (`api/account.py`). It stood empty for a while and this said so, long after
-    it stopped being true.
-
-    What ADR 0051 rules out is still ruled out: a Finding is an event that
-    occurred at a moment, never a value judged against a threshold. Nothing
-    writes one because a figure crossed a line. Its `description` is German
-    prose about how the User conducted the call, so it is personal data and
-    every deletion path has to reach it -- which it does, through the Session's
-    cascade (ADR 0026/0052).
-    """
+    """An event at a moment in the Session, never a figure judged against a
+    threshold (ADR 0051). Written per hard interruption (F-51). `description` is
+    personal data, reached by every deletion path through the Session cascade."""
 
     __tablename__ = "finding"
     __table_args__ = (
@@ -809,22 +626,11 @@ class Feedback(Base):
         ForeignKey("session.session_id", ondelete="CASCADE"), unique=True
     )
     summary: Mapped[str] = mapped_column(Text)
-    # F-42, phase-appropriate language: one short narrative about how the
-    # trainee's register moved across the three phases of the call. Prose and
-    # not a Measurement, because the thing being described is a change of tone
-    # over time, which no single number carries -- and a number here would need
-    # a norm nobody measured (ADR 0051). Nullable: it is written by the same
-    # model call as `summary`, so a wrap-up that fell back to narrative-only,
-    # or one generated before this column existed, legitimately has none.
+    # F-42: how the register moved across the call's phases. Prose, not a
+    # Measurement (ADR 0056). Nullable for older or fallback wrap-ups.
     phase_language: Mapped[str | None] = mapped_column(Text)
-    # Whether the tone of voice suited the occasion of this call. Prose for the
-    # same reason `phase_language` is (ADR 0056): what counts as the right
-    # register for a complaint is not the same as for a price negotiation, and
-    # no measured norm exists for either, so a figure here would be the
-    # invented threshold ADR 0051 refused. The paragraph is what closes the gap
-    # F-35's own caveat names -- how much melody is appropriate depends on the
-    # occasion, and until now nothing in the application said which occasion
-    # this was. Nullable on the same grounds as the column above.
+    # Whether the tone suited this call's occasion (ADR 0079). Prose: no measured
+    # norm exists (ADR 0051/0056). Nullable like the column above.
     tone_fit: Mapped[str | None] = mapped_column(Text)
     score: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -861,20 +667,10 @@ class FeedbackPoint(Base):
     metric_type_id: Mapped[int | None] = mapped_column(
         ForeignKey("metric_type.metric_type_id"), index=True
     )
-    # Which of F-62's focus goals this point is about, assigned by the wrap-up
-    # as it writes the point. A reference table like the one above, so no
-    # ondelete here either.
-    #
-    # This is what makes a point countable across a user's trainings, and it is
-    # the whole of the dashboard's stage 2: "the closing was named as an
-    # improvement in 4 of 8 wrap-ups" is a frequency of statements, not a
-    # measurement of a person, which is what keeps it inside ADR 0004/0065.
-    # A closed vocabulary and not free text, because two spellings of the same
-    # weakness would count as two.
-    #
-    # Nullable in three cases that mean different things and all end up NULL: a
-    # point about nothing in the catalogue, a model answer that left the key
-    # out, and every wrap-up written before this column existed.
+    # The F-62 focus goal this point is about (ADR 0080), so points can be counted
+    # across trainings -- a closed vocabulary, since two spellings would count as
+    # two. Reference table, so no ondelete. NULL: no matching goal, key omitted
+    # by the model, or written before the column existed.
     focus_goal_id: Mapped[int | None] = mapped_column(
         ForeignKey("focus_goal.focus_goal_id"), index=True
     )
@@ -893,21 +689,9 @@ class FeedbackPoint(Base):
 class Consent(Base):
     """One recorded consent decision (ADR 0066).
 
-    Append-only: granting, withdrawing and granting again write three rows, and
-    the current state is the newest of them. A decision is a thing that
-    happened at a moment, so overwriting the previous one would destroy the
-    only evidence that it was ever made -- which is exactly what a consent
-    record exists to keep.
-
-    Not a foreign key to anything, for the same reason `Session.subject_id` is
-    not (ADR 0031): identity lives in Keycloak and there is no local User table
-    for one to point at. Indexed, because every Session that ends asks this
-    table whether it may be stored.
-
-    `version` is the wording the subject actually agreed to. A changed notice
-    means a new version, which makes every earlier decision stale and prompts
-    again -- consent to a text nobody showed them is not consent.
-    """
+    Append-only, newest row wins: overwriting would destroy the evidence. No FK
+    (identity is Keycloak's, ADR 0031). `version` is the wording agreed to; a
+    new one makes every earlier decision stale."""
 
     __tablename__ = "consent"
     __table_args__ = (
@@ -927,18 +711,8 @@ class Consent(Base):
 
 class RetentionPreference(Base):
     """Whether one subject's Sessions are swept after the retention period
-    (ADR 0067).
-
-    One row per subject, and only for subjects who changed the default: the
-    absence of a row means the sweep applies, which is what makes the retention
-    period the default rather than something each account has to be opted into.
-
-    Deliberately its own table rather than a column on `session`. The choice is
-    about an account and not about a call, and putting it on the Session would
-    mean deciding, per row, what a Session written before the choice inherits.
-
-    Not a foreign key, for the same reason `Session.subject_id` is not
-    (ADR 0031): identity lives in Keycloak.
+    (ADR 0067). A row only for subjects who changed the default: no row means
+    the sweep applies. Per account, not per Session; no FK (ADR 0031).
     """
 
     __tablename__ = "retention_preference"
@@ -954,18 +728,9 @@ class RetentionPreference(Base):
 
 
 class FocusGoal(Base):
-    """One selectable training focus (F-62, ADR 0076).
-
-    A reference table like `metric_type`: the catalogue is shipped, seeded from
-    backend/db/seed_data.py and never written by a User. What a User owns is a
-    *selection* over it, which is the two tables below.
-
-    The German display text lives in these rows, exactly as a Scenario's title
-    does — it is content, not a label the interface could derive. What stays
-    English is the `key` the wire and the code use (ADR 0057/0061).
-
-    Retired goals are deactivated, never deleted: `focus_selection_goal`
-    references them, and a selection made last month has to stay readable.
+    """One selectable training focus (F-62, ADR 0076): a seeded reference table
+    with German display text and an English `key`. Retired goals are
+    deactivated, never deleted, since selections reference them.
     """
 
     __tablename__ = "focus_goal"
@@ -1001,14 +766,8 @@ class FocusGoal(Base):
 class FocusSelection(Base):
     """That one subject has answered the focus question, and when (ADR 0076).
 
-    Its own row rather than a flag derived from the goals below, because
-    "picked no focus" and "was never asked" are different states and the
-    interface has to tell them apart: the first must never re-open the dialog,
-    the second always must. A subject who continues without a focus has a row
-    here and none in `focus_selection_goal`.
-
-    Not a foreign key, for the same reason `Session.subject_id` is not
-    (ADR 0031): identity lives in Keycloak and there is no local User table.
+    Its own row because "picked no focus" and "never asked" must differ, or the
+    dialog re-opens forever. No FK (ADR 0031).
     """
 
     __tablename__ = "focus_selection"
@@ -1035,12 +794,8 @@ class FocusSelection(Base):
 
 
 class FocusSelectionGoal(Base):
-    """One goal a subject is currently focusing on (ADR 0076).
-
-    An ownership edge on the selection side (CASCADE) and a reference edge on
-    the catalogue side (no ondelete), which is the same split the rest of the
-    schema uses: replacing a selection removes its rows, while a FocusGoal with
-    selections behind it must not be deletable at all.
+    """One goal a subject is currently focusing on (ADR 0076). CASCADE from the
+    selection, no ondelete towards the catalogue.
     """
 
     __tablename__ = "focus_selection_goal"

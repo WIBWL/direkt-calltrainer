@@ -1,25 +1,8 @@
-"""
-Generates the ER diagram FROM the SQLAlchemy models (backend/db/models.py).
+"""Generates the ER diagram from Base.metadata (backend/db/models.py); needs no database.
 
-Single source of truth: derived from Base.metadata, so it can never drift from
-the real schema. Needs NO running database (an empty in-memory SQLite).
-
-Styling follows the design system (blue ramp): navy carries the headers,
-mid-blue the connections, paper the surface, IBM Plex Mono the "labels & data".
-PK/FK are marked on the columns; the layout is orthogonal and airy (clear by
-default).
-
-Usage (from the project root, with the .venv active):
-    python scripts/generate_erd.py
-
-Writes docs/diagrams/er_model.svg. That folder is gitignored: the
-diagram is generated on demand and never committed, so no stale copy exists.
-
-Prerequisites:
-    pip install -r requirements.txt          (sqlalchemy-schemadisplay, pydot)
-    brew install graphviz                    (the "dot" binary)
-    brew install --cask font-ibm-plex-mono   (optional, for the exact font)
-"""
+Usage (project root, .venv active):  python scripts/generate_erd.py
+Writes docs/diagrams/er_model.svg (gitignored, never committed). Needs requirements.txt
+(sqlalchemy-schemadisplay, pydot), Graphviz `dot`, optionally the IBM Plex Mono font."""
 import os
 import sys
 

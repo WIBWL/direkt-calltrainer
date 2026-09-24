@@ -1,28 +1,8 @@
 """Shared test fixtures.
 
-Two suites share this file. Most tests fake the STT/LLM/TTS pipeline and never
-touch a database; the persistence tests get a real one, created fresh per test
-and dropped afterwards, so a failing test can never leave the development
-database half-migrated and tests cannot see each other's rows.
-
-That split is why the POSTGRES_* settings are claimed with deliberately
-unusable values below, before the backend is imported: a test that does not ask
-for a database must not be able to reach the real one by accident. The
-persistence fixtures read .env separately (`_ENV`, via dotenv_values, which
-leaves os.environ alone) and inject only their own throwaway database, for the
-duration of the test. Without those settings in .env, or without a reachable
-server, they skip rather than fail, so a checkout without Postgres still gets a
-green run of everything else.
-
-The backend reads a handful of environment variables at import time
-(`backend/clients/config.py`), so they are set here *before* any backend
-module is imported. Values are dummies: no test in this suite makes a real
-network call — every pipeline backend (STT / LLM / TTS) is faked.
-
-The KugelAudio client is constructed with a dummy key and never reaches the
-network: every call into it is patched, in `test_tts_fallback.py` by standing
-in for the SDK object itself.
-"""
+Most tests fake STT/LLM/TTS and never touch a database; the persistence tests get
+a throwaway database per test and skip without a reachable Postgres. The backend
+reads its environment at import time, so it is set up below before any import."""
 
 # The env vars below must be set before backend imports run, so those imports
 # deliberately sit after this block.
@@ -39,21 +19,12 @@ os.environ.setdefault("KUGELAUDIO_MODEL", "test-kugelaudio-model")
 os.environ.setdefault("KUGELAUDIO_API_KEY", "test-kugelaudio-key")
 os.environ.setdefault("OIDC_ISSUER", "http://keycloak.test.invalid/realms/direkt")
 
-# Deliberately unusable credentials, and the reason they are set here at all:
-# backend/clients/config.py calls load_dotenv() when the backend is first
-# imported, which would otherwise put the developer's real POSTGRES_* into the
-# environment for the whole test session. Claiming them first is what keeps a
-# stray session_scope() out of the development database — it fails to connect
-# instead of quietly writing to it. The database fixtures below override all
-# three for the duration of a test that actually asks for one.
-#
-# Assigned, not setdefault: a variable that is already set would win, and that
-# is exactly the case worth guarding against. Running the suite inside the app
-# container is one — compose loads .env through `env_file`, so the real
-# settings are in the environment before pytest starts, and setdefault left the
-# guard switched off precisely where it was needed. Overriding cannot break the
-# database tests: they read .env directly (`_ENV`, via dotenv_values below) and
-# never consult the environment for the server they connect to.
+# Deliberately unusable credentials: backend/clients/config.py calls load_dotenv()
+# on import, which would otherwise put the real POSTGRES_* into the environment and
+# let a stray session_scope() write to the development database.
+# Assigned, not setdefault: inside the app container compose has already loaded
+# .env, and setdefault would leave the guard off exactly there. The database
+# fixtures read .env themselves (`_ENV`) and override these per test.
 os.environ["POSTGRES_USER"] = "calltrainer-test-no-such-user"
 os.environ["POSTGRES_PASSWORD"] = "not-a-real-password"
 os.environ["POSTGRES_DB"] = "calltrainer-test-no-such-database"
@@ -153,13 +124,7 @@ REPO = Path(__file__).resolve().parent.parent
 
 
 def load_seed_module():
-    """The library's initial content (ADR 0041).
-
-    It moved from `scripts/seed_reference_data.py` into `backend/db/seed_data.py`
-    when provisioning became part of application startup, so this is a plain
-    import now -- kept as a function so the tests that check *what* the library
-    ships still have one place to get it from.
-    """
+    """The library's initial content (ADR 0041), from `backend/db/seed_data.py`."""
     from backend.db import seed_data  # pylint: disable=import-outside-toplevel
 
     return seed_data
@@ -197,10 +162,8 @@ def scenario():
 def fake_library(monkeypatch):
     """Serve the test doubles in place of the database-backed library.
 
-    ADR 0041 put the database on the Session's start path, so anything that
-    goes through `/api/personas` or the `/ws/session` handshake would otherwise
-    need one. Patched on the `library` module itself, which is how both call
-    sites look the functions up."""
+    Patched on the `library` module, where both call sites look the functions up.
+    """
     by_id = {p.id: p for p in TEST_PERSONAS}
     by_key = {s.id: s for s in TEST_SCENARIOS}
     # Personas are curated (no scoping); a Scenario read is scoped to the
@@ -218,10 +181,8 @@ def fake_library(monkeypatch):
 class FakeLLM:
     """Stand-in for `backend.clients.llm.stream_reply`.
 
-    Configure `.replies` with the successive full replies to stream (one per
-    call). Each reply is emitted as several token deltas so the chunker and
-    the streaming pipeline see realistic input. Set `.fail_times` to raise an
-    OpenAIError on the first N calls before serving a reply.
+    `.replies` are the successive full replies, each streamed as several token
+    deltas; `.fail_times` raises an OpenAIError on the first N calls.
     """
 
     def __init__(self, replies=None):
@@ -276,15 +237,10 @@ class FakeSTT:
 
 
 class FakeTTS:
-    """Stand-in for `backend.clients.tts.synthesize_stream` (+ one-shot
-    `synthesize`).
+    """Stand-in for `backend.clients.tts.synthesize_stream` (+ one-shot `synthesize`).
 
-    One attempt per chunk, like the real one since ADR 0103: any `fail_times`
-    raises `KugelAudioError` (-> `tts_failed`), because there is no second
-    backend to cover a blip. It mimicked a two-attempt KugelAudio->DiReKT
-    sequence until that fallback was removed. Set `.hang` to an
-    `asyncio.Event` to park synthesis (barge-in tests). `.chunks_per_call`
-    controls how many audio sub-chunks one text chunk yields.
+    One attempt per chunk (ADR 0103): `fail_times` raises `KugelAudioError`. `.hang`
+    (an `asyncio.Event`) parks synthesis; `.chunks_per_call` sets sub-chunks per chunk.
     """
 
     def __init__(self):
@@ -385,14 +341,8 @@ _DB_CONNECT_TIMEOUT = 3
 def _loopback(host: str) -> str:
     """`localhost` -> `127.0.0.1` for the test database server.
 
-    The persistence tests talk to a *local* Postgres — the `db` container's
-    forwarded port. On Windows `localhost` resolves to `::1` first, but Docker
-    Desktop's port forward binds IPv4 only, so every connect wastes the libpq
-    connect timeout on the v6 address before falling back — with dozens of
-    throwaway databases each opened several times, that turns a 45-second run
-    into minutes or an outright hang (the Alembic engine has no timeout at all).
-    Pinning the loopback name sidesteps it and changes nothing on a stack that
-    was already answering on v4. A real hostname in POSTGRES_HOST is left alone.
+    On Windows `localhost` resolves to `::1` first, but Docker Desktop forwards IPv4
+    only, so every connect waits out a timeout (Alembic's has none) and the run hangs.
     """
     return "127.0.0.1" if host in ("localhost", "::1") else host
 
@@ -423,10 +373,8 @@ def _server_url() -> URL:
 def database_env(url: str) -> Iterator[None]:
     """Puts the POSTGRES_* settings for `url` into the environment for the block.
 
-    Alembic's env.py and backend/db/session.py both call `build_database_url()`,
-    which assembles the connection from POSTGRES_*, so setting those is how a
-    test aims them at its own throwaway database. Restored afterwards, down to
-    "was not set before", so the next test starts unable to connect again.
+    That is how Alembic and `build_database_url()` are aimed at a test's database.
+    Restored afterwards, down to "was not set", so the next test cannot connect again.
     """
     parsed = make_url(url)
     values = {
@@ -451,13 +399,8 @@ def database_env(url: str) -> Iterator[None]:
 def _alembic_config() -> Config:
     """Alembic settings for a programmatic migration inside the test process.
 
-    `configure_logging=False` is the same opt-out `backend/db/provision.py`
-    uses, and for the same reason: migrations/env.py otherwise calls
-    fileConfig(), which disables every logger that already exists — including
-    the application's own. In the app that would silently cost logging for the
-    rest of the process; here it silently costs it for the rest of the test
-    session, which is how a test that asserts on log output came to fail only
-    when a database test happened to run before it.
+    `configure_logging=False`: env.py's fileConfig() otherwise disables every existing
+    logger for the rest of the session, breaking later tests that assert on logs.
     """
     config = Config(str(PROJECT_ROOT / "alembic.ini"))
     config.attributes["configure_logging"] = False
@@ -540,11 +483,8 @@ def db_session(migrated_database: str) -> Iterator[DbSession]:
 def app_database(migrated_database: str) -> Iterator[str]:
     """Points the *application's* engine at this test's throwaway database.
 
-    backend/db/session.py memoises its engine, so the settings override alone
-    would not reach it — reset_engine() is what makes it pick the test database
-    up, and again afterwards so the next test is unaffected. Needed by anything
-    that goes through session_scope() rather than taking a session as an
-    argument, which is every write path since ADR 0034.
+    session.py memoises its engine, so reset_engine() is needed before and after.
+    Required by anything going through session_scope() (every write path, ADR 0034).
     """
     with database_env(migrated_database):
         reset_engine()
@@ -554,11 +494,9 @@ def app_database(migrated_database: str) -> Iterator[str]:
 
 @pytest.fixture
 def seeded_database(app_database: str) -> str:
-    """`app_database`, with the reference tables filled from seed_data.py /
-    metrics.py — the state the application boots into.
+    """`app_database` with the reference tables seeded, as the application boots.
 
-    For the setup endpoints, which read the persona and scenario tables
-    (ADR 0041) and therefore have nothing to serve without this.
+    Needed by the setup endpoints, which read the persona/scenario tables (ADR 0041).
     """
     # Imported here so a collection-time import never needs the environment.
     from backend.db.provision import seed  # pylint: disable=import-outside-toplevel
@@ -659,13 +597,8 @@ def persist(  # pylint: disable=too-many-arguments
 ) -> uuid.UUID:
     """Write a Session through the real write path; returns its extern_id.
 
-    persist_session() opens its own session_scope(), so this needs the
-    `app_database` fixture rather than `db_session` — the two see the same
-    database, but only the former is what the application itself connects to.
-
-    `started_at` defaults to a fixed instant, so a test that does not care
-    about time gets a reproducible one; the history tests override it, because
-    the order the listing returns is the thing they are checking.
+    Needs `app_database`, since persist_session() opens its own session_scope().
+    `started_at` defaults to a fixed instant for reproducibility.
     """
     # Imported here, not at module scope: importing the write path pulls in
     # the feedback stack, which a collection-time import should not need.
@@ -704,15 +637,10 @@ def persist(  # pylint: disable=too-many-arguments
 
 @pytest.fixture
 async def api_client(app_database: str) -> AsyncIterator[httpx.AsyncClient]:  # pylint: disable=unused-argument
-    """The FastAPI app, wired to this test's throwaway database.
+    """The FastAPI app, wired to this test's throwaway database via `app_database`.
 
-    `app_database` is requested for its effect, not its value: it is what points
-    the application's engine at this test's database.
-
-    Driven through httpx's ASGI transport rather than Starlette's TestClient:
-    the pinned starlette (0.35) passes `app=` to httpx.Client, which httpx 0.28
-    no longer accepts. Going through the transport exercises the same ASGI
-    stack without touching either pin.
+    Uses httpx's ASGI transport, not Starlette's TestClient: the pinned starlette
+    (0.35) passes `app=` to httpx.Client, which httpx 0.28 rejects.
     """
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -722,15 +650,8 @@ async def api_client(app_database: str) -> AsyncIterator[httpx.AsyncClient]:  # 
 def stub_completions(monkeypatch, reply) -> list[tuple[list[dict[str, str]], bool]]:
     """Replace `llm.complete` and record what it was asked.
 
-    `reply` is the text to answer with, or a callable invoked with the messages
-    (to raise, or to answer differently per attempt). The returned list holds
-    one `(messages, think)` pair per call, so a test can assert both what the
-    model was told and that it was asked off the live path (ADR 0011).
-
-    Lives here rather than in the one test file that uses it (F-61's): the
-    follow-up's tests grew their own variant while this branch was away, and a
-    stub of the pipeline's own client belongs beside the other pipeline fakes
-    either way.
+    `reply` is the answer text, or a callable given the messages. Returns one
+    `(messages, think)` pair per call, so a test can check what the model was told.
     """
     calls: list[tuple[list[dict[str, str]], bool]] = []
 
@@ -752,12 +673,9 @@ def asked(calls, index: int = 0) -> str:
     return "\n".join(message["content"] for message in calls[index][0])
 
 
-# One finished exchange with both speech durations filled in. speaking pace, the
-# one metric the reference fixture seeds, is a rate over phonation -- without
-# them nothing is measured and a Session carries no statistics at all. What a
-# test needs when it wants a Session that looks real and does not care what was
-# said in it (F-61). Three user utterances, because the reverse and follow-up
-# routes refuse a call with fewer (`api/sessions.py::MIN_USER_UTTERANCES`).
+# One finished exchange with speech durations filled in, so pace (a rate over
+# phonation) is measured. Three user utterances, because the reverse and
+# follow-up routes refuse fewer (`MIN_USER_UTTERANCES`).
 DRAFTED_FROM_TURNS = [
     Turn(seq=1, persona_text="Brandt hier.", persona_offset_ms=0, persona_end_ms=1500),
     Turn(seq=2, user_text="Guten Tag, was kann ich für Sie tun?",
@@ -781,13 +699,10 @@ DRAFTED_FROM_TURNS = [
 def a_finished_session(
     turns=None, subject: str | None = None, started_at: datetime | None = None
 ) -> uuid.UUID:
-    """One Session written through the real write path, defaulting to
-    `DRAFTED_FROM_TURNS`.
+    """One Session written through the real write path, default `DRAFTED_FROM_TURNS`.
 
-    `subject` names someone other than the test caller, which is how the
-    ownership refusals are set up; `started_at` moves it in time, which is how
-    the retention tests put one past the period. Both are omitted rather than
-    passed as None, so `persist` keeps its own defaults.
+    `subject` sets another owner (ownership refusals); `started_at` moves it in time
+    (retention). Omitted rather than passed as None, so `persist` keeps its defaults.
     """
     kwargs: dict = {}
     if subject is not None:

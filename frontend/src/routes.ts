@@ -1,10 +1,6 @@
 /**
- * The app's URLs, in one place.
- *
- * Each path is written in the route table, in every link, and in the
- * post-login return — a typo in any one of them is a
- * silent redirect to the fallback rather than an error, which is exactly the
- * kind of bug that survives review.
+ * The app's URLs, in one place: a typo in the route table, a link or the
+ * post-login return is a silent redirect to the fallback, not an error.
  */
 export const ROUTES = {
   /** The training flow (setup → mic check → call → wrap-up). */
@@ -37,13 +33,9 @@ export const ROUTES = {
 } as const;
 
 /**
- * What the history hands the training flow when a follow-up (F-60) or a
- * reverse (F-61) is started from a past training, through the router's location
- * state.
- *
- * The two screens are separate routes, so there is no shared component state to
- * put a selection into — and a query parameter would survive a reload and start
- * the call again. The training screen consumes this once and clears it.
+ * Handed via location state when a follow-up (F-60) or reverse (F-61) is started
+ * from a past training. Not a query parameter, which would survive a reload and
+ * start the call again; the training screen consumes it once and clears it.
  */
 export interface TrainingStart {
   scenarioId: string;
@@ -56,11 +48,8 @@ export interface TrainingStart {
 }
 
 /**
- * The URL of one past training.
- *
- * Encoded even though the id is a UUID the server generated: this value comes
- * back over the wire, and building a URL by concatenation is exactly where an
- * unexpected one stops being a path segment.
+ * The URL of one past training. Encoded although the id is a server UUID: it
+ * comes over the wire, and an unexpected one must stay one path segment.
  */
 export function sessionPath(sessionId: string): string {
   return `/trainings/${encodeURIComponent(sessionId)}`;

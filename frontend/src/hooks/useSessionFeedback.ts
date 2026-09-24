@@ -5,11 +5,8 @@ import { getSession } from "../sessions";
 
 const POLL_INTERVAL_MS = 2000;
 // Must not be shorter than the backend's JOB_TIMEOUT_S (backend/feedback/
-// queue.py): giving up earlier reports a failure on work that is still running.
-// The wrap-up would still reach the training history once it lands, but this
-// screen would already have told the User it failed. Generation
-// is asked in thinking mode and may be retried once, so "a few seconds" no
-// longer bounds it. Only this block waits, the transcript renders either way.
+// queue.py), or this screen reports a failure on work still running.
+// Generation runs in thinking mode and may be retried once.
 const POLL_TIMEOUT_MS = 600_000;
 // A request that keeps failing outright is a broken backend, not a slow one.
 const MAX_CONSECUTIVE_ERRORS = 3;
@@ -26,16 +23,9 @@ interface Result {
 }
 
 /**
- * Polls the finished Session until its Feedback settles (ADR 0019 generates it
- * asynchronously, so it does not exist yet when the call ends).
- *
- * The backend writes the Session before it sends session.ended, so an absent
- * Session here is conclusive — the write failed — rather than the client being
- * early. Reading it goes through `sessions.getSession`, which is where that
- * answer is turned into a null.
- *
- * The wrap-up is the only thing it waits for: the follow-up Scenario is asked
- * for by the User and answered by its own request (ADR 0069's amendment).
+ * Polls the finished Session until its wrap-up settles (generated async, ADR 0019).
+ * The Session is written before session.ended, so an absent one (`getSession`
+ * null) means the write failed, not that the client is early.
  */
 export function useSessionFeedback(sessionId: string | null) {
   const [result, setResult] = useState<Result>(() => ({
@@ -97,13 +87,10 @@ export function useSessionFeedback(sessionId: string | null) {
     };
   }, [sessionId, attempt]);
 
-  // The render that hands in a new id comes *before* the effect that starts
-  // polling it, and a screen mounted in that same render runs its own effects
-  // first. So an answer about the previous id — during a call the id is null,
-  // which reads "missing" — must never be passed off as one about this id: the
-  // waiting screen took exactly that for a settled wrap-up and moved on before
-  // it was ever seen. Derived here rather than reset in the effect, which would
-  // be one render too late.
+  // A new id arrives a render before the effect that polls it, and a screen
+  // mounted in that render reads first: an answer about the previous id (null
+  // during a call, which reads "missing") must not pass as one about this id.
+  // Derived here because resetting in the effect is one render too late.
   if (result.sessionId !== sessionId) {
     return sessionId === null
       ? { detail: null, state: "missing" as const, restart }

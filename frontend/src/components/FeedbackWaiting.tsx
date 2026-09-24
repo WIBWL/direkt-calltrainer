@@ -12,10 +12,8 @@ const BARS = [26, 52, 74, 44, 96, 62, 34, 70, 40, 58, 28];
 const CAPTION_MS = 3400;
 
 /**
- * What the wait is actually spent on, in the order it roughly happens. Light,
- * because this screen is the pause after a conversation the User has just had
- * to concentrate through — but every line is true of what the worker is doing,
- * which is what keeps it from reading as filler.
+ * What the wait is actually spent on, roughly in order. Light in tone, but every line
+ * is true of what the worker is doing, which keeps it from reading as filler.
  */
 const CAPTIONS = [
   "Das Gespräch wird abgetippt …",
@@ -27,32 +25,16 @@ const CAPTIONS = [
 ];
 
 /**
- * How long this screen waits before handing over regardless.
- *
- * `useSessionFeedback` polls for ten minutes (twice the worker's own timeout), which
- * is the right patience for a block on a page and the wrong one for a screen
- * that holds nothing else: a wrap-up that takes that long is one the User
- * should be reading their transcript instead of waiting for. The poll is not
- * lost by moving on — it carries on behind the post-call screen, and the
- * wrap-up appears there when it lands.
+ * How long this screen waits before handing over regardless. `useSessionFeedback` polls
+ * for ten minutes, too long for a screen holding nothing else; the poll carries on behind
+ * the post-call screen, where the wrap-up appears when it lands.
  */
 const WAIT_LIMIT_MS = 120_000;
 
 /**
- * The screen between hanging up and the wrap-up (F-09/F-10): the report is
- * written in the worker (ADR 0049), so there is a real wait here, and it used
- * to be spent looking at a finished-looking page with one grey line on it
- * saying the interesting part was still coming.
- *
- * So the wait gets a screen of its own and something to watch. The animation
- * is the whole content — under `prefers-reduced-motion` the scene stands still
- * (see index.css) rather than being dropped, because unlike the die (F-62)
- * there is nothing behind it to skip to.
- *
- * It is never shown for a Session that was not stored: without consent there
- * is no wrap-up on the way (ADR 0066), and a wait for something that is not
- * coming is the one thing this screen must not be. The caller decides that —
- * see App.tsx, which only enters this screen with a `sessionId` in hand.
+ * The wait between hanging up and the wrap-up the worker writes (F-09/F-10, ADR 0049).
+ * Under `prefers-reduced-motion` the scene stands still rather than being skipped. Never
+ * shown for an unstored Session (ADR 0066): App.tsx enters it only with a `sessionId`.
  */
 export default function FeedbackWaiting({
   state,

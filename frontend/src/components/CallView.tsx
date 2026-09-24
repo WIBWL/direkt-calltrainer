@@ -31,13 +31,9 @@ interface CallViewProps {
 }
 
 /**
- * Presentational: the live-call screen (F-46 — mic status via the animation,
- * call duration, and the end-call button). One panel and nothing above it:
- * during a call the screen shows who is on the line, and the Scenario's name
- * is neither needed nor wanted there (see the note in the markup). The Session itself is owned and kept
- * alive at the App level (see App.tsx) so it can be pre-warmed before this
- * screen ever mounts — so the timer counts from mount, not from Session start,
- * which is close enough given pre-warm is at most a few seconds.
+ * Presentational: the live-call screen (F-46 — mic status, call duration, end-call
+ * button). It names no Scenario. The Session is owned at the App level so it can be
+ * pre-warmed; the timer therefore counts from mount, a few seconds late at most.
  */
 export default function CallView({
   personaName,

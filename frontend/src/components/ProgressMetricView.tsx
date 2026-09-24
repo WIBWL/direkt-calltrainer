@@ -19,22 +19,9 @@ import PartsStrip from "./PartsStrip";
 import Sparkline from "./Sparkline";
 
 /**
- * One metric across the trainings, the dashboard's second level
- * (docs/dashboard-concept.md, section 7).
- *
- * The table is not a fallback for the chart, it is the other half of it. Which
- * Scenario and which Persona a value came from is what makes it readable at
- * all: a talk share of 62 % in a support call and one in a price negotiation
- * are not the same observation, and the chart cannot say which is which. It is
- * also the accessible alternative, so nothing here exists only as a drawing.
- *
- * Every row links into the training it came from. That is the third and last
- * level, and it is the screen that already exists (`PastSessionView`).
- *
- * Under the table stands what the wrap-ups wrote about the focus goals this
- * metric is evidence for, quoted. Section 7 of the concept asks for it, and
- * it is the half a chart cannot carry: a figure says what happened, the
- * sentence says what it was like.
+ * One metric across trainings, the dashboard's second level (docs/dashboard-concept.md, section 7). The table is
+ * the chart's other half, not a fallback: the Scenario and Persona behind a value make it readable, and it is the
+ * accessible form. Rows link to `PastSessionView`; below, the wrap-ups' statements on the backed goals are quoted.
  */
 export default function ProgressMetricView() {
   const { metricKey } = useParams<{ metricKey: string }>();

@@ -6,13 +6,10 @@ import type { ScenarioCategory } from "./scenarioLibrary";
  * separately, immediately after the "meta"/"chunk" message that describes them.
  */
 
-/** The call's current phase: sets the wave's color and the sr-only label, and
- * gates whether the waveform reacts to audio at all — only "speaking" does;
- * the actual amplitude comes from useStreamedAudioPlayback's audioLevel, not
- * from this value (see CallAnimation). Usually driven by the server's `state`
- * message, but the client also sets it directly: optimistically on barge-in
- * (ADR 0035, useSessionSocket's sendInterrupt) and held at "speaking" while
- * trailing audio is still playing out (useBargeIn's displayState). */
+/** The call's phase: sets the wave's colour and sr-only label; only "speaking"
+ * reacts to audio (amplitude from useStreamedAudioPlayback's audioLevel). Set by
+ * the server's `state` message, and by the client on barge-in (ADR 0035) and
+ * while trailing audio plays out (useBargeIn's displayState). */
 export type CallState = "listening" | "thinking" | "speaking";
 
 /** One line of the post-call transcript, placed on the Session's timeline.
@@ -44,13 +41,9 @@ export interface Persona {
 }
 
 /**
- * What the info panel behind a Persona card shows (`GET /api/personas/{id}`).
- *
- * Every text here is German display content, never the English prompt fields
- * the model reads (ADR 0043): `traits` is the `traits_label` column and
- * `objections` the objections' `text_label`, not their `text`. `traits` is
- * nullable because the column is — a Persona seeded without one still plays,
- * the panel just leaves the line out.
+ * The info panel behind a Persona card (`GET /api/personas/{id}`). German
+ * display text only, never the prompt fields (ADR 0043): `traits` is
+ * `traits_label`, `objections` their `text_label`. `traits` may be null.
  */
 export interface PersonaDetail extends Persona {
   traits: string | null;
@@ -81,11 +74,8 @@ export interface SessionStartMessage {
 
 /**
  * Announces one recorded Turn; the raw audio follows as the next binary frame.
- *
- * Carries no duration on purpose: the speaking time behind speaking rate, talk
- * share and fluency is the server's own measurement of the recording
- * (ADR 0047/0048), not the VAD's. A `duration_ms` field sat here for a while
- * that neither side sent or read.
+ * No duration on purpose: speaking time is the server's measurement of the
+ * recording (ADR 0047/0048), not the VAD's.
  */
 export interface TurnAudioMetaMessage {
   type: "turn.audio.meta";
@@ -110,11 +100,9 @@ export interface SessionEndMessage {
 export interface TurnInterruptMessage {
   type: "turn.interrupt";
   /**
-   * How many milliseconds of the in-flight persona reply actually played
-   * before the user cut in. The server commits only the utterances whose
-   * audio finished within this window to the conversation history — anything
-   * it streamed ahead but the client never played is discarded, so the next
-   * reply can't pick up from words that were never spoken aloud (ADR 0035).
+   * Milliseconds of the in-flight reply actually played before the user cut in.
+   * The server keeps only what played within it in the history, so the next
+   * reply cannot build on words never spoken aloud (ADR 0035).
    */
   played_ms: number;
 }
@@ -211,10 +199,8 @@ export interface SessionTurn {
   /** True on a Persona line the user cut into (ADR 0035). */
   interrupted: boolean;
   /**
-   * What the Persona had been about to say, cut off by the interruption. Null
-   * for every other line, and also for interrupted lines recorded before this
-   * was kept: the words were discarded at the time. Never part of the
-   * transcript, always rendered as what was *not* said.
+   * What the Persona was about to say when interrupted; null otherwise and for
+   * older recordings. Never transcript — always rendered as what was *not* said.
    */
   unheard_text: string | null;
 }
@@ -224,23 +210,16 @@ export interface FeedbackPoint {
   text: string;
   turn_id: number | null;
   /**
-   * Which of F-62's focus goals this point is about, as a catalogue key, or
-   * null where the wrap-up predates the tag or nothing in the catalogue
-   * fitted. Assigned by the wrap-up as it writes the point, which is what
-   * lets the progress view count what recurs across trainings without a
-   * second model call over somebody's history.
+   * The F-62 focus goal this point is about (catalogue key), assigned by the
+   * wrap-up (ADR 0080); null for older wrap-ups or when nothing fitted.
    */
   goal: string | null;
 }
 
 /**
- * One tagged point of a wrap-up: what it was about, whether it was a strength
- * or an improvement, and what was written.
- *
- * The text rides along because the progress view's second level has to say
- * what the wrap-ups wrote about a goal and not only how often (ADR 0064's
- * amendment). The summary, the phase paragraph and any untagged point stay on
- * the detail route, so this is still not the wrap-up.
+ * One tagged point of a wrap-up. The text rides along so the progress view can
+ * quote what was written about a goal (ADR 0064's amendment); summary, phase
+ * paragraph and untagged points stay on the detail route.
  */
 export interface FeedbackGoalTag {
   kind: "strength" | "improvement";
@@ -252,22 +231,14 @@ export interface FeedbackGoalTag {
 export interface SessionFeedback {
   summary: string;
   /**
-   * F-42: one paragraph on whether the register moved with the phase of the
-   * call — warm in the opening, factual through the core business, warm again
-   * at the close. Prose rather than a Measurement, because it describes a
-   * change over the call that no single number carries. NULL where the
-   * wrap-up has none; FeedbackView omits the block instead of showing it
-   * empty.
+   * F-42: whether the register moved with the phase of the call. Prose, not a
+   * Measurement (ADR 0056). NULL where absent; the block is then omitted.
    */
   phase_language: string | null;
   /**
-   * Whether the way the trainee sounded suited the occasion of this call.
-   * Prose for the same reason `phase_language` is (ADR 0056): the right
-   * register for a complaint is not the right register for a price
-   * negotiation, and no norm is measured for either. It answers the one
-   * question the intonation figures cannot, which is why it is rendered
-   * there rather than in the wrap-up. NULL where the wrap-up predates the
-   * block or the model left it out; the block is omitted, never shown empty.
+   * Whether the trainee's tone suited this call's occasion (ADR 0079), prose
+   * for ADR 0056's reasons. Rendered on the Sprachmelodie page, not in the
+   * wrap-up. NULL where absent; the block is then omitted.
    */
   tone_fit: string | null;
   points: FeedbackPoint[];
@@ -295,19 +266,9 @@ export interface Finding {
 export type TrafficLight = "green" | "yellow" | "red";
 
 /**
- * One step of the scale a reading was taken off — F-51's traffic light and
- * F-35's three-step intonation reading are both described this way.
- *
- * `label` and `range` come from the backend rather than being written here on
- * purpose: they belong beside the thresholds they describe, or a recalibration
- * silently leaves the wrong words on the screen. That is not hypothetical:
- * F-35's scale has already been replaced once, and every stored Session picked
- * the new one up on the next read without a migration.
- *
- * `light` may still be null for a scale with no direction; both scales carry one
- * today (ADR 0077). It is set beside the threshold it belongs to and never
- * derived in the frontend, and it is never the only channel: the step is
- * written out in words wherever the colour appears.
+ * One step of a reading's scale (F-51, F-35). `label`, `range` and `light` come
+ * from the backend, beside their thresholds, so a recalibration cannot leave wrong
+ * words on screen; never map them here (ADR 0078). `light` null = no direction.
  */
 export interface MetricStep {
   /** Machine-readable step name, matched against the measurement's own
@@ -325,15 +286,9 @@ export interface MetricStep {
 export type MeasurementSegment = "pressure" | "rest";
 
 /**
- * One metric over one stretch of a call (ADR 0081).
- *
- * The two halves of a comparison the user draws themselves. Deliberately no
- * difference, ratio or verdict travels with them: how big a gap means something
- * is exactly the norm ADR 0051 refuses to invent, so the wire carries the two
- * figures and nothing about their relation.
- *
- * No `detail`: a segment's loudness curve is a curve like any other and nothing
- * plots it (ADR 0064's reason, one level down).
+ * One metric over one stretch of a call (ADR 0081). Deliberately no difference,
+ * ratio or verdict between stretches (ADR 0051). No `detail`: nothing plots a
+ * segment's curve (ADR 0064).
  */
 export interface SegmentMeasurement {
   segment: MeasurementSegment;
@@ -375,10 +330,8 @@ export interface SessionDetail {
   metric_scales: Record<string, MetricStep[]>;
   feedback: SessionFeedback | null;
   /**
-   * The Scenario drafted from this Session's feedback (F-60, ADR 0069) — the
-   * next call in the same matter — or null: nobody has asked for one, the
-   * wrap-up named no improvement points to build one from, or the User has
-   * since deleted it. The card only; the editor loads the rest by id.
+   * The follow-up drafted from this Session (F-60, ADR 0069), or null if none
+   * was asked for, possible or kept. The card only; the rest loads by id.
    */
   follow_up: FollowUpCard | null;
 }
@@ -411,11 +364,8 @@ export interface SessionSummaryMeasurement {
   aspect: MetricAspect;
   value: number;
   /**
-   * Whether the metric is still part of the backend's current inventory.
-   * False for one measured under a key that has since been renamed: the row
-   * keeps pointing at the retired metric type, which carries the same display
-   * name as its replacement. The progress view drops those, or one renamed
-   * metric appears as two identical charts.
+   * False for a metric measured under a since-renamed key. The progress view
+   * drops those, or one renamed metric appears as two identical charts.
    */
   active: boolean;
 }
@@ -430,13 +380,8 @@ export interface SessionSummary {
    * Scenario row. */
   reverse: boolean;
   /**
-   * The kind of call this was (ADR 0072), or null for an uncategorised
-   * Scenario — every authored one, and every reverse.
-   *
-   * On the listing because the progress view reads courses over it: the
-   * concept's own objection to its charts is that Scenario and Persona move
-   * the figures more than behaviour does, so "your last five advisory calls"
-   * is a series where "your last five trainings" is scatter.
+   * The kind of call (ADR 0072), null for authored Scenarios and reverses. On
+   * the listing so the progress view can read courses per occasion.
    */
   category: ScenarioCategory | null;
   status: SessionOutcome;
@@ -459,11 +404,8 @@ export interface SessionSummary {
    *  would splice one training's pressure figure into the next one's line. */
   segments: SegmentMeasurement[];
   /**
-   * What this wrap-up's points were about, one entry per tagged point.
-   * Untagged points are absent rather than sent with a null goal: they cannot
-   * be counted, and a row of nulls invites treating "not assigned" as a
-   * category. Empty for a Session with no wrap-up, and for every one written
-   * before the tag existed.
+   * One entry per tagged point; untagged points are absent, not null-goaled, so
+   * "not assigned" cannot be counted as a category. Empty without a wrap-up.
    */
   feedback_goals: FeedbackGoalTag[];
 }
@@ -518,12 +460,9 @@ export interface ConsentState {
 /** Which heading a goal sits under. Display grouping only. */
 export type FocusGroupKey = "paraverbal" | "phases" | "impact" | "habit";
 
-/** One entry of the shipped catalogue. All text is German and comes from the
- *  database, exactly as a Scenario's title does: the client never composes it.
- *
- *  `focus_goal.evidence` is deliberately absent here. It records how far a goal
- *  can be measured today, which is planning information for the analysis work
- *  and not something the user is asked to weigh up while picking (ADR 0076). */
+/** One entry of the shipped catalogue; German text from the database. The
+ *  goal's `evidence` is deliberately absent: planning information, not
+ *  something the user weighs while picking (ADR 0076). */
 export interface FocusGoal {
   key: string;
   title: string;

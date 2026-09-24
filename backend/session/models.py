@@ -1,19 +1,8 @@
 """Session data, the Turn timeline, and the internal event union yielded by
-SessionOrchestrator.run_turn.
+SessionOrchestrator.run_turn (consumed only by `backend/api/session_ws.py`).
 
-The events are internal — `backend/api/session_ws.py` is their only consumer,
-turning each into one wire message. Separate types, not dicts, so a missing
-branch there is obvious.
-
-What a running call writes, and nothing that reads a finished one. The two
-readings of a finished Session -- `utterances` on a timeline, `conversation`
-folded into the facts the statistics come from -- are in
-`backend/feedback/calls.py`, together with the record they produce. They were
-here until the direction of that dependency was the wrong way round: the live
-turn loop imported the ORM and the whole analysis package to name one result
-type. Nothing in this module may import from `backend.feedback` except
-`acoustics`, which measures during the call rather than after it.
-"""
+What a running call writes; readings of a finished one live in `backend/feedback/calls.py`.
+Nothing here may import from `backend.feedback` except `acoustics` (test_module_dependencies)."""
 
 from dataclasses import dataclass, field
 from typing import Literal
@@ -51,27 +40,15 @@ class Turn:  # pylint: disable=too-many-instance-attributes
     # dispatched, or the played position where a barge-in cut it (ADR 0035).
     # This is the speaking time the metrics divide by.
     persona_end_ms: int | None = None
-    # Where it would have stopped had nobody cut in. Never trimmed, and never
-    # shown: the two are the same on an ordinary Turn and differ by exactly
-    # what the user did not hear on an interrupted one.
-    #
-    # Both are needed, and one was doing both jobs. F-51 asks "did the Persona
-    # have more to say", which is a statement about the audio that was sent;
-    # F-53's Redeanteil asks how long it was heard for. Trimming the single
-    # field for the second silently turned the first into a measurement of the
-    # browser's voice-detection delay -- the gap between the user starting to
-    # speak and the cut arriving -- and the drill-down then told the User their
-    # partner "had 0.7 seconds left" about a reply with nine seconds in it.
+    # Where it would have stopped had nobody cut in; never trimmed. Two fields
+    # because F-51 asks how much audio was *sent* and F-53's Redeanteil how long
+    # it was *heard*: reading F-51 off the trimmed end measures the browser's
+    # voice-detection delay instead ("0.7 seconds left" of a nine-second reply).
     persona_dispatched_end_ms: int | None = None
 
-    # Paraverbal facts about the user's speech (ADR 0048), taken while the
-    # audio was still in memory and already rebased onto the Session's
-    # timeline -- so a Turn reopened after a barge-in, and therefore spoken in
-    # several fragments, needs no special case once the Session is folded up.
-    #
-    # How long the recording ran, and how much of that was speech rather than
-    # silence. talk share divides by the first (the Persona's side is audio
-    # duration too), speaking pace by the second.
+    # Paraverbal facts about the user's speech (ADR 0048), already rebased onto
+    # the Session's timeline, so a Turn spoken in several fragments needs no
+    # special case. Talk share divides by the recording length, pace by phonation.
     user_speech_ms: int = 0
     user_phonation_ms: int = 0
     # False once any fragment of this Turn failed to measure: its words still

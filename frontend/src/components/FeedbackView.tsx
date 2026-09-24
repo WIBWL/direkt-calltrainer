@@ -39,46 +39,19 @@ import LoudnessCourse from "./LoudnessCourse";
 import SectionHeading from "./SectionHeading";
 import { useTranscriptFocus } from "./TranscriptFocus";
 
-/** What a screen can do with the follow-up Scenario (F-60): start it as the
- * next call. That belongs to whoever owns the screen, so it is passed in — the
- * post-call screen starts the call itself, the history hands the pairing to the
- * training flow.
- *
- * There is no edit beside it: a follow-up is the exercise one reading of the
- * wrap-up produced (ADR 0069), and the write routes refuse it the way they
- * refuse a reverse. Removing it is the one thing left to do with one, and that
- * is offered where a reverse's is — in the info panel behind its card.
- *
- * `onStart` gets the Persona too: the follow-up is played against the same
- * partner as the training it came out of, so there is nothing left to choose.
- *
- * `onCreated` fires once the User has asked for one and it has been written
- * (ADR 0069's amendment). The card renders from the answer either way; this is
- * for the screen's own copy of the library, which does not hold the new row
- * yet and is what the start button reads its names off. */
+/** What a screen can do with the follow-up Scenario (F-60), passed in by its owner. No
+ * edit: the write routes refuse a follow-up (ADR 0069); deletion is in the info panel.
+ * `onStart` gets the Persona too, since the follow-up keeps the training's partner.
+ * `onCreated` fires once one was written, so the screen's library copy can reload. */
 export interface FollowUpActions {
   onStart: (scenarioId: string, personaId: string) => void;
   onCreated?: (() => void) | undefined;
 }
 
 /**
- * How many times the User has to have spoken before the two offers in the
- * next-steps section appear at all.
- *
- * Both build a new exercise out of *this* call: the follow-up carries the case
- * forward from where it ended (ADR 0069), the reverse replays it from the other
- * side (ADR 0070). A call that was hung up after a sentence or two has no
- * "where it ended" to carry anywhere — it would cost a model call and the
- * better part of a minute to produce an exercise drafted from nothing. So they
- * are not offered there rather than offered and disappointing.
- *
- * Counted in the User's own utterances: `turns` is the stored transcript, one
- * row per speaker (ADR 0051), so the Persona's greeting and its answer to a
- * single "Hallo?" would otherwise make three on their own.
- *
- * The routes refuse under the same number (`MIN_USER_UTTERANCES` in
- * `backend/api/sessions.py`, pinned to this one by `tests/test_reverse.py`), so
- * hiding the offer here is the courtesy and the refusal there is the rule.
+ * User utterances needed before the follow-up and reverse offers appear: a call hung up
+ * after a sentence has nothing to build from. Counts the User's own rows only. The routes
+ * refuse under `MIN_USER_UTTERANCES` (`backend/api/sessions.py`, pinned by `tests/test_reverse.py`).
  */
 const MIN_USER_TURNS = 3;
 
@@ -92,23 +65,9 @@ const NOTICE: Record<string, string> = {
 };
 
 /**
- * The post-call wrap-up (F-09/F-10/F-53): the narrative the model wrote, and
- * the statistics it was written from.
- *
- * The two are shown together deliberately. ADR 0004 makes the qualitative text
- * the feedback itself, and ADR 0049 keeps every number out of the model's
- * hands — so the figures here are the evidence behind the text, never a score.
- * Each one describes the whole call rather than a single utterance (ADR 0051).
- *
- * The phase block (F-42) sits between the points and the figures on purpose: it
- * is the one part of the wrap-up that is about a change over the call rather
- * than about a moment or a total, so it closes the narrative before the
- * statistics begin rather than reading as another one of them.
- *
- * The Session is polled in `App`, once for this screen and the waiting screen
- * before it, and handed in with the poll's state: the downloadable report reads
- * the same `detail`, so the file cannot say anything the page above it does
- * not.
+ * The post-call wrap-up (F-09/F-10/F-53): the model's narrative and the statistics it
+ * was written from, the figures as evidence, never a score (ADR 0004/0049/0051). The
+ * Session is polled once in `App` and handed in, so the PDF reads the same `detail`.
  */
 export default function FeedbackView({
   detail,
@@ -163,20 +122,9 @@ export default function FeedbackView({
 }
 
 /**
- * The wrap-up itself, given data that has already been fetched.
- *
- * Split from the component above so the history's detail page, which reads the
- * Session once and needs the Transcript from the same response, can render the
- * report without the post-call notices.
- *
- * Renders nothing when the Session carries no wrap-up. What to say instead is
- * the caller's to decide, because the honest sentence differs: on the post-call
- * screen one is still being generated, in the history none ever was.
- *
- * The follow-up and reverse offers (F-60, F-61) stay props for the same
- * reason: the request that writes each is identical from both screens, what
- * happens with the answer is not — after a call the training flow is already
- * here, from the history it has to be handed over.
+ * The wrap-up itself, given fetched data, without the post-call notices, so the history's
+ * page can render it too. Renders nothing without a wrap-up: what to say instead differs
+ * per screen. The follow-up/reverse offers (F-60, F-61) are props for the same reason.
  */
 export function FeedbackReport({
   detail,
@@ -200,11 +148,8 @@ export function FeedbackReport({
   const spokenTurns = turns.filter((turn) => turn.speaker === "user").length;
   const longEnough = spokenTurns >= MIN_USER_TURNS;
 
-  // Built here rather than inline below so that "is there anything to offer?"
-  // and "what is on offer?" are the same question asked once — the row must
-  // not appear empty, and each half has its own reason to be absent.
-  //
-  // Only where the wrap-up named something to work on: those points are the
+  // Built here so "is there anything to offer?" is asked once and the row never
+  // appears empty. Only where the wrap-up named improvement points: those are the
   // follow-up's whole input, and the route refuses without them (ADR 0069).
   const followUpOffer =
     followUp && longEnough && improvements.length > 0 ? (
@@ -262,19 +207,10 @@ export function FeedbackReport({
         segments={detail.segments}
       />
 
-      {/* Last, because it is what to do *after* reading all of the above. The
-          two are side by side: they are alternatives, and stacked they read as
-          a sequence. Either can be absent — a wrap-up with no improvement
-          points has no follow-up to offer, a reverse cannot be reversed
-          again, and a call too short to build anything out of offers neither —
-          and whichever is left then takes the full width on its own.
-
-          The next-call offers (F-64) sit under that row, inside the same
-          section: they are one more thing to pick, which is what an item in
-          the next-steps block is. Where neither offer above exists they stand on
-          their own instead. `next` is an element even when it renders nothing,
-          so it cannot decide whether the heading appears, and a heading over an
-          empty section is worse than no heading. */}
+      {/* Last: what to do after reading. The two offers sit side by side as alternatives;
+          either may be absent, and the other then takes the full width. The next-call
+          offers (F-64) go under them, or stand alone. `next` is an element even when it
+          renders nothing, so it cannot decide whether the heading appears. */}
       {followUpOffer || reverseOffer ? (
         <section className="feedback-section">
           <SectionHeading eyebrow="WIE ES WEITERGEHT" title="Nächste Schritte" />
@@ -292,13 +228,8 @@ export function FeedbackReport({
 }
 
 /**
- * F-42's register block: the model's reading, the pattern it is read against,
- * and — behind the "i" — where that pattern comes from.
- *
- * The note is the finding itself rather than a description of it, because that
- * is the sentence a reader can act on. What it rests on, and what it cannot
- * tell them (ADR 0056: the phase boundaries are the model's own guess), sits in
- * `InfoDetails` like every other background text in this app.
+ * F-42's register block: the model's reading as the finding itself, and behind the "i"
+ * what it rests on and cannot tell (ADR 0056: the phase boundaries are the model's guess).
  */
 function PhaseLanguage({ text }: { text: string }) {
   return (
@@ -348,13 +279,9 @@ function PhaseLanguage({ text }: { text: string }) {
 }
 
 /**
- * The call's statistics (F-53), which exist independently of the narrative:
- * they are computed while the call runs (ADR 0047/0048) and stored with the
- * Session, so a Session whose wrap-up never got generated still has them.
- *
- * Never a judgement, only a reading — ADR 0051 declined to invent the norms
- * that would be needed to say whether a figure is good, and the note under the
- * grid says so rather than leaving the user to assume a direction.
+ * The call's statistics (F-53), computed during the call (ADR 0047/0048), so a Session
+ * with no wrap-up still has them. A reading, never a judgement (ADR 0051), and the note
+ * under the grid says so.
  */
 export function MetricSection({
   measurements,
@@ -428,13 +355,9 @@ export function MetricSection({
         ))}
       </div>
 
-      {/* The second sentence exists because the first one is contradicted a
-          few pixels above it: two metrics now carry a word beside their
-          figure. Rather than quietly dropping the claim, the exception is
-          named and bounded — it is what the reader is looking at. It stays out
-          of the shared `METRIC_DISCLAIMER` because the PDF prints the figures
-          without their readings, and there the sentence would point at
-          nothing. */}
+      {/* Names the exception to the sentence above: two metrics carry a word beside their
+          figure. Kept out of `METRIC_DISCLAIMER` because the PDF prints figures without
+          readings. */}
       <p className="metric-disclaimer">
         {METRIC_DISCLAIMER} Wo „Einschätzung“ steht, haben wir die Schwellen selbst
         gesetzt; welche das sind, steht jeweils dabei.
@@ -442,12 +365,9 @@ export function MetricSection({
 
       <MetricNotes measured={all} segments={segments} />
 
-      {/* Last, and pointing away: everything above describes this call, and the
-          question a figure raises once it has been described is "and how is
-          that for me usually", which this screen cannot answer — it holds one
-          call. Only where the Session was stored; without consent there is
-          nothing to compare it with and the link would lead to a page
-          explaining that (ADR 0066). */}
+      {/* Last, pointing to the same figure across trainings, which this screen cannot
+          answer. Only for a stored Session: without consent there is nothing to compare
+          (ADR 0066). */}
       {sessionId && (
         <p className="metric-progress-link">
           <Link to={ROUTES.progress}>
@@ -460,24 +380,9 @@ export function MetricSection({
 }
 
 /**
- * The two things the grid cannot say by being a grid.
- *
- * **That something is missing.** A metric that could not be measured leaves no
- * tile, so the grid looks complete at any size. It is not a rare case: a
- * recording with a noise floor under it defeats the silence detection, and
- * five figures are withheld together rather than shown wrong (`metrics.py`,
- * ADR 0085). Until now the screen said nothing at all, and a reader counting
- * nine tiles where they saw fourteen last time had no way to learn why.
- *
- * Which ones are missing is deliberately not named. The frontend would have to
- * guess at the reason, and "Sprechpausen fehlt" invites the reading that
- * something went wrong with the user rather than with the microphone.
- *
- * **That a second reading exists.** Where the wrap-up marked demanding
- * stretches, five of these metrics were measured twice over (ADR 0081). That
- * comparison is two figures per metric and lives on the metric's own page; the
- * grid only says that it is there, and says twice over that the split was a
- * model's judgement while the figures beside it are measured.
+ * What the grid cannot say: that a metric could not be measured and so left no tile
+ * (ADR 0085; which one is not named, the frontend would have to guess why), and that a
+ * second reading exists where the wrap-up marked demanding stretches (ADR 0081).
  */
 function MetricNotes({
   measured,
@@ -535,14 +440,9 @@ function MetricNotes({
 const INTONATION_KEY = "intonation";
 
 /**
- * One press that writes a Scenario out of this Session — the follow-up and the
- * reverse alike (ADR 0069, ADR 0070): the request, whether it is running, what
- * it wrote, and what went wrong.
- *
- * The backend's `detail` is written for the user, so it is shown as it is;
- * `fallback` stands in where there is none. `run` resolves to what was written,
- * or null when it failed, so a caller can act on success without a second
- * piece of state.
+ * One press that writes a Scenario out of this Session — follow-up or reverse (ADR 0069,
+ * ADR 0070). The backend's `detail` is shown as is, `fallback` where there is none. `run`
+ * resolves to what was written, or null on failure.
  */
 function useCreate<T>(create: () => Promise<T>, fallback: string) {
   const [created, setCreated] = useState<T | null>(null);
@@ -649,19 +549,10 @@ function StartCreated({
   );
 }
 
-/** The next call in the same matter, built from the points above (F-60).
- *
- * Asked for, not written unbidden (ADR 0069's amendment): the User presses the
- * button, exactly as they do for the reverse below. Until then this is an
- * offer; afterwards it is a Scenario of theirs like any other, and the same
- * card renders both — what the create route answers and what a later reload
- * brings are one shape.
- *
- * Starting skips the microphone check and lands on the case screen, against
- * the Persona this training was played with: the exercise follows from that
- * conversation, so re-picking a partner would be a step with only one sensible
- * answer. The Scenario stays an ordinary row in the library, so a different
- * partner is a matter of starting it from the setup screen instead. */
+/** The next call in the same matter, built from the points above (F-60). Asked for by
+ * the User (ADR 0069's amendment); the same card renders the offer and the written row.
+ * Starting skips the mic check and uses this training's Persona; another partner means
+ * starting it from the setup screen. */
 function FollowUp({
   scenario,
   personaId,
@@ -721,17 +612,10 @@ function FollowUp({
   );
 }
 
-/** The Reverse offer (F-61, ADR 0070): the same call from the other side.
- *
- * Two presses, not one, and the same two the follow-up beside it takes: the
- * first writes the Scenario, the second begins the call — labelled with the
- * same word the follow-up uses, because it is the same second press.
- * Preparing it takes a model call and the better part of a minute, so the
- * button that starts a conversation must not be the one that was pressed
- * before there was anything to start — and the User gets to read what came
- * back first. The Scenario is stored either way, so a press that is not
- * followed by a call is not a press wasted: it is in the library under its own
- * filter from then on. */
+/** The Reverse offer (F-61, ADR 0070): the same call from the other side. Two presses,
+ * like the follow-up: the first writes the Scenario (a model call, most of a minute), the
+ * second begins the call, so the start button is never the one pressed before there was
+ * anything to start. The Scenario is stored either way. */
 function Reverse({
   sessionId,
   onReverse,
@@ -783,16 +667,9 @@ function Reverse({
 }
 
 /**
- * Ask for the wrap-up once more.
- *
- * Deliberately plain: one button, and on a refusal the sentence the server
- * wrote. The three ways this can be refused are states the screen cannot see
- * for itself — a job may still be running, the call may hold nothing to
- * summarise — so the message comes from the side that decided (the arrangement
- * the follow-up and the reverse use for their own failures).
- *
- * On success it does not wait: polling resumes, and the notice above changes to
- * "wird erstellt" in the same press.
+ * Ask for the wrap-up once more. On a refusal it shows the server's sentence, since the
+ * reasons (a job still running, nothing to summarise) are invisible here. On success
+ * polling resumes at once.
  */
 function RetryFeedback({
   sessionId,
@@ -884,20 +761,9 @@ function PointList({
                   ) : (
                     <span className="feedback-point-time">{formatOffset(at)}</span>
                   ))}
-                {/* The goal sits *above* the sentence, as an eyebrow over it.
-                  Beside it, in the row the timestamp is in, it competed with
-                  the sentence for the same line and read as a second remark;
-                  over it, it says what the paragraph below is about before the
-                  paragraph starts, which is what a heading does.
-
-                  Which focus goal the wrap-up filed this under (ADR 0080). The
-                  tag was written when the point was and has been on the wire
-                  ever since, read by nothing but the progress view's counting
-                  — so the one screen where the sentence actually stands never
-                  said what it was about. Shown for every tagged point, not
-                  only for the User's own five: the wrap-up writes about the
-                  call it read, and a point about something they are not
-                  currently working on is still about that thing. */}
+                {/* The focus goal the wrap-up filed this point under (ADR 0080), as an eyebrow
+                  above the sentence so it reads as a heading. Shown for every tagged
+                  point, not only the User's own five. */}
                 <div className="feedback-point-body">
                   {point.goal && <span className="feedback-point-goal">{point.goal}</span>}
                   <p>{point.text}</p>
@@ -922,43 +788,26 @@ function Metric({
   /** Whether this metric has a page worth opening. */
   detailed: boolean;
 }) {
-  // Loudness is shown as a course, not a figure: its value is a dB span (95th
-  // percentile minus 5th) that reads like a level without being one and that no
-  // validated norm places (ADR 0004/0051). Without the curve the tile is empty.
-  // The course itself is read off the call by the server and arrives in the
-  // Measurement's detail (ADR 0091), so the sentence the wrap-up writes about
-  // it cannot disagree with the picture here.
+  // Loudness is shown as a course, not a figure: its dB span reads like a level without
+  // being one (ADR 0004/0051). The course arrives in the Measurement's detail (ADR 0091),
+  // so the wrap-up's sentence about it cannot disagree with the picture.
   const curve = measurement.key === "loudness" ? loudnessCourse(measurement.detail) : null;
   if (measurement.key === "loudness" && !curve) return null;
 
   const context = interruptionContext(measurement);
   const detail = metricSubline(measurement);
-  // The step this call landed on, in words, and its colour. Two metrics carry
-  // one: F-51's traffic light and F-35's three-step reading (`metricReading`).
-  //
-  // The traffic light colours the figure and nothing else. It is the only
-  // colour in this application that says something about a value, the two
-  // thresholds behind it are working values that nothing has validated (see
-  // `interruptions.py`), and a whole tile in that colour would shout an
-  // orientation. The step is written out underneath, so colour is never the
-  // only channel, and the scale it comes from is on the page behind the tile.
-  //
-  // F-35's light lands in the right place without a special case: this tile
-  // leads with the *word* for intonation, so the colour sits on the
-  // classification, which is what it was read from. It must never sit on the
-  // semitone figure, which is a different measurement from the one the step
-  // came out of.
+  // The step this call landed on, in words, and its colour (`metricReading`; F-51's
+  // traffic light and F-35's reading). The light colours the figure only, never the
+  // whole tile: its thresholds are unvalidated working values (`interruptions.py`).
+  // For F-35 the tile leads with the classification word, so the colour sits on that;
+  // it must never sit on the semitone figure, a different measurement from the step's.
   const { label: reading, readingLight } = metricReading(measurement);
 
   const figure = formatMetricValue(measurement);
 
-  // Intonation is the one metric whose unit a reader cannot place, so the
-  // reading leads and the semitones stand under it. Since ADR 0077 the reading
-  // comes from the pitch variation quotient and the figure is the range, so the
-  // figure is the measurement shown beside the reading rather than its evidence.
-  // It is never dropped: without it only the part resting on thresholds would be
-  // left, which is the wrong half to keep (ADR 0004/0051, ADR 0088). Every other
-  // tile leads with its measurement and lets the reading follow.
+  // Intonation's unit is one a reader cannot place, so the reading leads and the
+  // semitone range stands under it (ADR 0077). Never dropped: without it only the part
+  // resting on thresholds would be left (ADR 0004/0051, ADR 0088).
   const melody = measurement.key === INTONATION_KEY;
   const parts = metricParts(measurement);
 
@@ -1021,16 +870,9 @@ function Metric({
 }
 
 /**
- * The count set against the call it happened in.
- *
- * Context beside the figure, never inside it: dividing by the call length or by
- * the number of Persona replies was tried and put a single interruption on the
- * top step of a short call. The traffic light stays on the count; this line is
- * what lets a reader weigh that count for themselves.
- *
- * The backchannels are named here too, and named as not counting. Listening is
- * the other half of this goal, and a figure that only ever counted the failures
- * would describe an attentive call and an absent one identically.
+ * The count set against the call it happened in: context beside the figure, never a
+ * rate (a rate put one interruption in a short call on the top step). Backchannels are
+ * named as not counting, so an attentive call and an absent one read differently.
  */
 function interruptionContext(measurement: Measurement): string | null {
   if (measurement.key !== "interruptions") return null;

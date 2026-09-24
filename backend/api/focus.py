@@ -1,20 +1,8 @@
-"""REST routes for the training focus (F-62, ADR 0076).
+"""REST routes for the training focus (F-62, ADR 0076), on the caller's `sub` only.
 
-Two routes over one thing: what the caller could focus on and what they
-currently do, and a replacement for the second. Both act on the caller's own
-`sub` and take no subject argument — there is no form of this request that is
-about somebody else, so there is none to authorise or reject (ADR 0031/0064).
-
-The catalogue rides along with the selection instead of getting a route of its
-own. The two are never wanted apart: the first-run dialog needs the catalogue
-*and* whether the question was already answered, and the profile section needs
-the catalogue *and* what is ticked. Two routes would mean two round trips and
-two chances for the screen to render half a state.
-
-PUT, not POST: the body is the whole selection, so sending it twice leaves the
-same five goals rather than ten. That is the difference from `/api/consent`,
-which appends decisions and therefore posts.
-"""
+The catalogue rides along with the selection: the screens never want one
+without the other, and two requests could render half a state. PUT, because the
+body replaces the whole selection (unlike `/api/consent`, which appends)."""
 
 from __future__ import annotations
 
@@ -53,9 +41,8 @@ def read_focus(caller: AuthContext = Depends(require_user)) -> dict:
 def set_focus(choice: FocusChoice, caller: AuthContext = Depends(require_user)) -> dict:
     """Replace the caller's focus.
 
-    A bad request is a 400 and never a silent truncation: storing the first five
-    of six goals would file a focus the user did not pick, and they would have
-    no way of telling from the screen that it happened.
+    A bad request is a 400, never a silent truncation to a focus the user did
+    not pick.
     """
     with session_scope() as db:
         try:

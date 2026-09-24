@@ -1,9 +1,7 @@
-"""[CALL_END] marker handling and foreign-script scrubbing.
+"""[CALL_END] marker handling and foreign-script scrubbing (ADR 0033).
 
-Covers ADR 0033 (streamed pipeline): the persona ends a call by emitting a
-[CALL_END] marker in its text stream. The marker must never be spoken or
-stored, and stray non-Latin script from the small model must be dropped
-before synthesis.
+The marker must never be spoken or stored, and stray non-Latin script from the
+small model is dropped before synthesis.
 """
 
 import pytest
@@ -155,14 +153,10 @@ async def test_a_nudged_marker_is_taken_at_its_word(persona, scenario, fake_pipe
 async def test_a_reply_that_is_only_the_marker_ends_the_call(
     persona, scenario, fake_pipeline, reply
 ):
-    """The marker alone, or first -- which drags the rest of the chunk with it
-    (`_strip_end_marker`) -- leaves no words to speak.
+    """A bare or leading marker leaves no words to speak, and still ends the call.
 
-    That is a caller hanging up, not a failed completion. It used to fall
-    through to the empty-reply branch: a second completion spent on the same
-    answer, then `llm_failed`, an error screen in place of the goodbye the user
-    had just asked for, and the Session stored as aborted. The marker is taken
-    at its word here exactly as it is on a reply that carries words (ADR 0037).
+    That is a hang-up, not a failed completion: it must not fall through to the
+    empty-reply branch (retry, `llm_failed`, Session stored aborted). ADR 0037.
     """
     fake_pipeline.stt.transcripts = ["Okay, tschüss dann!"]
     fake_pipeline.llm.replies = [reply]

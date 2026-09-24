@@ -3,30 +3,13 @@
     python scripts/backfill_run_length.py            # show what would change
     python scripts/backfill_run_length.py --apply    # write it
 
-Possible at all because everything this metric divides was already stored by
-two other metrics. `phonation_share` keeps `phonation_ms` in its detail,
-`pauses` keeps a `count`, and the number of utterances is a row count on the
-`turn` table. None of it needs the recording, which ADR 0048 discards the moment
-it has been measured.
-
-That makes this the second metric in the project that can reach backwards, after
-the interruptions of F-51, and for the same underlying reason: it is a property
-of when somebody spoke rather than of how they sounded. Speaking pace, loudness
-and intonation can never be recomputed for a past Session.
-
-Runs against the database in `.env`, so a host shell will do; nothing here needs
-Redis or a model.
-
-Idempotent. Sessions that already carry the figure are skipped, so a second run
-reports nothing and changes nothing.
-"""
+Divides only figures already stored (`phonation_share`'s `phonation_ms`, `pauses`'
+`count`, the `turn` row count), so no audio is needed (ADR 0048). Uses `.env`'s
+database (no Redis, no model). Idempotent; Sessions with the figure are skipped."""
 
 # pylint: disable=duplicate-code
-# What is left, once `_backfill_cli` took the command line, the inventory
-# lookup and the table scan, is what a script cannot hand away: the preamble
-# that makes `backend` and `scripts` importable at all -- the `sys.path`
-# insert has to run before the import that would share it -- and this module's
-# own entry point, `main()` delegating plus the `if __name__` guard.
+# The sys.path preamble and the main()/__name__ guard cannot move into
+# `_backfill_cli`: the preamble must run before that import.
 
 
 from __future__ import annotations
@@ -57,16 +40,8 @@ logger = logging.getLogger("backfill_run_length")
 def _terms(session: db_models.Session, by_id: dict[int, str]) -> tuple[int, int, int] | None:
     """Phonation, utterances and pauses for one Session, or None if unusable.
 
-    The presence of a `phonation_share` row is the gate, and it is the right
-    one: that metric is withheld for the whole call when any Turn's measurement
-    failed (ADR 0051), so a Session carrying it has complete acoustics and one
-    without it could only be backfilled with a figure short by an unknown
-    amount.
-
-    A Session with no `pauses` row spoke without pausing inside an utterance,
-    which is nought pauses and not missing data. Absence and zero mean the same
-    thing here, unlike above.
-    """
+    A `phonation_share` row is the gate: it is withheld when any Turn's
+    measurement failed (ADR 0051). A missing `pauses` row means zero pauses."""
     phonation: int | None = None
     pause_count = 0
     for measurement in session.measurements:

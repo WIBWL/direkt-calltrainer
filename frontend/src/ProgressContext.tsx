@@ -7,16 +7,9 @@ import { CATEGORY_LABELS, type ScenarioCategory } from "./scenarioLibrary";
 import { latest, selectionSeries, type MetricSeries } from "./utils/progressStats";
 
 /**
- * Which trainings the dashboard is read over, counted in trainings (see
- * `progressStats.latest` for why not in days).
- *
- * It used to be 30 days, six months and everything. Six months is the retention
- * limit (ADR 0067), so the second and third said the same thing on almost every
- * account, and the first was empty for anybody who trains in bursts. The widest
- * option is still everything stored and nothing older.
- *
- * `prefix` is the selection's half of the sentence the pages without the switch
- * say themselves; the occasion below supplies the noun.
+ * Which trainings the dashboard reads, counted in trainings, not days
+ * (`progressStats.latest`). `prefix` is the selection's half of the sentence
+ * pages without the switch say themselves; the occasion supplies the noun.
  */
 export const PERIODS = [
   { key: "5", label: "Letzte 5", count: 5, prefix: "Ihren letzten 5" },
@@ -27,22 +20,9 @@ export const PERIODS = [
 export type PeriodKey = (typeof PERIODS)[number]["key"];
 
 /**
- * Which kind of call the dashboard is read over (ADR 0072's vocabulary).
- *
- * The answer to the concept's own strongest objection against its charts
- * (section 4.3): the trainings are not repeated measures. Scenario and Persona
- * move talk share, pace and the question count more than a change in behaviour
- * would, so a line across every training shows scatter while looking like
- * development. Narrowed to one occasion it is a series again, read against the
- * same kind of call — still the user's own past and nobody else's, which is the
- * only reference point ADR 0051 allows.
- *
- * It narrows and never judges: no occasion is the right one to train, and
- * nothing here compares two of them.
- *
- * `noun` is the dative plural the period's prefix takes ("Ihren letzten 5
- * Beratungsgesprächen"). It is not `CATEGORY_LABELS`, which names the occasion
- * of a call on a library card ("Beratung & Anforderung") and does not decline.
+ * Which kind of call the dashboard reads (ADR 0072): narrowed to one occasion, a
+ * line is a series rather than scatter (dashboard concept 4.3). `noun` is the dative
+ * plural the prefix takes ("Ihren letzten 5 Beratungsgesprächen").
  */
 export const OCCASIONS = [
   { key: "all", label: "Alle Anlässe", category: null, noun: "Trainings" },
@@ -80,12 +60,8 @@ export const OCCASIONS = [
 export type OccasionKey = (typeof OCCASIONS)[number]["key"];
 
 /**
- * Everything by default, as dashboard-concept.md section 10 decided: the first
- * look should show all there is, and narrowing is one click away.
- *
- * Also what an unknown value in the URL falls back to. A hand-typed
- * `?trainings=42` is not an error worth a screen — it is a selection nobody
- * offered, and the widest one is the honest answer to it.
+ * Everything by default (dashboard-concept.md section 10), and the fallback for
+ * an unknown URL value such as a hand-typed `?trainings=42`.
  */
 const DEFAULT_PERIOD: PeriodKey = "all";
 
@@ -134,24 +110,9 @@ interface ProgressContextValue {
 const ProgressContext = createContext<ProgressContextValue | null>(null);
 
 /**
- * The trainings the dashboard reads, and which of them are selected, for all
- * three of its screens (F-13).
- *
- * Two things used to go wrong without it, and both were invisible:
- *
- * The overview, a metric's page and a goal's page each loaded the whole history
- * for themselves, so every step into a detail and back asked for it again and
- * showed "Wird geladen …" over a screen that had just been drawn.
- *
- * And the period switch reached only the overview. A tile said "aus 5
- * Trainings" and the page it linked to was drawn over every stored one —
- * two screens describing the same metric differently, which is exactly what
- * section 7 of dashboard-concept.md rules out when it asks the detail level for
- * "alle Punkte des Zeitraums".
- *
- * The selection lives in the URL rather than in state here, so it survives a
- * reload and travels with a shared link — the reason section 7 gives for the
- * detail levels being routes at all.
+ * The trainings the dashboard reads and which are selected, shared by its three
+ * screens (F-13): one load, and the period reaches the detail pages too. The
+ * selection lives in the URL, so it survives a reload and a shared link.
  */
 export function ProgressProvider({ children }: { children: ReactNode }) {
   const { sessions, state, truncated, total } = useProgressData();
@@ -285,12 +246,9 @@ function readOccasion(raw: string | null): (typeof OCCASIONS)[number] {
   return fallback;
 }
 
-/** The trainings of one kind of call, or all of them for null. An
- *  uncategorised training — an authored Scenario, a reverse — belongs to no
- *  occasion and is therefore only ever in "Alle Anlässe". Dropping it from
- *  every narrowed view is right: it is a training whose kind nobody recorded,
- *  and putting it under a heading it may not belong to would be the guess this
- *  filter exists to avoid. */
+/** The trainings of one kind of call, or all for null. An uncategorised one
+ *  (authored Scenario, reverse) is only ever in "Alle Anlässe" — filing it
+ *  under a guessed heading is what this filter exists to avoid. */
 function byOccasion(
   sessions: SessionSummary[],
   category: ScenarioCategory | null,

@@ -1,14 +1,8 @@
-"""The HTTP surface of a stored Session: status codes and the response shape
-the frontend relies on (ADR 0050).
+"""The HTTP surface of a stored Session: status codes and response shape (ADR 0050).
 
-Covers the round trip that is the whole point of persisting a Session at all
-(ADR 0034, F-12): write it through `persist_session`, read it back through
-`GET /api/sessions/{extern_id}`, and get the same conversation out.
-
-The wire matches the schema (ADR 0057): the keys below are what
-frontend/src/protocol.ts declares, and they are the ORM's own column names
-passed straight through, so they are asserted verbatim here.
-"""
+Round trip of F-12 / ADR 0034: write through `persist_session`, read back through
+`GET /api/sessions/{extern_id}`. Keys are the ORM's column names verbatim, as
+frontend/src/protocol.ts declares them (ADR 0057)."""
 
 # pylint: disable=duplicate-code
 # Fixture data is repeated per test module on purpose: a test carrying its own
@@ -247,12 +241,10 @@ async def test_phase_block_reaches_the_wire_as_phase_language(
     stored: str | None,
     expected: str | None,
 ) -> None:
-    """F-42: the column is `feedback.phase_language` and the wire uses the same
-    key (ADR 0057), which FeedbackView.tsx reads.
+    """F-42: `feedback.phase_language` is served under the same key (ADR 0057).
 
-    NULL survives as null rather than becoming an empty string — the frontend
-    drops the block on falsiness, and a wrap-up generated before this existed
-    genuinely has no phase analysis to show."""
+    NULL stays null, not "": the frontend drops the block on falsiness, and older
+    wrap-ups genuinely have no phase analysis."""
     extern_id = uuid.uuid4()
     _store(extern_id)
     session_id = db_session.query(Session).one().session_id
@@ -286,14 +278,10 @@ async def test_tone_fit_reaches_the_wire_under_its_own_key(
     stored: str | None,
     expected: str | None,
 ) -> None:
-    """The column is `feedback.tone_fit` and the wire uses the same key
-    (ADR 0057). `IntonationReading.tsx` reads it, not FeedbackView: it answers
-    the question the intonation figures raise and cannot settle.
+    """`feedback.tone_fit` is served under the same key (ADR 0057), for IntonationReading.
 
-    NULL survives as null rather than becoming an empty string, on the same
-    grounds as the block above: a wrap-up written before this existed came from
-    a prompt that was never given the occasion, so it has no judgement to show
-    and the frontend leaves the block out."""
+    NULL stays null, not "": a wrap-up written before it was never given the occasion,
+    so the frontend leaves the block out."""
     extern_id = uuid.uuid4()
     _store(extern_id)
     session_id = db_session.query(Session).one().session_id

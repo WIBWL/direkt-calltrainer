@@ -38,13 +38,11 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
-    """Check the dependencies before the first request, so an unreachable
-    backend shows up as a boot-time log line, not a 500 far from its cause.
-    The checks only log — a dead dependency does not stop the boot.
+    """Check the dependencies before the first request, so a dead one is a boot-time
+    log line rather than a 500 far from its cause. The checks only log.
 
-    The DiReKT gateway is only reachable from its own network; off it, every
-    pipeline call 403s like a credentials problem, so the hint names the real
-    cause."""
+    Off the DiReKT gateway's network every pipeline call 403s like a credentials
+    problem, so the hint names the real cause."""
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             await client.get(DIREKT_URL)
@@ -74,17 +72,9 @@ _SWEEP_INTERVAL_S = 24 * 60 * 60
 async def _retention_loop() -> None:
     """Delete expired Sessions, once at startup and daily after that (ADR 0067).
 
-    Inside the app rather than as a cron entry or a scheduled Redis job. A cron
-    entry is a second place to deploy and a second thing to forget; a job queued
-    six months ahead does not survive a Redis restart. This asks the database
-    what is expired every time it wakes, so a missed run delays a deletion
-    rather than cancelling it.
-
-    Every failure is caught and the loop continues. A retention sweep that dies
-    on one bad night and never runs again is the failure mode worth designing
-    against: nothing would report it, and the period would quietly stop being
-    enforced.
-    """
+    In-process rather than cron or a scheduled Redis job (which would not survive a
+    Redis restart); it asks the database each time, so a missed run only delays.
+    Every failure is caught: a sweep that dies silently stops enforcing the period."""
     while True:
         try:
             removed = await asyncio.to_thread(retention.sweep_now)
@@ -101,9 +91,7 @@ async def _retention_loop() -> None:
 def _provision_database() -> None:
     """Migrate and seed on startup, so a fresh `docker compose up` is usable.
 
-    Non-fatal, like the backend check above: without it every Session fails to
-    persist and silently loses its Feedback, but the call itself still works,
-    so a database problem must not stop the app from booting.
+    Non-fatal: without it Sessions are not persisted, but calls still work.
     """
     try:
         logger.info("Database provisioned, reference rows created: %s", provision())
@@ -112,13 +100,9 @@ def _provision_database() -> None:
         logger.exception("Database provisioning failed - Sessions will not be persisted")
 
 
-# No interactive API docs and no published schema: `/docs`, `/redoc` and
-# `/openapi.json` are open by default and would hand every route and payload
-# shape to anyone who asks, without a login. Nothing reads them — the SPA's
-# wire types are hand-written in `frontend/src/protocol.ts`.
-#
-# No CORS middleware either: the SPA is served from the same origin as the API
-# (the only supported setup), so the browser never makes a cross-origin call.
+# No API docs or published schema (`/docs`, `/redoc`, `/openapi.json` would expose
+# every route without a login); the SPA's wire types live in frontend/src/protocol.ts.
+# No CORS middleware: the SPA is served from the same origin as the API.
 app = FastAPI(
     title="CallTrainer API",
     lifespan=lifespan,
@@ -171,20 +155,10 @@ def readiness() -> dict[str, str]:
 
 class SinglePageApp(StaticFiles):
     """Static files, with the client-side router's paths falling back to
-    `index.html`.
+    `index.html`, so a reload or shared link to e.g. `/profil` works.
 
-    The SPA owns routes like `/profil` that exist only in the browser. Plain
-    `StaticFiles` 404s them, so the app worked until the first reload or shared
-    link -- the failure only appears when someone types the URL rather than
-    clicking their way to it, which is why it is worth handling here rather
-    than noticing it in the pilot.
-
-    Two things deliberately keep their 404. A path under `/api` or `/ws` that
-    reaches this mount is an unknown endpoint, and answering it with a page
-    would turn a clear 404 into a JSON parse error in the caller. So is any
-    path that looks like a file: a mistyped bundle or a missing image must
-    fail as itself, not as HTML that a script tag then chokes on.
-    """
+    Deliberately still 404: paths under `/api`, `/ws`, `/health` (an unknown
+    endpoint must not answer with HTML) and anything that looks like a file."""
 
     # Reserved for the API and the live session; never the SPA's to route.
     _SERVER_PREFIXES = ("/api", "/ws", "/health")

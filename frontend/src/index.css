@@ -29,14 +29,10 @@
      reuse it for ordinary text. */
   --color-brand-accent: #ff6a00;
 
-  /* Chart identity hues (F-13, utils/metricGroups.ts). Slots 1, 5 and 7 of the
-     documented categorical palette, in that order, validated as an all-pairs
-     set against a white card: CVD ΔE 13.0, normal-vision ΔE 16.3.
-
-     Identity, never judgement. The hue belongs to a family of metrics and
-     never moves with a value, and none of the three is red, amber or green --
-     those are spent on ADR 0078's traffic light, and a dashboard that reused
-     one would invite exactly the reading ADR 0065 forbids. */
+  /* Chart identity hues (F-13, utils/metricGroups.ts): slots 1, 5, 7 of the
+     categorical palette, validated all-pairs on white (CVD ΔE 13.0, normal 16.3).
+     Identity, never judgement: never moves with a value, and none is red, amber or
+     green -- those belong to ADR 0078's traffic light (ADR 0065). */
   --series-speech: #2a78d6;
   --series-content: #e87ba4;
   --series-activity: #4a3aa7;
@@ -307,12 +303,9 @@ h2 {
   transition: border-color 0.2s;
 }
 
-/* The indicator remains visible as an empty circle for unselected choices.
-   18px, the same as the "i" ring in the corner below it: the two are the only
-   marks in a card's right margin and a difference in size between them reads
-   as a difference in importance that is not there. Nothing to weigh against
-   here the way there was for the "i" — this is a `span`, not a target, so
-   WCAG 2.5.8 has nothing to say about it. */
+/* The indicator stays visible as an empty circle when unselected. 18px, the same
+   as the "i" ring below, so neither reads as more important; a `span`, not a
+   target, so WCAG 2.5.8 does not apply. */
 .choice-check {
   position: absolute;
   top: 12px;
@@ -604,19 +597,10 @@ h2 {
 }
 
 .persona-card-portrait {
-  /* Flex so the initials fallback centres itself.
-     Width is fixed and the height stretches to the card's, rather than the
-     other way round: in a flex row the main size is resolved before the cross
-     size, so an `aspect-ratio` with a stretched height has nothing to compute
-     from and the slot blows up to its content's width. 72px is deliberately
-     narrower than the 3:4 the portraits are cropped for: three cards to a row
-     leave the body barely 90px of text once the check and the "i" have their
-     corner, which is what wrapped two-word names onto two lines and pushed
-     every role to the clamp. The slot gives that width back. Nothing is lost
-     by it — the source is square and `object-fit: cover` trims the sides
-     anyway, and at this width the zoom below still leaves the widest head in
-     the set (hair included) a clear margin either side; the picture is the
-     same size, there is just less room beside the face. */
+  /* Flex so the initials fallback centres itself. Width fixed, height stretched:
+     in a flex row the main size resolves first, so an `aspect-ratio` on a stretched
+     height has nothing to compute from. 72px (narrower than 3:4) leaves the text
+     room for two-word names; the square source is trimmed by `object-fit` anyway. */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -634,13 +618,10 @@ h2 {
   overflow: hidden;
 }
 
-/* The slot is taller than it is wide and the source is square, so `object-fit:
-   cover` already trims the sides. The zoom on top of that is what brings the
-   face up to a size one Persona can be told from another at: unzoomed, the card
-   would show too much of the half-body shot at this size. Every picture is framed
-   the same way — square, subject centred, face in the upper third — which is
-   what lets one origin serve all of them. The two large square slots show the
-   pose whole and need neither: their box matches the source. */
+/* The slot is taller than wide, so `object-fit: cover` trims the square source's
+   sides; the zoom brings the face up to a recognisable size. Works because every
+   portrait is framed alike (square, face in the upper third). The large square
+   slots need neither. */
 .persona-card-portrait > img {
   transform: scale(1.5);
   transform-origin: center 18%;
@@ -719,18 +700,10 @@ h2 {
   --origin-ink: var(--color-blue-600);
 }
 
-/* Own Scenario, hand-authored or shared with the company — the same colour
-   either way, and nothing on the badge to tell them apart but the label. A ring
-   around the shared one made it read as a kind of its own, when it is the same
-   Scenario of the User's with one more place it can be seen from.
-
-   Olive, not the green it used to be: that green sat 28° from the follow-up's
-   teal, the closest two hues in the whole set, and on a pale wash 28° is not a
-   difference anyone reads. This sits in the one gap the other five leave — 38°
-   clear of its nearest neighbour — at the same lightness as the green it
-   replaces, so only the hue moved. It also fixes the badge, whose text was the
-   only one in the set under the 4.5:1 small-text minimum (4.17); this pairing
-   is 6.0. */
+/* Own Scenario, hand-authored or shared -- same colour, only the label differs
+   (a shared one is not a kind of its own). Olive sits 38° clear of its nearest
+   hue (the old green was 28° from the follow-up's teal), and the badge text
+   reaches 6.0:1. */
 .card-origin-own,
 .card-origin-shared {
   --origin-tint: #ecf3d6;
@@ -790,19 +763,11 @@ h2 {
   background: #fdf0f5;
 }
 
-/* The "i" on a selection card, Personas and Scenarios alike. Bottom-right, on
-   the same 12px right edge and at the same 24px size as the check bubble above
-   it, so the two sit in one column down the card's right gutter -- the gutter
-   both grids' padding already keeps clear of text. Round and quiet: it must
-   read as an aside to the choice, not as a second way of making it. It replaced
-   the Scenario card's edit link, which moved into the panel (ADR 0062),
-   so a card carries one secondary affordance rather than two. */
-/* The button keeps its 24px box and the ring inside it is drawn on the span,
-   so the affordance can be quieter than its target: the "i" is the smaller of
-   the two things in a card's corner and should look it, but shrinking the
-   button itself would take the tap target under the 24px WCAG 2.5.8 asks for,
-   and the card behind it is a target too, so the spacing exception does not
-   apply. `place-items` centres the ring in that box. */
+/* The "i" on a selection card, bottom-right in one column with the check bubble
+   (same 12px edge, 24px size). Round and quiet: an aside to the choice, not a
+   second way of making it. The one secondary affordance a card carries (ADR 0062). */
+/* The button keeps its 24px box (WCAG 2.5.8; the card behind is a target too,
+   so the spacing exception does not apply); the smaller ring is drawn on the span. */
 .card-info {
   position: absolute;
   right: 12px;
@@ -957,15 +922,9 @@ h2 {
   line-height: 1.5;
 }
 
-/* Bordered like the cases beside it. It was dashed for a while, to set it
-   apart as the one tile that is not a case — but it is the selection the
-   screen opens on, and a dashed box in the first place of the grid reads as a
-   placeholder for something missing rather than as the choice already made.
-   Its colour still comes from `card-origin-random` like every other card's,
-   and that, its badge and its text are enough to set it apart.
-
-   The control that opens the rest of the grid is `.library-more`, styled with
-   the training history's `.session-more` further down. */
+/* Bordered like the cases beside it, not dashed: it is the opening selection,
+   and a dashed first tile reads as a placeholder. `card-origin-random`, its badge
+   and text set it apart. The "show more" control is `.library-more`. */
 
 /* --- Scenario editor modal --- */
 
@@ -2817,13 +2776,9 @@ p.follow-up-error {
   color: var(--text-muted);
 }
 
-/* Beside the call rather than under it (ADR 0070), and at its full length: no
-   scroll box of its own. A panel with an inner scrollbar hides part of the
-   briefing behind a gesture, and the one thing that must never happen mid-call
-   is the User not finding a fact they were told they have. The column simply
-   grows; the page scrolls if it has to, which on a briefing this size it
-   rarely does. Below the two-column breakpoint this goes back to being a block
-   under the call. */
+/* Beside the call (ADR 0070), at full length with no scroll box of its own: an
+   inner scrollbar hides part of the briefing, and the User must never miss a fact
+   mid-call. Below the two-column breakpoint it stacks under the call. */
 .reverse-brief-call {
   margin: 0 auto;
   background: #fff;
@@ -2887,12 +2842,9 @@ p.follow-up-error {
 
 /* --- One type scale for the three pre-call panels ----------------------- */
 
-/* The Briefing (ADR 0054), the case facts and a reverse's own brief are read
-   one under the other on the same screen, and the first two always are. Their label and their prose are therefore one declaration
-   each rather than three copies: they had drifted to two different scales, and
-   two blocks of the same kind set differently read as two kinds of thing.
-   Only what genuinely differs — the colour, the spacing, the `pre-line` on the
-   facts — stays with each panel. */
+/* The Briefing (ADR 0054), case facts and a reverse's brief share one label and
+   one prose declaration, so blocks of one kind cannot drift to different scales.
+   Only colour, spacing and the facts' `pre-line` differ per panel. */
 .scenario-briefing-title,
 .case-brief-eyebrow,
 .reverse-brief-eyebrow {
@@ -2953,12 +2905,8 @@ p.follow-up-error {
   letter-spacing: -0.025em;
 }
 
-/* Every section of the feedback page has the same shape: a heading row above,
-   a white box below. Half of them used to carry the heading inside the box,
-   which made two blocks of the same kind look like two different kinds of
-   thing. A box may still hold a title, but only for an *item* within a
-   section — the two offers in the next-steps block are things you can pick,
-   not sections of the page. */
+/* Every feedback section is a heading row above a white box. A box holds a title
+   only for an *item* within a section (the offers under next steps). */
 .feedback-section {
   margin-bottom: 24px;
 }
@@ -3907,12 +3855,8 @@ p.follow-up-error {
   min-width: 0;
 }
 
-/* Small state labels on a history row. Tinted rather than solid, and stating
-   a fact rather than raising an alarm: a call that was abandoned, or one whose
-   wrap-up never got written, is a thing that happened, not the user's mistake.
-   Colour is a second channel here, never the only one -- each chip says in
-   words what its colour repeats, so it survives being read in greyscale or by
-   someone who does not separate green from red. */
+/* State labels on a history row: tinted, stating a fact rather than an alarm.
+   Colour is never the only channel -- each chip says it in words too. */
 .chip {
   margin-left: 8px;
   padding: 1px 9px;
@@ -3967,12 +3911,10 @@ p.follow-up-error {
   border-color: var(--color-blue-600);
 }
 
-/* The bin, and the check and cross that replace it. The box widens from one
-   button to two while the bin slides out to the right, clipped at the box's
-   edge so it leaves rather than fades, and the two answers come in from the
-   left a moment after. Every button stays mounted; `visibility` hides the ones
-   not in play, and flips only at the end of a hiding transition (its own delay)
-   so the slide is still seen. */
+/* The bin, and the check and cross that replace it: the box widens, the bin
+   slides out right (clipped, not faded), the answers come in from the left.
+   All stay mounted; `visibility` flips only at the end of a hiding transition
+   so the slide is seen. */
 .session-row-actions {
   position: relative;
   flex: 0 0 auto;
@@ -4201,12 +4143,9 @@ p.follow-up-error {
   inset: 0;
   z-index: 50;
   display: flex;
-  /* NOT align-items: center. On a scroll container, a centered flex item that
-     is taller than the viewport overflows equally in both directions, and the
-     part above the top edge cannot be scrolled to: scrolling never goes above
-     the origin, so the head of a long dialog is simply lost. The dialog below
-     centers itself with `margin: auto` instead, which resolves to zero once
-     there is no free space left. */
+  /* NOT align-items: center. A centred flex item taller than a scroll container
+     overflows upwards where it cannot be scrolled to, losing the dialog's head.
+     The dialog centres itself with `margin: auto`, which collapses to zero instead. */
   align-items: flex-start;
   justify-content: center;
   padding: 24px;
@@ -4269,12 +4208,8 @@ p.follow-up-error {
   transition: background 0.2s, border-color 0.2s, opacity 0.2s;
 }
 
-/* A link wearing the button's clothes — picking focus goals, starting a
-   training. An `<a>` is inline, and an inline box's vertical padding takes up
-   no line height: it paints over the line above instead, which is how the
-   button came to sit on top of the sentence it answers. `inline-flex` makes the
-   padding count, and the underline a link would carry does not belong on a
-   button. */
+/* A link styled as a button. `inline-flex` because an inline `<a>`'s vertical
+   padding takes no line height and paints over the line above; no underline. */
 a.consent-button {
   display: inline-flex;
   align-items: center;
@@ -4427,26 +4362,11 @@ a.consent-button {
 }
 
 /* --- The traffic light on a classification (ADR 0078) -------------------- */
-/* The only colour in this application that says something about a value. It
-   exists so a reader gets an impression before the reading starts: the wrap-up
-   hands them nine figures at equal weight, and nothing else on that screen says
-   which one is worth their attention first. Colour is seen rather than read,
-   which is the whole property being used here.
-
-   It points, it does not grade. Green means nothing here needs attention today,
-   red means look here first. Two metrics carry one, F-51's interruptions and
-   F-35's intonation, and ADR 0078 holds the seven conditions any further one
-   has to meet.
-
-   It colours the classification and nothing else. Never a whole tile, which
-   would shout an orientation the thresholds cannot support and drown out the
-   neighbouring metrics that carry no reading at all. Never a raw figure
-   either: on F-35 the step is read from the liveliness while the tile's
-   number is the range, so the colour goes on the word.
-
-   Colour is never the only channel: the step is written out beside it, the word
-   "assessment" follows, the scale it came from sits on the metric's own
-   page, and the three tints differ in lightness so they survive greyscale. */
+/* The only colour in the app that says something about a value (ADR 0078): it
+   points, it does not grade -- green: nothing needs attention, red: look here first.
+   Only on the classification word, never a whole tile or raw figure. Never the only
+   channel: the step is written out, "assessment" follows, the scale is on the metric's
+   page, and the tints differ in lightness to survive greyscale. */
 
 .metric-value-green {
   color: var(--color-success);
@@ -4724,12 +4644,9 @@ a.consent-button {
 }
 
 /* --- What a figure was read off (MetricEvidence.tsx) ---------------------- */
-/* Every Kennzahl tile on the wrap-up screen opens its own page, so every page
-   has to show more than the tile did: the words that were counted, the
-   passages that were found, the pauses that were measured. Nothing in this
-   block may encode a direction -- no colour for a value, no target mark. The
-   one accent it uses sits on a *quoted word*, to say "this is the one that was
-   counted", never on a number. */
+/* Every Kennzahl page shows what its tile's figure was read off. Nothing here may
+   encode a direction -- no value colour, no target mark; the one accent marks a
+   *quoted counted word*, never a number. */
 
 .evidence-quote {
   margin: 0 0 0.75rem;
@@ -5036,13 +4953,8 @@ a.consent-button {
 
 /* --- intonation (F-35) ------------------------------------------------- */
 /* The contour and the five figures live on the metric's own page
-   (`SessionMetricView`); the wrap-up carries the tile like every other.
-
-   The arrangement is deliberate and replaced one that buried its own point: a
-   paragraph of method under every figure meant the sentence a reader acts on
-   sat in the middle of six hundred words about measurement. Now the lead
-   sentence carries the classification, the figures are figures, and the method
-   is behind the "i". Nothing was deleted, only moved. */
+   (`SessionMetricView`); the wrap-up carries a tile. Lead sentence first, figures
+   as figures, method behind the "i" (ADR 0077). */
 
 /* The one sentence this block is built around. Larger than body text and above
    the figures, because a reader who stops after it should still leave with the
@@ -5286,12 +5198,9 @@ a.consent-button {
 }
 
 /* --- Ihr Training: the band that opens the page ---------------------------- */
-/* Three columns on a wide screen: the counted figures stacked on the left, the
-   calendar at its natural width beside them, and the rest to the variety table,
-   which is the one that runs out of room first (a Persona's name gets clipped
-   otherwise). The calendar is sized to the calendar rather than to a share of
-   the page: one month of seven columns has a natural width, and a larger share
-   only stretched the card, not the grid in it. */
+/* Three columns on a wide screen: counted figures, the calendar at its natural
+   width (one month of seven columns), and the rest to the variety table, which
+   runs out of room first. */
 /* The first block on the page follows the lead and its "i", not another
    block, so it needs less than a section's usual distance. */
 .progress-training-section {
@@ -5305,21 +5214,9 @@ a.consent-button {
   align-items: start;
 }
 
-/* In the ordinary view the three cards end level.
-
-   They did not, and it showed: the counted figures are three short boxes and
-   the calendar is a month grid, so the left column stopped some fifty pixels
-   above its neighbours and the row read as three unrelated blocks instead of
-   as one band.
-
-   Not while the variety table is expanded, which is what the guard is for and
-   what the rule here used to say in place of stretching at all: opened to
-   twenty Scenarios that card runs to twice the height of the calendar, and
-   pulling the other two up to it would draw a border around half a screen of
-   nothing. The expanded state is read off the show-more button's own
-   `aria-expanded` rather than from a second class, so there is no copy of it
-   to keep in step — and where the table is short enough to need no button,
-   there is nothing to expand and the cards level for good. */
+/* In the ordinary view the three cards end level -- except while the variety
+   table is expanded (it runs to twice the calendar's height). Read off the
+   show-more button's own `aria-expanded`, so there is no second copy of the state. */
 .progress-training:not(:has(.session-more[aria-expanded="true"])) {
   align-items: stretch;
 }
@@ -5953,16 +5850,9 @@ a.consent-button {
 }
 
 /* --- When the user trained ------------------------------------------------ */
-/* Counting what somebody did needs no norm, which is why this is the one block
-   here that carries no caveat (ADR 0065). The shading is magnitude on a single
-   hue, three steps, and the number is printed in the cell -- so the colour is a
-   second reading of what the cell already says, never the only one.
-
-   Derived from --series-activity by mixing it with the surface at 45 % and
-   70 %, validated as an ordinal ramp against a white card: monotone lightness,
-   adjacent gaps over 0.06, light end 2.23:1, one hue. A darker light end than
-   the eye would pick, because the first step has to stay visible against the
-   card at all. */
+/* Counting needs no norm, so no caveat here (ADR 0065). Three steps of one hue
+   (--series-activity mixed with the surface at 45 %/70 %), validated as an ordinal
+   ramp; the number is printed in the cell, so colour is never the only reading. */
 
 .calendar {
   margin: 0;
@@ -6547,12 +6437,8 @@ button.calendar-day {
 }
 
 /* --- What recurs, and what to practise next (blocks D and E) ------------- */
-/* These two were a dashed, half-transparent example until each feedback point
-   carried the goal it was about (ADR 0080). The example styling is gone with
-   it: the content is the user's own now, and anything that still whispered
-   "placeholder" would undersell it. `progress-preview-note` is the last name
-   left over from that phase; the rest were renamed when the two lists became
-   two cards. */
+/* The user's own tagged points (ADR 0080), so no placeholder styling.
+   `progress-preview-note` is a leftover name from the preview phase. */
 
 .progress-preview-note {
   margin: 0 0 1rem;
@@ -6721,28 +6607,10 @@ a.recurring-item:focus-visible {
   font-size: 0.82rem;
 }
 
-/* The single practice suggestion. The ground first and small, the thing to
-   play next under it and large, the button at its end, the caveat last. That
-   order is the argument: a suggestion whose ground the reader has not seen is
-   an instruction, so the ground comes before the offer.
-
-   Across the full width under the two lists rather than as a third card in
-   their row: the same content in a 450px column ran three times their height,
-   and the row read as lopsided.
-
-   One column and not two. The ground used to sit beside the offer, which put
-   four lines of prose in 240 pixels next to a bordered, gradient-filled panel
-   — a card inside a card — with the two halves centred against each other, so
-   the chip and the name of the call missed each other by nine pixels and
-   nothing on the band lined up with anything else. Stacked, the prose gets a
-   measure it can be read at and the offer needs no box to be found.
-
-   The measure is on the prose and not on the band: this card runs the full
-   width of a 1440px page, and a paragraph set across it is 180 characters to
-   the line — but capping the whole band left the right two fifths of the card
-   empty, which reads as a layout that broke rather than as a column somebody
-   chose. So the two sentences get a width they can be read at, and the rows
-   that carry a structure — the rule, the offer, the foot — keep the card's. */
+/* The single practice suggestion: ground first and small, then the offer large,
+   button at its end, caveat last -- a suggestion without its ground is an
+   instruction. Full width under the two lists, one column. The measure caps the
+   prose only: capping the whole band left two fifths of the card empty. */
 
 .progress-practice-band {
   display: flex;
@@ -6775,13 +6643,8 @@ a.recurring-item:focus-visible {
   color: var(--color-navy-900);
 }
 
-/* The chip over the sentence that gives the ground. It says what kind of thing
-   this block is before the reader has read a word of it, which is the same job
-   the closing caveat does at the other end.
-
-   On a line of its own. Inline at the head of the paragraph it set the first
-   line ninety pixels in while the two under it started at the margin, which
-   reads as a broken first-line indent rather than as a label. */
+/* The chip over the ground sentence, on a line of its own: inline it read as a
+   broken first-line indent. */
 .progress-practice-chip {
   display: block;
   width: fit-content;
@@ -6796,16 +6659,9 @@ a.recurring-item:focus-visible {
   text-transform: uppercase;
 }
 
-/* The offer itself: the name of the call on the left, the button at the end of
-   the measure, wrapping under it where there is no room.
-
-   No box. It had a border and a 135-degree gradient inside a card that has a
-   border of its own, and the gradient ran out to the card's own white before
-   the panel's right edge did — so the fill dissolved while the border stayed,
-   which looks like a mistake rather than like a panel. What makes the offer
-   findable without one is the name set in the display face and the only dark
-   button on the screen; the rule above it is what separates it from the ground
-   it follows from. */
+/* The offer: the call's name left, the button at the end, wrapping when needed.
+   No box (a bordered gradient inside a card looked broken); the display face,
+   the only dark button and the rule above make it findable. */
 .progress-practice-offer {
   display: flex;
   flex-wrap: wrap;
@@ -8651,13 +8507,9 @@ a.recurring-item:focus-visible {
   color: var(--text-muted);
 }
 
-/* The stage owns the perspective, so the cube's own transform stays a plain
-   rotation and the keyframes below read as one.
-
-   The height is headroom, not the die: the throw opens 44px above where the
-   die comes to rest, and a box drawn tight around the resting position lets
-   that first frame overlap the heading. So the die sits low in a tall box and
-   the throw happens inside it. */
+/* The stage owns the perspective, so the cube's transform stays a plain rotation.
+   The height is headroom: the throw opens 44px above the resting position, and a
+   tight box let the first frame overlap the heading. */
 .dice-stage {
   position: relative;
   width: 96px;
@@ -8809,14 +8661,9 @@ a.recurring-item:focus-visible {
 
 /* --- Screen transitions ---------------------------------------------------- */
 
-/* The film cut between two screens: the screen dims to opaque, changes behind
-   the cover, and comes back. Two phases, driven from ScreenTransition.tsx —
-   which also sets --cover-ms/--reveal-ms, so the timers that fire the actual
-   screen change and these animations are the same numbers rather than two
-   copies of them.
-
-   Deliberately above everything and untouchable: a transition the user can
-   click through is a transition that lands them on a half-built screen. */
+/* The film cut between two screens, driven from ScreenTransition.tsx, which sets
+   --cover-ms/--reveal-ms so timers and animations share one number. Above
+   everything and unclickable: clicking through would land on a half-built screen. */
 .screen-transition {
   position: fixed;
   inset: 0;
@@ -9063,15 +8910,10 @@ a.recurring-item:focus-visible {
   background: linear-gradient(180deg, #b45309, #f59e0b, #b45309);
 }
 
-/* The control for it: an arm reaching in from the left of the device, with the
-   label and the arrow inside the button rather than beside it. That is the
-   whole point of the shape — a 3px sliver is far under the 24px a target needs
-   (WCAG 2.5.8), and this makes the target 210px wide without drawing the
-   switch any bigger than a switch.
-
-   `top`/`height` centre it on the sliver (74px + 20/2 = 84; 62 + 44/2 = 84),
-   and the right edge lands 6px inside the frame, so the arrowhead stops just
-   short of the switch and the press area still covers it. */
+/* An arm reaching in from the left, label and arrow inside the button: a 3px
+   sliver is far under WCAG 2.5.8's 24px, so this makes a 210px target without
+   drawing a bigger switch. `top`/`height` centre it on the sliver (74 + 20/2 = 84;
+   62 + 44/2 = 84); the right edge lands 6px inside the frame. */
 .incoming-mute-switch {
   position: absolute;
   top: 62px;

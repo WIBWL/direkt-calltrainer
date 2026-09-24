@@ -1,15 +1,8 @@
 """Verdicts on one reply against the call so far (`backend/session/reply_checks.py`).
 
-Covers:
-  ADR 0037  a reply that still presses is not a goodbye; a farewell anywhere wins
-  ADR 0038  verbatim repeats, A-B-A-B oscillation, restatements, re-greetings
-            and a first sentence already said are recognised
-
-Each check used to be reachable only by driving a Turn through the faked
-pipeline, which is how `test_repetition_guard.py` and `test_closing_intent.py`
-still exercise them in place. These call them directly, so a threshold or a
-pattern can be changed and read against its own cases.
-"""
+Covers ADR 0037 (still pressing is no goodbye; a farewell anywhere wins) and ADR 0038 (repeats,
+A-B-A-B, restatements, re-greetings, a first sentence already said). Called directly, so a
+threshold can be read against its own cases; the Turn-level tests live elsewhere."""
 from backend.session import reply_checks as checks
 from backend.session.language_packs import get_pack
 

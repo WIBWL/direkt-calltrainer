@@ -1,17 +1,8 @@
 """Whether a subject has agreed to their trainings being stored (ADR 0066).
 
-The single place that answers that question. Two callers matter and they are
-very different: the REST layer asks so the interface can prompt, and the write
-path asks so it can decline — the second one is the one that has to be right,
-because it is the last point at which unconsented data can still be prevented
-from existing.
-
-Consent is recorded as decisions, never as a current-state row that gets
-overwritten. `record_decision` appends, `current` reads the newest. That makes
-the history of a subject's decisions readable, which is the point of keeping
-them at all, and it makes a withdrawal impossible to confuse with never having
-agreed.
-"""
+The single place that answers it; the write path's answer is the one that must
+be right. Decisions are appended, never overwritten (`record_decision` appends,
+`current` reads the newest), so a withdrawal is distinct from never agreeing."""
 from __future__ import annotations
 
 import hashlib
@@ -50,22 +41,14 @@ class ConsentState:
 
     @property
     def allows_storage(self) -> bool:
-        """True only for a live `granted` against the *current* wording.
-
-        The version check is the part worth stating: a subject who agreed to an
-        older notice has not agreed to this one, and their Sessions must not be
-        stored on the strength of a decision about different text.
-        """
+        """True only for a live `granted` against the *current* wording; agreeing
+        to an older notice is not agreeing to this one."""
         return self.status == db_models.CONSENT_GRANTED and self.version == CURRENT_VERSION
 
     @property
     def decision_required(self) -> bool:
-        """True when the interface has to ask before training can be stored.
-
-        Both a missing decision and a stale one require asking. A withdrawal
-        does not: it is a decision, and re-prompting someone who just said no
-        would make the dialog a way of wearing them down.
-        """
+        """True when the interface has to ask: no decision or a stale one.
+        Not after a withdrawal -- re-prompting would wear the subject down."""
         if self.status == db_models.CONSENT_WITHDRAWN:
             return False
         return not self.allows_storage
@@ -91,10 +74,8 @@ def current(db: DbSession, subject_id: str) -> ConsentState:
 def record_decision(db: DbSession, subject_id: str, granted: bool) -> ConsentState:
     """Append a decision. Returns the state that now holds.
 
-    Idempotent in the sense that matters: repeating a decision that is already
-    in force against the current wording writes nothing, so a double-clicked
-    button does not fill the log with identical rows. A decision that *changes*
-    something is always written, including a re-grant after a withdrawal.
+    Repeating the decision already in force writes nothing (double clicks);
+    a decision that changes something is always written.
     """
     status = db_models.CONSENT_GRANTED if granted else db_models.CONSENT_WITHDRAWN
     state = current(db, subject_id)
@@ -117,19 +98,10 @@ def record_decision(db: DbSession, subject_id: str, granted: bool) -> ConsentSta
 def lock_subject(db: DbSession, subject_id: str) -> None:
     """Serialise this subject's consent decision against their Session writes.
 
-    Both sides of ADR 0066's promise take this before they act: the write path
-    before it reads the decision, and `POST /api/consent` before it records a
-    withdrawal and deletes what that withdrawal covers. Without it the two
-    transactions interleave -- the write reads "granted", the withdrawal
-    commits and deletes every Session that exists *at that moment*, then the
-    write inserts one more. The result is a stored training under a withdrawn
-    consent that no deletion path will ever visit again, which is precisely the
-    state ADR 0066 says must not occur.
-
-    Transaction-scoped (`pg_advisory_xact_lock`), so it is released by the
-    commit or rollback that ends the caller's transaction and cannot be leaked.
-    Keyed on the subject, so two different Users never wait on each other.
-    """
+    Taken by the write path before reading the decision and by `POST /api/consent`
+    before recording a withdrawal. Without it a write can read "granted", the
+    withdrawal commit and delete, and the write then insert a Session no deletion
+    path will ever visit (ADR 0066). Transaction-scoped, keyed on the subject."""
     key = int.from_bytes(
         hashlib.blake2b(subject_id.encode("utf-8"), digest_size=8).digest(),
         "big", signed=True,
@@ -140,20 +112,11 @@ def lock_subject(db: DbSession, subject_id: str) -> None:
 def allows_storage(subject_id: str, db: DbSession | None = None) -> bool:
     """Whether this subject's finished Sessions may be written.
 
-    With `db`, the question is answered inside the caller's own transaction,
-    which is how the write path asks: the answer and the INSERT it authorises
-    then commit together, and `lock_subject` keeps a withdrawal from slipping
-    between them. A failure propagates there rather than being swallowed, and
-    that is still failing closed -- it aborts the transaction, so nothing is
-    written.
-
-    Without `db` it opens its own transaction, which is what the REST layer
-    wants. **Fails closed**: if the question cannot be answered, the answer is
-    no. Everywhere else in this application a database failure is logged and
-    stepped over, on the grounds that losing a wrap-up is better than losing a
-    call — here the same reflex would store data on a guess, which is the one
-    outcome consent exists to prevent.
-    """
+    With `db`, answered inside the caller's transaction so the answer and the
+    INSERT commit together under `lock_subject`; a failure propagates and aborts.
+    Without `db` it opens its own. **Fails closed** either way: unlike everywhere
+    else in the app, a database failure here must not be stepped over, since that
+    would store data on a guess."""
     if db is not None:
         return current(db, subject_id).allows_storage
     try:

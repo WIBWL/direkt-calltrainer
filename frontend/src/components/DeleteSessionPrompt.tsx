@@ -3,12 +3,9 @@ import { useState } from "react";
 import { deleteSession } from "../sessions";
 
 /**
- * Deleting one stored training (ADR 0066): the request and its two states.
- *
- * A hook beside the prompt rather than inside it, because the two places that
- * offer the deletion — a row in the history and the training's own page — open
- * and close the question themselves, and the history's bin button has to know
- * whether a deletion is still in flight before it lets the question close.
+ * Deleting one stored training (ADR 0066): the request and its two states. A hook beside
+ * the prompt because both callers open and close the question themselves, and the
+ * history's bin button must know whether a deletion is in flight before it closes.
  */
 export function useSessionDeletion(sessionId: string | undefined, onDeleted: () => void) {
   const [deleting, setDeleting] = useState(false);
@@ -37,11 +34,8 @@ export function useSessionDeletion(sessionId: string | undefined, onDeleted: () 
 }
 
 /**
- * The question on a training's own page, once it is open. It says what goes
- * with the training, because the deletion is final and reaches the wrap-up and
- * the figures too. The history asks the same thing with a check and a cross in
- * place of its bin (`SessionHistory`), where a paragraph per row would push the
- * list apart.
+ * The question on a training's own page. It says what goes with the training, since the
+ * deletion is final. The history asks with a check and a cross instead (`SessionHistory`).
  */
 export default function DeleteSessionPrompt({
   deleting,

@@ -1,16 +1,8 @@
 """How a route loads a Session: whose it may be, and what comes with it.
 
-Both the detail route and the data export read a Session with its whole subtree,
-and both had their own copy of the list. The risk is not the duplication itself
-but the drift: a relationship added to one and not the other is not an error,
-it is the same page served with one query per row.
-
-`owned_session` is the same argument for the ownership rule. Every route that
-reads one Session by its `extern_id` wrote the query itself, and one of them
-loaded the row and compared the owner afterwards -- the shape `deletion.py`
-calls unsafe, since a comparison can be forgotten on one path the way a filter
-in the query cannot.
-"""
+Shared so the eager-load lists cannot drift apart (a missing relationship is
+not an error, just one query per row), and so ownership is a filter in the
+query rather than a comparison afterwards that one path could forget."""
 
 import uuid
 
@@ -26,13 +18,9 @@ SESSION_SUBTREE = (
     selectinload(db_models.Session.turns),
     selectinload(db_models.Session.measurements)
     .selectinload(db_models.Measurement.metric_type),
-    # Down to the focus goal, not only to the points: `served._detail_feedback`
-    # reads `point.focus_goal.key` for every point, and that relationship is a
-    # plain lazy one, so without this a wrap-up costs a query per tagged point.
-    # The listing route carries the same load for the same reason -- it is the
-    # one place this was noticed, and having it there and not here is exactly
-    # the drift this module exists to prevent. The export pays one batched
-    # query it does not read, which is a query, not a query per point.
+    # Down to the focus goal: `served._detail_feedback` reads
+    # `point.focus_goal.key`, a lazy relationship, so without this a wrap-up
+    # costs a query per tagged point. The listing route carries the same load.
     selectinload(db_models.Session.feedback)
     .selectinload(db_models.Feedback.points)
     .selectinload(db_models.FeedbackPoint.focus_goal),
@@ -47,14 +35,10 @@ WITH_WRAPUP = (
     selectinload(db_models.Session.feedback).selectinload(db_models.Feedback.points),
 )
 
-#: Exactly what `jobs.retry_blocked` walks, and nothing else: the wrap-up it
-#: refuses a second one for, the Turns it needs at least one of, and the jobs
-#: whose newest it reads. The route asked without any of them and paid three
-#: lazy loads for a single decision.
-#:
-#: The Turns come back in full to answer `not session.turns`. An EXISTS would
-#: be cheaper, but the same function serves `requeue_feedback.py`, and a
-#: transcript is tens of rows -- not worth splitting one rule into two shapes.
+#: Exactly what `jobs.retry_blocked` walks: the wrap-up, the Turns and the jobs.
+#: The Turns load in full to answer `not session.turns`; an EXISTS would be
+#: cheaper, but the rule also serves `requeue_feedback.py` and a transcript is
+#: tens of rows.
 FOR_RETRY = (
     selectinload(db_models.Session.feedback),
     selectinload(db_models.Session.turns),
@@ -67,10 +51,8 @@ def owned_session(
 ) -> db_models.Session | None:
     """The caller's Session with `extern_id`, or None.
 
-    None for one that is absent *and* for one that is someone else's: the two
-    are the same answer (ADR 0031/0050), because telling them apart would
-    confirm that an id exists. The owner is part of the query, so someone
-    else's row and its subtree are never loaded only to be thrown away.
+    None both for an absent id and for someone else's: telling them apart
+    would confirm the id exists (ADR 0031/0050).
     """
     return (
         db.query(db_models.Session)

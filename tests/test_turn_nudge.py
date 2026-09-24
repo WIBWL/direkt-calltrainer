@@ -1,17 +1,8 @@
-"""Which nudge a reply gets (`backend/session/nudges.py::for_turn`).
+"""Which nudge a reply gets (`backend/session/nudges.py::for_turn`), as a precedence table.
 
-Covers:
-  ADR 0035  the cut-off push outranks everything but the goodbye, and goes in
-            front of the user's message
-  ADR 0037  the goodbye push outranks everything
-  ADR 0038  the clarify pushes, then the standing anti-repeat reminder
-  ADR 0070  the reverse turns the reminder around
-  ADR 0073  the settlement check rides on the reminder alone, after the opening
-
-The precedence used to be an if-cascade inside the orchestrator, reachable only
-through `_messages_for_turn` (which `test_closing_intent.py` still drives); it
-is a table here.
-"""
+Covers ADR 0037 (goodbye push first), ADR 0035 (cut-off push next, before the user's message),
+ADR 0038 (clarify pushes, then the anti-repeat reminder), ADR 0070 (reverse turns it around),
+ADR 0073 (settlement check rides on the reminder alone, after the opening)."""
 
 from backend.session import nudges
 

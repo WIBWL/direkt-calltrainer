@@ -24,24 +24,10 @@ import {
   variety,
 } from "./progressStats";
 
-/**
- * The arithmetic behind the progress dashboard (F-13).
- *
- * Worth testing for the reason `trainingFlow` is: these are pure functions over
- * data the caller supplies, and every one of them can be wrong in a way that
- * renders perfectly. A band computed from the wrong spread, a series drawn
- * backwards in time, a calendar counting abandoned calls — none of it throws,
- * none of it is visible to `tsc`, and all of it turns into a sentence the
- * application tells somebody about themselves.
- *
- * What the cases are chosen for is that second part. They pin the claims the
- * screen makes out loud — "Ihr üblicher Bereich 118 bis 141", "in 9 von 12
- * Trainings", the direction a chart reads in — rather than covering lines.
- *
- * ADR 0051 and ADR 0065 are the standing constraint: nothing here may grow a
- * target, a threshold or a direction, and `band` is where one would arrive
- * first.
- */
+/** The arithmetic behind the progress dashboard (F-13): every failure here renders
+ * perfectly, so the cases pin the claims the screen makes out loud ("Ihr üblicher
+ * Bereich 118 bis 141", "in 9 von 12 Trainings"). Nothing may grow a target or a
+ * direction (ADR 0051/0065); `band` is where one would arrive first. */
 
 // --- Series -----------------------------------------------------------------
 

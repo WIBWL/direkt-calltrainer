@@ -1,14 +1,7 @@
 """Deep links into the client-side router survive a reload (F-31, ADR 0009).
 
-The SPA owns paths the server has no file for -- `/profil` today, the history
-and progress screens next. Plain `StaticFiles` 404s them, which works fine
-until someone reloads the page or opens a link, so the failure hides until the
-exact moment a user does the ordinary thing.
-
-Driven against a directory this module builds rather than against
-`frontend/dist`: the fallback is server behaviour and has to be assertable
-without a Node toolchain or a prior `npm run build`, which is also what keeps
-this test meaningful in a checkout where the frontend was never built.
+Plain `StaticFiles` 404s SPA paths like `/profil` on reload. Driven against a directory built
+here, not `frontend/dist`, so it needs no Node toolchain or prior build.
 """
 import httpx
 import pytest
@@ -89,11 +82,8 @@ async def test_a_missing_asset_stays_a_404(spa_client) -> None:
     ["/api/unknown", "/api/sessions/nope/deeper", "/ws/nothing", "/health/nothing"],
 )
 async def test_server_paths_never_fall_back_to_the_app(spa_client, path: str) -> None:
-    """An unknown endpoint under a server-owned prefix stays a 404.
-
-    Answering with a page would turn a clear failure into a JSON parse error
-    in the caller, which is a much worse thing to debug than the 404 it
-    replaced.
+    """An unknown endpoint under a server-owned prefix stays a 404, not an HTML page
+    the caller then fails to parse as JSON.
     """
     async with spa_client as client:
         response = await client.get(path)

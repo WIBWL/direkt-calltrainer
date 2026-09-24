@@ -1,22 +1,9 @@
 import { useEffect } from "react";
 
 /**
- * The ringtone on the incoming-call screen (F-63).
- *
- * Synthesised rather than played from a file: a recorded ringtone is someone
- * else's, and two soft notes are cheaper to make than to license — and can be
- * kept genuinely quiet, which a normalised sample cannot.
- *
- * Deliberately not a telephone bell. A real ring is an alarm built to be heard
- * through a wall, and it makes people tense before a call they are already
- * nervous about. This is a bell-like two-note motif — a rising fourth, sine
- * tones with one quiet harmonic, fast attack and long decay — at a level you
- * could talk over.
- *
- * The phone shakes and pulses on the same cycle, taken from
- * `RINGTONE_CYCLE_MS`: the two bursts of vibration are the figure's two bars
- * and the still half its silence. A phone buzzing out of time with its own
- * ringtone is worse than one that does not buzz at all.
+ * The ringtone on the incoming-call screen (F-63): synthesised (no licence, and
+ * genuinely quiet) and deliberately not an alarm-like telephone bell. The
+ * phone's animation runs on the same `RINGTONE_CYCLE_MS`, so keep them in step.
  */
 
 /** One note: when it is struck inside the cycle, and at what pitch. */
@@ -39,14 +26,9 @@ interface Ringtone {
   strikes: readonly Strike[];
 }
 
-/** The pattern in use. Swapping the ringtone is this constant and nothing
- * else — the scheduling below does not care how long it is or how many notes
- * it has.
- *
- * A marimba figure: two bars of six, a fourth of the cycle sounding and the
- * rest silence. The partials are what make it wooden rather than electronic —
- * a struck bar is tuned so that its fourth and tenth harmonics ring with the
- * fundamental, which is why this reads as a mallet and a bell does not. */
+/** The pattern in use; swapping the ringtone is this constant alone. A marimba
+ * figure of two six-note bars; the 4th and 10th partials are what make it sound
+ * wooden rather than electronic. */
 const RINGTONE: Ringtone = {
   cycle: 4.4,
   decay: 0.55,
@@ -101,11 +83,8 @@ function strike(ctx: AudioContext, at: number, freq: number) {
 }
 
 /**
- * Rings for as long as `enabled` stays true, and stops the moment it does not.
- *
- * Silence is the safe failure: a browser that refuses the AudioContext, or one
- * that never resumes it, leaves the screen working and quiet rather than
- * throwing on the way into a call.
+ * Rings while `enabled` is true. Silence is the safe failure: a refused or
+ * never-resumed AudioContext leaves the screen working and quiet.
  */
 export function useRingtone(enabled: boolean) {
   useEffect(() => {

@@ -1,34 +1,7 @@
-"""REST routes for finished Sessions: the caller's history, and one Session's
-Transcript, statistics and Feedback.
-
-The Feedback is generated asynchronously (ADR 0019), so the Session becomes
-readable before its wrap-up exists. `status` says which of the two states the
-client is looking at, and the client polls until it settles.
-
-Measurements sit next to the Turns rather than inside them: each one describes
-the whole call (ADR 0051). What stays per Turn is the Transcript itself, with
-the offset that makes it a timestamped transcript.
-
-A Session is addressed by its `extern_id`, never by its primary key
-(ADR 0050), and is readable only by the User whose `sub` is on the row
-(ADR 0031). A Session owned by someone else answers 404 and not 403: a 403
-would confirm that the id exists, which is exactly what the unguessable id is
-there to withhold. A sequential key could offer neither guarantee.
-
-Two routes here build a Scenario out of a finished Session, and both are asked
-for rather than volunteered. `POST /{extern_id}/follow-up` (F-60, ADR 0069)
-drafts the *next* exercise from the wrap-up's improvement points;
-`POST /{extern_id}/reverse` (F-61, ADR 0070) copies the case that was played
-into a Scenario that replays it with the roles swapped. They share their shape
-on purpose — 404 for an unknown or foreign Session, 409 for one there is
-nothing to build from, 503 for a model that would not answer, and idempotency
-through a UNIQUE column, so pressing the button twice costs no second model
-call. Both are here rather than under `/api/scenarios` because a Session is
-what they are built from; the detail route carries the card of whichever
-already exists.
-
-What a Session looks like on the wire is `served.py`'s: the routes here load
-it, check whose it is and answer with what that module makes of it.
+"""REST routes for finished Sessions: history, one Session with its wrap-up
+(polled, ADR 0019), and the follow-up/reverse built from one (ADR 0069/0070/0100).
+Addressed by `extern_id` (ADR 0050); someone else's answers 404, never 403,
+which would confirm the id exists (ADR 0031). Wire shapes are `served.py`'s.
 """
 
 from __future__ import annotations
@@ -72,23 +45,9 @@ def list_sessions(
 ) -> dict:
     """The caller's own finished Sessions, newest first (F-13/F-48).
 
-    Filtered by `subject_id` and by nothing else: there is no route to anyone
-    else's history, and no id to guess at, because ownership is the query here
-    rather than a check applied after one (ADR 0031). That column is indexed
-    for exactly this query -- see migration 18f5098dfb1b.
-
-    Carries each Session's Measurements, which is what makes one request serve
-    both screens: the history list reads the metadata, the progress view reads
-    the values as one point per Session (ADR 0051 already guarantees exactly
-    one per metric). `detail_json` is deliberately dropped -- the loudness
-    curve alone is larger than everything else here put together, and no view
-    over several Sessions plots it.
-
-    What it does not carry is the wrap-up text -- that stays on the detail
-    route. It does say whether one exists, under a name of its own: `status`
-    here is `session.status` (ADR 0057) and must keep meaning that, so the
-    wrap-up's state is `feedback_status` and never `status`.
-    """
+    Ownership is the query itself (ADR 0031; indexed, migration 18f5098dfb1b).
+    Carries the Measurements without `detail_json`, and no wrap-up text
+    (ADR 0064). `status` is `session.status`; the wrap-up's is `feedback_status`."""
     with session_scope() as db:
         query = (
             db.query(db_models.Session)
@@ -98,15 +57,8 @@ def list_sessions(
                 .selectinload(db_models.Measurement.metric_type),
                 selectinload(db_models.Session.persona),
                 selectinload(db_models.Session.scenario),
-                # Two more queries per page, not two per row: selectinload
-                # batches them, so the wrap-up flag costs the same at 20 rows
-                # as at one.
-                #
-                # The points and their goal hang off the same load for the same
-                # reason. `_feedback_goals` walks both, so without this a page
-                # of 20 wrap-ups costs a query per wrap-up plus one per tagged
-                # point -- the shape that looks fine on a developer's three
-                # Sessions and not on six months of them.
+                # Batched down to the focus goal, which `_feedback_goals` walks:
+                # without it a page costs a query per wrap-up and per tagged point.
                 selectinload(db_models.Session.feedback)
                 .selectinload(db_models.Feedback.points)
                 .selectinload(db_models.FeedbackPoint.focus_goal),
@@ -161,15 +113,8 @@ def delete_one_session(
 ) -> Response:
     """Delete one of the caller's own stored trainings (ADR 0066).
 
-    204 on success, 404 for an id that does not exist *or* is not the caller's
-    — the same answer the read route gives, for the same reason (ADR 0050): a
-    distinct response would confirm that an id exists, which is what makes it
-    worth guessing at.
-
-    Not idempotent in the HTTP sense on purpose: a second DELETE of the same id
-    is a 404, because by then it is indistinguishable from a wrong id. The
-    underlying operation is idempotent — nothing breaks — but the route will
-    not claim a training was deleted twice.
+    204 on success; 404 for an absent *or* foreign id, as the read route
+    (ADR 0050). A second DELETE is therefore a 404 too, on purpose.
     """
     with session_scope() as db:
         if not deletion.delete_session(db, caller.sub, extern_id):
@@ -198,26 +143,10 @@ def retry_feedback(
     extern_id: uuid.UUID, caller: AuthContext = Depends(require_user)
 ) -> dict:
     """Ask for this Session's wrap-up to be written again (ADR 0049).
-
-    A wrap-up that failed used to be a dead end on screen: the page said so in
-    one sentence and offered nothing, while the work was still perfectly
-    possible — it is written from the stored Transcript and Measurements, never
-    from audio (ADR 0048/0049), so a call from last week can still be analysed.
-    The only way back was `scripts/requeue_feedback.py`, which runs inside the
-    container because Redis is not published to the host. That is an operator's
-    tool, and the person missing their wrap-up is not the operator.
-
-    404 for an id that is absent *or* not the caller's, exactly as the read and
-    the delete answer (ADR 0031/0050). 409 with a sentence for the three states
-    a retry would be wrong in (`jobs.retry_blocked`). 503 if the queue cannot
-    be reached, which is the same answer the follow-up route gives for its own
-    unreachable dependency — and the job row is then left where it was rather
-    than moved to `queued`, so the screen keeps showing the failure it already
-    showed instead of a spinner nothing will ever end.
-
-    202 and not 200: the wrap-up has been *accepted for writing*, and the
-    client goes back to polling the read route for it.
-    """
+    Possible because it is written from stored data, never audio (ADR 0048).
+    202 accepted; 404 absent or foreign (ADR 0031/0050); 409 per
+    `jobs.retry_blocked`; 503 if the queue is unreachable, leaving the job row
+    untouched so the screen keeps showing the failure rather than a spinner."""
     with session_scope() as db:
         session = owned_session(db, caller.sub, extern_id, *FOR_RETRY)
         if session is None:
@@ -228,9 +157,7 @@ def retry_feedback(
             raise HTTPException(status_code=409, detail=_RETRY_REFUSALS[blocked])
 
         session_pk = session.session_id
-        # Imported here, not at module scope: every other route in this file
-        # works without Redis, and importing the queue would make the whole
-        # REST layer need it (the arrangement `requeue_feedback.py` uses).
+        # Imported here so the rest of the REST layer does not need Redis.
         from backend.feedback import queue  # pylint: disable=import-outside-toplevel
 
         try:
@@ -253,12 +180,8 @@ def retry_feedback(
 
 
 # How often the User must have spoken before a call can be reversed or carried
-# forward. Both build an exercise out of *this* call, and one hung up after a
-# sentence has nothing to replay or continue. The post-call screen hides both
-# offers under the same number (`MIN_USER_TURNS` in FeedbackView.tsx, pinned to
-# this one by tests/test_reverse.py); these routes are what enforces it. They
-# used to ask only for *some* Turn, so a call the screen offered nothing for
-# could still be reversed by asking the route directly.
+# forward. The screen hides both offers under `MIN_USER_TURNS` in
+# FeedbackView.tsx (pinned to this by tests/test_reverse.py); this enforces it.
 MIN_USER_UTTERANCES = 3
 
 
@@ -293,25 +216,10 @@ async def create_reverse(
     tenant_id: int = Depends(current_tenant_id),
 ) -> dict:
     """The reverse of this Session: the same call with the roles swapped (F-61).
-
-    Like the follow-up (ADR 0069) it writes a Scenario the User owns, so both
-    end up in the same library; unlike it, this one is asked for rather than
-    written by the worker, because a reverse is a thing you decide to do about
-    a call you have just had.
-
-    Idempotent, and cheaply so: the existing reverse is looked up before any
-    model call, so pressing the button twice costs nothing and yields the same
-    row. A reverse of a reverse is refused: the roles are already swapped, and
-    swapping them again is the original call with a copied briefing.
-
-    No consent guard, and none is needed (ADR 0066): without consent no Session
-    is written, and without a stored Session there is nothing here to read — the
-    first lookup answers 404. A withdrawal mid-flight removes the Session, so
-    the write below then finds nothing and answers the same way.
-
-    `session_scope()` is synchronous, so every read and write goes to a thread
-    — this route is `async def` for the model call and must not block the loop.
-    """
+    Idempotent: the existing reverse is looked up before any model call. A
+    reverse of a reverse is refused. No consent guard needed: without consent
+    there is no stored Session to read (ADR 0066). Database work goes to a
+    thread, since this route is async for the model call."""
     material = await asyncio.to_thread(_reverse_material, extern_id, caller.sub)
     # Absent and not-yours stay the same answer as in `get_session` (ADR 0050).
     if material is None:
@@ -416,24 +324,11 @@ async def create_follow_up(
     caller: AuthContext = Depends(require_user),
     tenant_id: int = Depends(current_tenant_id),
 ) -> dict:
-    """The next exercise, drafted from this Session's wrap-up (F-60).
+    """The next exercise, drafted from this Session's wrap-up (F-60, ADR 0069).
 
-    The sibling of the reverse below it, deliberately down to the shape: same
-    refusals, same idempotency, same 503. It was once written by the Feedback
-    worker without anyone asking — ADR 0069's amendment says why that changed,
-    and the short of it is that a library filling itself with exercises nobody
-    chose is a library people stop reading.
-
-    409 rather than 404 when the wrap-up names nothing to work on: the Session
-    is the caller's and does exist, and the improvement points are what makes
-    the next call an exercise — without them it would only carry the case
-    forward, with nothing to practise. The client hides the button in that
-    case, so this is the second line of defence, not the message anyone
-    should normally see.
-
-    `session_scope()` is synchronous, so every read and write goes to a thread
-    — this route is `async def` for the model call and must not block the loop.
-    """
+    Same shape as the reverse route. 409 when the wrap-up names no improvement
+    points: without them there is nothing to practise. Database work goes to a
+    thread, since this route is async for the model call."""
     material = await asyncio.to_thread(_follow_up_material, extern_id, caller.sub)
     # Absent and not-yours stay the same answer as in `get_session` (ADR 0050).
     if material is None:
@@ -492,12 +387,9 @@ def _follow_up_response(scenario) -> dict:
 
 @dataclass(frozen=True)
 class _FollowUpMaterial:
-    """What a follow-up is drafted from, read out before the database handle is
-    gone. The played Scenario's prompt fields are in here, exactly as they are
-    for the reverse above: a follow-up carries that case forward, and ADR 0070
-    already takes this exception to ADR 0043 for a case the User has just heard
-    played out. The measured statistics stay out -- no target range exists to
-    correct a figure against (ADR 0051)."""
+    """What a follow-up is drafted from, read before the database handle is gone.
+    Includes the played case's prompt fields (ADR 0070's exception to ADR 0043);
+    excludes the statistics, which have no target range (ADR 0051)."""
 
     session_pk: int
     user_utterances: int
@@ -505,12 +397,8 @@ class _FollowUpMaterial:
 
 
 def _follow_up_material(extern_id: uuid.UUID, subject: str) -> _FollowUpMaterial | None:
-    """This Session's material, or None if it is not the caller's.
-
-    A Session whose wrap-up never landed comes back with no improvements, which
-    the route refuses the same way it refuses a wrap-up that named none: from
-    here the two are one case, because the input is missing either way.
-    """
+    """This Session's material, or None if it is not the caller's. A missing
+    wrap-up yields no improvements, which the route refuses like an empty one."""
     with session_scope() as db:
         session = owned_session(db, subject, extern_id, *WITH_WRAPUP)
         if session is None:
@@ -540,14 +428,10 @@ def _follow_up_material(extern_id: uuid.UUID, subject: str) -> _FollowUpMaterial
 
 
 def _follow_up(db: DbSession, session_id: int) -> dict | None:
-    """The card of the Scenario drafted from this Session (ADR 0069), or None.
+    """The card of the active Scenario drafted from this Session (ADR 0069), or None.
 
-    Its own query rather than a relationship: `scenario` and `session` already
-    point at each other through `session.scenario_id`, and a second mapped edge
-    between them would have to disambiguate the first one everywhere.
-
-    Filtered on `active`, so a follow-up the User has since deleted stops being
-    offered — which is also what a deleted source Session leaves behind.
+    A query rather than a relationship: a second mapped edge between `scenario`
+    and `session` would have to be disambiguated everywhere.
     """
     scenario = (
         db.query(db_models.Scenario)

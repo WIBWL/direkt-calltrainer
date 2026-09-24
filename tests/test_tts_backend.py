@@ -1,17 +1,7 @@
-"""TTS has one backend: KugelAudio, and nothing behind it.
+"""TTS has one backend: KugelAudio, and nothing behind it (ADR 0103, removing ADR 0040's fallback).
 
-Covers ADR 0103, which removed the gateway's own TTS model as KugelAudio's
-fallback (ADR 0040) together with the switch that forced it:
-  * normal path -> KugelAudio
-  * a KugelAudio failure surfaces as `KugelAudioError`, in both shapes, rather
-    than being answered in another voice
-  * a stream that finishes cleanly without audio is a failure too
-And the PCM16 -> WAV wrapping KugelAudio output needs.
-
-The fallback is what these tests used to assert. It was removed because a dead
-KugelAudio then produced a working call in a different voice, 2-3x slower, with
-a green boot log -- so the one thing worth pinning now is that a failure is
-visible.
+A failure surfaces as `KugelAudioError` in both shapes (a clean stream without audio too),
+never as a working call in another voice. Also the PCM16 -> WAV wrapping.
 """
 
 import io

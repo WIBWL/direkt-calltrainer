@@ -4,14 +4,9 @@ import { microphoneErrorMessage } from "../utils/microphoneError";
 import { useAudioLevelMeter } from "./useAudioLevelMeter";
 
 /**
- * Measures the input level of the active microphone independently of the
- * conversation VAD used during a real training session. The metering itself
- * is shared with persona playback (see useAudioLevelMeter); what this hook
- * owns is the capture stream behind it.
- *
- * `deviceId` selects which input to open — `null` leaves it to the browser's
- * own default. Re-created every render, so `start()` always reads the current
- * value; MicCheck restarts the test when it changes while running.
+ * Meters the microphone for the mic check, independent of the call's VAD; owns
+ * the capture stream, the metering is `useAudioLevelMeter`. `deviceId` null
+ * means the browser default; `start()` always reads the current value.
  */
 export function useMicrophoneLevel(deviceId: string | null) {
   const [error, setError] = useState<string | null>(null);

@@ -1,19 +1,8 @@
-"""Turning an uploaded PDF into a fact list for an authored Scenario (F-58).
+"""Turning uploaded PDFs into a fact list for an authored Scenario (F-58).
 
-Covers:
-  F-58      a Scenario built from an uploaded document
-  ADR 0024  user-authored Scenarios
-  ADR 0058  the /api/scenarios/document helper (text source for the Fakten field)
-  F-58      several PDFs at once, condensed together into one fact list
-  ADR 0059  the extracted text is sanitised; the LLM sees it as a document, not
-            instructions
-  ADR 0011  the document is condensed so a long one does not bury the frame;
-            the condensing runs in thinking mode, which is only safe off the
-            live path (docs/research/model-parameters.md)
-
-`extract_pdf_text` is pure (a hand-built PDF, no fixtures). The LLM is faked --
-the same rule as the rest of the suite (`conftest.py`).
-"""
+Covers F-58 (one or several PDFs, condensed together), ADR 0024/0058 (the document helper),
+ADR 0059 (text sanitised, framed as a document), ADR 0011 (condensed in thinking mode, off the
+live path). `extract_pdf_text` is pure; the LLM is faked (`conftest.py`)."""
 from types import SimpleNamespace
 
 import httpx

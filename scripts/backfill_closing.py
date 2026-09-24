@@ -3,31 +3,13 @@
     python scripts/backfill_closing.py            # show what would change
     python scripts/backfill_closing.py --apply    # write it
 
-Possible because the closing is read from words alone. The user's last two
-utterances are stored as transcript rows on the `turn` table, the Session keeps
-its language, and `metrics.closing_parts` is the same function the live path
-runs -- so a figure written here is the figure the call would have got had the
-metric existed when it ended. None of it needs the recording, which ADR 0048
-discards the moment it has been measured.
-
-That makes this the third metric that can reach backwards, after the
-interruptions of F-51 and the Sprechlänge am Stück of F-53.
-
-Runs against the database in `.env`, so a host shell will do; nothing here needs
-Redis or a model.
-
-Idempotent. Sessions that already carry the figure are skipped, so a second run
-reports nothing and changes nothing. Sessions with fewer than three user
-utterances are skipped too, exactly as the live path skips them: a call hung up
-after a sentence or two has no closing to read.
-"""
+Read from the stored transcript via `metrics.closing_parts`, no audio needed. Uses the
+database in `.env` (no Redis, no model). Idempotent; skips Sessions that already carry
+the figure or have fewer than three user utterances, as the live path does."""
 
 # pylint: disable=duplicate-code
-# What is left, once `_backfill_cli` took the command line, the inventory
-# lookup and the table scan, is what a script cannot hand away: the preamble
-# that makes `backend` and `scripts` importable at all -- the `sys.path`
-# insert has to run before the import that would share it -- and this module's
-# own entry point, `main()` delegating plus the `if __name__` guard.
+# The sys.path preamble and the main()/__name__ guard cannot move into
+# `_backfill_cli`: the preamble must run before that import.
 
 
 from __future__ import annotations

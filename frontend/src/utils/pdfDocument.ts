@@ -4,27 +4,10 @@ import hankenRegular from "../assets/fonts/HankenGrotesk-Regular.ttf";
 import hankenSemiBold from "../assets/fonts/HankenGrotesk-SemiBold.ttf";
 import schibstedBold from "../assets/fonts/SchibstedGrotesk-Bold.ttf";
 
-/**
- * The chrome every PDF this application writes has in common.
- *
- * Two documents are built in the browser: the wrap-up of one call
- * (`feedbackPdf.ts`, F-64) and the progress screen over many
- * (`progressPdf.ts`, F-13). Everything that makes them look like one
- * application is here — the page geometry, the palette taken from `index.css`,
- * the app's own faces, the navy banner with the wordmark on it, the section
- * heading, the wrapped paragraph and the page break. What stays in each
- * document is its own content and the marks only it draws.
- *
- * One module rather than a copy, because the alternative was already visible:
- * a second file repeating the font registration, the banner and the heading,
- * where a change to the letter-spacing of an eyebrow would reach one document
- * and not the other, and nothing would say so.
- *
- * Both are built in the browser, which is a constraint and not a preference:
- * a training run without consent is never stored (ADR 0066) and still shows
- * its transcript, so a server route could not serve the one case where the
- * download is the only copy.
- */
+/** The chrome shared by `feedbackPdf.ts` (F-64) and `progressPdf.ts` (F-13):
+ * geometry, palette from `index.css`, fonts, banner, headings, paragraphs and page
+ * breaks, so a style change reaches both. Built in the browser because an
+ * unconsented run is never stored (ADR 0066) and the download is its only copy. */
 
 /** A4 in millimetres, which is also the unit a document is built in. */
 export const PAGE = { width: 210, height: 297 };
@@ -63,10 +46,8 @@ const LOGO_TILE = 18;
 const LOGO_PAD = 2;
 
 /**
- * How far apart the letters of a small uppercase line are set, in millimetres.
- * The pages track those out (`letter-spacing` on `.feedback-section-eyebrow`
- * and `.metric-name`); caps set solid read as an abbreviation rather than as a
- * label, which is the whole reason that rule exists on screen.
+ * Letter spacing of small uppercase lines in mm, matching `.feedback-section-eyebrow`
+ * and `.metric-name` on screen; solid caps read as an abbreviation.
  */
 export const TRACKING = 0.2;
 
@@ -151,13 +132,9 @@ export interface ParagraphOptions {
 }
 
 /**
- * A document being written, top to bottom.
- *
- * `y` is the only cursor and the caller moves it; everything that draws
- * something advances it by what it drew. It is an accessor rather than a plain
- * field so that the sheet's own helpers and the caller's marks read and write
- * one number — handing the cursor back and forth as a return value is what a
- * layout written this way gets wrong first.
+ * A document being written, top to bottom. `y` is the one cursor; everything
+ * that draws advances it. An accessor so helpers and caller share one number
+ * instead of passing it back and forth as return values.
  */
 export interface Sheet {
   doc: jsPDF;
@@ -180,11 +157,7 @@ export interface Sheet {
 }
 
 /**
- * A new document with the banner already on it.
- *
- * `title` names the document on the banner and again in the running head of
- * every later page, so a reader who opens it at page four still knows what
- * they are holding.
+ * A new document with the banner on it. `title` also heads every later page.
  */
 export async function openSheet(title: string): Promise<Sheet> {
   const { jsPDF: JsPDF } = await import("jspdf");

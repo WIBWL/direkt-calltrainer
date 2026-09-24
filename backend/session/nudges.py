@@ -1,18 +1,8 @@
 """The transient per-Turn instructions `SessionOrchestrator` slips in front of
 the model, and the one mark it leaves in the history.
 
-A nudge is appended to the message list for exactly one completion and never
-stored (ADR 0037, ADR 0038, ADR 0035): each one names a situation the standing
-system prompt is too far up-context to handle in a 4B model, and quotes the
-concrete text the model should steer away from or pick up from. They live
-here rather than in `orchestrator.py` because that module is at its line
-ceiling, and because they are prose, not control flow -- read and revised
-together, against transcripts.
-
-Which of them a reply gets is `for_turn`, at the end: the precedence between
-them was the orchestrator's, which imported every one of these names to
-choose among them, and a precedence is exactly what a table test pins.
-"""
+A nudge is used for exactly one completion and never stored (ADR 0035, ADR 0037,
+ADR 0038): the system prompt is too far up-context for a 4B model. `for_turn` picks one."""
 
 import re
 from dataclasses import dataclass
@@ -32,18 +22,10 @@ CLOSING_NUDGE = (
 )
 
 
-# Carried on every turn past the opening (ADR 0038). presence_penalty does not
-# stop a 4B model re-emitting a whole reply when the call stalls, and the
-# system prompt's standing "never repeat yourself" is too far up-context to
-# bite -- quoting the actual previous reply right before the model answers is
-# what measurably moves it. The same asymmetry applies to the role: the
-# standing rule sits in the system prompt and fades, while this nudge is what
-# demands something new every turn -- and the newest material in context is
-# whatever the user has just put on the table, so the cheapest way to comply is
-# to hand that back as the persona's own contribution. Observed: the persona
-# adopts the user's proposal, endorses it, then re-presents it as its own
-# solution. Only the concrete move is named here; the standing "you are not the
-# one who solves this" belongs in the system prompt, where it is paid once.
+# Carried on every turn past the opening (ADR 0038): presence_penalty and the
+# system prompt's standing rule are too weak; quoting the previous reply right
+# before the answer measurably works. The last lines stop the persona adopting
+# the user's proposal as its own, the cheapest way to "say something new".
 ANTI_REPEAT_NUDGE = (
     'Your previous reply in this call was:\n"{previous}"\n'
     "Say something genuinely different now: react to what the user just said, "
@@ -56,14 +38,9 @@ ANTI_REPEAT_NUDGE = (
     "were your own idea."
 )
 
-# The same nudge for a reverse (ADR 0070), and the paragraph above is why it
-# needs one: its last three lines exist to stop the persona adopting the user's
-# proposal and re-presenting it as its own solution. Reversed, that is not a
-# failure mode but the job -- the persona is the company side, the one that
-# *does* put things on the table -- so the rule left as it stands has the
-# nudge nearest the reply contradicting the casting the system prompt set. What
-# survives is the demand for something new every turn, which is the part that
-# is about repetition rather than about who solves the call.
+# The reverse form (ADR 0070): the ordinary one's last lines forbid putting an
+# offer forward, which reversed is the persona's job and would contradict the
+# casting from the position nearest the reply. Only the demand for something new stays.
 ANTI_REPEAT_NUDGE_REVERSE = (
     'Your previous reply in this call was:\n"{previous}"\n'
     "Say something genuinely different now: react to what the caller just "
@@ -76,23 +53,12 @@ ANTI_REPEAT_NUDGE_REVERSE = (
     "not hand their own request back to them as a question."
 )
 
-# Appended to the standing nudge above, so that the criterion the call ends on
-# is the last thing in context before the model answers. It already stands in
-# the system prompt, but the same recency problem applies to it as to the
-# anti-repeat rule -- and worse: `ANTI_REPEAT_NUDGE` offers three moves, all of
-# which carry the call on (press, give ground, ask something new), so the
-# instruction sitting nearest the reply argued against closing. Played over every
-# seeded Scenario against every Persona (`scripts/play_scenarios.py`), no pairing
-# ever ended the call on the Turn its condition was met; the persona re-asked
-# what had just been answered instead.
-#
-# The wording is the measured one, not the obvious one (ADR 0073). Written as an
-# instruction -- "finish your reply with exactly this marker: [CALL_END]" -- it
-# read as an order rather than a condition, and the persona appended the marker
-# to its own opening question: 32 of 34 pairings hung up by probe 3. So the
-# marker itself is not named here (the protocol stays in the system prompt, this
-# only points at it), the open case is the branch stated first, and closing is
-# gated on being able to quote back what met the criterion.
+# Appended to the standing nudge so the ending criterion is the last thing in
+# context: with only `ANTI_REPEAT_NUDGE` (whose moves all carry the call on) no
+# pairing ever ended on the Turn its condition was met. Worded as measured
+# (ADR 0073): phrased as an instruction naming [CALL_END], the persona appended the
+# marker to its opening question (32 of 34 pairings hung up by probe 3). So the
+# marker is not named, the open case comes first, and closing needs a quotable answer.
 SETTLEMENT_CHECK = (
     "\nOne question to settle before you send that reply. What ends this call is: "
     "{criterion}. Has the user actually given you that, in words you could quote "
@@ -142,12 +108,9 @@ REGENERATE_NUDGE = (
     "the conversation where it stands and respond to the user's last message."
 )
 
-# Sent when a reply was caught opening with a sentence the Persona has already
-# said earlier in the call, word for word, and is being regenerated (ADR 0038).
-# Seen after two barge-ins in a row: the short cut-off lines left in the
-# history are easy to reproduce, and the model reproduced one over an offer
-# the user had just made. Caught on the first chunk, before it is spoken, so
-# the call gets one fresh attempt instead of the loop guard's goodbye.
+# Sent when a reply opens with a sentence the Persona already said verbatim and is
+# being regenerated (ADR 0038), e.g. a cut-off line reproduced after barge-ins.
+# Caught on the first chunk, so the call gets a retry instead of the loop guard's goodbye.
 REPEAT_OPENING_NUDGE = (
     'You just started your reply with:\n"{opening}"\n'
     "You have already said exactly that earlier in this call, and the user "
@@ -174,13 +137,9 @@ CLARIFY_AGAIN_NUDGE = (
     "point in one sentence and carry the call forward."
 )
 
-# Sent when a reply was nothing but the user's own line read back, and is
-# being regenerated (ADR 0038). Seen live at the end of a negotiation: "36
-# Stunden, das geht nicht früher." came back verbatim, twice, and the echo
-# guard's stripping left an empty reply that the retry path then scored as an
-# LLM failure -- a hard error on the trainee's screen for a model that had
-# merely run out of things to say. One nudged retry first; if that is empty
-# too, the call ends with the fixed sign-off, as any exhausted loop does.
+# Sent when a reply was nothing but the user's own line read back and is being
+# regenerated (ADR 0038); stripping the echo left an empty reply that surfaced as
+# an LLM failure. If the retry is empty too, the call ends with the fixed sign-off.
 ECHO_NUDGE = (
     'You just repeated the user\'s own words back to them:\n"{opening}"\n'
     "That is not an answer. Respond to what they said in your own words: "
@@ -199,16 +158,10 @@ RESUME_NUDGE = (
     "said instead, in your own words."
 )
 
-# Appended to the history entry of a reply the user talked over (ADR 0035).
-# The history keeps only the words that were heard, and a bare fragment read
-# as a finished line is what disoriented the model: it tried to complete the
-# sentence, or -- after an interrupted opening -- introduced itself all over
-# again. A trailing dash is how written dialogue marks a cut-off line, which
-# every model has seen far more often than any bracketed stage direction. It
-# can still be *copied*: a reply that reproduced a dashed line from the
-# history came back dash and all ("Ich will—"), so `strip_interrupted_mark`
-# takes it back off every chunk before synthesis. Not part of
-# `Turn.persona_text`: the Transcript gets its own, human-readable marker.
+# Appended to the history entry of a reply the user talked over (ADR 0035): a bare
+# fragment read as a finished line made the model complete it or re-introduce
+# itself. The model can copy it, so `strip_interrupted_mark` removes it from every
+# chunk before synthesis. The Transcript gets its own human-readable marker.
 INTERRUPTED_MARK = "—"
 
 
@@ -223,19 +176,11 @@ def strip_interrupted_mark(text: str) -> str:
 
 _MARK_RUN_RE = re.compile(rf"\s*{INTERRUPTED_MARK}+\s*")
 
-# The turn right after that interruption (ADR 0035). Replaces the anti-repeat
-# nudge, whose "your previous reply was: <fragment>" made the fragment look
-# like a complete thought the model had to be different from -- and in that
-# confusion it flailed.
-#
-# Unlike the other nudges this one goes *before* the user's message, not after
-# it, and quotes nothing. A 4B model continues from whatever text sits last in
-# its context: a first version that ended with the fragment quoted had the
-# model finish that very sentence, word for word, over an offer the user had
-# just made; the version before it, ending in "react to what they just said",
-# had it read the user's line back out loud. With the nudge in between, the
-# dashed line above it is what was cut off and the user's message below it is
-# the last thing the model sees -- the one thing it should answer.
+# The turn right after that interruption (ADR 0035), replacing the anti-repeat
+# nudge. Unlike the others it goes *before* the user's message and quotes
+# nothing: a 4B model continues from whatever sits last in its context. Ending on
+# the quoted fragment made it finish that sentence; ending on "react to what they
+# just said" made it read the user's line back. The user's message must be last.
 INTERRUPTED_NUDGE = (
     "Your last line above ends with a dash: the user cut you off there, "
     "mid-sentence, and nothing after the dash was said. What follows is what "
@@ -262,21 +207,9 @@ class TurnNudge:
 
 def settlement_check(replies: int, *, reverse: bool, call_goal: str) -> str:
     """The reminder that the call may end now, phrased around the Scenario's
-    call goal where it has one (ADR 0073); empty over the opening exchanges.
-
-    Withheld there because measured over the seeded library, this check on the
-    opening exchanges is where it does damage and nothing else: nine of ten
-    premature hang-ups landed on the user's very first reply, where the persona
-    has only just said what it wants and the trainee cannot yet have met a
-    condition. Asking whether the matter is settled there is a question with one
-    possible answer, and the model answered it wrong. It cannot cost a real
-    closing either: the persona opens the call and states its case, so the
-    earliest turn on which a condition can honestly be met is the one this lets
-    through.
-
-    A reverse asks the same question from the other end of the line (ADR 0070):
-    the criterion is the caller's either way, but there it is the persona's to
-    meet rather than to be satisfied by.
+    call goal where it has one (ADR 0073); empty over the opening exchanges,
+    where nine of ten premature hang-ups landed and no condition can yet be met.
+    A reverse asks it from the other end of the line (ADR 0070).
     """
     if replies < SETTLEMENT_CHECK_AFTER_REPLIES:
         return ""
@@ -299,25 +232,9 @@ def for_turn(  # pylint: disable=too-many-arguments  # each is one situation the
 ) -> TurnNudge | None:
     """The one nudge this reply gets, or None, in order of precedence.
 
-    The closing push when the user has said goodbye (ADR 0037); the "you were
-    cut off here" push when the user talked over the previous reply (ADR 0035)
-    -- `interrupted` is only true where the view ends on the user's message it
-    goes in front of -- which outranks everything but the goodbye because it is
-    the one the model is most lost without; a "say it again, reworded shorter"
-    push when the user asked to hear something again (ADR 0038), firmer once
-    they have asked twice; otherwise a standing reminder quoting the persona's
-    own last reply so it does not come back reworded (ADR 0038), followed by the
-    settlement check.
-
-    The settlement check rides on that standing nudge alone. On a closing turn
-    the call is already ending, and on a repeat-request turn the user asked to
-    hear something again, which is not a moment to weigh the matter settled.
-
-    Reversed, the anti-repeat rule turns around with the casting (ADR 0070):
-    the persona is the side that puts things on the table, so the clause
-    forbidding that would undo the system prompt from the nearest position in
-    context.
-    """
+    Closing (ADR 0037) > interrupted (ADR 0035; only where the view ends on the
+    user's message) > repeat request, firmer the second time (ADR 0038) > the
+    anti-repeat reminder plus the settlement check, turned around for a reverse (ADR 0070)."""
     if closing:
         return TurnNudge(CLOSING_NUDGE)
     if interrupted:

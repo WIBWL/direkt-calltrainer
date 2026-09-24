@@ -1,16 +1,7 @@
 /**
- * Where a press leads: the training flow's screens and the transitions between
- * them, as one table, so the machine can be read in one place instead of by
- * finding every call site.
- *
- * Pure on purpose: no React, no network, no environment. Everything a
- * transition depends on is passed in, which is what makes the table testable
- * without a WebSocket, an AudioContext or a 15 MB ONNX download — none of which
- * the decisions here have anything to do with.
- *
- * It decides *where* and *how covered*, never *what else happens*. Activating
- * playback, sending `session.activate` and unmuting the microphone stay in
- * `App.tsx`, which performs them on the one event that reaches the call.
+ * Where a press leads: the training flow's screens and transitions as one pure
+ * table, testable without WebSocket, AudioContext or ONNX. Decides *where* and *how
+ * covered*, never side effects (playback, `session.activate`, unmute stay in App.tsx).
  */
 
 /** The screens of the training flow, in the order they are normally met. */
@@ -37,20 +28,9 @@ export type Screen =
 export type Cut = "none" | "fade";
 
 /**
- * What the flow routes on that the caller's render state and environment can
- * answer at the moment of any press.
- *
- * Passed in rather than read here — `prefersReducedMotion()` in particular is
- * an environment query, and a function that makes one cannot be tested by
- * describing a situation.
- *
- * A fact only one handler knows travels on that handler's event instead
- * (`sessionCommitted`, `callEnded`). They used to sit here, where the caller
- * held them as `false` between presses and every handler had to remember to
- * override the one it knew: forgetting `stored` skipped the waiting screen,
- * forgetting `reverse` sent a reverse to the wrong briefing, and nothing in the
- * type said which event needed which. On the event, a missing one does not
- * compile.
+ * What render state and environment answer at any press, passed in so the table
+ * stays testable. A fact only one handler knows rides on its event instead: as a
+ * context field a forgotten override silently misrouted; on the event it won't compile.
  */
 export interface FlowContext {
   /** The committed Scenario replays a finished Session with the roles swapped
@@ -60,13 +40,9 @@ export interface FlowContext {
    * deliberately not read beforehand. */
   drawn: boolean;
   /**
-   * The committed case as the detail route serves it, or null while that
-   * request is in flight.
-   *
-   * Null routes to the briefing screen, which is the safe answer: a case that
-   * turns out to hold nothing moves on by itself a moment later
-   * (`caseArrivedEmpty`), whereas skipping a case that turns out to hold
-   * something cannot be undone.
+   * The committed case from the detail route, null while in flight. Null routes
+   * to the briefing screen, the safe answer: an empty case moves on by itself
+   * (`caseArrivedEmpty`), a skipped full one cannot be undone.
    */
   committedCase: { briefing: string | null; facts: string | null } | null;
   /** Whether the User asked for reduced motion. The die has nothing to say
@@ -77,13 +53,9 @@ export interface FlowContext {
 /** What happened, as the flow hears it. */
 export type FlowEvent =
   /**
-   * A pairing was committed to and the Session is connecting (ADR 0042).
-   *
-   * Both facts come from the handler: the commit is the press that *sets* the
-   * committed Session, so render state has not caught up with it yet.
-   * `skipMicCheck` is true coming straight from a finished training
-   * (F-60/F-61), where the microphone was in use seconds ago and its device is
-   * still selected.
+   * A pairing was committed and the Session is connecting (ADR 0042). Facts come
+   * from the handler, as render state has not caught up yet. `skipMicCheck` is
+   * true straight from a finished training (F-60/F-61).
    */
   | { type: "sessionCommitted"; reverse: boolean; skipMicCheck: boolean }
   /** The microphone check was confirmed. */
@@ -96,13 +68,9 @@ export type FlowEvent =
   /** The die finished rolling. */
   | { type: "rollFinished" }
   /**
-   * The call was accepted — the ringing phone answered, or the reverse's
-   * briefing read and its button pressed. A reverse has no phone to answer:
-   * there the User is the caller (`_casting` in `session/prompting.py`), so
-   * that screen goes straight to the call.
-   *
-   * The only event that reaches the call, which is what keeps the three things
-   * `App` does on the way in from being reachable any other way.
+   * The ringing phone answered, or a reverse's briefing confirmed (there the
+   * User is the caller, `_casting` in `session/prompting.py`). The only event
+   * that reaches the call, so what `App` does on the way in cannot be bypassed.
    */
   | { type: "callAccepted" }
   /** The call ended, by hang-up, error or the Persona saying goodbye.
@@ -121,11 +89,8 @@ export interface Transition {
 }
 
 /**
- * Where an event leads, and what covers the change.
- *
- * The switch is exhaustive on purpose: a new event refuses to compile until
- * someone decides where it goes and whether a cut covers it, which is exactly
- * what is easy to forget.
+ * Where an event leads, and what covers the change. The switch is exhaustive so
+ * a new event does not compile until its destination and cut are decided.
  */
 export function nextScreen(context: FlowContext, event: FlowEvent): Transition {
   switch (event.type) {
@@ -184,20 +149,9 @@ function hasNothingToRead(context: FlowContext): boolean {
 }
 
 /**
- * Whether confirming the microphone check leads to a briefing rather than to
- * the call.
- *
- * Asked by the check's button, so its label names the step it actually takes.
- * Derived from `nextScreen` rather than worked out a second time: the two used
- * to be separate expressions reading *different* sources — the router took the
- * briefing from the committed case, the label from the library card — so a
- * Scenario carrying facts but no card briefing promised a call and delivered a
- * page of text, which `MicCheck`'s own docstring names as the thing that must
- * not happen.
- *
- * The label may now flip once, early, while the case is still in flight. That
- * is the honest trade: it is never wrong, where before it never flipped and
- * was sometimes wrong.
+ * Whether confirming the mic check leads to a briefing rather than the call.
+ * Derived from `nextScreen`, so the button's label and its press cannot disagree
+ * (see `MicCheck`); it may flip once while the case is in flight.
  */
 export function briefingFollows(context: FlowContext): boolean {
   const { screen } = nextScreen(context, { type: "micConfirmed" });

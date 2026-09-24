@@ -95,13 +95,10 @@ export default function App() {
     restart: restartRun,
   } = run;
   const [screen, setScreen] = useState<Screen>(restored ? "transcript" : "setup");
-  // The wrap-up, polled once for the two screens that show it: the waiting
-  // screen hands over when it settles, the post-call screen renders it, and the
-  // downloadable report (F-64) reads the same `detail`, so the file carries
-  // exactly what the page shows. Polled only while one of those screens is up,
-  // so nothing keeps asking once the User has moved on. Null while it is on its
-  // way, and for a call that was never stored — the file is then the protocol
-  // alone.
+  // The wrap-up, polled once for the waiting screen, the post-call screen and
+  // the downloadable report (F-64), so the file carries exactly what the page
+  // shows. Polled only while one of those screens is up. Null while on its way
+  // and for a call never stored — the file is then the protocol alone.
   const {
     detail: endedSessionDetail,
     state: feedbackState,
@@ -165,12 +162,10 @@ export default function App() {
   }, [micDevices, micDeviceId]);
 
 
-  // What the flow routes on that render state can answer, refreshed every
-  // render and read only from event handlers — which is what lets `advance`
-  // keep one identity for the life of the component. That matters:
-  // `handleAnalysed` is a dependency of the waiting screen's own patience
-  // timer, and a new identity would restart it. What only one handler knows
-  // travels on that handler's event instead (see `FlowEvent`).
+  // Render state the flow routes on, refreshed every render and read only from
+  // handlers, so `advance` keeps one identity: `handleAnalysed` feeds the
+  // waiting screen's patience timer, and a new identity would restart it.
+  // What only one handler knows travels on its event (see `FlowEvent`).
   const flowRef = useRef<Omit<FlowContext, "reducedMotion">>({
     reverse: false,
     drawn: false,
@@ -189,13 +184,9 @@ export default function App() {
   });
 
   /**
-   * The only way the screen changes.
-   *
-   * Every destination comes from `trainingFlow.nextScreen`, so the machine is
-   * the table there and not the sum of the call sites. The facts a handler
-   * knows and the render does not — whether this commit skips the microphone
-   * check, whether the call that just ended was stored — ride on the event
-   * itself, so leaving one out does not compile.
+   * The only way the screen changes; every destination comes from
+   * `trainingFlow.nextScreen`. Facts only a handler knows (skipped mic check,
+   * whether the call was stored) ride on the event, so omitting one fails to compile.
    */
   const advance = useCallback(
     (event: FlowEvent) => {
@@ -226,12 +217,9 @@ export default function App() {
     advance({ type: "callEnded", stored: ended.sessionId !== null });
   };
 
-  // The Session (WebSocket + audio playback, with the VAD below) lives here,
-  // at the App level, not inside whichever screen happens to be showing — it
-  // connects once the user commits to a Session, and its opening line is
-  // generated and buffered while the microphone check is still on screen, so
-  // the Persona can start speaking the moment the call screen appears
-  // (ADR 0042).
+  // The Session (WebSocket + playback + VAD) lives at App level, not in a
+  // screen: it connects on commit and buffers the opening line during the mic
+  // check, so the Persona speaks the moment the call screen appears (ADR 0042).
   const call = useLiveCall(committed, handleCallOver);
   const { accept } = call;
 
@@ -271,19 +259,10 @@ export default function App() {
       setScenarioId(nextScenarioId);
       setPersonaId(nextPersonaId);
       commit(nextScenarioId, nextPersonaId, options);
-      // Straight from a finished training (F-60/F-61) the microphone has just
-      // been used for the call this one follows from, and its device is still
-      // selected — so the check would be a screen between the button and the
-      // conversation and nothing else, and it is skipped.
-      //
-      // What is not skipped is the case: a reverse gets the briefing it has to
-      // argue from, and everything else the screen with its own Briefing
-      // on it — the same one the microphone check leads to. A follow-up used to
-      // go from the wrap-up straight to the ringing phone, which was the one
-      // way into a call that never showed the User what they were walking
-      // into. From there the ringing phone (F-63) is one further press:
-      // nothing goes straight into a conversation, and the last press before
-      // someone has to speak is always their own.
+      // Straight from a finished training (F-60/F-61) the microphone was just
+      // in use, so the check is skipped. The case is not: a reverse gets its
+      // briefing, everything else the case screen, then the ringing phone
+      // (F-63) — nothing goes straight into a conversation.
       advance({ type: "sessionCommitted", reverse, skipMicCheck });
       if (skipMicCheck) setIsMicrophoneMuted(false);
     },
@@ -313,14 +292,10 @@ export default function App() {
     beginSession(scenarioId, personaId, { reverse: selectedScenario?.reverse ?? false });
   }, [personaId, scenarioId, drawPool, selectedScenario, beginSession]);
 
-  // From the post-call screen into the reverse (F-61, ADR 0070): the same
-  // Persona, the new Scenario, no detour through the setup screen. Taken by the
-  // card's second button, once the Scenario exists and the User has read what
-  // it is — the first one only wrote it. Goes through the same `beginSession`
-  // as the follow-up's start button, which lands it on the briefing screen rather
-  // than in the call. The library is reloaded so the row is there when the User
-  // comes back to it, and the filter follows it, so it is not hidden behind
-  // whichever chip happened to be active.
+  // Post-call screen into the reverse (F-61, ADR 0070): same Persona, new
+  // Scenario, via `beginSession` onto the briefing screen. The card's second
+  // button — the first only wrote it. The library is reloaded and the filter
+  // follows the row so it is not hidden behind the active chip.
   const handleReverse = useCallback(
     (reverse: ReverseScenario) => {
       const persona = personaId ?? restored?.personaId ?? null;
@@ -346,12 +321,8 @@ export default function App() {
     advance({ type: "callAccepted" });
   }, [accept, advance]);
 
-  // The microphone check's own button. Where it leads is `trainingFlow`'s to
-  // decide: a reverse to its briefing, a drawn Scenario to
-  // the die (skipped under reduced motion, where it would be three seconds of
-  // nothing), a case with nothing in it straight to the phone, everything else
-  // to the case screen. The check's label asks the same function through
-  // `briefingFollows` when the screen renders, so the two cannot disagree.
+  // The mic check's button; `trainingFlow` decides where it leads. Its label
+  // asks the same function via `briefingFollows`, so the two cannot disagree.
   const handleMicConfirmed = useCallback(() => {
     advance({ type: "micConfirmed" });
   }, [advance]);
@@ -401,16 +372,10 @@ export default function App() {
     advance({ type: "restarted" });
   }, [advance, restartRun]);
 
-  // Starts a Scenario written out of a finished training as the next call,
-  // against the Persona that training was played with: the follow-up (F-60)
-  // and the reverse (F-61) alike. The call itself needs only the two ids, but
-  // the screens read the names off the library — which was fetched before that
-  // call ended and so does not hold the new row yet, hence the reload
-  // alongside.
-  //
-  // `reverse` cannot be looked up off the library here for the same reason:
-  // the row may not be in it yet, and getting it wrong would start the call
-  // without the briefing the User needs to play it at all.
+  // Starts a follow-up (F-60) or reverse (F-61) against the training's Persona.
+  // The library predates the new row, hence the reload — and why `reverse` is
+  // passed in rather than looked up: a wrong guess would start the call
+  // without the briefing the User needs.
   const handleStartFollowUp = useCallback(
     (followUpId: string, followUpPersonaId: string, reverse = false) => {
       void reloadScenarios();
@@ -478,26 +443,14 @@ export default function App() {
     />
   );
 
-  // Shown on the briefing screen and during the call, and nowhere else — the
-  // microphone check used to carry it too, which put the case the User is
-  // about to argue on the same screen as a level meter. It has its own screen
-  // now and holds nothing else.
-  //
-  // The slot is claimed as soon as the committed Scenario is known to be a
-  // reverse, before its briefing has arrived: the call screen lays itself out
-  // around this, and a panel that appeared a request later would move the
-  // call.
+  // Shown on the briefing screen and during the call only. The slot is claimed
+  // as soon as the Scenario is known to be a reverse, before its briefing
+  // arrives: the call screen lays out around it, and a late panel would move the call.
   const briefPanel = (variant: "prepare" | "call") => {
     if (!committed?.reverse) {
-      // An ordinary call keeps its facts in view the same way, which is the
-      // same exception to ADR 0033 for the same reason: fixed before the call,
-      // never the Persona's lines. The case is already null for a
-      // random Scenario, so nothing is revealed there.
-      //
-      // Briefing and facts both from the committed case: the selected card is
-      // not the committed Scenario when a follow-up starts from a wrap-up, and
-      // two sources for one case is the defect `briefingFollows` was built to
-      // end on the microphone check.
+      // An ordinary call keeps its facts in view too (same ADR 0033 exception:
+      // fixed before the call). Null for a random Scenario. Read from the
+      // committed case, never the selected card, which differs for a follow-up.
       return (
         <CaseBriefPanel
           briefing={committedCase?.briefing}
@@ -573,12 +526,8 @@ export default function App() {
   }
 
   if (screen === "mic-check") {
-    // Asked of the same function the button's press goes through, so the label
-    // cannot promise a call and deliver a page of text. It used to be a second
-    // expression reading a *different* source — the card's briefing where the
-    // router read the committed case's — and the two disagreed for a Scenario
-    // carrying facts but no card briefing. The label may flip once while the
-    // case is still in flight; it is no longer ever wrong.
+    // Same function the press goes through, so the label cannot promise a call
+    // and deliver a page of text. May flip once while the case is in flight.
     const nextIsBriefing = briefingFollows(flowContext());
     return (
       <AppLayout step="prepare" navigationLocked pageClassName="mic-check-page">
@@ -612,12 +561,9 @@ export default function App() {
   }
 
   if (screen === "call") {
-    // A real answer and not "an element exists": `CaseBriefPanel` renders
-    // nothing when there are no facts, so asking the element alone would not say
-    // whether there is supporting information to show during the call. A reverse
-    // keeps its briefing beside the call, because the trainee works from it
-    // throughout; ordinary case facts follow below it, so the live call keeps
-    // visual priority.
+    // Asked of the data, not the element: `CaseBriefPanel` renders nothing
+    // without facts. A reverse's briefing sits beside the call; ordinary case
+    // facts go below it, so the live call keeps visual priority.
     const briefPlacement: BriefPlacement | null = committed?.reverse
       ? "beside"
       : committedCase?.facts.trim()

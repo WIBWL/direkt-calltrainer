@@ -8,13 +8,9 @@ const WAVE_BAR_MAX_HEIGHTS = [10, 16, 24, 16, 10] as const;
 const MIN_BAR_HEIGHT = 4;
 
 /**
- * Pure state indicator for the live call — no transcript text, ever (ADR 0014
- * extended to cover live text, not just live behavioral feedback), and no
- * spoken phase announcement for a screen reader either: a real phone call
- * gives a blind caller no narrated "listening/thinking/speaking" either, just
- * the other person's voice and the gaps around it, which the persona's actual
- * audio already provides. Entirely `aria-hidden`, so nothing here talks over
- * the call itself.
+ * Pure state indicator for the live call: no transcript text (ADR 0014) and no
+ * spoken phase announcement, since a real call narrates nothing either. Entirely
+ * `aria-hidden`, so nothing here talks over the call itself.
  */
 export default function CallAnimation({
   state,

@@ -1,11 +1,7 @@
 /**
  * The Scenario library REST surface (backend/api/scenarios.py, ADR 0058).
- *
- * `listScenarios` feeds the selection screen; the rest is the authoring flow.
- * A Scenario is addressed by its `id` (the backend's unguessable extern_id,
- * ADR 0050). Wire field names are English, matching the schema (ADR 0057,
- * extended to this surface by ADR 0061); the card field `name` is the one that
- * differs from its column (`title`).
+ * A Scenario's `id` is its extern_id (ADR 0050). Wire names match the schema
+ * (ADR 0061), except the card's `name` (column `title`).
  */
 import { apiFetch } from "./api";
 import type { FollowUpCard } from "./protocol";
@@ -48,14 +44,9 @@ export interface OriginSessionRef {
   started_at: string;
 }
 
-/** What the User reads while playing a reverse: the briefing the Persona had
- * for the original call, in German, plus the checklist of what this call has to
- * cover (ADR 0070). Generated once when the reverse is created and stored
- * with it.
- *
- * `goal` and `goals` are two different things and both are wanted: the first is
- * the one sentence on what the caller is after, the second the concrete points
- * to raise, ask and come away with. */
+/** What the User reads while playing a reverse (ADR 0070), generated once and
+ * stored. `goal` is the one sentence on what the caller is after; `goals` the
+ * concrete points to raise, ask and come away with. */
 export interface ReverseBrief {
   situation: string;
   facts: string;
@@ -63,12 +54,9 @@ export interface ReverseBrief {
    * the two were merged — the same merge the Scenario's own `call_goal` got. */
   goal: string;
   goals: string[];
-  /** The bar, back when it was a field of its own. Read only, and appended to
-   * `goal` when a stored briefing still carries it; nothing writes it, and it
-   * can go once no stored reverse predates the merge. Same arrangement as
-   * `watch_points` below, for the same reason: a stored briefing is the only
-   * copy of a case that was played, and dropping half of it silently would be
-   * the worse of the two options. */
+  /** Legacy field, read only and appended to `goal` when an old stored briefing
+   * carries it — that briefing is the only copy. Can go once no stored reverse
+   * predates the merge (as `watch_points` below). */
   settled?: string;
   /** What `goals` was called before it became a list of objectives rather than
    * of things to watch out for. Read only so a briefing written before that
@@ -113,28 +101,13 @@ export interface ScenarioCard {
 }
 
 /** The pick that is not a Scenario: draw one, and do not say which (F-62).
- *
- * A sentinel id rather than a flag beside the selection, so the screen still
- * has exactly one selected value and the summary, the start button and the
- * picker's own pressed state each need no second case. It cannot collide with
- * a real Scenario: those ids are the backend's UUIDs (ADR 0050). */
+ * A sentinel id, so the screen keeps exactly one selected value; it cannot
+ * collide with a real id, those being UUIDs (ADR 0050). */
 export const RANDOM_SCENARIO_ID = "__random__";
 
-/** One of the Scenarios the User could have picked by hand, drawn at the moment
- * the call is committed to.
- *
- * A reverse and a follow-up are left out because neither survives being walked
- * into unprepared: a reverse is played *from* a briefing the User is meant to
- * read first (ADR 0070), and a follow-up continues a call they are meant to
- * remember (ADR 0069). Everything else is in — built-in, own and shared alike.
- *
- * This is only half the pool: the caller narrows it to what the two filter
- * rows currently show before handing it over (see `scenarioSelection.ts`). The draw once
- * ignored them both, on the argument that picking a category has already said
- * what is coming — but that read the surprise as the whole of the feature. It
- * is also the way into a case the User did not choose, and staying inside the
- * filter keeps that offer honest: nothing is drawn that the chips on screen
- * exclude. */
+/** Whether a Scenario may be drawn at random. Reverses (ADR 0070) and follow-ups
+ * (ADR 0069) are out: neither survives being walked into unprepared. The caller
+ * further narrows the pool to what the filter rows show (`scenarioSelection.ts`). */
 export function isDrawable(scenario: ScenarioCard): boolean {
   return !scenario.reverse && !scenario.follow_up;
 }
@@ -149,17 +122,9 @@ export function drawRandomScenario(pool: ScenarioCard[]): ScenarioCard | null {
 }
 
 /**
- * Level 1 of the library filter: where a Scenario comes from (ADR 0072), in
- * the order the chips are shown. The suggestions first where there are any,
- * then everything, then what ships, what the User wrote, what their company
- * shared, and last the two the system builds out of a finished training, which
- * exist only once there has been one — the order the kinds are met in, not the
- * order of the grid, which is alphabetical.
- *
- * "followUp" (ADR 0069) and "reverse" (ADR 0070) are both `origin: "own"` on
- * the wire and options of their own here, so the hand-authored option means
- * exactly that and nothing else. "recommended" and "tenant" are views across
- * the others; every Scenario sits under exactly one of the rest.
+ * Level 1 of the library filter, in chip order (ADR 0072). "followUp" (ADR 0069)
+ * and "reverse" (ADR 0070) are `origin: "own"` on the wire but options of their own,
+ * so "own" means hand-authored only. "recommended"/"tenant" are views across the rest.
  */
 export const LIBRARY_FILTERS = [
   "recommended",
@@ -292,13 +257,10 @@ export function toDraft(detail: ScenarioDetail): ScenarioDraft {
 
 export type FieldLimits = Record<TextField, number>;
 
-/** Max length per authorable field. The backend (`backend/authored_text.py`
- * FIELD_LIMITS) is the single source of truth and validates against it; the
- * editor calls `getFieldLimits()` so its input caps track that automatically.
- * This constant is what the editor uses until that answer arrives, and for good
- * if the request fails — so it must match exactly: a cap higher than the
- * server's lets the User type a field that Save then answers with a 422. It had
- * drifted to that for three fields; `tests/test_authored_text.py` pins it now. */
+/** Max length per authorable field until `getFieldLimits()` answers, and for good
+ * if it fails. Must match `backend/authored_text.py` FIELD_LIMITS exactly: a
+ * higher cap lets the User type what Save answers with a 422
+ * (`tests/test_authored_text.py` pins it). */
 export const FALLBACK_FIELD_LIMITS: FieldLimits = {
   name: 50,
   short_description: 100,
@@ -386,22 +348,15 @@ export interface ReverseScenario {
   reverse_brief: ReverseBrief | null;
 }
 
-/** Create (or find) the reverse of a finished Session: the same call with the
- * roles swapped (F-61, ADR 0070). It stores a Scenario, so the reverse can be
- * selected again later, and it is idempotent — the existing row comes back
- * rather than a second copy. Slow (thinking mode), so callers show a busy
- * state; 409 = nothing to swap or already a reverse, 503 = model unreachable,
- * both with a `detail` to show. */
+/** Create (or find — idempotent) the reverse of a finished Session (F-61,
+ * ADR 0070). Slow, so callers show a busy state; 409 = nothing to swap or
+ * already a reverse, 503 = model unreachable, both with a `detail`. */
 export const createReverse = (sessionId: string) =>
   apiFetch<ReverseScenario>(`/api/sessions/${sessionId}/reverse`, { method: "POST" });
 
-/** Draft (or find) the follow-up Scenario for a finished Session: the next
- * exercise, built from what its wrap-up asked the User to work on (F-60,
- * ADR 0069). Asked for rather than written unbidden, exactly like the reverse
- * above — the two routes share their shape down to the status codes: 409 =
- * that wrap-up names nothing to build from, 503 = model unreachable, both with
- * a `detail` to show, and a second press returns the row the first one wrote.
- * Slow (thinking mode), so callers show a busy state. */
+/** Draft (or find — idempotent) the follow-up Scenario for a finished Session
+ * (F-60, ADR 0069); same shape as `createReverse`. 409 = the wrap-up names
+ * nothing to build from, 503 = model unreachable. Slow, so show a busy state. */
 export const createFollowUp = (sessionId: string) =>
   apiFetch<FollowUpCard>(`/api/sessions/${sessionId}/follow-up`, { method: "POST" });
 

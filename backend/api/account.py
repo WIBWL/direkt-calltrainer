@@ -1,15 +1,8 @@
 """What is stored about the caller, and a copy of it (ADR 0066).
 
-Two routes over the same data and they are deliberately not one. The overview
-is a handful of counts, cheap enough to load with the profile screen on every
-visit; the export is every row the subject owns, which is large, slow and only
-ever wanted deliberately. Serving the second where the first was needed would
-put a full transcript dump behind an ordinary page load.
-
-Both are scoped by the caller's own `sub` in the query itself, like the history
-(ADR 0064): there is no form of either request that is about somebody else, so
-there is none to authorise or refuse.
-"""
+Deliberately two routes: the overview is cheap counts loaded with the profile
+screen, the export is every row the subject owns and only wanted deliberately.
+Both are scoped by the caller's `sub` in the query itself (ADR 0064)."""
 
 from __future__ import annotations
 
@@ -38,13 +31,7 @@ router = APIRouter(prefix="/api/me", dependencies=[Depends(require_user)])
 
 @router.get("/data")
 def data_overview(caller: AuthContext = Depends(require_user)) -> dict:
-    """How much is stored, and over what period.
-
-    Counts rather than content: the point is to let someone see the *extent* of
-    what is held about them at a glance, which a list of transcripts does not
-    do. The transcripts themselves are one click further on, in the history or
-    the export.
-    """
+    """How much is stored, and over what period: the extent, not the content."""
     with session_scope() as db:
         sessions = db.query(db_models.Session).filter_by(subject_id=caller.sub)
         session_ids = [row.session_id for row in sessions.with_entities(
@@ -71,17 +58,11 @@ def data_overview(caller: AuthContext = Depends(require_user)) -> dict:
 
 @router.get("/export")
 def export_data(caller: AuthContext = Depends(require_user)) -> JSONResponse:
-    """Everything stored about the caller, as one structured JSON document.
+    """Everything stored about the caller, as one nested JSON document.
 
-    Relationships are kept by nesting rather than by repeating foreign keys: a
-    copy of your own data should be readable by you, and a set of flat tables
-    joined on integers is not. The internal primary keys stay out of it for the
-    same reason — they say nothing to the reader and nothing outside this
-    database can use them.
-
-    Served as a download. The browser must not render a page of transcripts
-    in a tab that the next person at the machine can page back to.
-    """
+    Nested rather than flat tables, and without internal primary keys, so the
+    subject can read it. Served as a download so a page of transcripts is not
+    left in a browser tab."""
     with session_scope() as db:
         sessions = (
             db.query(db_models.Session)
@@ -97,12 +78,9 @@ def export_data(caller: AuthContext = Depends(require_user)) -> JSONResponse:
             # that it is a pseudonym rather than an anonymisation.
             "subject_id": caller.sub,
             "consent": _consent(db, caller.sub),
-            # Everything else filed under this subject, and the reason each is
-            # here rather than only in the overview: Article 15 is about the
-            # personal data, not about the trainings. A settings row, a focus
-            # the subject picked and a Scenario they wrote are all stored
-            # against their `sub`, and an export that quietly stops at the
-            # Sessions is the failure this route's own test warns about.
+            # Article 15 covers all personal data, not only the trainings:
+            # settings, focus and authored Scenarios are stored against the
+            # `sub` too, and an export stopping at the Sessions is incomplete.
             "retention": _retention(db, caller.sub),
             "focus": _focus(db, caller.sub),
             "scenarios": _authored_scenarios(db, caller.sub),
@@ -138,10 +116,8 @@ def set_retention(
 ) -> dict:
     """Switch the automatic deletion on or off for the caller.
 
-    Switching it off does not touch anything already stored, and switching it
-    back on does not delete anything on the spot either: the next sweep applies
-    the period as it always would. That keeps the setting a statement about the
-    future rather than an action with an immediate and surprising effect.
+    Neither direction acts on the spot: the next sweep applies the period, so
+    the setting stays a statement about the future, not a delete button.
     """
     with session_scope() as db:
         retention.set_auto_delete(db, caller.sub, choice.auto_delete)
@@ -179,9 +155,7 @@ def _consent(db: DbSession, subject_id: str) -> dict:
 def _focus(db: DbSession, subject_id: str) -> dict:
     """The training focus the subject picked (F-62).
 
-    A setting rather than training data, which is why no deletion path touches
-    it -- and exactly why it has to be in here: nothing else in the export or
-    in the profile would tell the subject it is stored at all.
+    A setting no deletion path touches, which is why the export must show it.
     """
     selection = focus_service.selection(db, subject_id)
     return {
@@ -197,12 +171,8 @@ def _authored_scenarios(db: DbSession, subject_id: str) -> list[dict]:
     """The Scenarios this subject wrote, including the two kinds derived from
     their own calls (ADR 0058/0069/0070).
 
-    Deactivated rows are included: a Scenario retired from the library is still
-    stored under this subject, and an export that showed only the live ones
-    would understate what is held. `reverse_brief` comes along because it is
-    the one field here written *about* the subject rather than by them -- prose
-    a model produced from their own wrap-up.
-    """
+    Deactivated rows count: they are still stored. `reverse_brief` is included
+    as prose a model wrote *about* the subject from their own wrap-up."""
     rows = (
         db.query(db_models.Scenario)
         .filter_by(created_by=subject_id)

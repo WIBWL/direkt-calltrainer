@@ -1,17 +1,8 @@
-"""What the boot check reports when a backend does not answer.
+"""What the boot check reports when a backend does not answer (ADR 0011/0103).
 
-Covers ADR 0011 / ADR 0103: one backend per leg, each named in `.env`, and a
-wrong name has to surface at boot rather than mid-call.
-
-The check only logs -- `lifespan` boots either way -- so its whole value is the
-sentence it writes. Two ways of losing that sentence are pinned here, both seen
-in a real log: `asyncio.wait_for`'s TimeoutError carries no message, so the line
-ended in a bare dash; and the OpenAI client retried a 429 twice with backoff
-*inside* the check's own deadline, so a rate-limited model never got to report
-its rate limit and timed out instead.
-
-The backends are faked (`conftest.py`); nothing here reaches a network.
-"""
+The check only logs, so its sentence is its whole value. Pins two ways it got lost: a bare
+TimeoutError has no message, and client retries on a 429 inside the check's deadline turned
+a rate limit into a timeout. Backends are faked (`conftest.py`)."""
 import asyncio
 import logging
 

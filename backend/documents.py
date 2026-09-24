@@ -1,30 +1,8 @@
-"""Turn the PDFs a User uploads while authoring a Scenario into a fact list.
+"""Turn the PDFs a User uploads while authoring a Scenario into a fact list (F-58).
 
-Text-layer PDFs only -- no OCR; a scanned image PDF has no extractable text and
-is rejected with a message that says so. The extracted text is **summarised by
-the LLM in thinking mode** (`llm.complete(think=True)` -- off the live path,
-latency is free and the extraction is markedly better) into the concrete facts
-that could matter as call background (names, figures, dates, contract terms,
-prior events), so a long document still fits the Fakten field and does not bury
-the frame for the small model (ADR 0011, 0059). Nothing is stored -- the summary
-lands in the field for the User to review and edit before saving.
-
-Several documents may be uploaded at once and are condensed **together**, in
-one model call: the Fakten field holds one list, and two contracts summarised
-apart would repeat every fact they share and leave the User to merge them by
-hand. `merge_document_text` is what hands them over as one text.
-
-The limits on the input are both memory bounds: `MAX_UPLOAD_MB` per file and
-`MAX_TOTAL_UPLOAD_MB` for one request together. Page count and extracted length
-are not capped -- a document under the ceiling is handed to the model whole, and
-if it does not fit the model's context the call fails and the raw text is
-returned instead (see below). The only limit on the output is the `case_facts`
-field cap (`MAX_TEXT`): the summary is truncated to it, nothing else.
-
-If the LLM is unreachable -- or the document was too large for it -- the raw
-text is returned instead, truncated to the field cap, with a flag so the caller
-can say it was not summarised.
-"""
+Text-layer PDFs only (no OCR), condensed **together** in one `llm.complete(think=True)`
+call; nothing is stored. Limits: `MAX_UPLOAD_MB` per file, `MAX_TOTAL_UPLOAD_MB` per
+request, output cut to `MAX_TEXT`. If the LLM fails, the raw text returns, unsummarised."""
 from __future__ import annotations
 
 import io
@@ -167,10 +145,8 @@ class ExtractedDocument:
 def merge_document_text(documents: Sequence[ExtractedDocument]) -> str:
     """The uploaded documents as one text for one model call.
 
-    A single document is handed over bare, exactly as before. Several are
-    introduced by their file names, so the model can tell two contracts apart
-    instead of blending them -- as a plain labelled line and not a fence, since
-    a delimiter a document could contain is worse than no delimiter at all."""
+    One document goes bare; several are each introduced by a plain labelled line
+    with the file name -- not a fence, which a document could contain itself."""
     if len(documents) == 1:
         return documents[0].text
     return "\n\n".join(

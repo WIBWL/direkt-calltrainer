@@ -1,39 +1,7 @@
-"""Generating the post-call wrap-up (ADR 0049).
-
-The model is given the transcript and the statistics already measured, and is
-asked to interpret them -- never to produce numbers of its own, and never to
-judge one against a norm nobody measured (ADR 0051). Its citations are checked
-against the Session, which is what ADR 0004's "traceable" and F-10's "Bezug auf
-konkrete Gesprächsstellen" require.
-
-It writes six things, not three: F-42's phase_language paragraph, the tone_fit
-paragraph and the list of utterances where the partner pushed back all come out
-of the same call as the summary and the two lists. One call rather than more of
-their own, because all of it is read off the same transcript and a second round
-trip would buy nothing but latency and a second way to fail.
-
-The last of them is the only one nobody reads. `pressure_turns` says which
-exchanges were demanding, which is a judgement about what was said and therefore
-the model's to make; what the application does with it is measure the same
-metrics over those exchanges and over the rest, so that composure under
-pressure (F-62) rests on a measurement instead of an opinion (ADR 0081,
-`backend/feedback/segments.py`).
-
-tone_fit answers the one question the measurements cannot: whether the way the
-trainee sounded suited the occasion. The same lively delivery that carries a
-sales call is the wrong answer to somebody who rang up angry, and no figure
-knows which of the two a call was. It is prose for the reason phase_language is
-(ADR 0056): the right register for a complaint is not the right register for a
-price negotiation, no norm is measured for either, and a number here would be
-the invented threshold ADR 0051 refused. It is also why `_occasion` puts the
-Scenario in front of the model, which nothing in this job used to do.
-
-The wrap-up is all this job produces. It used to draft the follow-up Scenario
-too, once the wrap-up was stored — that now happens only when the User asks for
-it, from a route of its own (ADR 0069's amendment, `backend/followups.py`), so
-the job has one model call and one thing that can fail.
-
-Runs in the async worker (ADR 0018/0019), not in the live path.
+"""Generating the post-call wrap-up in the async worker (ADR 0049, 0018/0019).
+The model interprets measured statistics, never produces or grades figures
+(ADR 0051). One call writes all six fields, incl. phase_language (ADR 0056),
+tone_fit (ADR 0079) and pressure_turns (ADR 0081, read by `segments.py`).
 """
 
 from __future__ import annotations
@@ -57,16 +25,9 @@ logger = logging.getLogger(__name__)
 
 _LANGUAGE_NAMES_EN = {"de": "German", "en": "English"}
 
-# The two wrap-ups written here rather than by the model, keyed by the same
-# English language name the prompt is built with. O2 asks the model to answer
-# in the Session's language and a 4B model (ADR 0011) still hands back the
-# English of the rule it is following -- which is exactly what a User saw when
-# a call they broke off immediately came back summarised as "nothing to
-# review". Neither path reaches the model, so neither can be got wrong.
-#
-# German for a language we do not know: the pilot runs in German, and a
-# sentence in the wrong language beats a KeyError on the one screen that is
-# meant to say why there is nothing to read.
+# The two wrap-ups written here rather than by the model, which answered them
+# in the prompt's English (ADR 0011). Keyed by the prompt's language name;
+# unknown languages fall back to German, the pilot's language.
 _NOTHING_SAID = {
     "German": "In diesem Training wurde nicht gesprochen. Es gibt daher nichts auszuwerten.",
     "English": "Nothing was said in this training, so there is nothing to review.",
@@ -85,24 +46,16 @@ def _in_language(texts: dict[str, str], language: str) -> str:
 class _Point(BaseModel):
     text: str
     turn_id: int | None = None
-    # Which of F-62's focus goals the point is about, as a catalogue key. This
-    # is what lets the dashboard count what recurs across a user's trainings
-    # without a second model call over their history.
-    #
-    # Defaulted, and anything the catalogue does not hold is dropped at storage
-    # time rather than rejected here: a point with a good observation and a
-    # made-up key is still a good observation, and losing it would be a worse
-    # trade than losing its tag. `_goal_ids` does the checking.
+    # Which of F-62's focus goals the point is about (ADR 0080). An unknown
+    # key is dropped at storage (`_goal_ids`), not rejected here: the
+    # observation is worth more than its tag.
     goal: str = ""
 
 
 class _Wrapup(BaseModel):
-    """Strengths and improvements as two lists, not one list with a label.
-
-    Asked for separately so they cannot compete for a single budget: given one
-    list and any notion of "enough points", the model spends the count on
-    improvements and tops it up with a token strength, which lets the quota
-    decide the feedback instead of the call.
+    """Strengths and improvements as two lists, not one list with a label, so
+    they cannot compete for one budget (the model would spend it on improvements
+    plus a token strength).
     """
 
     summary: str
@@ -113,17 +66,10 @@ class _Wrapup(BaseModel):
     # Whether the register suited the occasion. Defaulted on the same grounds.
     tone_fit: str = ""
     # The partner's utterances where the trainee was under pressure (ADR 0081).
-    # Ids, not prose: this one is not shown to anybody, it decides which
-    # exchanges the segment measurements are computed over.
-    #
-    # `None` is "nobody judged": the key was absent, or the whole reply failed
-    # to validate and this is the narrative-only fallback. An empty *list* is
-    # the other thing entirely -- the model looked and found nobody pushing
-    # back, which plenty of calls are. `turn.pressed` keeps the same
-    # distinction, NULL against False, and writing False for a call nobody
-    # judged is how `scripts/inspect_pressure_segments.py` lost the one
-    # difference it exists to show. An id the material does not hold is dropped
-    # at storage time, exactly as a made-up goal key is.
+    # Ids, never shown; they decide the segment measurements' stretches.
+    # `None` = nobody judged (key missing, or fallback); `[]` = judged, nothing
+    # pressing. Keep the two apart -- `turn.pressed` stores NULL vs False, and
+    # collapsing them broke `scripts/inspect_pressure_segments.py` once.
     pressure_turns: list[int] | None = None
     strengths: list[_Point] = []
     improvements: list[_Point] = []
@@ -196,33 +142,15 @@ async def _generate(session_id: int) -> None:
 
 def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
     """The Session as the model sees it, plus the Turn ids it is allowed to cite.
-
-    Two blocks: the call's measured statistics and the transcript on its
-    timeline, both rendered as plain statements of fact so the model's job is
-    visibly to explain the numbers rather than to produce them (ADR 0049).
-
-    No target ranges are supplied, because none were measured (ADR 0051). The
-    model is told as much, so it reports a figure it cannot place instead of
-    inventing the norm we declined to invent.
-
-    Loudness is the exception: described rather than measured, see below.
-
-    In a reverse (ADR 0070) the simulated side is labelled `Agent` rather than
-    `Caller`, and the material says outright that the trainee did the calling.
-    The label is not cosmetic: every rule in the prompt about who may be quoted
-    and who may not be judged is written against these words, so leaving the
-    machine called "Caller" while the trainee *was* the caller is exactly the
-    confusion that would put the feedback on the wrong person.
+    Statistics (no target ranges, ADR 0051; loudness described, not quoted) and
+    the timestamped transcript. In a reverse the partner is labelled `Agent`,
+    since the prompt's rules on who is judged key on that label (ADR 0070).
     """
     reverse = session.scenario.reverse
     lines = _occasion(session.scenario)
     lines.append("Measured statistics for this call (established fact):")
-    # Whole-call rows only. Since ADR 0081 a Session also carries measurements
-    # over the demanding stretches and over the rest, and the block this feeds
-    # is headed "for this call" while rule M3 tells the model to treat what is
-    # in it as established fact. Unfiltered, a regenerated wrap-up read the
-    # same metric three times with three different values -- the segment rows
-    # are written by the previous run and are still there on the next one.
+    # Whole-call rows only: the segment rows (ADR 0081) from a previous run
+    # would otherwise show the same metric three times with three values.
     lines += [
         f"    {m.metric_type.name}: {float(m.value):.1f} {m.metric_type.unit or ''}".rstrip()
         for m in stored.whole_call(session)
@@ -254,30 +182,10 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
 
 
 def _occasion(scenario: db_models.Scenario) -> list[str]:
-    """What kind of call this was, for the tone_fit block.
-
-    The Scenario's own prompt fields, which are English already (ADR 0043) and
-    are the same words the simulated caller was briefed with. Nothing is
-    translated or summarised on the way in.
-
-    It is here because the question tone_fit answers cannot be asked without
-    it. Whether a register suited the occasion depends entirely on what the
-    occasion was, and until now the wrap-up saw only the transcript, from which
-    the situation has to be guessed. A guess is exactly what this block must
-    not rest on.
-
-    ADR 0079 withholds `success_condition`: what would have ended the call well
-    is a result rather than an occasion, and handing it over invites the model
-    to grade the outcome under the heading of tone. It used to be its own
-    column, and this block passed `call_goal` beside the situation on the
-    grounds that wanting something is part of an occasion -- which it is.
-
-    Migration `3ce81b27af40` merged the two columns, so the criterion arrived in
-    the dossier inside the goal, and the guarantee was being made in a docstring
-    while the prompt broke it. The answer is to cut the criterion back off
-    (`_goal_without_criterion`) rather than to drop the goal: what the caller
-    wanted *is* the occasion, and a wrap-up left to guess it again is the state
-    this block was written to end.
+    """What kind of call this was, for tone_fit (ADR 0079), from the Scenario's
+    English prompt fields. The success criterion is withheld -- a result, not an
+    occasion -- and since migration `3ce81b27af40` it sits inside `call_goal`,
+    so it is cut off there (`_goal_without_criterion`), never the whole goal.
     """
     lines = [
         "The occasion of this call (established fact, not something to assess):",
@@ -298,28 +206,18 @@ _SETTLEMENT_MARKER = "The matter is settled when"
 
 
 def _goal_without_criterion(scenario: db_models.Scenario) -> str:
-    """The call goal without the sentence saying when it counts as met.
-
-    An authored goal carries no such sentence and goes in whole, which is right:
-    there is no second thing in it to withhold. A goal that is *nothing but* the
-    criterion yields an empty string, and the line is left out rather than
-    written blank.
+    """The call goal without the sentence saying when it counts as met. An
+    authored goal has none and goes in whole; a goal that is only the criterion
+    yields "" and its line is left out.
     """
     head, marker, _ = (scenario.call_goal or "").partition(_SETTLEMENT_MARKER)
     return (head if marker else scenario.call_goal or "").strip()
 
 
 def _loudness_course(session: db_models.Session) -> str | None:
-    """F-37's loudness as a sentence, or None if the call has no curve.
-
-    The stored value is a dB span (95th percentile minus 5th). Handed over as a
-    number, the wrap-up quotes it as a level -- above a chart that deliberately
-    shows none. What goes in instead is what that chart says, from the same
-    curve and the same parameters, so text and picture cannot contradict.
-
-    The whole call's row, like the figures above it: the segment rows carry a
-    `curve_db` of their own, and taking the first match described the pressing
-    stretch's curve as the course of the whole conversation.
+    """F-37's loudness as a sentence, or None if the call has no curve. A sentence
+    from the chart's own function, not the dB span, which the model would quote as
+    a level. Whole-call row only: segment rows carry a `curve_db` of their own.
     """
     for measurement in stored.whole_call(session):
         if measurement.metric_type.key != metrics.LOUDNESS_KEY:
@@ -337,14 +235,9 @@ def _timestamp(offset_ms: int) -> str:
 
 
 def _phase_rules(reverse: bool) -> str:
-    """What each of F-42's three phases looks like, from the trainee's side.
-
-    The three registers -- warm, factual, warm -- hold in both castings, and
-    the observation the block exists to make is the same one. What differs is
-    what each phase is *made of*: someone answering a call opens by receiving a
-    concern, someone making one opens by stating it, and the closing that has
-    to be checked is a solution offered in the first case and a commitment
-    obtained in the second (ADR 0070).
+    """What each of F-42's three phases looks like, from the trainee's side. The
+    registers (warm, factual, warm) are the same in a reverse; what each phase is
+    made of differs, e.g. stating the concern instead of receiving it (ADR 0070).
     """
     if reverse:
         return (
@@ -388,13 +281,9 @@ def _phase_rules(reverse: bool) -> str:
 
 @dataclass(frozen=True)
 class _Casting:
-    """Who was on which end of the line, in the words the material and the
-    prompt both use (ADR 0070).
-
-    Every rule in the prompt about who may be quoted and who may not be judged
-    names the simulated side by the label the transcript gives it, so the two
-    must be the same word. They were three pairs of literals in two functions,
-    held together by a comment saying they had to match.
+    """Who was on which end of the line (ADR 0070). One record, because the
+    prompt's rules name the simulated side by the transcript's own label, so
+    the two must be the same word.
     """
 
     # The transcript's label for the simulated side.
@@ -415,20 +304,9 @@ def _casting(reverse: bool) -> _Casting:
 
 
 def _goal_ids(db: DbSession) -> dict[str, int]:
-    """Catalogue key to row id, for the tag on each point.
-
-    Read from the table and not from `FOCUS_GOALS`, although the prompt is
-    built from the list: the table is what the foreign key points into, and a
-    goal seeded under a different id, or one deactivated since (ADR 0076),
-    has to resolve to what is actually there.
-
-    Deactivated goals are included on purpose. A point is a statement about a
-    call that happened, and a goal leaving the catalogue does not make the
-    statement untrue; the dashboard decides separately what it still shows.
-
-    The two habit goals are excluded, which is the one place this disagrees
-    with the prompt's own rule rather than trusting it. Neither is anything a
-    single call can show, so a tag on one is always a mistake.
+    """Catalogue key to row id, read from the table the foreign key points into.
+    Deactivated goals are included (the statement stays true, ADR 0076); the
+    habit goals are excluded, since no single call can show them.
     """
     return {
         goal.key: goal.focus_goal_id
@@ -444,28 +322,17 @@ _NEVER_ASSIGNED = frozenset(goal["id"] for goal in FOCUS_GOALS if goal["group"] 
 
 
 def _goal_catalogue() -> str:
-    """The focus goals as the prompt lists them, one key and title per line.
-
-    Built from `seed_data.FOCUS_GOALS`, which is the same list that seeds the
-    table the assignment is stored against. Written out rather than summarised:
-    the model has to pick a key character for character, and a key it has not
-    been shown is a key it will invent.
-
-    The German titles go with them even though the rest of the prompt is
-    English (ADR 0043). They are what tells the model what a key *means*, and
-    translating them here would leave two wordings of the same goal in the
-    system with nothing keeping them in step.
+    """The focus goals as the prompt lists them, one key and title per line, from
+    `seed_data.FOCUS_GOALS`. Written out in full so the model copies a key rather
+    than inventing one; the German titles stay untranslated (one wording only).
     """
     return "".join(f"    {goal['id']}: {goal['title']}\n" for goal in FOCUS_GOALS)
 
 
 def _worked_example(reverse: bool) -> str:
-    """The accepted point, shown rather than described.
-
-    Mirrored for a reverse (ADR 0070) because a model shown an example runs in
-    its direction: the specific one below is a trainee who *answered* a call,
-    and left as it is it invites feedback written for the wrong side of the
-    conversation.
+    """The accepted point, shown rather than described. Mirrored for a reverse
+    (ADR 0070): the model follows an example's direction, and the ordinary one
+    is a trainee who *answered* a call.
     """
     if reverse:
         return (
@@ -487,38 +354,11 @@ def _worked_example(reverse: bool) -> str:
 
 def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[str, str]]:
     """The prompt. English per ADR 0043; the Feedback itself is in `language`.
-
-    `reverse` (ADR 0070) swaps who was on which end of the line. Three things
-    move with it and nothing else: the label the simulated side carries in the
-    transcript, the words naming the person the trainee was talking *to*, and
-    the phase block, whose three registers were written for someone answering a
-    call and describe something different for someone making one. Every rule
-    about evidence, norms and scores is the same feedback either way, so it is
-    written once.
-
-    "Be concrete" is itself an abstraction, and a small model (ADR 0011)
-    answers an abstract brief with the safest thing it can say -- a generality
-    nobody can dispute. So the brief names the parts a point is made of, shows
-    a rejected and an accepted one, and gives the model a test to throw its
-    own points out with. The limits of ADR 0049 and ADR 0051 are unchanged.
-
-    The phase_language section (F-42) is the one part not built out of points.
-    It asks for prose about a *change* over the call -- warm in the opening,
-    factual through the core business, warm again at the close -- which is a
-    shape no single figure carries, so it is deliberately not a Measurement.
-    N1 still applies to it: describing a register is not grading one.
-
-    Form follows from the same fact. A small model loses a rule that sits in
-    the middle of a paragraph, so each rule is numbered and lives under the
-    heading for the decision it governs, and the three it breaks most often --
-    output language, untranslated keys, nothing outside the JSON -- are
-    repeated at the very end, where recency is worth most. The rules about
-    quotation marks exist because a verbatim quote is the one thing in this
-    task that can break the JSON.
+    `reverse` (ADR 0070) swaps only the partner label, the person addressed and
+    the phase block. Rules are numbered under headings, with the three most often
+    broken repeated at the end, because a small model (ADR 0011) loses the rest.
     """
-    # The transcript's own label for the simulated side, and the phrase for the
-    # person the trainee spoke to -- the words `_dossier` wrote, from the same
-    # record.
+    # The same labels `_dossier` wrote, from the same record.
     casting = _casting(reverse)
     partner, other = casting.partner, casting.other
     system = (
@@ -818,14 +658,8 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
 
 async def _ask(dossier: str, language: str, reverse: bool = False) -> _Wrapup:
     """One attempt plus one retry, then a narrative-only fallback (ADR 0049).
-
-    A response that never validates still produces Feedback -- the summary
-    without its evidence links -- because showing the user nothing is worse.
-
-    Asked in thinking mode: this is the one call that writes paragraphs of
-    German prose, from an English brief (ADR 0043) on a 4B model (ADR 0011),
-    where agreement and word order come apart in a single pass. The trace is
-    the revision pass, and it is free in the worker (ADR 0018/0019).
+    Thinking mode: German prose from an English brief on a 4B model (ADR 0011)
+    needs the revision pass, and time is free in the worker (ADR 0018/0019).
     """
     messages = _messages(dossier, language, reverse)
     raw = ""
@@ -840,19 +674,10 @@ async def _ask(dossier: str, language: str, reverse: bool = False) -> _Wrapup:
 
 
 def _unfenced_text(raw: str, language: str) -> str:
-    """The model's prose, for the fallback: readable even though it isn't JSON.
-
-    Prose is the whole condition. ADR 0049's degraded path is "a summary with no
-    evidence links" -- the paragraphs the model wrote, minus the structure -- and
-    an answer that failed to validate is very often not prose at all but JSON
-    that was cut off in the token budget or carried a field of the wrong type.
-    Stored raw, that reached the User as their summary, in the history and in
-    the PDF, and `scripts/requeue_feedback.py` skips any Session that already
-    has a Feedback row, so it could never be replaced.
-
-    So a reply that still looks like JSON is refused here and the fixed sentence
-    stands in. That sentence says no feedback could be written, which is true,
-    where a brace and a quoted key says nothing the User can read.
+    """The model's prose, for the fallback (ADR 0049). A reply that still looks
+    like (truncated) JSON is replaced by the fixed sentence: stored raw, it would
+    reach the User as their summary and, having a Feedback row, never be
+    requeued by `scripts/requeue_feedback.py`.
     """
     stripped = llm.without_fenced_blocks(raw).strip()
     if not stripped or _looks_like_json(stripped):
@@ -862,11 +687,8 @@ def _unfenced_text(raw: str, language: str) -> str:
 
 def _looks_like_json(text: str) -> bool:
     """Whether this is the model's failed structure rather than its prose.
-
-    Deliberately crude: an opening brace or bracket, or one of the keys the
-    schema asks for quoted as JSON quotes it. A summary that happens to mention
-    a brace does not start with one, and no German paragraph opens with
-    `"summary":`."""
+    Deliberately crude: a leading brace or bracket, or a schema key in JSON
+    quotes near the start."""
     if text[:1] in ("{", "["):
         return True
     fields: tuple[str, ...] = tuple(_Wrapup.model_fields)
@@ -903,14 +725,9 @@ def _without_turn_markers(text: str) -> str:
 
 
 def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) -> None:
-    """Replace this Session's Feedback with the generated one.
-
-    A point citing a Turn that is not this Session's is stored without the
-    citation rather than dropped: the observation may still be sound, but a
-    reference the user could follow to the wrong place must not survive.
-
-    Every text value passes `_without_turn_markers` on the way in: written
-    once, read on two screens, so the cleanup belongs here.
+    """Replace this Session's Feedback with the generated one. A citation of a
+    foreign Turn is dropped, the point kept; every text passes
+    `_without_turn_markers` here, once, for both screens that read it.
     """
     # Through the ORM, not a bulk delete. The database would carry the points
     # along by itself (feedback_point.feedback_id is ON DELETE CASCADE), but

@@ -6,19 +6,9 @@ import type {
 } from "../protocol";
 
 /**
- * History rows for the dashboard's specs.
- *
- * One builder shared by the four spec files rather than a literal in each: a
- * `SessionSummary` carries eleven fields, of which any one test cares about
- * two, and spelling out the other nine per case buries what the case is about.
- * The defaults are deliberately the boring ones — a completed training, no
- * measurements, no tags — so every fixture reads as "the same training, except
- * …".
- *
- * Not in the spec files themselves because `progressStats`, `goalMentions` and
- * `segmentStats` all read the same row and would otherwise each keep their own
- * idea of its shape, which is how the `CommittedSession` fixture drifted before
- * the specs were type-checked.
+ * History rows for the dashboard's specs, one builder shared so no spec keeps
+ * its own idea of a `SessionSummary`'s shape. Boring defaults (completed, no
+ * measurements, no tags), so each fixture reads "the same training, except …".
  */
 
 /** Counts up, so two sessions built in a row are never the same row. The id

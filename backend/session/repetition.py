@@ -1,13 +1,7 @@
 """Text comparisons behind the repetition guards (ADR 0038).
 
-Pure functions and the thresholds they are read against: no Session state, no
-pipeline, nothing async. `SessionOrchestrator` supplies the history and decides
-what a verdict means -- these only answer "how much of this text was already in
-that one".
-
-They live here rather than in `orchestrator.py` because they are self-contained
-and that module had grown to its line ceiling, leaving no room to change the
-guards without first making space.
+Pure functions and their thresholds: no Session state, nothing async. The
+orchestrator supplies the history and decides what a verdict means.
 """
 from __future__ import annotations
 
@@ -36,23 +30,14 @@ MIN_LOOP_REPLY_CHARS = 30
 # verstehe.") rather than shared content, so short ones are not compared.
 MIN_SENTENCE_LEN = 15
 
-# ADR 0038's verbatim check never fires on the failure below it: the Persona
-# varies its opening sentence and carries the same block underneath it
-# unchanged, Turn after Turn, so no two replies are ever wholly identical --
-# the gap ADR 0038's own Consequences name. What separates a restatement from
-# a caller legitimately quoting a figure twice is not *whether* a sentence
-# came back but *how much* of the reply is old: a reply that repeats its
-# opening and then says seven new things has moved the call on, one that is
-# four fifths its predecessor has not. Measured against a real call, those two
-# cases sit at 25% and 80%.
+# ADR 0038's verbatim check misses a Persona that varies its opening and carries
+# the same block underneath. What separates that from quoting a figure twice is
+# how much of the reply is old: measured on a real call, 25% vs 80%.
 RESTATEMENT_SHARE = 0.5
 
-# ...and a share needs more than one sentence to be a share *of*. With exactly
-# one the test degenerates into "has this sentence been said before", which
-# condemns a short confirmation — "Ganz genau. Der Betrag lag bei 480 Euro." is
-# one long sentence, carried over, and ended the call. A reply that really has
-# shrunk to one repeated sentence is caught on the next Turn by
-# `_repeats_last_reply`, which is the cheap direction of the same trade.
+# ...and a share needs more than one sentence: with one, a carried-over short
+# confirmation ended the call. A reply shrunk to one repeated sentence is caught
+# next Turn by `reply_checks.repeats_last`.
 MIN_RESTATEMENT_SENTENCES = 2
 
 
@@ -148,13 +133,9 @@ def said_sentences(lines) -> set[str]:
 
 def drop_said_sentences(text: str, said: set[str]) -> tuple[str, list[str]]:
     """`text` without the sentences already in `said`, plus the ones dropped.
-
-    The chunk-level form of the restatement check, applied *before* a chunk is
-    spoken: the model varies its opening sentence and carries the same block
-    underneath it Turn after Turn (the failure ADR 0038 names), and after a
-    barge-in it re-delivers the cut-off part wholesale. Dropping the carried
-    sentences lets the new ones through instead of ending the call over them.
-    """
+    The chunk-level restatement check, before a chunk is spoken: the model carries
+    the same block under a varied opening (ADR 0038) and re-delivers a cut-off part,
+    so dropping carried sentences lets the new ones through without ending the call."""
     kept: list[str] = []
     dropped: list[str] = []
     for sentence in SENTENCE_SPLIT_RE.split(text.strip()):
@@ -193,14 +174,9 @@ def has_repeated_sentence(text: str) -> bool:
 
 
 def restates(text: str, previous: str) -> bool:
-    """True if most of `text` was already in `previous` — the partial form of a
-    verbatim repeat (ADR 0038).
-
-    A share of the reply, not a count of sentences: repeating one figure while
-    adding new content is a real caller, repeating four fifths of the last reply
-    is the loop the guard is for. Below `MIN_RESTATEMENT_SENTENCES` there is no
-    share to take, so the reply is left alone.
-    """
+    """True if most of `text` was already in `previous`, the partial form of a
+    verbatim repeat (ADR 0038). A share, not a count: repeating one figure amid new
+    content is a real caller. Below `MIN_RESTATEMENT_SENTENCES` there is no share."""
     sentences = set(long_sentences(text))
     if len(sentences) < MIN_RESTATEMENT_SENTENCES:
         return False

@@ -1,33 +1,10 @@
-"""The scripted trainee for `scripts/play_scenarios.py`.
+"""The scripted trainee for `scripts/play_scenarios.py`: six user turns, the same for
+every Scenario except the fourth, which meets that Scenario's `success_condition`; the
+fifth concedes nothing, so a close there is the persona's own reading of the case.
 
-Six user turns per call, the same six for every Scenario, so the transcripts
-are comparable: the only thing that varies between two runs of different
-Scenarios is the system prompt.
-
-Five of the six are generic. The fourth is written per Scenario, because it has
-to satisfy that Scenario's `success_condition`, and those differ: one wants a
-figure with a validity date, another wants four points recapped. A single line
-cannot do both, and a generic one would fail everywhere, which would make the
-"persona never settles" flag useless.
-
-The probes carry a constraint that is easy to miss and silent when broken.
-`backend.session.language_packs.signals_closing` matches `farewell_re` AND
-`postpone_re` against the *user's* text, and a match sets `force_end_call`,
-which ends the call regardless of what the model said. A probe that trips it by
-accident does not fail loudly, it just cuts the call short and looks like a
-clean run. "I'll look into it and get back to you" is exactly such a phrase:
-`get back to you` is in the English `postpone_re`.
-
-`check_probes()` therefore validates every line against both packs, and the
-script refuses to run if it fails. Probes 1 to 5 must not signal closing;
-probe 6 must.
-
-Slot 5 exists so the measurement is not one Turn wide. The condition is met in
-slot 4, and if the farewell followed immediately, a persona that needs a beat to
-register what it was just given would be indistinguishable from one that never
-registers it at all. Slot 5 offers nothing new and concedes nothing, so a call
-that ends there ended on the persona's own reading of the case.
-"""
+Trap: `signals_closing` matches `farewell_re`/`postpone_re` on the *user's* text and
+forces the call to end -- a probe tripping it ("get back to you") silently looks like a
+clean short run. `check_probes()` enforces: probes 1-5 must not signal closing, 6 must."""
 from __future__ import annotations
 
 from backend.session.language_packs import LANGUAGE_PACKS, signals_closing
@@ -365,11 +342,7 @@ def probes_for(scenario_key: str | None, language: str) -> tuple[list[str], bool
 
 def check_probes() -> list[str]:
     """Every way a probe could silently measure the wrong thing. Empty = fine.
-
-    Run before the first LLM call: a probe that trips `signals_closing` sets
-    `force_end_call` and cuts the call short, which looks like a clean short run
-    rather than a broken probe.
-    """
+    Run before the first LLM call (see the module docstring's trap)."""
     problems = []
     for language, pack in LANGUAGE_PACKS.items():
         if language not in GENERIC:

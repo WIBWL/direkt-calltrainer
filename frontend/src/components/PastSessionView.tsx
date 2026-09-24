@@ -10,26 +10,9 @@ import FeedbackScreen, { transcriptFromTurns } from "./FeedbackScreen";
 import { FeedbackReport, MetricSection } from "./FeedbackView";
 
 /**
- * One past training, opened from the history (F-48): the wrap-up that was
- * generated for it at the time, the figures behind it, and the Transcript.
- *
- * It is the *same screen* as the one after a call — `FeedbackScreen` renders
- * both — and differs only in the buttons: back to the profile where the other
- * goes home, and the deletion under it. Two screens showing one report kept
- * drifting apart while they were two pieces of markup.
- *
- * Read once, never polled — the difference from the post-call screen, where a
- * wrap-up really is on its way (ADR 0019). Here whatever the database holds is
- * final, and polling a days-old Session spent a minute claiming one was being
- * created before calling it a failure, which is what this screen used to do.
- *
- * Someone else's Session answers 404 exactly like one that never existed
- * (ADR 0031/0050), so a guessed URL and a stale bookmark land alike.
- *
- * Both Scenarios a finished training can produce are offered here as they are
- * after the call — the follow-up (F-60) and the reverse (F-61) — each written
- * on request rather than in the background, which is what makes them offerable
- * about a training read weeks later.
+ * One past training from the history (F-48), rendered by `FeedbackScreen` like the post-call screen with other
+ * buttons. Read once, never polled: the stored state is final (ADR 0019). A foreign Session is a 404 like a
+ * missing one (ADR 0031/0050). Offers the follow-up (F-60) and reverse (F-61), both written on request.
  */
 export default function PastSessionView() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -65,15 +48,9 @@ export default function PastSessionView() {
     navigate(ROUTES.training, { state: { start } });
   };
 
-  // Still a link, not a button: it navigates, so middle-click and "open in new
-  // tab" have to keep working. Only its appearance is the button's.
-  //
-  // Two shapes, because it is used twice on the same screen: above the report,
-  // where a reader who has changed their mind after the first paragraph should
-  // not have to scroll a page of feedback to get back, and again in the
-  // actions row at the foot, where the post-call screen has its home button
-  // and where it has to look like its neighbours. The short screens — not
-  // found, failed, loading — have only the upper one, having no actions row.
+  // A link, not a button, so middle-click and "open in new tab" keep working; only styled as a button.
+  // Used twice: above the report (so a reader need not scroll back) and in the actions row at the foot.
+  // The short screens (not found, failed, loading) have only the upper one.
   const backLink = (
     <Link to={ROUTES.profile} className="back-to-start-button">
       Zurück zum Profil

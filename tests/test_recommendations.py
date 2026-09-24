@@ -1,15 +1,8 @@
-"""Scenario suggestions from what a User said about their work (F-62).
+"""Scenario suggestions from what a User said about their work.
 
-Covers:
-  F-62      call types and focus goals steer the suggestions, voice goals do not
-  ADR 0076  a suggestion names its reason and claims no measurement
-  ADR 0072  a suggested Scenario keeps its own origin: the suggestions are a
-            view over the cards, not a group that takes them out of theirs
-  F-64      what to play next (ADR 0087): the same Scenario in the other language, and
-            another from the library, without a model or a stored Session
-
-The scoring is a pure function over plain values; one test runs the listing.
-"""
+Covers F-62 (call types and focus goals steer, voice goals do not), ADR 0076 (names its reason,
+claims no measurement), ADR 0072 (a view, cards keep their origin), F-64/ADR 0087 (what to play
+next, without a model or stored Session). Scoring is pure; one test runs the listing."""
 from pathlib import Path
 
 import httpx
@@ -199,16 +192,9 @@ def _practice_category() -> dict[str, str | None]:
 
 
 def test_the_practice_offer_uses_the_first_kind_of_call_on_the_goal_s_row() -> None:
-    """Where a focus goal is practised is one editorial judgement, written on
-    the goal's own row (`practised_in` in `seed_data.FOCUS_GOALS`). The library
-    suggests every kind named there; the progress view's single practice offer
-    (`practiceRoutes.ts`) has to pick one, and it picks the first.
+    """`practiceRoutes.ts` must pick the *first* `practised_in` category of each goal row.
 
-    The two had drifted, so a User who picked Einwandbehandlung was sent to a
-    closing call on the setup screen and to a pricing call on the progress view,
-    and composure to different sets. The frontend copy exists because the
-    catalogue it would otherwise read does not travel with this judgement; this
-    holds it to the row.
+    The two had drifted, sending one goal to different call types on two screens.
     """
     practice = _practice_category()
     assert practice, "PRACTICE_CATEGORY parsed as empty; has its shape changed?"
@@ -227,20 +213,10 @@ def test_the_practice_offer_uses_the_first_kind_of_call_on_the_goal_s_row() -> N
 
 
 def test_every_goal_the_wrap_up_can_name_has_somewhere_to_practise_it() -> None:
-    """The practice block turns the most-named improvement into one call to make
-    (dashboard concept, section 5.E). A goal absent from the table yields no
-    suggestion at all -- deliberate, so that adding a catalogue goal forces
-    somebody to decide what it is practised in.
+    """Every catalogue goal (bar the two habit goals, never named in a wrap-up) needs a practice entry.
 
-    Deliberate only while somebody notices. The check above holds the table
-    against the library's; this one holds it against the catalogue, which is
-    where a goal is actually added. Without it the block simply falls silent for
-    whoever picked the new goal, on the one part of the screen that leads back
-    into training.
-
-    The two habit goals are excluded on the same ground the generator excludes
-    them: they are about how often somebody trains, so they are never named in a
-    wrap-up and can never be the improvement this block answers.
+    A missing goal yields no suggestion by design, so adding one forces a decision; this check
+    makes sure somebody notices instead of the block silently going empty.
     """
     practice = _practice_category()
     assignable = {goal["id"] for goal in FOCUS_GOALS} - set(_NEVER_ASSIGNED)

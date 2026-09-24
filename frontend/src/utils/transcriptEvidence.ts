@@ -1,23 +1,7 @@
-/**
- * Finding in the stored transcript what a metric counted (ADR 0098).
- *
- * The figures themselves are measured once, when the call ends, and are never
- * recomputed here (ADR 0051). What these functions do is locate the passage a
- * figure came from, so the metric's page can quote it. A count and a list of
- * quotations that disagree would be worse than either alone, so each function
- * below is written to reproduce the backend's own rule rather than a reasonable
- * approximation of it:
- *
- * - questions are cut at the question marks, because `metrics._questions`
- *   counts exactly those characters,
- * - a filler is matched as a whole phrase, lower-cased and with runs of
- *   whitespace closed, which is the form `metrics._fillers` counts in.
- *
- * Where a rule changes on the backend, this file is the second place to look.
- * It is in the frontend all the same: the sentences are in the transcript the
- * detail route already serves, and an endpoint that returned the same words a
- * second time would be a second copy to keep in step.
- */
+/** Locates in the stored transcript what a metric counted, for quoting (ADR 0098);
+ * the figures are never recomputed (ADR 0051). Mirrors the backend's rules exactly
+ * (questions at `?` like `metrics._questions`, fillers as `metrics._fillers`
+ * normalises them): change those, change this. */
 
 /** Ends a sentence, in the punctuation the speech recogniser writes. */
 const SENTENCE_END = /[.!?]/;
@@ -26,15 +10,9 @@ const SENTENCE_END = /[.!?]/;
  *  habit, few enough that the page stays readable under a long call. */
 const MAX_HITS = 5;
 
-/**
- * The questions in one turn, one entry per question mark.
- *
- * Each runs from the end of the previous sentence up to its own question mark,
- * so a turn that says "Guten Tag. Wie kann ich helfen?" quotes only the
- * question. The count therefore matches the metric exactly, which a split on
- * sentence boundaries would not: a question mark inside a sentence would be
- * counted by the backend and dropped here.
- */
+/** The questions in one turn, one per question mark (matching the metric's count),
+ * each from the end of the previous sentence: "Guten Tag. Wie kann ich helfen?"
+ * quotes only the question. */
 export function questionsIn(text: string): string[] {
   const found: string[] = [];
   let start = 0;
@@ -72,15 +50,9 @@ export interface FillerHit {
   at: number;
 }
 
-/**
- * Where the counted filler words fall in the call, at most `MAX_HITS` of them.
- *
- * One hit per sentence at most: a sentence with two fillers in it would
- * otherwise be quoted twice, and the second copy tells a reader nothing the
- * first did not. The words arrive in the order the detail lists them, which is
- * most frequent first, so a shortened list shows the habit rather than the
- * accident.
- */
+/** Where the counted filler words fall, at most `MAX_HITS`, one per sentence so no
+ * sentence is quoted twice. Words come most frequent first, so a short list shows
+ * the habit rather than the accident. */
 export function fillerHits(
   turns: { text: string; at: number }[],
   words: string[],

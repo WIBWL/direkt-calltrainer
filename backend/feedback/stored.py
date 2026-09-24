@@ -1,20 +1,7 @@
-"""Reading a stored Session back as the call it was.
-
-`rows.py` is the way in: measured figures become `measurement` rows. This is
-the way back out, and it had no home -- every reader of a stored Session
-rebuilt its piece of "the call as stored" for itself: the whole-call filter
-three times, the transcript order three times, the user's utterances four
-times, and the rows turned back into Turns once, in `segments.py`, where the
-fold then forgot that a reverse is measured the other way round. Two of the
-wrap-up's recorded bugs were a forgotten filter (the same metric read three
-times, the pressing stretch's curve described as the whole call's).
-
-Nothing here computes a figure. It hands back rows in the order and the subset
-a reader needs, and for a fold it takes the Persona's language and the casting
-from the Session itself, so neither can be left out.
-
-Not in `calls.py`, which folds the live call's Turns and imports no ORM on
-purpose (see its docstring); this module is the one that knows both.
+"""Reading a stored Session back as the call it was (ADR 0102); `rows.py` is the
+way in. Computes nothing: rows in the order and subset readers need, and a fold
+that takes language and casting from the Session so neither can be forgotten.
+Not in `calls.py`, which imports no ORM on purpose.
 """
 
 from __future__ import annotations
@@ -41,11 +28,8 @@ def whole_call(session: db_models.Session) -> list[db_models.Measurement]:
 
 
 def user_texts(session: db_models.Session) -> list[str]:
-    """What the user said, one entry per utterance, in order.
-
-    One row per speaker per exchange (`calls.utterances`), which is the unit
-    `Conversation.user_turns` counts in the live path, so a window of the last
-    two means the same two utterances here as it did then."""
+    """What the user said, one entry per utterance, in order -- the same unit
+    `Conversation.user_turns` counts in the live path."""
     return [
         row.transcript for row in ordered_turns(session)
         if row.speaker == db_models.SPEAKER_USER
@@ -53,14 +37,9 @@ def user_texts(session: db_models.Session) -> list[str]:
 
 
 def exchanges(session: db_models.Session) -> list[tuple[Turn, db_models.Turn]]:
-    """The stored utterances rebuilt into in-memory Turns, each paired with the
-    row it came from -- the inverse of `calls.utterances`, as far as the
-    metrics need one.
-
-    The Persona's row gives its window, the user's gives its window and its
-    stored facts. A user row with no stored facts keeps its text and loses its
-    milliseconds, which is exactly the state `user_acoustics_complete=False`
-    describes and which the derivations already know how to withhold on.
+    """The stored utterances rebuilt into in-memory Turns, each paired with its
+    row -- the inverse of `calls.utterances`, as far as the metrics need one. A
+    user row without stored facts reads as `user_acoustics_complete=False`.
     """
     rebuilt: list[tuple[Turn, db_models.Turn]] = []
     for index, row in enumerate(ordered_turns(session)):

@@ -34,23 +34,10 @@ export interface FinishedNames {
   personaId: string | null;
 }
 
-/**
- * One training run, from the press that commits to a Session to the restart
- * after its wrap-up: which Session is committed, what its case or briefing is,
- * whether it was drawn blind, what was said once it has ended, which Session
- * the wrap-up is fetched for, and what survives a reload.
- *
- * These were eight loose pieces of state in `App.tsx`, written from five
- * handlers whose ordering rules lived in comments ("after `beginSession`,
- * which clears it"). The hook owns them and the rules with them; where a press
- * *leads* is still `trainingFlow`'s (ADR 0096), and `App` still decides which
- * screen shows what.
- *
- * Nothing connects on its own (ADR 0042): `commit` is only ever called from a
- * deliberate press, and a new object every time, since that identity is what
- * makes this a new Session for `useSessionSocket` even when the pairing is
- * unchanged.
- */
+/** One training run from commit to restart: the committed Session, its case or
+ * briefing, the drawn name, the ended transcript and what survives a reload.
+ * Routing stays in `trainingFlow` (ADR 0096). `commit` runs only on a deliberate
+ * press (ADR 0042), with a new object each time: that identity is the new Session. */
 export function useTrainingRun() {
   // Read once on mount: a reload lands back on the wrap-up of the call that
   // had just ended.
@@ -77,18 +64,9 @@ export function useTrainingRun() {
   // per committed Session rather than once per screen.
   const [reverseBrief, setReverseBrief] = useState<ReverseBrief | null>(null);
 
-  // One request for whichever half the committed Scenario has: the case of an
-  // ordinary call, or the briefing of a reverse (ADR 0070). Both come from the
-  // detail route — the listing deliberately withholds the case (ADR 0045), and
-  // the reverse's case is only ever served there, for the caller's own rows.
-  //
-  // Fetched rather than read off the library card: a follow-up is started from
-  // a wrap-up, and its row is not in the library yet — the reload runs beside
-  // the commit, not before it.
-  //
-  // A reverse may have had its briefing seeded by `commit`, and this refetch
-  // lands on the same content — which is why a failure leaves the existing
-  // value alone rather than clearing it.
+  // The case of an ordinary call or a reverse's briefing (ADR 0070), from the
+  // detail route: the listing withholds the case (ADR 0045), and a follow-up's
+  // row is not in the library yet. A failure keeps any briefing `commit` seeded.
   useEffect(() => {
     setCommittedCase(null);
     if (!committed?.reverse) setReverseBrief(null);

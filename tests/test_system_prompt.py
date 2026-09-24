@@ -1,24 +1,8 @@
-"""The LLM system prompt the orchestrator builds for a session.
+"""The LLM system prompt the orchestrator builds: most counterpart-behaviour requirements live here.
 
-This is where most functional requirements about *how the counterpart
-behaves* are actually implemented, so they are asserted against the prompt
-text.
-
-Covers:
-  F-01  live simulation: reacts to content and conversation management
-  F-04  persona role/traits/behaviour is injected
-  F-03  scenario context is injected
-  F-12  the persona speaks only its lines, no meta-commentary (transcript
-        stays clean)
-  ADR 0043  instructions are English; the spoken language comes from the
-            Persona, and what cannot follow into English lives in the
-            language pack
-  ADR 0033 / ADR 0037 / ADR 0038  the [CALL_END] closing protocol
-  ADR 0045  the Scenario carries the case (facts, call goal, success
-            condition), the Persona carries the objections -- and the
-            condition is a criterion to weigh, not a demand to recite
-  R-12  spontaneous objections
-"""
+Covers F-01, F-03, F-04, F-12 (no meta-commentary), R-12 (spontaneous objections),
+ADR 0043 (English instructions; spoken-only parts in the language pack), ADR 0033/0037/0038
+([CALL_END] protocol), ADR 0045 (Scenario carries the case, Persona the objections)."""
 
 from dataclasses import replace
 

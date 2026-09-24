@@ -1,25 +1,7 @@
 /**
- * The F0 contour of a call, drawn the way phonetics draws it (F-35). Six
- * conventions, each a decision rather than a style:
- *
- * - **Semitones, relative to the speaker's own median.** Hertz is linear and
- *   pitch perception is not, so a Hertz axis draws the same intonation
- *   differently for a low and a high voice.
- * - **The horizontal axis is speaking time, not call time.** The curve holds
- *   the user's frames only, so no stretch of it stands for the Persona talking.
- *   Turn boundaries are dashed marks rather than gaps: the seam is a fact, dead
- *   space is not.
- * - **Unvoiced stretches are bridged, but drawn as bridges** — dotted and
- *   faint, and never across a seam. Holes broke the line into confetti; a
- *   silent interpolation would draw movement nobody measured, which is the
- *   commonest way an F0 plot lies.
- * - **Never more points than pixels.** Two minutes of speech is ~2400 points
- *   over 676 units; drawn one for one the line grows hair that is rendering
- *   noise. Above that density each column is reduced to its median.
- * - **The band is the speaker's own 5th-95th percentile**, measured at both
- *   ends rather than assumed symmetric, and it is not a target — it is the only
- *   comparison available without a norm nobody has measured (ADR 0051).
- * - **No colour carries meaning.** One hue throughout.
+ * The F0 contour (F-35), drawn the phonetics way: semitones relative to the speaker's median; x = the user's
+ * speaking time with dashed turn seams; unvoiced gaps bridged dotted, never across a seam; at most one point per
+ * pixel (column median); band = the speaker's own 5th-95th percentile, not a target (ADR 0051); one hue.
  */
 
 import { formatNumber } from "../utils/metrics";
@@ -224,13 +206,9 @@ export default function PitchContour({
 }
 
 /**
- * The curve at no more than `maxPoints`, by taking each column's median.
- *
- * The median and not a mean or a sample: a mean would pull the value towards a
- * stray frame instead of ignoring it, and sampling one frame per column is what
- * turns a syllable rate into a sawtooth. A column with no voicing at all stays
- * empty, so the gaps survive the condensing, and the seams move with the points
- * they belong to.
+ * The curve at no more than `maxPoints`, by each column's median: a mean would be pulled by stray frames, and
+ * sampling one frame per column turns a syllable rate into a sawtooth. Unvoiced columns stay empty, so gaps
+ * survive, and seams move with their points.
  */
 function condense(
   points: (number | null)[],

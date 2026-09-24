@@ -1,17 +1,8 @@
-"""Pipeline fault tolerance.
+"""Pipeline fault tolerance: ADR 0016 (one retry, then graceful end) per leg, per ADR 0033/0044/0103.
 
-Covers ADR 0016 (one retry, then graceful end) as reinterpreted per leg by
-ADR 0033 / ADR 0044:
-  * STT: one retry; a second failure -> `stt_failed`, turn ends
-  * LLM: retried only while nothing has been sent; -> `llm_failed`
-  * TTS: one backend and no fallback since ADR 0103, so any failure to
-    synthesise a chunk -> `tts_failed`. A failure *after* audio has been sent
-    ends the turn for a second reason (a fresh synth would diverge from what
-    was heard).
-The one retry ADR 0016 grants is per leg: STT and the LLM have one, and the
-voice does not, because a retry there is a second request on a pooled socket
-whose state the first one left in doubt (ADR 0044).
-"""
+STT: one retry, then `stt_failed`. LLM: retried only while nothing was sent, then `llm_failed`.
+TTS: no retry and no fallback, so any chunk failure -> `tts_failed`; a retry would be a second
+request on a pooled socket in unknown state (ADR 0044)."""
 
 import pytest
 

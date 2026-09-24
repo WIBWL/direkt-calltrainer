@@ -1,26 +1,9 @@
 import type { SessionSummary } from "../protocol";
 
-/**
- * What the wrap-ups keep coming back to, counted across a user's trainings.
- *
- * The dashboard's block D (docs/dashboard-concept.md). It invents nothing: the
- * wrap-ups already wrote points of two kinds, and since each point carries the
- * focus goal it is about, they can be counted. What comes out is a **frequency
- * of statements**, never a measurement of a person, which is the distinction
- * that keeps this inside ADR 0004 and ADR 0065.
- *
- * Two decisions that change the number:
- *
- * **Counted per training, not per point** — two improvements about the closing
- * in one call are one call that mentioned it. Counting points would let a
- * single wordy wrap-up look like a pattern.
- *
- * **The denominator is the trainings that could have mentioned it**, i.e. those
- * whose wrap-up carries any assignment. A training with no wrap-up never had an
- * opinion, and one written before the assignment existed could not record it;
- * leaving either in would quietly shrink every fraction. The interface says
- * which number it divides by.
- */
+/** What the wrap-ups keep naming, per focus goal (block D, ADR 0004/0065): a
+ * frequency of statements, never a measurement. Counted per training, not per
+ * point, so one wordy wrap-up is no pattern; the denominator is trainings whose
+ * wrap-up carries any goal tag, since the others could not have named it. */
 export interface GoalMentions {
   goal: string;
   /** In how many trainings this goal was named, of `total`. */
@@ -54,12 +37,8 @@ export function mentionSummary(sessions: SessionSummary[]): MentionSummary {
 }
 
 /**
- * The goals of one kind, most-mentioned first.
- *
- * Ties are broken by goal key rather than left to the sort's input order, so
- * the same data renders the same way on every read. Two goals mentioned three
- * times each should not swap places because a training was added at the other
- * end of the list.
+ * The goals of one kind, most-mentioned first; ties broken by goal key so the
+ * same data renders the same way on every read.
  */
 function rank(sessions: SessionSummary[], kind: "strength" | "improvement"): GoalMentions[] {
   const counts = new Map<string, number>();
@@ -81,16 +60,9 @@ function rank(sessions: SessionSummary[], kind: "strength" | "improvement"): Goa
 }
 
 /**
- * One thing a wrap-up wrote about a goal, with the training it was written in.
- *
- * The dashboard counts mentions; this is what was counted. A frequency with no
- * way to read behind it asks the user to take a number on trust, and for the
- * goals with no measurement the sentences are the whole of what exists
- * (ADR 0064's amendment put them on the listing for this).
- *
- * It stays a quotation and never becomes an input: nothing here summarises,
- * groups or weighs the sentences, because that would be a second opinion about
- * a call written without reading it (ADR 0004).
+ * One thing a wrap-up wrote about a goal, with its training: what the counts
+ * count (ADR 0064's amendment). Always quoted, never summarised or weighed,
+ * which would be a second opinion on a call nobody read (ADR 0004).
  */
 export interface GoalStatement {
   sessionId: string;
@@ -104,11 +76,8 @@ export interface GoalStatement {
 }
 
 /**
- * Everything the wrap-ups wrote about these goals, newest training first.
- *
- * Several goals at once because a metric can stand behind more than one, and
- * the order within a training is the wrap-up's own (`position`), which the
- * listing preserves.
+ * Everything the wrap-ups wrote about these goals, newest training first;
+ * within a training in the wrap-up's own order (`position`).
  */
 export function statementsFor(
   sessions: SessionSummary[],
@@ -131,13 +100,9 @@ export function statementsFor(
 }
 
 /**
- * How often one goal was named, over all trainings that could have named it.
- *
- * For the focus tiles (block B), where the goals with no measurement of their
- * own have something to show. No threshold here, unlike the
- * block above: on a tile the user picked themselves, "once so far" is a
- * legitimate answer to "how is this going", where in a list of recurring
- * themes it would be noise.
+ * How often one goal was named, over all trainings that could have named it,
+ * for the focus tiles (block B). No threshold: on a goal the user picked,
+ * "once so far" is a real answer.
  */
 export function mentionsFor(
   sessions: SessionSummary[],

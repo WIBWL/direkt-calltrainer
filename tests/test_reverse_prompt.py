@@ -1,26 +1,8 @@
-"""The swapped casting a reverse runs under (F-61, ADR 0070).
+"""The swapped casting a reverse runs under (F-61, ADR 0070): what the model is told, and
+that an ordinary Scenario is told none of it (`test_system_prompt.py` guards the ordinary prompt).
 
-A reverse replays one finished Session with the roles turned around: the User
-rings and the Persona picks up. Everything the pipeline does stays the same, so
-what is asserted here is only what the model is *told* — and, just as much,
-that an ordinary Scenario is told none of it.
-
-Covers:
-  F-61      the User calls, the Persona answers
-  ADR 0070  the casting is swapped in the one prompt, not in a second one;
-            role and objections are dropped; the opening is a greeting only
-  ADR 0043  instructions stay English, the spoken language comes from the pack
-  ADR 0045  the case keeps its three fields; they are relabelled, not rewritten
-  ADR 0071  the call-state notes are kept from the same side as the prompt
-  ADR 0073  the settlement check asks about the caller's bar either way
-  ADR 0038  the per-turn anti-repeat nudge turns around with the casting
-
-No database, no network: these are pure functions over a Persona and a
-Scenario, plus one assembled by an orchestrator that never connects to
-anything. `tests/test_system_prompt.py` is the guard on the ordinary prompt and
-keeps holding — the tests below only add that the reverse text never leaks into
-it.
-"""
+Also covers ADR 0043 (English instructions, spoken language from the pack), 0045 (case fields
+relabelled, not rewritten), 0071 (call-state notes), 0073 (settlement check), 0038 (anti-repeat nudge)."""
 
 from dataclasses import replace
 
@@ -208,15 +190,10 @@ def test_the_opening_forbids_guessing_at_the_case():
 
 
 def test_the_ordinary_opening_is_unchanged():
-    """Same guard as on the casting: nothing the reverse needs may reach a call
-    that is not one.
+    """Nothing the reverse needs may reach an ordinary call.
 
-    The first assertion used to compare `opening_instruction(GERMAN)` with
-    `opening_instruction(GERMAN, reverse=False)`, which is the same call written
-    twice and true whatever either returns — it would have passed with the
-    reversed text in both. What the default has to keep *meaning* is that the
-    Persona opens with a reason for calling, so that is what is checked here:
-    the calling examples are in it, the answering ones are not.
+    Checks what the default must mean -- the Persona opens with a reason for calling --
+    rather than comparing the default with an explicit `reverse=False` (a tautology).
     """
     ordinary = opening_instruction(GERMAN)
 
@@ -305,10 +282,8 @@ def test_the_ordinary_nudge_still_speaks_from_the_callers_side():
 
 # --- What the orchestrator actually attaches -------------------------------
 #
-# The two constants above are worth nothing unless the per-turn message
-# assembly reaches for them, and which one it reaches for is decided by a flag
-# on the Scenario. Asserted through `_messages_for_turn` rather than by reading
-# the branch, because that is the thing a later refactor can quietly break.
+# The constants above matter only if per-turn assembly picks them by the Scenario's
+# flag; asserted through `_messages_for_turn`, which a refactor could quietly break.
 
 
 def _standing_nudge(orch, replies=3):

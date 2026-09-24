@@ -1,22 +1,8 @@
 """The persistence schema (SQLAlchemy models), and what the database enforces.
 
-Covers:
-  ADR 0026  normalized schema for session persistence
-  ADR 0025  SQLAlchemy ORM as the single source of truth
-  ADR 0026  metric types carry a `feature_id` linking a measurement back to
-            a feature in docs/features.md (F-24, F-35..F-38, F-51, ...)
-  ADR 0029  measurement detail is JSONB
-  ADR 0051  one set of statistics per Session, not per Turn
-  ADR 0053  invariants the code assumes are enforced by the database
-  F-09/F-14  Feedback row: qualitative summary (NOT NULL) + optional score
-  F-12      Turn transcripts are stored
-
-Two halves. The first asserts against the mapper metadata and needs no
-infrastructure. The second, below, writes to a real database, because a
-constraint that is only declared is not the same as one the server applies --
-and these particular constraints exist to catch a writer that the tests above
-cannot see.
-"""
+Covers ADR 0025, 0026 (incl. metric `feature_id`: F-24, F-35..F-38, F-51), 0029, 0051, 0053; F-09/F-14, F-12.
+First half checks mapper metadata; the second writes to a real database, since a declared
+constraint is not proof the server applies it."""
 
 from datetime import UTC, datetime
 from decimal import Decimal

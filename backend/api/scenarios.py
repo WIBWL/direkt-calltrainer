@@ -1,39 +1,8 @@
 """REST routes for the Scenario library and User-authored Scenarios (ADR 0058).
-
-`GET /api/scenarios` feeds the selection screen: every Scenario the caller may
-see, each badged `builtin` (a shipped built-in), `own` (one they authored) or
-`tenant` (shared by a colleague), and `follow_up` where the worker wrote it from
-one of their own Sessions (ADR 0069). The list carries card fields only.
-
-`GET /api/scenarios/{id}` is the read view behind that list (ADR 0062): any
-Scenario the caller may select, with `editable` saying whether they may also
-open the editor on it. `call_goal` — the caller's intent and the bar that
-settles it — is the answer key to the exercise (ADR 0043/0045) and is withheld
-from a built-in. The *write* routes remain owner-scoped.
-
-`POST /api/scenarios/document` (F-58) is a stateless helper: it extracts the
-uploaded text-layer PDFs -- several at once -- and has the LLM condense them
-into one fact list for the editor's Fakten field (`backend/documents.py`),
-storing nothing.
-
-A reverse (ADR 0070) and a follow-up (ADR 0069) are rows of this table too,
-listed and read through the same routes and badged `own` like anything else the
-caller owns. Each is written by its own route on the Session
-(`POST /api/sessions/{id}/reverse`, `.../follow-up`) and by nothing here: the
-edit and share routes below refuse both. A reverse copies a case that was
-actually played and carries a briefing built from its author's own wrap-up; a
-follow-up is drafted to sit exactly at that wrap-up's improvement point. In
-either case an edited row would no longer be the thing the Session produced,
-and a shared one would pass on a reading of the author's feedback. DELETE
-takes both: the one action left on them is removing them again.
-
-The wire vocabulary is English, matching the schema (ADR 0057, extended to this
-surface by ADR 0061). `backend/library.py` does the sanitising (ADR 0059); this
-module only validates shape and length and maps the card field `name` onto the
-`title` column. A Scenario is addressed by its `extern_id` (ADR 0050); the write
-routes are owner-scoped by the Keycloak `sub` and the resolved tenant, never by
-anything the client sends.
-"""
+Listing and detail (ADR 0062; a built-in withholds `call_goal`, ADR 0043/0045),
+authoring, sharing, and the stateless PDF helper (F-58). Reverses and follow-ups
+(ADR 0069/0070) are written on the Session; here they can only be deleted.
+Sanitising is `library.py`'s (ADR 0059); writes are owner-scoped by `sub`."""
 from __future__ import annotations
 
 import logging
@@ -62,12 +31,8 @@ from backend.tenants import ResolvedTenant
 
 logger = logging.getLogger(__name__)
 
-# The requirement sits on the router, as it does on the other five: every
-# route below needs a verified caller, and a tenth one added later would
-# otherwise be reachable unauthenticated with nothing to say so -- no test
-# fails, no warning, and the browser works. The routes that take a `user`
-# parameter still do, because they *use* it; only the two that named one
-# purely to force the check have lost it.
+# On the router, so a route added later cannot be reachable unauthenticated
+# by forgetting a parameter; routes that take `user` do so to use it.
 router = APIRouter(prefix="/api/scenarios", dependencies=[Depends(require_user)])
 
 
@@ -198,27 +163,11 @@ def _origin_group(card: dict) -> int:
 
 
 def _detail(scenario, subject: str) -> dict:
-    """One Scenario as the client reads it (ADR 0062).
+    """One Scenario for the editor and the info panel (ADR 0062).
 
-    Two audiences, one payload: the editor, which opens only on a row the
-    caller owns, and the read-only info panel, which opens on any row they
-    may select. `editable` is what separates them, and it is decided here
-    from the verified `sub` rather than taken from the client.
-
-    A built-in withholds `call_goal` — None, not "", so the client can tell
-    "withheld" from "the author left it empty". That field is the caller's
-    *intent* and the bar by which the call is done; reading it in advance
-    would hand the trainee the answer to the
-    exercise. `description` and `case_facts` are the situation, which comes
-    up in the call anyway, so they are served. A Scenario the caller or a
-    colleague authored withholds nothing: they wrote it, or work with the
-    person who did.
-
-    A reverse (ADR 0070) is authored and therefore withholds nothing either,
-    which is the exception that ADR deliberately takes to ADR 0043: the played
-    case reaches the client because seeing what the Persona had is the point,
-    and the User has just heard it play out.
-    """
+    `editable` is decided from the verified `sub`. A built-in withholds
+    `call_goal` as None (not "") because it is the exercise's answer key;
+    authored rows, reverses included (ADR 0070), withhold nothing."""
     # No author at all = a shipped built-in. A colleague's shared row has an
     # author, just not this caller, and is served in full.
     built_in = scenario.created_by is None
@@ -240,12 +189,9 @@ def _detail(scenario, subject: str) -> dict:
         # `public` for a built-in now that this route serves one. The editor
         # never sees that value: it opens only where `editable` is true.
         "visibility": scenario.visibility,
-        # Authorship, not visibility: a colleague's shared Scenario is
-        # readable but not editable (ADR 0058 -- only the author may write).
-        # And the two kinds built from a Session are the caller's own yet still
-        # not editable: the write routes exclude both in their WHERE clause
-        # (ADR 0069, ADR 0070), so a panel that offered the edit would open an
-        # editor whose Save answers 404.
+        # Authorship, not visibility (ADR 0058). Reverses and follow-ups are
+        # the caller's own but excluded by the write routes (ADR 0069/0070),
+        # so offering the edit would open an editor whose Save answers 404.
         "editable": (
             scenario.created_by == subject and
             not scenario.reverse and
@@ -342,12 +288,9 @@ def next_calls(
 async def _read_documents(uploads: list[UploadFile]) -> list[ExtractedDocument]:
     """Every upload, read and extracted, in the order they were sent.
 
-    One file at a time and checked as it goes: the per-file ceiling against the
-    declared size *before* reading, the total against what has actually arrived
-    *after*. A client that sends no Content-Length therefore still cannot get
-    more than one oversized file past the gate. The first unusable document
-    fails the whole request -- a half-applied batch would leave the User
-    guessing which of their files made it into the field."""
+    Per-file ceiling on the declared size before reading, total on the bytes
+    actually read after, so a missing Content-Length cannot slip a second
+    oversized file through. One unusable document fails the whole batch."""
     if not uploads:
         raise DocumentError("Es wurde keine Datei ausgewählt.")
 
@@ -370,14 +313,11 @@ async def _read_documents(uploads: list[UploadFile]) -> list[ExtractedDocument]:
 
 @router.post("/document")
 async def extract_document(files: list[UploadFile] = File(...)) -> dict:
-    """Extract the text from the uploaded text-layer PDFs and let the LLM
-    condense them into one fact list for the editor's Fakten field (F-58).
+    """Condense uploaded text-layer PDFs into one fact list for Fakten (F-58).
 
-    Several files are summarised *together*, in one model call: the field holds
-    one list, and two documents condensed apart would repeat every fact they
-    share. Stateless: nothing is stored, the client puts the returned text into
-    the field and the User edits it before saving. `summarised` is False when
-    the LLM was unreachable and the raw (truncated) text is returned instead."""
+    All files in one model call, so shared facts are not repeated. Stores
+    nothing. `summarised` is False when the LLM was unreachable and the raw
+    (truncated) text is returned instead."""
     try:
         documents = await _read_documents(files)
     except DocumentError as e:
@@ -422,9 +362,7 @@ def get_scenario(
     """One Scenario the caller may select, for the info panel and — where
     `editable` says so — for the editor (ADR 0062).
 
-    Scoped by `library.get_scenario`, which serves built-ins, rows shared
-    with the caller's company, and their own. Another User's private row is
-    invisible there and stays a 404, indistinguishable from an unknown id
+    Another User's private row is a 404, indistinguishable from an unknown id
     (ADR 0031/0050)."""
     scenario = library.get_scenario(extern_id, user.sub, tenant_id)
     if scenario is None:

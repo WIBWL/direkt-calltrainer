@@ -17,23 +17,9 @@ import SectionHeading from "./SectionHeading";
 import Sparkline from "./Sparkline";
 
 /**
- * Every metric over time, one row each (block C of the dashboard).
- *
- * A table and not a grid of tiles: the concept sized that grid for nine metrics
- * behind a switch, there are sixteen now, and the wall it was built against was
- * back. A row per metric fits all of them on one screen at full width, every
- * sparkline the same size and on the same axis position, which is what lets the
- * eye compare them (Tufte's sparkline table). The switch goes with it — nothing
- * is hidden, so there is nothing to switch to.
- *
- * The two families stay as row groups headed in their hue rather than halves
- * behind a control. Colour is identity and never a value
- * (`utils/metricGroups`): the hue hangs off the group, and the cells never see
- * one.
- *
- * Also the better accessible form: a screen reader moves through a real table
- * by row and column and hears which metric a figure belongs to, where sixteen
- * links wrapping drawings gave it sixteen images with a number in the name.
+ * Every metric over time, one row each (block C of the dashboard): a sparkline table fits all sixteen on one
+ * screen at comparable size, and is the better accessible form. The two families are row groups headed in
+ * their hue; colour is identity, never a value (`utils/metricGroups`).
  */
 export default function ProgressMetricTable({ series }: { series: MetricSeries[] }) {
   if (series.length === 0) {
@@ -156,12 +142,8 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
 }
 
 /**
- * One metric.
- *
- * The name is the link, so the row has one real control for the keyboard and
- * the screen reader. The rest of the row takes a click too, as a convenience
- * for the mouse: a thin name is a small target on a row this wide, and the row
- * already highlights as one thing under the pointer.
+ * One metric. The name is the link — the row's one real control for keyboard and screen reader; the rest of
+ * the row also takes a click as a mouse convenience.
  */
 function MetricRow({ series }: { series: MetricSeries }) {
   const navigate = useNavigate();

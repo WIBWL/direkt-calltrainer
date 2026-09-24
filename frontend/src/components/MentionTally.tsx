@@ -1,20 +1,7 @@
 /**
- * How many of the analysed trainings named something, drawn.
- *
- * One pip per analysed training, filled where the theme came up. A count over a
- * denominator of three or eight is what this is, and pips say that where a bar
- * would round it into a proportion and invite reading it as a level. Above
- * `MAX_PIPS` the row of dots stops being countable at a glance, so it becomes a
- * single track instead, which is the lesser evil at that width.
- *
- * Decoration only: the figure stands beside it in words wherever it is used, and
- * this carries `aria-hidden` for that reason. It is a frequency of statements
- * either way, never a measurement and never a score (ADR 0065, ADR 0080).
- *
- * Shared by the recurring block and the focus tiles of the goals with no
- * measurement, which say the same kind of thing and so should look alike: a big
- * "3 von 8" on a tile read as a mark, where the same count as pips reads as
- * what it is.
+ * One pip per analysed training, filled where the theme came up: a count, not a proportion or a level (ADR 0065,
+ * ADR 0080). Above `MAX_PIPS` it becomes a single track. `aria-hidden`, the figure always stands beside it in
+ * words. Shared by the recurring block and unmeasured goals' tiles, where a big "3 von 8" read as a mark.
  */
 const MAX_PIPS = 12;
 
