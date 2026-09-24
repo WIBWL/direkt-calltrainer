@@ -5729,6 +5729,12 @@ a.consent-button {
   flex: 0 0 auto;
 }
 
+/* The only card on an empty progress page: the default h2 margin sits the
+   title almost on the sentence under it, which reads as one block. */
+.progress-empty h2 {
+  margin-bottom: 0.75rem;
+}
+
 /* The two cards' own titles, one level under the section heading "Ihr
    Training" that stands above both. */
 .progress-card-title {

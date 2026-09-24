@@ -801,9 +801,9 @@ function OverviewSection({ series }: { series: MetricSeries[] }) {
 function EmptyState({ goals }: { goals: FocusGoal[] }) {
   return (
     <>
-      <div className="card">
+      <div className="card progress-empty">
         <h2>Noch kein Training abgeschlossen</h2>
-        <p>
+        <p className="card-lead">
           Sobald Sie ein Gespräch zu Ende geführt haben, stehen hier Ihre Kennzahlen und ihr
           Verlauf über die Zeit. Ein Verlauf wird ab {MIN_SESSIONS_FOR_SERIES} Trainings
           gezeigt, vorher wären es einzelne Punkte ohne Aussage.
