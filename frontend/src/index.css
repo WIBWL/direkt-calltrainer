@@ -3560,16 +3560,65 @@ p.follow-up-error {
     font-size: 32px;
   }
 
+  .feedback-meta {
+    flex-wrap: wrap;
+  }
+
   .feedback-details {
     grid-template-columns: 1fr;
+  }
+
+  .feedback-summary-section .feedback-box,
+  .feedback-phase-card .feedback-box,
+  .feedback-point-card {
+    padding: 20px;
+  }
+
+  .feedback-point-item {
+    gap: 12px;
+  }
+
+  .feedback-point-time {
+    flex-basis: 44px;
+    font-size: 13px;
+  }
+
+  .feedback-metrics-filter {
+    padding: 10px 12px 12px;
   }
 
   .feedback-metrics-section .metric-grid {
     grid-template-columns: 1fr;
   }
 
+  .feedback-metrics-section .metric {
+    min-height: auto;
+    padding: 18px;
+  }
+
   .feedback-metrics-section .metric-loudness {
     grid-column: auto;
+    min-height: 0;
+    padding: 18px;
+  }
+
+  .next-steps {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .card.next-step {
+    padding: 18px 20px;
+  }
+
+  .feedback-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .feedback-actions .back-to-start-button {
+    width: 100%;
+    text-align: center;
   }
 
   .feedback-section-head {
@@ -6980,6 +7029,24 @@ a.recurring-item:focus-visible {
 
 .next-calls .follow-up-button:hover {
   background: var(--color-navy-700);
+}
+
+/* Library suggestions stack vertically on narrow screens so the scenario text
+   keeps enough room and the start action remains easy to reach. */
+@media (max-width: 720px) {
+  .next-calls {
+    padding: 18px 20px;
+  }
+
+  .next-call {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .next-call .follow-up-button {
+    width: 100%;
+  }
 }
 
 /* Why a suggested card is suggested (F-62). */
