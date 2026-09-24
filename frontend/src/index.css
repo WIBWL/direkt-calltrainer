@@ -2415,9 +2415,9 @@ h2 {
 }
 
 .feedback-metrics-section .loudness-course-axis {
-  margin-top: 8px;
+  margin-top: 6px;
   padding: 0 4px;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 /* Named, not left as a bare mm:ss range: the axis is the user's own speaking
@@ -2434,10 +2434,10 @@ h2 {
 }
 
 .feedback-metrics-section .loudness-course-legend {
-  margin-top: 12px;
-  max-width: 820px;
-  font-size: 12px;
-  line-height: 1.55;
+  margin-top: 10px;
+  max-width: none;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 /* The note under the statistics saying they carry no target range (ADR 0048).
@@ -2448,6 +2448,22 @@ h2 {
   border-left: 3px solid var(--blue-light);
   font-size: 0.9rem;
   color: var(--text-muted);
+}
+
+.feedback-metrics-section .metric-progress-link {
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 12px;
+}
+
+.feedback-metrics-section .metric-progress-link a {
+  color: var(--color-blue-600);
+  text-decoration: none;
+}
+
+.feedback-metrics-section .metric-progress-link a:hover {
+  text-decoration: underline;
 }
 
 /* Out from under the disclaimer's rule: it is an offer and not part of the
@@ -3223,50 +3239,59 @@ p.follow-up-error {
   margin-bottom: 32px;
 }
 
-/* The metric switch and its short explanation form one navigation unit before
-   the figures, without competing visually with the metric cards themselves. */
+/* The metric switch behaves like a compact segmented control instead of a
+   separate dashboard panel. */
 .feedback-metrics-filter {
-  margin-bottom: 20px;
-  padding: 12px 14px 14px;
+  margin-bottom: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.feedback-metrics-filter .filter-slider {
+  padding: 4px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
-  background: #f8fbfd;
+  border-radius: 10px;
+  background: var(--color-surface);
 }
 
 .feedback-metrics-filter .filter-slider-option {
   flex: 1;
   justify-content: center;
-  min-height: 36px;
+  min-height: 34px;
 }
 
 .feedback-metrics-lead {
-  margin: 10px 4px 0;
+  margin: 8px 2px 0;
   color: var(--color-text-muted-secondary);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
 .feedback-metrics-section .metric-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
+/* Metric tiles stay compact and flat so the figures read as part of the
+   report rather than as separate dashboard widgets. */
 .feedback-metrics-section .metric {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 124px;
-  padding: 20px;
+  min-height: 112px;
+  padding: 17px 18px;
   border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
   background: var(--color-surface);
-  box-shadow: 0 6px 20px rgba(3, 37, 62, 0.035);
+  box-shadow: none;
 }
 
 .feedback-metrics-section .metric-name {
   color: var(--color-text-muted-secondary);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: 0;
@@ -3274,11 +3299,35 @@ p.follow-up-error {
 }
 
 .feedback-metrics-section .metric-value {
-  margin-top: 14px;
+  margin-top: 15px;
   color: var(--color-navy-900);
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 700;
   line-height: 1.1;
+}
+
+.feedback-metrics-section .metric-subline,
+.feedback-metrics-section .metric-context,
+.feedback-metrics-section .metric-light-label {
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-text-muted-secondary);
+}
+
+/* Detail links remain discoverable but do not compete with the measurement. */
+.feedback-metrics-section .metric-open-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: var(--color-blue-600);
+  opacity: 0.85;
+}
+
+.feedback-metrics-section .metric-open:hover .metric-open-hint {
+  text-decoration: underline;
+  opacity: 1;
 }
 
 .feedback-metrics-section .metric-disclaimer {
@@ -3294,13 +3343,13 @@ p.follow-up-error {
    horizontal room that a regular metric tile cannot provide. */
 .feedback-metrics-section .metric-loudness {
   grid-column: 1 / -1;
-  min-height: 190px;
-  padding: 22px;
+  min-height: 0;
+  padding: 18px;
 }
 
 .feedback-metrics-section .metric-loudness .loudness-course {
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--color-border-subtle);
 }
 
