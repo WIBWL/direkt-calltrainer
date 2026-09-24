@@ -671,8 +671,8 @@ export default function App() {
 
   if (screen === "transcript") {
     return (
-      // The brand in the header leaves for the same place the home button at
-      // the foot does, and has to do the same thing to get there: these two
+      // The brand in the header leaves for the same place the preparation button
+      // at the foot does, and has to do the same thing to get there: these two
       // screens are a state under the training route, not a route of their own.
       <AppLayout
         step="feedback"
@@ -686,7 +686,7 @@ export default function App() {
           detail={endedSessionDetail}
           actions={
             <button className="back-to-start-button" type="button" onClick={handleRestart}>
-              Zur Startseite
+              Zur Vorbereitung
             </button>
           }
           feedback={

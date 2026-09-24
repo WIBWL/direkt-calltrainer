@@ -26,9 +26,9 @@ interface FeedbackScreenProps {
    * generated, and for a call that was never stored (ADR 0066) — the download
    * is then the protocol alone, and says so. */
   detail?: SessionDetail | null;
-  /** What leads away from this screen, first in the actions row: home after a
-   * call, back to the profile in the history. The one thing the two screens
-   * are allowed to differ in. */
+  /** What leads away from this screen, first in the actions row: preparation
+   * after a call, back to the profile in the history. The one thing the two
+   * screens are allowed to differ in. */
   actions?: ReactNode;
   /** Anything that belongs *under* the transcript — the history's delete. */
   children?: ReactNode;
