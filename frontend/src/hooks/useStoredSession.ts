@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { SessionDetail } from "../protocol";
-import { getSession } from "../sessions";
+import { readStoredSession } from "../sessions";
 
 /** "missing" is what `sessions.getSession` reports as null — no such Session,
  *  or not the caller's (ADR 0031/0050), which are deliberately the same
@@ -11,7 +11,8 @@ export type StoredSessionState = "loading" | "ready" | "missing" | "failed";
 /**
  * One stored Session, read once. Unlike `useSessionFeedback` it never polls
  * (ADR 0019): nothing is in flight days later, so a missing wrap-up is `ready`,
- * not an error. `reload` re-reads after a follow-up was created (F-60).
+ * not an error. `reload` re-reads past the cache in `sessions.ts`, after a
+ * follow-up was created (F-60).
  */
 export function useStoredSession(sessionId: string | null) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
@@ -33,7 +34,7 @@ export function useStoredSession(sessionId: string | null) {
 
     void (async () => {
       try {
-        const data = await getSession(sessionId);
+        const data = await readStoredSession(sessionId, nonce > 0);
         if (cancelled) return;
         if (data === null) return setState("missing");
         setDetail(data);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { ApiError, getPersona } from "../api";
+import { ApiError } from "../api";
+import { getPersona } from "../personas";
 import type { PersonaDetail } from "../protocol";
 import Modal from "./Modal";
 import PersonaAvatar from "./PersonaAvatar";

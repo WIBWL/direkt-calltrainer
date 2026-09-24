@@ -28,6 +28,35 @@ export async function getSession(sessionId: string): Promise<SessionDetail | nul
 }
 
 /**
+ * The last few settled Sessions read, so a step from a training to one of its
+ * Kennzahlen and back does not fetch the same detail, curves and all, three
+ * times. Only a finished or failed wrap-up is kept: one still being written
+ * would stay "being written" on every later visit.
+ */
+const settled = new Map<string, SessionDetail>();
+const SETTLED_KEPT = 5;
+
+/** `getSession` through that cache. `fresh` skips it, for a re-read after the
+ *  Session changed (a follow-up written, a retry accepted). */
+export async function readStoredSession(
+  sessionId: string,
+  fresh = false,
+): Promise<SessionDetail | null> {
+  const kept = fresh ? undefined : settled.get(sessionId);
+  if (kept) return kept;
+  const data = await getSession(sessionId);
+  settled.delete(sessionId);
+  if (data && (data.status === "done" || data.status === "failed")) {
+    settled.set(sessionId, data);
+    if (settled.size > SETTLED_KEPT) settled.delete(settled.keys().next().value!);
+  }
+  return data;
+}
+
+/** Drop every kept Session, after a withdrawal of consent deleted them all. */
+export const forgetStoredSessions = () => settled.clear();
+
+/**
  * One page of the caller's own finished Sessions, newest first (F-48). The route
  * filters by the caller's subject (ADR 0064).
  */
@@ -44,5 +73,7 @@ export const retryFeedback = (sessionId: string) =>
 
 /** Delete one stored training. 404s for an id that is absent *or* not the
  * caller's, exactly as the read does. */
-export const deleteSession = (sessionId: string) =>
-  apiFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+export async function deleteSession(sessionId: string): Promise<void> {
+  await apiFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+  settled.delete(sessionId);
+}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { apiFetch } from "../api";
+import { forgetStoredSessions } from "../sessions";
 import type { ConsentState } from "../protocol";
 
 export type ConsentLoadState = "loading" | "ready" | "failed";
@@ -43,6 +44,7 @@ export function useConsent() {
         "/api/consent",
         { method: "POST", body: JSON.stringify({ granted }) },
       );
+      if (!granted) forgetStoredSessions();
       setConsent(data);
       setState("ready");
       return data.deleted_sessions;

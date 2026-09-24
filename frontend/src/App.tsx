@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { apiFetch } from "./api";
 import AppLayout from "./components/AppLayout";
 import CallView, { type BriefPlacement } from "./components/CallView";
 import CaseBriefPanel from "./components/CaseBriefPanel";
@@ -25,6 +24,7 @@ import { useScenarioLibrary } from "./hooks/useScenarioLibrary";
 import NextCalls from "./components/NextCalls";
 import { useSessionFeedback } from "./hooks/useSessionFeedback";
 import { useTrainingRun, type CommitOptions } from "./hooks/useTrainingRun";
+import { listPersonas } from "./personas";
 import type { Persona } from "./protocol";
 import ReverseBriefPanel from "./components/ReverseBriefPanel";
 import { ROUTES, type TrainingStart } from "./routes";
@@ -138,7 +138,7 @@ export default function App() {
   // Loaded apart from the library, so either one failing leaves the other
   // usable and names itself in the error line.
   useEffect(() => {
-    apiFetch<Persona[]>("/api/personas")
+    listPersonas()
       .then((data) => {
         setPersonas(data);
         if (!restored && data[0]) setPersonaId(data[0].id);
