@@ -2362,6 +2362,14 @@ h2 {
   overflow: visible;
 }
 
+/* On the feedback overview the plot gets its own quiet surface so the curve
+   reads as a visualization inside the metric card rather than as decoration. */
+.feedback-metrics-section .loudness-course-plot {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: #f8fbfd;
+}
+
 /* The range the speaker held for most of the call. A pale tint, not a traffic
    light: a colour reading as a verdict is the score ADR 0004 rules out. */
 .loudness-course-band {
@@ -2384,6 +2392,10 @@ h2 {
   stroke-linejoin: round;
 }
 
+.feedback-metrics-section .loudness-course-line {
+  stroke-width: 2;
+}
+
 .loudness-course-marker circle {
   fill: var(--color-blue-600);
 }
@@ -2402,6 +2414,12 @@ h2 {
   color: var(--color-text-muted-secondary);
 }
 
+.feedback-metrics-section .loudness-course-axis {
+  margin-top: 8px;
+  padding: 0 4px;
+  font-size: 12px;
+}
+
 /* Named, not left as a bare mm:ss range: the axis is the user's own speaking
    time, not the call clock (backend/session/models.py). */
 .loudness-course-axis-name {
@@ -2413,6 +2431,13 @@ h2 {
   font-size: 11px;
   line-height: 1.5;
   color: var(--color-text-muted-secondary);
+}
+
+.feedback-metrics-section .loudness-course-legend {
+  margin-top: 12px;
+  max-width: 820px;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 /* The note under the statistics saying they carry no target range (ADR 0048).
@@ -3243,13 +3268,18 @@ p.follow-up-error {
   color: var(--color-text-muted-secondary);
 }
 
+/* The loudness course spans the complete grid because the time course needs
+   horizontal room that a regular metric tile cannot provide. */
 .feedback-metrics-section .metric-loudness {
   grid-column: 1 / -1;
-  min-height: 140px;
+  min-height: 190px;
+  padding: 22px;
 }
 
 .feedback-metrics-section .metric-loudness .loudness-course {
-  margin-top: 14px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 /* The empty state stands in for a line, so it takes a line's inset. Without
