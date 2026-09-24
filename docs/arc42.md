@@ -176,15 +176,25 @@ Der Engpass ist die Kette aus Spracherkennung, Antwortgenerierung und Sprachsynt
 
 ## 5.1 Whitebox Gesamtsystem
 
-*TODO: Komponenten der obersten Ebene (z. B. Engine für Anrufsimulation, Sprachanalyse, Feedback-Engine, Frontend).*
+Das System besteht aus einem browserbasierten Frontend, dem FastAPI-Backend, einem asynchronen Worker sowie den angebundenen Sprach- und Dialogdiensten. Der Echtzeitpfad des Trainings läuft zwischen Frontend und Backend über eine WebSocket-Verbindung; die Nachbereitung wird nach Gesprächsende getrennt davon verarbeitet (ADR 0018, ADR 0019, ADR 0033).
 
-*\<Übersichtsdiagramm\>*
+### Frontend
 
-*Begründung: \<Erläuternder Text\>*
+Das Frontend ist als Single-Page-Anwendung mit React und TypeScript umgesetzt (ADR 0008). Es bildet den vollständigen Trainingsablauf aus Sicht des Nutzers ab und übernimmt die Darstellung der einzelnen Trainingsschritte, die clientseitige Zustandsverwaltung sowie die Kommunikation mit den HTTP- und WebSocket-Schnittstellen des Backends.
 
-*Enthaltene Bausteine: \<Beschreibung der enthaltenen Bausteine (Blackboxen)\>*
+`App.tsx` koordiniert den Trainingsablauf. Der Wechsel zwischen den einzelnen Ansichten wird über die in `trainingFlow.ts` definierte Ablaufsteuerung bestimmt (ADR 0096). Zustände, die mehrere Ansichten betreffen, werden in spezialisierte Hooks und Contexts ausgelagert.
 
-*Wichtige Schnittstellen: \<Beschreibung wichtiger Schnittstellen\>*
+Die wichtigsten Frontend-Bausteine sind:
+
+- `SetupView`: Auswahl von Szenario und Persona sowie Vorbereitung des Trainings. Erst der bewusste Start erzeugt eine Session; die reine Auswahl löst noch keine Verbindung zum Backend aus (ADR 0042).
+- `MicCheck`: Prüfung des Mikrofonzugriffs und des ausgewählten Eingabegeräts vor Gesprächsbeginn.
+- `CallView`: Darstellung des laufenden Trainingsgesprächs. Während des Gesprächs werden nur die für den Gesprächszustand notwendigen Informationen angezeigt; das vollständige Transkript erscheint erst nach Gesprächsende (ADR 0014).
+- `FeedbackView`: Darstellung des qualitativen Wrap-ups sowie der berechneten Gesprächskennzahlen nach Abschluss einer Session (F-09, F-10, F-53).
+- `ProgressView` und zugehörige Detailansichten: Darstellung mehrerer abgeschlossener Trainings und ihrer Entwicklung über die Zeit (F-13).
+
+Die Logik des Trainingsablaufs ist von der Darstellung getrennt. `useTrainingRun` verwaltet die aktuell gebundene Session sowie die Daten, die über das Gesprächsende hinaus benötigt werden. `useLiveCall` bündelt die Logik des laufenden Gesprächs und verbindet WebSocket-Kommunikation, Audiowiedergabe und Unterbrechungsverhalten. Dadurch bleiben die sichtbaren Komponenten weitgehend auf Darstellung und Benutzerinteraktion beschränkt.
+
+Die Authentifizierung liegt außerhalb des eigentlichen Trainingsablaufs. `AuthGate` schützt die geschützten Routen und bindet die Anwendung über OIDC an Keycloak an (ADR 0009). Die Routen für Training, Profil, Fortschritt und vergangene Sessions werden zentral in `main.tsx` aufgebaut.
 
 ## 5.2 Ebene 2
 
