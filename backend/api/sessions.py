@@ -181,7 +181,7 @@ def retry_feedback(
 
 # How often the User must have spoken before a call can be reversed or carried
 # forward. The screen hides both offers under `MIN_USER_TURNS` in
-# FeedbackView.tsx (pinned to this by tests/test_reverse.py); this enforces it.
+# FeedbackReport.tsx (pinned to this by tests/test_reverse.py); this enforces it.
 MIN_USER_UTTERANCES = 3
 
 

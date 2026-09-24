@@ -51,7 +51,7 @@ def test_every_metric_belongs_to_one_half_of_the_grid() -> None:
 
 
 def test_both_halves_of_the_grid_are_measured() -> None:
-    """The slider hides itself when one half is empty (FeedbackView.tsx)."""
+    """The slider hides itself when one half is empty (MetricSection.tsx)."""
     assert {metric.aspect for metric in METRICS if metric.active} == set(METRIC_ASPECTS)
 
 

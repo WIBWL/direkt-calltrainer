@@ -7,7 +7,8 @@ import type { ReverseScenario } from "../scenarioLibrary";
 import AppLayout from "./AppLayout";
 import DeleteSessionPrompt, { useSessionDeletion } from "./DeleteSessionPrompt";
 import FeedbackScreen, { transcriptFromTurns } from "./FeedbackScreen";
-import { FeedbackReport, MetricSection } from "./FeedbackView";
+import FeedbackReport from "./FeedbackReport";
+import MetricSection from "./MetricSection";
 
 /**
  * One past training from the history (F-48), rendered by `FeedbackScreen` like the post-call screen with other

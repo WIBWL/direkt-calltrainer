@@ -282,7 +282,7 @@ CLOSING_WINDOW = 2
 # Below this many user turns there is no closing to speak of, and the window
 # would reach back into the opening. The same floor below which the post-call
 # screen offers neither a follow-up nor a reverse (`MIN_USER_TURNS` in
-# FeedbackView.tsx): a call hung up after a sentence or two has no end of its own.
+# FeedbackReport.tsx): a call hung up after a sentence or two has no end of its own.
 MIN_CLOSING_TURNS = 3
 
 

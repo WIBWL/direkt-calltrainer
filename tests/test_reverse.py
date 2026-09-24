@@ -236,7 +236,7 @@ def test_the_route_and_the_screen_share_one_threshold() -> None:
     held together here -- the route used to ask only for *some* Turn."""
     screen = (
         Path(__file__).resolve().parent.parent /
-        "frontend" / "src" / "components" / "FeedbackView.tsx"
+        "frontend" / "src" / "components" / "FeedbackReport.tsx"
     ).read_text(encoding="utf-8")
     value = screen.split("const MIN_USER_TURNS = ", 1)[1].split(";", 1)[0]
     assert int(value) == MIN_USER_UTTERANCES
