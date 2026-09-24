@@ -8186,7 +8186,7 @@ a.recurring-item:focus-visible {
   font-weight: 600;
 }
 
-.auth-status-card span {
+.auth-status-card > div > span {
   color: var(--color-text-muted-secondary);
   font-size: 12px;
 }
