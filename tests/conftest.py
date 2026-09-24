@@ -533,7 +533,7 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
     language = db_models.Language(code="de", name="Deutsch")
     # The default tenant every caller with no company resolves to (ADR 0060).
     default_tenant = db_models.Tenant(extern_ref="default", name="Ohne Unternehmen")
-    # Built-ins: public and authored by nobody (ADR 0058), like a seeded row.
+    # Built-ins: the Scenario public and authored by nobody (ADR 0058), like a seeded row.
     persona = db_models.Persona(
         key=PERSONA_KEY,
         name="Thomas Brandt",
@@ -542,10 +542,8 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
         traits="sachlich",
         behavior="Verhalten",
         training_goal="",
-        difficulty="mittel",
         language_code="de",
         active=True,
-        visibility=db_models.VISIBILITY_PUBLIC,
     )
     scenario = db_models.Scenario(
         key=SCENARIO_KEY,

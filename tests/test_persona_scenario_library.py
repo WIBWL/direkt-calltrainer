@@ -34,15 +34,12 @@ def _persona_row(**overrides):
     fields = {
         "key": "row-persona",
         "extern_id": _PERSONA_EXTERN_ID,
-        "created_by": None,
-        "visibility": models.VISIBILITY_PUBLIC,
         "name": "Thomas Brandt",
         "role_label": "Geschäftsführer, Fokus auf Strategie & Budget",
         "role": "Managing director of a mid-sized company",
         "traits": "matter-of-fact, time-conscious",
         "behavior": "You press for concrete answers.",
         "training_goal": "",
-        "difficulty": "mittel",
         "language_code": "de",
         "kugelaudio_voice_id": 1885,
         "active": True,
@@ -455,7 +452,7 @@ def test_every_seeded_portrait_is_a_file_that_exists(entry):
 # `persona.traits` once did). Maps seed field -> column, mirroring `provision._seed_*`.
 _PERSONA_COLUMNS = {
     "id": "key", "name": "name", "role_label": "role_label", "role": "role",
-    "traits": "traits", "avatar_url": "avatar_url", "difficulty": "difficulty",
+    "traits": "traits", "avatar_url": "avatar_url",
     "language_id": "language_code",
 }
 _SCENARIO_COLUMNS = {

@@ -109,10 +109,10 @@ def test_seed_deactivates_personas_it_no_longer_contains(migrated_database: str)
             conn.execute(
                 text(
                     "INSERT INTO persona (key, extern_id, name, role_label, role, traits,"
-                    " behavior, training_goal, difficulty, language_code,"
-                    " kugelaudio_voice_id, active, visibility)"
+                    " behavior, training_goal, language_code,"
+                    " kugelaudio_voice_id, active)"
                     " VALUES ('retired-persona', gen_random_uuid(), 'Alt', 'Alt', 'Alt',"
-                    " 'alt', 'alt', '', 'mittel', 'de', 1885, true, 'public')"
+                    " 'alt', 'alt', '', 'de', 1885, true)"
                 )
             )
 

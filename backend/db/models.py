@@ -88,7 +88,7 @@ JOB_DONE = "done"
 JOB_FAILED = "failed"
 JOB_STATUSES = (JOB_QUEUED, JOB_RUNNING, JOB_DONE, JOB_FAILED)
 
-# Persona.visibility / Scenario.visibility (ADR 0058): who may see an authored
+# Scenario.visibility (ADR 0058): who may see an authored
 # row in their library. A shipped built-in is 'public'; a User's own row starts
 # 'private'; 'tenant' (added by ADR 0060) shares it with the author's company
 # and requires `tenant_id` to be set (a second CHECK enforces that).
@@ -175,23 +175,10 @@ def _brief_only_on_a_reverse() -> CheckConstraint:
     )
 
 
-class AuthoredContent:
-    """Authorship columns shared by `scenario` and, for symmetry, `persona`.
+class ReferenceRow:
+    """What every row the client can pick carries: an id for the outside world
+    and its timestamps. `persona` has only this; `scenario` adds authorship."""
 
-    `created_by` (ADR 0058), `tenant_id` (ADR 0060) and `visibility` are
-    independent. Each table adds the CHECKs itself; they cannot live on a mixin.
-    Also what exempts a row from provision's deactivation sweep."""
-
-    # Keycloak `sub` of the author, NULL on a shipped built-in. A plain string
-    # with no foreign key, for the same reason `session.subject_id` is one
-    # (ADR 0031): there is still no user table to point at.
-    created_by: Mapped[str | None] = mapped_column(String(64), index=True)
-    # The owning company (ADR 0060). NULL = a global built-in. Set on every
-    # authored row, even a private one, so sharing is a `visibility` flip. Its
-    # index is the composite `(tenant_id, visibility)` each table declares below
-    # (ADR 0060) -- that covers the FK too, `tenant_id` being its first column.
-    tenant_id: Mapped[int | None] = mapped_column(ForeignKey("tenant.tenant_id"))
-    visibility: Mapped[str] = mapped_column(String(12), default=VISIBILITY_PRIVATE)
     # The id the outside world uses (ADR 0050). An authored row has no natural
     # `key` slug, and a sequential primary key must never leave the backend.
     extern_id: Mapped[uuid.UUID] = mapped_column(
@@ -214,6 +201,26 @@ class AuthoredContent:
     )
 
 
+class AuthoredContent(ReferenceRow):
+    """Authorship columns of a table that holds User rows beside the shipped
+    ones -- today `scenario` alone (ADR 0058).
+
+    `created_by` (ADR 0058), `tenant_id` (ADR 0060) and `visibility` are
+    independent. Each table adds the CHECKs itself; they cannot live on a mixin.
+    Also what exempts a row from provision's deactivation sweep."""
+
+    # Keycloak `sub` of the author, NULL on a shipped built-in. A plain string
+    # with no foreign key, for the same reason `session.subject_id` is one
+    # (ADR 0031): there is still no user table to point at.
+    created_by: Mapped[str | None] = mapped_column(String(64), index=True)
+    # The owning company (ADR 0060). NULL = a global built-in. Set on every
+    # authored row, even a private one, so sharing is a `visibility` flip. Its
+    # index is the composite `(tenant_id, visibility)` each table declares below
+    # (ADR 0060) -- that covers the FK too, `tenant_id` being its first column.
+    tenant_id: Mapped[int | None] = mapped_column(ForeignKey("tenant.tenant_id"))
+    visibility: Mapped[str] = mapped_column(String(12), default=VISIBILITY_PRIVATE)
+
+
 class Tenant(Base):
     """A company whose members share the Scenarios they author (ADR 0060, R-58).
     Seeded: the pilot tenants plus `default`. `extern_ref` is the key a request
@@ -225,21 +232,13 @@ class Tenant(Base):
     name: Mapped[str] = mapped_column(String(120))
 
 
-class Persona(AuthoredContent, Base):
+class Persona(ReferenceRow, Base):
     """The simulated conversation partner; this table is the source of truth
-    (ADR 0041). Curated, not User-authored (ADR 0058): the `AuthoredContent`
-    columns are only for symmetry. One Language and one voice (ADR 0043).
+    (ADR 0041). Curated, not User-authored (ADR 0058), so it carries no
+    authorship columns. One Language and one voice (ADR 0043).
     """
 
     __tablename__ = "persona"
-    __table_args__ = (
-        _one_of("visibility", VISIBILITIES),
-        _tenant_visibility_needs_a_tenant(),
-        # The visibility filter's hot path (ADR 0060). Named explicitly, as a
-        # multi-column index must be; the convention only auto-names by the
-        # first column.
-        Index("ix_persona_tenant_id_visibility", "tenant_id", "visibility"),
-    )
     persona_id: Mapped[int] = mapped_column(primary_key=True)
     # e.g. andreas-kastner-ceo. Nullable for symmetry with `scenario.key`
     # (ADR 0058), though every Persona is a built-in and does carry a slug.
@@ -265,7 +264,6 @@ class Persona(AuthoredContent, Base):
     # what the User is meant to practise, not what the Persona does, and the
     # model never reads it.
     training_goal: Mapped[str] = mapped_column(Text)
-    difficulty: Mapped[str] = mapped_column(String(40))
     language_code: Mapped[str] = mapped_column(ForeignKey("language.code"), index=True)
     # The Persona's voice, and the only one since KugelAudio became the whole
     # of the speech output (ADR 0103) -- a second column held the retired

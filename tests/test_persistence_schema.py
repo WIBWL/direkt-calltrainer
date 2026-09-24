@@ -74,18 +74,25 @@ def test_reference_entities_are_keyed_by_a_stable_business_key():
 
 
 def test_authored_reference_rows_carry_an_external_id_and_ownership():
-    """ADR 0058: Persona and Scenario also hold User-authored rows now, so each
+    """ADR 0058: Scenario holds User-authored rows beside the shipped ones, so it
     carries an unguessable `extern_id` (the wire id, ADR 0050), a `created_by`
     (NULL for a built-in) and a CHECK-guarded `visibility`. The `key` slug is
     nullable -- an authored row has none."""
-    for model in (models.Persona, models.Scenario):
-        cols = {c.name: c for c in model.__table__.columns}
-        assert cols["extern_id"].unique
-        assert cols["key"].nullable
-        assert cols["created_by"].nullable
-        checks = {c.name for c in model.__table__.constraints
-                  if c.__class__.__name__ == "CheckConstraint"}
-        assert f"ck_{model.__tablename__}_visibility_valid" in checks
+    cols = {c.name: c for c in models.Scenario.__table__.columns}
+    assert cols["extern_id"].unique
+    assert cols["key"].nullable
+    assert cols["created_by"].nullable
+    checks = {c.name for c in models.Scenario.__table__.constraints
+              if c.__class__.__name__ == "CheckConstraint"}
+    assert "ck_scenario_visibility_valid" in checks
+
+
+def test_a_persona_is_addressed_by_extern_id_and_carries_no_authorship():
+    """ADR 0058: a Persona is curated, never authored, so it has the wire id and
+    nothing of the authorship columns a Scenario needs."""
+    cols = {c.name for c in models.Persona.__table__.columns}
+    assert models.Persona.__table__.c.extern_id.unique
+    assert not cols & {"created_by", "tenant_id", "visibility"}
 
 
 def test_measurement_value_is_numeric():

@@ -151,14 +151,12 @@ def _seed_personas(db: DbSession) -> int:
              "role": clean(p["role"]), "traits": clean(p["traits"]),
              "traits_label": clean(p["traits_label"]),
              "behavior": clean(p["behavior"]),
-             "training_goal": clean(p["training_goal"]), "difficulty": p["difficulty"],
+             "training_goal": clean(p["training_goal"]),
              # Not cleaned: a path, not prompt text (ADR 0059). `active` is
              # False only while something the Persona needs (a voice id) is missing.
              "avatar_url": p.get("avatar_url"),
              "active": p.get("active", True), "language_code": p["language_id"],
-             "kugelaudio_voice_id": p["kugelaudio_voice_id"],
-             # A shipped built-in belongs to nobody and everybody (ADR 0058).
-             "created_by": None, "visibility": VISIBILITY_PUBLIC})
+             "kugelaudio_voice_id": p["kugelaudio_voice_id"]})
         created += was_created
         _seed_objections(db, row, p["objections"], p["objection_labels"])
     return created

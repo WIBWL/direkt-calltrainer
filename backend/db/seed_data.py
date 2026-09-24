@@ -66,7 +66,6 @@ PERSONAS = [
             "muss eine Zahl, einen Termin oder einen Namen liefern, statt "
             "allgemein zu bleiben."
         ),
-        "difficulty": "medium",
         "language_id": "de",
         "kugelaudio_voice_id": 972,
         # R-12 / ADR 0045: moves, not quotable lines -- the model reuses quoted
@@ -115,7 +114,6 @@ PERSONAS = [
             "auch wenn sie nichts bekommt. Der Nutzer muss selbst merken, "
             "dass die Frage noch offen ist."
         ),
-        "difficulty": "easy",
         "language_id": "en",
         "kugelaudio_voice_id": 1071,
         "objections": [
@@ -173,7 +171,6 @@ PERSONAS = [
             "Der Nutzer muss präzise antworten, statt zusammenzufassen, und "
             "akzeptieren, dass die Zusage von einer zweiten Instanz abhängt."
         ),
-        "difficulty": "hard",
         "language_id": "de",
         "kugelaudio_voice_id": 1657,
         "active": True,
@@ -226,7 +223,6 @@ PERSONAS = [
             "nichts. Der Nutzer muss den Bedarf selbst erfragen, sonst "
             "versandet das Gespräch."
         ),
-        "difficulty": "medium",
         "language_id": "de",
         "kugelaudio_voice_id": 1887,
         "active": True,
@@ -281,7 +277,6 @@ PERSONAS = [
             "statt über den Betrag zu verhandeln. Die Persona verhandelt "
             "nicht."
         ),
-        "difficulty": "medium",
         "language_id": "de",
         "kugelaudio_voice_id": 980,
         "active": True,
@@ -335,7 +330,6 @@ PERSONAS = [
             "Fachbegriffe in Bilder übersetzen, statt sie mit weiteren "
             "Fachbegriffen zu erklären."
         ),
-        "difficulty": "easy",
         "language_id": "en",
         "kugelaudio_voice_id": 1655,
         "active": True,
