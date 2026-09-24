@@ -32,12 +32,15 @@ describe("backingOf", () => {
     expect(backingOf("composure").kind).toBe("segment");
   });
 
-  it("says of Artikulation that no measurement is planned, not merely absent", () => {
-    const planned = backingOf("articulation").note;
-    const absent = backingOf("empathy").note;
+  it("knows nothing of the retired Artikulation and says so honestly", () => {
+    // ADR 0105 retired the goal. A key the catalogue no longer names has to
+    // reach the fallback, not a leftover entry: a tile drawn from a stale row
+    // would go on offering a goal the application withdrew.
+    const retired = backingOf("articulation");
 
-    expect(planned).toMatch(/keine Messung, und es ist keine geplant/);
-    expect(absent).not.toBe(planned);
+    expect(FOCUS_BACKING.articulation).toBeUndefined();
+    expect(retired.kind).toBe("text");
+    expect(retired.note).toMatch(/noch keine Messung/);
   });
 });
 
@@ -61,18 +64,19 @@ describe("the catalogue's shape", () => {
     }
   });
 
-  it("holds the split the dashboard concept states: 8 measured, 1 segment, 2 activity, 3 text", () => {
+  it("holds the split the dashboard concept states: 8 measured, 1 segment, 2 activity, 2 text", () => {
     const kinds = Object.values(FOCUS_BACKING).map((backing) => backing.kind);
     const count = (kind: string) => kinds.filter((k) => k === kind).length;
 
     // docs/dashboard-concept.md section 4.2. Pinned as a count because the
     // honest answer differs per goal, and a goal quietly moving between
-    // buckets is what changes what the screen claims.
+    // buckets is what changes what the screen claims. Thirteen since ADR 0105
+    // retired the Artikulation, which was one of the text goals.
     expect(count("metric")).toBe(8);
     expect(count("segment")).toBe(1);
     expect(count("activity")).toBe(2);
-    expect(count("text")).toBe(3);
-    expect(kinds).toHaveLength(14);
+    expect(count("text")).toBe(2);
+    expect(kinds).toHaveLength(13);
   });
 });
 

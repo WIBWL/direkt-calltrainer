@@ -69,7 +69,7 @@ describe("PRACTICE_CATEGORY", () => {
   it("binds the paraverbal goals to no kind of call", () => {
     // Speaking rate or intonation can be worked on in any conversation, so the
     // suggestion widens their practice instead of narrowing it.
-    for (const goal of ["pace", "intonation", "articulation", "conciseness", "talk_share"]) {
+    for (const goal of ["pace", "intonation", "conciseness", "talk_share"]) {
       expect(PRACTICE_CATEGORY[goal], goal).toBeNull();
     }
   });

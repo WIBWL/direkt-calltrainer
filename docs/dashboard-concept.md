@@ -345,11 +345,13 @@ abgebrochen), also Aktivität und Vielfalt.
 
 ### 4.2 Abdeckung der Fokusziele
 
-Der Katalog aus F-62 hat 14 Ziele. „Souveräne Lautstärke“ stand hier bis zur
-Ergänzung von ADR 0076 und ist zurückgezogen: Gemessen wird der Pegel der
-Aufnahme, und der sagt genauso viel über Mikrofon und Sitzabstand wie über die
-sprechende Person. Die Kennzahl `loudness` bleibt, das Ziel nicht. Was heute mit
-Daten hinterlegt werden kann:
+Der Katalog aus F-62 hat 13 Ziele. Zwei sind zurückgezogen, und beide aus
+demselben Grund. „Souveräne Lautstärke“ ging mit der Ergänzung zu ADR 0076:
+Gemessen wird der Pegel der Aufnahme, und der sagt genauso viel über Mikrofon
+und Sitzabstand wie über die sprechende Person. Die Kennzahl `loudness` bleibt,
+das Ziel nicht. „Deutliche Artikulation“ ging mit ADR 0105, der die Frage
+beantwortet, die weiter unten in diesem Abschnitt an die Projektleitung
+gestellt war. Was heute mit Daten hinterlegt werden kann:
 
 | Fokusziel | Heute belegbar durch | Lücke |
 |---|---|---|
@@ -361,14 +363,13 @@ Daten hinterlegt werden kann:
 | Regelmäßiges Training | Sitzungsdaten | keine |
 | Trainingsvielfalt | Persona × Szenario | keine |
 | Lebendige Sprachmelodie | `intonation` (Tonhöhenumfang in Halbtönen, plus Kurve) | keine |
-| Deutliche Artikulation | Auswertungstext, und der dünn | keine Messung, und es ist keine geplant (siehe unten) |
 | Souveränität unter Druck | `pace`, `pauses`, `run_length`, `loudness`, `talk_share`, je über die fordernden Stellen und über den Rest (ADR 0081) | welche Stellen fordernd waren, entscheidet die Auswertung und nicht eine Messung |
 | Souveräner Gesprächseinstieg | `opening`: Begrüßung, eigener Name und Hilfsangebot bzw. Anliegen im ersten Beitrag, dazu dessen Tempo (ADR 0086) | ob der Einstieg *zugewandt* klang, steht nur im Auswertungstext |
 | Sichere Einwandbehandlung | Auswertungstext | keine Messung |
 | Klarer Gesprächsabschluss | `closing`: Zusammenfassung, konkreter nächster Schritt und Verabschiedung in den letzten zwei Beiträgen (ADR 0089), dazu Auswertungstext und `phase_language` | ob das Richtige zusammengefasst und ein tragfähiger Schritt vereinbart wurde, bleibt Text |
 | Empathie und Kundenorientierung | Auswertungstext | keine Messung, laut Katalog auch keine geplant |
 
-Elf Ziele sind also heute mit Zahlen unterlegbar, drei nur mit Text. Zuletzt
+Elf Ziele sind also heute mit Zahlen unterlegbar, zwei nur mit Text. Zuletzt
 hinzugekommen ist der Gesprächsabschluss (ADR 0089), das Gegenstück zum
 Einstieg. Eines der elf ist der Sonderfall: „Souveränität unter Druck“ wird nicht als Verlauf
 gezeigt, sondern als Vergleich zweier Abschnitte innerhalb eines Gesprächs
@@ -378,9 +379,9 @@ Das ist kein Mangel des Dashboards, sondern der Umsetzungsstand. Der Entwurf
 muss beides tragen können, und ein Ziel ohne Messung darf keine leere Kachel
 erzeugen (Abschnitt 6).
 
-**Die Artikulation bekommt keine Messung, und das ist eine Entscheidung und kein
-Rückstand.** Sie stand als letzter offener Punkt in Stufe 3. Drei Gründe, jeder
-für sich ausreichend:
+**Die Artikulation bekommt keine Messung, und das Ziel ist deshalb aus dem
+Katalog genommen** (ADR 0105). Beides ist eine Entscheidung und kein Rückstand.
+Drei Gründe, jeder für sich ausreichend:
 
 * **Das Mikrofon ist nicht herauszurechnen.** Undeutlichkeit zeigt sich in der
   spektralen Schärfe des Signals, und die hängt von Mikrofon, Abstand und der
@@ -397,19 +398,24 @@ für sich ausreichend:
   ab wann jemand undeutlich spricht. Für diese Nutzergruppe ist nichts
   validiert, und ADR 0051 verbietet die Erfindung genau hier.
 
-Was bleibt, ist der Auswertungstext, und der ist bei diesem Ziel **dünner als bei
+Geblieben wäre der Auswertungstext, und der ist bei diesem Ziel **dünner als bei
 den beiden anderen Textzielen**: Ob ein Abschluss klar war, steht im Gesagten und
 ist aus dem Transkript lesbar. Ob jemand deutlich gesprochen hat, steht gerade
 nicht darin. Das Modell kann dazu nur etwas sagen, wenn es im Transkript
 Nachfragen des Gegenübers findet („Wie bitte?“), und das ist ein schwaches
-Indiz. Daraus folgt eine Frage an die Projektleitung, die hier nicht allein
-entschieden wird: **Soll „Deutliche Artikulation“ im Katalog bleiben?** Ein Ziel
-anzubieten, zu dem die Anwendung dauerhaft fast nichts sagen kann, ist dieselbe
-Art von Versprechen, wegen der die Lautstärke gegangen ist. Bis das entschieden
-ist, bleibt das Ziel wählbar, und `focus_goal.evidence` steht auf
-`interpretive` statt wie bisher auf `mixed` — die Spalte sagt, wie weit ein Ziel
-ableitbar ist, und „gemischt“ war eine Zusage auf eine Messung, die nicht
-kommt.
+Indiz. Es ist sogar schwächer, als es hier zuerst stand: Die Persona verhört
+sich nie, sie liest ein Transkript. Eine Nachfrage von ihr sagt etwas über die
+Erkennerqualität und über das Modell, nicht über die sprechende Person.
+
+Daraus folgte eine Frage an die Projektleitung, die an dieser Stelle nicht
+allein entschieden wurde: **Soll „Deutliche Artikulation“ im Katalog bleiben?**
+Sie ist mit Nein beantwortet (ADR 0105). Ein Ziel anzubieten, zu dem die
+Anwendung dauerhaft fast nichts sagen kann, ist dieselbe Art von Versprechen,
+wegen der die Lautstärke gegangen ist, und hier eine Stufe schlimmer: Bei der
+Lautstärke blieb wenigstens der Vergleich innerhalb eines Gesprächs. Die Zeile
+wird beim Seeding deaktiviert und nicht gelöscht, wer sie gewählt hatte,
+behält vier Ziele, und die Anforderung F-38 bleibt in der Featureliste stehen,
+denn die Anwendung erfüllt sie nicht und soll das auch sagen.
 
 ### 4.3 Zwei methodische Vorbehalte, die in die Oberfläche gehören
 

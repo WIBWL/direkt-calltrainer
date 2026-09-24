@@ -1477,32 +1477,16 @@ FOCUS_GOALS = [
     # The loudness goal is retired: the recorded level depends on the microphone,
     # so calls are not comparable. Deactivated, not deleted -- selections
     # reference it (ADR 0076); the `loudness` metric stays.
-    {
-        "id": "articulation",
-        # `interpretive`: no measurement is planned (docs/dashboard-concept.md,
-        # 4.2). Sharpness depends on the microphone, and Whisper normalises
-        # swallowed endings away, so neither audio nor transcript carries it.
-        "group": "paraverbal",
-        "evidence": "interpretive",
-        "position": 3,
-        "title": "Deutliche Artikulation",
-        "caption": (
-            "Klar verständlich sprechen, ohne zu nuscheln oder Endungen zu "
-            "verschlucken."
-        ),
-        "info": (
-            "Am Telefon fehlt das Mundbild, deshalb trägt die Aussprache "
-            "allein die Verständlichkeit. Undeutliche oder verschluckte "
-            "Wörter zwingen Ihr Gegenüber zum Nachfragen und stören den "
-            "Gesprächsfluss. Im Blick ist, wie klar Sie über das ganze "
-            "Gespräch hinweg sprechen."
-        ),
-    },
+    #
+    # The articulation goal is retired the same way (ADR 0105): the same argument
+    # one step further, with no comparison within one recording either, and
+    # Whisper normalises swallowed endings away. F-38 stays in the feature list
+    # as a requirement answered with a reasoned no (ADR 0084).
     {
         "id": "conciseness",
         "group": "paraverbal",
         "evidence": "measured",
-        "position": 4,
+        "position": 3,
         "title": "Prägnante Sprache",
         "caption": (
             "Auf den Punkt kommen und Füllwörter, Wiederholungen und "
@@ -1521,7 +1505,7 @@ FOCUS_GOALS = [
         "id": "opening",
         "group": "phases",
         "evidence": "mixed",
-        "position": 5,
+        "position": 4,
         "title": "Souveräner Gesprächseinstieg",
         "caption": (
             "Begrüßung, Vorstellung und Anlass des Gesprächs klar und "
@@ -1539,7 +1523,7 @@ FOCUS_GOALS = [
         "id": "needs_analysis",
         "group": "phases",
         "evidence": "mixed",
-        "position": 6,
+        "position": 5,
         "practised_in": ("requirements",),
         "title": "Aktive Bedarfsermittlung",
         "caption": "Durch gezielte Fragen herausfinden, was Ihr Kunde wirklich braucht.",
@@ -1554,7 +1538,7 @@ FOCUS_GOALS = [
         "id": "objection_handling",
         "group": "phases",
         "evidence": "mixed",
-        "position": 7,
+        "position": 6,
         "practised_in": ("closing",),
         "title": "Sichere Einwandbehandlung",
         "caption": "Auf Bedenken und Einwände ruhig und überzeugend eingehen.",
@@ -1574,7 +1558,7 @@ FOCUS_GOALS = [
         # -- is still only the wrap-up's to say.
         "group": "phases",
         "evidence": "mixed",
-        "position": 8,
+        "position": 7,
         "practised_in": ("closing",),
         "title": "Klarer Gesprächsabschluss",
         "caption": (
@@ -1593,7 +1577,7 @@ FOCUS_GOALS = [
         "id": "active_listening",
         "group": "impact",
         "evidence": "mixed",
-        "position": 9,
+        "position": 8,
         "practised_in": ("requirements",),
         "title": "Aktives Zuhören",
         "caption": "Ausreden lassen, aufgreifen und bestätigen, statt zu unterbrechen.",
@@ -1610,7 +1594,7 @@ FOCUS_GOALS = [
         "id": "empathy",
         "group": "impact",
         "evidence": "interpretive",
-        "position": 10,
+        "position": 9,
         "practised_in": ("operations",),
         "title": "Empathie und Kundenorientierung",
         "caption": "Die Situation und die Stimmung Ihres Gegenübers erkennen und aufgreifen.",
@@ -1625,7 +1609,7 @@ FOCUS_GOALS = [
         "id": "composure",
         "group": "impact",
         "evidence": "mixed",
-        "position": 11,
+        "position": 10,
         # A fault report is where a caller arrives annoyed, and a pricing call
         # is pressure too. The first is the one practice suggestion (the
         # plainer case of it); the library suggests both.
@@ -1645,7 +1629,7 @@ FOCUS_GOALS = [
         "id": "talk_share",
         "group": "impact",
         "evidence": "measured",
-        "position": 12,
+        "position": 11,
         "title": "Ausgewogener Redeanteil",
         "caption": "Das richtige Verhältnis zwischen selbst sprechen und sprechen lassen.",
         "info": (
@@ -1662,7 +1646,7 @@ FOCUS_GOALS = [
         "id": "training_regularity",
         "group": "habit",
         "evidence": "measured",
-        "position": 13,
+        "position": 12,
         "title": "Regelmäßiges Training",
         "caption": "Dranbleiben und kontinuierlich üben statt in seltenen Schüben.",
         "info": (
@@ -1675,7 +1659,7 @@ FOCUS_GOALS = [
         "id": "training_variety",
         "group": "habit",
         "evidence": "measured",
-        "position": 14,
+        "position": 13,
         "title": "Trainingsvielfalt",
         "caption": "Verschiedene Szenarien und Gesprächspartner bewusst durchspielen.",
         "info": (
