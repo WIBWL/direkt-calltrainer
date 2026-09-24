@@ -3133,32 +3133,34 @@ p.follow-up-error {
   gap: 5px;
 }
 
-/* This section keeps a class of its own only for how its background note is
-   set — the white box is `.feedback-box` inside it, and the spacing comes from
-   `.feedback-section`, like every other section on the page. */
+/* Phase language stays deliberately flat: the explanation, rule of thumb and
+   optional background information belong to one report module. */
 .feedback-phase-card .feedback-box {
-  padding: 24px 26px;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(3, 37, 62, 0.04);
+  padding: 22px 24px;
+  border-radius: 14px;
+  box-shadow: none;
 }
 
 .feedback-phase-text {
-  margin: 0 0 18px;
-  color: var(--color-navy-900);
-  font-size: 15px;
+  margin: 0;
+  color: var(--color-text-muted-secondary);
+  font-size: 14px;
   line-height: 1.65;
 }
 
+/* The rule of thumb is separated by a simple divider rather than another
+   coloured callout, keeping the report visually quiet. */
 .feedback-phase-note {
-  margin: 0;
-  padding: 12px 14px;
-  border-left: 3px solid var(--color-blue-300);
-  border-radius: 8px;
-  background: var(--color-blue-100);
-  color: var(--color-navy-900);
+  margin: 16px 0 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--color-border-subtle);
+  border-left: 0;
+  border-radius: 0;
+  background: transparent;
   font-size: 13px;
-  font-weight: 600;
   line-height: 1.5;
+  font-weight: 600;
+  color: var(--color-navy-900);
 }
 
 /* The background behind that sentence sits in the shared "i" (InfoDetails).
@@ -3166,11 +3168,11 @@ p.follow-up-error {
    card right above already carries a left accent and a second one reads as a
    second kind of thing, and a tighter type scale to match the card's own. */
 .feedback-phase-card .info-details {
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 .feedback-phase-card .info-summary {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .feedback-phase-card .info-body {
