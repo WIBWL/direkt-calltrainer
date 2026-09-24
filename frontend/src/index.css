@@ -24,6 +24,17 @@
   --color-text-muted-secondary: #5f7180;
   --color-success: #2e8064;
   --color-danger: #b4453a;
+  /* Shared tints outside the brand scale: the green of a positive status, the
+     amber of the traffic light's middle step and the Rollentausch's own palette. */
+  --color-success-ink: #226048;
+  --color-success-tint: #f1f8f5;
+  --color-success-border: #bfd8cb;
+  --color-warning: #b57a12;
+  --color-reverse-ink: #8a5200;
+  --color-reverse-accent: #c98a2b;
+  --color-reverse-tint: #f0e2cc;
+  --color-surface-tint: #f8fbfd;
+  --color-avatar: #eaf5fc;
   /* The wordmark's "ai". Below 4.5:1 on white on purpose -- WCAG 1.4.3 exempts
      brand names, so this may be the vivid orange and not a muted one. Do not
      reuse it for ordinary text. */
@@ -44,19 +55,7 @@
 
   /* Frequently used border radii */
   --radius-card: 22px;
-  --radius-choice: 16px;
   --radius-control: 10px;
-
-  /* Compatibility aliases for the existing styles */
-  --navy: var(--color-navy-900);
-  --navy-light: var(--color-blue-600);
-  --blue: var(--color-blue-600);
-  --blue-light: var(--color-blue-300);
-  --bg: var(--color-background);
-  --border: var(--color-border);
-  --text-muted: var(--color-text-muted);
-  --success: var(--color-success);
-  --danger: var(--color-danger);
 }
 
 * {
@@ -65,8 +64,8 @@
 
 body {
   font-family: var(--font-sans);
-  background: var(--bg);
-  color: var(--navy);
+  background: var(--color-background);
+  color: var(--color-navy-900);
   margin: 0;
 }
 
@@ -259,7 +258,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.18em;
   font-size: 0.7rem;
-  color: var(--blue);
+  color: var(--color-blue-600);
   margin-bottom: 0.5rem;
 }
 
@@ -276,7 +275,7 @@ h2 {
   font-size: 1rem;
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: var(--navy-light);
+  color: var(--color-blue-600);
   margin: 0 0 0.35rem;
 }
 
@@ -293,8 +292,8 @@ h2 {
   flex-direction: column;
   gap: 0.35rem;
   text-align: left;
-  background: #fff;
-  border: 2px solid var(--border);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
   border-radius: 16px;
   padding: 1rem 3.25rem 1rem 1rem;
   cursor: pointer;
@@ -323,11 +322,11 @@ h2 {
 }
 
 .persona-card:hover {
-  border-color: var(--blue-light);
+  border-color: var(--color-blue-300);
 }
 
 .persona-card.selected {
-  border-color: var(--blue);
+  border-color: var(--color-blue-600);
   background: var(--color-surface-selected);
 }
 
@@ -353,7 +352,7 @@ h2 {
 
 .card-subtitle {
   font-size: 0.8rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
@@ -688,7 +687,7 @@ h2 {
      The card surface itself stays neutral; origin is communicated explicitly by
      the labelled badge rather than by tinting the whole choice. */
   background: var(--origin-tint, var(--color-blue-100));
-  color: var(--origin-ink, var(--navy));
+  color: var(--origin-ink, var(--color-navy-900));
 }
 
 /* One colour pair per Scenario origin. The variables are consumed by the
@@ -722,7 +721,7 @@ h2 {
    are the other way round, which is not a degree of ownership. */
 .card-origin-reverse {
   --origin-tint: #fdf0dd;
-  --origin-ink: #8a5200;
+  --origin-ink: var(--color-reverse-ink);
 }
 
 .card-origin-tenant {
@@ -861,7 +860,7 @@ h2 {
 
 /* What an <img> would have covered, the initials get instead. */
 .persona-avatar-fallback {
-  background: #eaf5fc;
+  background: var(--color-avatar);
   color: var(--color-blue-600);
   font-weight: 600;
 }
@@ -1118,14 +1117,6 @@ h2 {
   outline-offset: 2px;
 }
 
-.pdf-dropzone input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-}
-
 .pdf-dropzone-cloud {
   width: 38px;
   height: 38px;
@@ -1241,14 +1232,14 @@ h2 {
    panel that otherwise only closes. Shape comes from `.editor-actions button`
    so it lines up with the close button beside it; only the colour is its own. */
 .editor-edit {
-  border-color: var(--navy) !important;
-  background: var(--navy) !important;
+  border-color: var(--color-navy-900) !important;
+  background: var(--color-navy-900) !important;
   color: var(--color-surface);
   font-weight: 600;
 }
 
 .editor-edit:hover {
-  background: var(--navy-light) !important;
+  background: var(--color-blue-600) !important;
 }
 
 /* In-panel replacement for window.confirm when a click outside would discard
@@ -1459,7 +1450,7 @@ h2 {
   font-family: var(--font-mono);
   font-size: 0.8rem;
   letter-spacing: 0.02em;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   margin-top: 1rem;
   min-height: 1.2em;
 }
@@ -1471,12 +1462,12 @@ h2 {
 }
 
 #status.error {
-  color: var(--danger);
+  color: var(--color-danger);
 }
 
 .card {
-  background: #fff;
-  border: 1px solid var(--border);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 20px;
   padding: 1.5rem;
   margin-top: 1.5rem;
@@ -1503,13 +1494,13 @@ h2 {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  background: var(--navy);
-  color: #fff;
+  background: var(--color-navy-900);
+  color: var(--color-surface);
   transition: background 0.2s, opacity 0.2s;
 }
 
 .start-call-button:hover {
-  background: var(--navy-light);
+  background: var(--color-blue-600);
 }
 
 .start-call-button:disabled {
@@ -1535,7 +1526,7 @@ h2 {
 }
 
 .end-call-button {
-  background: var(--danger);
+  background: var(--color-danger);
   margin-top: 2.5rem;
 }
 
@@ -1551,13 +1542,13 @@ h2 {
   padding: 0.9rem 1.5rem;
   margin-top: 0.75rem;
   font: inherit;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   cursor: pointer;
   text-decoration: underline;
 }
 
 .cancel-button:hover {
-  color: var(--navy);
+  color: var(--color-navy-900);
 }
 
 /* The desktop call screen follows the centered 800px layout from Figma. */
@@ -1629,7 +1620,7 @@ h2 {
   justify-content: center;
   flex-shrink: 0;
   border-radius: 50%;
-  background: #eaf5fc;
+  background: var(--color-avatar);
   color: var(--color-blue-600);
   font-size: 40px;
   font-weight: 600;
@@ -1670,10 +1661,10 @@ h2 {
   justify-content: center;
   margin: 0;
   padding: 6px 10px;
-  border: 1px solid #bfd8cb;
+  border: 1px solid var(--color-success-border);
   border-radius: 999px;
-  background: #f1f8f5;
-  color: #226048;
+  background: var(--color-success-tint);
+  color: var(--color-success-ink);
   font-size: 12px;
   font-weight: 500;
   line-height: 1.2;
@@ -1956,8 +1947,8 @@ h2 {
 
 .mic-test-panel-success {
   min-height: 220px;
-  border-color: #bfd8cb;
-  background: #f1f8f5;
+  border-color: var(--color-success-border);
+  background: var(--color-success-tint);
 }
 
 .mic-test-panel-copy,
@@ -2046,7 +2037,7 @@ h2 {
   flex-shrink: 0;
   border: 1px solid #0c2f24;
   border-radius: 50%;
-  background: #226048;
+  background: var(--color-success-ink);
   color: var(--color-surface);
   font-size: 16px;
   font-weight: 600;
@@ -2173,7 +2164,7 @@ h2 {
 }
 
 .muted {
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 /* Very narrow screens use one content column and keep controls easy to scan
@@ -2299,12 +2290,12 @@ h2 {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 .metric-value {
   font-size: 1.05rem;
-  color: var(--navy);
+  color: var(--color-navy-900);
 }
 
 /* The loudness course (F-37). No value beside it -- the dB span behind the curve
@@ -2326,7 +2317,7 @@ h2 {
 .feedback-metrics-section .loudness-course-plot {
   border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
-  background: #f8fbfd;
+  background: var(--color-surface-tint);
 }
 
 /* The range the speaker held for most of the call. A pale tint, not a traffic
@@ -2404,9 +2395,9 @@ h2 {
 .metric-disclaimer {
   margin: 8px 0 0;
   padding-left: 12px;
-  border-left: 3px solid var(--blue-light);
+  border-left: 3px solid var(--color-blue-300);
   font-size: 0.9rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 .feedback-metrics-section .metric-progress-link {
@@ -2506,7 +2497,7 @@ h2 {
 
 .card p.follow-up-teaser {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 .follow-up-actions {
@@ -2524,13 +2515,13 @@ h2 {
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
-  background: var(--navy);
-  color: #fff;
+  background: var(--color-navy-900);
+  color: var(--color-surface);
   transition: background 0.2s;
 }
 
 .follow-up-button:hover {
-  background: var(--navy-light);
+  background: var(--color-blue-600);
 }
 
 /* Actions inside the feedback offers follow the compact control shape used
@@ -2550,7 +2541,7 @@ h2 {
 .card p.follow-up-note {
   margin: 0.6rem 0 0;
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 /* A request that failed: writing a follow-up or a reverse under its offer, or
@@ -2600,15 +2591,15 @@ p.follow-up-error {
   margin: 0 auto 1.5rem;
   max-width: 720px;
   width: 100%;
-  border: 1px solid var(--border);
-  border-left: 3px solid #c98a2b;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-reverse-accent);
   border-radius: var(--radius-card);
   background: #fffaf2;
   padding: 1.25rem 1.4rem;
 }
 
 .reverse-brief-eyebrow {
-  color: #8a5200;
+  color: var(--color-reverse-ink);
 }
 
 .reverse-brief-title {
@@ -2619,7 +2610,7 @@ p.follow-up-error {
 .reverse-brief-lead {
   margin: 0.3rem 0 1rem;
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 .reverse-brief-fields {
@@ -2633,7 +2624,7 @@ p.follow-up-error {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #8a5200;
+  color: var(--color-reverse-ink);
 }
 
 .reverse-brief-field dd {
@@ -2644,7 +2635,7 @@ p.follow-up-error {
 
 .reverse-brief-watch {
   margin-top: 1.2rem;
-  border-top: 1px solid #f0e2cc;
+  border-top: 1px solid var(--color-reverse-tint);
   padding-top: 1rem;
 }
 
@@ -2668,14 +2659,14 @@ p.follow-up-error {
   flex: none;
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
-  color: #8a5200;
+  color: var(--color-reverse-ink);
 }
 
 .reverse-brief-progress {
   height: 4px;
   margin-bottom: 0.8rem;
   border-radius: 999px;
-  background: #f0e2cc;
+  background: var(--color-reverse-tint);
   overflow: hidden;
 }
 
@@ -2683,7 +2674,7 @@ p.follow-up-error {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #c98a2b;
+  background: var(--color-reverse-accent);
   transition: width 160ms ease-out;
 }
 
@@ -2731,7 +2722,7 @@ p.follow-up-error {
   height: 18px;
   border: 1.5px solid #d9c19b;
   border-radius: 5px;
-  background: #fff;
+  background: var(--color-surface);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2739,18 +2730,18 @@ p.follow-up-error {
 }
 
 .reverse-brief-watch-list input:focus-visible + .reverse-brief-watch-box {
-  outline: 2px solid var(--navy);
+  outline: 2px solid var(--color-navy-900);
   outline-offset: 2px;
 }
 
 .reverse-brief-watch-list label.is-ticked {
   background: #fdf3e4;
-  border-color: #f0e2cc;
+  border-color: var(--color-reverse-tint);
 }
 
 .reverse-brief-watch-list label.is-ticked .reverse-brief-watch-box {
-  background: #c98a2b;
-  border-color: #c98a2b;
+  background: var(--color-reverse-accent);
+  border-color: var(--color-reverse-accent);
 }
 
 /* The tick itself, drawn rather than a glyph so it cannot pick up a font. */
@@ -2759,7 +2750,7 @@ p.follow-up-error {
   width: 5px;
   height: 9px;
   margin-top: -2px;
-  border: solid #fff;
+  border: solid var(--color-surface);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
@@ -2773,7 +2764,7 @@ p.follow-up-error {
 .reverse-brief-watch-note {
   margin: 0.7rem 0 0;
   font-size: 0.72rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 /* Beside the call (ADR 0070), at full length with no scroll box of its own: an
@@ -2781,7 +2772,7 @@ p.follow-up-error {
    mid-call. Below the two-column breakpoint it stacks under the call. */
 .reverse-brief-call {
   margin: 0 auto;
-  background: #fff;
+  background: var(--color-surface);
 }
 
 @media (min-width: 1080px) {
@@ -2801,7 +2792,7 @@ p.follow-up-error {
   margin: 0 auto 1.5rem;
   max-width: 720px;
   width: 100%;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-blue-600);
   border-radius: var(--radius-card);
   background: var(--color-surface-filter);
@@ -2878,7 +2869,7 @@ p.follow-up-error {
   flex: 0 0 3rem;
   font-variant-numeric: tabular-nums;
   font-size: 0.8rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 /* --- Feedback page --- */
@@ -2953,11 +2944,11 @@ p.follow-up-error {
 
 .feedback-section-head.is-success .feedback-section-icon {
   background: #eaf7f0;
-  color: #226048;
+  color: var(--color-success-ink);
 }
 
 .feedback-section-head.is-success .feedback-section-eyebrow {
-  color: #226048;
+  color: var(--color-success-ink);
 }
 
 .feedback-section-head.is-danger .feedback-section-icon {
@@ -3063,7 +3054,7 @@ p.follow-up-error {
   padding: 12px;
   border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
-  background: #f8fbfd;
+  background: var(--color-surface-tint);
 }
 
 .feedback-point-item + .feedback-point-item {
@@ -4351,7 +4342,7 @@ a.consent-button {
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: var(--color-surface);
   background: var(--color-danger);
   cursor: pointer;
   transition: background 0.2s;
@@ -4373,7 +4364,7 @@ a.consent-button {
 }
 
 .metric-value-yellow {
-  color: #b57a12;
+  color: var(--color-warning);
 }
 
 .metric-value-red {
@@ -4515,7 +4506,7 @@ a.consent-button {
 }
 
 .metric-step.metric-step-yellow {
-  border-left-color: #b57a12;
+  border-left-color: var(--color-warning);
 }
 
 .metric-step.metric-step-red {
@@ -6848,14 +6839,6 @@ a.recurring-item:focus-visible {
   font-weight: 600;
 }
 
-.focus-chip input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-}
-
 .focus-chip:has(input:focus-visible) {
   outline: 2px solid var(--color-blue-600);
   outline-offset: 2px;
@@ -7057,16 +7040,6 @@ a.recurring-item:focus-visible {
 .focus-goal-selected {
   border-color: var(--color-blue-600);
   background: var(--color-surface-selected);
-}
-
-/* The real control, kept for the keyboard and the screen reader and drawn as
-   the circle below. */
-.focus-goal-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
 }
 
 /* Both halves of the text are labels for the same box, so either one ticks it. */
@@ -7346,8 +7319,12 @@ a.recurring-item:focus-visible {
    short. What a decision turns on stays in the open; the background lives in
    here. Native <details>, so it opens on find-in-page and prints expanded. */
 
-/* Present to a screen reader, absent to the eye. */
-.visually-hidden {
+/* Present to a screen reader, absent to the eye. The inputs are the real
+   controls behind a drawn chip, circle or drop zone, kept for the keyboard. */
+.visually-hidden,
+.pdf-dropzone input,
+.focus-chip input,
+.focus-goal-input {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -8002,7 +7979,7 @@ a.recurring-item:focus-visible {
   gap: 11px;
   border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
-  background: #f8fbfd;
+  background: var(--color-surface-tint);
   color: var(--color-text-muted-secondary);
   font-size: 12.5px;
   line-height: 1.5;
@@ -8498,13 +8475,13 @@ a.recurring-item:focus-visible {
   margin: 0.2rem 0 0;
   font-family: var(--font-display);
   font-size: 1.6rem;
-  color: var(--navy);
+  color: var(--color-navy-900);
 }
 
 .rolling-lead {
   margin: 0;
   max-width: 34ch;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 /* The stage owns the perspective, so the cube's transform stays a plain rotation.
@@ -8545,7 +8522,7 @@ a.recurring-item:focus-visible {
 
 .dice-pip {
   border-radius: 50%;
-  background: var(--navy);
+  background: var(--color-navy-900);
 }
 
 .dice-pip.is-empty {
@@ -8945,7 +8922,7 @@ a.recurring-item:focus-visible {
 }
 
 .incoming-mute-switch:hover {
-  color: var(--navy);
+  color: var(--color-navy-900);
 }
 
 /* The switch lights up with its own control, so the arm and the sliver read as
@@ -9079,7 +9056,7 @@ a.recurring-item:focus-visible {
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  color: #fff;
+  color: var(--color-surface);
   transition: transform 0.12s ease-out, filter 0.2s;
 }
 
@@ -9125,7 +9102,7 @@ a.recurring-item:focus-visible {
   margin: 2.4rem 0 0;
   max-width: 34ch;
   text-align: center;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 /* The arm reaches 204px left of a device that is centred in the page, so it
