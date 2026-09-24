@@ -2490,22 +2490,22 @@ h2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   align-items: stretch;
-  gap: 18px;
-  margin-top: 18px;
+  gap: 14px;
+  margin-top: 14px;
 }
 
-/* Both next-step offers use the same calm card treatment. The narrow accent
-   identifies the option without making either card look more important. */
+/* The two follow-up options use the same flat report surface as the sections
+   above them; the narrow accent is enough to distinguish their purpose. */
 .card.next-step {
   display: flex;
   flex-direction: column;
   margin-top: 0;
-  padding: 22px 24px;
+  padding: 20px 22px;
   border: 1px solid var(--color-border-subtle);
-  border-left: 3px solid var(--color-blue-600);
-  border-radius: 12px;
+  border-left: 4px solid var(--color-blue-600);
+  border-radius: 14px;
   background: var(--color-surface);
-  box-shadow: 0 8px 24px rgba(3, 37, 62, 0.04);
+  box-shadow: none;
 }
 
 /* The lead is what gives way, so what follows it lines up across the two. */
@@ -2577,11 +2577,11 @@ h2 {
 /* Actions inside the feedback offers follow the compact control shape used
    throughout the training flow rather than the older pill treatment. */
 .next-steps .follow-up-button {
-  min-height: 40px;
-  padding: 9px 16px;
+  min-height: 38px;
+  padding: 8px 14px;
   border-radius: 9px;
   background: var(--color-navy-900);
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .next-steps .follow-up-button:hover {
@@ -3554,23 +3554,22 @@ p.follow-up-error {
   min-width: 0;
 }
 
-/* The final controls are separated from the report itself so navigation,
-   transcript access and export read as actions rather than another section. */
+/* Final actions sit outside the report content and stay intentionally compact. */
 .feedback-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-start;
-  gap: 10px;
-  margin-top: 32px;
-  padding-top: 24px;
+  gap: 8px;
+  margin-top: 26px;
+  padding-top: 18px;
   border-top: 1px solid var(--color-border-subtle);
 }
 
 .feedback-actions .back-to-start-button {
   min-height: 40px;
-  padding: 9px 16px;
+  padding: 9px 14px;
   border-radius: 9px;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 /* The quiet way back to the setup screen. Shared by the wrap-up and the
@@ -7033,17 +7032,17 @@ a.recurring-item:focus-visible {
 /* Existing library suggestions remain visually subordinate to the two main
    next-step offers while using the same card language as the feedback page. */
 .next-calls {
-  margin-top: 18px;
-  padding: 20px 24px;
+  margin-top: 14px;
+  padding: 18px 20px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--color-surface);
-  box-shadow: 0 8px 24px rgba(3, 37, 62, 0.04);
+  box-shadow: none;
 }
 
 .next-calls-list {
   list-style: none;
-  margin: 14px 0 0;
+  margin: 10px 0 0;
   padding: 0;
 }
 
@@ -7051,8 +7050,8 @@ a.recurring-item:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 14px 0;
+  gap: 14px;
+  padding: 12px 0;
   border-top: 1px solid var(--color-border-subtle);
 }
 
@@ -7065,14 +7064,14 @@ a.recurring-item:focus-visible {
 
 .next-call-title {
   color: var(--color-navy-900);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.4;
 }
 
 .next-call-reason {
   color: var(--color-text-muted-secondary);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -7081,11 +7080,11 @@ a.recurring-item:focus-visible {
 }
 
 .next-calls .follow-up-button {
-  min-height: 38px;
-  padding: 8px 15px;
+  min-height: 36px;
+  padding: 7px 12px;
   border-radius: 9px;
   background: var(--color-navy-900);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .next-calls .follow-up-button:hover {
