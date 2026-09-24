@@ -54,15 +54,6 @@ export interface ReverseBrief {
    * the two were merged — the same merge the Scenario's own `call_goal` got. */
   goal: string;
   goals: string[];
-  /** Legacy field, read only and appended to `goal` when an old stored briefing
-   * carries it — that briefing is the only copy. Can go once no stored reverse
-   * predates the merge (as `watch_points` below). */
-  settled?: string;
-  /** What `goals` was called before it became a list of objectives rather than
-   * of things to watch out for. Read only so a briefing written before that
-   * still shows its list; nothing writes it, and it can go once no stored
-   * reverse predates the change. */
-  watch_points?: string[];
 }
 
 /** Why a Scenario is suggested (F-62): the kind of call it is, and which of

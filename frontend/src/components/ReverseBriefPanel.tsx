@@ -26,7 +26,7 @@ export default function ReverseBriefPanel({
       return next;
     });
 
-  const goals = brief.goals ?? brief.watch_points ?? [];
+  const { goals } = brief;
   const done = goals.filter((_, index) => ticked.has(index)).length;
 
   return (
@@ -45,13 +45,7 @@ export default function ReverseBriefPanel({
       <dl className="reverse-brief-fields">
         <Field label="Situation" text={brief.situation} />
         <Field label="Was Sie wissen" text={brief.facts} />
-        {/* One field: what is wanted and what settles it were two, and a
-            briefing written before the merge still carries the second half
-            separately — appended here so nothing stored goes unread. */}
-        <Field
-          label="Was Sie erreichen wollen"
-          text={[brief.goal, brief.settled].filter(Boolean).join(" ")}
-        />
+        <Field label="Was Sie erreichen wollen" text={brief.goal} />
       </dl>
 
       {goals.length > 0 && (
