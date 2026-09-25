@@ -117,9 +117,9 @@ export default function IncomingCall({
               className="incoming-avatar"
             />
 
-            <p className="incoming-caller" id="incoming-title">
+            <h1 className="incoming-caller" id="incoming-title">
               {personaName}
-            </p>
+            </h1>
 
             <div className="incoming-actions">
               <span className="incoming-action">
