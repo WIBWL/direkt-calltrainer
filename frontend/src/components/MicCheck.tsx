@@ -93,8 +93,6 @@ export default function MicCheck({
   return (
     <>
       <section className="setup-intro mic-check-intro" aria-labelledby="mic-check-page-title">
-        <div className="eyebrow">Training vorbereiten</div>
-
         <h1 id="mic-check-page-title">Mikrofon testen</h1>
 
         <p className="setup-intro-description">

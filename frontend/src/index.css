@@ -253,15 +253,6 @@ body {
   }
 }
 
-.eyebrow {
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  font-size: 0.7rem;
-  color: var(--color-blue-600);
-  margin-bottom: 0.5rem;
-}
-
 h1 {
   font-family: var(--font-display);
   font-weight: 700;
@@ -1304,18 +1295,6 @@ h2 {
    onboarding page so both training entry screens share one visual structure. */
 .setup-intro {
   margin-bottom: 20px;
-}
-
-/* The wrap-up's intro is not a `.setup-intro` but carries the same eyebrow, and
-   it looked like a different element for want of this. */
-.setup-intro .eyebrow,
-.feedback-intro .eyebrow,
-.feedback-wait .eyebrow {
-  margin-bottom: 10px;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.4;
-  letter-spacing: 0.12em;
 }
 
 .setup-intro h1 {
@@ -2469,15 +2448,8 @@ h2 {
   align-self: flex-start;
 }
 
-.next-step-eyebrow {
-  color: var(--color-blue-600);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
 .card h2.next-step-title {
-  margin: 5px 0 8px;
+  margin: 0 0 8px;
   color: var(--color-navy-900);
   font-size: 20px;
   line-height: 1.2;
@@ -2564,10 +2536,6 @@ p.follow-up-error {
    the two read as two options rather than as one thing said twice. */
 .card.reverse-offer {
   border-left-color: var(--color-brand-accent);
-}
-
-.card.reverse-offer .next-step-eyebrow {
-  color: #a94b0a;
 }
 
 /* The reverse's pre-call screen: the briefing and the button, nothing else.
@@ -2913,14 +2881,6 @@ p.follow-up-error {
   min-width: 0;
 }
 
-.feedback-section-eyebrow {
-  margin-bottom: 4px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--color-blue-600);
-}
-
 .feedback-section-title {
   margin: 0;
   font-size: 20px;
@@ -2947,16 +2907,8 @@ p.follow-up-error {
   color: var(--color-success-ink);
 }
 
-.feedback-section-head.is-success .feedback-section-eyebrow {
-  color: var(--color-success-ink);
-}
-
 .feedback-section-head.is-danger .feedback-section-icon {
   background: #fff3e8;
-  color: #9a4d14;
-}
-
-.feedback-section-head.is-danger .feedback-section-eyebrow {
   color: #9a4d14;
 }
 
@@ -8342,14 +8294,6 @@ a.recurring-item:focus-visible {
   justify-content: space-between;
   gap: 20px;
   margin-bottom: 16px;
-}
-
-.feedback-transcript-eyebrow {
-  margin-bottom: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--color-blue-600);
 }
 
 .feedback-transcript-title {

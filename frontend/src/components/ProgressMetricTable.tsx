@@ -27,7 +27,6 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
       <section className="progress-section" aria-labelledby="metric-table-title">
         <SectionHeading
           id="metric-table-title"
-          eyebrow="WIE SIE GESPROCHEN HABEN"
           title="Kennzahlen über die Zeit"
         />
         <div className="card">
@@ -49,7 +48,6 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
     <section className="progress-section" aria-labelledby="metric-table-title">
       <SectionHeading
         id="metric-table-title"
-        eyebrow="WIE SIE GESPROCHEN HABEN"
         title="Kennzahlen über die Zeit"
       />
 

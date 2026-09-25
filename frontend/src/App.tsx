@@ -513,7 +513,6 @@ export default function App() {
     return (
       <AppLayout step="prepare" navigationLocked pageClassName="rolling-page">
         <section className="rolling-panel" aria-live="polite">
-          <div className="eyebrow">ZUFALLSSZENARIO</div>
           <h1 className="rolling-title">Es wird gewürfelt …</h1>
           <DiceRoll durationMs={ROLL_MS} />
           <p className="rolling-lead">

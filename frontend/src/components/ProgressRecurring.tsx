@@ -36,7 +36,6 @@ export default function ProgressRecurring({
     <section className="progress-section" aria-labelledby="recurring-title">
       <SectionHeading
         id="recurring-title"
-        eyebrow="WAS GENANNT WURDE"
         title="Was in Ihren Auswertungen wiederkehrt"
       />
 

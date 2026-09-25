@@ -73,21 +73,19 @@ export default function FeedbackReport({
     <>
       <section className="feedback-section feedback-summary-section">
         <div className="feedback-box feedback-summary-card">
-          <SectionHeading eyebrow="QUALITATIVE EINORDNUNG" title="Zusammenfassung" />
+          <SectionHeading title="Zusammenfassung" />
           <p className="feedback-summary-text">{outline.summary}</p>
         </div>
       </section>
 
       <div className="feedback-details">
         <PointList
-          eyebrow="STÄRKEN"
           title="Das gelang gut"
           points={outline.strengths}
           tone="success"
         />
 
         <PointList
-          eyebrow="WEITERENTWICKELN"
           title="Das können Sie verbessern"
           points={improvements}
           tone="danger"
@@ -110,7 +108,7 @@ export default function FeedbackReport({
           renders nothing, so it cannot decide whether the heading appears. */}
       {followUpOffer || reverseOffer ? (
         <section className="feedback-section">
-          <SectionHeading eyebrow="WIE ES WEITERGEHT" title="Nächste Schritte" />
+          <SectionHeading title="Nächste Schritte" />
           <div className="next-steps">
             {followUpOffer}
             {reverseOffer}
@@ -131,7 +129,7 @@ export default function FeedbackReport({
 function PhaseLanguage({ text }: { text: string }) {
   return (
     <section className="feedback-section feedback-phase-card">
-      <SectionHeading eyebrow="GESPRÄCHSFÜHRUNG" title="Phasengerechte Sprache" />
+      <SectionHeading title="Phasengerechte Sprache" />
 
       <div className="feedback-box">
         <p className="feedback-phase-text">{text}</p>
@@ -176,12 +174,10 @@ function PhaseLanguage({ text }: { text: string }) {
 }
 
 function PointList({
-  eyebrow,
   title,
   points,
   tone,
 }: {
-  eyebrow: string;
   title: string;
   points: OutlinePoint[];
   tone: "success" | "danger";
@@ -195,7 +191,6 @@ function PointList({
     <section className={`feedback-section feedback-point-section ${tone}`}>
       <div className={`feedback-box feedback-point-card ${tone}`}>
         <SectionHeading
-          eyebrow={eyebrow}
           title={title}
           tone={tone}
           icon={tone === "success" ? "✓" : "!"}

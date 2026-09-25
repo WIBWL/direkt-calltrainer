@@ -71,7 +71,6 @@ export default function FeedbackWaiting({
 
   return (
     <div className="feedback-wait">
-      <div className="eyebrow">TRAINING ABGESCHLOSSEN</div>
       <h1 className="feedback-title">Ihr Feedback wird erstellt</h1>
 
       <div className="feedback-wait-stage" aria-hidden="true">
