@@ -1848,11 +1848,6 @@ h2 {
   margin-bottom: 0;
 }
 
-.mic-check-intro {
-  max-width: 800px;
-  margin-bottom: 40px;
-}
-
 .mic-device-label {
   display: block;
   margin-bottom: 6px;
@@ -2071,11 +2066,6 @@ h2 {
 
 /* Narrow phones stack both success actions and reduce card padding. */
 @media (max-width: 480px) {
-  .mic-check-page .setup-section {
-    padding: 20px;
-    border-radius: 18px;
-  }
-
   .mic-test-panel {
     min-height: 180px;
     padding: 18px;
