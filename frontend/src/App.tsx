@@ -461,9 +461,14 @@ export default function App() {
     }
     if (!reverseBrief) {
       return (
-        <section className={`reverse-brief reverse-brief-${variant}`}>
-          <div className="reverse-brief-eyebrow">IHRE UNTERLAGEN</div>
-          <p className="reverse-brief-lead">Werden geladen …</p>
+        <section
+          className={`reverse-brief reverse-brief-${variant}`}
+          aria-labelledby="reverse-brief-loading-title"
+        >
+          <h2 id="reverse-brief-loading-title" className="reverse-brief-title">
+            Sie rufen an
+          </h2>
+          <p className="reverse-brief-lead">Unterlagen werden geladen …</p>
         </section>
       );
     }
@@ -623,7 +628,7 @@ export default function App() {
         step="feedback"
         onHome={handleRestart}
         pageClassName="feedback-page"
-        >
+      >
         <FeedbackScreen
           transcript={transcript}
           personaName={personaName}

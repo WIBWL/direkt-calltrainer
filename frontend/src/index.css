@@ -2542,6 +2542,20 @@ p.follow-up-error {
   align-items: stretch;
 }
 
+.brief-actions .start-call-button {
+  border-radius: 9px;
+  background: var(--color-navy-900);
+}
+
+.brief-actions .start-call-button:hover {
+  background: var(--color-navy-700);
+}
+
+.brief-actions .start-call-button:focus-visible {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
+}
+
 /* The briefing the User holds during a reverse call. Deliberately the loudest
    thing on the call screen after the animation: it is the only place the case
    exists for them, and a panel they have to hunt for mid-call is no panel. */
@@ -2556,12 +2570,8 @@ p.follow-up-error {
   padding: 1.25rem 1.4rem;
 }
 
-.reverse-brief-eyebrow {
-  color: var(--color-reverse-ink);
-}
-
 .reverse-brief-title {
-  margin: 0.35rem 0 0;
+  margin: 0;
   font-size: 1.15rem;
 }
 
@@ -2757,8 +2767,13 @@ p.follow-up-error {
   padding: 1.25rem 1.4rem;
 }
 
-.case-brief-eyebrow {
-  color: var(--color-blue-600);
+.case-brief-title {
+  margin: 0;
+  color: var(--color-navy-900);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 /* `pre-line` because facts are often written as short lines rather than as a
@@ -2794,15 +2809,6 @@ p.follow-up-error {
 /* The Briefing (ADR 0054), case facts and a reverse's brief share one label and
    one prose declaration, so blocks of one kind cannot drift to different scales.
    Only colour, spacing and the facts' `pre-line` differ per panel. */
-.scenario-briefing-title,
-.case-brief-eyebrow,
-.reverse-brief-eyebrow {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
 .scenario-briefing-body,
 .case-brief-body {
   font-size: 0.92rem;
@@ -9105,7 +9111,13 @@ a.recurring-item:focus-visible {
 
 .scenario-briefing-title {
   margin: 0 0 6px;
-  color: var(--color-blue-600);
+  color: var(--color-navy-900);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  text-transform: none;
 }
 
 .scenario-briefing-body {

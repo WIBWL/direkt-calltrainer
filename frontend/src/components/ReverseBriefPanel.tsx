@@ -34,7 +34,6 @@ export default function ReverseBriefPanel({
       className={`reverse-brief reverse-brief-${variant}`}
       aria-labelledby="reverse-brief-title"
     >
-      <div className="reverse-brief-eyebrow">IHRE UNTERLAGEN</div>
       <h2 id="reverse-brief-title" className="reverse-brief-title">
         Sie rufen an
       </h2>
