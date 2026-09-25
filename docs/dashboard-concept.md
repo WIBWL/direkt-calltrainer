@@ -88,6 +88,17 @@ drei und mehr), ein leerer Tag sein Datum, der heutige einen Ring. Gezählt
 werden nur abgeschlossene Trainings. Ein abgebrochenes Gespräch wird weder
 gezählt noch eigens markiert, denn die Frage lautet, wann jemand trainiert hat.
 
+Das gilt seit dem zweiten Nachtrag zu ADR 0034 für den ganzen Block, nicht mehr
+nur für den Kalender. Die drei Zahlen und das Raster daneben zählten jedes
+gespeicherte Gespräch mit, sodass die Karte „17 Trainings" neben einem Kalender
+mit vierzehn Marken stand und das PDF denselben Widerspruch auf Papier
+wiederholte. Dieselbe Regel steht jetzt an einer Stelle
+(`progressStats.completedOnly`). Für die Kennzahlen gilt eine **zweite** Regel,
+und die fragt nach der Länge statt nach dem Status: Ein Gespräch unter einer
+Minute liefert keine Zahlen mehr in die Kurven, ein neun Minuten langes bleibt
+drin, auch wenn es an einem Netzabbruch endete. Wie viele dabei wegfallen, steht
+neben dem Zeitraumschalter und auf der ersten Seite des PDF.
+
 Gezeigt wird ein Monat, beim Aufruf der laufende; zwei Pfeile blättern zurück
 bis zum Monat des ältesten Trainings und wieder vor. Sechs Monate
 nebeneinander waren eine Wand aus Rastern, in der ausgerechnet der gesuchte

@@ -8,6 +8,7 @@ import {
   band,
   callDurationMs,
   completeParts,
+  completedOnly,
   dayKey,
   durationSeries,
   firstTrainingMonth,
@@ -17,6 +18,7 @@ import {
   latest,
   median,
   mostVarying,
+  readable,
   selectionSeries,
   toSeries,
   trainingsOn,
@@ -280,6 +282,72 @@ describe("the counted figures", () => {
   it("has no span with nothing stored", () => {
     expect(activity([])).toMatchObject({ sessions: 0, firstAt: null, lastAt: null });
   });
+
+  it("counts finished trainings only, like the calendar beside it", () => {
+    // ADR 0034's amendment: a call nobody ended is kept without being counted.
+    // These three figures counted every stored row, so the card said 3 over a
+    // calendar showing two marks.
+    const counts = activity([
+      session({ started_at: "2026-09-03T10:00:00Z", scenario: "A", persona: "X" }),
+      session({ started_at: "2026-09-02T10:00:00Z", scenario: "B", persona: "Y", status: "aborted" }),
+      session({ started_at: "2026-09-01T10:00:00Z", scenario: "A", persona: "X" }),
+    ]);
+
+    expect(counts).toMatchObject({ sessions: 2, scenarios: 1, personas: 1 });
+    // The span too: it is the range of what was counted, not of what is stored.
+    expect(counts.firstAt).toBe("2026-09-01T10:00:00Z");
+    expect(counts.lastAt).toBe("2026-09-03T10:00:00Z");
+  });
+});
+
+// --- Which trainings a course may be drawn from -----------------------------
+
+describe("the calls long enough to read figures from", () => {
+  const long = (over = {}) =>
+    session({ started_at: "2026-09-01T10:00:00Z", ended_at: "2026-09-01T10:05:00Z", ...over });
+  const short = (over = {}) =>
+    session({ started_at: "2026-09-01T10:00:00Z", ended_at: "2026-09-01T10:00:20Z", ...over });
+
+  it("drops a call too short to describe", () => {
+    // A talk share or a speaking pace read off twenty seconds is a statistic
+    // about a fragment, and it sat in the band as an equal point.
+    expect(readable([long(), short(), long()])).toHaveLength(2);
+  });
+
+  it("keeps a long call that ended badly, and drops a short one that ended well", () => {
+    // On the length and deliberately not on the status: `aborted` also means a
+    // dropped connection, and a call that ran its course and died at the end of
+    // it is a complete measurement (`MIN_CALL_MS`).
+    const kept = readable([long({ status: "aborted" }), short({ status: "completed" })]);
+
+    expect(kept).toHaveLength(1);
+    expect(kept[0]?.status).toBe("aborted");
+  });
+
+  it("keeps a call whose length cannot be worked out", () => {
+    // The rule is "drop what is known to be too short", not "drop what cannot
+    // be checked": discarding a call that may well have been a full one is the
+    // worse of the two mistakes.
+    expect(readable([session({ ended_at: null })])).toHaveLength(1);
+  });
+
+  it("is what the series are built from, so no caller can forget it", () => {
+    const series = selectionSeries([
+      long({ measurements: [measurement("pace", 120)] }),
+      short({ measurements: [measurement("pace", 300)] }),
+    ]);
+
+    expect(series.find((s) => s.key === "pace")?.points.map((p) => p.value)).toEqual([120]);
+  });
+
+  it("counts the finished and the readable separately, because they answer different questions", () => {
+    // A short but finished call is counted in the record at the top and left
+    // out of the courses below. Neither rule is the other one's approximation.
+    const sessions = [long(), short(), long({ status: "aborted" })];
+
+    expect(completedOnly(sessions)).toHaveLength(2);
+    expect(readable(sessions)).toHaveLength(2);
+  });
 });
 
 // --- Call length ------------------------------------------------------------
@@ -436,16 +504,17 @@ describe("the trainings behind a variety cell", () => {
     expect(trainingsWith(sessions, "A", "X")).toEqual([wanted]);
   });
 
-  it("include an abandoned call, because the cell counted it", () => {
-    // `variety` has no status filter, so the list must not have one either, or
-    // a cell saying 2 would open onto one row.
+  it("leave out an abandoned call, exactly as the cell does", () => {
+    // Both go through `completedOnly` (ADR 0034's amendment). They still have to
+    // agree with each other — a cell saying 2 must not open onto three rows —
+    // and now with the calendar beside them as well.
     const sessions = [
       session({ scenario: "A", persona: "X" }),
       session({ scenario: "A", persona: "X", status: "aborted" }),
     ];
 
-    expect(variety(sessions).cells[0]?.count).toBe(2);
-    expect(trainingsWith(sessions, "A", "X")).toHaveLength(2);
+    expect(variety(sessions).cells[0]?.count).toBe(1);
+    expect(trainingsWith(sessions, "A", "X")).toHaveLength(1);
   });
 });
 

@@ -17,6 +17,40 @@ import {
  *  direction. The dashboard shows single values instead and says so. */
 export const MIN_SESSIONS_FOR_SERIES = 3;
 
+/** The trainings a cross-Session view may count: the ones carried to the end
+ *  (ADR 0034's amendment). One function rather than the same filter at five
+ *  call sites, which is how four of them came to disagree (ADR 0102) — the card
+ *  read "17 Trainings" over a calendar showing fourteen marks, and the PDF
+ *  reproduced the split onto paper where nobody can ask which is right. */
+export function completedOnly(sessions: SessionSummary[]): SessionSummary[] {
+  return sessions.filter((session) => session.status === "completed");
+}
+
+/** How long a call must have run for its figures to join a series. **Set, not
+ *  measured**, like `MIN_SESSIONS_FOR_SERIES`, and a floor on describability
+ *  rather than a judgement: under a minute a talk share is a statistic about a
+ *  fragment, and it otherwise sits in the band as an equal point. On the length
+ *  and deliberately not on the status — `aborted` also means a dropped
+ *  connection, so a nine-minute call that died at the end is a complete
+ *  measurement. It does not catch a long call in which the user barely spoke;
+ *  that would need a figure which is itself one of the ones being filtered. */
+export const MIN_CALL_MS = 60_000;
+
+/** The trainings whose figures may be read as a series. Separate from
+ *  `completedOnly` on purpose: "when did somebody train" is answered by a
+ *  finished call, "is there enough call to describe" by a long enough one. One
+ *  left out here is still counted above and still in the calendar, and the
+ *  screen says how many. */
+export function readable(sessions: SessionSummary[]): SessionSummary[] {
+  return sessions.filter((session) => {
+    const ms = callDurationMs(session);
+    // Kept where the length cannot be worked out: the rule is "drop what is
+    // known to be too short", not "drop what cannot be checked", and such a row
+    // predates `ended_at`.
+    return ms === null || ms >= MIN_CALL_MS;
+  });
+}
+
 /** How many multiples of the spread the usual-range band covers. The same
  *  construction backend/feedback/metrics.py uses for the loudness course, and
  *  self-referential for the same reason (ADR 0051). */
@@ -238,13 +272,15 @@ export interface Activity {
 }
 
 /** What the user did, counted. Activity needs no norm to be shown, which is
- *  what ADR 0065 names as explicitly permitted. */
+ *  what ADR 0065 names as explicitly permitted. Completed trainings only, like
+ *  the calendar these figures stand beside (`completedOnly`). */
 export function activity(sessions: SessionSummary[]): Activity {
-  const dates = sessions.map((s) => s.started_at).sort();
+  const finished = completedOnly(sessions);
+  const dates = finished.map((s) => s.started_at).sort();
   return {
-    sessions: sessions.length,
-    scenarios: new Set(sessions.map((s) => s.scenario)).size,
-    personas: new Set(sessions.map((s) => s.persona)).size,
+    sessions: finished.length,
+    scenarios: new Set(finished.map((s) => s.scenario)).size,
+    personas: new Set(finished.map((s) => s.persona)).size,
     firstAt: dates[0] ?? null,
     lastAt: dates[dates.length - 1] ?? null,
   };
@@ -272,12 +308,18 @@ export function callDurationMs(session: SessionSummary): number | null {
  * list all progress screens read (via `ProgressContext`), so every row the overview
  * links to exists on the page behind the link. */
 export function selectionSeries(sessions: SessionSummary[]): MetricSeries[] {
-  const duration = durationSeries(sessions);
-  return [...toSeries(sessions), ...(duration ? [duration] : [])];
+  // The length floor is applied once, here, so both kinds of series see the
+  // same set and no caller can forget it. A call too short to describe used to
+  // sit in every band as an equal point (`readable`, `MIN_CALL_MS`).
+  const long = readable(sessions);
+  const duration = durationSeries(long);
+  return [...toSeries(long), ...(duration ? [duration] : [])];
 }
 
 /** The call lengths as a series, in minutes, so they can be drawn like any
- *  metric. */
+ *  metric. Its key is in `utils/metrics`' catalogue like every other, marked
+ *  `derived` there because it has no `metric_type` row behind it: without an
+ *  entry it inherited every display fact from the unknown-key fallback. */
 export function durationSeries(sessions: SessionSummary[]): MetricSeries | null {
   const points: SeriesPoint[] = [];
   for (const session of [...sessions].reverse()) {
@@ -388,8 +430,7 @@ export function activityMonth(
  *  entirely, here and not in the component, so no view can count them back in. */
 function trainingDays(sessions: SessionSummary[]): Map<string, number> {
   const counts = new Map<string, number>();
-  for (const session of sessions) {
-    if (session.status !== "completed") continue;
+  for (const session of completedOnly(sessions)) {
     const key = dayKey(new Date(session.started_at));
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
@@ -403,8 +444,7 @@ export function firstTrainingMonth(
   sessions: SessionSummary[],
 ): { year: number; month: number } | null {
   let oldest: number | null = null;
-  for (const session of sessions) {
-    if (session.status !== "completed") continue;
+  for (const session of completedOnly(sessions)) {
     const at = new Date(session.started_at).getTime();
     if (Number.isNaN(at)) continue;
     if (oldest === null || at < oldest) oldest = at;
@@ -427,21 +467,20 @@ export function dayKey(date: Date): string {
  * cell prints. */
 export function trainingsOn(sessions: SessionSummary[], date: Date): SessionSummary[] {
   const key = dayKey(date);
-  return sessions.filter(
-    (session) =>
-      session.status === "completed" && dayKey(new Date(session.started_at)) === key,
+  return completedOnly(sessions).filter(
+    (session) => dayKey(new Date(session.started_at)) === key,
   );
 }
 
-/** The trainings behind one cell of the variety grid, newest first. No status
- *  filter, because `variety` counts every stored training into the cell and the
- *  list has to match what the cell says. */
+/** The trainings behind one cell of the variety grid, newest first. Through the
+ *  same `completedOnly` the cell was counted with, so a cell saying 2 can never
+ *  open onto three rows. */
 export function trainingsWith(
   sessions: SessionSummary[],
   scenario: string,
   persona: string,
 ): SessionSummary[] {
-  return sessions.filter(
+  return completedOnly(sessions).filter(
     (session) => session.scenario === scenario && session.persona === persona,
   );
 }
@@ -464,7 +503,10 @@ export interface Variety {
  */
 export function variety(sessions: SessionSummary[]): Variety {
   const counts = new Map<string, VarietyCell>();
-  for (const session of sessions) {
+  // Completed only, like everything else in this block (`completedOnly`). The
+  // grid and `trainingsWith` below used to agree with each other and with
+  // nothing else on the screen.
+  for (const session of completedOnly(sessions)) {
     const id = `${session.scenario}\0${session.persona}`;
     const cell = counts.get(id) ?? { scenario: session.scenario, persona: session.persona, count: 0 };
     cell.count += 1;
