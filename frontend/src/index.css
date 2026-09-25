@@ -9146,11 +9146,11 @@ a.recurring-item:focus-visible {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding-block: 24px 8px;
+  padding-block: 0 8px;
 }
 
 .feedback-wait .feedback-title {
-  margin-bottom: 8px;
+  margin-bottom: 0;
 }
 
 .feedback-wait-stage {
@@ -9238,9 +9238,11 @@ a.recurring-item:focus-visible {
 }
 
 .feedback-wait-note {
+  max-width: 42ch;
   margin: 0 0 20px;
-  font-size: 0.88rem;
   color: var(--color-text-muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
 }
 
 /* A way out, not an offer: quiet enough that waiting stays the obvious thing
@@ -9258,6 +9260,12 @@ a.recurring-item:focus-visible {
 
 .feedback-wait-skip:hover {
   color: var(--color-navy-900);
+}
+
+.feedback-wait-skip:focus-visible {
+  outline: 2px solid var(--color-blue-600);
+  outline-offset: 3px;
+  border-radius: 6px;
 }
 
 /* Unlike the die (F-62) this screen is still shown
