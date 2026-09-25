@@ -72,7 +72,7 @@ export default function MetricSection({
 
   return (
     <section className="feedback-section feedback-metrics-section">
-      <SectionHeading eyebrow="ERGÄNZENDE AUSWERTUNG" title="Kennzahlen zum Gespräch" />
+      <SectionHeading title="Kennzahlen zum Gespräch" />
 
       {split && (
         <div className="feedback-metrics-filter">

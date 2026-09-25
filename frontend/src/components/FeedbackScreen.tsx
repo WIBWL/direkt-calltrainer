@@ -110,7 +110,6 @@ export default function FeedbackScreen({
   const body = (
     <>
       <div className="feedback-intro">
-        <div className="eyebrow">TRAINING ABGESCHLOSSEN</div>
         <h1 className="feedback-title">Ihr Gesprächsfeedback</h1>
       </div>
 
@@ -180,7 +179,6 @@ export default function FeedbackScreen({
         <section className="feedback-transcript-section" id={logId}>
           <div className="feedback-transcript-heading">
             <div>
-              <div className="feedback-transcript-eyebrow">GESPRÄCH IM DETAIL</div>
               <h2 className="feedback-transcript-title">Vollständiges Transkript</h2>
             </div>
 

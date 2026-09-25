@@ -18,11 +18,15 @@ export default function CaseBriefPanel({
 
   if (variant === "call") {
     if (!facts) return null;
-    // The eyebrow is the heading here, so the section takes its name from a
-    // label rather than from a heading hidden for the eye only.
+
     return (
-      <section className="case-brief case-brief-call" aria-label="Fakten des Falls">
-        <div className="case-brief-eyebrow">FAKTEN DES FALLS</div>
+      <section
+        className="case-brief case-brief-call"
+        aria-labelledby="case-brief-call-title"
+      >
+        <h3 id="case-brief-call-title" className="case-brief-title">
+          Fakten des Falls
+        </h3>
         <p className="case-brief-body">{facts}</p>
       </section>
     );
@@ -35,8 +39,10 @@ export default function CaseBriefPanel({
       <ScenarioBriefing briefing={briefing} />
 
       {facts && (
-        <section className="case-brief">
-          <div className="case-brief-eyebrow">FAKTEN DES FALLS</div>
+        <section className="case-brief" aria-labelledby="case-brief-title">
+          <h3 id="case-brief-title" className="case-brief-title">
+            Fakten des Falls
+          </h3>
           <p className="case-brief-body">{facts}</p>
         </section>
       )}

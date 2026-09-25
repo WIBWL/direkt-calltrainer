@@ -124,7 +124,7 @@ export default function ProgressView() {
       {/* First, above the switch: activity over every stored training. It needs no norm (ADR 0065) and is
           what a returning User checks first. */}
       <section className="progress-section progress-training-section" aria-labelledby="activity-title">
-        <SectionHeading id="activity-title" eyebrow="WAS SIE GETAN HABEN" title="Ihr Training" />
+        <SectionHeading id="activity-title" title="Ihr Training" />
 
         <div className="progress-training">
           <ul className="progress-stats">
@@ -379,7 +379,6 @@ function FocusSection({
     <section className="progress-section" aria-labelledby="focus-title">
       <SectionHeading
         id="focus-title"
-        eyebrow="WORAN SIE ARBEITEN"
         title="Ihre Fokusziele"
         aside={
           <Link to={ROUTES.profile} className="progress-section-link">
@@ -680,7 +679,7 @@ function OverviewSection({ series }: { series: MetricSeries[] }) {
 
   return (
     <section className="progress-section" aria-labelledby="overview-title">
-      <SectionHeading id="overview-title" eyebrow="WAS SICH BEWEGT" title="Überblick" />
+      <SectionHeading id="overview-title" title="Überblick" />
 
       {withSpread.length > 0 ? (
         <ul className="focus-tiles">
@@ -734,7 +733,7 @@ function EmptyState({ goals }: { goals: FocusGoal[] }) {
 
       {goals.length > 0 && (
         <section className="progress-section" aria-labelledby="focus-title">
-          <SectionHeading id="focus-title" eyebrow="WORAN SIE ARBEITEN" title="Ihre Fokusziele" />
+          <SectionHeading id="focus-title" title="Ihre Fokusziele" />
           <p className="muted">
             Diese Ziele haben Sie gewählt. Sie werden hier ausgewertet, sobald Trainings
             vorliegen.

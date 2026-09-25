@@ -43,10 +43,10 @@ export default function FocusDialog({
       <AppHeader />
 
       <main className="focus-onboarding-main">
-        <div className="focus-onboarding-intro">
+        <div className="setup-intro focus-onboarding-intro">
           <h1 id="focus-title">Worauf möchten Sie sich konzentrieren?</h1>
 
-          <p>
+          <p className="setup-intro-description">
             Wählen Sie bis zu {focus.max_goals} Ziele. Auf diese Ziele schaut die Auswertung
             danach besonders genau.
           </p>

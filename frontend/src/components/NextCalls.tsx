@@ -18,7 +18,6 @@ export default function NextCalls({
 
   return (
     <section className="card next-calls" aria-labelledby="next-calls-title">
-      <div className="next-step-eyebrow">ALS NÄCHSTES</div>
       <h2 className="next-step-title" id="next-calls-title">Aus Ihrer Bibliothek</h2>
       <ul className="next-calls-list">
         {offers.map((offer) => (

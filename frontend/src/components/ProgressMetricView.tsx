@@ -130,32 +130,34 @@ export default function ProgressMetricView() {
 
       <h2>Einzelne Trainings</h2>
       <div className="card">
-        <table className="progress-table">
-          <thead>
-            <tr>
-              <th scope="col">Datum</th>
-              <th scope="col">Szenario</th>
-              <th scope="col">Gesprächspartner</th>
-              <th scope="col" className="progress-table-value">
-                Wert
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((point) => (
-              <tr key={point.sessionId}>
-                <td>
-                  <Link to={sessionPath(point.sessionId)}>
-                    {formatDate(point.at) ?? point.at}
-                  </Link>
-                </td>
-                <td>{point.scenario}</td>
-                <td>{point.persona}</td>
-                <td className="progress-table-value">{formatPoint(series, point.value)}</td>
+        <div className="progress-table-scroll">
+          <table className="progress-table">
+            <thead>
+              <tr>
+                <th scope="col">Datum</th>
+                <th scope="col">Szenario</th>
+                <th scope="col">Gesprächspartner</th>
+                <th scope="col" className="progress-table-value">
+                  Wert
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((point) => (
+                <tr key={point.sessionId}>
+                  <td>
+                    <Link to={sessionPath(point.sessionId)}>
+                      {formatDate(point.at) ?? point.at}
+                    </Link>
+                  </td>
+                  <td>{point.scenario}</td>
+                  <td>{point.persona}</td>
+                  <td className="progress-table-value">{formatPoint(series, point.value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <p className="muted">

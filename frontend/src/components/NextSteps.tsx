@@ -43,15 +43,13 @@ function useCreate<T>(create: () => Promise<T>, fallback: string) {
 }
 
 /** The frame both offers share, before and after their Scenario is written:
- *  eyebrow, title, one lead paragraph, and whatever the offer is right now. */
+ *  title, one lead paragraph, and whatever the offer is right now. */
 function NextStepCard({
-  eyebrow,
   title,
   lead,
   className,
   children,
 }: {
-  eyebrow: string;
   title: string;
   lead: string;
   className?: string;
@@ -59,7 +57,6 @@ function NextStepCard({
 }) {
   return (
     <section className={cx("card next-step", className)}>
-      <div className="next-step-eyebrow">{eyebrow}</div>
       <h2 className="next-step-title">{title}</h2>
       <p className="next-step-lead">{lead}</p>
       {children}
@@ -151,7 +148,6 @@ export function FollowUp({
   if (!card) {
     return (
       <NextStepCard
-        eyebrow="WEITER ÜBEN"
         title="Folgeszenario"
         lead="Daraus lässt sich Ihr nächstes Gespräch bauen: derselbe Fall, einige Zeit später – diesmal so, dass genau das nötig ist, was hier gefehlt hat."
       >
@@ -173,7 +169,6 @@ export function FollowUp({
 
   return (
     <NextStepCard
-      eyebrow="WEITER ÜBEN"
       title="Folgeszenario"
       lead="Daraus ist Ihr nächstes Gespräch entstanden: derselbe Fall, einige Zeit später – diesmal so, dass genau das nötig ist, was hier gefehlt hat. Es liegt unter „Folgeszenario“ in Ihrer Auswahl."
     >
@@ -207,7 +202,6 @@ export function Reverse({
   if (created) {
     return (
       <NextStepCard
-        eyebrow="PERSPEKTIVE WECHSELN"
         title="Rollentausch"
         className="reverse-offer"
         lead="Ihr Rollentausch ist vorbereitet. Sie bekommen vor dem Gespräch die Unterlagen zu sehen, die die KI eben hatte."
@@ -224,7 +218,6 @@ export function Reverse({
 
   return (
     <NextStepCard
-      eyebrow="PERSPEKTIVE WECHSELN"
       title="Rollentausch"
       className="reverse-offer"
       lead="Erleben Sie dasselbe Gespräch von der anderen Seite: Sie rufen an, die KI nimmt ab. Was die KI eben wusste, sehen währenddessen Sie."

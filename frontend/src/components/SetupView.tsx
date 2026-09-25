@@ -98,8 +98,6 @@ export default function SetupView({
   return (
     <>
       <section className="setup-intro" aria-labelledby="setup-page-title">
-        <div className="eyebrow">Training vorbereiten</div>
-
         <h1 id="setup-page-title">Wählen Sie Ihr Kundengespräch</h1>
 
         <p className="setup-intro-description">
