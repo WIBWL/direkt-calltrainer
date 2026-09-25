@@ -7822,7 +7822,8 @@ a.recurring-item:focus-visible {
   max-width: 100%;
   min-height: 275px;
   padding: 24px;
-  border-radius: 24px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
   background: var(--color-surface);
   box-shadow: 0 5px 18px rgba(3, 37, 62, 0.03);
 }
@@ -8028,21 +8029,21 @@ a.recurring-item:focus-visible {
   width: 100%;
   max-width: 470px;
   justify-self: end;
-  padding: 38px 36px 34px;
+  padding: 30px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 20px;
+  border-radius: 12px;
   background: var(--color-surface);
-  box-shadow: 0 10px 36px rgba(3, 37, 62, 0.035);
+  box-shadow: 0 10px 28px rgba(3, 37, 62, 0.055);
 }
 
 .login-card-title {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   color: var(--color-navy-900);
   font-family: var(--font-display);
-  font-size: 31px;
+  font-size: 1.75rem;
   font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.03em;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .login-card-description {
@@ -8113,8 +8114,8 @@ a.recurring-item:focus-visible {
   width: 100%;
   min-height: 46px;
   border: 0;
-  border-radius: 10px;
-  background: var(--color-navy-700);
+  border-radius: 9px;
+  background: var(--color-navy-900);
   color: var(--color-surface);
   display: inline-flex;
   align-items: center;
@@ -8125,11 +8126,11 @@ a.recurring-item:focus-visible {
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 6px 14px rgba(3, 37, 62, 0.12);
-  transition:
-    background 0.16s ease,
-    transform 0.12s ease,
-    box-shadow 0.16s ease;
+  transition: background 0.2s;
+}
+
+.login-submit-button:hover {
+  background: var(--color-navy-700);
 }
 
 .login-submit-button:hover {
@@ -8185,9 +8186,9 @@ a.recurring-item:focus-visible {
 }
 
 .login-privacy-note a:focus-visible {
-  outline: 2px solid var(--color-blue-300);
-  outline-offset: 2px;
-  border-radius: 2px;
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
+  border-radius: 4px;
 }
 
 .login-error {
@@ -8301,10 +8302,10 @@ a.recurring-item:focus-visible {
     padding: 5px 12px;
   }
 
-  .login-training-preview {
-    padding: 20px;
-    border-radius: 18px;
-  }
+.login-training-preview {
+  padding: 20px;
+  border-radius: 12px;
+}
 
   .login-training-header {
     gap: 12px;
@@ -8357,10 +8358,6 @@ a.recurring-item:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .login-submit-button {
     transition: none;
-  }
-
-  .login-submit-button:hover {
-    transform: none;
   }
 
   .auth-status-spinner {
