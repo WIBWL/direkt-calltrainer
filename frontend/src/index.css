@@ -2841,8 +2841,8 @@ p.follow-up-error {
    width and desktop inset leave an 800px reading column, matching the compact
    composition used throughout the report. */
 .feedback-page {
-  width: min(896px, calc(100% - 32px));
-  padding: 48px 48px 72px;
+  width: min(800px, calc(100% - 32px));
+  padding: 40px 0 56px;
 }
 
 /* The finished-training heading uses the same restrained hierarchy as the
@@ -2854,9 +2854,9 @@ p.follow-up-error {
 .feedback-title {
   margin: 0;
   color: var(--color-navy-900);
-  font-size: 42px;
-  line-height: 1.1;
-  letter-spacing: -0.025em;
+  font-size: 1.75rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 /* Every feedback section is a heading row above a white box. A box holds a title
@@ -2878,10 +2878,11 @@ p.follow-up-error {
 
 .feedback-section-title {
   margin: 0;
-  font-size: 20px;
-  line-height: 1.2;
-  font-weight: 700;
   color: var(--color-navy-900);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
 }
 
 /* The mark before a heading, in the colours that half of the wrap-up carries. */
@@ -2920,7 +2921,7 @@ p.follow-up-error {
 .feedback-box {
   padding: 24px 28px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--color-surface);
 }
 
@@ -2937,7 +2938,7 @@ p.follow-up-error {
 .feedback-summary-card {
   padding: 24px 28px;
   border-left: 4px solid var(--color-blue-600);
-  border-radius: 14px;
+  border-radius: 12px;
   box-shadow: none;
 }
 
@@ -2971,7 +2972,7 @@ p.follow-up-error {
 .feedback-point-card {
   height: 100%;
   padding: 20px;
-  border-radius: 14px;
+  border-radius: 12px;
   box-shadow: none;
 }
 
@@ -2984,7 +2985,7 @@ p.follow-up-error {
 }
 
 .feedback-point-section .feedback-section-head {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .feedback-point-list {
@@ -3000,7 +3001,7 @@ p.follow-up-error {
   gap: 10px;
   padding: 12px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--color-surface-tint);
 }
 
@@ -3039,7 +3040,7 @@ p.follow-up-error {
    optional background information belong to one report module. */
 .feedback-phase-card .feedback-box {
   padding: 22px 24px;
-  border-radius: 14px;
+  border-radius: 12px;
   box-shadow: none;
 }
 
@@ -3454,7 +3455,6 @@ p.follow-up-error {
 .feedback-actions .back-to-start-button {
   min-height: 40px;
   padding: 9px 14px;
-  border-radius: 9px;
   font-size: 12px;
 }
 
@@ -3500,10 +3500,6 @@ p.follow-up-error {
 @media (max-width: 720px) {
   .feedback-page {
     padding: 32px 0 48px;
-  }
-
-  .feedback-title {
-    font-size: 32px;
   }
 
   .feedback-meta {
@@ -3582,7 +3578,7 @@ p.follow-up-error {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 10px 0 28px;
+  margin: 8px 0 24px;
   color: var(--color-text-muted-secondary);
   font-size: 14px;
   line-height: 1.5;
