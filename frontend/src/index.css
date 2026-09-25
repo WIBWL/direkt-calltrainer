@@ -822,7 +822,7 @@ h2 {
   flex-shrink: 0;
   width: 160px;
   height: 160px;
-  border-radius: 14px;
+  border-radius: 12px;
   font-size: 44px;
 }
 
@@ -884,12 +884,13 @@ h2 {
 }
 
 .persona-info-section h3 {
-  margin: 0 0 0.3rem;
-  font-size: 0.78rem;
+  margin: 0 0 6px;
+  color: var(--color-navy-900);
+  font-family: var(--font-display);
+  font-size: 0.9rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+  line-height: 1.35;
+  letter-spacing: -0.01em;
 }
 
 .persona-info-section p {
@@ -945,7 +946,7 @@ h2 {
   width: min(640px, 100%);
   max-height: 90vh;
   background: var(--color-surface);
-  border-radius: 16px;
+  border-radius: 12px;
   /* Clip the scroll container so its scrollbar stops at the rounded corners
    * instead of drawing a square edge over them. */
   overflow: hidden;
@@ -960,8 +961,13 @@ h2 {
 }
 
 .editor-panel h2 {
-  margin: 0 0 1rem;
+  margin: 0 0 16px;
   color: var(--color-navy-900);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
 }
 
 .persona-info-identity h2 {
@@ -1194,11 +1200,16 @@ h2 {
 .editor-actions button {
   border: 1px solid var(--color-border);
   background: var(--color-surface);
-  border-radius: 10px;
+  border-radius: 9px;
   padding: 0.5rem 1rem;
   font: inherit;
   font-size: 0.85rem;
   cursor: pointer;
+}
+
+.editor-actions button:focus-visible {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
 }
 
 .editor-actions button:disabled {
@@ -1247,7 +1258,7 @@ h2 {
 .editor-confirm-box {
   width: min(400px, 100%);
   background: var(--color-surface);
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 1.25rem;
 }
 
@@ -1273,11 +1284,16 @@ h2 {
 .editor-confirm-actions button {
   border: 1px solid var(--color-border);
   background: var(--color-surface);
-  border-radius: 10px;
+  border-radius: 9px;
   padding: 0.5rem 1rem;
   font: inherit;
   font-size: 0.85rem;
   cursor: pointer;
+}
+
+.editor-confirm-actions button:focus-visible {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
 }
 
 .editor-confirm-discard {
@@ -7445,9 +7461,9 @@ a.recurring-item:focus-visible {
 }
 
 .info-summary:focus-visible {
-  outline: 2px solid var(--color-navy-900);
+  outline: 3px solid var(--color-blue-300);
   outline-offset: 3px;
-  border-radius: var(--radius-control);
+  border-radius: 4px;
 }
 
 .info-icon {
@@ -8133,16 +8149,6 @@ a.recurring-item:focus-visible {
   background: var(--color-navy-700);
 }
 
-.login-submit-button:hover {
-  background: var(--color-navy-900);
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(3, 37, 62, 0.16);
-}
-
-.login-submit-button:active {
-  transform: translateY(0);
-}
-
 .login-submit-button:focus-visible {
   outline: 3px solid var(--color-blue-300);
   outline-offset: 3px;
@@ -8305,10 +8311,10 @@ a.recurring-item:focus-visible {
     padding: 5px 12px;
   }
 
-.login-training-preview {
-  padding: 20px;
-  border-radius: 12px;
-}
+  .login-training-preview {
+    padding: 20px;
+    border-radius: 12px;
+  }
 
   .login-training-header {
     gap: 12px;
