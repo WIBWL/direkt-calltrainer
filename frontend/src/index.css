@@ -2421,7 +2421,7 @@ h2 {
   padding: 20px 22px;
   border: 1px solid var(--color-border-subtle);
   border-left: 4px solid var(--color-blue-600);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--color-surface);
   box-shadow: none;
 }
@@ -2492,11 +2492,13 @@ h2 {
   padding: 8px 14px;
   border-radius: 9px;
   background: var(--color-navy-900);
+  color: var(--color-surface);
   font-size: 12px;
 }
 
-.next-steps .follow-up-button:hover {
-  background: var(--color-navy-700);
+.next-steps .follow-up-button:focus-visible {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
 }
 
 .card p.follow-up-note {
@@ -3523,10 +3525,6 @@ p.follow-up-error {
   .feedback-point-time {
     flex-basis: 44px;
     font-size: 13px;
-  }
-
-  .feedback-metrics-filter {
-    padding: 10px 12px 12px;
   }
 
   .feedback-metrics-section .metric-grid {
@@ -6813,7 +6811,7 @@ a.recurring-item:focus-visible {
   margin-top: 14px;
   padding: 18px 20px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--color-surface);
   box-shadow: none;
 }
@@ -6862,11 +6860,17 @@ a.recurring-item:focus-visible {
   padding: 7px 12px;
   border-radius: 9px;
   background: var(--color-navy-900);
+  color: var(--color-surface);
   font-size: 12px;
 }
 
 .next-calls .follow-up-button:hover {
   background: var(--color-navy-700);
+}
+
+.next-calls .follow-up-button:focus-visible {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
 }
 
 /* Library suggestions stack vertically on narrow screens so the scenario text
