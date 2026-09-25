@@ -1,8 +1,13 @@
 import type { FocusGoal, SessionSummary } from "../protocol";
-import { backingOf } from "./focusMetrics";
-import { mentionSummary } from "./goalMentions";
 import { showsInOverview } from "./metrics";
 import { GROUPS, groupOf, type MetricGroup } from "./metricGroups";
+import {
+  focusOutline,
+  recurringOutline,
+  type FocusOutline,
+  type FocusReading,
+  type RecurringOutline,
+} from "./progressOutline";
 import {
   BLUE,
   HEADING_HEIGHT,
@@ -19,9 +24,11 @@ import {
 import {
   MIN_SESSIONS_FOR_SERIES,
   activity,
+  completedOnly,
   formatBand,
   formatPoint,
   partsSummary,
+  readable,
   selectionSeries,
   variety,
   type MetricSeries,
@@ -92,6 +99,10 @@ export async function buildProgressPdf({
   // The same list the screen reads (`selectionSeries`), so the file cannot
   // show a row the page does not, or miss one it does.
   const series = selectionSeries(selected).filter((s) => showsInOverview(s.key));
+  // Those of the selection the courses were drawn from: a call too short to
+  // describe carries no figures (`readable`, `MIN_CALL_MS`). Both counts are
+  // stated below rather than one silently swapped for the other.
+  const long = readable(selected);
 
   sheet.facts([
     ["Ausgewertet", `${selected.length} von ${sessions.length}`],
@@ -123,12 +134,38 @@ export async function buildProgressPdf({
     );
     sheet.y += 4;
   }
+  // The sentence the screen puts beside its switch, and it matters more here: a
+  // reader cannot ask a sheet why a course rests on fewer calls than the line
+  // above it names.
+  if (selected.length > long.length) {
+    const short = selected.length - long.length;
+    sheet.paragraph(
+      `${short === 1 ? "Eines dieser Gespräche war" : `${short} dieser Gespräche waren`} zu ` +
+        "kurz, um daraus Kennzahlen zu lesen. Die Kurven weiter unten sind deshalb über " +
+        `${long.length} Trainings gezeichnet; gezählt ${short === 1 ? "ist es" : "sind sie"} ` +
+        "oben mit.",
+      { size: 9, colour: MUTED, lineHeight: 4.3 },
+    );
+    sheet.y += 4;
+  }
   sheet.y += 4;
 
   record(sheet, sessions, counts);
-  focus(sheet, selected, catalogue, picked, series);
-  recurring(sheet, selected, catalogue);
-  metrics(sheet, series, selected.length);
+  // What each goal reads and what recurs are both decided in
+  // `progressOutline`, which the screen renders as JSX and this file as
+  // paragraphs. Neither decides which readings exist (ADR 0102).
+  focus(
+    sheet,
+    focusOutline({
+      goals: catalogue.filter((goal) => picked.includes(goal.key)),
+      series,
+      selected,
+      readable: long,
+      shows: showsInOverview,
+    }),
+  );
+  recurring(sheet, recurringOutline(selected, catalogue));
+  metrics(sheet, series, long.length);
 
   return { doc: sheet.doc, filename: `Calltrainer_Fortschritt_${stamp(date)}.pdf` };
 }
@@ -211,45 +248,45 @@ function record(
  *  shapes the tiles take (`utils/focusMetrics.ts`), written out as lines. A
  *  goal with no measurement says so rather than being left off: a sheet that
  *  quietly dropped it would let the reader believe it is being tracked. */
-function focus(
-  sheet: Sheet,
-  selected: SessionSummary[],
-  catalogue: FocusGoal[],
-  picked: string[],
-  series: MetricSeries[],
-) {
-  const goals = catalogue.filter((goal) => picked.includes(goal.key));
-  if (goals.length === 0) return;
+function focus(sheet: Sheet, outline: FocusOutline[]) {
+  if (outline.length === 0) return;
 
   sheet.heading("Woran Sie arbeiten", "Ihre Fokusziele");
 
-  for (const goal of goals) {
+  for (const entry of outline) {
     sheet.keep(14);
-    sheet.paragraph(goal.title, { size: 10.5, style: "bold", colour: NAVY });
+    sheet.paragraph(entry.title, { size: 10.5, style: "bold", colour: NAVY });
+    sheet.paragraph(goalSentence(entry.reading), { size: 9, colour: MUTED, lineHeight: 4.3 });
+    sheet.y += 3;
+  }
+  sheet.y += 4;
+}
 
-    const backing = backingOf(goal.key);
-    const primary = series.find((s) => s.key === backing.metrics[0]);
-    if (backing.kind === "metric" && primary) {
-      const last = primary.points[primary.points.length - 1];
-      const band = formatBand(primary);
-      sheet.paragraph(
-        `${primary.name}: zuletzt ${last ? formatPoint(primary, last.value) : "kein Wert"}` +
-          (band ? `, üblicher Bereich ${band}` : "") +
-          `, aus ${primary.points.length} Trainings.`,
-        { size: 9, colour: MUTED, lineHeight: 4.3 },
+/** One focus goal's reading as a sentence. Which of the five states it is was
+ *  decided in `progressOutline`, for the screen and this file at once (ADR
+ *  0102); what is left is the wording a paragraph needs where a tile has a chart
+ *  and a tally — the part that may legitimately differ. */
+function goalSentence(reading: FocusReading): string {
+  switch (reading.kind) {
+    case "metric": {
+      const { series, last, band, trainings } = reading;
+      return (
+        `${series.name}: zuletzt ${last ?? "kein Wert"}` +
+        (band ? `, üblicher Bereich ${band}` : "") +
+        `, aus ${trainings} Trainings.`
       );
-    } else if (backing.kind === "metric") {
-      // A goal that *has* a measurement, in a selection where nothing carries
-      // it: a metric younger than these calls, or one the recordings could not
-      // yield (ADR 0085). Said in so many words rather than falling through to
-      // one of the sentences below, which would tell the reader this goal has
-      // no measurement at all.
-      sheet.paragraph(
-        "In den ausgewerteten Trainings liegt dazu noch kein Messwert vor.",
-        { size: 9, colour: MUTED, lineHeight: 4.3 },
+    }
+    case "no-value":
+      return reading.note;
+    case "segment":
+      return (
+        "Verglichen werden hier zwei Abschnitte eines Gesprächs; der Vergleich steht in " +
+        "der Auswertung des jeweiligen Trainings."
       );
-    } else if (backing.kind === "text") {
-      const { improvements, strengths, total } = countMentions(selected, goal.key);
+    case "activity":
+      return "Was dieses Ziel beantwortet, steht oben unter „Ihr Training“.";
+    case "mentions": {
+      const { improvements, strengths, total, note, measured } = reading;
       // Only the halves that happened. "in 0 als Stärke" reads as a score of
       // zero, which is the one thing a count of statements must not become
       // (ADR 0080).
@@ -257,36 +294,20 @@ function focus(
         ...(improvements > 0 ? [`in ${improvements} als Verbesserung`] : []),
         ...(strengths > 0 ? [`in ${strengths} als Stärke`] : []),
       ];
-      sheet.paragraph(
-        total === 0 || named.length === 0
-          ? (backing.note ?? "Zu diesem Ziel liegt noch nichts vor.")
-          : `Keine Messung. Von ${total} ausgewerteten Trainings ${named.join(", ")} genannt.`,
-        { size: 9, colour: MUTED, lineHeight: 4.3 },
-      );
-    } else {
-      sheet.paragraph(
-        backing.kind === "segment"
-          ? "Verglichen werden hier zwei Abschnitte eines Gesprächs; der Vergleich steht in " +
-            "der Auswertung des jeweiligen Trainings."
-          : "Was dieses Ziel beantwortet, steht oben unter „Ihr Training“.",
-        { size: 9, colour: MUTED, lineHeight: 4.3 },
-      );
+      if (total === 0 || named.length === 0) return note;
+      const lead = measured ? "Noch kein Messwert in dieser Auswahl." : "Keine Messung.";
+      return `${lead} Von ${total} ausgewerteten Trainings ${named.join(", ")} genannt.`;
     }
-    sheet.y += 3;
   }
-  sheet.y += 4;
 }
 
 /** What the wrap-ups keep naming. A frequency of statements over a named
  *  denominator, never a measurement and never a percentage — ADR 0080's
  *  wording kept word for word, because this is the block most easily misread as
  *  a grade and a sheet of paper cannot be asked a follow-up question. */
-function recurring(sheet: Sheet, selected: SessionSummary[], catalogue: FocusGoal[]) {
-  const summary = mentionSummary(selected);
+function recurring(sheet: Sheet, summary: RecurringOutline) {
   if (summary.total === 0) return;
   if (summary.strengths.length === 0 && summary.improvements.length === 0) return;
-
-  const title = (key: string) => catalogue.find((goal) => goal.key === key)?.title ?? key;
 
   sheet.heading("Was wiederkehrt", "Aus Ihren Auswertungen");
   sheet.paragraph(
@@ -309,7 +330,10 @@ function recurring(sheet: Sheet, selected: SessionSummary[], catalogue: FocusGoa
       sheet.doc.setFont("app", "normal");
       sheet.doc.setFontSize(9);
       sheet.doc.setTextColor(...NAVY);
-      sheet.doc.text(drawable(title(entry.goal)), MARGIN.left, sheet.y);
+      // The catalogue title where there is one, the raw key otherwise: a goal
+      // retired since still has points pointing at it (ADR 0076), and a slug is
+      // a poor label but an honest one.
+      sheet.doc.text(drawable(entry.title ?? entry.goal), MARGIN.left, sheet.y);
       sheet.doc.setTextColor(...MUTED);
       sheet.doc.text(
         `in ${entry.count} von ${summary.total}`,
@@ -451,32 +475,12 @@ function course(sheet: Sheet, series: MetricSeries, left: number, top: number) {
   doc.circle(px(values.length - 1), py(values[values.length - 1]!), 0.7, "F");
 }
 
-/** How often one goal was named in the selection, as a strength and as an
- *  improvement, counted per training the way the screen counts it: the same
- *  goal named twice in one wrap-up counts once. */
-function countMentions(sessions: SessionSummary[], goal: string) {
-  let strengths = 0;
-  let improvements = 0;
-  let total = 0;
-  for (const session of sessions) {
-    if (session.feedback_goals.length === 0) continue;
-    total += 1;
-    const kinds = new Set(
-      session.feedback_goals.filter((tag) => tag.goal === goal).map((tag) => tag.kind),
-    );
-    if (kinds.has("strength")) strengths += 1;
-    if (kinds.has("improvement")) improvements += 1;
-  }
-  return { strengths, improvements, total };
-}
-
 /** The trainings per calendar month, newest month first. Completed only, the
  *  way the calendar counts them: an abandoned call is not an answer to "when
  *  did I train" (ADR 0034's amendment). */
 function byMonth(sessions: SessionSummary[]): [string, number][] {
   const counts = new Map<string, { label: string; count: number; at: number }>();
-  for (const session of sessions) {
-    if (session.status !== "completed") continue;
+  for (const session of completedOnly(sessions)) {
     const date = new Date(session.started_at);
     if (Number.isNaN(date.getTime())) continue;
     const key = `${date.getFullYear()}-${date.getMonth()}`;

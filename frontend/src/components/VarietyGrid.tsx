@@ -118,7 +118,14 @@ export default function VarietyGrid({
           type="button"
           className="session-more"
           aria-expanded={expanded}
-          onClick={() => setExpanded((open) => !open)}
+          onClick={() => {
+            // Collapsing can take the opened cell off the screen, and its list
+            // would then stand under a grid that no longer shows what it
+            // belongs to. `ActivityCalendar` clears the same state when it
+            // pages to another month, for the same reason.
+            setOpened(null);
+            setExpanded((open) => !open);
+          }}
         >
           {expanded
             ? "Weniger anzeigen"
