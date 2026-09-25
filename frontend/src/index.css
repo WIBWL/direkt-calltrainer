@@ -6733,16 +6733,6 @@ a.recurring-item:focus-visible {
   margin: 0 auto 20px;
 }
 
-.focus-onboarding-intro h1 {
-  margin-bottom: 8px;
-}
-
-.focus-onboarding-intro p {
-  margin: 0;
-  color: var(--color-text-muted);
-  line-height: 1.55;
-}
-
 .focus-onboarding .focus-dialog {
   margin: 0 auto;
 }
@@ -6922,11 +6912,10 @@ a.recurring-item:focus-visible {
   flex-wrap: wrap;
   margin: 0 0 0.6rem;
   font-family: var(--font-display);
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-navy-900);
 }
 
 /* `auto-fit` rather than a fixed two: the dialog gets two columns, the
