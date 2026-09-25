@@ -4075,12 +4075,28 @@ p.follow-up-error {
   text-decoration: none;
 }
 
+.app-page-narrow.progress-page > .back-link {
+  margin-bottom: 20px;
+}
+
+.app-page-narrow.progress-page > .page-lead + .muted {
+  margin: 0 0 24px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
 .back-link::before {
   content: "← ";
 }
 
 .back-link:hover {
   text-decoration: underline;
+}
+
+.back-link:focus-visible {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
+  border-radius: 4px;
 }
 
 /* The one-line subtitle under a page heading — who the call was with. Sits in
@@ -5170,8 +5186,21 @@ a.consent-button {
 }
 
 .progress-page h2 {
-  font-size: 1.05rem;
   margin: 0;
+  font-size: 1.05rem;
+}
+
+.app-page-narrow.progress-page h2 {
+  color: var(--color-navy-900);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+.app-page-narrow.progress-page > h2 + .card {
+  margin-top: 14px;
 }
 
 /* The section headings are the wrap-up's (`SectionHeading`), and they need the
@@ -6364,6 +6393,12 @@ button.calendar-day {
   white-space: nowrap;
 }
 
+.progress-table a:focus-visible {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
 /* The demanding stretches of a call against the rest (ADR 0081). Reuses the
    progress table's type and rules so the two read as the same kind of thing.
    Both value columns are styled identically on purpose: giving the
@@ -6432,6 +6467,12 @@ button.calendar-day {
   margin: 0;
   font-size: 0.85rem;
   color: var(--color-text-muted);
+}
+
+.goal-statement-source a:focus-visible {
+  outline: 3px solid var(--color-blue-300);
+  outline-offset: 3px;
+  border-radius: 4px;
 }
 
 /* The kind is written out, never a colour on its own: a green dot beside a
