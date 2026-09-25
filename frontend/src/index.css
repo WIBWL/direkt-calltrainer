@@ -4415,21 +4415,44 @@ a.consent-button {
 
 /* --- One metric's own page --------------------------------------------- */
 
-/* Room between the areas of this page. A metric's page is figure, scale,
-   note, reading and excerpts stacked in one column, and at the default card
-   rhythm they ran together into one grey block where the eye had nowhere to
-   rest. The space is what says these are separate things. */
-.metric-page .card {
-  margin-top: 2rem;
-  padding: 1.75rem;
+.metric-page {
+  padding-top: 40px;
+  padding-bottom: 56px;
 }
 
-.metric-page h1 {
-  margin-bottom: 0.5rem;
+.metric-page > .back-link {
+  margin-bottom: 20px;
+}
+
+.metric-page > h1 {
+  margin-bottom: 8px;
+}
+
+.metric-page > .page-lead {
+  margin: 0 0 24px;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.metric-page .card {
+  margin-top: 14px;
+  padding: 24px;
+  border-radius: 12px;
 }
 
 .metric-page h2 {
-  margin-top: 2.5rem;
+  margin: 32px 0 0;
+  color: var(--color-navy-900);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+.metric-page h2 + .card {
+  margin-top: 14px;
 }
 
 /* The figure is what the page is about, so it carries the weight and the
