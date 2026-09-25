@@ -96,6 +96,12 @@ body {
   max-width: none;
 }
 
+@media (max-width: 900px) {
+  .app-page-wide {
+    width: calc(100% - 32px);
+  }
+}
+
 /* The shared header remains consistent across every training screen. */
 .app-header {
   width: 100%;
@@ -864,6 +870,10 @@ h2 {
 
 /* The panel is only so wide; below this the two columns stop fitting. */
 @media (max-width: 520px) {
+  .editor-scroll {
+    padding: 20px;
+  }
+
   .persona-info-header {
     flex-direction: column;
     align-items: flex-start;
@@ -4471,6 +4481,16 @@ a.consent-button {
   margin-top: 14px;
 }
 
+@media (max-width: 720px) {
+  .profile-page,
+  .progress-page,
+  .metric-page,
+  .legal-page {
+    padding-top: 32px;
+    padding-bottom: 48px;
+  }
+}
+
 /* The figure is what the page is about, so it carries the weight and the
    reading sits under it rather than beside it. */
 .metric-page-figure {
@@ -5448,6 +5468,21 @@ a.consent-button {
   width: fit-content;
 }
 
+@media (max-width: 620px) {
+  .progress-periods {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .progress-period {
+    flex: 0 0 auto;
+  }
+
+  .progress-occasions {
+    max-width: 100%;
+  }
+}
+
 /* The count beside an occasion, so nobody presses into a narrow selection
    without knowing how narrow. Dimmed, because it is context and not the
    label. */
@@ -6402,6 +6437,11 @@ button.calendar-day {
   margin-bottom: 0.75rem;
 }
 
+.progress-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
 .progress-table {
   width: 100%;
   border-collapse: collapse;
@@ -6444,6 +6484,11 @@ button.calendar-day {
    under-pressure column any emphasis of its own would make it the figure that
    counts and turn a comparison into a verdict. */
 
+.segment-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
 .segment-table {
   width: 100%;
   border-collapse: collapse;
@@ -6477,6 +6522,16 @@ button.calendar-day {
 .segment-training {
   margin: 0 0 0.6rem;
   font-size: 0.9rem;
+}
+
+@media (max-width: 620px) {
+  .progress-table {
+    min-width: 520px;
+  }
+
+  .segment-table {
+    min-width: 420px;
+  }
 }
 
 /* Quotations from the wrap-ups on the second level, for a metric and for a

@@ -19,28 +19,30 @@ export default function SegmentComparison({
 
   return (
     <>
-      <table className="segment-table">
-        <thead>
-          <tr>
-            <th scope="col">Kennzahl</th>
-            <th scope="col" className="segment-value">
-              Unter Druck
-            </th>
-            <th scope="col" className="segment-value">
-              Sonst
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {pairs.map((pair) => (
-            <tr key={pair.key}>
-              <td>{pair.name}</td>
-              <td className="segment-value">{figure(pair.key, pair.pressure, pair.unit)}</td>
-              <td className="segment-value">{figure(pair.key, pair.rest, pair.unit)}</td>
+      <div className="segment-table-scroll">
+        <table className="segment-table">
+          <thead>
+            <tr>
+              <th scope="col">Kennzahl</th>
+              <th scope="col" className="segment-value">
+                Unter Druck
+              </th>
+              <th scope="col" className="segment-value">
+                Sonst
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {pairs.map((pair) => (
+              <tr key={pair.key}>
+                <td>{pair.name}</td>
+                <td className="segment-value">{figure(pair.key, pair.pressure, pair.unit)}</td>
+                <td className="segment-value">{figure(pair.key, pair.rest, pair.unit)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {caveat && (
         <p className="muted">
