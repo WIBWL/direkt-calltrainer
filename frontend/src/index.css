@@ -7721,25 +7721,9 @@ a.recurring-item:focus-visible {
   overflow-wrap: anywhere;
 }
 
-/* The Art. 21 notice is set in capitals in the original and stays that way:
-   it is a legally prescribed form, not a styling choice. Letter-spacing and a
-   smaller size keep a wall of capitals readable. */
-.legal-uppercase {
-  font-size: 0.85rem;
-  letter-spacing: 0.01em;
-  line-height: 1.6;
-  color: var(--color-text-muted);
-}
-
-/* Marks the draft, and the two facts still to be filled in. Loud on purpose:
-   an unreviewed privacy statement must not be mistakable for a final one. */
-/* The date a legal document was last revised, and the one-line opener on the
-   notes page. Both sit above the body and set it up rather than joining it. */
-.legal-date {
-  margin: -0.5rem 0 2rem;
-  font-size: 0.9rem;
-  color: var(--color-text-muted);
-}
+/* `.legal-uppercase` (the Art. 21 notice in capitals) and `.legal-date` (the
+   revision date) stood here. Both were named only by the privacy statement,
+   which is now a referral to the project's own page and carries neither. */
 
 .legal-body p.legal-lead {
   font-size: 1.05rem;
