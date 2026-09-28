@@ -99,7 +99,7 @@ def _provision_database() -> None:
 # No API docs or published schema (`/docs`, `/redoc`, `/openapi.json` would expose
 # every route without a login); the SPA's wire types live in frontend/src/protocol.ts.
 # No CORS middleware: the frontend container proxies /api, /ws and /health, so
-# the SPA and the API share an origin (frontend/Caddyfile).
+# the SPA and the API share an origin (frontend/nginx.conf).
 app = FastAPI(
     title="CallTrainer API",
     lifespan=lifespan,

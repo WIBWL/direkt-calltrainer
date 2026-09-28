@@ -15,15 +15,14 @@ x-logging: &logging
 
 services:
   frontend:
-    build:
-      args:
-        # Baked into the SPA at build time. `:?` makes the build fail outright
-        # instead of silently falling back to compose.yaml's localhost default,
-        # which would produce an image whose login points at nothing.
-        OIDC_ISSUER: ${OIDC_ISSUER:?set OIDC_ISSUER in .env}
+    environment:
+      # Served to the SPA at runtime. `:?` makes `up` fail outright instead of
+      # silently falling back to compose.yaml's localhost default, whose login
+      # points at nothing.
+      OIDC_ISSUER: ${OIDC_ISSUER:?set OIDC_ISSUER in .env}
     # Static files only: the external proxy sends /api, /ws and /health to the
-    # backend itself (frontend/static.Caddyfile).
-    command: ["caddy", "run", "--config", "/etc/caddy/static.Caddyfile", "--adapter", "caddyfile"]
+    # backend itself (frontend/static.nginx.conf).
+    command: ["nginx", "-c", "/etc/nginx/static.nginx.conf", "-g", "daemon off;"]
     ports: !reset []
     # Serving files does not need the backend up.
     depends_on: !reset {}

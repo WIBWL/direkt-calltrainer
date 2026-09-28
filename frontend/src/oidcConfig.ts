@@ -1,16 +1,16 @@
-// OIDC configuration. The issuer is build-time Vite env (repo-root .env) under
-// the backend's own name, not a VITE_ copy, so the two cannot disagree —
-// vite.config widens `envPrefix` for it. The client id is the same in every
-// realm, so not a setting. Build-time is enough: one image per deploy.
+// OIDC configuration. The issuer comes at runtime from the frontend
+// container's OIDC_ISSUER (served as /config.js by spa.conf.template), the backend's
+// own name, so one image serves every realm. The client id is the same in
+// every realm, so not a setting.
 
 // Required, deliberately without a default: every candidate value is wrong in
 // some environment, and getting it wrong does not fail at build — the app just
 // mints tokens the backend rejects, surfacing as a 401 far from the cause. Fail
 // loudly instead.
-const issuer = import.meta.env.OIDC_ISSUER;
+const issuer = typeof window === "undefined" ? undefined : window.OIDC_ISSUER;
 if (!issuer) {
   throw new Error(
-    "OIDC_ISSUER is not set. Add it to .env (e.g. http://localhost:18081/realms/direkt) and rebuild.",
+    "OIDC_ISSUER is not set. Set it in the frontend container's environment (e.g. http://localhost:18081/realms/direkt) and restart it.",
   );
 }
 

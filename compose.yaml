@@ -1,7 +1,7 @@
 name: direkt-calltrainer
 services:
-  # The SPA and the one port the browser talks to. Caddy serves the build and
-  # forwards /api, /ws and /health to the backend (frontend/Caddyfile), so the
+  # The SPA and the one port the browser talks to. nginx serves the build and
+  # forwards /api, /ws and /health to the backend (frontend/nginx.conf), so the
   # app stays same-origin: no CORS, and Keycloak redirects back to this port.
   frontend:
     # Nothing here comes back on its own otherwise: a Docker restart, an OOM
@@ -11,10 +11,10 @@ services:
     restart: unless-stopped
     build:
       context: ./frontend
-      args:
-        # The SPA needs the issuer at `npm run build` time (see
-        # frontend/Dockerfile). Same name the backend reads, same .env line.
-        OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:18081/realms/direkt}
+    environment:
+      # Served to the SPA at runtime as /config.js (frontend/spa.conf.template). Same
+      # name the backend reads, same .env line.
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:18081/realms/direkt}
     ports:
       # Host port is deliberately non-standard to avoid clashes (e.g. mkdocs,
       # other uvicorn/Django apps, all default to 8000).
@@ -23,7 +23,8 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      # 127.0.0.1, not localhost: nginx listens on IPv4 only.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
       interval: 15s
       timeout: 5s
       retries: 3

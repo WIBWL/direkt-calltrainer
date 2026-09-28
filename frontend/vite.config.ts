@@ -4,10 +4,6 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  envDir: "../",
-  // The SPA reads OIDC_ISSUER under the backend's own name, not a VITE_ copy,
-  // so the two cannot drift. OIDC_JWKS_URL is runtime-only, never in the build.
-  envPrefix: ["VITE_", "OIDC_"],
   server: {
     port: 5173,
   },

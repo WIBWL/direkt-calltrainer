@@ -25,7 +25,7 @@ Copy `.env.example` to `.env` and fill in the real `DIREKT_API_KEY` and `KUGELAU
 docker compose up --build
 ```
 
-Builds three images — `frontend` (the SPA, served by Caddy, which forwards `/api`, `/ws` and `/health`), `backend` and `worker` — and serves everything on `http://localhost:8391`.
+Builds three images — `frontend` (the SPA, served by nginx, which forwards `/api`, `/ws` and `/health`), `backend` and `worker` — and serves everything on `http://localhost:8391`.
 
 For development, add `--watch` (`docker compose up --build --watch`) to have the containers pick up code changes automatically: backend edits are synced into the backend and worker, which restart without a full rebuild, while frontend edits and `requirements.txt` changes trigger a rebuild.
 

@@ -20,7 +20,7 @@ docker compose -f compose.yaml -f compose.prod.yaml up -d --build
 The proxy's Docker network must exist before the first start (`PROXY_NETWORK` in `.env`); Compose joins it but never creates it. On it the containers answer as `calltrainer-frontend:80` and `calltrainer-backend:8000`. The proxy has to:
 
 - **Terminate TLS** for the domain. HTTPS is not optional: the browser grants the microphone only in a secure context.
-- **Route by path**, all on the one domain: `/api*`, `/ws*` and `/health*` to `calltrainer-backend:8000`, everything else to `calltrainer-frontend:80`. The browser must see one origin — there is no CORS middleware, and Keycloak redirects back to that origin. A backend path that reaches the frontend by mistake answers 404 (`frontend/static.Caddyfile`).
+- **Route by path**, all on the one domain: `/api*`, `/ws*` and `/health*` to `calltrainer-backend:8000`, everything else to `calltrainer-frontend:80`. The browser must see one origin — there is no CORS middleware, and Keycloak redirects back to that origin. A backend path that reaches the frontend by mistake answers 404 (`frontend/static.nginx.conf`).
 - **Pass the WebSocket upgrade** on `/ws/session` and keep the connection open for the length of a call: no short idle/read timeout (nginx's default of 60 s would cut a call off while the User is thinking).
 - **Accept request bodies of at least 20 MB** (document upload; nginx's default is 1 MB).
 - Set the headers the app relies on: `Strict-Transport-Security "max-age=31536000"`, `X-Content-Type-Options "nosniff"`, `Referrer-Policy "strict-origin-when-cross-origin"` and `Permissions-Policy "microphone=(self), camera=(), geolocation=()"`. Compression is already done by the frontend container.
@@ -56,7 +56,9 @@ calltrainer.example.org {
 
 That is the whole file. `.env` is not in the repository and on the server should be readable by the deploying user only (`chmod 600 .env`).
 
-`OIDC_ISSUER` is baked into the frontend at build time. Changing it needs `--build`; a restart is not enough.
+`OIDC_ISSUER` reaches the frontend at runtime (its container serves it as `/config.js`), so the frontend image is the same for every realm. Changing it needs the frontend container recreated (`up -d`), not a rebuild.
+
+The three images can also be built and pushed to `registry.internal.efre-direkt.de` with `docker buildx bake --push` (`docker-bake.hcl`; `TAG=... ` sets the tag, default `latest`).
 
 ### What is deliberately *not* in `.env`
 
