@@ -89,6 +89,7 @@ RUN npm run build
 
 # Env (read by render-config.sh at start):
 #   OIDC_ISSUER   required, the realm the backend checks tokens against
+#   API_URL       the backend's origin; unset means the SPA's own
 FROM nginx:1-alpine AS frontend
 COPY --from=frontend-build /app/dist /usr/share/nginx/html
 COPY frontend/docker/default.conf /etc/nginx/conf.d/default.conf

@@ -26,7 +26,7 @@ from backend.auth import check_realm
 from backend.clients import tts
 from backend.clients.health import check_backends
 from backend.db.provision import provision
-from backend import retention
+from backend import cors, retention
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -98,8 +98,6 @@ def _provision_database() -> None:
 
 # No API docs or published schema (`/docs`, `/redoc`, `/openapi.json` would expose
 # every route without a login); the SPA's wire types live in frontend/src/protocol.ts.
-# No CORS middleware: the frontend container proxies /api, /ws and /health, so
-# the SPA and the API share an origin (frontend/nginx.conf).
 app = FastAPI(
     title="CallTrainer API",
     lifespan=lifespan,
@@ -107,6 +105,8 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
 )
+# The SPA's origin in a deployment, where it is another host (ADR 0107).
+cors.install(app)
 
 app.include_router(personas_router)
 app.include_router(scenarios_router)

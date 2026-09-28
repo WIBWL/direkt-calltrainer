@@ -1,4 +1,5 @@
 import { currentAccessToken, userManager } from "./auth";
+import { apiUrl } from "./config";
 
 /** A non-2xx reply from the backend. */
 export class ApiError extends Error {
@@ -45,7 +46,7 @@ export async function authorizedFetch(path: string, init?: RequestInit): Promise
     void reauthenticate();
     throw new ApiError(401, "no active session");
   }
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl + path, {
     ...init,
     headers: {
       // Only a string body is JSON here: a FormData body has to set its own

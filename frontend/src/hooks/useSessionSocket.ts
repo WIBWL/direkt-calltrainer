@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { currentAccessToken } from "../auth";
+import { apiUrl } from "../config";
 import type { CallState, ClientMessage, ServerMessage, TranscriptEntry } from "../protocol";
 
-// The frontend container proxies /ws to the backend, so the WebSocket is
-// same-origin (ADR 0104).
-// Derived from window.location rather than a base-URL env var, which no longer
-// exists.
+// On the backend's origin (config.ts), or the SPA's own when that is empty
+// (Vite proxies /ws in development). A browser sends no CORS preflight for a
+// WebSocket; the token rides in the first message, so a foreign page has no
+// credentials to borrow (ADR 0107).
 const WS_URL =
   typeof window === "undefined"
     ? "/ws/session"
-    : `${window.location.origin.replace(/^http/, "ws")}/ws/session`;
+    : new URL("/ws/session", apiUrl || window.location.origin).href.replace(/^http/, "ws");
 
 /** The Session the user has committed to, as far as the connection is
  * concerned. A fresh object stands for a fresh Session: the connection is

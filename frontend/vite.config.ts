@@ -10,6 +10,7 @@ import react from "@vitejs/plugin-react";
  */
 function runtimeConfig(): Plugin {
   const serveConfig = (_req: IncomingMessage, res: ServerResponse) => {
+    // No API_URL locally: the proxy below keeps the API on the SPA's origin.
     const config = { oidcIssuer: process.env.OIDC_ISSUER };
     res.setHeader("Content-Type", "text/javascript");
     res.setHeader("Cache-Control", "no-store");

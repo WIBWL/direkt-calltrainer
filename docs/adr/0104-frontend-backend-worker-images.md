@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (amends ADR 0008)
+Accepted (amends ADR 0008); the single origin is superseded by ADR 0107, the build by ADR 0108
 
 ## Context
 

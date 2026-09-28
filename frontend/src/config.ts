@@ -6,6 +6,7 @@ declare global {
   interface Window {
     __APP_CONFIG__?: {
       oidcIssuer?: string;
+      apiUrl?: string;
     };
   }
 }
@@ -24,3 +25,10 @@ if (!cfg?.oidcIssuer) {
 
 /** The realm issuer URL; the backend reads the same `OIDC_ISSUER`. */
 export const oidcIssuer: string = cfg.oidcIssuer;
+
+/**
+ * The backend's origin, e.g. `https://calltrainer-backend.efre-direkt.de`, which
+ * allows this one in its `CORS_ORIGINS`. Empty means the SPA's own origin: Vite
+ * proxies the API in development, so no CORS is involved there.
+ */
+export const apiUrl: string = (cfg.apiUrl ?? "").replace(/\/+$/, "");
