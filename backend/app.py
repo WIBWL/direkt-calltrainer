@@ -11,6 +11,9 @@ from fastapi import FastAPI, HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from shared.clients.config import DIREKT_URL
+from shared.db.session import session_scope
+from shared.logging_config import configure_logging
 from backend.api.account import router as account_router
 from backend.api.consent import router as consent_router
 from backend.api.focus import router as focus_router
@@ -21,11 +24,8 @@ from backend.api.sessions import router as sessions_router
 from backend.api.tenant import router as tenant_router
 from backend.auth import check_realm
 from backend.clients import tts
-from backend.clients.config import DIREKT_URL
 from backend.clients.health import check_backends
 from backend.db.provision import provision
-from backend.db.session import session_scope
-from backend.logging_config import configure_logging
 from backend import retention
 
 configure_logging()

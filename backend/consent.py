@@ -13,8 +13,8 @@ from datetime import UTC, datetime
 from sqlalchemy import text
 from sqlalchemy.orm import Session as DbSession
 
-from backend.db import models as db_models
-from backend.db.session import session_scope
+from shared.db import models as db_models
+from shared.db.session import session_scope
 
 logger = logging.getLogger(__name__)
 

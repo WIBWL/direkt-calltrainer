@@ -15,14 +15,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from openai import OpenAIError
 from sqlalchemy.orm import Session as DbSession, selectinload
 
+from shared.db import models as db_models
+from shared.db.session import session_scope
+from shared.feedback import jobs
 from backend import deletion, library
 from backend.api import served
 from backend.api._loading import FOR_RETRY, SESSION_SUBTREE, WITH_WRAPUP, owned_session
 from backend.api.deps import current_tenant_id
 from backend.auth import AuthContext, require_user
-from backend.db import models as db_models
-from backend.db.session import session_scope
-from backend.feedback import jobs
 from backend.followups import FollowUpError, PlayedCall, draft_follow_up
 from backend.reversals import ReverseError, draft_brief
 
@@ -158,7 +158,7 @@ def retry_feedback(
 
         session_pk = session.session_id
         # Imported here so the rest of the REST layer does not need Redis.
-        from backend.feedback import queue  # pylint: disable=import-outside-toplevel
+        from shared.feedback import queue  # pylint: disable=import-outside-toplevel
 
         try:
             queue.enqueue_feedback(session_pk)
@@ -181,7 +181,7 @@ def retry_feedback(
 
 # How often the User must have spoken before a call can be reversed or carried
 # forward. The screen hides both offers under `MIN_USER_TURNS` in
-# FeedbackReport.tsx (pinned to this by tests/test_reverse.py); this enforces it.
+# FeedbackReport.tsx (pinned to this by backend/tests/test_reverse.py); this enforces it.
 MIN_USER_UTTERANCES = 3
 
 

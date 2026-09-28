@@ -11,11 +11,11 @@ from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFil
 from openai import OpenAIError
 from pydantic import BaseModel, Field
 
+from shared.db.models import SCENARIO_CATEGORIES, VISIBILITY_TENANT
 from backend import library, recommendations
 from backend.api.deps import current_tenant, current_tenant_id
 from backend.auth import AuthContext, require_user
 from backend.authored_text import FIELD_LIMITS, WIRE_FIELD_LIMITS, clean
-from backend.db.models import SCENARIO_CATEGORIES, VISIBILITY_TENANT
 from backend.documents import (
     MAX_TEXT,
     DocumentError,

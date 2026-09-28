@@ -1,0 +1,12 @@
+# The wrap-up worker (ADR 0018/0019): everything it needs is shared.
+[project]
+name = "calltrainer-worker"
+version = "0"
+requires-python = "==3.12.*"
+dependencies = ["calltrainer-shared"]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+calltrainer-shared = { workspace = true }

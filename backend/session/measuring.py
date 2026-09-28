@@ -1,14 +1,14 @@
 """Attaching one utterance's paraverbal measurements to its Turn (ADR 0048).
 
-`analyze` (backend/feedback/acoustics.py) measures the audio on a worker thread
+`analyze` (shared/feedback/acoustics.py) measures the audio on a worker thread
 during the STT round trip; this places the result on the Session's timeline.
 """
 
 import asyncio
 import logging
 
-from backend.feedback.acoustics import AcousticsError, Pause, TurnAcoustics
-from backend.session.models import Turn
+from shared.feedback.acoustics import AcousticsError, Pause, TurnAcoustics
+from shared.turn import Turn
 
 logger = logging.getLogger(__name__)
 

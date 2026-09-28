@@ -16,10 +16,10 @@ import logging
 
 from openai import OpenAIError
 
-from backend.clients import llm
+from shared.clients import llm
+from shared.turn import Turn
 from backend.personas import Persona
 from backend.scenarios import Scenario
-from backend.session.models import Turn
 from backend.session.nudges import STATE_NOTES_FRAME
 from backend.session.prompting import STATE_MAX_TOKENS, build_state_prompt
 

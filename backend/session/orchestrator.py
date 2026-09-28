@@ -16,8 +16,11 @@ from typing import NamedTuple
 from kugelaudio.exceptions import KugelAudioError
 from openai import OpenAIError
 
-from backend.clients import llm, stt, tts
-from backend.feedback.acoustics import analyze
+from shared.clients import llm
+from shared.feedback.acoustics import analyze
+from shared.language_packs import LanguagePack, get_pack, is_phantom, signals_closing
+from shared.turn import Turn
+from backend.clients import stt, tts
 from backend.personas import Persona
 from backend.scenarios import Scenario
 from backend.session.call_notes import CallNotes
@@ -33,8 +36,7 @@ from backend.session.nudges import (
     ECHO_NUDGE, INTERRUPTED_MARK, REGENERATE_NUDGE, REPEAT_OPENING_NUDGE, RESUME_NUDGE,
     strip_interrupted_mark,
 )
-from backend.session.language_packs import LanguagePack, get_pack, is_phantom, signals_closing
-from backend.session.models import AudioChunk, Failed, StateChanged, Turn, TurnCompleted, TurnEvent
+from backend.session.events import AudioChunk, Failed, StateChanged, TurnCompleted, TurnEvent
 
 logger = logging.getLogger(__name__)
 

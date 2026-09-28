@@ -15,14 +15,14 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
 
+from shared.db import models as db_models
+from shared.db.session import session_scope
 from backend.api import served
 from backend.api._loading import SESSION_SUBTREE
 from backend import consent as consent_service
 from backend import focus as focus_service
 from backend import retention
 from backend.auth import AuthContext, require_user
-from backend.db import models as db_models
-from backend.db.session import session_scope
 
 logger = logging.getLogger(__name__)
 

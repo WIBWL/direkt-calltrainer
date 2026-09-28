@@ -11,9 +11,9 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session as DbSession
 
+from shared.db import models as db_models
+from shared.db.seed_data import FOCUS_GROUP_NAMES, TRAINING_ROLE_CATALOGUE
 from backend import consent
-from backend.db import models as db_models
-from backend.db.seed_data import FOCUS_GROUP_NAMES, TRAINING_ROLE_CATALOGUE
 
 logger = logging.getLogger(__name__)
 

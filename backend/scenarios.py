@@ -44,7 +44,7 @@ class Scenario:
     # defect ADR 0045 removed. Empty means a Scenario that briefs nobody.
     briefing: str = ""
     # Display/filter only, never part of the prompt (ADR 0072): one of
-    # `backend.db.models.SCENARIO_CATEGORIES`, or None for a Scenario that
+    # `shared.db.models.SCENARIO_CATEGORIES`, or None for a Scenario that
     # carries no category. F-03's three call contexts, made selectable.
     category: str | None = None
     # Authorship (ADR 0058) and visibility (`private`/`tenant`/`public`; `tenant`

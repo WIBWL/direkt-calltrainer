@@ -6,10 +6,10 @@ a 4B model copies phrases out of long rule lists, so the machinery is enforced i
 
 from datetime import date
 
+from shared.language_packs import LanguagePack
 from backend.authored_text import AUTHORED_SCENARIO_NOTE
 from backend.personas import Persona
 from backend.scenarios import Scenario
-from backend.session.language_packs import LanguagePack
 
 
 def opening_instruction(pack: LanguagePack, reverse: bool = False) -> str:

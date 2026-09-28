@@ -9,8 +9,8 @@ import logging
 
 from pydantic import BaseModel
 
+from shared.clients import llm
 from backend.authored_text import clean, fit
-from backend.clients import llm
 
 logger = logging.getLogger(__name__)
 

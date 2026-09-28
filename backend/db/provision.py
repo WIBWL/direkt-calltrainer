@@ -1,20 +1,18 @@
 """Bringing an empty database up to a usable state: migrate, then seed.
 
-Run at startup and by scripts/seed_reference_data.py; both halves idempotent.
-Content comes from backend/db/seed_data.py (ADR 0041/0076) and, for MetricType,
-backend/feedback/metrics.py, so inventory and analysis cannot drift apart."""
+Run at startup and by backend/scripts/seed_reference_data.py; both halves idempotent.
+Content comes from shared/db/seed_data.py (ADR 0041/0076) and, for MetricType,
+shared/feedback/metrics.py, so inventory and analysis cannot drift apart."""
 
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-
 from alembic import command
 from alembic.config import Config
 from sqlalchemy.orm import Session as DbSession
 
-from backend.authored_text import clean
-from backend.db.models import (
+from shared.db import ALEMBIC_INI
+from shared.db.models import (
     AuthoredContent,
     FocusGoal,
     Language,
@@ -25,19 +23,12 @@ from backend.db.models import (
     Tenant,
     VISIBILITY_PUBLIC,
 )
-from backend.db.seed_data import (
-    FOCUS_GOALS,
-    LANGUAGE_NAMES,
-    PERSONAS,
-    SCENARIOS,
-    TENANTS,
-)
-from backend.db.session import advisory_lock, session_scope
-from backend.feedback.metrics import METRICS
+from shared.db.seed_data import FOCUS_GOALS, LANGUAGE_NAMES, PERSONAS, SCENARIOS, TENANTS
+from shared.db.session import advisory_lock, session_scope
+from shared.feedback.metrics import METRICS
+from backend.authored_text import clean
 
 logger = logging.getLogger(__name__)
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # Every column the ORM requires is carried by seed_data.py, and its field names
 # match the columns one to one, so nothing is defaulted or mapped here.
@@ -46,7 +37,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 def provision() -> dict[str, int]:
     """Migrate to head and seed the reference tables. Returns rows created."""
     logger.info("Migrating database to head...")
-    config = Config(str(PROJECT_ROOT / "alembic.ini"))
+    config = Config(str(ALEMBIC_INI))
     # Keep our logging setup; see the note in migrations/env.py.
     config.attributes["configure_logging"] = False
     command.upgrade(config, "head")
@@ -168,7 +159,7 @@ def _seed_objections(db: DbSession, persona: Persona, objections, labels) -> Non
     Replaced wholesale (no natural key), so their ids change on every startup:
     never reference an objection by id -- use persona and position, or add a
     stable key first. English `objections` and German `labels` are written in one
-    pass so they cannot drift; tests/test_persona_scenario_library.py pins them.
+    pass so they cannot drift; backend/tests/test_persona_scenario_library.py pins them.
     """
     db.flush()  # a freshly created Persona needs its id before rows point at it
     db.query(PersonaObjection).filter_by(

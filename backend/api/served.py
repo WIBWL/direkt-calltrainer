@@ -6,9 +6,10 @@ frontend/src/protocol.ts (ADR 0057)."""
 
 from __future__ import annotations
 
-from backend.db import models as db_models
-from backend.feedback import readings, stored
-from backend.feedback.jobs import is_live
+from shared.db import models as db_models
+from shared.feedback import stored
+from shared.feedback.jobs import is_live
+from backend.feedback import readings
 
 
 def _metric(metric_type: db_models.MetricType) -> dict:

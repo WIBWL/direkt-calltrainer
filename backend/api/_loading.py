@@ -9,7 +9,7 @@ import uuid
 from sqlalchemy.orm import Session as DbSession, selectinload
 from sqlalchemy.orm.interfaces import LoaderOption
 
-from backend.db import models as db_models
+from shared.db import models as db_models
 
 #: What every Session-serving route needs. The two callers differ only in what
 #: they add to it -- the detail route also reads the analysis jobs and the

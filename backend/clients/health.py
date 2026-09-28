@@ -13,8 +13,10 @@ import wave
 from kugelaudio.exceptions import KugelAudioError
 from openai import DEFAULT_MAX_RETRIES, OpenAIError
 
-from backend.clients import llm, stt, tts
-from backend.clients.config import KUGELAUDIO_MODEL, LLM_MODEL, STT_MODEL
+from shared.clients import llm
+from shared.clients.config import LLM_MODEL
+from backend.clients import stt, tts
+from backend.clients.config import KUGELAUDIO_MODEL, STT_MODEL
 from backend.personas import PersonaVoice
 
 logger = logging.getLogger(__name__)

@@ -16,22 +16,16 @@ from typing import Literal
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy.exc import SQLAlchemyError
 
+from shared.logging_config import session_id_scope
+from shared.feedback import jobs
+from shared.feedback.calls import utterances
 from backend.auth import AuthContext, authenticate_ws
-from backend.logging_config import session_id_scope
 from backend.tenants import resolve_tenant_id
 from backend import library
-from backend.feedback import jobs
 from backend.personas import Persona
 from backend.scenarios import Scenario
 from backend.session import persistence
-from backend.feedback.calls import utterances
-from backend.session.models import (
-    AudioChunk,
-    Failed,
-    StateChanged,
-    TurnCompleted,
-    TurnEvent,
-)
+from backend.session.events import AudioChunk, Failed, StateChanged, TurnCompleted, TurnEvent
 from backend.session.orchestrator import SessionOrchestrator
 
 logger = logging.getLogger(__name__)
@@ -137,7 +131,7 @@ async def _record(call: persistence.FinishedCall) -> None:
     try:
         # Imported here: the live path must not need Redis to be importable.
         # `jobs` stays at module scope because the handler needs it when this fails.
-        from backend.feedback import queue  # pylint: disable=import-outside-toplevel
+        from shared.feedback import queue  # pylint: disable=import-outside-toplevel
 
         await asyncio.to_thread(queue.enqueue_feedback, db_id)
     except Exception as e:  # pylint: disable=broad-exception-caught

@@ -1,7 +1,7 @@
 """Writing a finished Session to the database (ADR 0034), in one transaction after
 the call has ended -- never from the live turn loop, which must not fail on the DB.
 
-Writes the two readings `backend/feedback/calls.py` produces (the utterances on
+Writes the two readings `shared/feedback/calls.py` produces (the utterances on
 their timeline and the folded call) as rows."""
 
 from __future__ import annotations
@@ -16,14 +16,14 @@ from sqlalchemy.orm import Session as DbSession
 
 # Imported as a module, not by name: `db.Session`/`db.Turn` keep the schema's
 # entities visibly distinct from the identically named in-memory ones.
+from shared.db import models as db_models
+from shared.db.session import session_scope
+from shared.feedback import interruptions, metrics, rows
+from shared.feedback.calls import Conversation, conversation, utterances
+from shared.turn import Turn
 from backend import consent
-from backend.db import models as db_models
-from backend.db.session import session_scope
-from backend.feedback import interruptions, metrics, rows
-from backend.feedback.calls import Conversation, conversation, utterances
 from backend.personas import Persona
 from backend.scenarios import Scenario
-from backend.session.models import Turn
 
 logger = logging.getLogger(__name__)
 

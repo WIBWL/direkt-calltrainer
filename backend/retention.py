@@ -10,8 +10,8 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session as DbSession
 
+from shared.db import models as db_models
 from backend import deletion
-from backend.db import models as db_models
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +140,7 @@ def sweep_now() -> int:
     period that silently stops existing.
     """
     # Imported here so importing this module never requires a database.
-    from backend.db.session import session_scope  # pylint: disable=import-outside-toplevel
+    from shared.db.session import session_scope  # pylint: disable=import-outside-toplevel
 
     with session_scope() as db:
         return sweep(db)

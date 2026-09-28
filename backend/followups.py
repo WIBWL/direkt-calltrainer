@@ -10,8 +10,8 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ValidationError
 
+from shared.clients import llm
 from backend.authored_text import WIRE_FIELD_LIMITS, clean, fit
-from backend.clients import llm
 
 logger = logging.getLogger(__name__)
 

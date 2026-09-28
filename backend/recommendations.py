@@ -9,9 +9,9 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from shared.db.seed_data import FOCUS_GOALS
+from shared.db.session import session_scope
 from backend import focus, library
-from backend.db.seed_data import FOCUS_GOALS
-from backend.db.session import session_scope
 
 # One row of the grid in front of the "show all" tile.
 MAX_RECOMMENDATIONS = 5

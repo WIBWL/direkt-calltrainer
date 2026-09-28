@@ -1,0 +1,161 @@
+# The Python workspace: three packages, one lockfile (uv.lock).
+#   shared/   imported by both processes
+#   backend/  the API and the live call
+#   worker/   the wrap-up
+# Each image installs only its own closure (`uv sync --package calltrainer-backend`);
+# a developer's machine gets all of it plus the dev group (`uv sync`).
+[project]
+name = "direkt-calltrainer"
+version = "0"
+requires-python = "==3.12.*"
+dependencies = ["calltrainer-backend", "calltrainer-worker"]
+
+[dependency-groups]
+dev = [
+    # Tests
+    "pytest==8.3.4",
+    "pytest-asyncio==0.25.2",
+    # Lint
+    "flake8==7.1.1",
+    "flake8-pyproject==1.2.3",
+    "pylint==3.3.3",
+    # ERD generation (backend/scripts/generate_erd.py)
+    "pydot==3.0.4",
+    "sqlalchemy-schemadisplay==2.0",
+    # Docs site (arc42 + ADRs)
+    "mkdocs==1.6.1",
+    "mkdocs-material==9.5.49",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["shared", "backend", "worker"]
+
+[tool.uv.sources]
+calltrainer-backend = { workspace = true }
+calltrainer-worker = { workspace = true }
+
+
+[tool.pytest.ini_options]
+# The suite lives beside each package; see each tests/README.md for the
+# feature -> test traceability matrix.
+testpaths = ["shared/tests", "backend/tests", "worker/tests"]
+pythonpath = ["."]
+# auto: async test functions are collected without needing a marker on each one.
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    # starlette 0.35 imports `multipart` under its old name (fastapi[all] pin)
+    "ignore::PendingDeprecationWarning",
+]
+
+
+# Read through flake8-pyproject; flake8 itself only reads .flake8/setup.cfg/tox.ini.
+[tool.flake8]
+# E261: at least two spaces before inline comment
+# W293: blank line contains whitespace
+# W504: line break after binary operator
+# W291: trailing whitespace
+# E221: multiple spaces before operator -- allows aligning a block of related
+#       constant assignments into columns, same taste as E261 above
+ignore = ["E261", "W293", "W504", "W291", "E221"]
+max-line-length = 120
+max-complexity = 10
+# Alembic writes the files under versions/ itself, in its own layout — its
+# continuation-line style trips E122/E128 on every single revision. Reformatting
+# generated code by hand would just be undone by the next `alembic revision`.
+# The migrations are still reviewed by a human before they are applied; see
+# CLAUDE.md, "Schema changes".
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "frontend/node_modules",
+    "shared/db/migrations/versions",
+]
+# When an editor lints one migration file by its full path, `exclude` above does
+# not apply (flake8 only filters files it discovers itself, not ones passed
+# explicitly). autogenerate's continuation-line layout under op.create_table
+# trips the whole E12x family; ignore it there, the same call `exclude` makes.
+per-file-ignores = ["shared/db/migrations/versions/*: E12"]
+
+
+[tool.pylint.main]
+# Minimum Python version to use for version dependent checks
+py-version = "3.12"
+ignore = [".venv", "venv", "dist", ".git"]
+# Alembic generates the revision files and drives them through `op`, whose
+# members are attached at runtime -- pylint sees an empty module and reports
+# E1101 for every operation. Excluded for the same reason as in [tool.flake8]:
+# the files are generated, and a human reviews each one before it is applied.
+# pylint matches this with re.match, so the `(^|.*[\\/])` prefix is what lets it
+# hit the path however an editor passes it -- workspace-relative, absolute, or
+# with Windows backslashes -- not just the repo-root-relative form.
+ignore-paths = ['(^|.*[\\/])migrations[\\/]versions[\\/].*']
+# alembic.context and alembic.op are populated by Alembic at migration runtime,
+# so a static read of either finds none of the members env.py / a revision
+# legitimately calls (op.add_column etc.). parselmouth.praat is a submodule of a
+# compiled C extension -- a static read cannot resolve the import (E0401).
+ignored-modules = ["alembic.context", "alembic.op", "parselmouth.praat"]
+# parselmouth is a compiled C extension (praat-parselmouth); pylint cannot see
+# its members from a static read. Listing it here lets pylint import it for
+# run-time introspection instead of reporting I1101 for every Sound/PraatError
+# reference in shared/feedback/acoustics.py.
+extension-pkg-allow-list = ["parselmouth"]
+# The repository root is the import root for all three packages. Uses
+# source-roots rather than an init-hook that prepends "." to sys.path -- the
+# latter shadows stdlib modules like collections.abc when pylint runs with a
+# different working directory.
+source-roots = ["."]
+
+[tool.pylint."messages control"]
+# Responsibility: logic, design metrics, and docstrings only.
+# PEP8 style and formatting is enforced by flake8 -- disabled here to avoid duplication.
+# C: Convention, R: Refactor, W: Warning, E: Error, F: Fatal
+disable = [
+    "C0301",  # line-too-long   -- flake8 (E501) owns line length
+    "C0303",  # trailing-whitespace -- flake8 (W291/W293) owns this
+    "C0304",  # missing-final-newline -- flake8 (W292) owns this
+    "C0305",  # trailing-newlines -- flake8 (W391) owns this
+    "W0311",  # bad-indentation  -- flake8 (E1xx) owns this
+    "W0511",  # fixme            -- ignore TODO/FIXME comments
+    "W0611",  # unused-import    -- flake8 (F401) owns this
+    "W1203",  # logging-fstring-interpolation -- f-strings in logging calls
+    # missing-module-docstring -- not required for plain data/config modules
+    # (personas.py, scenarios.py etc.) where the data speaks for itself;
+    # function/method docstrings (C0116) are still enforced for actual logic.
+    "C0114",
+    # missing-class-docstring -- same reasoning, for simple dataclasses
+    # (Persona, Scenario, PersonaVoice) whose fields are self-explanatory.
+    "C0115",
+    # too-few-public-methods -- SQLAlchemy models and dataclasses are
+    # declarations, not behaviour; every class in shared/db/models.py
+    # would otherwise be flagged forever.
+    "R0903",
+    # redefined-outer-name -- a pytest test takes its fixtures as parameters
+    # named after them; this is the framework's design, not shadowing.
+    # Unavoidable in the test suites and harmless elsewhere.
+    "W0621",
+]
+
+[tool.pylint.design]
+max-args = 5
+max-locals = 15
+max-returns = 6
+max-statements = 50
+max-parents = 7
+max-attributes = 10
+min-public-methods = 2
+max-public-methods = 20
+
+[tool.pylint.similarities]
+min-similarity-lines = 4
+ignore-comments = true
+ignore-docstrings = true
+ignore-imports = true
+
+[tool.pylint.reports]
+reports = false

@@ -12,8 +12,8 @@ from dataclasses import dataclass
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
+from shared.clients import llm
 from backend.authored_text import FIELD_LIMITS, clean
-from backend.clients import llm
 
 # Every upload is read into memory before it is parsed, so both ceilings are
 # memory bounds, not policy ones -- and the total matters as much as the single

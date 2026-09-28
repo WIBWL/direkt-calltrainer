@@ -1,0 +1,27 @@
+# What the backend and the worker both import: the database (models, session,
+# seed data, migrations), the LLM client, the measuring code and the job queue.
+[project]
+name = "calltrainer-shared"
+version = "0"
+requires-python = "==3.12.*"
+dependencies = [
+    # Database: Postgres driver and migrations
+    "alembic==1.14.0",
+    "psycopg[binary]==3.2.10",
+    "sqlalchemy==2.0.36",
+    # The model gateway (ADR 0011)
+    "httpx==0.28.1",
+    "openai==1.109.1",
+    "pydantic==2.13.5",
+    # Measuring a call: Praat (shared/feedback/acoustics.py is the only importer)
+    "numpy==2.5.2",
+    "praat-parselmouth==0.4.7",
+    # The wrap-up queue (ADR 0019)
+    "redis==8.1.0",
+    "rq==2.12.0",
+    "python-dotenv==1.0.1",
+]
+
+[tool.uv]
+# Imported from the repository root (or /app in the images), not installed.
+package = false

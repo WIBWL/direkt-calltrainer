@@ -9,9 +9,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from shared.db.session import session_scope
 from backend import focus as focus_service
 from backend.auth import AuthContext, require_user
-from backend.db.session import session_scope
 
 router = APIRouter(prefix="/api/focus", dependencies=[Depends(require_user)])
 

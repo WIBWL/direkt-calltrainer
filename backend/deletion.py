@@ -11,7 +11,7 @@ import uuid
 
 from sqlalchemy.orm import Session as DbSession
 
-from backend.db import models as db_models
+from shared.db import models as db_models
 
 logger = logging.getLogger(__name__)
 

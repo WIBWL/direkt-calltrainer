@@ -1,0 +1,25 @@
+# The API and the live call.
+[project]
+name = "calltrainer-backend"
+version = "0"
+requires-python = "==3.12.*"
+dependencies = [
+    "calltrainer-shared",
+    # Web / API server
+    "fastapi==0.109.0",
+    "gunicorn==21.2.0",
+    "pyjwt[crypto]==2.13.0",
+    "uvicorn[standard]==0.27.0",
+    # UploadFile, the PDF upload in /api/scenarios/document
+    "python-multipart==0.0.32",
+    # Speech output (ADR 0103)
+    "kugelaudio==1.9.0",
+    # Scenario authoring: pull text out of an uploaded PDF (text-layer only, no OCR)
+    "pypdf==5.1.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+calltrainer-shared = { workspace = true }

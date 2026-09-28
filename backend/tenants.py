@@ -9,9 +9,9 @@ from dataclasses import dataclass
 
 from sqlalchemy import select
 
+from shared.db.models import Tenant
+from shared.db.session import session_scope
 from backend.auth import AuthContext
-from backend.db.models import Tenant
-from backend.db.session import session_scope
 
 DEFAULT_TENANT_REF = "default"
 

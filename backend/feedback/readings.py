@@ -9,7 +9,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from backend.feedback import explanations, interruptions, intonation, metrics
+from shared.feedback import interruptions, intonation, metrics
+from backend.feedback import explanations
 
 # One step of a scale as the interface shows it: the machine-readable name, how
 # it is said, where it applies, and a colour where the scale has a direction.

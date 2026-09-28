@@ -9,8 +9,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from shared.language_packs import LanguagePack
 from backend.session import repetition
-from backend.session.language_packs import LanguagePack
 from backend.session.nudges import strip_interrupted_mark
 
 

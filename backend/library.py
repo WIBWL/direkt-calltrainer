@@ -11,9 +11,9 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
+from shared.db import models
+from shared.db.session import session_scope
 from backend.authored_text import clean
-from backend.db import models
-from backend.db.session import session_scope
 from backend.personas import Persona, PersonaVoice
 from backend.scenarios import OriginSession, Scenario
 

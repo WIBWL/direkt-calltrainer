@@ -9,10 +9,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from shared.db.session import session_scope
 from backend import consent as consent_service
 from backend import deletion
 from backend.auth import AuthContext, require_user
-from backend.db.session import session_scope
 
 router = APIRouter(prefix="/api/consent", dependencies=[Depends(require_user)])
 
