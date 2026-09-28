@@ -2,32 +2,19 @@ import { Link, useParams } from "react-router-dom";
 
 import { useStoredSession } from "../hooks/useStoredSession";
 import type { Finding, SessionTurn } from "../protocol";
-import { ROUTES, sessionPath } from "../routes";
-import { metricReading } from "../utils/metrics";
+import { ROUTES, progressMetricPath, sessionPath } from "../routes";
+import { comparableAcrossCalls, formatValue, metricReading } from "../utils/metrics";
 import { formatOffset } from "../utils/time";
 import { pairFor } from "../utils/segmentStats";
 import AppLayout from "./AppLayout";
 import IntonationReading from "./IntonationReading";
+import MetricEvidence from "./MetricEvidence";
 import MetricScale from "./MetricScale";
 import SegmentComparison from "./SegmentComparison";
 
-/** Counts read without decimals, everything else with one. The unit follows,
- *  except for "count", which the figure already is. */
-function formatFigure(value: number, unit: string | null): string {
-  const text = unit === "Anzahl" ? value.toFixed(0) : value.toFixed(1);
-  return unit && unit !== "Anzahl" ? `${text} ${unit}` : text;
-}
-
 /**
- * One metric of one training, in full (F-51's interruptions, F-35's intonation).
- *
- * Its own page rather than a panel inside the wrap-up. The excerpts run to
- * several lines each, a call with four interruptions would push everything
- * below it off the screen, and this is something a user may want to link to or
- * come back to. Back is the browser's.
- *
- * Reads the Session once and never polls, like `PastSessionView`: whatever the
- * database holds for a finished call is final.
+ * One metric of one training in full, on its own route so it can be linked and left with Back. Reads the
+ * Session once and never polls, like `PastSessionView`.
  */
 export default function SessionMetricView() {
   const { sessionId, metricKey } = useParams<{ sessionId: string; metricKey: string }>();
@@ -90,7 +77,7 @@ export default function SessionMetricView() {
       <div className="card">
         <p className="metric-page-figure">
           <span className={light ? `metric-value-${light}` : undefined}>
-            {formatFigure(measurement.value, measurement.unit)}
+            {formatValue(measurement.key, measurement.value, measurement.unit)}
           </span>
           {reading && (
             <span className="metric-light-label">
@@ -105,6 +92,16 @@ export default function SessionMetricView() {
         <MetricScale steps={steps} current={current} />
 
         {note && <p className="metric-note">{note}</p>}
+
+        {/* The way up to the same metric across trainings. Not for loudness: kept out of every cross-call
+            view (`comparableAcrossCalls`), since its dB span is the recording's level. */}
+        {comparableAcrossCalls(measurement.key) && (
+          <p className="metric-page-across">
+            <Link to={progressMetricPath(measurement.key)}>
+              Diese Kennzahl über alle Trainings ansehen
+            </Link>
+          </p>
+        )}
       </div>
 
       {metricKey === "intonation" && (
@@ -115,6 +112,12 @@ export default function SessionMetricView() {
           />
         </div>
       )}
+
+      {/* What the figure was read off: the words that were counted, the
+          passages that were found, the pauses that were measured. Every tile on
+          the wrap-up screen leads here now, so every page has to say more than
+          the tile did (see MetricEvidence.tsx). */}
+      <MetricEvidence measurement={measurement} turns={detail.turns} />
 
       {pair && (
         <>
@@ -142,18 +145,9 @@ export default function SessionMetricView() {
 }
 
 /**
- * The transcript around one interruption (F-51).
- *
- * A timestamp alone tells the user that something happened at 2:48, which they
- * cannot check against a memory of the call. What they can check is the
- * sentence: their own line, the Persona's line it cut into, and what the
- * Persona had been about to say next.
- *
- * That last part is the counterfactual and is styled as one. It is not part of
- * the transcript and never was heard: the server keeps it aside precisely so it
- * cannot leak into the conversation the model reads (ADR 0035). For calls
- * recorded before it was kept it is simply absent, which the block says rather
- * than leaving a gap.
+ * The transcript around one interruption (F-51): the user's line, the Persona's line it cut into, and what the
+ * Persona had been about to say. That last part was never heard and is kept aside so it cannot reach the
+ * model's history (ADR 0035); styled as such, and absent for older calls, which the block says.
  */
 function InterruptionDetail({
   findings,

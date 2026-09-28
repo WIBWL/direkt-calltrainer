@@ -83,7 +83,7 @@ request's tenant to an `extern_ref` in this order:
 
 1. **the `tenant` claim** — a custom Keycloak user attribute, set by whoever
    creates the account (accounts are created by hand anyway, ADR 0009) and
-   mapped into the access token by the `calltrainer tenant` protocol mapper.
+   mapped into the access token by the `direkt-calltrainer tenant` protocol mapper.
    It matches `tenant.extern_ref` directly.
 2. else the **`default`** tenant.
 

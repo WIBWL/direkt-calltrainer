@@ -7,7 +7,9 @@ ausgearbeitet, sondern nur benannt, wo sie gebraucht wird.
 **Umsetzungsstand:** Stufe 1 ist gebaut und liegt unter `/fortschritt`, über die
 volle Breite der Anwendung (1440 px, Kopfzeile mitgeführt). Der Bildschirm
 selbst ist `frontend/src/components/ProgressView.tsx`, die Detailebene
-`ProgressMetricView.tsx`, der Rechenteil `frontend/src/utils/progressStats.ts`.
+`ProgressMetricView.tsx`, der Rechenteil `frontend/src/utils/progressStats.ts`,
+die gemeinsame Datenhaltung der drei Bildschirme
+`frontend/src/ProgressContext.tsx`.
 Er greift ausschließlich auf echte, gespeicherte Werte zu und kommt ohne neuen
 Endpunkt aus, weil `GET /api/sessions` die Messwerte je Sitzung bereits
 mitliefert.
@@ -140,6 +142,50 @@ markiert die Auswertung in dem Modellaufruf, den sie ohnehin macht; damit danach
 (die Aufnahme ist zu diesem Zeitpunkt längst gelöscht, ADR 0048). Verglichen wird
 nichts: Es stehen zwei Zahlen nebeneinander, und wie groß ein Unterschied sein
 darf, sagt niemand. Damit ist Stufe 3 abgeschlossen: Was dort offen aussah, ist entweder gebaut oder mit Begründung verworfen, und die Artikulation ist der letzte Fall der zweiten Art (Abschnitt 4.2).
+
+**Nachtrag (September 2026, zweite Runde).** Vier Dinge sind hinzugekommen,
+nachdem eine Durchsicht ergeben hatte, dass an den Stufen nichts mehr offen war,
+an der Seite aber sehr wohl:
+
+* **Block A endet nicht mehr blind.** Ein Kalendertag mit Trainings und eine
+  gespielte Zelle im Raster sind jetzt Knöpfe; darunter erscheinen die
+  Trainings dahinter, je mit Link (`TrainingLinks.tsx`). Vorher sagte eine
+  Zelle „2 Trainings“ und der einzige Weg zu diesen beiden führte über die
+  Historie im Profil, nach Datum, von Hand. Genau der Block, aus dem nichts
+  folgte, den Abschnitt 3 (Verbert) ausschließt. Leere Tage und ungespielte
+  Kombinationen bleiben stumme Zellen: dreißig Tabstopps, um zwei erreichbare
+  zu finden, wäre die schlechtere Barrierefreiheit.
+* **Auswahl nach Gesprächsanlass** als zweite Zeile neben dem Zeitraumschalter
+  (`OCCASIONS` in `ProgressContext.tsx`). Das ist die Antwort auf den stärksten
+  Einwand, den dieses Dokument gegen seine eigenen Diagramme erhebt
+  (Abschnitt 4.3): Szenario und Persona verschieben Redeanteil, Tempo und
+  Fragenanzahl mehr als eine Verhaltensänderung. Über alle Trainings ist eine
+  Linie Streuung, über eine Art von Gespräch ist sie eine Reihe. Erst
+  eingegrenzt, dann gekürzt, sonst hinge die Zahl der ausgewerteten Trainings
+  daran, was zwischendurch gespielt wurde. Jede Option trägt ihre Anzahl, eine
+  ohne Trainings ist nicht drückbar, und die Auswahl steht wie der Zeitraum in
+  der URL (`?anlass=`). Dafür führt `GET /api/sessions` jetzt `category` mit.
+* **„Früher und zuletzt“** auf der Seite einer Kennzahl (`EarlyAndLate.tsx`):
+  dieselbe Beschreibung zweimal, über die ältere und die jüngere Hälfte der
+  Auswahl, nebeneinander. Kein Unterschied, kein Pfeil, kein Wort für eine
+  Richtung. Es ist die Konstruktion, die ADR 0081 für die beiden Abschnitte
+  eines Gesprächs schon erlaubt, angewandt auf zwei Abschnitte einer
+  Geschichte; ADR 0065 trägt dazu einen Nachtrag mit fünf Bedingungen. Bewusst
+  nicht in der Übersicht: sechzehn solcher Paare wären sechzehn Einladungen,
+  einen Trend hineinzulesen.
+* **Der Übungsvorschlag nimmt Bezug auf sich selbst.** Hat eine Auswertung nach
+  dem Training, aus dem der Punkt stammt, noch einmal etwas zu dem Ziel
+  geschrieben, steht dieser Satz jetzt darunter. Damit schließt sich der Kreis
+  aus Abschnitt 3 (Zimmerman), der bisher nur in eine Richtung lief. Nichts
+  wird dafür gespeichert und nichts behauptet: zwei Aussagen in der
+  Reihenfolge, in der sie geschrieben wurden.
+
+Dazu zwei kleinere: Eine Textzielkachel führt jetzt mit dem jüngsten Satz aus
+den Auswertungen statt mit einer Punktreihe, weil für diese Ziele die Sätze das
+Einzige sind, was es gibt, und eine Zahl ohne Blick dahinter sich wie eine
+Messung liest. Und wo eine Kennzahl in weniger Trainings vorliegt als die
+Auswahl umfasst, sagt die Kachel das; warum, steht hinter dem „i“ der Tabelle,
+mit beiden möglichen Gründen und ohne einen davon zu behaupten.
 
 ## 1. Zweck
 
@@ -403,7 +449,7 @@ Einstellungen, während das Dashboard eine Arbeitsansicht ist.
 
 Stand nach der Überarbeitung (September 2026). Die Buchstaben der Abschnitte
 unten sind die ursprünglichen, die Reihenfolge auf dem Bildschirm ist A mit dem
-Aktivitätsteil, dann der Zeitraumschalter, dann B, D mit E und C.
+Aktivitätsteil, dann der Zeitraumschalter, dann B, D mit E und C, zuletzt F.
 
 ```
 +-----------------------------------------------------------------------+
@@ -447,6 +493,8 @@ Aktivitätsteil, dann der Zeitraumschalter, dann B, D mit E und C.
 |  ● Gesprächsinhalt                                                     |
 |  Fragen           4         ~~~~\/~~~      3 bis 6                 12  |
 |  Gesprächseinstieg 3 Teile  [3][2][3][3]   in 9 von 12 alle 3      12  |
++-----------------------------------------------------------------------+
+|  [ Fortschritt herunterladen ]                                         |  F
 +-----------------------------------------------------------------------+
 ```
 
@@ -570,6 +618,42 @@ Der Vorschlag nennt immer, woher er kommt („weil der Abschluss in Ihren letzte
 Auswertungen dreimal genannt wurde“). Eine Empfehlung ohne Begründung ist an
 dieser Stelle eine Anweisung.
 
+### F. Mitnehmen
+
+Ganz unten ein Knopf: **Fortschritt herunterladen**
+(`frontend/src/utils/progressPdf.ts`). Das Dashboard ist das, was jemand in ein
+Gespräch mit einer Ausbilderin oder einer Führungskraft mitnimmt, und bis dahin
+ging das nur als Bildschirmfoto je Block.
+
+Die Datei trägt, was die Seite trägt, in der Reihenfolge der Seite: die
+Aufzeichnung dessen, was trainiert wurde, über alle gespeicherten Gespräche,
+die Fokusziele, was die
+Auswertungen wiederholt nennen, und jede Kennzahl mit ihrem üblichen Bereich und
+einem gezeichneten Verlauf — gelesen über die Trainings, die die Schalter
+auswählen, was die erste Seite in Worten sagt.
+
+Drei Dinge stehen bewusst **nicht** darin:
+
+* **Der Kalender.** Zwölf Monatsraster sind vier Seiten Kästchen. Was ein Leser
+  daraus mitnimmt — wie viele Trainings in welchen Monat fielen — ist eine
+  Liste, und eine Liste ist das, was ein Blatt Papier gut kann.
+* **Jede Wertung.** Kein Zielwert, keine Ampel, kein Pfeil, keine Differenz
+  zwischen einem früheren und einem späteren Wert, keine Gesamtnote
+  (ADR 0004, ADR 0051, ADR 0065). Auf Papier ist die Regel schärfer als auf dem
+  Bildschirm: Ein Blatt, das jemand anderem in die Hand gegeben wird, liest sich
+  als Beurteilung der Person, solange nicht dasteht, dass es keine ist. Es steht
+  zweimal da, unter dem Titel und am Fuß.
+* **Eine Route auf dem Server.** Gebaut wird im Browser, aus den Zahlen, die die
+  Seite ohnehin hält. Ein zweiter Weg zu denselben Zahlen ist genau das, was
+  Abschnitt 9 ausschließt; dass die Feedback-Datei aus demselben Grund im
+  Browser gebaut wird, kommt hinzu (ADR 0066).
+
+Der Knopf sitzt, wo der Feedback-Bildschirm seinen hat: in derselben
+Aktionszeile und mit deren Klassen, nicht mit einer Kopie ihrer Regeln. Das
+Seitengerüst beider Dokumente — Banner, Schriften, Palette, Überschrift, Absatz,
+Seitenumbruch — ist `frontend/src/utils/pdfDocument.ts`, damit die zwei Dateien,
+die diese Anwendung schreibt, wie eine Anwendung aussehen.
+
 ## 6. Zustände
 
 Ein Dashboard wird an seinen Randfällen beurteilt, nicht am vollen Bildschirm.
@@ -611,6 +695,13 @@ Drei Ebenen, mehr nicht:
    Eine Kennzahl zeigt die Sätze zu den Zielen, für die sie die *erste*
    Kennzahl ist (`focusMetrics.goalsForMetric`). Sonst sammelte die
    Reaktionszeit Aussagen aus drei Zielen ein, für die sie nur eine Nebengröße
+   ist.
+
+   **Der Zeitraum gilt hier mit** (seit September 2026). Gebaut war es anders:
+   Die Kachel sagte „aus 5 Trainings“, und die Seite dahinter zeichnete jedes
+   gespeicherte — zwei Bildschirme, die über dieselbe Kennzahl verschieden
+   sprachen. Die Auswahl reist im Link mit (`withPeriod`), und weil diese Ebene
+   den Schalter selbst nicht trägt, sagt sie in Worten, worüber sie gelesen
    ist.
 3. **Ein einzelnes Training**. Führt in die bestehende Ansicht
    `PastSessionView`. Diese Ebene ist bereits gebaut und wird nicht verdoppelt.
@@ -686,11 +777,42 @@ Vorschlag, damit die spätere Umsetzung nicht am Datenweg hängt:
   Zeitraum ist aus demselben Grund ein Filter im Browser und kein Parameter:
   Eine Seite lädt, danach kostet ein Wechsel des Zeitraums keine Anfrage.
   Gedeckelt ist das durch die Aufbewahrung von sechs Monaten (ADR 0067) und
-  durch eine Seite von 100 Sitzungen, worüber die Ansicht Auskunft gibt.
+  durch zehn Seiten zu je 100 Sitzungen, worüber die Ansicht Auskunft gibt.
+  Eine Seite war es bis September 2026, und das war zu wenig: Die drei Zahlen
+  im Kopf und der Kalender lesen sich als Aussage über ein Konto, nicht über
+  eine Seite, und waren damit nicht unvollständig, sondern falsch, sobald mehr
+  als hundert Trainings gespeichert waren. Der Lader holt die Seiten
+  nacheinander und hört auf, sobald eine kurz zurückkommt
+  (`hooks/useProgressData.ts`).
+* **Ein Laden und eine Auswahl für alle drei Bildschirme**
+  (`ProgressContext.tsx`, als Layout-Route um die drei gelegt). Vorher rief
+  jede Ebene den Lader selbst auf, also kostete jeder Schritt in ein Detail und
+  zurück die ganze Verlaufsliste noch einmal. Der Zeitraum steht in der URL
+  (`?trainings=5|10`, die Voreinstellung bleibt draußen) und nicht im Zustand
+  einer Komponente: Damit überlebt er einen Neuladen und reist mit einem
+  geteilten Link — der Grund, aus dem Abschnitt 7 die Detailebenen überhaupt
+  zu Routen macht.
 * **Ein markierter Feedback-Punkt trägt seinen Text mit** (Ergänzung zu ADR
   0064). Was die Liste weiterhin nicht trägt, ist die Auswertung als Text:
   Zusammenfassung, Phasenabsatz, `tone_fit` und jeder nicht markierte Punkt
   bleiben auf der Detailroute.
+* **Die Rechenteile sind geprüft** (`utils/*.test.ts`, Vitest). Sie sind reine
+  Funktionen, und jeder ihrer Fehler zeichnet sauber: eine Reihe, die rückwärts
+  in der Zeit läuft, ein Band aus der falschen Streuung, ein Nenner, der die
+  Trainings ohne Auswertung mitzählt. Nichts davon wirft eine Ausnahme, und
+  alles davon wird zu einem Satz, den die Anwendung jemandem über sich selbst
+  sagt, über Daten, die er nicht nachrechnen kann. Geprüft werden deshalb die
+  Aussagen, die der Bildschirm laut trifft („Ihr üblicher Bereich 118 bis 141“,
+  „in 9 von 12 Trainings“), nicht Zeilen. Dass ein Fokusziel aus dem Katalog
+  auch eine Kachel und einen Übungsvorschlag bekommt, hängt an zwei Tabellen im
+  Frontend, die still danebenliegen können; `tests/test_focus_goal_coverage.py`
+  und `tests/test_recommendations.py` halten beide gegen den gesäten Katalog.
+* **Die Mitnahme ist ebenfalls kein Endpunkt.** Das PDF (Abschnitt F) wird im
+  Browser gebaut, aus den Sitzungen, die für die Ansicht ohnehin geladen sind.
+  Eine Serverroute dafür wäre der zweite Weg zu denselben Zahlen, den der erste
+  Punkt ausschließt, und sie müsste die Auswahl der Schalter noch einmal
+  nachbilden. jsPDF und die Schriften werden erst beim Druck auf den Knopf
+  geholt, liegen also nicht im Startbündel.
 * **Auf Anfrage berechnet, nicht materialisiert.** Sechs Monate Aufbewahrung
   begrenzen die Datenmenge je Konto auf eine Größenordnung, die eine Abfrage
   ohne Aggregattabelle trägt. Eine Aggregattabelle wäre eine zweite Wahrheit,
@@ -743,6 +865,7 @@ Offene Fragen an die Projektleitung, die ich nicht allein entscheiden sollte:
 | 1 (gebaut) | Kopf, Kennzahlen mit Verläufen, Fokuszielkacheln für die acht messbaren Ziele, alle Zustände aus Abschnitt 6, Detailebene | Nur vorhandene Daten. Kein Schemaeingriff. |
 | 2 (gebaut) | Bereich D und E, dazu die zweite Ebene für Kennzahl und Fokusziel mit den zitierten Aussagen | Zuordnung im Generator, eine Spalte, ADR aus Abschnitt 10. Erledigt durch ADR 0080 (`feedback_point.focus_goal_id`, Migration `d4c81b70e2a5`) samt der redaktionellen Tabelle in `utils/practiceRoutes.ts` und der Ergänzung zu ADR 0064 für den Text auf der Liste. |
 | 3 (abgeschlossen) | Fokusziele ohne Messung mit Zahlen unterlegen | Gebaut: Sprachmelodie (F-35), Unterbrechungen (F-51), Abschnittswerte für „Souveränität unter Druck“ (ADR 0081). Verworfen mit Begründung: Füllwörter (Whisper normalisiert sie weg), das Fokusziel zur Lautstärke (misst das Mikrofon mit), die Artikulation (Abschnitt 4.2). Keine offenen Punkte mehr. |
+| 4 (gebaut) | Bereich F: die Ansicht als PDF zum Mitnehmen | Nur vorhandene Daten und kein Schemaeingriff — gebaut im Browser aus den Sitzungen, die die Ansicht ohnehin lädt (`utils/progressPdf.ts`), auf dem Seitengerüst, das aus der Feedback-Datei herausgelöst wurde (`utils/pdfDocument.ts`). Nachträglich ergänzt, nicht ursprünglich geplant: Der Bedarf kam aus dem Gebrauch, weil die Seite sonst nur als Bildschirmfoto in ein Gespräch mitzunehmen war. |
 
 Stufe 1 ist für sich genommen brauchbar und hält jede bestehende Entscheidung
 ein. Das ist der Zuschnitt, mit dem angefangen werden sollte.

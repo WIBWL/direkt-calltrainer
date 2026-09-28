@@ -5,33 +5,15 @@ import { useStoredSession } from "../hooks/useStoredSession";
 import type { FocusGoal, SessionSummary } from "../protocol";
 import { ROUTES, type TrainingStart } from "../routes";
 import { listScenarios, type ScenarioCard } from "../scenarioLibrary";
-import { mentionSummary } from "../utils/goalMentions";
+import { mentionSummary, statementsFor, type GoalStatement } from "../utils/goalMentions";
 import { PRACTICE_CATEGORY, PRACTICE_REASON } from "../utils/practiceRoutes";
 import { formatDayMonth } from "../utils/time";
 import InfoDetails from "./InfoDetails";
 
 /**
- * Block E of the dashboard: one thing to practise next.
- *
- * One suggestion and not a list. The decision about what to train next should
- * end in a click, and a stack of options is the same screen again with the
- * decision handed back to the reader.
- *
- * It always names where it comes from — naming the goal and how many wrap-ups
- * raised it is what makes this a suggestion; the same button without that
- * sentence is an instruction, and this screen has no standing to give one
- * (ADR 0004, ADR 0065).
- *
- * Three routes, in the order section 5.E of the concept sets out: the follow-up
- * (F-60) written from the training where the point was last named, else a
- * Scenario of the kind that goal is practised in (`PRACTICE_CATEGORY`, an
- * editorial table, unplayed preferred), else — for goals binding to no kind of
- * call — any unplayed one.
- *
- * The partner is the Persona from that same training, not chosen and not
- * varied: holding the voice constant is what makes the next call an exercise on
- * the point. The wire carries no difficulty on a Persona, so "a more demanding
- * partner" is not something this could pick even if it should.
+ * Block E: one thing to practise next, always naming its ground, else it is an instruction (ADR 0004, ADR 0065).
+ * Routes (concept 5.E): the follow-up (F-60) from the training that last named it, else a Scenario of the goal's
+ * kind (`PRACTICE_CATEGORY`, unplayed first), else any unplayed one. Persona held constant from that training.
  */
 export default function ProgressPractice({
   sessions,
@@ -66,7 +48,7 @@ export default function ProgressPractice({
     return () => {
       cancelled = true;
     };
-  }, [target]);
+  }, [hasTarget]);
 
   if (!target || !source) return null;
 
@@ -76,6 +58,7 @@ export default function ProgressPractice({
   // what it is practised in. Silence is the honest answer, not a random call.
   if (category === undefined) return null;
 
+  const since = wordSince(sessions, target.goal, source);
   const personaId = detail?.persona_id ?? null;
   const followUp = detail?.follow_up ?? null;
   const suggestion = followUp
@@ -92,19 +75,28 @@ export default function ProgressPractice({
         Als Nächstes üben
       </h3>
 
-      {/* The ground, then the offer, then the button — left to right across
-          the band rather than stacked. That order is the argument either way:
-          a suggestion whose ground the reader has not seen is an instruction,
-          and this screen has no standing to give one. Reading order is the
-          same as the source order, so the two halves swap under each other on
-          a narrow screen without anything else changing. */}
+      {/* Ground, then offer, then button, in one column: a suggestion whose ground the reader has not seen
+          is an instruction. */}
       <div className="progress-practice-band">
         <p className="progress-practice-why">
           <span className="progress-practice-chip">Vorschlag</span>
           {goal?.title ?? target.goal} wurde in {target.count} Ihrer Auswertungen als
-          Verbesserungspunkt genannt, zuletzt am {formatDayMonth(source.started_at) ?? source.started_at} im Gespräch
+          Verbesserungspunkt genannt, zuletzt am{" "}
+          {formatDayMonth(source.started_at) ?? source.started_at} im Gespräch
           „{source.scenario}“.
         </p>
+
+        {since && (
+          // Looks back (Zimmerman's cycle): the wrap-ups raised this, and afterwards a wrap-up said this.
+          // Causation is never claimed — that would be the measurement ADR 0080 refuses.
+          <p className="progress-practice-since">
+            <span className="progress-practice-chip">Seither</span>
+            In Ihrem Training am {formatDayMonth(since.at) ?? since.at} („{since.scenario}“)
+            stand dazu{" "}
+            {since.kind === "strength" ? "als Stärke" : "als Verbesserungspunkt"}:{" "}
+            <q>{since.text}</q>
+          </p>
+        )}
 
         <div className="progress-practice-offer">
           <div className="progress-practice-text">
@@ -138,24 +130,28 @@ export default function ProgressPractice({
 
       {/* The line calling this a suggestion and not an instruction stays in
           view: it is what keeps the button above from reading as an order. How
-          the suggestion was put together is background and sits behind the "i". */}
-      <p className="progress-practice-note">
-        Ein Vorschlag, keine Vorgabe. Über die Startseite können Sie jederzeit etwas anderes
-        wählen.
-      </p>
-      <InfoDetails label="Wie dieser Vorschlag zustande kommt">
-        <p>
-          Er folgt daraus, was Ihre Auswertungen mehrfach als Verbesserung genannt haben. Gibt es
-          zu dem Gespräch, in dem das zuletzt vorkam, ein Folgeszenario, wird dieses
-          vorgeschlagen. Sonst ein Szenario aus der Art von Gespräch, in der sich das Ziel üben
-          lässt, bevorzugt eines, das Sie noch nicht gespielt haben.
+          the suggestion was put together is background and sits behind the "i",
+          on the same line — two trailing rows each with their own weight made
+          the foot of the block heavier than the offer in it. */}
+      <div className="progress-practice-foot">
+        <p className="progress-practice-note">
+          Ein Vorschlag, keine Vorgabe. Über die Startseite können Sie jederzeit etwas anderes
+          wählen.
         </p>
-        <p>
-          Der Gesprächspartner ist derselbe wie in dem Training, in dem der Punkt zuletzt genannt
-          wurde. So bleibt die Stimme gleich, und das nächste Gespräch ist eine Übung an genau
-          diesem Punkt.
-        </p>
-      </InfoDetails>
+        <InfoDetails label="Wie dieser Vorschlag zustande kommt">
+          <p>
+            Er folgt daraus, was Ihre Auswertungen mehrfach als Verbesserung genannt haben. Gibt
+            es zu dem Gespräch, in dem das zuletzt vorkam, ein Folgeszenario, wird dieses
+            vorgeschlagen. Sonst ein Szenario aus der Art von Gespräch, in der sich das Ziel
+            üben lässt, bevorzugt eines, das Sie noch nicht gespielt haben.
+          </p>
+          <p>
+            Der Gesprächspartner ist derselbe wie in dem Training, in dem der Punkt zuletzt
+            genannt wurde. So bleibt die Stimme gleich, und das nächste Gespräch ist eine Übung
+            an genau diesem Punkt.
+          </p>
+        </InfoDetails>
+      </div>
     </section>
   );
 }
@@ -171,17 +167,23 @@ function lastNaming(sessions: SessionSummary[], goal: string): SessionSummary | 
 }
 
 /**
- * A Scenario of the right kind, preferring one the user has not played.
- *
- * Unplayed first because repeating the same case tests recall as much as
- * delivery, and because it widens their practice at no cost. Where everything
- * of that kind has been played, the least recently played one is still a
- * better answer than none.
- *
- * Matched on the title, which is what both the history row and the library card
- * carry. An id on the history row would be sturdier; the title is what is on
- * the wire today and a duplicate title would only cost this block a slightly
- * worse suggestion.
+ * What a wrap-up has said about this goal since the suggestion's training, or null. Derived, never stored (a
+ * stored press would be per-device or training data, ADR 0066). `source` is the newest training naming the goal,
+ * so a newest statement from a later training is the case worth showing.
+ */
+function wordSince(
+  sessions: SessionSummary[],
+  goal: string,
+  source: SessionSummary,
+): GoalStatement | null {
+  const newest = statementsFor(sessions, [goal])[0];
+  if (!newest || newest.sessionId === source.session_id) return null;
+  return newest;
+}
+
+/**
+ * A Scenario of the right kind, unplayed first (else the least recently played). Matched on the title, the one
+ * thing both the history row and the library card carry; a duplicate title only costs a worse suggestion.
  */
 function pickScenario(
   library: ScenarioCard[] | null,

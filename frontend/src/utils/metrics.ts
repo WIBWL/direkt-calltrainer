@@ -1,26 +1,15 @@
 import type { Measurement, MetricAspect, TrafficLight } from "../protocol";
 
 /**
- * How the call's statistics (F-53) are labelled, split and read.
- *
- * Shared rather than owned by the feedback page, because the downloadable
- * report (`utils/feedbackPdf.ts`) and the progress view read the same figures:
- * a tile saying "2,4" on screen and "2.4 Sekunden" in the file would be the
- * same measurement reported twice, differently.
- *
- * Never a judgement, only a reading — ADR 0051 declined to invent the norms
- * that would be needed to say whether a figure is good, which is what
- * `METRIC_DISCLAIMER` says wherever they are shown.
+ * How the call's statistics (F-53) are labelled, split and read — shared by the
+ * page, the PDF and the progress view so a figure reads the same everywhere.
+ * Never a judgement: there are no norms (ADR 0051, `METRIC_DISCLAIMER`).
  */
 
 /**
- * Every metric the backend measures today, as its own type.
- *
- * Hand-written, and pinned to the backend inventory by a test
- * (`tests/test_metrics.py`): adding a metric there fails the suite until it is
- * described here. That is the whole point of the union — the catalogue below
- * is keyed by it, so a missing entry is a compile error rather than a figure
- * that quietly renders as "4.0" on one screen and vanishes from another.
+ * Every metric the backend measures, pinned to its inventory by
+ * `tests/test_metrics.py`. The catalogue below is keyed by it, so an
+ * undescribed metric is a compile error rather than a silently wrong figure.
  */
 export type MetricKey =
   | "talk_share"
@@ -48,20 +37,14 @@ export type SeriesShape = "line" | "parts";
 
 interface MetricDescriptor {
   /**
-   * Whether the figure means anything set beside another call's.
-   *
-   * Required, with no default: it used to be absence from a `NOT_ACROSS_CALLS`
-   * set, so a new metric was silently comparable. The loudness is the one that
-   * is not — its dB span is the microphone and the distance as much as the
-   * speaker (ADR 0076's amendment).
+   * Whether the figure means anything beside another call's. Required, no default,
+   * so a new metric is never silently comparable. Loudness is not: its dB span
+   * depends on the microphone (ADR 0076's amendment).
    */
   comparableAcrossCalls: boolean;
   /**
-   * Whether it earns a row in the progress overview.
-   *
-   * Required for the same reason: it used to be absence from a hidden-set.
-   * A metric can be worth measuring and still repeat what the row above it
-   * already said.
+   * Whether it earns a row in the progress overview. Required for the same
+   * reason; a metric can be worth measuring yet repeat the row above it.
    */
   inOverview: boolean;
   /** Decimals the figure reads naturally in. Defaults to none for a count and
@@ -69,17 +52,12 @@ interface MetricDescriptor {
   decimals?: number;
   /**
    * A checklist's parts, in the order they are usually said (F-63, ADR 0089).
-   *
-   * The tile, the progress view and the PDF all show *which* parts from this
-   * one list: "1 von 3" was not self-explanatory in the first test and read
-   * like a mark (ADR 0004).
+   * Every screen names *which* parts from this list; "1 von 3" read like a mark.
    */
   parts?: readonly (readonly [key: string, label: string])[];
   /**
-   * How many parts one call can be credited with — deliberately not
-   * `parts.length`. The opening lists four but checks three: the offer of help
-   * and the concern depend on who rang, so exactly one of them applies. This
-   * number used to be read out of the unit string `"von 3"` with a regex.
+   * How many parts one call can be credited with — not `parts.length`: the
+   * opening lists four but checks three (offer of help or concern, by who rang).
    */
   partsTotal?: number;
   /** What the tile's drill-down promises, where it has one. */
@@ -87,19 +65,32 @@ interface MetricDescriptor {
 }
 
 /**
- * One row per metric, and the only place a metric's display facts live.
- *
- * Private on purpose: callers ask the functions below rather than indexing
- * this, so the table can grow a field without every screen learning about it.
+ * One row per metric, the only place its display facts live. Private: callers
+ * use the functions below, so a new field reaches no screen by accident.
  */
 const CATALOGUE: Record<MetricKey, MetricDescriptor> = {
-  talk_share: { comparableAcrossCalls: true, inOverview: true, decimals: 0 },
-  questions: { comparableAcrossCalls: true, inOverview: true },
-  pace: { comparableAcrossCalls: true, inOverview: true, decimals: 0 },
+  talk_share: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    decimals: 0,
+    openHint: "Die Verteilung ansehen",
+  },
+  questions: { comparableAcrossCalls: true, inOverview: true, openHint: "Ihre Fragen ansehen" },
+  pace: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    decimals: 0,
+    openHint: "Diese Kennzahl ansehen",
+  },
   // Across trainings this repeats the call length in other units. Still
   // measured, and still reachable from its own page and the concise-speech goal.
-  word_count: { comparableAcrossCalls: true, inOverview: false, decimals: 0 },
-  fillers: { comparableAcrossCalls: true, inOverview: true },
+  word_count: {
+    comparableAcrossCalls: true,
+    inOverview: false,
+    decimals: 0,
+    openHint: "Die Verteilung ansehen",
+  },
+  fillers: { comparableAcrossCalls: true, inOverview: true, openHint: "Die Wörter ansehen" },
   opening: {
     comparableAcrossCalls: true,
     inOverview: true,
@@ -111,6 +102,7 @@ const CATALOGUE: Record<MetricKey, MetricDescriptor> = {
       ["concern", "Anliegen"],
     ],
     partsTotal: 3,
+    openHint: "Ihren Einstieg ansehen",
   },
   closing: {
     comparableAcrossCalls: true,
@@ -122,15 +114,41 @@ const CATALOGUE: Record<MetricKey, MetricDescriptor> = {
       ["farewell", "Verabschiedung"],
     ],
     partsTotal: 3,
+    openHint: "Ihren Abschluss ansehen",
   },
-  repetitions: { comparableAcrossCalls: true, inOverview: true },
-  hesitations: { comparableAcrossCalls: true, inOverview: true },
-  reaction_time: { comparableAcrossCalls: true, inOverview: true },
-  pauses: { comparableAcrossCalls: true, inOverview: true },
-  phonation_share: { comparableAcrossCalls: true, inOverview: true, decimals: 0 },
-  run_length: { comparableAcrossCalls: true, inOverview: true },
+  repetitions: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    openHint: "Die Passagen ansehen",
+  },
+  hesitations: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    openHint: "Diese Kennzahl ansehen",
+  },
+  reaction_time: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    openHint: "Diese Kennzahl ansehen",
+  },
+  pauses: { comparableAcrossCalls: true, inOverview: true, openHint: "Die Pausen ansehen" },
+  phonation_share: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    decimals: 0,
+    openHint: "Die Verteilung ansehen",
+  },
+  run_length: {
+    comparableAcrossCalls: true,
+    inOverview: true,
+    openHint: "Diese Kennzahl ansehen",
+  },
   // The one metric that is not comparable between calls; see the field above.
-  loudness: { comparableAcrossCalls: false, inOverview: true },
+  loudness: {
+    comparableAcrossCalls: false,
+    inOverview: true,
+    openHint: "Den Verlauf groß ansehen",
+  },
   intonation: {
     comparableAcrossCalls: true,
     inOverview: true,
@@ -144,12 +162,14 @@ const CATALOGUE: Record<MetricKey, MetricDescriptor> = {
 };
 
 /**
- * What a key the catalogue has never been taught reads as.
- *
- * Reachable for a renamed metric: the detail route serves a stored Session's
- * measurements unfiltered, so a call from before ADR 0057's rename still
- * carries `redeanteil`. It renders plainly rather than crashing. The progress
- * views never see one — they drop anything the backend marks inactive.
+ * Every metric the catalogue knows, in inventory order, so a screen can notice
+ * a measurement that could not be taken (it leaves no row at all).
+ */
+export const METRIC_KEYS = Object.keys(CATALOGUE) as MetricKey[];
+
+/**
+ * An unknown key, rendered plainly rather than crashing: the detail route serves
+ * old Sessions unfiltered, so a pre-ADR 0057 call still carries `redeanteil`.
  */
 const UNKNOWN: MetricDescriptor = { comparableAcrossCalls: true, inOverview: true };
 
@@ -195,7 +215,8 @@ export function showsInOverview(key: string): boolean {
   return describe(key).inOverview;
 }
 
-/** What the tile's drill-down promises. */
+/** What the tile's drill-down promises. Every catalogue metric names its own;
+ * the fallback is for an unknown key (see `UNKNOWN`). */
 export function openHint(key: string): string {
   return describe(key).openHint ?? "Ansehen";
 }
@@ -213,13 +234,9 @@ export function metricParts(measurement: Measurement): MetricPart[] | null {
 }
 
 /**
- * The reading a metric carries beside its figure, where it carries one —
- * F-51's traffic light and F-35's three-step liveliness (ADR 0077, ADR 0078).
- *
- * Every part is served by the backend beside the threshold it was read off
- * (`api/sessions.py::_served_detail`), so a recalibration cannot leave a stale
- * word or colour on screen; this only says where in `detail` each one sits,
- * once for the tile and the metric's own page.
+ * The reading beside a figure — F-51's traffic light, F-35's liveliness (ADR 0077,
+ * ADR 0078). Word and colour are served beside the threshold, never mapped here;
+ * this only says where in `detail` each sits.
  */
 export interface MetricReading {
   /** The step in words, e.g. "lebendig". */
@@ -280,21 +297,22 @@ export function withDerived(measurements: Measurement[]): Measurement[] {
 }
 
 /**
- * One figure as it is read out, for every screen that shows one.
- *
- * The single rule. There used to be three — this one keyed by metric, one in
- * `progressStats` keyed by magnitude, and a third parsing the unit string —
- * and they disagreed: the same reaction time read "1.8 s" on the wrap-up and
- * "1,8 s" on the progress table. The comma is the German one and the dot was
- * simply wrong.
- *
- * `unit` is passed rather than looked up because the caller sometimes has a
- * reason to suppress it: the low end of a range carries no unit, the high end
- * does.
+ * A bare number with a German decimal comma, for figures that belong to no
+ * metric (a semitone span, a range in an aria-label). A metric's own value goes
+ * through `formatValue`.
+ */
+export function formatNumber(value: number, decimals: number): string {
+  return value.toFixed(decimals).replace(".", ",");
+}
+
+/**
+ * One figure as it is read out — the single formatting rule for every screen,
+ * with the German comma. `unit` is passed so a caller can suppress it (the low
+ * end of a range carries none).
  */
 export function formatValue(key: string, value: number, unit: string | null): string {
   const decimals = describe(key).decimals ?? (isCount(unit) ? 0 : 1);
-  const text = value.toFixed(decimals).replace(".", ",");
+  const text = formatNumber(value, decimals);
   return unit && !isCount(unit) ? `${text} ${unit}` : text;
 }
 
@@ -348,15 +366,6 @@ function closingSubline(measurement: Measurement): string | null {
   const read = measurement.detail?.["turns_read"];
   if (typeof read !== "number") return null;
   return `geprüft: ${read === 1 ? "Ihr letzter Beitrag" : `Ihre letzten ${read} Beiträge`}`;
-}
-
-/** The loudness curve out of a Measurement's `detail` (ADR 0029), or null. It
- * is the only thing that metric has to show: its value is a dB span that reads
- * like a level without being one (ADR 0004/0051). */
-export function loudnessCurve(measurement: Measurement): (number | null)[] | null {
-  const curve = measurement.detail?.["curve_db"] as (number | null)[] | undefined;
-  if (!curve?.some((value) => value !== null)) return null;
-  return curve;
 }
 
 /** F-08's second half, already in `word_count`'s own `detail`: its own tile,

@@ -1,23 +1,8 @@
 """User-authored Scenarios: ownership, visibility and the write path.
 
-Covers:
-  F-34      user-authored Scenario context
-  F-59/R-58 tenant-scoped library: a colleague sees a shared Scenario without
-            re-entering it
-  ADR 0058  authoring: `created_by`, owner-scoped CRUD, addressing by extern_id
-  ADR 0060  the third axis -- `tenant_id` (company) and `visibility` widened to
-            `tenant`. Every read is scoped to the caller and their tenant; the
-            client never supplies either.
-  ADR 0059  authored text is sanitised on the way in
-  ADR 0063  the editor's field-length caps come from the API, not a mirror
-  ADR 0072  the Scenario category: optional, from a closed vocabulary, and the
-            value the library's category filter runs on
-  ADR 0050  a row is addressed by its unguessable extern_id
-
-Runs against a seeded throwaway database (needs Postgres, skips without one).
-The seed ships the `solox` / `appollo` / `default` tenants; the callers below
-resolve to them via their `tenant` claim (the Keycloak user attribute).
-"""
+Covers F-34, F-59/R-58 (tenant-shared library), ADR 0058 (owner-scoped CRUD), ADR 0060 (tenant/visibility),
+ADR 0059 (sanitising), ADR 0063 (field limits), ADR 0072 (category), ADR 0050 (extern_id).
+Needs a seeded Postgres (skips without); callers resolve via their `tenant` claim."""
 import httpx
 import pytest
 

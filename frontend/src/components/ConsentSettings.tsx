@@ -3,18 +3,9 @@ import { useState } from "react";
 import { useConsentContext } from "../ConsentContext";
 
 /**
- * The storage decision on the profile page: what it currently is, and how to
- * change it (ADR 0066).
- *
- * Withdrawal is confirmed in a second step, and the confirmation says what it
- * will destroy — because it does destroy something. Consent is the only basis
- * this application has for keeping the data, so withdrawing it deletes the
- * stored trainings rather than leaving them behind with nothing to justify
- * them. A user who learns that afterwards has learned it too late.
- *
- * Granting again is not confirmed. It takes nothing away, and putting a
- * speed bump in front of the reversible direction only makes the irreversible
- * one look equally routine.
+ * The storage decision on the profile page (ADR 0066). Withdrawal is confirmed in a step
+ * that says what it destroys: consent is the only basis for keeping the data, so it
+ * deletes the stored trainings. Granting again takes nothing away and is not confirmed.
  */
 export default function ConsentSettings() {
   const { consent, saving, decide } = useConsentContext();

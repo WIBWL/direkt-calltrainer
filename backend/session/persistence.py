@@ -1,21 +1,16 @@
-"""Writing a finished Session to the database (ADR 0034).
+"""Writing a finished Session to the database (ADR 0034), in one transaction after
+the call has ended -- never from the live turn loop, which must not fail on the DB.
 
-One transaction, once, after the call has ended -- never from inside the live
-turn loop, which must not be able to fail because of the database.
-
-This is the seam between the in-memory Session and the schema: it takes the two
-readings of a finished Session that backend/feedback/calls.py produces -- the
-utterances on their timeline, and the call folded into the facts its statistics
-come from -- and writes them as rows.
-"""
+Writes the two readings `backend/feedback/calls.py` produces (the utterances on
+their timeline and the folded call) as rows."""
 
 from __future__ import annotations
 
 import logging
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from decimal import Decimal
 
 from sqlalchemy.orm import Session as DbSession
 
@@ -24,7 +19,7 @@ from sqlalchemy.orm import Session as DbSession
 from backend import consent
 from backend.db import models as db_models
 from backend.db.session import session_scope
-from backend.feedback import interruptions, metrics
+from backend.feedback import interruptions, metrics, rows
 from backend.feedback.calls import Conversation, conversation, utterances
 from backend.personas import Persona
 from backend.scenarios import Scenario
@@ -44,33 +39,31 @@ _STATUS = {
 }
 
 
-def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-    extern_id: uuid.UUID,
-    subject_id: str,
-    persona: Persona,
-    scenario: Scenario,
-    turns: Sequence[Turn],
-    started_at: datetime,
-    reason: str,
-) -> int | None:
-    """Write the Session, its Turns and its measurements. Returns session_id,
-    or None where storage consent was refused and nothing was written.
+@dataclass(frozen=True)
+class FinishedCall:
+    """Everything the write needs to know about a call that has ended; named
+    fields because several are same-typed strings a positional swap would pass."""
 
-    `subject_id` is the Keycloak `sub` from the handshake (ADR 0009): the
-    Session belongs to the account that placed the call, not to a placeholder
-    (ADR 0031).
+    extern_id: uuid.UUID
+    # The Keycloak `sub` from the handshake (ADR 0009): the Session belongs to
+    # the account that placed the call, not to a placeholder (ADR 0031).
+    subject_id: str
+    persona: Persona
+    scenario: Scenario
+    turns: Sequence[Turn]
+    started_at: datetime
+    # How it ended, in the wire protocol's vocabulary (see `_STATUS`).
+    reason: str
 
-    The consent check lives *inside* this transaction (ADR 0066). Asked from
-    outside it, the answer was true and the INSERT that relied on it committed
-    some milliseconds later -- long enough for a withdrawal in another tab to
-    record itself and delete every Session that existed at that moment, leaving
-    this one behind with no deletion path ever to reach it again. Here the
-    answer and the write commit together, and `lock_subject` holds the
-    withdrawal off until they do.
 
-    Synchronous by design: the caller dispatches it off the event loop once the
-    call is over (ADR 0034), so nothing here has to be async-aware.
-    """
+def persist_session(call: FinishedCall) -> int | None:
+    """Write the Session, its Turns and measurements; the session_id, or None if
+    storage consent was refused. The consent check sits *inside* this transaction
+    under `lock_subject` (ADR 0066): outside it, a concurrent withdrawal could commit
+    in between and strand this Session beyond every deletion path. Synchronous; the
+    caller runs it off the event loop after the call (ADR 0034)."""
+    extern_id, subject_id, persona, scenario = call.extern_id, call.subject_id, call.persona, call.scenario
+    turns = call.turns
     with session_scope() as db:
         consent.lock_subject(db, subject_id)
         if not consent.allows_storage(subject_id, db=db):
@@ -82,8 +75,8 @@ def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-a
             persona=_reference(db, db_models.Persona, persona.id),
             scenario=_reference(db, db_models.Scenario, scenario.id),
             language_code=persona.language_id,
-            status=_STATUS.get(reason, db_models.STATUS_ABORTED),
-            started_at=started_at,
+            status=_STATUS.get(call.reason, db_models.STATUS_ABORTED),
+            started_at=call.started_at,
             ended_at=datetime.now(UTC),
         )
         session.turns = [
@@ -124,32 +117,15 @@ def persist_session(  # pylint: disable=too-many-arguments,too-many-positional-a
 def _write_analysis(
     db: DbSession, session: db_models.Session, call: Conversation
 ) -> None:
-    """Attach the Session's Measurement and Finding rows.
-
-    A metric the seed does not know is dropped rather than written against a
-    guessed reference row -- provision.py seeds the inventory from the same
-    METRICS tuple, so that can only happen against a database behind the code.
-
-    Findings are written for one thing only, and the distinction is what makes
-    it allowable: a hard interruption is an *event that occurred at a moment*,
-    not a value judged against a threshold. ADR 0051 keeps the table empty for
-    the second kind, because marking a figure as remarkable takes a norm nobody
-    measured. Nothing of that sort is written here -- an overlap either happened
-    or it did not, and the row says when.
-    """
-    metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType).all()}
-    session.measurements = [
-        db_models.Measurement(
-            metric_type_id=metric_ids[m.key],
-            value=Decimal(f"{m.value:.4f}"),
-            detail_json=m.detail,
-        )
-        for m in metrics.measure(call)
-        if m.key in metric_ids
-    ]
+    """Attach the Session's Measurement and Finding rows (`feedback/rows.py` owns
+    dropping unknown metrics and rounding). Findings only for hard interruptions:
+    an event at a moment, not a value judged against a threshold, which ADR 0051
+    forbids for lack of a norm."""
+    ids = rows.metric_ids(db)
+    session.measurements = rows.measurements(ids, metrics.measure(call))
     session.findings = [
         db_models.Finding(
-            metric_type_id=metric_ids.get(interruptions.COUNT_KEY),
+            metric_type_id=ids.get(interruptions.COUNT_KEY),
             category=interruptions.FINDING_CATEGORY,
             offset_ms=event.offset_ms,
             description=interruptions.finding_description(event),
@@ -159,15 +135,9 @@ def _write_analysis(
 
 
 def _reference(db: DbSession, model: type, extern_id: str):
-    """The Persona / Scenario row a Session points at, by its `extern_id`.
-
-    That is what the value object carries as `.id` since ADR 0058 (an authored
-    row has no `key` slug). Assigned through the relationship rather than the
-    foreign key, so the primary key never has to be named here -- only Persona
-    and Scenario go through this, the Feedback tables are attached directly, by
-    id. `active` is not checked -- a Session may reference a since-retired row,
-    same as before.
-    """
+    """The Persona / Scenario row a Session points at, by its `extern_id` (the
+    value object's `.id` since ADR 0058). `active` is not checked: a Session may
+    reference a since-retired row."""
     try:
         ref = uuid.UUID(str(extern_id))
     except (ValueError, TypeError) as e:

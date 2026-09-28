@@ -1,8 +1,6 @@
 """The job queue between the live Session and the Feedback worker (ADR 0019).
-
-Deliberately thin: one queue, one job type. Everything the worker needs is
-already in Postgres by the time the job runs (ADR 0034/0048), so the payload is
-just a Session's primary key -- no transcript, and above all no audio.
+One queue, one job type; the payload is just a Session's primary key, since
+everything else is in Postgres by then -- never a transcript or audio (ADR 0048).
 """
 
 from __future__ import annotations
@@ -14,13 +12,13 @@ from redis import Redis
 from rq import Queue
 
 from backend.feedback.generator import generate_feedback
+from backend.feedback.jobs import JOB_TIMEOUT_S
 
 QUEUE_NAME = "feedback"
 
-# How long a queued job may wait before it is considered stale, and how long
-# one may run. Generous: the wrap-up is a single LLM call against a gateway
-# that is occasionally slow, and nobody is blocked while it works.
-JOB_TIMEOUT_S = 300
+# Bounds the job RQ runs, and the window a reader believes a `running` row for
+# (`jobs.is_live`). Defined beside that reading rather than here, so asking the
+# question does not require Redis.
 _RESULT_TTL_S = 3600
 
 # How long the *enqueue* may take, which is a different question entirely: it
@@ -31,33 +29,18 @@ SOCKET_TIMEOUT_S = 5
 
 @lru_cache(maxsize=1)
 def connection() -> Redis:
-    """The process-wide Redis connection, created on first use.
-
-    Read lazily like the database settings in backend/db/session.py, so importing this
-    module never requires a configured environment.
-
-    Deliberately without a read timeout: this is the worker's connection, and
-    the worker spends most of its life blocked on it waiting for a job. A
-    socket timeout shorter than that block would turn the normal idle state
-    into an error. The app side gets its own connection below.
+    """The worker's process-wide Redis connection, created lazily on first use.
+    Deliberately without a read timeout: the worker idles blocked on it, and a
+    timeout would turn that into an error. The app has its own connection below.
     """
     return Redis.from_url(_url())
 
 
 @lru_cache(maxsize=1)
 def _enqueue_connection() -> Redis:
-    """The app's connection, which only ever pushes a job and waits for the ack.
-
-    Timed out for the same reason the database connection is (backend/db/
-    session.py): `enqueue_feedback` runs on a threadpool thread while the user
-    waits for their transcript, and `session.ended` goes out only once it
-    returns. A *refused* connection fails at once, but a Redis that merely
-    stops answering -- a paused container, a dropped packet, a swapped-out
-    process -- would hold that thread until the OS gave up minutes later, and
-    the user would never get the transcript. Without consent that transcript is
-    the only copy of the call there is (F-64, ADR 0034/0066). A queue push is
-    local and tiny, so seconds are generous; the job itself is bounded by
-    JOB_TIMEOUT_S and has nothing to do with this.
+    """The app's connection, which only pushes a job. Timed out because the user
+    waits on it for their transcript -- possibly the only copy (F-64, ADR 0066)
+    -- and a Redis that stops answering would otherwise hold it for minutes.
     """
     return Redis.from_url(
         _url(),

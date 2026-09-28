@@ -1,26 +1,8 @@
 """Setup screen: the REST endpoints that feed persona/scenario selection.
 
-Covers:
-  F-43  setup overview  (mandatory settings visible before a session)
-  F-44  persona card view  (persona picked from cards with a short profile)
-  F-15/ADR 0015  persona-card selection
-  F-01/F-03/F-04  the persona and scenario libraries are exposed to the client
-  ADR 0001  scenario and persona are separate, independently chosen
-  F-31/F-50/ADR 0009  the setup lists require a valid Keycloak token
-  ADR 0041  both are served from the database-backed library
-  ADR 0043  the endpoints serve display fields only; the Persona's language is
-            a property of the Persona, not a Session-level choice
-
-Uses httpx's ASGITransport rather than starlette's TestClient: the repo pins
-httpx 0.28, whose Client no longer accepts the `app=` kwarg TestClient passes.
-The `_override_auth` autouse fixture (conftest) makes every request here an
-authenticated one unless a test drops the override.
-
-Runs against a seeded throwaway database: since ADR 0041 the endpoints read the
-persona and scenario tables rather than the modules below, so the modules are
-what the seed *wrote* — which is exactly what makes comparing against them a
-meaningful assertion rather than a tautology.
-"""
+Covers F-43, F-44, F-15/ADR 0015, F-01/F-03/F-04, ADR 0001 (chosen independently), F-31/F-50/ADR 0009
+(token required), ADR 0041 (from the database), ADR 0043 (display fields only). httpx ASGITransport
+(TestClient breaks on httpx 0.28); runs on a seeded throwaway database, so comparing with the seed is real."""
 
 # pylint: disable=duplicate-code
 # Fixture data is repeated per test module on purpose: a test carrying its own

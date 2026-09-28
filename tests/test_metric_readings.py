@@ -1,24 +1,8 @@
-"""What a stored Measurement says beyond its figure, and the shape ADR 0078
-requires it to say it in.
+"""What a stored Measurement says beyond its figure, in ADR 0078's required shape.
 
-`backend/feedback/readings.py` holds one entry per metric that carries an
-explanation, a scale or a step derived on read. Those three used to be three
-tables inside `backend/api/sessions.py`, where a metric key could be misspelt
-or outlive its metric and the route would go on serving a dictionary nobody
-could match to anything.
-
-The conditions pinned here are ADR 0078's, and they are pinned structurally
-rather than left to care: a scale that loses its words, or gains a colour on
-one step and not the next, is a traffic light asserting a direction it never
-wrote down.
-
-Covers:
-  F-35, F-51  the two readings that carry a step
-  F-53        the metric explained at length that deliberately carries none
-  ADR 0051    a figure is measured once and stored; a step is not a figure
-  ADR 0063    the text lives beside the threshold, not copied into the client
-  ADR 0078    what a light on a metric may claim, and under which conditions
-"""
+`readings.py` holds explanation, scale and derived step per metric. Covers F-35,
+F-51 (steps), F-53 (every active metric explained), F-37 (loudness course), ADR 0051,
+ADR 0063 (text beside the threshold) and ADR 0078's conditions, pinned structurally."""
 import pytest
 
 from backend.feedback import intonation, metrics, readings
@@ -30,6 +14,16 @@ def test_every_explained_key_is_a_metric_that_exists():
     """A key here that no metric answers to serves text nothing can show."""
     inventory = {m.key for m in metrics.METRICS}
     assert readings.explained_keys() <= inventory
+
+
+def test_every_active_metric_is_explained():
+    """Every active metric is explained: the condition behind "every tile opens".
+
+    `MetricSection` links a tile only when `metric_notes` covers its metric. Pinned as
+    a rule, not a count, so a new metric without a word about it fails here.
+    """
+    active = {m.key for m in metrics.METRICS if m.active}
+    assert active <= readings.explained_keys(), sorted(active - readings.explained_keys())
 
 
 def test_every_scale_belongs_to_a_metric_that_is_explained():
@@ -89,10 +83,8 @@ def test_a_measurement_with_no_detail_stays_without_one():
 
 # --- A reading is not written down (ADR 0091) --------------------------------
 #
-# Everything above is the reading side. This is the invariant the module exists
-# for, and it had no test: F-51's step was being stored in the measurement's
-# detail and served back from there, which is exactly what ADR 0091 forbids and
-# exactly what ADR 0077 had already had to undo once for F-35.
+# The invariant the module exists for: a step is derived on read, never stored
+# in the measurement's detail (ADR 0077 had to undo exactly that for F-35).
 
 _READING_KEYS = frozenset({
     "light", "light_label",
@@ -103,9 +95,8 @@ _READING_KEYS = frozenset({
 def test_no_measurement_stores_a_step_or_a_colour():
     """The detail a call writes holds facts and no judgement about them.
 
-    Named keys rather than a diff against `served_detail`: a key that is both
-    stored and derived would make the diff empty, which is the very state this
-    has to catch.
+    Named keys, not a diff against `served_detail`: a key both stored and derived
+    would make the diff empty.
     """
     from tests.test_metrics import _call_with_a_barge_in  # pylint: disable=import-outside-toplevel
     from backend.feedback.calls import conversation  # pylint: disable=import-outside-toplevel
@@ -116,14 +107,10 @@ def test_no_measurement_stores_a_step_or_a_colour():
 
 
 def test_a_recalibrated_threshold_reaches_a_call_already_measured(monkeypatch):
-    """The property the split is for, stated end to end.
+    """A recalibrated threshold reaches a call already measured.
 
-    The two numbers behind F-51's light are invented working values, and the
-    module says so: they are meant to be recalibrated once the pilot has data.
-    A stored step survives that recalibration, and then the interface shows a
-    figure coloured by the old scale beside a legend built from the new one --
-    a red 3 next to a legend putting 3 in the yellow band, with the current
-    step marked in a band the number is not in.
+    F-51's thresholds are invented working values meant to be recalibrated; a stored
+    step would show an old-scale colour beside a legend built from the new scale.
     """
     from backend.feedback import interruptions  # pylint: disable=import-outside-toplevel
 
@@ -152,3 +139,62 @@ def test_a_colour_stored_by_an_older_version_does_not_win():
     stale = {"hard_offsets_ms": [], "light": "red"}
 
     assert readings.served_detail(interruptions.COUNT_KEY, stale)["light"] == "green"
+
+
+# --- F-37: the course the screen draws and the prompt describes ------------
+
+def _steady(points: int, level: float = 65.0) -> list[float | None]:
+    """Steady without being constant, like real Praat output."""
+    return [level + (index % 5) - 2 for index in range(points)]
+
+
+def _with_stretch(shift: float, length: int, at: int) -> list[float | None]:
+    curve = _steady(600)
+    for index in range(at, at + length):
+        curve[index] = curve[index] + shift
+    return curve
+
+
+def test_the_loudness_course_is_served_beside_the_stored_curve():
+    """The band, the smoothed line and the stretches are read on every request
+    and never stored (ADR 0091) -- the browser computed all three a second time
+    until this was served."""
+    stored = {"curve_db": _with_stretch(shift=10.0, length=60, at=450)}
+
+    served = readings.served_detail(metrics.LOUDNESS_KEY, stored)
+
+    assert served["curve_db"] is stored["curve_db"], "the stored curve is unchanged"
+    course = served["course"]
+    assert len(course["smoothed"]) == len(stored["curve_db"])
+    assert course["low"] < course["median"] < course["high"]
+    assert [stretch["direction"] for stretch in course["stretches"]] == ["louder"]
+    assert 450 <= course["stretches"][0]["peak_index"] < 510
+
+
+def test_a_curve_too_short_to_read_is_served_exactly_as_stored():
+    stored = {"curve_db": [65.0, 66.0, None]}
+
+    assert readings.served_detail(metrics.LOUDNESS_KEY, stored) == stored
+
+
+def test_a_measurement_without_a_curve_is_served_as_stored():
+    """Nothing to read it off, and nothing pretended."""
+    stored = {"span_db": 12.0}
+
+    assert readings.served_detail(metrics.LOUDNESS_KEY, stored) == stored
+
+
+@pytest.mark.parametrize(
+    ("curve", "described"),
+    [(_steady(600), False), (_with_stretch(shift=10.0, length=60, at=450), True)],
+)
+def test_the_sentence_and_the_drawing_read_the_same_call(curve, described: bool):
+    """The wrap-up's sentence about the course and the course on screen come
+    out of one function now. They were two implementations in two languages,
+    and a drawing that marked no stretch under a sentence naming one would have
+    been nobody's fault in particular."""
+    served = readings.served_detail(metrics.LOUDNESS_KEY, {"curve_db": curve})
+    sentence = metrics.describe_loudness_course(curve)
+
+    assert bool(served["course"]["stretches"]) is described
+    assert ("stretch" in sentence) is described

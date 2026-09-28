@@ -1,8 +1,9 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_OIDC_ISSUER: string;
-  readonly VITE_OIDC_CLIENT_ID?: string;
+  // Not VITE_-prefixed on purpose: see oidcConfig.ts and `envPrefix` in
+  // vite.config.ts. The backend reads the same name.
+  readonly OIDC_ISSUER: string;
 }
 
 interface ImportMeta {

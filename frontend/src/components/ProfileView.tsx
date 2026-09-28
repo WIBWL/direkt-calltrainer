@@ -15,24 +15,9 @@ import SessionHistory from "./SessionHistory";
 const DIREKT_CONTACT = "wiwi-direkt@uni-wuerzburg.de";
 
 /**
- * The account screen (F-31), the privacy notice (F-49) and the deletion paths.
- *
- * A route-level screen, so it brings its own AppLayout the way App.tsx does for
- * the training screens, rather than having the router assemble the frame.
- *
- * Read-only by construction: every value is a claim the realm asserts, nothing
- * derived or filled in. Identity lives in Keycloak and there is no User table
- * (ADR 0031), so nothing here could accept an edit; the screen says so rather
- * than offering fields that would fail on save.
- *
- * Deliberately *not* shown: the Keycloak `sub` and the realm URL, which answer
- * no question a user has, and the access token's expiry, which describes a
- * five-minute token rather than their session (see `useAccount`).
- *
- * Leads with what the user came for and folds explanations into `InfoDetails`.
- * The full text is the privacy statement's job and is linked rather than
- * paraphrased — two copies of a claim are two things to keep in sync, and one
- * will lose.
+ * The account screen (F-31), privacy notice (F-49) and deletion paths, with its own AppLayout. Read-only: identity
+ * lives in Keycloak, no User table (ADR 0031). The `sub`, realm URL and token expiry are deliberately not shown.
+ * The privacy statement is linked, not paraphrased.
  */
 export default function ProfileView() {
   const account = useAccount();
@@ -95,6 +80,15 @@ export default function ProfileView() {
 
       <section className="card">
         <h2>Ihre Trainings</h2>
+        {/* The history lists the trainings one at a time; the progress screen
+            is the same set read across. The link belongs here rather than only
+            in the account chip: somebody who has come to look at what they
+            trained is one sentence away from the page that answers it, and the
+            concept has said so since the first draft. */}
+        <p className="card-lead">
+          Einzeln aufgeführt. Über alle Trainings hinweg steht das auf{" "}
+          <Link to={ROUTES.progress}>Ihrer Fortschrittsseite</Link>.
+        </p>
         <SessionHistory />
       </section>
 

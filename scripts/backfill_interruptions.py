@@ -3,27 +3,13 @@
     python scripts/backfill_interruptions.py            # show what would change
     python scripts/backfill_interruptions.py --apply    # write it
 
-Possible at all because the *timeline* is persisted, unlike the audio: a Turn
-row carries its speaker, its offset and its duration, which is everything
-`interruptions.classify` reads. That makes this metric unusual in this project.
-Speaking pace or loudness can never be recomputed for a past Session, because
-ADR 0048 discards the recording the moment it has been measured; an overlap can,
-because it is a property of when people spoke rather than of how they sounded.
-
-Runs against the database in `.env`, so a host shell will do; nothing here needs
-Redis or a model.
-
-Idempotent. Sessions that already carry the figures are skipped, so a second run
-reports nothing and changes nothing. Anything already written is left alone
-rather than recomputed: a stored measurement is what the user has already been
-shown, and quietly moving it under them would be worse than leaving one
-generation of figures in place.
-"""
+Possible because the Turn timeline is stored (the audio is not, ADR 0048). Uses the
+database in `.env` (no Redis, no model). Idempotent; figures already written are
+never recomputed, since the user has already been shown them."""
 
 # pylint: disable=duplicate-code
-# What is left once `_backfill_cli` took the command line is this module's own
-# entry point: `main()` delegating, and the `if __name__` guard. A script
-# cannot share its own entry point.
+# The sys.path preamble and the main()/__name__ guard cannot move into
+# `_backfill_cli`: the preamble must run before that import.
 
 
 from __future__ import annotations
@@ -31,7 +17,6 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from decimal import Decimal
 
 from dotenv import load_dotenv
 
@@ -46,29 +31,19 @@ load_dotenv()
 # load_dotenv() before it reads the environment -- so these cannot move up.
 from backend.db import models as db_models  # noqa: E402
 from backend.db.session import session_scope  # noqa: E402
-from backend.feedback import interruptions  # noqa: E402
+from backend.feedback import interruptions, rows  # noqa: E402
+from backend.feedback.metrics import Measurement  # noqa: E402
 from scripts import _backfill_cli  # noqa: E402
 
 logger = logging.getLogger("backfill_interruptions")
 
 
 def _timeline(session: db_models.Session) -> tuple[interruptions.Segment, ...]:
-    """The stored Turn rows as the classifier's segments.
+    """The stored Turn rows as the classifier's segments, in `seq_index` order.
 
-    Rows without a duration are dropped: an overlap cannot be established
-    against a segment whose end is unknown, and assuming one would invent the
-    measurement. Ordered by `seq_index`, which is the order they were spoken in
-    and is unique per Session by constraint.
-
-    No `dispatched_ms`: the schema keeps one duration per utterance, so the
-    audio a trimmed reply *would* have run to is not recoverable from a stored
-    Session, and `Segment` falls back to the stored one. For every Session this
-    script is for -- recorded before the live path measured any of this -- that
-    stored duration *is* the dispatched end, so the reading is the intended one.
-    For a Session recorded since, the live path has already written the figures
-    from the in-memory Turns, where both ends exist, and this script skips any
-    Session that has them.
-    """
+    Rows without a duration are dropped rather than guessed. No `dispatched_ms`: it is
+    not stored, but for Sessions recorded before the live path measured this, the
+    stored duration *is* the dispatched end; newer Sessions already have figures."""
     return tuple(
         interruptions.Segment(
             speaker=turn.speaker,
@@ -85,15 +60,14 @@ def backfill(apply: bool) -> int:
     """Write the figures for every Session that has none. Returns how many."""
     written = 0
     with session_scope() as db:
-        metric_ids = {m.key: m.metric_type_id for m in db.query(db_models.MetricType)}
-        count_id = metric_ids.get(interruptions.COUNT_KEY)
-        if count_id is None:
-            logger.error("Metric inventory not seeded; run the app once first")
+        ids = _backfill_cli.metric_ids(db, logger, interruptions.COUNT_KEY)
+        if ids is None:
             return 0
+        count_id = ids[interruptions.COUNT_KEY]
 
-        for session in db.query(db_models.Session).order_by(db_models.Session.session_id):
-            existing = {m.metric_type_id for m in session.measurements}
-            if count_id in existing:
+        for session in _backfill_cli.each_session(db):
+            # Skip what already carries the figure: this one fills a gap.
+            if count_id in {m.metric_type_id for m in session.measurements}:
                 continue
             timeline = _timeline(session)
             if not timeline:
@@ -108,13 +82,10 @@ def backfill(apply: bool) -> int:
             if not apply:
                 continue
 
-            session.measurements.append(db_models.Measurement(
-                metric_type_id=count_id,
-                value=Decimal(f"{len(report.hard)}.0000"),
-                # Marks the row as reconstructed rather than measured when the
-                # call ended. The figures are identical either way, but a row
-                # that says where it came from is worth the one key.
-                detail_json={**report.detail(), "backfilled": True},
+            session.measurements.extend(rows.measurements(
+                {interruptions.COUNT_KEY: count_id},
+                [Measurement(interruptions.COUNT_KEY, float(len(report.hard)), report.detail())],
+                backfilled=True,
             ))
             session.findings.extend(
                 db_models.Finding(

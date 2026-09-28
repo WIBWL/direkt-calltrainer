@@ -1,31 +1,14 @@
 import type { ReactNode } from "react";
 
 import type { Measurement, TrafficLight } from "../protocol";
+import { formatNumber } from "../utils/metrics";
 import InfoDetails from "./InfoDetails";
 import PitchContour from "./PitchContour";
 
 /**
- * What a speaker's pitch contour says about their delivery (F-35).
- *
- * The layout: the contour, one sentence with the coloured classification in it,
- * then the five figures as tiles in the same grid the metrics use. Each tile
- * carries its own "i" with what it measures and what it is worth. Below them
- * the one or two readings that mean something without a norm.
- *
- * The method used to sit under every figure, which buried the one sentence a
- * reader acts on in six hundred words about measurement. Nothing was deleted,
- * only moved behind the icons.
- *
- * Only the liveliness carries a classification and a traffic light, being the
- * only figure with a published boundary (Hincks 2005, measured against human
- * ratings). ADR 0078 holds the conditions a light comes with; ADR 0077 records
- * why the reading sits there and not on the range, whose old five-step scale
- * had nothing behind its derivation.
- *
- * The endings and the development need no norm: a slope rises or falls whoever
- * is speaking, and a speaker compared with themselves has no reference point to
- * invent. The wording stops at the observation and leaves whether it was
- * intended to the person who was there.
+ * What a speaker's pitch contour says about their delivery (F-35): the contour, a lead
+ * sentence, then five figure tiles with an "i" each. Only liveliness carries a class and
+ * light (Hincks 2005; ADR 0077/0078); endings and development need no norm.
  */
 
 /** Below this a change between the first and last third is wobble, not a
@@ -44,13 +27,9 @@ export default function IntonationReading({
 }: {
   measurement: Measurement;
   /**
-   * Whether the tone suited the occasion, from the wrap-up (`feedback.tone_fit`).
-   *
-   * It is rendered here and not in the wrap-up because it answers the question
-   * the figures on this page raise and cannot settle: how much melody is
-   * appropriate depends on the occasion, and every caveat in this block says
-   * so. Null for a training whose wrap-up predates it, or one still being
-   * written, in which case the block is left out rather than shown empty.
+   * Whether the tone suited the occasion, from the wrap-up (`feedback.tone_fit`), shown
+   * here because it answers what these figures cannot. Null for an older or unfinished
+   * wrap-up, in which case the block is left out.
    */
   toneFit?: string | null;
 }) {
@@ -172,8 +151,8 @@ export default function IntonationReading({
 
         <Tile
           name="Umfang"
-          value={`${measurement.value.toFixed(1)} Halbtöne`}
-          subline={`das ${Math.pow(2, measurement.value / 12).toFixed(2)}-fache der Frequenz`}
+          value={`${formatNumber(measurement.value, 1)} Halbtöne`}
+          subline={`das ${formatNumber(Math.pow(2, measurement.value / 12), 2)}-fache der Frequenz`}
           info="Was der Umfang misst"
         >
           <p>
@@ -240,7 +219,7 @@ export default function IntonationReading({
         {first != null && last != null && (
           <Tile
             name="Verlauf"
-            value={`${first.toFixed(1)} → ${last.toFixed(1)}`}
+            value={`${formatNumber(first, 1)} → ${formatNumber(last, 1)}`}
             subline={developmentSubline(first, last)}
             info="Was der Verlauf vergleicht"
           >
@@ -269,12 +248,8 @@ export default function IntonationReading({
 }
 
 /**
- * One figure as a tile, in the same grid the metrics use.
- *
- * The shape is `.metric` deliberately, so these read as the same kind of thing
- * as the tiles in the wrap-up rather than as a second design. What they add is
- * the icon: on the wrap-up grid the explanation lives on the metric's own
- * page, and here there is no further page to go to.
+ * One figure as a tile, shaped as `.metric` so it reads like the wrap-up's tiles; it adds
+ * an "i", since here there is no further page to go to.
  */
 function Tile({
   name,
@@ -306,12 +281,8 @@ function Tile({
 }
 
 /**
- * The one sentence this screen is built around.
- *
- * The classification in words, coloured, plus what it sounds like to somebody
- * on the other end of the line. Short: a reader who wants the rest opens an
- * icon, and a reader who stops here should still leave with the right
- * impression.
+ * The one sentence this screen is built around: the coloured classification in words and
+ * what it sounds like on the other end of the line.
  */
 function lead(
   pvq: number | null | undefined,
@@ -364,11 +335,8 @@ function endingsSubline({ falling, rising, level }: Endings): string {
 }
 
 /**
- * What the endings say, in one sentence, or nothing.
- *
- * What is worth noticing is the mismatch between what somebody meant and how it
- * landed, and only the speaker can settle that, so the sentence stops at the
- * observation.
+ * What the endings say, in one sentence, or nothing. It stops at the observation: only
+ * the speaker can settle whether it landed as meant.
  */
 function endingsNote(endings: Endings | undefined): string | null {
   if (!endings) return null;
@@ -396,8 +364,8 @@ function developmentSubline(first: number, last: number): string {
   const change = last - first;
   if (Math.abs(change) < NOTABLE_CHANGE_ST) return "erstes zu letztem Drittel";
   return change < 0
-    ? `enger um ${Math.abs(change).toFixed(1)} Halbtöne`
-    : `weiter um ${change.toFixed(1)} Halbtöne`;
+    ? `enger um ${formatNumber(Math.abs(change), 1)} Halbtöne`
+    : `weiter um ${formatNumber(change, 1)} Halbtöne`;
 }
 
 /** A comparison of the speaker with themselves, which is the only comparison
@@ -412,10 +380,10 @@ function developmentNote(
 
   if (change < 0) {
     return (
-      `Gegen Ende wurde Ihre Melodie enger, um ${Math.abs(change).toFixed(1)} Halbtöne. Das ` +
+      `Gegen Ende wurde Ihre Melodie enger, um ${formatNumber(Math.abs(change), 1)} Halbtöne. Das ` +
       "passiert oft, wenn ein Gespräch anstrengend wird oder zum Schluss nur noch Formalien " +
       "abgearbeitet werden."
     );
   }
-  return `Gegen Ende wurde Ihre Melodie weiter, um ${change.toFixed(1)} Halbtöne.`;
+  return `Gegen Ende wurde Ihre Melodie weiter, um ${formatNumber(change, 1)} Halbtöne.`;
 }

@@ -1,20 +1,14 @@
 """Deep links into the client-side router survive a reload (F-31, ADR 0009).
 
-The SPA owns paths the server has no file for -- `/profil` today, the history
-and progress screens next. Plain `StaticFiles` 404s them, which works fine
-until someone reloads the page or opens a link, so the failure hides until the
-exact moment a user does the ordinary thing.
-
-Driven against a directory this module builds rather than against
-`frontend/dist`: the fallback is server behaviour and has to be assertable
-without a Node toolchain or a prior `npm run build`, which is also what keeps
-this test meaningful in a checkout where the frontend was never built.
+Plain `StaticFiles` 404s SPA paths like `/profil` on reload. Driven against a directory built
+here, not `frontend/dist`, so it needs no Node toolchain or prior build.
 """
 import httpx
 import pytest
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app import SinglePageApp
+from backend.app import SinglePageApp, app
 
 INDEX_HTML = "<!doctype html><title>Calltrainer</title><div id=root></div>"
 BUNDLE_JS = "console.log('bundle')"
@@ -28,14 +22,14 @@ def spa_client(tmp_path):
     assets.mkdir()
     (assets / "index-abc123.js").write_text(BUNDLE_JS, encoding="utf-8")
 
-    app = FastAPI()
+    bare = FastAPI()
 
-    @app.get("/api/personas")
+    @bare.get("/api/personas")
     def _personas() -> list[str]:
         return []
 
-    app.mount("/", SinglePageApp(directory=str(tmp_path), html=True), name="frontend")
-    transport = httpx.ASGITransport(app=app)
+    bare.mount("/", SinglePageApp(directory=str(tmp_path), html=True), name="frontend")
+    transport = httpx.ASGITransport(app=bare)
     return httpx.AsyncClient(transport=transport, base_url="http://testserver")
 
 
@@ -88,11 +82,8 @@ async def test_a_missing_asset_stays_a_404(spa_client) -> None:
     ["/api/unknown", "/api/sessions/nope/deeper", "/ws/nothing", "/health/nothing"],
 )
 async def test_server_paths_never_fall_back_to_the_app(spa_client, path: str) -> None:
-    """An unknown endpoint under a server-owned prefix stays a 404.
-
-    Answering with a page would turn a clear failure into a JSON parse error
-    in the caller, which is a much worse thing to debug than the 404 it
-    replaced.
+    """An unknown endpoint under a server-owned prefix stays a 404, not an HTML page
+    the caller then fails to parse as JSON.
     """
     async with spa_client as client:
         response = await client.get(path)
@@ -109,3 +100,24 @@ async def test_a_real_api_route_is_unaffected(spa_client) -> None:
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+@pytest.mark.parametrize("path", ["/openapi.json", "/docs", "/redoc"])
+async def test_the_api_schema_is_not_published(path: str) -> None:
+    """FastAPI serves its schema and two documentation pages by default, open
+    to anyone and outside the login. Nothing reads them, so the deployed app
+    must not hand out every route and payload shape: whatever the path answers
+    (the SPA's fallback, or a 404 in a checkout without a built frontend), it
+    is not the schema."""
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get(path)
+
+    assert "openapi" not in response.text.lower()
+    assert "swagger" not in response.text.lower()
+
+
+def test_no_cors_middleware() -> None:
+    """The SPA is served same-origin, so no origin needs allowing; a leftover
+    allow-list is one more thing to reason about on a deployed server."""
+    assert all(m.cls is not CORSMiddleware for m in app.user_middleware)

@@ -9,34 +9,18 @@ import { listSessions } from "../sessions";
  * on the network. The backend caps a page at 100 (ADR 0064). */
 const PAGE_SIZE = 20;
 
-/** How many rows the list opens on, and how many each press of the button adds
- * after that.
- *
- * The two differ on purpose. The profile screen is not the history screen: the
- * list sits under the account, the consent switches and the data overview, and
- * three rows are enough to say what it is and to reach the training just
- * finished. Someone who presses the button is no longer glancing, so the step
- * from there is a page's worth rather than three more.
- *
- * Both are display, not fetching: a page from the server is `PAGE_SIZE` rows
- * either way, and `showMore` asks for the next one only when the rows it is
- * about to reveal are not already here. One step is smaller than one page, so
- * a press never waits on more than one request. */
+/** Rows shown at first (a glance, on the profile screen) and added per press.
+ * Display only: `showMore` fetches the next `PAGE_SIZE` page only when the rows
+ * to reveal are missing, and a step is smaller than a page, so a press waits on
+ * at most one request. */
 const FIRST_ROWS = 3;
 const STEP_ROWS = 10;
 
 export type HistoryState = "loading" | "ready" | "failed";
 
 /**
- * The caller's own finished Sessions, newest first (F-48).
- *
- * Loads one page and appends further ones on demand rather than asking for
- * everything: the endpoint is paginated because a history grows without bound,
- * and a screen that always requested the maximum would quietly stop being
- * complete on the day someone passed it.
- *
- * Ownership needs no argument here — the route filters by the caller's own
- * subject and offers no way to ask about anyone else (ADR 0064).
+ * The caller's own finished Sessions, newest first (F-48), one page at a time,
+ * appended on demand. The route itself scopes to the caller (ADR 0064).
  */
 export function useSessionHistory() {
   const [loaded, setLoaded] = useState<SessionSummary[]>([]);

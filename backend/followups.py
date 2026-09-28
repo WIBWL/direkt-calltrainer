@@ -1,33 +1,8 @@
-"""The next call in the same matter, drafted from a Session's Feedback (F-60).
+"""The next call in the same matter, drafted from a Session's Feedback (F-60, ADR 0069).
 
-The improvement points say what to work on; the model is asked for the *next*
-call in the case the trainee has just played -- the same matter, moved on in
-time -- built so that the thing the feedback asked for is the only way through
-it. The draft is written here and stored by `backend/library.py` like any
-authored Scenario, so sanitising, caps and ownership stay where they are.
-
-**Asked for, not written unbidden** (ADR 0069's amendment). It began as a second
-model call in the Feedback worker, arriving a little after the wrap-up whether
-anyone wanted it or not; the User now presses a button for it, exactly as they
-do for the reverse (F-61). What that buys is stated in the ADR; what it means
-here is that this module no longer knows anything about a worker. It drafts,
-`POST /api/sessions/{id}/follow-up` reads the material and stores the result,
-and a failure is a status code rather than a silent log line.
-
-The played Scenario's four prompt fields are in the material, which ADR 0043
-otherwise withholds from the client. That is the exception ADR 0070 already
-takes for the reverse, on the same ground: the case is one the User has just
-heard played out, so a draft that continues it tells them nothing they were
-not told by the call itself. The measured statistics stay out -- no target
-range exists to correct a figure against (ADR 0051).
-
-The four case fields become the caller's briefing, so the prompt keeps the
-exercise's purpose out of them. `short_description` and the trainee's own
-briefing (ADR 0054) are the two fields where it may be said, because the
-caller reads neither.
-
-The values are German: it lands in the User's own library, as F-58's text does.
-"""
+Asked for via `POST /api/sessions/{id}/follow-up`; drafted here, stored by `library.py`.
+The played case's four prompt fields go into the prompt (ADR 0070's exception to ADR
+0043), statistics stay out (ADR 0051), and the exercise's purpose stays out of the case."""
 from __future__ import annotations
 
 import logging
@@ -35,7 +10,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ValidationError
 
-from backend.authored_text import WIRE_FIELD_LIMITS, clean
+from backend.authored_text import WIRE_FIELD_LIMITS, clean, fit
 from backend.clients import llm
 
 logger = logging.getLogger(__name__)
@@ -43,12 +18,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class PlayedCall:
-    """The call a follow-up continues, as the prompt needs it.
-
-    Its own type rather than nine parameters: the API layer reads these off one
-    Session, and this module stays the only place that decides what a draft is
-    built from.
-    """
+    """The call a follow-up continues, as the prompt needs it -- one type so this
+    module stays the only place that decides what a draft is built from."""
 
     scenario_name: str
     scenario_teaser: str
@@ -75,9 +46,8 @@ _REQUIRED = ("name", "short_description", "description")
 class _Draft(BaseModel):
     """The six authorable fields (`backend/api/scenarios.py`'s ScenarioInput).
 
-    All defaulted: a missing optional key costs that field, not the whole
-    draft. The three in `_REQUIRED` are checked after cleaning, because a field
-    that survives validation and then cleans to nothing is just as unusable.
+    All defaulted, so a missing optional key costs only that field. `_REQUIRED`
+    is checked after cleaning, since a field can clean to nothing.
     """
 
     name: str = ""
@@ -91,30 +61,9 @@ class _Draft(BaseModel):
         """Cleaned and capped to what the authoring API enforces (ADR 0059/0063),
         so the editor shows exactly the text that would be stored."""
         return {
-            field: _fit(clean(getattr(self, field)), cap)
+            field: fit(clean(getattr(self, field)), cap)
             for field, cap in WIRE_FIELD_LIMITS.items()
         }
-
-
-def _fit(value: str, cap: int) -> str:
-    """One field, held to its cap without ending mid-word.
-
-    The prompt states every limit, and the card's twice over, and a small
-    model (ADR 0011) still writes past the 100 characters `short_description`
-    gets -- so the cap has to hold on this side as well. Cutting back to the
-    last space leaves a readable line instead of a severed word, and the
-    ellipsis says the sentence was cut rather than written that way. Only
-    ever a safety net: a draft that needs it has already lost its ending.
-    """
-    if len(value) <= cap:
-        return value
-    head = value[: cap - 1].rstrip()
-    space = head.rfind(" ")
-    # Back off to a word boundary only while that leaves most of the field --
-    # one very long word must not cut the line down to nothing.
-    if space > cap // 2:
-        head = head[:space]
-    return head.rstrip(" ,;:-–—") + "…"
 
 
 # --- Prompt ---------------------------------------------------------------
@@ -155,10 +104,8 @@ def _material(call: PlayedCall) -> str:
 def _messages(material: str) -> list[dict[str, str]]:
     """The prompt. English per ADR 0043; the draft itself is German.
 
-    Numbered, like the wrap-up's: a small model (ADR 0011) loses a rule that
-    sits mid-paragraph. The ones it breaks without them are S2 (the caller must
-    not learn what is being trained), S1 (no addressing the trainee) and S5
-    (carry the played case forward rather than play it again unchanged).
+    Numbered because a small model (ADR 0011) loses mid-paragraph rules; the ones
+    it breaks otherwise are S1, S2 and S5.
     """
     caps = ", ".join(f"{field} {cap}" for field, cap in WIRE_FIELD_LIMITS.items())
     system = (
@@ -236,13 +183,7 @@ def _messages(material: str) -> list[dict[str, str]]:
         "the bar inside call_goal: never offer them something the caller "
         "would not accept, or the call cannot be won.\n"
         "\n"
-        "# Never\n"
-        "N1. No markdown, no headings, no bullet characters, no line breaks "
-        "inside the JSON strings.\n"
-        "N2. No straight double quote inside a string: forget the backslash in "
-        "front of one and the whole answer is unreadable. Use „ “ or single "
-        "quotes.\n"
-        "N3. No text of any kind before or after the JSON object.\n"
+        f"{llm.JSON_ANSWER_NEVER}"
         "\n"
         "# Output\n"
         "Answer with a single JSON object and nothing else.\n"
@@ -292,19 +233,11 @@ def _messages(material: str) -> list[dict[str, str]]:
 
 
 async def draft_follow_up(call: PlayedCall) -> dict[str, str]:
-    """One draft, cleaned and capped, ready to store.
+    """One draft, cleaned and capped, ready to store (thinking mode, ADR 0011).
 
-    Thinking mode, as off the live path (ADR 0011). Propagates OpenAIError;
-    raises FollowUpError when nothing usable came back -- unlike the wrap-up
-    there is no partial result worth keeping, because a Scenario with no
-    situation in it is not an exercise. Both reach the caller as a 503, which
-    is the whole difference the amendment made: the same failure used to be a
-    log line nobody read.
-
-    Its own retry loop rather than `llm.complete_json` (F-61 uses that one):
-    this re-asks on a draft whose required fields came back *empty*, which is a
-    judgement about the content and not about whether it parsed.
-    """
+    Propagates OpenAIError; raises FollowUpError when nothing usable came back.
+    Both become a 503. Own retry loop rather than `llm.complete_json`: it also
+    re-asks when required fields came back *empty*, not only on a parse failure."""
     messages = _messages(_material(call))
     for attempt in range(2):  # initial attempt + one retry
         raw = await llm.complete(

@@ -1,15 +1,8 @@
 """Seeing, taking and removing your own data (F-49, ADR 0066).
 
-Three routes that all rest on the same rule: the caller's `sub` is part of the
-query, so there is no request here that could be about somebody else. Each one
-gets a test that proves it, because "it only returns your data" is the kind of
-property that holds until someone adds a parameter.
-
-The export also gets a completeness test. An export that quietly omits a table
-is worse than none — it answers the question wrongly rather than not at all, so
-the test asserts against what was actually stored rather than a fixed list of
-keys that would go stale the moment a column is added.
-"""
+All three routes put the caller's `sub` in the query; each gets a test proving
+it. The export is checked for completeness against what was actually stored,
+since an export that silently omits a table is worse than none."""
 
 # pylint: disable=duplicate-code
 # Fixture data is repeated per test module on purpose: a test carrying its own
@@ -106,9 +99,8 @@ async def test_export_carries_everything_that_was_stored(
 ) -> None:
     """Completeness asserted against the database, not against a list of keys.
 
-    A fixed expected shape would go stale the moment a column is added, and the
-    export would start omitting it silently — which is the one failure mode
-    that makes an export worse than none at all.
+    A fixed shape would go stale when a column is added, and the export would omit it
+    silently.
     """
     persist(turns=TURNS)
     _add_feedback(db_session)
@@ -130,15 +122,10 @@ async def test_export_carries_everything_that_was_stored(
 async def test_the_export_reaches_past_the_sessions(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """Three things are filed under the subject and are not a training, and the
-    export omitted all three until a review looked for them.
+    """Focus, retention setting and authored Scenarios are in the export too.
 
-    The test above is the one that should have caught it and did not: it asserts
-    completeness *within* a Session -- every Turn, every point -- and a whole
-    branch missing from the document passes it untouched. Article 15 is about
-    the personal data, not about the trainings, so the focus a subject picked,
-    the retention setting they changed and a Scenario they wrote all belong in
-    their copy.
+    They are personal data but not trainings (Art. 15), so the per-Session
+    completeness test above cannot notice them missing.
     """
     persist(turns=TURNS)
     await api_client.put("/api/focus", json={"goals": ["pace"], "role": "sales",

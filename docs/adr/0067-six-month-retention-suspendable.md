@@ -40,6 +40,6 @@ The cost is that the suspension makes the period soft. Anyone can switch it off 
 
 ADR 0065's distribution data is affected: measurements go with the Session that carried them, so a cohort assembled from pilot data thins out at six months. If that data matters for establishing norms, the answer is the second consent purpose ADR 0065/0066 already anticipate — de-identified measurements retained separately, on their own basis — and not a longer period for everything.
 
-Two things this deliberately does not do. It does not touch the consent log, which outlives the data it permitted (ADR 0068). And it does not reach the plaintext transcripts that `LOG_TRANSCRIPTS` writes when it is switched on, for the same reason nothing else does: no deletion path reaches a log file.
+Two things this deliberately does not do. It does not touch the consent log, which outlives the data it permitted (ADR 0068). And it does not reach a log file, which no deletion path reaches — which is why, since ADR 0066's amendment of 2026-09-23, no spoken content is written to one at all.
 
 The period is expected to be revisited once the pilot has an opinion about how long people actually look back.

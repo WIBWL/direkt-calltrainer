@@ -1,32 +1,12 @@
-"""Read back how the wrap-up split a call into demanding stretches and the rest
-(F-62, ADR 0081).
+"""Read back how the wrap-up split each call into demanding stretches and the rest
+(F-62, ADR 0081) -- the model's marks are something no test can judge.
 
     python scripts/inspect_pressure_segments.py                 # every stored Session
     python scripts/inspect_pressure_segments.py --session <id>  # one, with its transcript
     python scripts/inspect_pressure_segments.py --transcript    # all of them, with transcripts
 
-The one thing about this feature that no test can answer. Whether a marked
-utterance really was demanding is a judgement about what was said, made by a
-language model, and the only way to check it is to read the lines it marked
-beside the ones it did not.
-
-Two failure modes are what to look for, and both leave the application working
-and the screen plausible:
-
-* **Everything marked.** The two stretches are then the same stretch measured
-  twice, and the comparison shows a difference of nearly zero, which reads as
-  "very composed" to anybody who does not know.
-* **Nothing marked, call after call.** Either the calls genuinely had no push
-  back in them -- entirely possible with the gentler Personas -- or the model is
-  dropping the key. The summary below separates those two by showing how often
-  it happens and on which Scenario.
-
-The rate column is the quick read: a call where the partner pushed in every
-single one of its turns, or in none of a dozen, is worth opening.
-
-Read-only. It writes nothing, needs no model and no Redis, and runs against the
-database in `.env`, so a host shell will do.
-"""
+Look for everything marked (the two stretches are one) or nothing marked call after
+call. Read-only; uses `.env`'s database, no model, no Redis."""
 
 from __future__ import annotations
 
@@ -62,7 +42,6 @@ _EXCERPT = 90
 class _Row:
     """One Session, reduced to what this script reports about it."""
 
-    # pylint: disable=too-few-public-methods  # a record, printed and discarded
     # pylint: disable=too-many-instance-attributes  # one field per printed column
 
     def __init__(self, session: db_models.Session) -> None:
@@ -100,13 +79,8 @@ class _Row:
 
     @property
     def verdict(self) -> str:
-        """What to make of this row, in one word that can be grepped for.
-
-        A ladder of distinct states rather than a chain of conditions: each
-        arm is a different thing to do about the call, and collapsing two of
-        them would hide the difference between "nobody pushed back" and
-        "nothing judged it", which is the whole point of the script.
-        """
+        """What to make of this row, in one greppable word. Distinct states, so
+        "nobody pushed back" never collapses into "nothing judged it"."""
         # pylint: disable=too-many-return-statements  # one per state, see above
         if not self.has_facts:
             return "no-facts"       # recorded before ADR 0081; nothing to measure
@@ -149,13 +123,8 @@ def _report(rows: list[_Row]) -> None:
 
 
 def _transcript(row: _Row) -> None:
-    """One call, with the marked lines pointed at.
-
-    The trainee's answer is shown under the line it answers, because that is the
-    utterance whose figures land in the pressing stretch -- the thing to sanity
-    check is not only "was this demanding" but "is the answer under it the one
-    that should be measured as spoken under pressure".
-    """
+    """One call, with the marked lines pointed at. The trainee's answer is shown
+    under the line it answers, since that answer is what the pressing stretch measures."""
     logger.info("")
     logger.info("%s -- %s mit %s", row.extern_id, row.scenario, row.persona)
     logger.info("Befund: %s", row.verdict)
@@ -188,7 +157,7 @@ def _summary(rows: list[_Row]) -> None:
         )
         # A single `%`, not a doubled one: logging only escapes when it is given
         # arguments to format with, and this line has none.
-        logger.info(  # pylint: disable=logging-too-few-args
+        logger.info(
             "Nahe 0% oder nahe 100% ist das Warnzeichen: Dann vergleicht die Anzeige "
             "zwei Abschnitte, die keine zwei sind."
         )

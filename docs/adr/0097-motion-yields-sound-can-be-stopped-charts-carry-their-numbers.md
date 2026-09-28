@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted, **amended on 2026-09-19**: the reverse's card turn, one of the examples below, no longer exists (see the amendment at the end).
 
 The accessibility statement (`/barrierefreiheit`) names EN 301 549, which corresponds in substance to WCAG 2.1 level AA, and states partial conformance. The Calltrainer itself has not been through the BITV self-assessment that statement describes.
 
@@ -52,3 +52,9 @@ A new animation has to say which of the three kinds it is before it is built, be
 The charts' data appears twice, drawn and as text or a table. That is intended, and it means a change to what a chart shows has to change its accessible name as well.
 
 Nothing here is checked automatically (ADR 0094). Conformance rests on these rules being followed, and the self-assessment the accessibility statement promises is still outstanding.
+
+## Amendment (2026-09-19): the card turn is gone, the rule stands
+
+The Context names the card turn before a reverse (F-61) as one of the things that move, and the rule for animations that cover a change says `ScreenTransition` runs the cut at once "instead of behind the card or the fade". The card turn has since been removed, with its card (ADR 0096's amendment of the same date). The only covering animation left is the fade, and a reverse now changes screen with no cut at all.
+
+The rule itself is unchanged: under reduced motion the fade is skipped and the change still happens. Only the example has gone. The earlier text is left as written, because it records what existed when the rule was made.

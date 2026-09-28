@@ -11,13 +11,13 @@ Calltrainer is a use case built within [EFRE-DiReKT](https://efre-direkt.de/), a
 
 ## Architecture
 
-FastAPI backend, React + TypeScript frontend, one Docker image. Speech-to-text, dialogue generation, and text-to-speech all run through the EFRE-DiReKT gateway, an OpenAI-compatible model gateway - no separate provider accounts or local models needed to run the app.
+FastAPI backend, React + TypeScript frontend, one Docker image. Speech-to-text and dialogue generation run through the EFRE-DiReKT gateway — an OpenAI-compatible endpoint, named with one model per step in `.env`. Text-to-speech runs on KugelAudio. One backend per leg, no fallbacks and no switches between them (ADR 0103). No local models are needed.
 
 > **Note:** The EFRE-DiReKT gateway is only reachable from its own network - connect via VPN before running the app.
 
 ## 1. Setup
 
-Copy `.env.example` to `.env` and fill in the real `DIREKT_API_KEY`.
+Copy `.env.example` to `.env` and fill in the real `DIREKT_API_KEY` and `KUGELAUDIO_API_KEY`.
 
 ## 2. Run the App
 
@@ -31,7 +31,7 @@ For development, add `--watch` (`docker compose up --build --watch`) to have the
 
 ## 3. Login (Keycloak)
 
-`docker compose up` brings its own Keycloak on `http://localhost:18081` and imports `keycloak/direkt-realm.json` — the `calltrainer-frontend` client and three fixed users:
+`docker compose up` brings its own Keycloak on `http://localhost:18081` and imports `keycloak/direkt-realm.json` — the `direkt-calltrainer` client and three fixed users:
 
 | user | password | company (`tenant`) |
 |---|---|---|
@@ -54,6 +54,6 @@ The Keycloak admin console is at <http://localhost:18081> with `admin` / `admin`
 The full architecture documentation - arc42 and every Architecture Decision Record (ADR) - is served via [MkDocs](https://www.mkdocs.org):
 
 ```powershell
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 mkdocs serve
 ```

@@ -1,16 +1,8 @@
 """The live session loop: STT -> streamed dialogue -> chunked TTS per turn.
 
-Covers:
-  F-46  Live-Call-Interface: the listening / thinking / speaking state model
-  F-01  the persona opens the call and then responds turn by turn
-  F-12/F-52/R-52  the full transcript is assembled from the turns, and only
-        at the end (nothing partial is exposed mid-call)
-  ADR 0033  streamed pipeline: audio is produced chunk by chunk, first chunk
-        before the whole reply is finished
-  ADR 0047/0048  each Turn's acoustics are measured inline, off the critical
-        path: what the measurement puts on the Turn, and what it leaves there
-        when it fails. What the statistics do with it: tests/test_metrics.py
-"""
+Covers F-46 (listening/thinking/speaking), F-01 (persona opens, then turn by turn),
+F-12/F-52/R-52 (transcript only at the end), ADR 0033 (first audio chunk before the reply ends),
+ADR 0047/0048 (per-Turn acoustics inline and on failure; statistics: tests/test_metrics.py)."""
 
 import pytest
 

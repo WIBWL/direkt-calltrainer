@@ -1,23 +1,8 @@
-"""The follow-up Scenario written from a Session's Feedback (F-60).
+"""The follow-up Scenario written from a Session's Feedback (F-60, F-10).
 
-Covers:
-  F-60      the next exercise, built from what the wrap-up asked for
-  F-10      the improvement points are what it is built from
-  ADR 0069  asked for by the User (the amendment), drafted on request and
-            stored as an authored Scenario; one per Session; deactivated
-            when its source Session goes
-  ADR 0043  the played Scenario's prompt fields reach the model here, the
-            exception ADR 0070 takes for a case the User has just played
-  ADR 0051  the measured statistics are not input
-  ADR 0058  stored through the ordinary authoring path, owned by the User
-  ADR 0059  the generated text is cleaned and capped like any authored text
-  ADR 0066  deleting the training takes the follow-up out of the library
-  ADR 0067  so does the retention sweep
-  ADR 0011  asked in thinking mode, which is only safe off the live path
-
-The model is faked throughout (`conftest.py`). The storage tests need Postgres
-(`docker compose up -d db`); without it the database fixtures skip.
-"""
+Covers ADR 0069 (asked for by the User, one per Session), ADR 0043/0070 (played case
+reaches the model), ADR 0051, 0058, 0059, 0066/0067 (retired with its Session) and
+ADR 0011 (thinking mode off the live path). Model faked; storage tests need Postgres."""
 
 import json
 import uuid
@@ -32,7 +17,9 @@ from backend import deletion, library, retention
 from backend.authored_text import FIELD_LIMITS
 from backend.db.models import Feedback, FeedbackPoint, Measurement, Scenario, Session
 from backend.followups import FollowUpError, PlayedCall, draft_follow_up
-from tests.conftest import TEST_AUTH, a_finished_session, asked, stub_completions
+from tests.conftest import (
+    DRAFTED_FROM_TURNS, TEST_AUTH, a_finished_session, asked, stub_completions,
+)
 
 # `app_database` and `reference_data` are taken by several tests only to
 # activate the fixture.
@@ -332,14 +319,9 @@ async def test_an_unparseable_reply_is_retried_once_and_then_fails(
 
 # --- Asking for it (database) ----------------------------------------------
 #
-# `reference_data` is requested per test, not through a module-level
-# `pytestmark`: the draft tests above must keep running without a database.
-#
-# Everything below goes through the route, because since ADR 0069's amendment
-# the route is the only way a follow-up comes about. It is the reverse's route
-# in every respect but what it drafts (`tests/test_reverse.py` is its twin),
-# and these tests are deliberately the same shape, so a divergence between the
-# two features shows up as a difference between the two files.
+# `reference_data` is requested per test, not via `pytestmark`: the draft tests
+# above must run without a database. Deliberately the same shape as
+# `tests/test_reverse.py`, so a divergence shows as a difference between the files.
 
 
 def _store_feedback(
@@ -431,6 +413,23 @@ async def test_nothing_is_written_without_improvement_points(
     nothing to build an exercise from, and the model is not asked."""
     extern_id = a_finished_session()
     _store_feedback(db_session, [])
+    calls = stub_completions(monkeypatch, _REPLY)
+
+    response = await _ask_for_one(api_client, extern_id)
+
+    assert response.status_code == 409
+    assert not calls
+    assert _follow_ups(db_session) == []
+
+
+async def test_nothing_is_written_for_a_call_too_short_to_build_on(
+    api_client: httpx.AsyncClient, db_session: DbSession,
+    reference_data, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One sentence from the User, improvement points or not: the screen offers
+    no follow-up under three utterances, and the route now refuses the same."""
+    extern_id = a_finished_session(turns=DRAFTED_FROM_TURNS[:2])
+    _store_feedback(db_session, _IMPROVEMENTS)
     calls = stub_completions(monkeypatch, _REPLY)
 
     response = await _ask_for_one(api_client, extern_id)
@@ -585,15 +584,10 @@ async def test_the_played_scenarios_prompt_fields_reach_the_model(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The case the trainee played, read off the row and handed over whole.
+    """The played case is read off the row and handed over whole (ADR 0069, 2nd amendment).
 
-    This is the assertion ADR 0069's second amendment reverses. It used to read
-    `secret not in prompt`: a built-in's case is withheld from the client
-    (ADR 0043), and a readable follow-up must not be the way around it. The
-    exception is ADR 0070's, taken for the reverse first and on the same ground
-    -- the User has just heard this case played out, so continuing it tells
-    them nothing the call did not. Withholding it would leave the draft nothing
-    to carry forward.
+    Withheld from the client otherwise (ADR 0043); the exception is ADR 0070's: the User
+    has just heard this case, and the draft needs it to carry the matter forward.
     """
     played = "Die Gutschrift wurde am 3. März zugesagt und nie gebucht."
     scenario = db_session.query(Scenario).one()

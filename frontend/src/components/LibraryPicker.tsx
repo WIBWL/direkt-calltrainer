@@ -24,13 +24,8 @@ const ORIGIN_LABELS: Record<Exclude<LibraryFilter, "tenant">, string> = {
   reverse: "Rollentausch",
 };
 
-/** How many tiles the collapsed grid shows: two full rows of three. The seeded
- * library alone is seventeen rows deep, and a selection screen that opens on
- * all of them is a scroll before it is a choice.
- *
- * Every tile here is a case to pick — opening the rest is a button under the
- * grid instead (like the training history's), because it is not one of the
- * choices and reading it as a sixth case is a moment's confusion every time. */
+/** How many tiles the collapsed grid shows: two full rows of three. The rest open from a
+ * button under the grid, not a tile, so it is never mistaken for a case to pick. */
 const COLLAPSED_TILES = 6;
 
 /** Dates the call a reverse replays and names its Persona, so two reverses of
@@ -69,12 +64,9 @@ interface LibraryPickerProps {
   offerRandom?: boolean;
 }
 
-/** The card's origin, which is also the suffix of its `card-origin-` class —
- * the one that carries the colour of both the tile and its badge. Not the
- * level-2 category — the prop of that name is the thematic filter.
- *
- * The two kinds the system wrote itself come first: both are `origin: "own"`,
- * and that is the distinction the badge is making. */
+/** The card's origin, also the suffix of its `card-origin-` class (tile and badge colour);
+ * not the level-2 category. The two system-written kinds come first: both are
+ * `origin: "own"`, and that is the distinction the badge makes. */
 function badgeClass(card: ScenarioCard): string {
   if (card.reverse) return "reverse";
   if (card.follow_up) return "follow-up";
@@ -91,17 +83,9 @@ function badgeLabel(card: ScenarioCard, tenantName: string | null): string {
 }
 
 /**
- * The Scenario selection grid: two filter rows, a "new" button, and badged
- * cards with an "i" that opens the info panel (ADR 0058 / 0060 / 0062 /
- * 0069).
- *
- * The rows are independent and combine. Level 1 says where a Scenario comes
- * from (suggested, all, built-in, hand-authored, the caller's company,
- * follow-up or reverse),
- * level 2 says what kind of call it is. Both are the same component, so they
- * are the same size by construction. What each option matches is decided in
- * `scenarioLibrary.ts` (`matchesFilter`, `matchesCategory`), where the caller
- * builds the visible set and the counts from the same functions.
+ * The Scenario selection grid: two independent filter rows (origin, then kind of call), a
+ * "new" button, and badged cards with an "i" for the info panel (ADR 0058/0060/0062/0069).
+ * What each option matches lives in `scenarioLibrary.ts` (`matchesFilter`, `matchesCategory`).
  */
 export default function LibraryPicker({
   items,

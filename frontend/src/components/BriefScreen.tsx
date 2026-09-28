@@ -3,15 +3,9 @@ import type { ReactNode } from "react";
 import AppLayout from "./AppLayout";
 
 /**
- * The last screen before a call: a briefing, the button that goes on, and the
- * way out (F-61, F-63).
- *
- * Shared by the reverse's briefing and the ordinary call's case, because it is
- * the same moment in the flow — the last thing read before someone has to
- * speak. The way out is the microphone check's door, in the same place: for a
- * reverse this screen *replaces* that one, so leaving must not read as a
- * different act. Leaving drops the committed Session rather than holding its
- * connection open.
+ * The last screen before a call: a briefing, the button on, and the way out (F-61,
+ * F-63). Shared by the reverse's briefing and the ordinary case. The way out sits where
+ * the mic check's does, since for a reverse this replaces it; leaving drops the Session.
  */
 export default function BriefScreen({
   onContinue,

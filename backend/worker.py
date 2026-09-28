@@ -1,11 +1,8 @@
-"""The Feedback worker process (ADR 0018/0019).
+"""The Feedback worker process (ADR 0018/0019): same code and database as the app,
+no request cycle. Generates one finished Session's wrap-up per queued job, so a
+slow model never affects a live call.
 
-A second deployable next to the FastAPI app, sharing its code and its database
-but none of its request cycle: it takes one finished Session's id off the queue
-and generates its wrap-up, so a slow or failing model can never affect a live call.
-
-Run it with:  python -m backend.worker
-"""
+Run it with:  python -m backend.worker"""
 
 import logging
 

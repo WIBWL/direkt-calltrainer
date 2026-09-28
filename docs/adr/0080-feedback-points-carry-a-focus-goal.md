@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Stage 2 of `docs/dashboard-konzept.md`, the decision its section 10
+Accepted. Stage 2 of `docs/dashboard-concept.md`, the decision its section 10
 left open. Introduces migration `d4c81b70e2a5`. Constrained by ADR 0004 and
 ADR 0065; uses F-62's catalogue (ADR 0076).
 

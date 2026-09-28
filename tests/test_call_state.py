@@ -1,26 +1,15 @@
-"""The caller's notes and the history window (ADR 0071), and their absence
-where the model can read its own transcript (ADR 0075).
+"""The caller's notes and the history window (ADR 0071, ADR 0075, ADR 0103).
 
-Past a handful of exchanges the 4B model misread the raw transcript -- it
-attributed its own case to the user and asked about it for eight Turns. So on
-that backend the model does not read the whole history: it reads the system
-prompt, its notes on the call (one background summarisation call per completed
-exchange, never on the path to a reply), and the last few exchanges verbatim.
-The full history is still kept: the repetition guards, the barge-in trims and
-the Transcript work on it, not on the model's view.
-
-Everything above is the default and is what the tests here assert. The last
-two assert the other shape (ADR 0075): with `CALL_STATE_NOTES` off the model
-is handed the conversation itself and no summarisation call is made at all.
-"""
+The 4B model misread long raw transcripts, so it reads the system prompt, its
+notes (one background summarisation per exchange) and the last few exchanges.
+The full history is still kept for the guards, the trims and the Transcript."""
 
 from backend.session.models import TurnCompleted
 from backend.session.nudges import STATE_NOTES_FRAME
-from backend.session import orchestrator as orchestrator_module
 from backend.session.orchestrator import HISTORY_WINDOW, SessionOrchestrator
 from tests.conftest import collect
 
-# pylint: disable=missing-function-docstring,protected-access
+# pylint: disable=missing-function-docstring
 
 USER = [
     "Worum geht es denn genau?",
@@ -44,14 +33,8 @@ async def _run(orch, fake_pipeline, turns):
     events = []
     for i in range(turns):
         events = await collect(orch.run_turn(bytes([i]), "turn.webm", "audio/webm"))
-        await orch.flush_state()
+        await orch.notes.settle()
     return events
-
-
-def test_the_suite_runs_with_the_notes_on():
-    """The guard behind every assertion in this file: conftest claims GEMINI so
-    the developer's own .env cannot decide which shape is under test."""
-    assert orchestrator_module.CALL_STATE_NOTES is True
 
 
 async def test_the_model_reads_notes_plus_a_window_not_the_whole_history(persona, scenario, fake_pipeline):
@@ -66,7 +49,7 @@ async def test_the_model_reads_notes_plus_a_window_not_the_whole_history(persona
     history = [m for m in view[2:] if m["role"] in ("user", "assistant")]
     assert len(history) == HISTORY_WINDOW, "the last three exchanges verbatim"
     assert USER[0] not in str(view), "the first exchange reaches the model only through the notes"
-    assert USER[0] in [m["content"] for m in orch._messages], "but the full record keeps it"
+    assert USER[0] in [m["content"] for m in orch.history.messages], "but the full record keeps it"
 
 
 async def test_no_notes_before_the_first_exchange_has_completed(persona, scenario, fake_pipeline):
@@ -94,15 +77,15 @@ async def test_a_failed_refresh_keeps_the_previous_notes(persona, scenario, fake
     fake_pipeline.llm.state_fail_times = 0
     orch = SessionOrchestrator(persona, scenario)
     await _run(orch, fake_pipeline, 1)
-    assert orch._state == "- first notes"
+    assert orch.notes.text == "- first notes"
 
     fake_pipeline.llm.state_fail_times = 1
     fake_pipeline.stt.transcripts = [USER[1]]
     fake_pipeline.llm.replies = [PERSONA[1]]
     await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
-    await orch.flush_state()
+    await orch.notes.settle()
 
-    assert orch._state == "- first notes", "stale notes beat none; the call goes on"
+    assert orch.notes.text == "- first notes", "stale notes beat none; the call goes on"
 
 
 async def test_a_barge_in_re_refreshes_the_notes_with_only_the_heard_part(
@@ -114,7 +97,7 @@ async def test_a_barge_in_re_refreshes_the_notes_with_only_the_heard_part(
     full = PERSONA[0]
 
     orch.note_late_barge_in(2000)  # a few words in
-    await orch.flush_state()
+    await orch.notes.settle()
 
     heard = orch.turns[0].persona_text
     assert full.startswith(heard) and heard != full
@@ -139,45 +122,11 @@ async def test_the_guards_still_see_the_whole_history(persona, scenario, fake_pi
     assert PERSONA[0] not in str(fake_pipeline.llm.calls[-2][2:]), "it was outside the window"
 
 
-async def test_without_notes_the_model_is_handed_the_whole_conversation(
-    persona, scenario, fake_pipeline, monkeypatch
-):
-    """ADR 0075: on a backend that reads its own history, the window and the
-    summary both go -- the first exchange is still there verbatim on Turn 5."""
-    monkeypatch.setattr(orchestrator_module, "CALL_STATE_NOTES", False)
-    orch = SessionOrchestrator(persona, scenario)
-    await _run(orch, fake_pipeline, 5)
-
-    view = fake_pipeline.llm.calls[-1]
-    assert view[0]["role"] == "system", "the system prompt first"
-    assert not any(m["content"].startswith(STATE_NOTES_FRAME) for m in view), "no summary"
-    history = [m for m in view if m["role"] in ("user", "assistant")]
-    assert len(history) > HISTORY_WINDOW, "not a window any more"
-    assert USER[0] in [m["content"] for m in history], "the opening exchange, verbatim"
-    assert PERSONA[0] in [m["content"] for m in history]
-
-
-async def test_without_notes_no_summarisation_request_is_made(
-    persona, scenario, fake_pipeline, monkeypatch
-):
-    """The point of ADR 0075 is not only fidelity: the refresh is one LLM
-    request per exchange, half of what a Turn spends."""
-    monkeypatch.setattr(orchestrator_module, "CALL_STATE_NOTES", False)
-    orch = SessionOrchestrator(persona, scenario)
-    await _run(orch, fake_pipeline, 3)
-
-    assert fake_pipeline.llm.state_calls == [], "nothing is spent filling notes nothing reads"
-    assert orch._state == ""
-
-
 def _summarising_llm(monkeypatch, fake_pipeline):
-    """Point the notes refresh at a summariser that behaves like a real one: it
-    carries forward everything it was handed, notes and exchange alike.
+    """A summariser that carries forward everything it is handed, like a real one.
 
-    The canned `states` the other tests use cannot show this defect. Those
-    strings never contain the Persona's words, so an assertion that the unheard
-    part stayed out of the notes holds however the notes were built -- it is
-    the fake that guarantees it, not the code under test.
+    The canned `states` never contain the Persona's words, so with them the
+    "unheard part stays out" assertions would hold however the notes were built.
     """
     async def summarise(messages, **_kwargs):
         fake_pipeline.llm.state_calls.append(messages)
@@ -189,59 +138,51 @@ def _summarising_llm(monkeypatch, fake_pipeline):
 async def test_a_trimmed_reply_is_summarised_from_the_notes_that_predate_it(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """A re-refresh after a barge-in starts from the notes as they stood
-    *before* this exchange, never from the current ones.
+    """A re-refresh after a barge-in starts from the notes as they stood *before*.
 
-    Notes are rewritten from the previous notes rather than from the history
-    (ADR 0075), so by the time the barge-in lands the first refresh may already
-    have absorbed the unheard sentence -- and nothing in a second pass built on
-    that text could contradict it. ADR 0071 promises the notes never record
-    words the user did not hear; that holds only if the second pass starts
-    from before them.
-    """
+    Notes are rewritten from the previous notes (ADR 0075), so the first refresh may
+    already hold the unheard sentence; ADR 0071's "never record unheard words" holds
+    only if the second pass starts from before them."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 10000)
     _summarising_llm(monkeypatch, fake_pipeline)
 
     orch = SessionOrchestrator(persona, scenario)
     await _run(orch, fake_pipeline, 1)
     full = PERSONA[0]
-    assert full in orch._state, "the notes absorbed the whole reply before the barge-in"
+    assert full in orch.notes.text, "the notes absorbed the whole reply before the barge-in"
 
     orch.note_late_barge_in(2000)  # a few words in
-    await orch.flush_state()
+    await orch.notes.settle()
 
     heard = orch.turns[0].persona_text
     assert full.startswith(heard) and heard != full
     unheard = full[len(heard):].strip()
-    assert unheard and unheard not in orch._state, "the unheard tail is out of the notes"
-    assert heard in orch._state, "and what was heard is in them"
+    assert unheard and unheard not in orch.notes.text, "the unheard tail is out of the notes"
+    assert heard in orch.notes.text, "and what was heard is in them"
 
 
 async def test_a_reply_nobody_heard_leaves_the_notes_as_they_were(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """The barge-in dropped the reply whole: the exchange never happened, so the
-    notes go back to what they said before it.
+    """A reply dropped whole by a barge-in: the notes revert to before the exchange.
 
-    The refresh for that exchange is already in flight when the interrupt lands
-    and was started with the full reply. Left alone it finished, wrote the
-    Persona's words into the notes, and no second refresh ever followed --
-    there was no longer an exchange to summarise.
+    The refresh for it was already in flight with the full reply; left alone it wrote
+    the Persona's unheard words into the notes and nothing later replaced them.
     """
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 10000)
     _summarising_llm(monkeypatch, fake_pipeline)
 
     orch = SessionOrchestrator(persona, scenario)
     await _run(orch, fake_pipeline, 2)
-    before = orch._state
+    before = orch.notes.text
     assert PERSONA[1] in before
 
     fake_pipeline.stt.transcripts = [USER[2]]
     fake_pipeline.llm.replies = [PERSONA[2]]
     await collect(orch.run_turn(b"c", "turn.webm", "audio/webm"))
     orch.note_late_barge_in(0)  # nothing played at all
-    await orch.flush_state()
+    await orch.notes.settle()
 
     assert orch.turns[-1].persona_text == "", "the reply was dropped"
-    assert PERSONA[2] not in orch._state, "and it is not in the notes either"
-    assert orch._state == before, "which are exactly the notes from before it"
+    assert PERSONA[2] not in orch.notes.text, "and it is not in the notes either"
+    assert orch.notes.text == before, "which are exactly the notes from before it"

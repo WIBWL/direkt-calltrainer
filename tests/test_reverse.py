@@ -1,24 +1,13 @@
-"""The reverse of a finished Session: the same call, roles swapped (F-61).
+"""The reverse of a finished Session: the same call, roles swapped (F-61, ADR 0070).
 
-Covers:
-  F-61      the User rings and the Persona answers, from one played Session
-  ADR 0070  a Scenario row with a marker, copying the case verbatim; one per
-            Session; the briefing is stored and never reaches a prompt; a
-            reverse is neither editable nor shareable; consent withdrawal and
-            the six-month sweep take it, a single deletion does not
-  ADR 0043  suspended here on purpose -- the played case reaches the client
-  ADR 0051  the measured statistics are not input
-  ADR 0059  the briefing is cleaned like any text written into the table
-  ADR 0050  someone else's Session answers 404, like an unknown one
-  ADR 0011  asked in thinking mode, which is only safe off the live path
-
-The model is faked throughout (`conftest.py`). The route and library tests need
-Postgres (`docker compose up -d db`); without it the database fixtures skip.
-"""
+Also covers ADR 0043 (suspended: the played case reaches the client), 0051 (no statistics as
+input), 0059 (briefing cleaned), 0050 (foreign Session is 404), 0011 (thinking mode off the live path).
+Model faked (`conftest.py`); route and library tests need Postgres, else they skip."""
 
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import httpx
 import pytest
@@ -26,13 +15,16 @@ from openai import APIConnectionError
 from sqlalchemy.orm import Session as DbSession
 
 from backend import consent, deletion, library, retention
+from backend.api.sessions import MIN_USER_UTTERANCES
 from backend.db.models import Feedback, FeedbackPoint, Scenario, Session, Tenant
 from backend.reversals import (
     FIELD_LIMITS, GOAL_LIMIT, MAX_GOALS, ReverseError, draft_brief,
 )
 from backend.session.language_packs import get_pack
 from backend.session.prompting import build_system_prompt
-from tests.conftest import TEST_PERSONAS, a_finished_session, asked, stub_completions
+from tests.conftest import (
+    DRAFTED_FROM_TURNS, TEST_PERSONAS, a_finished_session, asked, stub_completions,
+)
 
 # `app_database` and `reference_data` are taken by several tests only to
 # activate the fixture.
@@ -199,6 +191,17 @@ async def test_a_long_goal_is_capped(monkeypatch: pytest.MonkeyPatch) -> None:
     assert len((await _draft())["goals"][0]) == GOAL_LIMIT
 
 
+async def test_a_long_goal_is_cut_at_a_word_and_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The follow-up's rule (`authored_text.fit`): a slice used to cut the goal
+    the User ticks off mid-call in the middle of a word."""
+    stub_completions(monkeypatch, json.dumps({**_BRIEF, "goals": ["Rechnung " * 40]}))
+
+    goal = (await _draft())["goals"][0]
+    assert len(goal) <= GOAL_LIMIT
+    assert goal.endswith("…")
+    assert set(goal[:-1].split()) == {"Rechnung"}, "no word cut in half"
+
+
 async def test_an_empty_goal_is_dropped(monkeypatch: pytest.MonkeyPatch) -> None:
     stub_completions(monkeypatch, json.dumps({**_BRIEF, "goals": ["Punkt.", "   ", ""]}))
 
@@ -225,6 +228,18 @@ async def test_an_unparseable_reply_is_retried_once_and_then_fails(
     with pytest.raises(ReverseError):
         await _draft()
     assert len(calls) == 2
+
+
+def test_the_route_and_the_screen_share_one_threshold() -> None:
+    """The post-call screen hides the offer under `MIN_USER_TURNS`; the route
+    refuses under `MIN_USER_UTTERANCES`. Two numbers for one rule, so they are
+    held together here -- the route used to ask only for *some* Turn."""
+    screen = (
+        Path(__file__).resolve().parent.parent /
+        "frontend" / "src" / "components" / "FeedbackReport.tsx"
+    ).read_text(encoding="utf-8")
+    value = screen.split("const MIN_USER_TURNS = ", 1)[1].split(";", 1)[0]
+    assert int(value) == MIN_USER_UTTERANCES
 
 
 # --- The route (database) --------------------------------------------------
@@ -416,14 +431,10 @@ async def test_the_detail_route_serves_the_briefing(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """This is how the panel gets its text during the call, and the deliberate
-    exception to ADR 0043 -- for a case the User has already heard played.
+    """The panel's in-call text, the deliberate exception to ADR 0043.
 
-    The case comes back in the display language, not in the English the prompt
-    reads: `_detail` prefers the twin (ADR 0062), and a reverse of a built-in
-    only has one because `_insert_reverse` copies it along with the field it
-    belongs to. It did not, once, and the info panel read the case out in
-    English -- which this line is here to catch.
+    The case must come back in the display language: `_insert_reverse` has to copy
+    the twin (ADR 0062), or the info panel reads the case out in English.
     """
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
@@ -560,6 +571,20 @@ async def test_a_session_with_no_turns_is_refused(
 
     assert response.status_code == 409
     assert "gesprochen" in response.json()["detail"]
+
+
+async def test_a_call_too_short_for_the_screen_is_refused_too(
+    api_client: httpx.AsyncClient, db_session: DbSession, reference_data
+) -> None:
+    """One sentence from the User: the screen offers no reverse for it, and the
+    route used to build one anyway for anybody who asked it directly."""
+    _give_the_scenario_a_case(db_session)
+    extern_id = a_finished_session(turns=DRAFTED_FROM_TURNS[:2])
+
+    response = await api_client.post(f"/api/sessions/{extern_id}/reverse")
+
+    assert response.status_code == 409
+    assert db_session.query(Scenario).filter_by(reverse=True).count() == 0
 
 
 async def test_a_reverse_of_a_reverse_is_refused(
@@ -720,17 +745,10 @@ async def test_the_retention_sweep_takes_the_reverse_with_it(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The other half of ADR 0070's deletion rule, and the half nothing else
-    would notice: the six-month sweep (ADR 0067) removes the reverse along with
-    the Session it replays.
+    """The six-month sweep (ADR 0067) removes the reverse with the Session it replays (ADR 0070).
 
-    This test asserted the opposite until ADR 0070 was amended. The reason it
-    changed: the briefing is written from that call's own wrap-up, and once the
-    call has expired what survives is a text about how a person argued with its
-    source destroyed. The line now runs between the paths where somebody is
-    deciding about that row -- a single deletion, where the User is present,
-    is told the reverse stays and can remove it herself -- and the two that run
-    with nobody there, the withdrawal and this sweep.
+    The briefing is written from that call's wrap-up. Only a single deletion, where the
+    User is present, keeps the reverse; withdrawal and this sweep run with nobody there.
     """
     _give_the_scenario_a_case(db_session)
     old = datetime.now(UTC) - retention.RETENTION - timedelta(days=1)

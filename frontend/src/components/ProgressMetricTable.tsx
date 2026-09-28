@@ -1,37 +1,25 @@
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { useProgressContext } from "../ProgressContext";
 import { progressMetricPath } from "../routes";
 import { GROUPS, groupOf, type MetricGroup } from "../utils/metricGroups";
 import {
   MIN_SESSIONS_FOR_SERIES,
   formatBand,
   formatPoint,
+  partsSummary,
   type MetricSeries,
 } from "../utils/progressStats";
 import InfoDetails from "./InfoDetails";
-import PartsStrip, { partsSummary } from "./PartsStrip";
+import PartsStrip from "./PartsStrip";
 import SectionHeading from "./SectionHeading";
 import Sparkline from "./Sparkline";
 
 /**
- * Every metric over time, one row each (block C of the dashboard).
- *
- * A table and not a grid of tiles: the concept sized that grid for nine metrics
- * behind a switch, there are sixteen now, and the wall it was built against was
- * back. A row per metric fits all of them on one screen at full width, every
- * sparkline the same size and on the same axis position, which is what lets the
- * eye compare them (Tufte's sparkline table). The switch goes with it — nothing
- * is hidden, so there is nothing to switch to.
- *
- * The two families stay as row groups headed in their hue rather than halves
- * behind a control. Colour is identity and never a value
- * (`utils/metricGroups`): the hue hangs off the group, and the cells never see
- * one.
- *
- * Also the better accessible form: a screen reader moves through a real table
- * by row and column and hears which metric a figure belongs to, where sixteen
- * links wrapping drawings gave it sixteen images with a number in the name.
+ * Every metric over time, one row each (block C of the dashboard): a sparkline table fits all sixteen on one
+ * screen at comparable size, and is the better accessible form. The two families are row groups headed in
+ * their hue; colour is identity, never a value (`utils/metricGroups`).
  */
 export default function ProgressMetricTable({ series }: { series: MetricSeries[] }) {
   if (series.length === 0) {
@@ -39,7 +27,6 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
       <section className="progress-section" aria-labelledby="metric-table-title">
         <SectionHeading
           id="metric-table-title"
-          eyebrow="WIE SIE GESPROCHEN HABEN"
           title="Kennzahlen über die Zeit"
         />
         <div className="card">
@@ -61,7 +48,6 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
     <section className="progress-section" aria-labelledby="metric-table-title">
       <SectionHeading
         id="metric-table-title"
-        eyebrow="WIE SIE GESPROCHEN HABEN"
         title="Kennzahlen über die Zeit"
       />
 
@@ -134,6 +120,15 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
           dort wie eine Note gelesen würde. Die Farbe steht für die Gruppe, nie für einen Wert.
         </p>
         <p>
+          Die Spalte „Trainings“ sagt, aus wie vielen Gesprächen eine Zeile besteht. Diese
+          Zahl kann kleiner sein als die Zahl Ihrer Trainings, und dafür gibt es zwei Gründe.
+          Entweder ist die Kennzahl neuer als das Gespräch: Die Aufnahme wird nach jedem
+          Training gelöscht, deshalb lässt sich nichts nachmessen. Oder die Aufnahme hatte so
+          viel Hintergrundgeräusch, dass sich Sprechen und Stille nicht trennen ließen. Dann
+          fehlen Sprechtempo, Sprechpausen, Redefluss, Sprechlänge und Lautstärke für dieses
+          eine Gespräch, weil ein Wert daraus mehr über den Raum sagen würde als über Sie.
+        </p>
+        <p>
           Die Lautstärke fehlt hier mit Absicht. Gemessen wird der Pegel der Aufnahme, und der
           hängt von Mikrofon und Abstand genauso ab wie von Ihnen. Über mehrere Gespräche
           hinweg ist er deshalb nicht vergleichbar. Ihren Verlauf innerhalb eines Gesprächs
@@ -145,16 +140,15 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
 }
 
 /**
- * One metric.
- *
- * The name is the link, so the row has one real control for the keyboard and
- * the screen reader. The rest of the row takes a click too, as a convenience
- * for the mouse: a thin name is a small target on a row this wide, and the row
- * already highlights as one thing under the pointer.
+ * One metric. The name is the link — the row's one real control for keyboard and screen reader; the rest of
+ * the row also takes a click as a mouse convenience.
  */
 function MetricRow({ series }: { series: MetricSeries }) {
   const navigate = useNavigate();
-  const path = progressMetricPath(series.key);
+  // The selection travels with the link, so the page behind it is drawn over
+  // the same trainings this row was (see ProgressContext.tsx).
+  const { withPeriod } = useProgressContext();
+  const path = withPeriod(progressMetricPath(series.key));
   const last = series.points[series.points.length - 1];
   const enough = series.points.length >= MIN_SESSIONS_FOR_SERIES;
 

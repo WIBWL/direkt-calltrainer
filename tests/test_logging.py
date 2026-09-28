@@ -1,9 +1,7 @@
-"""Centralized logging.
+"""Centralized logging (ADR 0039, ADR 0055).
 
-Covers ADR 0039 and ADR 0055: colored per-module console output plus a log
-file that is opened fresh once per process and then kept for the whole run
-(every Session, not just the current one), carrying the session id on every
-line so calls stay separable.
+Colored per-module console output plus one log file per process, kept for the
+whole run, with the session id on every line.
 """
 
 import logging

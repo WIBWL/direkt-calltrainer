@@ -13,19 +13,9 @@ interface ConsentContextValue {
 const ConsentContext = createContext<ConsentContextValue | null>(null);
 
 /**
- * Holds the storage decision for the whole app and asks for it when it is
- * missing (ADR 0066).
- *
- * One fetch, one source of truth. Three screens describe this same fact — the
- * dialog, the setup screen's notice and the profile's revocation — and letting
- * each fetch its own copy is how two of them end up disagreeing on screen after
- * the third has just changed it.
- *
- * The dialog replaces the app rather than floating over a usable one, because
- * an unanswered decision means the next training's fate is undecided. It never
- * blocks on a *failed* load: the backend is what actually enforces storage and
- * fails closed by itself, so a network blip here must not lock a user who has
- * long since decided out of their own trainer.
+ * Holds the storage decision app-wide, one fetch, and asks when missing (ADR 0066).
+ * Never blocks on a *failed* load: the backend fails closed by itself, so a
+ * network blip must not lock out a user who decided long ago.
  */
 export function ConsentProvider({ children }: { children: ReactNode }) {
   const { consent, state, saving, decide } = useConsent();

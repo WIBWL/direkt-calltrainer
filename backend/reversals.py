@@ -1,39 +1,15 @@
 """The briefing a User reads while playing a reverse (F-61, ADR 0070).
 
-A reverse replays one finished Session with the roles swapped, and the User
-walks into it holding what the Persona held: the situation, the facts of the
-case, and what the caller wants together with the bar they count as settled.
-Those exist already — they are the Scenario's prompt fields — but they are
-written in English, addressed to whoever is playing the caller, and phrased as
-instructions to a model. This module turns them into German prose addressed to
-the User, and adds the short checklist of goals — the concrete things to
-raise, ask and come away with — that the caller is working through.
-
-It **translates and re-addresses; it does not invent**. That is the whole brief
-the model is given, and the reason: the User is about to argue this case, so a
-briefing that adds a figure the Scenario never carried would send them into the
-call defending something the Persona has never heard of.
-
-Two things stay out of it. The measured statistics, for ADR 0051's reason — no
-target range exists, so nothing here can say what a figure should have been.
-And the briefing never reaches any prompt: it is stored on the Scenario row and
-sent to the browser, and `session/prompting.py` builds the call from the
-Scenario's own fields as always. A briefing the Persona could read would be a
-briefing the Persona could act on.
-
-Unlike `backend/followups.py` this is not stateless — the result is stored, by
-`library.create_reverse`, because a reverse is a Scenario the User can select
-again. What the two do share is the shape, and share literally: both go through
-`llm.complete_json`, which owns the thinking mode, the single retry and the
-"nothing parsed" answer (ADR 0011).
-"""
+Turns the played Scenario's English prompt fields into German prose for the User plus a
+goal checklist. It **translates, never invents**. No statistics (ADR 0051), and it never
+reaches a prompt -- a briefing the Persona could read, it could act on."""
 from __future__ import annotations
 
 import logging
 
 from pydantic import BaseModel
 
-from backend.authored_text import clean
+from backend.authored_text import clean, fit
 from backend.clients import llm
 
 logger = logging.getLogger(__name__)
@@ -60,13 +36,8 @@ class ReverseError(RuntimeError):
 
 
 class _Brief(BaseModel):
-    """The briefing panel's fields.
-
-    All defaulted, like the follow-up's draft: a missing key costs that panel,
-    not the whole briefing. A reverse with a thin brief is still a usable
-    exercise — the case is in the Scenario either way — where no reverse at all
-    is not.
-    """
+    """The briefing panel's fields. All defaulted: a missing key costs that
+    panel, not the whole briefing, and a thin brief is still a usable exercise."""
 
     situation: str = ""
     facts: str = ""
@@ -74,17 +45,15 @@ class _Brief(BaseModel):
     goals: list[str] = []
 
     def sanitised(self) -> dict:
-        """Cleaned (ADR 0059) and capped, ready to store and to show.
-
-        Run through `clean` for the same reason authored text is, even though
-        this text never reaches a prompt: it is stored on a Scenario row, and
-        the rule that keeps control tokens out of that table should not depend
-        on which writer filled the row in.
-        """
+        """Cleaned (ADR 0059) and capped, ready to store and to show. Cleaned
+        though it never reaches a prompt: the rule for the `scenario` table
+        should not depend on which writer filled the row."""
         brief = {
-            field: clean(getattr(self, field))[:cap] for field, cap in FIELD_LIMITS.items()
+            field: fit(clean(getattr(self, field)), cap) for field, cap in FIELD_LIMITS.items()
         }
-        goals = [clean(g)[:GOAL_LIMIT].strip() for g in self.goals]
+        # Held at a word boundary like the follow-up's fields: a slice cut the
+        # briefing the User argues from in the middle of a word.
+        goals = [fit(clean(g), GOAL_LIMIT) for g in self.goals]
         brief["goals"] = [g for g in goals if g][:MAX_GOALS]
         return brief
 
@@ -122,13 +91,9 @@ def _material(
 def _messages(material: str) -> list[dict[str, str]]:
     """The prompt. English per ADR 0043; the briefing itself is German.
 
-    Numbered and sectioned like the wrap-up's, for the same reason (ADR 0011).
-    The three rules a small model breaks here are R1 (it writes a new case
-    rather than translating the one it was given), R2 (it addresses the trainee
-    as the person answering the phone, which is the role they are leaving) and
-    G2 (it answers with advice about manner — „bleiben Sie ruhig“ — where a
-    goal has to be a thing that either happened in the call or did not).
-    """
+    Numbered like the wrap-up's (ADR 0011). Rules a small model breaks here: R1
+    (inventing a case), R2 (addressing the trainee in the role they are leaving),
+    G2 (advice about manner instead of goals that happened or did not)."""
     system = (
         "# Role\n"
         "You prepare a trainee for a phone-call exercise. They have just "
@@ -190,13 +155,7 @@ def _messages(material: str) -> list[dict[str, str]]:
         "G4. Short: one line each, at most about twelve words, beginning with "
         "the verb. No sub-clause explaining why it matters.\n"
         "\n"
-        "# Never\n"
-        "N1. No markdown, no headings, no bullet characters, no line breaks "
-        "inside the JSON strings.\n"
-        "N2. No straight double quote inside a string: forget the backslash "
-        "in front of one and the whole answer is unreadable. Use „ “ or "
-        "single quotes.\n"
-        "N3. No text of any kind before or after the JSON object.\n"
+        f"{llm.JSON_ANSWER_NEVER}"
         "\n"
         "# Output\n"
         "Answer with a single JSON object and nothing else.\n"
@@ -247,14 +206,9 @@ async def draft_brief(
 ) -> dict:
     """One briefing, cleaned and capped, ready to store on the reverse.
 
-    Thinking mode and one retry, as off the live path (ADR 0011) --
-    `llm.complete_json` owns both, so the follow-up draft (F-60) and this one
-    cannot drift apart on how hard they try. Propagates OpenAIError; raises
-    ReverseError when nothing parsed. Unlike the wrap-up there is no narrative
-    fallback worth keeping: the reverse would be created either way, and a
-    Scenario carrying an unreadable briefing is worse than a button that says
-    to try again.
-    """
+    `llm.complete_json` owns thinking mode and the retry (shared with F-60).
+    Propagates OpenAIError; raises ReverseError when nothing parsed -- no fallback,
+    since an unreadable briefing is worse than a button saying try again."""
     messages = _messages(
         _material(description, case_facts, call_goal, improvements or [])
     )

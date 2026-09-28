@@ -2,13 +2,13 @@
 
 ## Status
 
-Proposed. The first two parts describe what is in place. The third — ESLint restricted to the React hook rules — is not built.
+Accepted. All three parts are in place; the third — ESLint restricted to the React hook rules — was built on 2026-09-21 (see *Built* below).
 
 ## Context
 
 There is no CI workflow in the repository and no Node toolchain on the development machine. The frontend is verified when the image is built: `docker build --target frontend-build` runs `npm ci && npm run build`, and `build` is `tsc && vite build`. Whatever that step does not catch reaches the browser.
 
-**The compiler runs at maximum strictness** (`frontend/tsconfig.json`): `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnusedLocals`, `noUnusedParameters`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `verbatimModuleSyntax`. The test specs are type-checked with everything else, since a fixture had once drifted out of shape while they were excluded. CLAUDE.md still describes them as excluded; `tsconfig.json` is the current state.
+**The compiler runs at maximum strictness** (`frontend/tsconfig.json`): `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnusedLocals`, `noUnusedParameters`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `verbatimModuleSyntax`. The test specs are type-checked with everything else, since a fixture had once drifted out of shape while they were excluded. CLAUDE.md described them as excluded for a while after that; it has been corrected, and `tsconfig.json` is the current state.
 
 **The test suite is deliberately narrow** (Vitest, jsdom, hand-written Web Audio and WebSocket fakes in `src/test/setup.ts`):
 
@@ -41,3 +41,12 @@ The build gains a lint step and a development dependency. Effects that are delib
 A regression in what a screen shows is still caught only by looking at it. The accessibility of the markup is not checked automatically either (see ADR 0097).
 
 Because there is no CI, all of this runs only when somebody builds the image. The deploy builds the same image, so nothing reaches a server unchecked, but a broken commit can sit on a branch until then.
+
+## Built
+
+`frontend/eslint.config.js` enables `rules-of-hooks` and `exhaustive-deps` as errors and nothing else, parsing TypeScript through `@typescript-eslint/parser` only so it can read the source, not to add its rules. `reportUnusedDisableDirectives` is an error too, so a disable comment that stops suppressing anything fails the build instead of lingering. `npm run build` is now `eslint src && tsc && vite build`, and `npm run lint` runs the step alone.
+
+The first run found six violations. Four were incomplete dependency lists that happened to work: `beginSession` and the call's accept handler closed over callbacks that keep one identity by construction, and the listening effect read `vad` through a property path the rule could not follow — each now names what it reads. One was a hook name on a function that is not a hook (`useAppFonts` in the PDF builder, now `registerAppFonts`). And **one was a live defect**: `ProgressPractice` keyed its library fetch on the suggestion object, which is rebuilt on every render, although the comment beside it explained exactly why it must be keyed on whether there is one — every response re-ran the effect and fetched the library again. The code now says what the comment did.
+
+The four disable comments that remain are the deliberate exceptions this decision anticipated — effects keyed on identity or run once on mount — each carrying its reason.
+

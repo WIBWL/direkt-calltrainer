@@ -26,13 +26,8 @@ function readRms({ analyser, samples }: MeterSource): number {
 
 /**
  * Samples an AnalyserNode once per animation frame and exposes its amplitude
- * as a normalized 0..1 `level`.
- *
- * Shared by the two places that meter audio — the pre-call microphone check
- * (input) and persona playback (output) — because the measurement is the same
- * in both; only what is metered and how far the value is scaled differ.
- * `gain` covers the latter: speech RMS is naturally small, so a meter that
- * should visibly react needs the raw value scaled before it is clamped.
+ * as a normalized 0..1 `level`. Used for the mic check and persona playback;
+ * `gain` scales the raw RMS (speech RMS is small) before it is clamped.
  */
 export function useAudioLevelMeter(gain = 1) {
   const [level, setLevel] = useState(0);

@@ -1,0 +1,19 @@
+# TLS in front of the app (compose.prod.yaml). The domain comes from .env;
+# its DNS record must point at this server before the first start, or the
+# certificate request fails.
+{$CALLTRAINER_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# The microphone is the one device the app asks for.
+		Permissions-Policy "microphone=(self), camera=(), geolocation=()"
+		-Server
+	}
+
+	# One upstream for everything: the SPA, /api, /health and the /ws/session
+	# WebSocket, whose upgrade Caddy passes through by itself.
+	reverse_proxy app:8000
+}

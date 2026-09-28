@@ -6,19 +6,9 @@ import FocusGoalPicker, { toggleGoal } from "./FocusGoalPicker";
 import FocusProfilePicker from "./FocusProfilePicker";
 
 /**
- * The training focus on the profile page: what is currently picked, and how to
- * change it (F-62, ADR 0076).
- *
- * Read-only until the user asks to edit. The section is passed on the way to
- * something else most of the time, and a dozen open checkboxes would make a
- * page about your account look like a form waiting to be filled in, while a
- * stray click on a checkbox that saved immediately would silently change what
- * the training emphasises.
- *
- * Editing therefore has an explicit Save, and Cancel restores what was there.
- * Neither direction is confirmed: unlike withdrawing consent, nothing here
- * destroys anything, and a confirmation on a harmless change makes the harmful
- * ones look equally routine.
+ * The training focus on the profile page (F-62, ADR 0076). Read-only until the user asks
+ * to edit, so a stray click cannot change what the training emphasises. Editing has an
+ * explicit Save and Cancel, unconfirmed since nothing here destroys anything.
  */
 export default function FocusSettings() {
   const { focus, saving, choose } = useFocusContext();

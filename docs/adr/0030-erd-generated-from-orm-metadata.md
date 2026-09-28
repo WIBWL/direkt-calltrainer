@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted, amended 2026-09-23: the diagram is no longer part of the docs site. `docs/datenmodell.md` and the MkDocs hook that regenerated the diagram before every build were removed; `scripts/generate_erd.py` stays and writes `docs/diagrams/er_model.svg` (SVG only, no PNG), a gitignored folder, on demand. Nothing is committed any more, so there is no stale copy to fall back to or to review in a diff — the Decision and Consequences below describe the arrangement before this amendment.
 
 ## Context
 
@@ -10,7 +10,7 @@ With the schema now defined in code (ADR 0026), the project's documentation need
 
 ## Decision
 
-`scripts/generate_erd.py` generates the ER diagram directly from `Base.metadata` using `sqlalchemy-schemadisplay` and `pydot`/Graphviz, against an empty in-memory SQLite engine so no running database is required. It writes both `docs/er_modell.png` and `docs/er_modell.svg`, styled to match the project's existing design tokens (Blue-Ramp palette, IBM Plex Mono font). The generated files stay committed to the repository, and a MkDocs `on_pre_build` hook (`scripts/mkdocs_hooks.py`) additionally re-runs the generator before every docs build, so the diagram published on `docs/datenmodell.md` is derived from the current `models.py` rather than from whatever was last committed. When the generator cannot run — typically because the Graphviz `dot` binary is absent — the hook logs a warning and the build continues with the committed diagram instead of failing.
+`scripts/generate_erd.py` generates the ER diagram directly from `Base.metadata` using `sqlalchemy-schemadisplay` and `pydot`/Graphviz, against an empty in-memory SQLite engine so no running database is required. It writes both `docs/er_model.png` and `docs/er_model.svg`, styled to match the project's existing design tokens (Blue-Ramp palette, IBM Plex Mono font). The generated files stay committed to the repository, and a MkDocs `on_pre_build` hook (`scripts/mkdocs_hooks.py`) additionally re-runs the generator before every docs build, so the diagram published on `docs/datenmodell.md` is derived from the current `models.py` rather than from whatever was last committed. When the generator cannot run — typically because the Graphviz `dot` binary is absent — the hook logs a warning and the build continues with the committed diagram instead of failing.
 
 ## Consequences
 

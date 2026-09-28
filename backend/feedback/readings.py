@@ -1,24 +1,7 @@
-"""What a stored Measurement means when it is read back.
-
-A measurement is computed once, when the call ends, and kept (`metrics.py`). A
-**reading** is the step of a scale that figure lands on, and it is derived on
-every read instead -- because the thresholds behind it are working values that
-nothing has validated, and a stored step would outlive the scale it came from.
-
-The split has already paid for itself once: F-35's reading moved from the
-semitone range onto the pitch variation quotient, and every stored Session
-picked up the new scale on its next read, or lost its step where the new input
-had never been measured. No migration, and the audio to re-measure from is long
-gone (ADR 0048).
-
-Three tables used to sit in `backend/api/sessions.py` -- which metrics carry an
-explanation, which carry a scale, and which need fields added to their stored
-detail. An HTTP route is the wrong place to keep a list of metrics: give a new
-one a scale and a reading and it measures, stores and serves correctly while
-arriving with no explanation, no scale and no step, and nothing fails. Here the
-three are one entry per metric, beside the thresholds they describe.
-
-The route now knows no metric keys at all.
+"""What a stored Measurement means when it is read back (ADR 0091).
+A measurement is stored once; a **reading** (the step it lands on) is derived on
+every read, so a recalibrated scale reaches old Sessions without a migration.
+One entry per metric here; the API routes know no metric keys.
 """
 
 from __future__ import annotations
@@ -26,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from backend.feedback import interruptions, intonation, metrics
+from backend.feedback import explanations, interruptions, intonation, metrics
 
 # One step of a scale as the interface shows it: the machine-readable name, how
 # it is said, where it applies, and a colour where the scale has a direction.
@@ -35,13 +18,9 @@ Step = dict[str, str | None]
 
 @dataclass(frozen=True)
 class Reading:
-    """What one metric offers a reader beyond its figure.
-
-    `explanation` is required and the other two are not, on purpose: ADR 0078
-    lets a scale exist only beside the population its boundaries came from, so
-    a scale with nothing to read next to it is a threshold the user cannot
-    argue with. The reverse is fine -- `run_length` is explained at length and
-    deliberately carries no step, because a correlation is not a boundary.
+    """What one metric offers a reader beyond its figure. A scale never exists
+    without an explanation (ADR 0078's fourth condition); an explanation without
+    a scale is fine. `derive` may add served fields, as `loudness` does.
     """
 
     # The text behind the metric's "i", read from the constant at request time
@@ -59,13 +38,9 @@ class Reading:
 
 
 def _liveliness(detail: dict) -> dict:
-    """F-35's step, off the pitch variation quotient in the detail and not off
-    the Measurement's own value, which is the semitone range.
-
-    The two are different figures and only one of them has a boundary anybody
-    has published (see `intonation.liveliness`). A Session measured before the
-    quotient existed carries no `pvq` and gets no step, which is the honest
-    answer rather than a gap papered over with the withdrawn scale.
+    """F-35's step, off the `pvq` in the detail -- never off the Measurement's own
+    value, the semitone range, which has no published boundary. No `pvq`, no step
+    (see `intonation.liveliness`).
     """
     step = intonation.liveliness(detail.get("pvq"), detail.get("voiced_ms"))
     if step is None:
@@ -80,22 +55,22 @@ def _liveliness(detail: dict) -> dict:
     }
 
 
+def _loudness_course(detail: dict) -> dict:
+    """F-37's course (smoothed line, own band, stretches outside it), served so
+    the drawing and the wrap-up's sentence (`metrics.describe_loudness_course`)
+    come from one function. A curve too short to read is served as stored.
+    """
+    curve = detail.get("curve_db")
+    if not isinstance(curve, list):
+        return detail
+    course = metrics.loudness_course(curve)
+    return detail if course is None else {**detail, "course": course}
+
+
 def _interruption_light(detail: dict) -> dict:
-    """F-51's traffic light, colour and word, off the count in the detail.
-
-    Derived rather than read back: the step used to be written into the stored
-    detail, which is the one thing ADR 0091 says must not happen. The two
-    numbers behind this light are described in `interruptions.py` as invented
-    working values to be calibrated once the pilot has data -- and a stored
-    colour survives that calibration, so a Session stored at three
-    interruptions kept its red while the legend served beside it, built from
-    the constants, put three in the yellow band. The count itself is what is
-    stored; `hard_offsets_ms` holds one entry per hard interruption, so its
-    length is exactly the number the light reads.
-
-    A detail written before that list existed gets no light, which is the same
-    answer `_liveliness` gives a Session with no `pvq`: a step nobody can
-    reproduce from what is stored is worse than none.
+    """F-51's traffic light, colour and word, derived on read from the length of
+    `hard_offsets_ms` -- never stored, or it would outlive a recalibration
+    (ADR 0091). A detail without that list gets no light.
     """
     offsets = detail.get("hard_offsets_ms")
     if not isinstance(offsets, list):
@@ -114,13 +89,32 @@ def _interruption_light(detail: dict) -> dict:
 # ask the three functions below, so adding a metric here reaches every route
 # without any of them learning about it.
 _READINGS: dict[str, Reading] = {
+    # The two with a scale. Their wording lives beside the thresholds it
+    # describes, which is ADR 0078's fifth condition.
     intonation.RANGE_KEY: Reading(
         intonation.EXPLANATION, intonation.liveliness_steps, _liveliness,
     ),
     interruptions.COUNT_KEY: Reading(
         interruptions.EXPLANATION, interruptions.light_steps, _interruption_light,
     ),
-    metrics.RUN_LENGTH_KEY: Reading(metrics.RUN_LENGTH_EXPLANATION),
+    # The rest: explained, deliberately without a step. Every active metric must
+    # be here, or its tile states a figure with no way to check it (ADR 0098).
+    metrics.RUN_LENGTH_KEY: Reading(explanations.RUN_LENGTH),
+    "talk_share": Reading(explanations.TALK_SHARE),
+    "questions": Reading(explanations.QUESTIONS),
+    "pace": Reading(explanations.PACE),
+    "word_count": Reading(explanations.WORD_COUNT),
+    "fillers": Reading(explanations.FILLERS),
+    "opening": Reading(explanations.OPENING),
+    metrics.CLOSING_KEY: Reading(explanations.CLOSING),
+    "repetitions": Reading(explanations.REPETITIONS),
+    "hesitations": Reading(explanations.HESITATIONS),
+    "reaction_time": Reading(explanations.REACTION_TIME),
+    "pauses": Reading(explanations.PAUSES),
+    "phonation_share": Reading(explanations.PHONATION_SHARE),
+    # Explained like the rest, and the only one of them that also derives:
+    # the course the screen draws is read here (ADR 0091), never stored.
+    metrics.LOUDNESS_KEY: Reading(explanations.LOUDNESS, derive=_loudness_course),
 }
 
 
@@ -142,12 +136,9 @@ def scales() -> dict[str, list[Step]]:
 
 
 def served_detail(key: str, detail: dict | None) -> dict | None:
-    """The stored facts, plus whatever this metric's reading adds to them.
-
-    A metric with no reading, and a Session whose detail was never written, are
-    both served exactly as stored -- which is also what `GET /api/me/export`
-    serves in every case, deliberately: an export is a copy of what is held,
-    not of what is concluded from it.
+    """The stored facts, plus whatever this metric's reading adds to them. The
+    export deliberately does not call this: it copies what is held, not what is
+    concluded from it.
     """
     if detail is None:
         return None

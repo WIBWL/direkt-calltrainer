@@ -1,13 +1,7 @@
-"""The write path from ADR 0034: a finished Session becomes exactly one row,
-with its Turns, in one transaction.
+"""The write path from ADR 0034: a finished Session becomes one row, with its Turns, in one transaction.
 
-These tests exercise `persistence.persist_session` directly rather than through
-the WebSocket, because the interesting behaviour is the mapping — in-memory
-Turns to utterance rows, end reason to `session.status` — not the transport.
-
-A Turn is an exchange in memory but one row per speaker in the schema
-(ADR 0026), so the counts below are utterances, not exchanges; `utterances()`
-in backend/session/models.py is what performs that flattening.
+Calls `persistence.persist_session` directly: the point is the mapping, not the transport.
+Counts are utterances, not exchanges (ADR 0026; `utterances()` in backend/feedback/calls.py).
 """
 import uuid
 

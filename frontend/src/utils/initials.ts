@@ -1,14 +1,7 @@
 /**
- * Up to two initials for an avatar: the first letter of the first and of the
- * last part of a name, so "Anna Maria Berger" reads "AB".
- *
- * One function for every avatar in the app — the account chip, a Persona's
- * portrait fallback and the transcript's speaker marks — so the same name
- * cannot come out as two different pairs of letters on two screens.
- *
- * Taken per grapheme rather than per code unit, so a name starting with a
- * character outside the BMP does not lose half of itself. Empty for an empty
- * name; what stands in for it is the caller's to decide.
+ * Up to two initials ("Anna Maria Berger" → "AB") for every avatar in the app.
+ * Taken per grapheme, not code unit, so a non-BMP first character stays whole.
+ * Empty for an empty name; the fallback is the caller's.
  */
 export function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);

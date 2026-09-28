@@ -9,16 +9,9 @@ import {
 import type { CallState } from "../protocol";
 
 /**
- * The wire between the two hooks, which neither of their own specs covers.
- *
- * `useStreamedAudioPlayback.test.ts` proves `interrupt()` stops the audio and
- * returns how much was heard; `useSessionSocket.test.ts` proves the socket
- * stops forwarding chunks. Nothing proved the number got from one to the other
- * — and dropping it is a silent failure: the transcript keeps words nobody
- * heard, which is exactly what ADR 0035 exists to prevent.
- *
- * Plain fakes rather than the Web Audio and WebSocket doubles: what is under
- * test here is the wire, not the audio.
+ * The wire between playback and socket, which neither hook's own spec covers:
+ * the heard position `interrupt()` returns must reach the server, or the
+ * transcript silently keeps unheard words (ADR 0035). Plain fakes suffice.
  */
 
 function fakes(callState: CallState, isPlaying: boolean, playedMs = 1234) {

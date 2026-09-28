@@ -1,0 +1,19 @@
+# Everything the running application needs, plus the tools that only a
+# developer's machine does: none of this goes into the Docker image.
+-r requirements.txt
+
+# ERD generation (scripts/generate_erd.py)
+pydot==3.0.4
+sqlalchemy-schemadisplay==2.0
+
+# Docs site (arc42 + ADRs)
+mkdocs==1.6.1
+mkdocs-material==9.5.49
+
+# Tests
+pytest==8.3.4
+pytest-asyncio==0.25.2
+
+# Lint
+flake8==7.1.1
+pylint==3.3.3

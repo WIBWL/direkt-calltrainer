@@ -1,16 +1,8 @@
-"""A KugelAudio stream left before its `final` frame resets the pooled socket
-(ADR 0044 amendment).
+"""A KugelAudio stream left before its `final` frame resets the pooled socket (ADR 0044 amendment).
 
-`stream_async` reads frames off the shared connection until `final`, with no
-request id to tell requests apart. A barge-in abandons the stream mid-way, so
-that request's remaining audio and its `final` stay queued -- and every later
-stream yields the previous request's audio as its own: a one-chunk offset that
-persists for the life of the socket. Live, that was the persona's last sentence
-arriving at the start of the next Turn, every Turn. So an unfinished stream
-drops the pooled connection and re-warms a fresh one in the background, and
-the orchestrator closes an abandoned stream at once rather than leaving it to
-the garbage collector.
-"""
+Frames carry no request id, so an abandoned stream's leftovers become the next request's
+audio: a persistent one-chunk offset. An unfinished stream drops and re-warms the connection,
+and the orchestrator closes an abandoned stream at once."""
 
 import asyncio
 
@@ -24,7 +16,7 @@ from backend.session.orchestrator import SessionOrchestrator
 
 # pylint: disable=missing-function-docstring,protected-access
 
-VOICE = PersonaVoice(tts_voice="de_male", kugelaudio_voice_id=1885)
+VOICE = PersonaVoice(kugelaudio_voice_id=1885)
 
 
 class _Chunk:
@@ -66,7 +58,6 @@ class _Client:
 def kugel(monkeypatch):
     """A fake pooled KugelAudio client behind `synthesize_stream`."""
     streaming = _StreamingTTS([_Chunk(b"\x00\x01" * 100), _Chunk(b"\x02\x03" * 100), {"final": True}])
-    monkeypatch.setattr(tts, "SKIP_KUGELAUDIO", False)
     monkeypatch.setattr(tts, "AudioChunk", _Chunk)
     monkeypatch.setattr(tts, "KUGELAUDIO_CLIENT", _Client(streaming))
     return streaming
@@ -98,18 +89,14 @@ async def test_a_stream_read_to_its_final_frame_keeps_the_socket(kugel):
     assert kugel.closed == 0 and kugel.connected == 0
 
 
-async def test_a_stream_failing_before_audio_falls_back_and_drops_the_socket(kugel, monkeypatch):
+async def test_a_stream_failing_before_audio_raises_and_drops_the_socket(kugel):
     kugel.fail = KugelAudioError("kugelaudio down")
 
-    async def fake_direkt(_text, _voice):
-        return b"DIREKT-WAV"
-
-    monkeypatch.setattr(tts, "_synthesize", fake_direkt)
-
-    pieces = [piece async for piece in tts.synthesize_stream("Ein Satz.", VOICE, "de")]
+    with pytest.raises(KugelAudioError):
+        async for _ in tts.synthesize_stream("Ein Satz.", VOICE, "de"):
+            pass
     await _settle()
 
-    assert pieces == [b"DIREKT-WAV"]
     assert kugel.closed == 1, "no `final` was read, so the socket is not trusted"
 
 
@@ -145,16 +132,11 @@ async def test_the_orchestrator_closes_an_abandoned_stream_before_the_teardown_r
     assert closed == ["Es geht um die Exportfunktion, die seit elf Tagen nicht funktioniert."]
 
 
-async def test_the_one_shot_path_drops_the_socket_too(kugel, monkeypatch):
-    """ADR 0044's invariant is about the pooled connection, and the one-shot
-    request uses the same one.
+async def test_the_one_shot_path_drops_the_socket_too(kugel):
+    """The one-shot request shares the pooled connection, so it needs the same reset (ADR 0044).
 
-    It had no `final` check and no reset. `synthesize` catches the failure and
-    answers with DiReKT audio, so the fallback-closing line is simply spoken in
-    the other voice and everything looks healthy -- while the abandoned
-    request's frames wait on the shared socket for the next call in the process,
-    which then hears the end of somebody else's goodbye and is a chunk out of
-    step from there on.
+    Otherwise a failed request's frames wait on the socket and the next call in the
+    process is a chunk out of step.
     """
     kugel.frames = [_Chunk(b"\x00\x01" * 100)]  # audio, then the stream dies
     kugel.fail = None
@@ -163,17 +145,13 @@ async def test_the_one_shot_path_drops_the_socket_too(kugel, monkeypatch):
         yield _Chunk(b"\x00\x01" * 100)
         raise KugelAudioError("connection reset mid-stream")
 
-    async def fake_direkt(_text, _voice):
-        return b"DIREKT-WAV"
-
     kugel.stream_async = dying_stream
-    monkeypatch.setattr(tts, "_synthesize", fake_direkt)
 
-    out = await tts.synthesize("Auf Wiederhoeren.", VOICE, "de")
+    with pytest.raises(KugelAudioError):
+        await tts.synthesize("Auf Wiederhoeren.", VOICE, "de")
     await _settle()
 
-    assert out == b"DIREKT-WAV", "the caller still gets audio"
-    assert kugel.closed == 1, "and the socket nobody finished reading is dropped"
+    assert kugel.closed == 1, "the socket nobody finished reading is dropped"
 
 
 async def test_the_one_shot_path_keeps_a_finished_socket(kugel):
@@ -189,12 +167,8 @@ async def test_the_one_shot_path_keeps_a_finished_socket(kugel):
 async def test_two_sessions_cannot_stream_on_the_pooled_socket_at_once(kugel):
     """One request at a time on the shared connection.
 
-    The frames carry no request id, and `websockets` refuses two concurrent
-    `recv()` calls on one connection outright -- a ConcurrencyError, which is a
-    RuntimeError and is caught nowhere along the TTS path: one call would end on
-    `tts_failed` and the other be stored as an aborted Session and logged as a
-    client that had gone away. ADR 0044 treated low concurrency as a cost
-    argument; it is a precondition.
+    `websockets` refuses two concurrent `recv()` calls with a ConcurrencyError that
+    nothing on the TTS path catches, failing one call and aborting the other.
     """
     in_flight = 0
     overlap = 0

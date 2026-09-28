@@ -125,8 +125,8 @@ Dieses Kapitel fasst die tragenden Entscheidungen des ersten Prototyps zusammen.
 | Frontend | Single-Page-Anwendung in React und TypeScript, vom Backend mit ausgeliefert | 0008 |
 | Backend | Python mit FastAPI | 0012 |
 | Architekturstil | Geschichteter modularer Monolith für den Echtzeitpfad, asynchroner Worker für die Nachbereitung | 0018 |
-| Sprach- und Dialogmodelle | Uni-gehostetes DiReKT-Gateway für STT und LLM; getrennt selbst gehostete lokale Modelle statt eines externen Anbieters | 0011, 0021 |
-| Sprachsynthese | KugelAudio als Standard, DiReKT als Rückfallebene | 0040 |
+| Sprach- und Dialogmodelle | Uni-gehostetes DiReKT-Gateway für STT und LLM, je ein Modellname in `.env`; getrennt selbst gehostete lokale Modelle statt eines externen Anbieters | 0011, 0021, 0103 |
+| Sprachsynthese | KugelAudio, ohne Rückfallebene | 0040, 0103 |
 | Sprecherwechsel | Silero-VAD im Browser; das Turn-Ende wird erkannt, nicht per Knopfdruck gesetzt | 0036 |
 | Transport | Eine WebSocket-Verbindung je Session, Audio in Chunks in beide Richtungen | 0033, 0044 |
 | Persistenz | Eigene PostgreSQL-Instanz, SQLAlchemy 2.0, Alembic-Migrationen aus den ORM-Metadaten | 0010, 0025, 0026, 0027 |
@@ -176,15 +176,25 @@ Der Engpass ist die Kette aus Spracherkennung, Antwortgenerierung und Sprachsynt
 
 ## 5.1 Whitebox Gesamtsystem
 
-*TODO: Komponenten der obersten Ebene (z. B. Engine für Anrufsimulation, Sprachanalyse, Feedback-Engine, Frontend).*
+Das System besteht aus einem browserbasierten Frontend, dem FastAPI-Backend, einem asynchronen Worker sowie den angebundenen Sprach- und Dialogdiensten. Der Echtzeitpfad des Trainings läuft zwischen Frontend und Backend über eine WebSocket-Verbindung; die Nachbereitung wird nach Gesprächsende getrennt davon verarbeitet (ADR 0018, ADR 0019, ADR 0033).
 
-*\<Übersichtsdiagramm\>*
+### Frontend
 
-*Begründung: \<Erläuternder Text\>*
+Das Frontend ist als Single-Page-Anwendung mit React und TypeScript umgesetzt (ADR 0008). Es bildet den vollständigen Trainingsablauf aus Sicht des Nutzers ab und übernimmt die Darstellung der einzelnen Trainingsschritte, die clientseitige Zustandsverwaltung sowie die Kommunikation mit den HTTP- und WebSocket-Schnittstellen des Backends.
 
-*Enthaltene Bausteine: \<Beschreibung der enthaltenen Bausteine (Blackboxen)\>*
+`App.tsx` koordiniert den Trainingsablauf. Der Wechsel zwischen den einzelnen Ansichten wird über die in `trainingFlow.ts` definierte Ablaufsteuerung bestimmt (ADR 0096). Zustände, die mehrere Ansichten betreffen, werden in spezialisierte Hooks und Contexts ausgelagert.
 
-*Wichtige Schnittstellen: \<Beschreibung wichtiger Schnittstellen\>*
+Die wichtigsten Frontend-Bausteine sind:
+
+- `SetupView`: Auswahl von Szenario und Persona sowie Vorbereitung des Trainings. Erst der bewusste Start erzeugt eine Session; die reine Auswahl löst noch keine Verbindung zum Backend aus (ADR 0042).
+- `MicCheck`: Prüfung des Mikrofonzugriffs und des ausgewählten Eingabegeräts vor Gesprächsbeginn.
+- `CallView`: Darstellung des laufenden Trainingsgesprächs. Während des Gesprächs werden nur die für den Gesprächszustand notwendigen Informationen angezeigt; das vollständige Transkript erscheint erst nach Gesprächsende (ADR 0014).
+- `FeedbackView`: Darstellung des qualitativen Wrap-ups sowie der berechneten Gesprächskennzahlen nach Abschluss einer Session (F-09, F-10, F-53).
+- `ProgressView` und zugehörige Detailansichten: Darstellung mehrerer abgeschlossener Trainings und ihrer Entwicklung über die Zeit (F-13).
+
+Die Logik des Trainingsablaufs ist von der Darstellung getrennt. `useTrainingRun` verwaltet die aktuell gebundene Session sowie die Daten, die über das Gesprächsende hinaus benötigt werden. `useLiveCall` bündelt die Logik des laufenden Gesprächs und verbindet WebSocket-Kommunikation, Audiowiedergabe und Unterbrechungsverhalten. Dadurch bleiben die sichtbaren Komponenten weitgehend auf Darstellung und Benutzerinteraktion beschränkt.
+
+Die Authentifizierung liegt außerhalb des eigentlichen Trainingsablaufs. `AuthGate` schützt die geschützten Routen und bindet die Anwendung über OIDC an Keycloak an (ADR 0009). Die Routen für Training, Profil, Fortschritt und vergangene Sessions werden zentral in `main.tsx` aufgebaut.
 
 ## 5.2 Ebene 2
 
@@ -196,16 +206,19 @@ Der Engpass ist die Kette aus Spracherkennung, Antwortgenerierung und Sprachsynt
 
 # 6. Laufzeitsicht
 
-*Hinweis: Die Laufzeitsicht baut methodisch auf der Bausteinsicht (Kapitel 5) auf, die noch nicht ausgearbeitet ist. Die technischen Grundentscheidungen stehen inzwischen fest und sind in Kapitel 4 beschrieben; die Szenarien hier sind aber weiterhin auf funktionaler Ebene formuliert und nicht an konkrete Bausteine gebunden. Sobald Kapitel 5 vorliegt, sind sie entsprechend zu binden (siehe TS-01).*
+*Die Laufzeitsicht baut auf der Bausteinsicht aus Kapitel 5 auf. Für den Frontend-Anteil werden die dort beschriebenen Komponenten und Hooks den einzelnen Schritten des Trainingsablaufs zugeordnet. Die Backend-seitige Verarbeitung wird weiterhin auf funktionaler Ebene beschrieben.*
 
 ## 6.1 Szenario 1: Start und Ablauf eines Trainingsgesprächs
 
-- Der Nutzer startet ein neues Training und wählt (minimal) eine Persona bzw. ein Szenario aus (z. B. Support-Fall oder Beratungsgespräch, F-03, Q-02: möglichst wenige Pflichtangaben).
-- Das System initiiert die Gesprächssimulation: Der Nutzer spricht über PC/Headset, die Sprache wird in Echtzeit in Text umgewandelt (Speech-to-Text).
-- Das KI-Backend generiert eine Antwort der simulierten Persona (F-01, F-04), die per Text-to-Speech in gesprochene Sprache umgewandelt und ausgegeben wird.
-- Dieser Zyklus (Sprechen → Erkennen → Antworten → Aussprechen) wiederholt sich fortlaufend, bis der Nutzer das Gespräch beendet. Sowohl kurze Support-Calls als auch längere Beratungsgespräche werden dabei unterstützt (F-03).
+- Der Nutzer öffnet die Trainingsvorbereitung. `SetupView` stellt die verfügbaren Szenarien und Personas dar und übergibt die Auswahl an den in `App.tsx` gehaltenen Trainingszustand.
+- Erst mit dem bewussten Start des Trainings wird über `useTrainingRun` eine Session gebunden (ADR 0042). Die reine Auswahl von Szenario und Persona erzeugt noch keine Gesprächsverbindung.
+- Vor dem Gespräch führt `MicCheck` die Prüfung des Mikrofonzugriffs und des ausgewählten Eingabegeräts durch. Das ausgewählte Gerät wird anschließend in den laufenden Trainingszustand übernommen.
+- Der Wechsel zwischen Vorbereitung, Mikrofonprüfung und Gespräch wird über die in `trainingFlow.ts` definierte Ablaufsteuerung koordiniert (ADR 0096).
+- Im laufenden Gespräch stellt `CallView` den Gesprächszustand dar. `useLiveCall` bündelt dabei die WebSocket-Kommunikation, die Audiowiedergabe und das Unterbrechen der Persona.
+- Die Sprache des Nutzers wird an das Backend übertragen und dort per Speech-to-Text verarbeitet. Das KI-Backend generiert anschließend die Antwort der simulierten Persona (F-01, F-04), die per Text-to-Speech erzeugt und über die bestehende WebSocket-Verbindung an das Frontend zurückgegeben wird.
+- Dieser Zyklus aus Sprechen, Erkennen, Antworten und Ausgeben wiederholt sich, bis die Session beendet wird. Nach Gesprächsende übernimmt `useTrainingRun` das Transkript und die Kennung der abgeschlossenen Session für die anschließende Auswertung.
 
-Besonderheiten: Der gesamte Zyklus muss in Echtzeit ablaufen (Q-03), da Verzögerungen den natürlichen Gesprächsfluss stören. Parallel zur eigentlichen Konversation läuft die Analyse des Sprechverhaltens (Szenario 2) mit.
+Besonderheiten: Der gesamte Zyklus muss in Echtzeit ablaufen (Q-03), da Verzögerungen den natürlichen Gesprächsfluss stören. Die sichtbaren Zustände und die technische Gesprächslogik sind im Frontend getrennt: `CallView` übernimmt die Darstellung, während `useLiveCall` und die darunterliegenden Hooks die laufende Kommunikation und Audiowiedergabe steuern. Parallel zur Gesprächssimulation läuft die Analyse des Sprechverhaltens aus Szenario 2.
 
 ## 6.2 Szenario 2: Analyse des Sprechverhaltens während des Gesprächs
 
@@ -320,7 +333,7 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0027 | Alembic Migrations Autogenerated from ORM Metadata | angenommen | |
 | ADR 0028 | No Secondary Indexes Beyond Primary/Foreign Keys Yet | abgelöst durch ADR 0052 | |
 | ADR 0029 | JSONB for Flexible Per-Measurement Detail Data | angenommen | |
-| ADR 0030 | ER Diagram Generated from ORM Metadata | angenommen | |
+| ADR 0030 | ER Diagram Generated from ORM Metadata | angenommen, geändert | |
 | ADR 0031 | Pseudonymous subject_id Placeholder Instead of a User Foreign Key | angenommen | C-04, F-31 |
 | ADR 0032 | AnalysisJob as a Persisted Entity for Async Job Status | angenommen | Q-07, F-09 |
 | ADR 0033 | Streaming Session Pipeline via Chunked TTS over WebSocket | angenommen | Q-03, F-01, F-46 |
@@ -330,7 +343,7 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0037 | Closing-Intent Detection Is Regex-Based, Not an LLM Classifier | angenommen | Q-07, F-01 |
 | ADR 0038 | Guard Against Degenerate Repetition; Guarantee a Closing Line on Backstopped Endings | angenommen | Q-07, F-01 |
 | ADR 0039 | Centralized Logging — Colored Console, Per-Session-Truncated File, Not Committed | angenommen (Datei-Truncation überarbeitet durch ADR 0055) | |
-| ADR 0040 | TTS Defaults to KugelAudio with a DiReKT Fallback; Gemini Removed | angenommen (grenzt die TTS-Hälfte von ADR 0021 ein) | Q-03, Q-07, C-04, F-01 |
+| ADR 0040 | TTS Defaults to KugelAudio with a DiReKT Fallback; Gemini Removed | angenommen, Rückfallebene später entfernt (ADR 0103); grenzt die TTS-Hälfte von ADR 0021 ein | Q-03, Q-07, C-04, F-01 |
 | ADR 0041 | Personas and Scenarios Loaded from the Database | angenommen | F-03, F-04 |
 | ADR 0042 | Opening Turn Pre-Warmed at Session Commitment, Not on Selection | angenommen | Q-03, F-01 |
 | ADR 0043 | English Prompt Content, Session Language Bound to the Persona | angenommen (löst ADR 0022 ab) | C-01, R-35, F-03, F-04 |
@@ -358,7 +371,7 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0071 | The Model Reads Its Notes and the Last Exchanges, Not the Whole History | angenommen (eingeschränkt durch ADR 0075) | Q-03, Q-07 |
 | ADR 0072 | The Scenario Category as a Closed Vocabulary | angenommen | F-03, F-43, F-44 |
 | ADR 0073 | The Settlement Check Rides on the Per-Turn Nudge | angenommen (verfeinert ADR 0037 und ADR 0038) | Q-01, Q-03 |
-| ADR 0074 | Dialogue Generation May Run on Gemini, Under One Switch and on Two Models | angenommen (kehrt ADR 0040s Entfernung des Gemini-Pfads um, schränkt ADR 0011 auf STT ein) | Q-03, Q-08, C-04 |
+| ADR 0074 | Dialogue Generation May Run on Gemini, Under One Switch and on Two Models | ersetzt durch ADR 0103 | Q-03, Q-08, C-04 |
 | ADR 0075 | The Caller’s Notes Are Kept Only Where the Model Cannot Read Its Own History | angenommen (schränkt ADR 0071 auf das Gateway ein) | Q-03, Q-08 |
 | ADR 0076 | Focus Goals as a Stored Selection | angenommen, ergänzt (das Ziel zur Lautstärke ist zurückgezogen; die Auswahl steuert die Szenario-Empfehlungen) | F-62, F-13, C-04 |
 | ADR 0077 | The Liveliness Reading Moves to the Pitch Variation Quotient | angenommen (ändert ADR 0051s Ausnahme für F-35) | F-35, Q-01, Q-04 |
@@ -447,7 +460,7 @@ Stand: erster lauffähiger Prototyp. Die Spalte *Art* unterscheidet, ob eine Sch
 | TS-08 | Eine Tabelle für Einzelbefunde besteht im Schema, hat aber weder Schreiber noch Leser. | bewusst | Totes Schema. Es kostet nichts im Betrieb, täuscht aber eine Funktion vor, die es nicht gibt. | Entweder mit dem Pilotbetrieb befüllen oder entfernen. |
 | TS-09 | Die Python-Version ist festgenagelt, weil die verwendete ORM-Fassung auf neueren Fassungen nicht mehr lädt. | aufgefallen | Sicherheitsaktualisierungen der Sprachumgebung sind blockiert. | ORM anheben, danach die Festlegung nachziehen. |
 | TS-10 | Für die Zeilenenden gibt es keine im Projekt hinterlegte Konvention, obwohl auf verschiedenen Betriebssystemen gearbeitet wird. | aufgefallen | Änderungen erscheinen größer, als sie sind; Zeilenenden verrauschen die Historie. | Konvention hinterlegen. |
-| TS-11 | Für die Sprachsynthese besteht nur auf Deutsch eine funktionierende Rückfallebene. | aufgefallen | Fällt der Standardanbieter aus, liest bei einer englischsprachigen Persona ein deutsches Stimmmodell den englischen Text. Es kommt Audio, es wird kein Fehler gemeldet, und auffallen würde es nur am Klang. | Englische Rückfallebene beschaffen oder den Ausfall hörbar machen, statt still falsch zu synthetisieren. |
+| TS-11 | Für die Sprachsynthese besteht nur auf Deutsch eine funktionierende Rückfallebene — **abgetragen** | aufgefallen | Fiel der Standardanbieter aus, las bei einer englischsprachigen Persona ein deutsches Stimmmodell den englischen Text. Es kam Audio, es wurde kein Fehler gemeldet, und auffallen wäre es nur am Klang. | **Abgetragen durch ADR 0103: die Rückfallebene ist entfernt.** Von den beiden vorgeschlagenen Wegen — englische Rückfallebene beschaffen oder den Ausfall hörbar machen — ist der zweite gegangen: Ein Ausfall von KugelAudio beendet den Turn mit `tts_failed`, statt ihn still in der falschen Stimme zu synthetisieren. |
 
 ### Inhalt
 

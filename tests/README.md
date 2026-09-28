@@ -2,13 +2,13 @@
 
 Feature-traceable tests for the Calltrainer backend. Every test file names the
 `F-xx` features (`docs/features.md`), `R-xx` requirements
-(`docs/initial_requirements.md`) and ADRs (`docs/adr/`) it exercises, in its
+(`docs/initial-requirements.md`) and ADRs (`docs/adr/`) it exercises, in its
 module docstring and per-test docstrings.
 
 ## Running
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 pytest
 ```
 
@@ -49,6 +49,7 @@ source of that content, and which imports without a database.
 | Storage consent: the gate on the write path, version staleness, withdrawal deletes | F-49, F-31, ADR 0031, ADR 0034, ADR 0066 | `test_consent.py` |
 | Six-month retention: the boundary, the per-account suspension, idempotence | F-49, ADR 0031, ADR 0066, ADR 0067 | `test_retention.py` |
 | Focus goals: the five-goal limit at the backend, "no focus" as a decision, the catalogue, that deleting trainings leaves the selection alone, and the role and call types stored beside it | F-62, ADR 0031, ADR 0041, ADR 0066, ADR 0076 | `test_focus_goals.py` |
+| Every shipped focus goal reaches the dashboard: a tile backing per goal, no backing for a goal that is not shipped, and the habit goals excluded in both places at once | F-62, F-13, ADR 0076, ADR 0080 | `test_focus_goal_coverage.py` |
 | Data rights: overview counts, export completeness and scoping, deleting one training | F-49, F-31, ADR 0050, ADR 0064, ADR 0066 | `test_data_rights.py` |
 | Spoken content stays out of the log unless explicitly switched on | F-49, ADR 0039, ADR 0066 | `test_transcript_logging.py` |
 | Deep links into the client-side router survive a reload, without swallowing unknown API paths | F-31, ADR 0009, ADR 0064 | `test_spa_routing.py` |
@@ -76,12 +77,12 @@ source of that content, and which imports without a database.
 | A goodbye without the marker ends the call, and its own farewell is not doubled by the fallback line; a reply that only presses does not end it | ADR 0037 (amendment) | `test_call_end_marker.py` |
 | Repetition guard, re-introduction regeneration + guaranteed sign-off | ADR 0038, ADR 0043 | `test_repetition_guard.py` |
 | `[CALL_END]` marker + foreign-script scrub | ADR 0033 | `test_call_end_marker.py` |
-| Barge-in / eager interruption (incl. the note-barge-in ordering contract, a late interrupt over a committed reply's tail, the `[unterbrochen]` transcript marker, and the cut-off dash + one-Turn nudge that keep the model in the conversation afterwards) | ADR 0035 | `test_barge_in.py`, `test_barge_in_ordering.py` |
-| The startup backend checks: the wrap-up model is checked at boot when it is a separate model, and not when it is the same one; the check asks the way its callers do | ADR 0016, ADR 0074 | `test_startup_checks.py` |
-| The caller's notes and the history window: the model reads notes + the last three exchanges, the guards and the Transcript keep the full record; background refresh, refresh-on-trim, failure keeps stale notes. And the other shape: with the notes off the model is handed the whole conversation and no summarisation request is made | ADR 0071, ADR 0075 | `test_call_state.py` |
+| Barge-in / eager interruption (incl. the note-barge-in ordering contract, a late interrupt over a committed reply's tail, the `[unterbrochen]` transcript marker, and the cut-off dash + one-Turn nudge that keep the model in the conversation afterwards) | ADR 0035 | `test_barge_in.py`, `test_barge_in_ordering.py`, `test_spoken_reply.py` (what a cut reply was heard as, without a Turn) |
+| The startup backend checks: one per leg, each naming its model, and a rate-limited or silent backend says which it was | ADR 0016, ADR 0103 | `test_startup_checks.py` |
+| The caller's notes and the history window: the model reads notes + the last three exchanges, the guards and the Transcript keep the full record; background refresh, refresh-on-trim, failure keeps stale notes | ADR 0071 | `test_call_state.py` |
 | Whisper phantom transcripts ("*Titelm*", "Vielen Dank.") are no Turn | ADR 0071 | `test_stt_phantom.py` |
-| Pipeline fault tolerance (retry → graceful end) | ADR 0016, ADR 0033 | `test_pipeline_failure.py` |
-| TTS backend selection & fallback | ADR 0040 | `test_tts_fallback.py` |
+| Pipeline fault tolerance (retry → graceful end; the voice has no retry and no fallback) | ADR 0016, ADR 0033, ADR 0103 | `test_pipeline_failure.py` |
+| TTS runs on KugelAudio alone: a failure surfaces instead of being answered in another voice | ADR 0103 | `test_tts_backend.py` |
 | A KugelAudio stream left before `final` drops the pooled socket and re-warms; the orchestrator closes an abandoned stream at once (the one-chunk audio offset after a barge-in) | ADR 0044 (amendment) | `test_tts_stream_reset.py` |
 | What the TTS backend is handed (German thousands separator + ordinals) | ADR 0033, ADR 0044 | `test_speech_text.py` |
 | WebSocket wire protocol & handshake (+ token in `session.start`) | F-46, F-50, ADR 0009, ADR 0033, ADR 0035 | `test_websocket_protocol.py` |
@@ -93,6 +94,11 @@ source of that content, and which imports without a database.
 | Overlapping speech: the rule order that keeps a backchannel from counting, terminal overlap, hard vs soft, and the provisional traffic light | F-51, ADR 0035, ADR 0036, ADR 0051 | `test_interruptions.py` |
 | Scenario suggestions: call types and focus goals steer them, voice goals do not, a suggested Scenario keeps its own origin, and the offers after a call | F-62, F-64, ADR 0072, ADR 0076, ADR 0087 | `test_recommendations.py` |
 | Hesitation sounds read off the pitch contour: a held flat stretch counts, running speech and short vowels do not, and a failed measurement suppresses the figure | F-51, ADR 0048, ADR 0084 | `test_hesitations.py` |
+| A stored Session on the wire: one way to name a figure, the whole call apart from its segments, what the listing leaves out and what the export keeps | ADR 0051, ADR 0064, ADR 0066, ADR 0081, ADR 0091 | `test_served_session.py` |
+| Reading a stored Session back: transcript order, the whole call apart from its segments, the user's lines, rows rebuilt into Turns, and a slice of a reverse folded as a reverse | ADR 0051, ADR 0081, ADR 0086 | `test_stored_session.py` |
+| The call's message record: named operations for trimming, dropping and extending, and a window behind the system prompt | ADR 0035, ADR 0038, ADR 0071 | `test_history.py` |
+| Verdicts on one reply against the replies before it: repeats, oscillation, restatement, re-greeting, a still-pressing ending, and whether a finished reply ends the call and needs a goodbye | ADR 0037, ADR 0038 | `test_reply_checks.py` |
+| Which nudge a reply gets, in order of precedence, the reverse's reminder and the settlement check | ADR 0035, ADR 0037, ADR 0038, ADR 0070, ADR 0073 | `test_turn_nudge.py` |
 | Async wrap-up job status (queued → running → done/failed), and every path that can strand it | F-09, F-10, ADR 0019, ADR 0032, ADR 0034, ADR 0050 | `test_feedback_job_status.py` |
 | Wrap-up prompt & phase block (F-42), and the thinking-mode call it is asked with | F-09, F-42, F-43, ADR 0004, ADR 0011, ADR 0043, ADR 0049, ADR 0051, ADR 0056 | `test_wrapup_prompt.py` |
 | Documented gaps (current-state guards) | F-56 | `test_documented_gaps.py` |
@@ -108,9 +114,10 @@ source of that content, and which imports without a database.
   `test_api.py`); the generated text itself is not asserted, since it is model
   output. `metrics.py` is covered by `test_metrics.py` and `acoustics.py` by
   `test_acoustics.py` since the pitch curve was added.
-* **Frontend** (React hooks, in-browser Silero VAD / ADR 0036, streamed audio
-  playback) — no JS test runner is configured. VAD confirmed-speech filtering
-  is a browser-only concern.
+* **Frontend** — not in this suite. Vitest covers the live-call audio path and
+  the training flow's transition table (`cd frontend && npm test`, ADR 0094);
+  in-browser Silero VAD confirmed-speech filtering (ADR 0036) stays a
+  browser-only concern that neither suite reaches.
 * **Real backend connectivity** — `scripts/check_backends.py` already does a
   live OK/FAIL probe against the configured STT/LLM/TTS models.
 * **Whether the model actually follows the frame** — every prompt test here

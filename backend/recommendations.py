@@ -1,8 +1,7 @@
 """Which Scenarios to suggest first, from what a User said about their work (F-62).
 
-Rule-based, and every suggestion says why it was made, so the screen can show
-the reason rather than ask to be trusted. Suggesting a Scenario to practise a
-goal claims nothing about how the User does at it (ADR 0076).
+Rule-based; every suggestion carries its reason. Suggesting a Scenario claims
+nothing about how the User does at a goal (ADR 0076).
 """
 
 from __future__ import annotations
@@ -11,20 +10,17 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from backend import focus, library
+from backend.db.seed_data import FOCUS_GOALS
 from backend.db.session import session_scope
 
 # One row of the grid in front of the "show all" tile.
 MAX_RECOMMENDATIONS = 5
 
-# The call context that exercises a focus goal. The voice goals are absent on
-# purpose: every Scenario trains the voice, so they cannot steer the choice.
+# The call context that exercises a focus goal (`practised_in` in
+# `seed_data.FOCUS_GOALS`). Voice goals and `opening` name none on purpose:
+# every call trains the voice and has an opening, so they cannot steer.
 GOAL_CATEGORIES: dict[str, tuple[str, ...]] = {
-    "objection_handling": ("closing",),
-    "closing": ("closing",),
-    "needs_analysis": ("requirements",),
-    "active_listening": ("requirements",),
-    "composure": ("operations", "pricing"),
-    "empathy": ("operations",),
+    goal["id"]: tuple(goal["practised_in"]) for goal in FOCUS_GOALS if goal.get("practised_in")
 }
 
 
@@ -53,9 +49,8 @@ def recommend(
 ) -> dict[str, Recommendation]:
     """The Scenarios to suggest, by id, at most MAX_RECOMMENDATIONS.
 
-    A call type counts 2, each goal the context exercises 1; a Scenario not yet
-    played wins a tie, then the listing order. A reverse replays one particular
-    call and an uncategorised Scenario has no context, so neither is suggested.
+    Call type scores 2, each exercised goal 1; ties go to unplayed, then listing
+    order. Reverses and uncategorised Scenarios are never suggested.
     """
     kinds, picked = set(categories), tuple(goals)
     scored = []
@@ -148,16 +143,23 @@ def next_for_subject(
     partners: list[Partner],
 ) -> list[NextCall]:
     """`next_calls` over this subject's own profile and history."""
+    played_ids = library.played_scenario_ids(subject)
     return next_calls(played, persona, Choices(
         candidates, partners,
-        for_subject(subject, candidates), library.played_scenario_ids(subject),
+        for_subject(subject, candidates, played_ids), played_ids,
     ))
 
 
-def for_subject(subject: str, candidates: list[Candidate]) -> dict[str, Recommendation]:
-    """`recommend` over this subject's own focus selection and training history."""
+def for_subject(
+    subject: str, candidates: list[Candidate], played_ids: set[str] | None = None
+) -> dict[str, Recommendation]:
+    """`recommend` over this subject's own focus selection and training history.
+
+    `played_ids` is for a caller that already read the history: `next_for_subject`
+    needs it twice, and asked the database for it twice until it was passed in.
+    """
     with session_scope() as db:
         chosen = focus.selection(db, subject)
-    return recommend(
-        candidates, chosen.categories, chosen.keys, library.played_scenario_ids(subject)
-    )
+    if played_ids is None:
+        played_ids = library.played_scenario_ids(subject)
+    return recommend(candidates, chosen.categories, chosen.keys, played_ids)

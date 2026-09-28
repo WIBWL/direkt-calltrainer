@@ -15,18 +15,9 @@ interface FilterSliderProps<T extends string> {
 }
 
 /**
- * One row of the Scenario library filter: a track, one option per value, and a
- * thumb that slides onto whichever is active.
- *
- * Used for both levels (origin above, thematic category below), which is what
- * keeps them the same size: one component, one stylesheet, so the second row
- * cannot end up smaller than the first by drifting apart.
- *
- * A `radiogroup` rather than an `input type="range"`, because the options are
- * nominal: dragging along an axis would imply an order between two call
- * contexts that does not exist, and a range input announces itself to a screen
- * reader as a number. Arrow keys move the selection, which is what a radiogroup
- * gives for free and what makes it behave like a slider on the keyboard too.
+ * One row of the Scenario library filter, used for both levels so they cannot drift in
+ * size. A `radiogroup`, not `input type="range"`: the options are nominal, and a range
+ * would imply an order and announce a number. Arrow keys still move the selection.
  */
 export default function FilterSlider<T extends string>({
   options,

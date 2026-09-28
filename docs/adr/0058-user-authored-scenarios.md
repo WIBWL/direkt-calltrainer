@@ -101,5 +101,4 @@ Deleting a User (F-49) should remove their `private` Scenarios and anonymise
 `created_by` on any they shared. Doing that cleanly wants the real foreign key
 for `subject_id` that ADR 0031 deferred — noted here, not introduced.
 
-The migrations, `docs/datenmodell.md` and the ER diagram regenerate from
-`backend/db/models.py` as usual.
+The migrations regenerate from `backend/db/models.py` as usual.

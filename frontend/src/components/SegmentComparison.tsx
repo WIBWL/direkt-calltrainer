@@ -1,19 +1,10 @@
+import { formatValue } from "../utils/metrics";
 import type { SegmentPair } from "../utils/segmentStats";
 
 /**
- * Two figures side by side: how somebody spoke while the other side was
- * pushing back, and how they spoke the rest of the time (ADR 0081, F-62).
- *
- * The one thing this component must not do is answer the question. No
- * difference is shown, nothing is coloured, nothing is called stable or
- * shaky — how large a gap means something is the norm ADR 0051 declines to
- * invent, and this is a screen where one would be very easy to slip in.
- * Two numbers and their labels; the reader compares.
- *
- * The caveat under it is not decoration. Which exchanges were demanding was
- * decided by the language model that wrote the wrap-up, not measured, and a
- * reader who is not told that will take the split for a measurement as exact
- * as the figures sitting on it.
+ * Two figures side by side: under pressure vs the rest of the call (ADR 0081, F-62). Shows no difference, no
+ * colour, no "stable" — how large a gap matters is the norm ADR 0051 declines. The caveat under it matters: the
+ * split was the language model's judgement, not a measurement.
  */
 export default function SegmentComparison({
   pairs,
@@ -28,28 +19,30 @@ export default function SegmentComparison({
 
   return (
     <>
-      <table className="segment-table">
-        <thead>
-          <tr>
-            <th scope="col">Kennzahl</th>
-            <th scope="col" className="segment-value">
-              Unter Druck
-            </th>
-            <th scope="col" className="segment-value">
-              Sonst
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {pairs.map((pair) => (
-            <tr key={pair.key}>
-              <td>{pair.name}</td>
-              <td className="segment-value">{figure(pair.pressure, pair.unit)}</td>
-              <td className="segment-value">{figure(pair.rest, pair.unit)}</td>
+      <div className="segment-table-scroll">
+        <table className="segment-table">
+          <thead>
+            <tr>
+              <th scope="col">Kennzahl</th>
+              <th scope="col" className="segment-value">
+                Unter Druck
+              </th>
+              <th scope="col" className="segment-value">
+                Sonst
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {pairs.map((pair) => (
+              <tr key={pair.key}>
+                <td>{pair.name}</td>
+                <td className="segment-value">{figure(pair.key, pair.pressure, pair.unit)}</td>
+                <td className="segment-value">{figure(pair.key, pair.rest, pair.unit)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {caveat && (
         <p className="muted">
@@ -64,11 +57,9 @@ export default function SegmentComparison({
   );
 }
 
-/** A figure, or a dash where that stretch of the call was too short to measure.
- *  A dash and not a zero: nothing was measured there, which is not the same as
- *  having measured nothing. */
-function figure(value: number | null, unit: string | null): string {
-  if (value === null) return "–";
-  const text = value.toFixed(1).replace(".", ",");
-  return unit ? `${text} ${unit}` : text;
+/** A figure as every other screen reads it, or a dash where that stretch of the
+ *  call was too short to measure. A dash and not a zero: nothing was measured
+ *  there, which is not the same as having measured nothing. */
+function figure(key: string, value: number | null, unit: string | null): string {
+  return value === null ? "–" : formatValue(key, value, unit);
 }

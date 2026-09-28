@@ -1,12 +1,11 @@
 import { Link, useParams } from "react-router-dom";
 
 import { useFocusContext } from "../FocusContext";
-import { useProgressData } from "../hooks/useProgressData";
+import { useProgressContext } from "../ProgressContext";
 import type { SessionSummary } from "../protocol";
 import { ROUTES, progressMetricPath, sessionPath } from "../routes";
 import { backingOf } from "../utils/focusMetrics";
 import { mentionsFor, statementsFor } from "../utils/goalMentions";
-import { toSeries } from "../utils/progressStats";
 import { segmentTrainings } from "../utils/segmentStats";
 import { formatDate } from "../utils/time";
 import AppLayout from "./AppLayout";
@@ -14,32 +13,24 @@ import GoalStatements from "./GoalStatements";
 import SegmentComparison from "./SegmentComparison";
 
 /**
- * One focus goal across the trainings, the dashboard's second level for the
- * other half of the overview (docs/dashboard-konzept.md, section 7, which puts
- * a metric and a Focus Goal on the same level here).
- *
- * The tiles in block B were a dead end until this existed, and for the goals
- * with no measurement they were the *only* thing on screen about that goal — a
- * bare count with no way to see what was said. A count the reader cannot check
- * is worse than none, because it looks like a measurement.
- *
- * So, in order: what the goal is, how often it was named and out of how many,
- * then every sentence quoted and linking into its call. Where a metric stands
- * behind the goal it links there rather than redrawing the chart — one chart,
- * one page, or the two start disagreeing about what "in this period" means.
- *
- * No verdict anywhere. The wording is ADR 0080's throughout, because this is
- * the page where a frequency is most likely to be read as a grade.
+ * One focus goal across trainings, the dashboard's second level (docs/dashboard-concept.md, section 7): the goal,
+ * how often it was named out of how many, every sentence quoted and linked. A backing metric is linked, not
+ * redrawn. No verdict; ADR 0080's wording, since a frequency is easily read as a grade here.
  */
 export default function ProgressGoalView() {
   const { goalKey } = useParams<{ goalKey: string }>();
-  const { sessions, state } = useProgressData();
+  // The overview's selection, for the reason ProgressMetricView gives: the
+  // tile and the page behind it count the same trainings or they contradict
+  // each other, and here it is a count of statements, which is the figure most
+  // easily misread (ADR 0080).
+  const { selected: sessions, series: all, periodPhrase, state, withPeriod } =
+    useProgressContext();
   const { focus } = useFocusContext();
 
   const goal = focus?.goals.find((entry) => entry.key === goalKey);
 
   const back = (
-    <Link to={ROUTES.progress} className="back-link">
+    <Link to={withPeriod(ROUTES.progress)} className="back-link">
       Zurück zum Fortschritt
     </Link>
   );
@@ -88,7 +79,7 @@ export default function ProgressGoalView() {
   const backing = backingOf(goalKey);
   // Only a series that actually has points: linking to an empty metric page
   // promises a chart that is not there.
-  const measured = toSeries(sessions).filter((series) =>
+  const measured = all.filter((series) =>
     backing.metrics.includes(series.key),
   );
 
@@ -97,6 +88,9 @@ export default function ProgressGoalView() {
       {back}
       <h1>{goal.title}</h1>
       <p className="page-lead">{goal.caption}</p>
+      {/* No switch of its own, so it says what it reads -- see the same line on
+          a metric's page. */}
+      <p className="muted">Gelesen über {periodPhrase}.</p>
 
       <div className="card">
         {/* Habit goals are never tagged -- the wrap-up is refused them in the
@@ -122,7 +116,7 @@ export default function ProgressGoalView() {
             {measured.map((series, index) => (
               <span key={series.key}>
                 {index > 0 && ", "}
-                <Link to={progressMetricPath(series.key)}>{series.name}</Link>
+                <Link to={withPeriod(progressMetricPath(series.key))}>{series.name}</Link>
               </span>
             ))}
             .
@@ -137,7 +131,7 @@ export default function ProgressGoalView() {
           <p className="muted">
             Dieses Ziel betrifft Ihr Training selbst, nicht ein einzelnes Gespräch. Wie
             regelmäßig und wie breit Sie trainieren, steht oben auf der{" "}
-            <Link to={ROUTES.progress}>Fortschrittsseite</Link>.
+            <Link to={withPeriod(ROUTES.progress)}>Fortschrittsseite</Link>.
           </p>
         )}
 
@@ -157,14 +151,8 @@ export default function ProgressGoalView() {
 }
 
 /**
- * The comparison behind "composure under pressure", one block per training
- * (ADR 0081).
- *
- * Per training and not aggregated across them. Averaging the pressure figures
- * of six calls against their calm figures would hide that the pressure in each
- * call was a different thing -- a price objection in one, a complaint in
- * another -- and would produce the single number this goal must not have. The
- * trainings are listed newest first and each links into itself.
+ * The "composure under pressure" comparison, one block per training, newest first (ADR 0081). Never aggregated:
+ * each call's pressure was a different thing, and an average would be the single number this goal must not have.
  */
 function PressureSection({ sessions }: { sessions: SessionSummary[] }) {
   const trainings = segmentTrainings(sessions);

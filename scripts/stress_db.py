@@ -1,23 +1,12 @@
-"""Load test for the Postgres schema, driven through the application's own
-write and read paths.
-
-Why not pgbench alone: pgbench measures the server, not this application. What
-can actually fall over here is the shape of our own access -- one fat
-transaction per finished Session (backend/session/persistence.py), a wide
-eager-loaded read per wrap-up poll (backend/api/sessions.py), and a connection
-pool of POOL_SIZE + POOL_MAX_OVERFLOW shared by every request. This script
-exercises exactly those, so a number it produces means something about the app.
-
-Safety: it refuses to touch the database named in .env. It creates its own
-throwaway database, migrates and seeds it the way the app would, and drops it
-afterwards -- the same approach the persistence tests take.
+"""Load test for the Postgres schema through the app's own write and read paths
+(persist_session, the wrap-up poll's eager read, the shared pool) -- not pgbench.
+Refuses the database named in .env; creates, migrates and drops a throwaway one.
 
     python scripts/stress_db.py --sessions 300 --writers 16
     python scripts/stress_db.py --volume 5000 --readers 32 --duration 20
     python scripts/stress_db.py --sessions 200 --writers 32 --pool-size 20
 
-Exit code is 0 only if no operation failed.
-"""
+Exit code is 0 only if no operation failed."""
 # duplicate-code: this script deliberately re-implements the throwaway-database
 # helpers from tests/conftest.py (which it cannot import) and copies the wrap-up
 # read from backend/api/sessions.py verbatim -- benchmarking the *exact* query is
@@ -52,7 +41,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # scripts/stress_db.py` without PYTHONPATH -- the same shape as
 # scripts/seed_reference_data.py.
 # pylint: disable=wrong-import-position,import-outside-toplevel
-from backend import library  # noqa: E402
+from backend import consent, library  # noqa: E402
+from backend.db.session import DEFAULT_DATABASE, DEFAULT_USER  # noqa: E402
 from backend.feedback.acoustics import Pause  # noqa: E402
 from backend.session.models import Turn  # noqa: E402
 
@@ -72,17 +62,16 @@ _DB_SETTINGS = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
 
 def server_url() -> URL:
     """The configured database server, from .env."""
-    missing = [k for k in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB")
-               if not _ENV.get(k)]
+    missing = [k for k in ("POSTGRES_PASSWORD",) if not _ENV.get(k)]
     if missing:
         sys.exit(f"Missing from .env: {', '.join(missing)}")
     return URL.create(
         "postgresql+psycopg",
-        username=_ENV["POSTGRES_USER"],
+        username=_ENV.get("POSTGRES_USER") or DEFAULT_USER,
         password=_ENV["POSTGRES_PASSWORD"],
         host=_ENV.get("POSTGRES_HOST") or "localhost",
         port=int(_ENV.get("POSTGRES_PORT") or 5432),
-        database=_ENV["POSTGRES_DB"],
+        database=_ENV.get("POSTGRES_DB") or DEFAULT_DATABASE,
     )
 
 
@@ -152,9 +141,22 @@ def provision(url: str, pool_size: int) -> None:
         command.upgrade(Config(os.path.join(PROJECT_ROOT, "alembic.ini")), "head")
         with db_session.session_scope() as db:
             seed(db)
+            for index in range(SUBJECTS):
+                consent.record_decision(db, subject(index), True)
 
 
 # --- Synthetic load -------------------------------------------------------
+
+# The writes are spread over this many synthetic subjects, each of whom has
+# granted consent in `provision` -- without it `persist_session` refuses every
+# write (ADR 0066) and the run would time nothing but refusals.
+SUBJECTS = 50
+
+
+def subject(index: int) -> str:
+    """The synthetic subject the `index`-th Session is written under."""
+    return f"stress-{index % SUBJECTS:03d}"
+
 
 _SENTENCES = (
     "Guten Tag, vielen Dank fuer Ihren Anruf bei uns im Support.",
@@ -167,12 +169,8 @@ _SENTENCES = (
 
 
 def synthetic_turns(count: int, rng: random.Random) -> list[Turn]:
-    """A Session of `count` exchanges, shaped like a real one.
-
-    Alternating speech windows on a rising timeline, plus the paraverbal facts
-    the live path measures per Turn (ADR 0048). Values are plausible, not real:
-    the point is row count and column width, not acoustic truth.
-    """
+    """A Session of `count` exchanges, shaped like a real one (alternating speech
+    windows, per-Turn paraverbal facts, ADR 0048). Plausible, not real values."""
     turns: list[Turn] = []
     clock = 0
     for seq in range(count):
@@ -265,7 +263,7 @@ def write_load(
 ) -> tuple[Samples, list[uuid.UUID]]:
     """`total` finished Sessions written concurrently through persist_session --
     the real transaction, including its Measurement rows and its queued job."""
-    from backend.session.persistence import persist_session
+    from backend.session.persistence import FinishedCall, persist_session
 
     samples = Samples(f"{label}  persist_session  ({workers} threads)")
     written: list[uuid.UUID] = []
@@ -282,17 +280,22 @@ def write_load(
         extern_id = uuid.uuid4()
         turns = synthetic_turns(turns_per_session, rng)
         with timed(samples):
-            persist_session(
+            stored = persist_session(FinishedCall(
                 extern_id=extern_id,
-                subject_id=f"stress-{index % 50:03d}",
+                subject_id=subject(index),
                 persona=personas[index % len(personas)],
                 scenario=scenarios[index % len(scenarios)],
                 turns=turns,
                 started_at=datetime.now(UTC) - timedelta(minutes=3),
                 reason="completed",
-            )
-        with lock:
-            written.append(extern_id)
+            ))
+            # A refusal is not an exception, so without this the run reported
+            # a throughput made of nothing but consent refusals, and read back
+            # Sessions that were never written.
+            if stored is None:
+                raise RuntimeError(f"persist_session stored nothing for {subject(index)}")
+            with lock:
+                written.append(extern_id)
 
     start = time.perf_counter()
     with ThreadPoolExecutor(max_workers=workers) as pool:

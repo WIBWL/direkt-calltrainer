@@ -21,40 +21,17 @@ interface ScenarioInfoProps {
   onDelete: (id: string) => void;
 }
 
-/** The text rows, in the editor's own order so the two panels read the same
- * way round. A field that is empty or withheld is left out entirely rather
- * than shown as a heading with nothing under it.
- *
- * `call_goal` is deliberately not among them, for any kind of Scenario: it
- * says what the caller wants and the bar that settles the call, which is the
- * answer key to the exercise. It was withheld from built-ins for exactly that
- * reason (ADR 0043/0045) and reading it in advance spoils an authored one just
- * as thoroughly — the editor is where its author sees it again. */
+/** Text rows in the editor's order; empty or withheld fields are left out. `call_goal` is never shown: it is
+ * the answer key to the exercise (ADR 0043/0045), for built-in and authored Scenarios alike. */
 const SECTIONS: { key: keyof ScenarioDetail; label: string }[] = [
   { key: "briefing", label: "Briefing" },
   { key: "case_facts", label: "Fakten des Falls" },
 ];
 
 /**
- * Read-only view of a Scenario, opened by the "i" on its card.
- *
- * Same modal shell as ScenarioEditor and PersonaInfo (`Modal`: Escape and
- * click-outside to dismiss), and the same field order as the editor — so the
- * panel a user reads and the form they then edit are recognisably the same
- * thing.
- *
- * Reading comes before writing for every Scenario (ADR 0062): the card carries
- * no edit affordance, and the edit button appears here instead, only on a row
- * the *server* marked `editable`. The panel shows the case as the trainee may
- * know it going in — their briefing and the facts — and nothing of what the
- * caller is after. The teaser is left out too: it is the card this panel was
- * opened from.
- *
- * A reverse (ADR 0070) and a follow-up (ADR 0069) are the caller's own rows and
- * still not editable, so the editor — where every hand-authored row is deleted
- * — is closed to both. Their delete control is here instead, in the same corner
- * of the same actions row, and sits apart from the close button because it is
- * the only thing this otherwise read-only panel does.
+ * Read-only Scenario view from the card's "i" (ADR 0062): the editor's `Modal` and field order, edit button only
+ * where the server set `editable`. Shows only what the trainee may know going in. Reverses (ADR 0070) and
+ * follow-ups (ADR 0069) are not editable, so their delete control lives here.
  */
 export default function ScenarioInfo({
   scenarioId,
@@ -97,12 +74,8 @@ export default function ScenarioInfo({
       labelledBy="scenario-info-title"
       onDismiss={dismiss}
       overlay={
-        // The whole phrase per kind, not a noun slotted into one sentence: the
-        // two kinds take different articles in the UI language, so a shared
-        // frame would be ungrammatical for one of them. It asks at all because
-        // one slip costs a row that can only be recreated from the training it
-        // came from, at the price of a model call — if that training is even
-        // still stored.
+        // A whole phrase per kind: the two take different articles. Confirmed because the row can only be
+        // recreated from its training, with a model call, if that training is still stored.
         confirmingDelete &&
         detail && (
           <ConfirmDialog
