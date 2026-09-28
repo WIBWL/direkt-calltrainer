@@ -1,8 +1,10 @@
 # The three images of ADR 0104, built for the registry:
-#   docker buildx bake                 # build all three
-#   docker buildx bake --push          # and push them
-#   TAG=2026-09-28 docker buildx bake --push backend
-# The names are the ones Compose gives its local builds. amd64 only:
+#   docker buildx bake -f docker-bake.hcl            # build all three
+#   docker buildx bake -f docker-bake.hcl --push     # and push them
+#   TAG=2026-09-28 docker buildx bake -f docker-bake.hcl --push backend
+# Always pass -f: without it bake also reads compose.yaml, merges its services
+# into these targets and fails without a .env (its env_file), which the build
+# itself never needs. The names are the ones Compose gives its local builds. amd64 only:
 # praat-parselmouth ships no Linux aarch64 wheel (see compose.yaml), and the
 # frontend follows so every image matches the host. The frontend image carries
 # no issuer; its container reads OIDC_ISSUER at runtime (frontend/spa.conf.template).

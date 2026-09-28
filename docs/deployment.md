@@ -1,16 +1,18 @@
 # Deployment
 
-How the Calltrainer goes live on a server. `compose.yaml` describes local development; a deployment layers `compose.prod.yaml` on top of it, which changes only what a server must not inherit: the local Keycloak and its `localhost` issuer are dropped, nothing publishes a port, and the frontend and backend join the network of an **external reverse proxy**, which terminates TLS and routes between them. This repository ships no proxy for deployment.
+How the Calltrainer goes live on a server. `compose.yaml` describes local development and builds from source; a deployment runs `compose.prod.yaml` **on its own**, which pulls the three prebuilt images from `registry.internal.efre-direkt.de` and takes every setting from a `.env` beside it. The server needs those two files and no checkout of the repository. There is no local Keycloak, nothing publishes a port, and the frontend and backend join the network of an **external reverse proxy**, which terminates TLS and routes between them. This repository ships no proxy for deployment.
 
 ```
-docker compose -f compose.yaml -f compose.prod.yaml up -d --build
+docker compose -f compose.prod.yaml pull
+docker compose -f compose.prod.yaml up -d
 ```
 
 ## Once, before the first start
 
 ### Server
 
-- Docker Engine with Compose **2.24.4 or later** (`docker compose version`); `compose.prod.yaml` uses `!reset`/`!override`.
+- Docker Engine with the Compose plugin (`docker compose version`).
+- Logged in to the registry: `docker login registry.internal.efre-direkt.de`.
 - amd64. `praat-parselmouth` ships no Linux arm64 wheel.
 - Firewall: the stack publishes no port at all. Postgres, Redis, the backend and the frontend container are reachable only over Docker networks; what faces the internet is the external proxy's business.
 - The server must be able to **reach the DiReKT gateway (`DIREKT_URL`)**. By default it is reachable only from the university network or its VPN, and the server is at Hetzner. Check this first (see "Check the backends" below): without the gateway there is no speech recognition and no reply.
@@ -42,7 +44,7 @@ calltrainer.example.org {
 
 ### `.env`
 
-`cp .env.example .env`, then fill in:
+Copy `compose.prod.yaml` and `.env.example` to a directory on the server, `cp .env.example .env`, then fill in:
 
 | Variable | Value |
 |---|---|
@@ -53,12 +55,13 @@ calltrainer.example.org {
 | `DIREKT_URL` | `https://llm.efre-direkt.de`, unless the server reaches the gateway by another route |
 | `PROXY_NETWORK` | the name of the external reverse proxy's Docker network |
 | `STT_MODEL`, `LLM_MODEL`, `KUGELAUDIO_MODEL` | leave as in `.env.example`; the same in development and deployment |
+| `TAG` | optional: the image tag to run, default `latest`. Pin one (e.g. `2026-09-28`) to know what is running and to roll back. |
 
-That is the whole file. `.env` is not in the repository and on the server should be readable by the deploying user only (`chmod 600 .env`).
+That is the whole file. `compose.prod.yaml` hands each variable to the containers by name (`environment`, no `env_file`), and `up` refuses to start while one is missing. `.env` is not in the repository and on the server should be readable by the deploying user only (`chmod 600 .env`).
 
 `OIDC_ISSUER` reaches the frontend at runtime (its container serves it as `/config.js`), so the frontend image is the same for every realm. Changing it needs the frontend container recreated (`up -d`), not a rebuild.
 
-The three images can also be built and pushed to `registry.internal.efre-direkt.de` with `docker buildx bake --push` (`docker-bake.hcl`; `TAG=... ` sets the tag, default `latest`).
+The three images are built and pushed to `registry.internal.efre-direkt.de` from a checkout, not on the server: `docker buildx bake -f docker-bake.hcl --push` (`TAG=...` sets the tag, default `latest`).
 
 ### What is deliberately *not* in `.env`
 
@@ -68,8 +71,8 @@ These are the same in development and deployment, so they are constants in the c
 |---|---|
 | Keycloak client id `direkt-calltrainer` | `frontend/src/oidcConfig.ts` |
 | Token audience `direkt-calltrainer` | `backend/auth.py` (`OIDC_AUDIENCE`) |
-| Postgres role and database `trainer` | `backend/db/session.py` (`DEFAULT_USER`/`DEFAULT_DATABASE`) and the `db` service in `compose.yaml` |
-| Postgres host and port, Redis URL | set by `compose.yaml` for the containers; the code defaults to `localhost` for a host-side run |
+| Postgres role and database `trainer` | `backend/db/session.py` (`DEFAULT_USER`/`DEFAULT_DATABASE`) and the `db` service in both compose files |
+| Postgres host and port, Redis URL | set by the compose files for the containers; the code defaults to `localhost` for a host-side run |
 
 ### Keycloak (the real realm)
 
@@ -94,19 +97,19 @@ Locally, `keycloak/direkt-realm.json` sets all of this up; in the realm at `keyc
 ## Starting
 
 ```
-git pull
-docker compose -f compose.yaml -f compose.prod.yaml up -d --build
-docker compose -f compose.yaml -f compose.prod.yaml ps
+docker compose -f compose.prod.yaml pull
+docker compose -f compose.prod.yaml up -d
+docker compose -f compose.prod.yaml ps
 ```
 
 Always start without a service name: `up -d backend` does not start the worker, and wrap-ups then silently never appear.
 
 The database needs no manual step: the app migrates and seeds it at startup (`backend/db/provision.py`). `Database provisioning failed` in the log means no Personas or Scenarios are loaded and no Session will be stored.
 
-An alias keeps the two files from being forgotten:
+An alias saves the `-f`:
 
 ```
-alias dc='docker compose -f compose.yaml -f compose.prod.yaml'
+alias dc='docker compose -f compose.prod.yaml'
 ```
 
 ### Check the backends
@@ -132,12 +135,12 @@ Must report OK for STT, LLM and TTS. The same check runs at startup (`Startup ch
    dc exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB"' > backup-$(date +%F).dump
    ```
    The file contains transcripts. Delete it once the deployment has succeeded rather than keeping it — see below.
-2. `git pull`, then `dc up -d --build`.
+2. Push the new images (or set `TAG` in `.env` to the new tag), then `dc pull && dc up -d`. Rolling back the code is setting `TAG` back — the schema is not rolled back with it, hence step 1.
 3. Read `dc logs backend --tail 100` for `Database provisioning failed` and `Startup check`.
 
 ## Operation
 
-- **Logs**: `dc logs <service>` (Docker rotates them at 5 × 20 MB per `compose.prod.yaml`) and `logs/calltrainer.log`, which starts over with every process start (ADR 0055). Neither contains spoken content.
+- **Logs**: `dc logs <service>` (Docker rotates them at 5 × 20 MB per `compose.prod.yaml`) and `logs/calltrainer.log`/`logs/worker.log` inside the backend and worker containers (`dc exec backend cat logs/calltrainer.log`), which start over with every process start (ADR 0055) and are not mounted to the host, so a recreated container starts without them. Neither contains spoken content.
 - **Retention**: the six-month deletion runs daily inside the app (ADR 0067). `dc exec backend python scripts/apply_retention.py` shows what is due.
 - **Missing wrap-ups**: `dc ps -a`, then `dc exec backend python scripts/requeue_feedback.py --apply`.
 - **Capacity**: gunicorn runs one worker process. How many concurrent calls that carries has not been measured; test it before a larger group of users.
