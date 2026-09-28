@@ -52,7 +52,6 @@ source of that content, and which imports without a database.
 | Every shipped focus goal reaches the dashboard: a tile backing per goal, no backing for a goal that is not shipped, and the habit goals excluded in both places at once | F-62, F-13, ADR 0076, ADR 0080 | `test_focus_goal_coverage.py` |
 | Data rights: overview counts, export completeness and scoping, deleting one training | F-49, F-31, ADR 0050, ADR 0064, ADR 0066 | `test_data_rights.py` |
 | Spoken content stays out of the log unless explicitly switched on | F-49, ADR 0039, ADR 0066 | `test_transcript_logging.py` |
-| Deep links into the client-side router survive a reload, without swallowing unknown API paths | F-31, ADR 0009, ADR 0064 | `test_spa_routing.py` |
 | Setup screen: persona/scenario REST endpoints (+ auth gate, deactivated rows withheld) | F-43, F-44, F-15, F-31, F-50, F-01/03/04, ADR 0001, ADR 0009, ADR 0026, ADR 0041, ADR 0043, ADR 0045, ADR 0058, ADR 0072 | `test_setup_api.py` |
 | Session read route: `extern_id`, ownership (404 for foreign and unknown alike), wire shape | F-09, F-12, F-42, ADR 0031, ADR 0034, ADR 0050, ADR 0057 | `test_api.py` |
 | Session history: ownership as the query, total order under pagination, what the listing withholds | F-13, F-48, F-31, F-50, ADR 0009, ADR 0031, ADR 0051, ADR 0052, ADR 0057, ADR 0064 | `test_session_history.py` |

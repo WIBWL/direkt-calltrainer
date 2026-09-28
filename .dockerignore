@@ -26,3 +26,13 @@
 **/values.dev.yaml
 LICENSE
 README.md
+# The backend and worker images copy only what they run; the SPA has its own
+# build context (frontend/).
+frontend
+docs
+tests
+benchmark
+keycloak
+deploy
+logs
+site

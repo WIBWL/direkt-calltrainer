@@ -1,0 +1,16 @@
+# Deployment (compose.prod.yaml): the SPA only. The external reverse proxy
+# sends /api, /ws and /health straight to the backend; if one of those still
+# arrives here, that proxy is misrouting, and a 404 says so where the SPA's
+# HTML would hide it.
+{
+	admin off
+}
+
+:80 {
+	encode zstd gzip
+
+	@backend path /api* /ws* /health*
+	respond @backend 404
+
+	import spa.caddy
+}

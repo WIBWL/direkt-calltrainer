@@ -1,9 +1,9 @@
 """Re-queue wrap-ups for Sessions that never got one (e.g. worker down, Redis lost the job).
 
-    docker compose exec app python scripts/requeue_feedback.py           # dry run
-    docker compose exec app python scripts/requeue_feedback.py --apply   # queue them
+    docker compose exec backend python scripts/requeue_feedback.py           # dry run
+    docker compose exec backend python scripts/requeue_feedback.py --apply   # queue them
 
-Run **inside the app container**: Redis is not published to the host. Written from the
+Run **inside the backend container**: Redis is not published to the host. Written from the
 stored Transcript and Measurements (ADR 0049), so old Sessions work. Safe to run twice;
 eligibility is `jobs.retry_blocked`, shared with `POST /api/sessions/{id}/feedback`."""
 

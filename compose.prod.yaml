@@ -1,7 +1,8 @@
 # Production override, only ever on top of compose.yaml:
 #   docker compose -f compose.yaml -f compose.prod.yaml up -d --build
-# Drops the local Keycloak, the localhost issuer and the public app port, and puts
-# Caddy in front for TLS. Steps around it: docs/deployment.md.
+# Drops the local Keycloak, the localhost issuer and every published port. TLS and
+# routing belong to the external reverse proxy, which reaches the frontend and the
+# backend over the shared Docker network PROXY_NETWORK. Steps: docs/deployment.md.
 # `!reset`/`!override` need Docker Compose >= 2.24.4; without them a list or map here
 # would be *merged* into compose.yaml's, which is wrong for ports and depends_on.
 
@@ -13,13 +14,29 @@ x-logging: &logging
     max-file: "5"
 
 services:
-  app:
+  frontend:
     build:
       args:
         # Baked into the SPA at build time. `:?` makes the build fail outright
         # instead of silently falling back to compose.yaml's localhost default,
         # which would produce an image whose login points at nothing.
         OIDC_ISSUER: ${OIDC_ISSUER:?set OIDC_ISSUER in .env}
+    # Static files only: the external proxy sends /api, /ws and /health to the
+    # backend itself (frontend/static.Caddyfile).
+    command: ["caddy", "run", "--config", "/etc/caddy/static.Caddyfile", "--adapter", "caddyfile"]
+    ports: !reset []
+    # Serving files does not need the backend up.
+    depends_on: !reset {}
+    # The proxy's network is shared with other stacks, where a bare `frontend`
+    # could resolve to someone else's container; the proxy uses the alias.
+    networks:
+      default:
+      proxy:
+        aliases: [calltrainer-frontend]
+    develop: !reset {}
+    logging: *logging
+
+  backend:
     environment:
       # compose.yaml pins both to the local Keycloak, and `environment` wins
       # over `env_file` -- so the .env value would never arrive without this.
@@ -27,14 +44,16 @@ services:
       # Empty means unset (backend/auth.py): the keys are found through the
       # issuer's own discovery document, which the container can reach.
       OIDC_JWKS_URL: ""
-    # Not published at all: Caddy reaches the app over the compose network.
-    ports: !reset []
     # The deployed Keycloak is external, so the local one is not a dependency.
     depends_on: !override
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      default:
+      proxy:
+        aliases: [calltrainer-backend]
     develop: !reset {}
     logging: *logging
 
@@ -56,33 +75,8 @@ services:
   keycloak:
     profiles: ["local-keycloak"]
 
-  # TLS termination and the only thing listening on the network. Caddy fetches
-  # and renews the certificate itself, passes the WebSocket upgrade through
-  # without configuration and sets no read timeout or body size limit, so a
-  # long call and a 20 MB PDF upload both need nothing extra. The browser only
-  # grants the microphone over HTTPS, so this is not optional.
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    environment:
-      CALLTRAINER_DOMAIN: ${CALLTRAINER_DOMAIN:?set CALLTRAINER_DOMAIN in .env}
-    volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    depends_on:
-      app:
-        condition: service_healthy
-    logging: *logging
-
-volumes:
-  # Holds the TLS certificates and the ACME account. Losing it means asking
-  # Let's Encrypt again, which is rate-limited per domain.
-  caddy-data:
-    name: direkt-calltrainer-caddy-data
-  caddy-config:
-    name: direkt-calltrainer-caddy-config
+networks:
+  # Created and owned by the external reverse proxy's stack, not this one.
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:?set PROXY_NETWORK in .env}

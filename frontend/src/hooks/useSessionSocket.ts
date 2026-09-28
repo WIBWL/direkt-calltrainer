@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { currentAccessToken } from "../auth";
 import type { CallState, ClientMessage, ServerMessage, TranscriptEntry } from "../protocol";
 
-// The backend serves this SPA, so the WebSocket is same-origin (see CLAUDE.md).
+// The frontend container proxies /ws to the backend, so the WebSocket is
+// same-origin (ADR 0104).
 // Derived from window.location rather than a base-URL env var, which no longer
 // exists.
 const WS_URL =

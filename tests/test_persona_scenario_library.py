@@ -440,7 +440,7 @@ def test_every_seeded_persona_carries_a_portrait_named_after_it(entry):
 def test_every_seeded_portrait_is_a_file_that_exists(entry):
     """The other half: the path the row carries has to name a file the app
     actually serves. `frontend/public/` is copied into `frontend/dist/` by the
-    Vite build, which is the directory the backend serves."""
+    Vite build, which is the directory the frontend container serves."""
     served = _PORTRAIT_DIR / pathlib.PurePosixPath(entry["avatar_url"]).name
     assert served.is_file(), f"{entry['id']}: no portrait at {entry['avatar_url']}"
 

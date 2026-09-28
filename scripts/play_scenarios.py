@@ -3,9 +3,9 @@
 An inspection tool, not a test. Only the LLM leg is real; STT returns the scripted probe
 (`scripts/scenario_probes.py` -- read its docstring first), TTS silence, acoustics nothing.
 
-    docker compose exec app python scripts/play_scenarios.py
-    docker compose exec app python scripts/play_scenarios.py --only closing-recap-mismatch
-    docker compose exec app python scripts/play_scenarios.py --persona andreas-kastner-ceo
+    docker compose exec backend python scripts/play_scenarios.py
+    docker compose exec backend python scripts/play_scenarios.py --only closing-recap-mismatch
+    docker compose exec backend python scripts/play_scenarios.py --persona andreas-kastner-ceo
 
 Writes per-pairing Markdown plus summary.md to logs/scenario-runs/<timestamp>/. Exit 2: bad
 probes or empty selection; 1: a run failed; else 0 (red flags never change it)."""

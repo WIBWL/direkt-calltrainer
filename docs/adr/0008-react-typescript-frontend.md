@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (amended by ADR 0104: the build is served by its own frontend container, not by FastAPI)
 
 ## Context
 

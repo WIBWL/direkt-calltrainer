@@ -1,24 +1,51 @@
 name: direkt-calltrainer
 services:
-  app:
-    image: direkt-calltrainer
+  # The SPA and the one port the browser talks to. Caddy serves the build and
+  # forwards /api, /ws and /health to the backend (frontend/Caddyfile), so the
+  # app stays same-origin: no CORS, and Keycloak redirects back to this port.
+  frontend:
     # Nothing here comes back on its own otherwise: a Docker restart, an OOM
     # kill or a crash leaves the container down. On the worker that is silent
     # -- calls keep working and wrap-ups simply never appear -- which is
     # exactly how a dead worker went unnoticed for hours.
+    restart: unless-stopped
+    build:
+      context: ./frontend
+      args:
+        # The SPA needs the issuer at `npm run build` time (see
+        # frontend/Dockerfile). Same name the backend reads, same .env line.
+        OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:18081/realms/direkt}
+    ports:
+      # Host port is deliberately non-standard to avoid clashes (e.g. mkdocs,
+      # other uvicorn/Django apps, all default to 8000).
+      - 8391:80
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    develop:
+      watch:
+        - action: rebuild
+          path: ./frontend
+          ignore:
+            - node_modules/
+            - dist/
+            - public/vad/
+
+  backend:
     restart: unless-stopped
     # Pinned: praat-parselmouth ships no Linux aarch64 wheel, so an arm64 build
     # falls back to the source tarball and fails to compile in python-slim.
     platform: linux/amd64
     build:
       context: .
-      dockerfile: ./Dockerfile
+      dockerfile: ./backend/Dockerfile
       platforms:
         - linux/amd64
-      args:
-        # The SPA needs the issuer at `npm run build` time (see Dockerfile).
-        # Same name the backend reads below, from the same .env line.
-        OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:18081/realms/direkt}
     env_file:
       - .env
     environment:
@@ -33,10 +60,7 @@ services:
       # over the compose network instead (backend/auth.py's OIDC_JWKS_URL).
       OIDC_ISSUER: http://localhost:18081/realms/direkt
       OIDC_JWKS_URL: http://keycloak:8080/realms/direkt/protocol/openid-connect/certs
-    ports:
-      # Host port is deliberately non-standard to avoid clashes (e.g. mkdocs,
-      # other uvicorn/Django apps, all default to 8000). Container stays 8000.
-      - 8391:8000
+    # No published port: the browser reaches it through the frontend.
     volumes:
       - ./logs:/app/logs
     depends_on:
@@ -64,35 +88,22 @@ services:
         - action: sync+restart
           path: ./backend
           target: /app/backend
-        # Anything that needs `pip install` or the frontend build re-run:
-        # cheap enough to just rebuild the image from scratch.
         - action: rebuild
           path: ./requirements.txt
-        - action: rebuild
-          path: ./frontend
-          ignore:
-            - node_modules/
-            - dist/
 
-  # The Feedback worker (ADR 0018/0019): same image and code as the app, a
+  # The Feedback worker (ADR 0018/0019): the backend's code in its own image, a
   # different process. It only ever touches Postgres and the LLM gateway, so
   # it needs no port of its own and nothing depends on it being up for a call
   # to run -- a stopped worker just means wrap-ups queue until it returns.
   worker:
-    image: direkt-calltrainer
-    # Nothing here comes back on its own otherwise: a Docker restart, an OOM
-    # kill or a crash leaves the container down. On the worker that is silent
-    # -- calls keep working and wrap-ups simply never appear -- which is
-    # exactly how a dead worker went unnoticed for hours.
     restart: unless-stopped
-    # Same image as app, so the same pin applies.
+    # Same dependencies as the backend, so the same pin applies.
     platform: linux/amd64
     build:
       context: .
-      dockerfile: ./Dockerfile
+      dockerfile: ./backend/worker.Dockerfile
       platforms:
         - linux/amd64
-    command: ["python", "-m", "backend.worker"]
     env_file:
       - .env
     environment:
