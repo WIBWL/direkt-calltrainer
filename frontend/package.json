@@ -8,6 +8,7 @@
     "dev": "vite",
     "prebuild": "node scripts/copy-vad-assets.mjs",
     "build": "eslint src && tsc && vite build",
+    "build:watch": "node scripts/copy-vad-assets.mjs && vite build --watch",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

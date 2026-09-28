@@ -9,8 +9,9 @@
 </head>
 <body>
   <div id="root"></div>
-  <!-- Runtime settings from the container's environment (spa.conf.template); a classic
-       script, so it has run before the deferred module below. -->
+  <!-- Runtime settings (src/config.ts): written from the container's environment at
+       start, served by Vite in dev and preview. A classic script, so it has run
+       before the deferred module below. -->
   <script src="/config.js"></script>
   <script type="module" src="/src/main.tsx"></script>
 </body>

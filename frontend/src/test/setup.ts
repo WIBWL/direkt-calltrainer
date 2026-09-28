@@ -4,8 +4,8 @@
  * and socket delivery, hence the manual controls (resolve decode, deliver frame).
  */
 
-// What /config.js sets in the browser; oidcConfig.ts refuses to load without it.
-(window as { OIDC_ISSUER?: string }).OIDC_ISSUER = "http://localhost:18081/realms/direkt";
+// What /config.js sets in the browser; config.ts refuses to load without it.
+window.__APP_CONFIG__ = { oidcIssuer: "http://localhost:18081/realms/direkt" };
 
 // --- Web Audio -------------------------------------------------------------
 

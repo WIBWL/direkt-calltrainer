@@ -1,0 +1,77 @@
+# Backing services for local development. The apps run on the host (README,
+# "Running it locally"); credentials and ports here must match .env.example.
+#
+#   docker compose -f dev-compose.yaml up -d      # start
+#   docker compose -f dev-compose.yaml down       # stop, keep data
+#   docker compose -f dev-compose.yaml down -v    # stop and wipe all volumes
+#
+# Host ports are shifted to avoid clashing with local installs and with the
+# dataplatform's dev services (15432, 18080), and kept below 32768 (the
+# ephemeral port range). All bound to loopback: the credentials are in git.
+name: direkt-calltrainer
+
+services:
+  postgres:
+    image: postgres:17
+    # Checkpoint logging off: a test run (a database per test) otherwise fills
+    # the log with hundreds of lines. Turn it back on before diagnosing real I/O.
+    command: postgres -c log_checkpoints=off
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: calltrainer
+    ports:
+      - '127.0.0.1:15433:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d calltrainer']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # The wrap-up queue (ADR 0019). No volume: it holds in-flight jobs only; a
+  # job's outcome lives in Postgres (ADR 0032).
+  redis:
+    image: redis:8-alpine
+    command: ['redis-server', '--loglevel', 'warning']
+    ports:
+      - '127.0.0.1:16379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Dev only (start-dev, embedded H2). Imports keycloak/direkt-realm.json on boot
+  # (ADR 0009): client `direkt-calltrainer`, users niklas, mathias, eberhard
+  # (password = username), admin console admin/admin. Import is skipped if the
+  # realm already exists, so after editing the JSON:
+  #
+  #   docker compose -f dev-compose.yaml rm -sf keycloak && docker volume rm direkt-calltrainer-keycloak-data
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      # Quarkus/Infinispan/Hibernate boot chatter; WARN keeps errors.
+      KC_LOG_LEVEL: WARN
+    ports:
+      # Both loopback addresses: Windows resolves `localhost` to ::1 first, and
+      # an IPv4-only binding costs ~200 ms per request on the fallback.
+      - '127.0.0.1:18081:8080'
+      - '[::1]:18081:8080'
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      # Nested mount: the import dir comes from the repo, the H2 db stays in the volume.
+      - ./keycloak:/opt/keycloak/data/import:ro
+
+# Fixed names, independent of the compose project name. Not the old
+# `direkt-calltrainer_pgdata`: that one was initialised with each developer's
+# own password, which dev-compose.yaml no longer knows.
+volumes:
+  postgres-data:
+    name: direkt-calltrainer-postgres-data
+  keycloak-data:
+    name: direkt-calltrainer-keycloak-data
