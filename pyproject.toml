@@ -39,8 +39,8 @@ calltrainer-worker = { workspace = true }
 
 
 [tool.pytest.ini_options]
-# The suite lives beside each package; see each tests/README.md for the
-# feature -> test traceability matrix.
+# The suites live beside each package; docs/testing.md has the feature -> test
+# traceability matrix.
 testpaths = ["shared/tests", "backend/tests", "worker/tests"]
 pythonpath = ["."]
 # auto: async test functions are collected without needing a marker on each one.

@@ -1,91 +1,83 @@
 # Deployment
 
-How the Calltrainer goes live on a server. `compose.yaml` describes local development and builds from source; a deployment runs `compose.prod.yaml` **on its own**, which pulls the three prebuilt images from `registry.internal.efre-direkt.de` and takes every setting from a `.env` beside it. The server needs those two files and no checkout of the repository. There is no local Keycloak, nothing publishes a port, and the frontend and backend join the network of an **external reverse proxy**, which terminates TLS and routes between them. This repository ships no proxy for deployment.
+How the Calltrainer goes live. This repository builds the three images and pushes them to `registry.internal.efre-direkt.de`; the stack that runs them is in **`direkt-infrastructure`**, `public/calltrainer/compose.yml`, included from `public/compose.yml` on the DiReKT Hetzner host beside the dataplatform. There, Traefik terminates TLS and routes two hosts, WUD updates the three app containers when a new `latest` appears, and the secrets are Docker secrets. Nothing is deployed from this repository and the server needs no checkout of it.
+
+| Host | Service | Port |
+|---|---|---|
+| `calltrainer.efre-direkt.de` | `calltrainer-frontend` — the SPA (nginx) | 80 |
+| `calltrainer-backend.efre-direkt.de` | `calltrainer-backend` — the API and the call's WebSocket | 8000 |
+| — | `calltrainer-worker`, `calltrainer-db` (Postgres 17), `calltrainer-redis` | — |
+
+The worker, Postgres and Redis sit on the stack's own network `calltrainer_internal`; the backend and the worker also join `proxy`, where they reach the LLM gateway as `http://litellm:4000` (inside the host, past the public IP allowlist).
+
+## Releasing a version
+
+From a clean checkout of the commit to ship:
 
 ```
-docker compose -f compose.prod.yaml pull
-docker compose -f compose.prod.yaml up -d
+git tag v1.2.3 && git push origin v1.2.3
+scripts/build-and-push.sh                 # all three; or name some: frontend backend worker
 ```
+
+The script refuses to run unless HEAD carries a `v*` tag that has been pushed, and pushes each image twice: `:v1.2.3` (what a rollback pins) and `:latest` (what the stack runs and WUD watches). It builds with a buildx `docker-container` builder named `wud` and `--provenance=true`, because WUD's digest watching only works on an OCI index — a plain `docker push` of `latest` is never picked up (`direkt-infrastructure/public/README.md`). amd64 only: praat-parselmouth ships no Linux arm64 wheel. It needs bash 4 and `docker login registry.internal.efre-direkt.de`.
+
+WUD checks hourly, pulls the new `latest`, recreates the container and prunes the old image. **The schema migrates itself when the new backend starts** — see "Every later deployment" for the dump to take first.
 
 ## Once, before the first start
 
-### Server
+### Secrets
 
-- Docker Engine with the Compose plugin (`docker compose version`).
-- Logged in to the registry: `docker login registry.internal.efre-direkt.de`.
-- amd64. `praat-parselmouth` ships no Linux arm64 wheel.
-- Firewall: the stack publishes no port at all. Postgres, Redis, the backend and the frontend container are reachable only over Docker networks; what faces the internet is the external proxy's business.
-- The server must be able to **reach the DiReKT gateway (`DIREKT_URL`)**. By default it is reachable only from the university network or its VPN, and the server is at Hetzner. Check this first (see "Check the backends" below): without the gateway there is no speech recognition and no reply.
+On the host, beside the stack's `compose.yml` (`secrets/` is gitignored in `direkt-infrastructure`):
 
-### External reverse proxy
+| File | Content | Read by |
+|---|---|---|
+| `public/calltrainer/secrets/calltrainer_direkt_api_key.txt` | a LiteLLM key for the gateway | backend, worker |
+| `public/calltrainer/secrets/calltrainer_kugelaudio_api_key.txt` | the KugelAudio key | backend |
+| `public/calltrainer/secrets/calltrainer_postgres_password.txt` | long and random, e.g. `openssl rand -base64 32` | Postgres, backend, worker |
 
-The proxy's Docker network must exist before the first start (`PROXY_NETWORK` in `.env`); Compose joins it but never creates it. On it the containers answer as `calltrainer-frontend:80` and `calltrainer-backend:8000`. The proxy has to:
+Postgres applies its password **only when `container_data/pgdata` is first created** — set it before the first start. The app reads each as `NAME_FILE=/run/secrets/...` (ADR 0106); the database URL names no password, `POSTGRES_PASSWORD_FILE` supplies it, so the one file is the only place it lives.
 
-- **Terminate TLS** for the domain. HTTPS is not optional: the browser grants the microphone only in a secure context.
-- **Route by path**, all on the one domain: `/api*`, `/ws*` and `/health*` to `calltrainer-backend:8000`, everything else to `calltrainer-frontend:80`. The browser must see one origin — there is no CORS middleware, and Keycloak redirects back to that origin. A backend path that reaches the frontend by mistake answers 404 (`frontend/static.nginx.conf`).
-- **Pass the WebSocket upgrade** on `/ws/session` and keep the connection open for the length of a call: no short idle/read timeout (nginx's default of 60 s would cut a call off while the User is thinking).
-- **Accept request bodies of at least 20 MB** (document upload; nginx's default is 1 MB).
-- Set the headers the app relies on: `Strict-Transport-Security "max-age=31536000"`, `X-Content-Type-Options "nosniff"`, `Referrer-Policy "strict-origin-when-cross-origin"` and `Permissions-Policy "microphone=(self), camera=(), geolocation=()"`. Compression is already done by the frontend container.
+### Settings
 
-For Caddy as the external proxy that is:
+Everything else is written into the stack's `compose.yml`, not a `.env`: every value is either the same for every deployment of this stack or a secret above.
 
-```
-calltrainer.example.org {
-	header Strict-Transport-Security "max-age=31536000"
-	header X-Content-Type-Options "nosniff"
-	header Referrer-Policy "strict-origin-when-cross-origin"
-	header Permissions-Policy "microphone=(self), camera=(), geolocation=()"
-
-	@backend path /api* /ws* /health*
-	reverse_proxy @backend calltrainer-backend:8000
-	reverse_proxy calltrainer-frontend:80
-}
-```
-
-### `.env`
-
-Copy `compose.prod.yaml` and `.env.example` to a directory on the server, `cp .env.example .env`, then fill in:
-
-| Variable | Value |
+| Setting | Value there |
 |---|---|
-| `DIREKT_API_KEY` | key for the DiReKT gateway |
-| `KUGELAUDIO_API_KEY` | key for KugelAudio |
-| `POSTGRES_PASSWORD` | long and random, e.g. `openssl rand -base64 32`. Set it **before the first start**: Postgres applies it only when the volume is created. |
-| `OIDC_ISSUER` | `https://keycloak.efre-direkt.de/realms/direkt` |
-| `DIREKT_URL` | `https://llm.efre-direkt.de`, unless the server reaches the gateway by another route |
-| `PROXY_NETWORK` | the name of the external reverse proxy's Docker network |
-| `STT_MODEL`, `LLM_MODEL`, `KUGELAUDIO_MODEL` | leave as in `.env.example`; the same in development and deployment |
-| `TAG` | optional: the image tag to run, default `latest`. Pin one (e.g. `2026-09-28`) to know what is running and to roll back. |
+| `POSTGRES_URL` | `postgresql://calltrainer@calltrainer-db:5432/calltrainer` |
+| `REDIS_URL` | `redis://calltrainer-redis:6379` |
+| `DIREKT_URL` | `http://litellm:4000` |
+| `STT_MODEL`, `LLM_MODEL`, `KUGELAUDIO_MODEL` | as in `.env.example` (ADR 0103) |
+| `OIDC_ISSUER` | `https://keycloak.efre-direkt.de/realms/direkt` — backend and frontend, the same value |
+| `CORS_ORIGINS` (backend) | `https://calltrainer.efre-direkt.de` (ADR 0107) |
+| `API_URL` (frontend) | `https://calltrainer-backend.efre-direkt.de` |
 
-That is the whole file. `compose.prod.yaml` hands each variable to the containers by name (`environment`, no `env_file`), and `up` refuses to start while one is missing. `.env` is not in the repository and on the server should be readable by the deploying user only (`chmod 600 .env`).
+The images set `LOG_FORMAT=json`. `OIDC_ISSUER` and `API_URL` reach the SPA at container start (`frontend/docker/render-config.sh` writes `/config.js`), so the frontend image is the same everywhere; changing either needs the container recreated, not a rebuild. The backend pins `keycloak.efre-direkt.de` to the host's LAN address (`extra_hosts`), as the dataplatform does, so its OIDC discovery rides the local Traefik.
 
-`OIDC_ISSUER` reaches the frontend at runtime (its container serves it as `/config.js`), so the frontend image is the same for every realm. Changing it needs the frontend container recreated (`up -d`), not a rebuild.
-
-The three images are built and pushed to `registry.internal.efre-direkt.de` from a checkout, not on the server: `docker buildx bake -f docker-bake.hcl --push` (`TAG=...` sets the tag, default `latest`).
-
-### What is deliberately *not* in `.env`
-
-These are the same in development and deployment, so they are constants in the code. Changing one is a code change and a new build.
+What is deliberately a constant in the code rather than a setting:
 
 | Value | Where |
 |---|---|
 | Keycloak client id `direkt-calltrainer` | `frontend/src/oidcConfig.ts` |
 | Token audience `direkt-calltrainer` | `backend/auth.py` (`OIDC_AUDIENCE`) |
-| Postgres role and database `trainer` | `backend/db/session.py` (`DEFAULT_USER`/`DEFAULT_DATABASE`) and the `db` service in both compose files |
-| Postgres host and port, Redis URL | set by the compose files for the containers; the code defaults to `localhost` for a host-side run |
+
+### Traefik
+
+The two routers use the shared `websecure` entrypoint and the `*.efre-direkt.de` wildcard certificate. HTTPS is not optional: the browser grants the microphone only in a secure context. A headers middleware (`calltrainer-headers`, on both routers) sets `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and `Permissions-Policy: microphone=(self), camera=(), geolocation=()`; the frontend container compresses its own files.
+
+**Check on the first deployment:** a call's WebSocket can sit quiet for a while when the User thinks. Traefik v3's entrypoint timeouts apply to the shared `websecure` entrypoint; if calls are cut off after about a minute of silence, raise `respondingTimeouts` there (in `public/compose.yml`, affecting every service), since nothing in the Calltrainer's stack can.
 
 ### Keycloak (the real realm)
 
 Locally, `keycloak/direkt-realm.json` sets all of this up; in the realm at `keycloak.efre-direkt.de` it has to be done by hand. The JSON file is the template.
 
 1. **Client** `direkt-calltrainer`: public (client authentication off), standard flow on, PKCE `S256`.
-   - Valid redirect URIs: `https://<domain>/*`
-   - Valid post logout redirect URIs: `https://<domain>/*`
-   - Web origins: `https://<domain>`
+   - Valid redirect URIs: `https://calltrainer.efre-direkt.de/*`
+   - Valid post logout redirect URIs: `https://calltrainer.efre-direkt.de/*`
+   - Web origins: `https://calltrainer.efre-direkt.de` (the SPA's; the backend's host never talks to Keycloak from a browser)
 2. **Audience mapper** on the client: type *Audience*, included custom audience `direkt-calltrainer`, added to the access token. Without it `backend/auth.py` rejects every token.
 3. **User profile**: declare the attribute `tenant`, *view* and *edit* **admin only**. This is a security boundary (ADR 0060): a user who can set their own `tenant` reads another company's shared Scenarios. Do not set the unmanaged attribute policy to *Enabled*.
 4. **Tenant mapper** on the client: type *User Attribute*, attribute `tenant`, claim `tenant`, added to the access token.
-5. **Users**: give each one a `tenant` whose value is a seeded tenant (`solox`, `appollo`; see `backend/db/seed_data.py`). An unknown value or none lands in the `default` tenant. A new company is a seed change plus a deployment.
+5. **Users**: give each one a `tenant` whose value is a seeded tenant (`solox`, `appollo`; see `shared/db/seed_data.py`). An unknown value or none lands in the `default` tenant. A new company is a seed change plus a deployment.
 6. Realm: *Require SSL* at least `external requests`. The development users `niklas`/`mathias`/`eberhard` do not exist there and must not.
 
 ### Legal
@@ -96,53 +88,51 @@ Locally, `keycloak/direkt-realm.json` sets all of this up; in the realm at `keyc
 
 ## Starting
 
-```
-docker compose -f compose.prod.yaml pull
-docker compose -f compose.prod.yaml up -d
-docker compose -f compose.prod.yaml ps
-```
-
-Always start without a service name: `up -d backend` does not start the worker, and wrap-ups then silently never appear.
-
-The database needs no manual step: the app migrates and seeds it at startup (`backend/db/provision.py`). `Database provisioning failed` in the log means no Personas or Scenarios are loaded and no Session will be stored.
-
-An alias saves the `-f`:
+In `public/` on the host:
 
 ```
-alias dc='docker compose -f compose.prod.yaml'
+docker compose pull calltrainer-frontend calltrainer-backend calltrainer-worker
+docker compose up -d
+docker compose ps -a | grep calltrainer
 ```
+
+Start without naming single services: `up -d calltrainer-backend` does not start the worker, and wrap-ups then silently never appear.
+
+The database needs no manual step: the backend migrates and seeds it at startup (`backend/db/provision.py`). `Database provisioning failed` in its log means no Personas or Scenarios are loaded and no Session will be stored.
 
 ### Check the backends
 
 ```
-dc exec backend python scripts/check_backends.py
+docker compose exec calltrainer-backend python -m backend.scripts.check_backends
 ```
 
 Must report OK for STT, LLM and TTS. The same check runs at startup (`Startup check: … FAILED` in the log) but does not stop the app from booting.
 
 ### Acceptance
 
-1. `https://<domain>/health/ready` answers 200.
-2. Log in through Keycloak and land back in the app.
-3. Grant consent and hold a call (the microphone prompt appears, the Persona answers audibly).
-4. After the call the wrap-up appears (if not: `dc ps -a` — is the `worker` running?).
+1. `https://calltrainer-backend.efre-direkt.de/health/ready` answers 200.
+2. Log in at `https://calltrainer.efre-direkt.de` through Keycloak and land back in the app.
+3. Grant consent and hold a call (the microphone prompt appears, the Persona answers audibly). The browser's network tab shows the API requests going to `calltrainer-backend.` without CORS errors.
+4. After the call the wrap-up appears (if not: `docker compose ps -a` — is `calltrainer-worker` running?).
 5. The training shows in the history on the profile page; delete it once.
 
 ## Every later deployment
 
-1. **Back up first.** There is no downgrade path for a migrated schema:
-   ```
-   dc exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB"' > backup-$(date +%F).dump
-   ```
-   The file contains transcripts. Delete it once the deployment has succeeded rather than keeping it — see below.
-2. Push the new images (or set `TAG` in `.env` to the new tag), then `dc pull && dc up -d`. Rolling back the code is setting `TAG` back — the schema is not rolled back with it, hence step 1.
-3. Read `dc logs backend --tail 100` for `Database provisioning failed` and `Startup check`.
+WUD rolls out a new `latest` by itself, so the step that has to come *before* the tag is pushed is the backup. There is no downgrade path for a migrated schema:
+
+```
+docker compose exec -T calltrainer-db sh -c 'pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB"' > backup-$(date +%F).dump
+```
+
+The file contains transcripts. Delete it once the deployment has succeeded rather than keeping it — see below. Then push the tag and run `scripts/build-and-push.sh`; within the hour WUD recreates the containers. Read `docker compose logs calltrainer-backend --tail 100` for `Database provisioning failed` and `Startup check` afterwards.
+
+Rolling back the code is pinning the previous version's tag in the stack (`calltrainer-backend:v1.2.2` etc.) and `docker compose up -d` — the schema is not rolled back with it, hence the dump. Put `latest` back once a fixed version is pushed, or WUD stops following.
 
 ## Operation
 
-- **Logs**: `dc logs <service>` (Docker rotates them at 5 × 20 MB per `compose.prod.yaml`) and `logs/calltrainer.log`/`logs/worker.log` inside the backend and worker containers (`dc exec backend cat logs/calltrainer.log`), which start over with every process start (ADR 0055) and are not mounted to the host, so a recreated container starts without them. Neither contains spoken content.
-- **Retention**: the six-month deletion runs daily inside the app (ADR 0067). `dc exec backend python scripts/apply_retention.py` shows what is due.
-- **Missing wrap-ups**: `dc ps -a`, then `dc exec backend python scripts/requeue_feedback.py --apply`.
+- **Logs**: stdout only, one JSON object per line (ADR 0105), collected by Alloy into Loki (`direkt-infrastructure/internal/`); `docker compose logs calltrainer-backend` on the host. The Session id is the `session` field. Neither the backend nor the worker logs spoken content.
+- **Retention**: the six-month deletion runs daily inside the app (ADR 0067). `docker compose exec calltrainer-backend python -m backend.scripts.apply_retention` shows what is due.
+- **Missing wrap-ups**: `docker compose ps -a`, then `docker compose exec calltrainer-backend python -m backend.scripts.requeue_feedback --apply`.
 - **Capacity**: gunicorn runs one worker process. How many concurrent calls that carries has not been measured; test it before a larger group of users.
 
 ## Backups — deliberately not set up

@@ -133,7 +133,7 @@ Dieses Kapitel fasst die tragenden Entscheidungen des ersten Prototyps zusammen.
 | Hintergrundverarbeitung | Redis mit RQ als Job-Queue | 0019 |
 | Authentifizierung | Keycloak, OIDC Authorization Code Flow mit PKCE | 0009 |
 | Paraverbale Messung | Praat über Parselmouth | 0047 |
-| Betrieb | Uni-gehosteter Server, Docker Compose | 0020 |
+| Betrieb | DiReKT-Host bei Hetzner, Docker Compose hinter Traefik (`direkt-infrastructure`), drei Images aus einer Registry | 0020, 0104, 0107, 0108 |
 
 ## 4.2 Ansatz je Qualitätsziel
 
@@ -449,7 +449,7 @@ Stand: erster lauffähiger Prototyp. Die Spalte *Art* unterscheidet, ob eine Sch
 | TS-02 | Es gibt kein Eval-Setup für Prompt-Änderungen. | bewusst | Jede Änderung am Systemprompt — und damit an F-01 — ist argumentiert, nicht gemessen. Ob eine Kürzung oder eine neue Regel das Gespräch verbessert, ist derzeit Meinung. | Kleines Eval-Skript: dieselbe Persona × Szenario, N Läufe mit und ohne Änderung, Vergleich von Antwortlänge und Turn-Anzahl. Der Rücklauf synthetisierter Sprache durch die Spracherkennung hat sich bereits als objektiver Prüfgriff bewährt. |
 | TS-03 | Das Frontend hat keinen Testrunner. | bewusst | Sprecherwechsel, Wiedergabe-Warteschlange und Unterbrechen sind ausschließlich manuell geprüft. Genau dort lagen bereits Fehler, die kein Backend-Test finden konnte. | Testrunner einrichten und zuerst die Wiedergabe-Warteschlange abdecken. |
 | TS-04 | Tests konnten sich stillschweigend selbst überspringen: Datenbanktests fanden ihre Zugangsdaten im Container nicht und meldeten sich als *übersprungen* statt als Fehler. | aufgefallen | 49 Tests prüften über längere Zeit nichts, ohne dass es auffiel; nach Behebung fanden sie vier echte Fehler. | Ein übersprungener Test darf im Regellauf nicht unbemerkt bleiben — Zugangsdaten im Container verfügbar machen und die Suite mit einer Mindestzahl ausgeführter Tests absichern. |
-| TS-05 | Der Vite-Dev-Server startet die Anwendung nicht mehr; die WASM-Bausteine der Spracherkennung im Browser scheitern dort. | aufgefallen | Frontend-Änderungen sind nur über den Produktionsbuild im Container prüfbar. Das verlängert jede Rückkopplungsschleife spürbar. | Ursache im Zusammenspiel von Vite und onnxruntime-web klären, sonst dauerhaft auf den Containerpfad festlegen und den Dev-Server aus der Dokumentation nehmen. |
+| TS-05 | Der Vite-Dev-Server startet die Anwendung nicht mehr; die WASM-Bausteine der Spracherkennung im Browser scheitern dort. | aufgefallen | Änderungen am Gespräch sind nur über den Produktionsbuild prüfbar (`npm run build:watch` und `npm run preview`). Das verlängert jede Rückkopplungsschleife spürbar. | Ursache im Zusammenspiel von Vite und onnxruntime-web klären, sonst dauerhaft auf den Containerpfad festlegen und den Dev-Server aus der Dokumentation nehmen. |
 
 ### Umsetzung
 

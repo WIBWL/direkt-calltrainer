@@ -1,41 +1,51 @@
 # Test suite
 
-Feature-traceable tests for the Calltrainer backend. Every test file names the
-`F-xx` features (`docs/features.md`), `R-xx` requirements
+Feature-traceable tests for the Calltrainer's Python packages. Every test file
+names the `F-xx` features (`docs/features.md`), `R-xx` requirements
 (`docs/initial-requirements.md`) and ADRs (`docs/adr/`) it exercises, in its
-module docstring and per-test docstrings.
+module docstring and per-test docstrings. Each suite sits beside its package:
+`shared/tests/` (the measuring and storage code), `backend/tests/` (the API, the
+live call, the domain rules) and `worker/tests/` (the wrap-up).
 
 ## Running
 
 ```bash
-pip install -r requirements-dev.txt
-pytest
+source .env
+uv run pytest                       # all three suites
+uv run pytest worker/tests          # one
 ```
 
 Two kinds of test live side by side. Most need no network access, credentials,
 database or browser: the three pipeline backends (STT / LLM / TTS) are faked
-(`tests/conftest.py`), and the REST layer is driven through an in-process ASGI
-transport. Dummy env vars are set in `conftest.py` before any backend module is
-imported. Keycloak auth (ADR 0009) is bypassed by an autouse `_override_auth`
-fixture that overrides `require_user`; `test_auth.py` verifies the real token
-logic against a throwaway RSA key and a stubbed JWKS.
+(`backend/tests/conftest.py`), and the REST layer is driven through an
+in-process ASGI transport. The environment every package reads at import is set
+by `shared/tests/fixtures.py`, which each suite's `conftest.py` registers as a
+plugin and imports first. Keycloak auth (ADR 0009) is bypassed by an autouse
+`_override_auth` fixture that overrides `require_user`; `test_auth.py` verifies
+the real token logic against a throwaway RSA key and a stubbed JWKS.
 
 The database tests (`test_migrations.py`, `test_seed.py`, `test_save_session.py`,
 `test_cascade_delete.py`, `test_feedback_job_status.py`, `test_api.py`,
 `test_session_history.py`, `test_focus_goals.py`, `test_pressure_segments.py`,
 `test_setup_api.py`, and the second half of `test_persistence_schema.py`) each
-create a throwaway database on the server named in `.env`, migrate it and drop
-it afterwards. Postgres has to be running for them (`docker compose up -d db`);
-the development database is never touched, and without a reachable server they
-skip rather than fail — so look at the skip count, not only at the colour.
-`conftest.py` assigns the `POSTGRES_*` names unusable values before the backend
-is imported, so a test that does not ask for a database cannot reach the real
-one by accident; `test_database_isolation.py` guards that ordering. Inside the
-app container this is the only thing standing between the suite and the compose
-database, because `env_file` puts the real settings into the environment first.
+create a throwaway database on the server `POSTGRES_URL` names in the sourced
+`.env`, migrate it and drop it afterwards. Postgres has to be running for them
+(`docker compose -f dev-compose.yaml up -d`); the development database is never
+touched, and without a reachable server they skip rather than fail — so look at
+the skip count, not only at the colour. `shared/tests/fixtures.py` takes the
+server from `POSTGRES_URL` and then assigns it, and `REDIS_URL`, unusable values
+before any package is imported, so a test that does not ask for a database
+cannot reach the real one by accident; `test_database_isolation.py` guards that
+ordering.
+
+The worker's end-to-end tests (`test_feedback_job_status.py`,
+`test_pressure_segments.py`) store a Session through the backend's write path
+and read it back through its API, so `worker/tests/conftest.py` borrows the
+backend suite's `api_client` and auth override. That is test code only; the
+packages themselves never import each other (`test_module_dependencies.py`).
 
 Personas and Scenarios live in the database since ADR 0041, so the suite owns
-its own value objects (`TEST_PERSONAS` / `TEST_SCENARIOS` in `conftest.py`) and
+its own value objects (`TEST_PERSONAS` / `TEST_SCENARIOS` in `backend/tests/conftest.py`) and
 the `fake_library` fixture serves them wherever the code would otherwise read
 the database. What the *shipped* library contains is a separate question,
 asserted against `backend/scripts/seed_reference_data.py` — which ADR 0041 makes the
@@ -107,8 +117,8 @@ source of that content, and which imports without a database.
 
 ## Not covered here
 
-* **The post-call wrap-up** (F-10) — implemented in `backend/feedback/`
-  (ADR 0047–0051). Only the prompt is covered (`test_wrapup_prompt.py`, its job
+* **The post-call wrap-up** (F-10) — implemented in `worker/generator.py`
+  over `shared/feedback/` (ADR 0047–0051). Only the prompt is covered (`test_wrapup_prompt.py`, its job
   status in `test_feedback_job_status.py`, and the wire round trip in
   `test_api.py`); the generated text itself is not asserted, since it is model
   output. `metrics.py` is covered by `test_metrics.py` and `acoustics.py` by

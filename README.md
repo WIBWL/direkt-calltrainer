@@ -2,7 +2,6 @@
 
 AI-powered phone conversation trainer with real-time speech analysis and behavioral feedback.
 
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Status](https://img.shields.io/badge/status-active--development-yellow)
 
 ## About
@@ -11,27 +10,34 @@ Calltrainer is a use case built within [EFRE-DiReKT](https://efre-direkt.de/), a
 
 ## Architecture
 
-FastAPI backend, React + TypeScript frontend, one Docker image. Speech-to-text and dialogue generation run through the EFRE-DiReKT gateway — an OpenAI-compatible endpoint, named with one model per step in `.env`. Text-to-speech runs on KugelAudio. One backend per leg, no fallbacks and no switches between them (ADR 0103). No local models are needed.
+A React + TypeScript frontend and two Python processes — the FastAPI backend (the API and the live call) and the wrap-up worker — built as three images from one `Dockerfile`. The Python side is one uv workspace of three packages: `shared/`, `backend/`, `worker/` (ADR 0108). Speech-to-text and dialogue generation run through the EFRE-DiReKT gateway — an OpenAI-compatible endpoint, named with one model per step in `.env`. Text-to-speech runs on KugelAudio. One backend per leg, no fallbacks and no switches between them (ADR 0103). No local models are needed.
 
 > **Note:** The EFRE-DiReKT gateway is only reachable from its own network - connect via VPN before running the app.
 
-## 1. Setup
+## Running it locally
 
-Copy `.env.example` to `.env` and fill in the real `DIREKT_API_KEY` and `KUGELAUDIO_API_KEY`.
+The apps run on your machine; Docker runs only Postgres, Redis and Keycloak. You need [uv](https://docs.astral.sh/uv/), Node 22 and Docker.
 
-## 2. Run the App
-
-```powershell
-docker compose up --build
+```sh
+uv sync                                       # Python 3.12 and every package, plus the dev tools
+(cd frontend && npm install)
+cp .env.example .env                          # then fill in DIREKT_API_KEY and KUGELAUDIO_API_KEY
+docker compose -f dev-compose.yaml up -d      # Postgres :15433, Redis :16379, Keycloak :18081
 ```
 
-Builds three images — `frontend` (the SPA, served by nginx, which forwards `/api`, `/ws` and `/health`), `backend` and `worker` — and serves everything on `http://localhost:8391`.
+Then, each in its own shell with `source .env` first:
 
-For development, add `--watch` (`docker compose up --build --watch`) to have the containers pick up code changes automatically: backend edits are synced into the backend and worker, which restart without a full rebuild, while frontend edits and `requirements.txt` changes trigger a rebuild.
+```sh
+uv run uvicorn backend.app:app --reload       # the backend, :8000
+uv run python -m worker                       # the wrap-up worker
+cd frontend && npm run dev                    # the SPA on http://localhost:5173
+```
 
-## 3. Login (Keycloak)
+The live call needs the production build — voice detection does not load under `npm run dev` — so for anything touching the call run `npm run build:watch` and `npm run preview` instead, and open `http://localhost:8391`. Both Vite servers forward `/api`, `/ws` and `/health` to the backend.
 
-`docker compose up` brings its own Keycloak on `http://localhost:18081` and imports `keycloak/direkt-realm.json` — the `direkt-calltrainer` client and three fixed users:
+## Login (Keycloak)
+
+`dev-compose.yaml` brings its own Keycloak on `http://localhost:18081` and imports `keycloak/direkt-realm.json` — the `direkt-calltrainer` client and three fixed users:
 
 | user | password | company (`tenant`) |
 |---|---|---|
@@ -39,21 +45,33 @@ For development, add `--watch` (`docker compose up --build --watch`) to have the
 | `mathias` | `mathias` | Solox |
 | `eberhard` | `eberhard` | APPOLLO |
 
-Opening `http://localhost:8391` redirects to Keycloak; log in as any of them. There is nothing to configure and no roles — a valid token is all the app checks (ADR 0009).
+Opening the app redirects to Keycloak; log in as any of them. There is nothing to configure and no roles — a valid token is all the app checks (ADR 0009).
 
-**To change the realm, edit the JSON and wipe the volume** — import is skipped for a realm that already exists:
+**To change the realm, edit the JSON and drop Keycloak's volume** — import is skipped for a realm that already exists:
 
-```powershell
-docker compose down -v ; docker compose up --build
+```sh
+docker compose -f dev-compose.yaml rm -sf keycloak && docker volume rm direkt-calltrainer-keycloak-data
+docker compose -f dev-compose.yaml up -d
 ```
 
 The Keycloak admin console is at <http://localhost:18081> with `admin` / `admin`. Production uses the shared `direkt` realm at `keycloak.efre-direkt.de`, administered by hand (the import file is dev-only).
 
-## 4. Documentation
+## Tests
+
+```sh
+source .env && uv run pytest                  # needs dev-compose.yaml's Postgres, or the database tests skip
+uv run flake8 && uv run pylint backend/ shared/ worker/
+(cd frontend && npm run lint && npm test)
+```
+
+## Images and deployment
+
+`scripts/build-and-push.sh` builds the three images for `registry.internal.efre-direkt.de` from a commit with a pushed `v*` tag. The deployment itself is in `direkt-infrastructure` (`public/calltrainer/compose.yml`), which updates to a new `latest` on its own; see `docs/deployment.md`.
+
+## Documentation
 
 The full architecture documentation - arc42 and every Architecture Decision Record (ADR) - is served via [MkDocs](https://www.mkdocs.org):
 
-```powershell
-pip install -r requirements-dev.txt
-mkdocs serve
+```sh
+uv run mkdocs serve -a localhost:8001
 ```
