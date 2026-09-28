@@ -1,30 +1,23 @@
 """Database access: engine and session factory, for app and worker alike.
 
-The URL is built from the POSTGRES_* settings on first use, not at import
-time, so importing this module never requires a loaded environment.
+The URL is read on first use, not at import time, so importing this module
+never requires a configured environment.
 """
-import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import lru_cache
 
 from sqlalchemy import URL, Engine, create_engine, text
+from sqlalchemy.engine import make_url
 # Aliased because "Session" is also an entity of this schema (models.Session).
 from sqlalchemy.orm import Session as DbSession
 from sqlalchemy.orm import sessionmaker
 
-# Host and port are the only part of the URL that differs between running on
-# the host and running inside the compose network, where the database is
-# reachable as "db" rather than on localhost.
-DEFAULT_HOST = "localhost"
-DEFAULT_PORT = "5432"
+from shared.env import optional, required
 
-# The role and database the `db` service creates; overridable only so tests and
-# backend/scripts/stress_db.py can aim at a throwaway database. Not "postgres": existing
-# volumes were initialised with "trainer", and Postgres applies the name only
-# on first init, so renaming would point at a database that does not exist.
-DEFAULT_USER = "trainer"
-DEFAULT_DATABASE = "trainer"
+# The one driver installed; `postgres://` and `postgresql://` are accepted for
+# the same database, so a URL written for any other client works here too.
+DRIVER = "postgresql+psycopg"
 
 # Taken by every process that provisions the database (app instances,
 # backend/scripts/seed_reference_data.py), so they serialise instead of racing; the
@@ -40,26 +33,15 @@ CONNECT_TIMEOUT_SECONDS = 5
 
 
 def build_database_url() -> URL:
-    """Assembles the connection URL from the POSTGRES_* settings; only the
-    password is required. No DATABASE_URL, so the password lives in one place.
-    URL.create quotes the components, so "@", "/" or "%" need no escaping.
+    """The connection URL: `POSTGRES_URL`, whose password `POSTGRES_PASSWORD`
+    replaces when set. A deployment keeps the password in one Docker secret that
+    the database container reads too (`POSTGRES_PASSWORD_FILE`), and names the
+    rest in the URL; in development the URL carries it and nothing else is set.
     """
-    if not os.environ.get("POSTGRES_PASSWORD"):
-        raise RuntimeError(
-            "Database settings missing: POSTGRES_PASSWORD. Inside the container "
-            "it comes from the env_file (.env); locally, call load_dotenv() first."
-        )
-    return URL.create(
-        "postgresql+psycopg",
-        # `or`, not a get() default: an .env that names the variable without
-        # a value ("POSTGRES_PORT=") yields "", which is not missing as far as
-        # get() is concerned -- and int("") would then raise.
-        username=os.environ.get("POSTGRES_USER") or DEFAULT_USER,
-        password=os.environ["POSTGRES_PASSWORD"],
-        host=os.environ.get("POSTGRES_HOST") or DEFAULT_HOST,
-        port=int(os.environ.get("POSTGRES_PORT") or DEFAULT_PORT),
-        database=os.environ.get("POSTGRES_DB") or DEFAULT_DATABASE,
-    )
+    url = make_url(required("POSTGRES_URL")).set(drivername=DRIVER)
+    password = optional("POSTGRES_PASSWORD")
+    # URL.set quotes the components, so "@", "/" or "%" in it need no escaping.
+    return url.set(password=password) if password is not None else url
 
 
 @lru_cache(maxsize=1)

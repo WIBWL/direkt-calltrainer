@@ -1,11 +1,12 @@
-"""The fixtures every suite shares, loaded as a pytest plugin for the whole run
-(`-p shared.tests.fixtures` in pyproject.toml): the environment the packages
-read at import, and the throwaway databases the persistence tests run against.
+"""The fixtures every suite shares, registered by each suite's conftest.py:
+the environment the packages read at import, and the throwaway databases the
+persistence tests run against.
 
 Most tests fake the pipeline and never touch a database; the persistence tests
-get a throwaway database per test and skip without a reachable Postgres. The
-packages read their environment at import time, so it is set up below before
-any import."""
+get a throwaway database per test, on the server `POSTGRES_URL` names in the
+environment the suite was started from (`source .env && uv run pytest`), and
+skip without one. The packages read their environment at import time, so it is
+set up below before any import."""
 
 # The env vars below must be set before any package import runs, so those imports
 # deliberately sit after this block.
@@ -16,16 +17,22 @@ import os
 os.environ.setdefault("DIREKT_URL", "http://direkt.test.invalid")
 os.environ.setdefault("DIREKT_API_KEY", "test-direkt-key")
 os.environ.setdefault("LLM_MODEL", "test-llm-model")
+os.environ.setdefault("LOG_FORMAT", "pretty")
 
-# Deliberately unusable credentials: shared/clients/config.py calls load_dotenv()
-# on import, which would otherwise put the real POSTGRES_* into the environment and
-# let a stray session_scope() write to the development database.
-# Assigned, not setdefault: inside the app container compose has already loaded
-# .env, and setdefault would leave the guard off exactly there. The database
-# fixtures read .env themselves (`_ENV`) and override these per test.
-os.environ["POSTGRES_USER"] = "calltrainer-test-no-such-user"
-os.environ["POSTGRES_PASSWORD"] = "not-a-real-password"
-os.environ["POSTGRES_DB"] = "calltrainer-test-no-such-database"
+# The server the persistence tests create their databases on: the developer's
+# own, as sourced from .env. Taken before the guard below replaces it.
+_SERVER = os.environ.get("POSTGRES_URL")
+_SERVER_PASSWORD = os.environ.get("POSTGRES_PASSWORD")
+
+# Deliberately unusable settings, so a stray session_scope() or enqueue fails
+# loudly instead of writing to the development database or queue. Assigned, not
+# setdefault: the sourced .env has already set the real ones, and setdefault
+# would leave the guard off exactly there. The database fixtures aim the app at
+# a throwaway database per test (`database_env`).
+os.environ["POSTGRES_URL"] = "postgresql://calltrainer-test-no-such-user@127.0.0.1:1/no-such-database"
+os.environ["REDIS_URL"] = "redis://127.0.0.1:1"
+for _name in ("POSTGRES_URL_FILE", "POSTGRES_PASSWORD", "POSTGRES_PASSWORD_FILE", "REDIS_URL_FILE"):
+    os.environ.pop(_name, None)
 
 import uuid  # noqa: E402
 from collections.abc import Iterator  # noqa: E402
@@ -37,7 +44,6 @@ from pathlib import Path  # noqa: E402
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
-from dotenv import dotenv_values  # noqa: E402
 from sqlalchemy import URL, create_engine, text  # noqa: E402
 from sqlalchemy.engine import make_url  # noqa: E402
 from sqlalchemy.exc import OperationalError  # noqa: E402
@@ -47,7 +53,7 @@ from sqlalchemy.orm import sessionmaker  # noqa: E402
 from shared.clients import llm  # noqa: E402
 from shared.db import ALEMBIC_INI, models as db_models  # noqa: E402
 from shared.db.seed_data import FOCUS_GOALS  # noqa: E402
-from shared.db.session import DEFAULT_DATABASE, DEFAULT_USER, reset_engine  # noqa: E402
+from shared.db.session import DRIVER, reset_engine  # noqa: E402
 
 
 # --- Database fixtures ----------------------------------------------------
@@ -55,21 +61,13 @@ from shared.db.session import DEFAULT_DATABASE, DEFAULT_USER, reset_engine  # no
 # one of these fixtures never opens a connection to Postgres at all.
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-# Read, not loaded: dotenv_values leaves os.environ alone, so a test that does
-# not request a database fixture still has no POSTGRES_* set and cannot connect.
-_ENV = dotenv_values(PROJECT_ROOT / ".env")
-
-# The POSTGRES_* keys database_env() injects; host and port fall back to the
-# same defaults shared/db/session.py applies.
-_DB_SETTINGS = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
-                "POSTGRES_HOST", "POSTGRES_PORT")
 
 # Bounds the reachability probe so an unreachable server fails in a few seconds
 # instead of hanging on libpq's default.
 _DB_CONNECT_TIMEOUT = 3
 
 
-def _loopback(host: str) -> str:
+def _loopback(host: str | None) -> str | None:
     """`localhost` -> `127.0.0.1` for the test database server.
 
     On Windows `localhost` resolves to `::1` first, but Docker Desktop forwards IPv4
@@ -85,46 +83,29 @@ def _render(url: URL) -> str:
 
 
 def _server_url() -> URL:
-    """The configured database server, or a skip if .env is incomplete."""
-    missing = [k for k in ("POSTGRES_PASSWORD",) if not _ENV.get(k)]
-    if missing:
+    """The configured database server, or a skip if none was sourced."""
+    if not _SERVER:
         # `return` only so every path returns an expression: skip() raises.
-        return pytest.skip(f"Database settings missing from .env: {', '.join(missing)}")
-    return URL.create(
-        "postgresql+psycopg",
-        username=_ENV.get("POSTGRES_USER") or DEFAULT_USER,
-        password=_ENV["POSTGRES_PASSWORD"],
-        host=_loopback(_ENV.get("POSTGRES_HOST") or "localhost"),
-        port=int(_ENV.get("POSTGRES_PORT") or 5432),
-        database=_ENV.get("POSTGRES_DB") or DEFAULT_DATABASE,
-    )
+        return pytest.skip("POSTGRES_URL is not set; `source .env` to run the persistence tests")
+    url = make_url(_SERVER).set(drivername=DRIVER)
+    if _SERVER_PASSWORD:
+        url = url.set(password=_SERVER_PASSWORD)
+    return url.set(host=_loopback(url.host))
 
 
 @contextmanager
 def database_env(url: str) -> Iterator[None]:
-    """Puts the POSTGRES_* settings for `url` into the environment for the block.
+    """Points `POSTGRES_URL` at `url` for the block.
 
     That is how Alembic and `build_database_url()` are aimed at a test's database.
-    Restored afterwards, down to "was not set", so the next test cannot connect again.
+    Restored afterwards, so the next test is back on the unusable placeholder.
     """
-    parsed = make_url(url)
-    values = {
-        "POSTGRES_USER": parsed.username,
-        "POSTGRES_PASSWORD": parsed.password,
-        "POSTGRES_DB": parsed.database,
-        "POSTGRES_HOST": parsed.host,
-        "POSTGRES_PORT": str(parsed.port or 5432),
-    }
-    previous = {k: os.environ.get(k) for k in _DB_SETTINGS}
-    os.environ.update(values)
+    previous = os.environ["POSTGRES_URL"]
+    os.environ["POSTGRES_URL"] = url
     try:
         yield
     finally:
-        for key, was in previous.items():
-            if was is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = was
+        os.environ["POSTGRES_URL"] = previous
 
 
 def _alembic_config() -> Config:

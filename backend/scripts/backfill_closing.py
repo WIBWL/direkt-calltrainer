@@ -8,26 +8,17 @@ database in `.env` (no Redis, no model). Idempotent; skips Sessions that already
 the figure or have fewer than three user utterances, as the live path does."""
 
 # pylint: disable=duplicate-code
-# The load_dotenv() preamble and the main()/__name__ guard cannot move into
-# `_backfill_cli`: the preamble must run before that import.
+# The main()/__name__ guard cannot move into `_backfill_cli`.
 
 
 from __future__ import annotations
 
 import logging
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# After load_dotenv(): importing the backend reads the environment.
-# pylint: disable=wrong-import-position
-# load_dotenv() has to run before the packages read the environment -- so
-# these cannot move up.
-from shared.db.session import session_scope  # noqa: E402
-from shared.feedback import metrics, rows, stored  # noqa: E402
-from shared.language_packs import LANGUAGE_PACKS  # noqa: E402
-from backend.scripts import _backfill_cli  # noqa: E402
+from shared.db.session import session_scope
+from shared.feedback import metrics, rows, stored
+from shared.language_packs import LANGUAGE_PACKS
+from backend.scripts import _backfill_cli
 
 logger = logging.getLogger("backfill_closing")
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — revises the per-Session truncation decided in ADR 0039.
+Superseded by ADR 0105 (there is no log file any more). Revised the per-Session truncation decided in ADR 0039.
 
 ## Context
 

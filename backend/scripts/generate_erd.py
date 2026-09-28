@@ -1,6 +1,6 @@
 """Generates the ER diagram from Base.metadata (shared/db/models.py); needs no database.
 
-Usage (project root, .venv active):  python -m backend.scripts.generate_erd
+Usage (project root):  uv run python -m backend.scripts.generate_erd
 Writes docs/diagrams/er_model.svg (gitignored, never committed). Needs the dev group
 (sqlalchemy-schemadisplay, pydot), Graphviz `dot`, optionally the IBM Plex Mono font."""
 import os
@@ -8,12 +8,10 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy_schemadisplay import create_schema_graph
 
-# pylint: disable=wrong-import-position  # same sys.path reason as the noqa markers below
+from shared.db.models import Base
+
 # pylint: disable=no-member  # pydot's Dot builds its set_*/write_* methods at runtime
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from shared.db.models import Base  # noqa: E402
-
 OUTPUT_SVG = os.path.join(PROJECT_ROOT, "docs", "diagrams", "er_model.svg")
 
 # --- Design tokens (blue ramp) -------------------------------------------

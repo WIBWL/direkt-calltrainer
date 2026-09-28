@@ -8,27 +8,18 @@ database in `.env` (no Redis, no model). Idempotent; figures already written are
 never recomputed, since the user has already been shown them."""
 
 # pylint: disable=duplicate-code
-# The load_dotenv() preamble and the main()/__name__ guard cannot move into
-# `_backfill_cli`: the preamble must run before that import.
+# The main()/__name__ guard cannot move into `_backfill_cli`.
 
 
 from __future__ import annotations
 
 import logging
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# After load_dotenv(): importing the backend reads the environment.
-# pylint: disable=wrong-import-position
-# load_dotenv() has to run before the packages read the environment -- so
-# these cannot move up.
-from shared.db import models as db_models  # noqa: E402
-from shared.db.session import session_scope  # noqa: E402
-from shared.feedback import interruptions, rows  # noqa: E402
-from shared.feedback.metrics import Measurement  # noqa: E402
-from backend.scripts import _backfill_cli  # noqa: E402
+from shared.db import models as db_models
+from shared.db.session import session_scope
+from shared.feedback import interruptions, rows
+from shared.feedback.metrics import Measurement
+from backend.scripts import _backfill_cli
 
 logger = logging.getLogger("backfill_interruptions")
 

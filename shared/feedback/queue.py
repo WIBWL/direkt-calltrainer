@@ -5,12 +5,12 @@ everything else is in Postgres by then -- never a transcript or audio (ADR 0048)
 
 from __future__ import annotations
 
-import os
 from functools import lru_cache
 
 from redis import Redis
 from rq import Queue
 
+from shared.env import required
 from shared.feedback.jobs import JOB_TIMEOUT_S
 
 QUEUE_NAME = "feedback"
@@ -53,7 +53,9 @@ def _enqueue_connection() -> Redis:
 
 
 def _url() -> str:
-    return os.environ.get("REDIS_URL", "redis://localhost:6379")
+    """Read on first use, not at import: the live path imports this module lazily
+    and must not need Redis configured merely to load."""
+    return required("REDIS_URL")
 
 
 @lru_cache(maxsize=1)

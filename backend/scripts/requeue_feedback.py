@@ -12,18 +12,10 @@ from __future__ import annotations
 import argparse
 import logging
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# After load_dotenv(): importing the backend reads the environment.
-# pylint: disable=wrong-import-position
-# load_dotenv() has to run before the packages read the environment -- so
-# these cannot move up.
-from shared.db import models as db_models  # noqa: E402
-from shared.feedback import jobs  # noqa: E402
-from shared.db.session import session_scope  # noqa: E402
-from shared.logging_config import configure_logging  # noqa: E402
+from shared.db import models as db_models
+from shared.feedback import jobs
+from shared.db.session import session_scope
+from shared.logging_config import configure_logging
 
 logger = logging.getLogger(__name__)
 

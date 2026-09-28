@@ -1,24 +1,14 @@
 """Migrates the database to head and fills the reference tables -- a thin CLI over
 backend/db/provision.py, which the app also runs at startup.
 
-Run from the project root, with an active .venv and a running Postgres:
+Run from the project root with .env sourced and the database running:
     python -m backend.scripts.seed_reference_data"""
-import os
-
-from dotenv import load_dotenv
-
-# A script, not a package: the project root has to be on the search path
-# before the backend imports, hence the noqa markers on them.
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# pylint: disable=wrong-import-position  # sys.path is set up just above
-from shared.db.session import session_scope  # noqa: E402
-from backend.db.provision import inventory, provision  # noqa: E402
+from shared.db.session import session_scope
+from backend.db.provision import inventory, provision
 
 
 def main() -> None:
     """Provision the database, then print what was created and what is there."""
-    load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
     created = provision()
     with session_scope() as db:
         counts = inventory(db)

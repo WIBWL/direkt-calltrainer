@@ -1,39 +1,30 @@
 """The reference tables the application seeds itself (ADR 0041, 0057, 0058, 0076).
 
 The seed runs on every start, so a second run must change nothing. Run through
-backend/scripts/seed_reference_data.py as a subprocess, the path a human takes (its `load_dotenv`
-and `sys.path` setup only behave that way as a script); the app calls the same provision()."""
+backend/scripts/seed_reference_data.py as a subprocess, the path a human takes; the app
+calls the same provision()."""
 import os
 import subprocess
 import sys
 
 import pytest
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import make_url
 
 from shared.tests.fixtures import PROJECT_ROOT
 
 
 def _postgres_env(database_url: str) -> dict[str, str]:
-    """The POSTGRES_* settings for `database_url`, as the seed script's own
-    `build_database_url()` expects to find them."""
-    url = make_url(database_url)
-    return {
-        "POSTGRES_USER": url.username,
-        "POSTGRES_PASSWORD": url.password,
-        "POSTGRES_DB": url.database,
-        "POSTGRES_HOST": url.host,
-        "POSTGRES_PORT": str(url.port or 5432),
-    }
+    """The database setting for `database_url`, as the seed script's own
+    `build_database_url()` expects to find it."""
+    return {"POSTGRES_URL": database_url}
 
 
 def _run_seed(database_url: str) -> str:
     result = subprocess.run(
         [sys.executable, "-m", "backend.scripts.seed_reference_data"],
         cwd=PROJECT_ROOT,
-        # These must win over the .env the script itself loads; python-dotenv
-        # does not override variables that are already set, so passing them
-        # through the child's environment is enough.
+        # The child inherits the suite's placeholder, so the test's own
+        # database has to be named explicitly.
         env={**os.environ, **_postgres_env(database_url)},
         capture_output=True,
         text=True,

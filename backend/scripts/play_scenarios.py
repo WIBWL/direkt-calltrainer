@@ -21,23 +21,17 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dotenv import load_dotenv
-
-# A script, not a package: the project root has to be on the search path
-# before anything under backend/ can be imported.
-
-# pylint: disable=wrong-import-position
-from shared.clients import llm  # noqa: E402
-from shared.feedback.acoustics import AcousticsError  # noqa: E402
-from shared.language_packs import get_pack, signals_closing  # noqa: E402
-from backend import library  # noqa: E402
-from backend.clients import stt, tts  # noqa: E402
-from backend.personas import Persona  # noqa: E402
-from backend.scenarios import Scenario  # noqa: E402
-from backend.session import orchestrator as orch  # noqa: E402
-from backend.session.prompting import build_system_prompt  # noqa: E402
-from backend.session.events import Failed, TurnCompleted  # noqa: E402
-from backend.scripts.scenario_probes import (  # noqa: E402
+from shared.clients import llm
+from shared.feedback.acoustics import AcousticsError
+from shared.language_packs import get_pack, signals_closing
+from backend import library
+from backend.clients import stt, tts
+from backend.personas import Persona
+from backend.scenarios import Scenario
+from backend.session import orchestrator as orch
+from backend.session.prompting import build_system_prompt
+from backend.session.events import Failed, TurnCompleted
+from backend.scripts.scenario_probes import (
     CONCRETE,
     FAREWELL,
     SETTLE,
@@ -463,7 +457,6 @@ def _select(personas, scenarios, args):
 
 
 async def _main() -> int:
-    load_dotenv()
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     args = _parse_args()
 

@@ -1,27 +1,21 @@
 import logging
 from logging.config import fileConfig
-from pathlib import Path
 
 from alembic import context
-from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool, text
 
 from shared.db.models import Base
 from shared.db.session import PROVISION_LOCK_KEY, build_database_url
 
-# Load .env for the POSTGRES_* settings the connection URL is assembled from.
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-load_dotenv(PROJECT_ROOT / ".env")
-
 config = context.config
 
 try:
-    # Same assembly the application uses, so migrations can never run against a
-    # different database than the app does.
+    # The same reading the application does, so migrations can never run against
+    # a different database than the app does.
     DATABASE_URL = build_database_url().render_as_string(hide_password=False)
 except RuntimeError as exc:
     raise SystemExit(
-        f"{exc} See .env.example for the POSTGRES_* settings."
+        f"{exc} -- `source .env` first."
     ) from exc
 # Doubled because alembic.ini is read through ConfigParser, where a single "%"
 # starts an interpolation and would reject a password containing one.

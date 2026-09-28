@@ -1,13 +1,18 @@
-"""Central logging setup: colored console + a log file, both stamping every
-line with its Session (ADR 0039, ADR 0055). Call `configure_logging()` once at startup.
+"""Central logging setup: one handler on stdout, stamping every line with its
+Session (ADR 0039, ADR 0105). Call `configure_logging()` once at startup.
 
-The file is truncated once per process and holds every Session since (ADR 0055).
+`LOG_FORMAT` picks the shape: `json`, one object per line for the log shipper
+that reads the containers' output (the images set it), or `pretty`, the colored
+lines for a developer's terminal (`.env.example` sets it). There is no log file.
 """
 
 import contextlib
 import contextvars
+import json
 import logging
-from pathlib import Path
+from datetime import UTC, datetime
+
+from shared.env import required
 
 # Set once per WebSocket connection (see backend/api/session_ws.py) and read
 # by _SessionIdFilter below; propagates through every awaited call in that
@@ -68,46 +73,63 @@ class _ColorFormatter(logging.Formatter):
         return f"{color}{message}{_RESET}" if color else message
 
 
+class _JsonFormatter(logging.Formatter):
+    """One JSON object per line, the Session id a field of its own, so a query
+    can select one call's lines without parsing the message."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        entry = {
+            "time": datetime.fromtimestamp(record.created, UTC).isoformat(timespec="milliseconds"),
+            "level": record.levelname,
+            "logger": record.name,
+            "session": record.__dict__.get("session_id", "-"),
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(entry, ensure_ascii=False)
+
+
+_FORMATTERS = {
+    "json": _JsonFormatter,
+    "pretty": lambda: _ColorFormatter(_LOG_FORMAT, _DATE_FORMAT),
+}
+
+
 class _State:
     """Holds configure_logging()'s setup state -- a mutable attribute on a
     shared instance instead of module globals reassigned via `global`."""
 
     configured = False
-    file_handler: logging.FileHandler | None = None
 
 
 _state = _State()
 
 
-def configure_logging(log_file: str | Path = "logs/calltrainer.log") -> None:
-    """Sets up console (colored) and file (plain) handlers on the root
-    logger; safe to call more than once (later calls are a no-op).
+def configure_logging() -> None:
+    """Sets up the one stdout handler on the root logger, in the `LOG_FORMAT`
+    shape; safe to call more than once (later calls are a no-op).
 
     Replaces any existing root handlers (e.g. gunicorn's own), so this is the
-    only thing writing our output. The file is opened in `w` mode (ADR 0055)."""
+    only thing writing our output."""
     if _state.configured:
         return
+    log_format = required("LOG_FORMAT")
+    if log_format not in _FORMATTERS:
+        raise RuntimeError(f"LOG_FORMAT must be one of {', '.join(_FORMATTERS)}, not {log_format!r}")
     _state.configured = True
 
     root = logging.getLogger()
     root.handlers.clear()
     root.setLevel(logging.INFO)
-    session_filter = _SessionIdFilter()
 
     # httpx logs a line for every request it makes at INFO -- the startup
     # backend checks, every OIDC key refresh, every pipeline call. Our own
-    # clients (backend/clients/*) already log the calls that matter, so drop
-    # httpx to WARNING; raise it back if you need raw HTTP tracing.
+    # clients (shared/clients/*, backend/clients/*) already log the calls that
+    # matter, so drop httpx to WARNING; raise it back if you need raw HTTP tracing.
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
     console = logging.StreamHandler()
-    console.setFormatter(_ColorFormatter(_LOG_FORMAT, _DATE_FORMAT))
-    console.addFilter(session_filter)
+    console.setFormatter(_FORMATTERS[log_format]())
+    console.addFilter(_SessionIdFilter())
     root.addHandler(console)
-
-    log_path = Path(log_file)
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    _state.file_handler = logging.FileHandler(log_path, mode="w", encoding="utf-8")
-    _state.file_handler.setFormatter(logging.Formatter(_LOG_FORMAT, _DATE_FORMAT))
-    _state.file_handler.addFilter(session_filter)
-    root.addHandler(_state.file_handler)

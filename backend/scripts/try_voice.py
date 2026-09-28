@@ -2,7 +2,7 @@
 fed back through STT -- a voice can return audio of the right length and still be
 unintelligible, which only this round-trip (or listening) catches.
 
-Run from the project root, with an active .venv:
+Run from the project root with .env sourced:
     python -m backend.scripts.try_voice 1071 1018 1656
     python -m backend.scripts.try_voice --language de 1885
     python -m backend.scripts.try_voice --text "Guten Tag, hier ist Thomas Brandt." 1885
@@ -12,15 +12,8 @@ import argparse
 import asyncio
 import os
 
-from dotenv import load_dotenv
-
-# A script, not a package: the project root has to be on the search path
-# before the backend imports, hence the noqa markers on them.
-load_dotenv()
-
-# pylint: disable=wrong-import-position  # sys.path is set up just above
-from backend.clients import stt, tts  # noqa: E402
-from backend.clients.config import KUGELAUDIO_CLIENT, KUGELAUDIO_MODEL  # noqa: E402
+from backend.clients import stt, tts
+from backend.clients.config import KUGELAUDIO_CLIENT, KUGELAUDIO_MODEL
 
 SAMPLE_TEXT = {
     "en": (

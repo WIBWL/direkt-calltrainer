@@ -19,7 +19,6 @@ dependencies = [
     # The wrap-up queue (ADR 0019)
     "redis==8.1.0",
     "rq==2.12.0",
-    "python-dotenv==1.0.1",
 ]
 
 [tool.uv]

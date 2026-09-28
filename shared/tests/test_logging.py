@@ -1,9 +1,11 @@
-"""Centralized logging (ADR 0039, ADR 0055).
+"""Centralized logging (ADR 0039, ADR 0105).
 
-Colored per-module console output plus one log file per process, kept for the
-whole run, with the session id on every line.
+One handler on stdout, no file: JSON lines for the log shipper, or the colored
+lines for a terminal, with the session id on every line either way.
 """
 
+import io
+import json
 import logging
 
 import pytest
@@ -29,7 +31,6 @@ def _restore_logging():
     root = logging.getLogger()
     saved_handlers = root.handlers[:]
     saved_configured = logging_config._state.configured
-    saved_file_handler = logging_config._state.file_handler
     try:
         yield
     finally:
@@ -38,7 +39,17 @@ def _restore_logging():
                 h.close()
         root.handlers[:] = saved_handlers
         logging_config._state.configured = saved_configured
-        logging_config._state.file_handler = saved_file_handler
+
+
+def _configure(monkeypatch, log_format):
+    """Run configure_logging() afresh with `log_format`, its output captured."""
+    monkeypatch.setenv("LOG_FORMAT", log_format)
+    logging_config._state.configured = False
+    configure_logging()
+    stream = io.StringIO()
+    (handler,) = logging.getLogger().handlers
+    handler.setStream(stream)
+    return stream
 
 
 def test_session_id_scope_tags_records_and_resets():
@@ -50,46 +61,56 @@ def test_session_id_scope_tags_records_and_resets():
     assert _tagged_session_id() == "-"  # restored after the block
 
 
-def test_configure_logging_installs_console_and_file_handlers(tmp_path):
-    log_file = tmp_path / "sub" / "calltrainer.log"
-    # configure_logging is a one-shot guarded by module state; force a re-run.
-    logging_config._state.configured = False
-    configure_logging(log_file)
+@pytest.mark.parametrize("log_format", ["json", "pretty"])
+def test_configure_logging_installs_one_stream_handler_and_no_file(monkeypatch, log_format):
+    _configure(monkeypatch, log_format)
 
-    root = logging.getLogger()
-    handler_types = {type(h).__name__ for h in root.handlers}
-    assert "StreamHandler" in handler_types
-    assert "FileHandler" in handler_types
-    assert log_file.exists(), "the log file is created (with parents)"
+    (handler,) = logging.getLogger().handlers
+    assert type(handler) is logging.StreamHandler  # pylint: disable=unidiomatic-typecheck
 
 
-def test_log_file_keeps_lines_across_sessions(tmp_path):
-    """The file accumulates for the whole run -- a new Session does not clear
-    the previous one's lines (ADR 0055)."""
-    log_file = tmp_path / "calltrainer.log"
-    logging_config._state.configured = False
-    configure_logging(log_file)
+def test_json_lines_carry_the_session_as_a_field(monkeypatch):
+    stream = _configure(monkeypatch, "json")
 
     with session_id_scope("session-one"):
-        logging.getLogger("backend.test").info("first call noise")
+        logging.getLogger("backend.test").info("first call %s", "noise")
+    logging.getLogger("backend.test").warning("between calls")
+
+    first, second = (json.loads(line) for line in stream.getvalue().splitlines())
+    assert first["session"] == "session-one"
+    assert first["message"] == "first call noise"
+    assert first["level"] == "INFO" and first["logger"] == "backend.test"
+    assert second["session"] == "-"
+
+
+def test_json_keeps_the_traceback_inside_the_one_line(monkeypatch):
+    """A multi-line traceback as its own lines would reach the log shipper as
+    that many separate entries, none of them saying which error it belongs to."""
+    stream = _configure(monkeypatch, "json")
+
+    try:
+        raise ValueError("boom")
+    except ValueError:
+        logging.getLogger("backend.test").exception("failed")
+
+    (line,) = stream.getvalue().splitlines()
+    assert "ValueError: boom" in json.loads(line)["exception"]
+
+
+def test_pretty_lines_carry_the_session_in_brackets(monkeypatch):
+    stream = _configure(monkeypatch, "pretty")
+
     with session_id_scope("session-two"):
         logging.getLogger("backend.test").info("second call noise")
-    for h in logging.getLogger().handlers:
-        h.flush()
 
-    contents = log_file.read_text(encoding="utf-8")
-    assert "first call noise" in contents, "the earlier Session's lines are still there"
-    assert "second call noise" in contents
-    assert "[session session-one]" in contents and "[session session-two]" in contents
+    assert "[session session-two]" in stream.getvalue()
+    assert "second call noise" in stream.getvalue()
 
 
-def test_configure_logging_opens_the_file_fresh_each_process(tmp_path):
-    """`w` mode: a restart (a fresh configure_logging) starts the file over,
-    which is what bounds its growth (ADR 0055)."""
-    log_file = tmp_path / "calltrainer.log"
-    log_file.write_text("stale line from a previous run\n", encoding="utf-8")
-
+@pytest.mark.parametrize("log_format", ["", "text"])
+def test_an_unset_or_unknown_format_refuses_to_start(monkeypatch, log_format):
+    monkeypatch.setenv("LOG_FORMAT", log_format)
     logging_config._state.configured = False
-    configure_logging(log_file)
 
-    assert "stale line" not in log_file.read_text(encoding="utf-8")
+    with pytest.raises(RuntimeError, match="LOG_FORMAT"):
+        configure_logging()

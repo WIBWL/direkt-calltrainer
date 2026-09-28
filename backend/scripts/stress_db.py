@@ -1,6 +1,7 @@
 """Load test for the Postgres schema through the app's own write and read paths
 (persist_session, the wrap-up poll's eager read, the shared pool) -- not pgbench.
-Refuses the database named in .env; creates, migrates and drops a throwaway one.
+Never touches the database POSTGRES_URL names; creates, migrates and drops a
+throwaway one on the same server.
 
     python -m backend.scripts.stress_db --sessions 300 --writers 16
     python -m backend.scripts.stress_db --volume 5000 --readers 32 --duration 20
@@ -8,7 +9,7 @@ Refuses the database named in .env; creates, migrates and drops a throwaway one.
 
 Exit code is 0 only if no operation failed."""
 # duplicate-code: this script deliberately re-implements the throwaway-database
-# helpers from tests/conftest.py (which it cannot import) and copies the wrap-up
+# helpers from shared/tests/fixtures.py (not in the image) and copies the wrap-up
 # read from backend/api/sessions.py verbatim -- benchmarking the *exact* query is
 # the point.
 # pylint: disable=duplicate-code
@@ -30,79 +31,49 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from dotenv import dotenv_values
 from sqlalchemy import URL, create_engine, text
-from sqlalchemy.engine import make_url
 from sqlalchemy.orm import selectinload
 
-
-# Imported after the path insert above, so this file runs as `python
-# backend/scripts/stress_db.py` without PYTHONPATH -- the same shape as
-# backend/scripts/seed_reference_data.py.
-# pylint: disable=wrong-import-position,import-outside-toplevel
-from shared.db import ALEMBIC_INI  # noqa: E402
-from shared.db.session import DEFAULT_DATABASE, DEFAULT_USER  # noqa: E402
-from shared.feedback.acoustics import Pause  # noqa: E402
-from shared.turn import Turn  # noqa: E402
-from backend import consent, library  # noqa: E402
-
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# Read, not loaded: dotenv_values leaves os.environ alone, so nothing here can
-# put the developer's real database into the environment by accident.
-_ENV = dotenv_values(os.path.join(PROJECT_ROOT, ".env"))
+# pylint: disable=import-outside-toplevel
+from shared.db import ALEMBIC_INI
+from shared.db.session import build_database_url
+from shared.feedback.acoustics import Pause
+from shared.turn import Turn
+from backend import consent, library
 
 logger = logging.getLogger("stress")
 
-_DB_SETTINGS = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
-                "POSTGRES_HOST", "POSTGRES_PORT")
+# Taken from the environment once, before database_env() points it elsewhere.
+_SERVER = os.environ.get("POSTGRES_URL")
 
 
 # --- Environment ----------------------------------------------------------
 
 def server_url() -> URL:
-    """The configured database server, from .env."""
-    missing = [k for k in ("POSTGRES_PASSWORD",) if not _ENV.get(k)]
-    if missing:
-        sys.exit(f"Missing from .env: {', '.join(missing)}")
-    return URL.create(
-        "postgresql+psycopg",
-        username=_ENV.get("POSTGRES_USER") or DEFAULT_USER,
-        password=_ENV["POSTGRES_PASSWORD"],
-        host=_ENV.get("POSTGRES_HOST") or "localhost",
-        port=int(_ENV.get("POSTGRES_PORT") or 5432),
-        database=_ENV.get("POSTGRES_DB") or DEFAULT_DATABASE,
-    )
+    """The configured database server: the one POSTGRES_URL names."""
+    if not _SERVER:
+        sys.exit("POSTGRES_URL is not set -- `source .env` first")
+    return build_database_url()
 
 
 @contextmanager
 def database_env(url: str) -> Iterator[None]:
     """Points build_database_url() -- and therefore Alembic and the app's
     engine -- at `url` for the duration of the block."""
-    parsed = make_url(url)
-    previous = {k: os.environ.get(k) for k in _DB_SETTINGS}
-    os.environ.update({
-        "POSTGRES_USER": parsed.username,
-        "POSTGRES_PASSWORD": parsed.password,
-        "POSTGRES_DB": parsed.database,
-        "POSTGRES_HOST": parsed.host,
-        "POSTGRES_PORT": str(parsed.port or 5432),
-    })
+    previous = {k: os.environ.pop(k, None) for k in ("POSTGRES_URL", "POSTGRES_PASSWORD")}
+    os.environ["POSTGRES_URL"] = url
     try:
         yield
     finally:
-        for key, was in previous.items():
-            if was is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = was
+        os.environ.pop("POSTGRES_URL")
+        os.environ.update({k: v for k, v in previous.items() if v is not None})
 
 
 @contextmanager
 def throwaway_database(keep: bool) -> Iterator[str]:
     """Creates a database for this run and drops it afterwards.
 
-    Never the .env database: a load test writes tens of thousands of rows and
+    Never the POSTGRES_URL database: a load test writes tens of thousands of rows and
     would leave the development data unusable.
     """
     server = server_url()

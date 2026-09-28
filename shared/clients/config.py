@@ -6,28 +6,15 @@ Required variables have no default and throw before the app listens, not later
 as a misleading 403. One backend per leg (ADR 0011, ADR 0103): STT and dialogue
 on the OpenAI-compatible gateway, speech output on KugelAudio."""
 
-import os
-
 import httpx
-from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
-load_dotenv()
+from shared.env import required
 
-
-def required_env(name: str) -> str:
-    """Read a variable that must be set, or throw. No default: a fallback that
-    happens to look right just moves the failure to the first request."""
-    value = os.environ.get(name)
-    if not value:
-        raise RuntimeError(f"{name} is required (see .env.example)")
-    return value
-
-
-# The model gateway (ADR 0011): any OpenAI-compatible endpoint, named in `.env`.
+# The model gateway (ADR 0011): any OpenAI-compatible endpoint.
 # A named constant because `lifespan` in app.py checks this same URL at boot.
-DIREKT_URL = required_env("DIREKT_URL")
-DIREKT_API_KEY = required_env("DIREKT_API_KEY")
+DIREKT_URL = required("DIREKT_URL")
+DIREKT_API_KEY = required("DIREKT_API_KEY")
 
 # The library default (600 s read, two retries) let a wedged gateway hold a Turn
 # for up to half an hour with no error. Two minutes per attempt (between chunks
@@ -43,4 +30,4 @@ CLIENT = AsyncOpenAI(base_url=f"{DIREKT_URL}/v1", api_key=DIREKT_API_KEY, timeou
 # the name in `.env`, because which model runs is a deployment fact and one
 # buried in Python is one nobody checks before wondering why a call feels slow.
 LLM_CLIENT = CLIENT
-LLM_MODEL = required_env("LLM_MODEL")
+LLM_MODEL = required("LLM_MODEL")

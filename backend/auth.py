@@ -6,7 +6,6 @@ No role *check* (ADR 0009); `roles` is carried so one can be added later."""
 
 import asyncio
 import logging
-import os
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -16,27 +15,16 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import PyJWKClientConnectionError
 
+from shared.env import required
+
 logger = logging.getLogger(__name__)
 
 
-def _issuer() -> str:
-    value = os.environ.get("OIDC_ISSUER")
-    if not value:
-        # No default: the SPA and backend must name the same realm, and a
-        # default that disagrees doesn't fail at boot — discovery succeeds, then
-        # every request 401s far from the cause.
-        raise RuntimeError("OIDC_ISSUER is required (see .env.example)")
-    return value.rstrip("/")
-
-
-OIDC_ISSUER = _issuer()
-
-# Optional. When set, the JWKS is fetched from here instead of being resolved
-# from the issuer's discovery document. Needed when the backend reaches Keycloak
-# under a different host than the browser does — e.g. in compose the browser
-# uses http://localhost:18081 (which is also the token `iss`) while the app
-# container reaches http://keycloak:8080. The `iss` check still uses OIDC_ISSUER.
-OIDC_JWKS_URL = os.environ.get("OIDC_JWKS_URL", "").rstrip("/") or None
+# No default: the SPA and backend must name the same realm, and a default that
+# disagrees doesn't fail at boot — discovery succeeds, then every request 401s
+# far from the cause. The keys are found through the issuer's own discovery
+# document, so the backend must reach the realm under the name the browser uses.
+OIDC_ISSUER = required("OIDC_ISSUER").rstrip("/")
 
 # A constant, not config: a value that disagrees with the realm just yields 401s
 # rather than a boot failure, so hard-coding it is safer than an env var nobody
@@ -66,11 +54,8 @@ class AuthContext:
 
 @lru_cache(maxsize=1)
 def _jwks_client() -> jwt.PyJWKClient:
-    """The realm's JWKS client. Uses `OIDC_JWKS_URL` if set, else resolves
-    `jwks_uri` from the OIDC discovery document (parity with the reference).
-    Built once; caches keys and refetches on an unknown `kid`."""
-    if OIDC_JWKS_URL:
-        return jwt.PyJWKClient(OIDC_JWKS_URL)
+    """The realm's JWKS client, its `jwks_uri` resolved from the OIDC discovery
+    document. Built once; caches keys and refetches on an unknown `kid`."""
     discovery_url = f"{OIDC_ISSUER}/.well-known/openid-configuration"
     resp = httpx.get(discovery_url, timeout=10.0)
     resp.raise_for_status()
@@ -161,7 +146,7 @@ def authenticate_ws(message: dict) -> AuthContext | None:
 async def check_realm() -> None:
     """Log an error if the realm's keys are unreachable at startup. Does not
     stop the app (matches how `lifespan` treats DiReKT)."""
-    url = OIDC_JWKS_URL or f"{OIDC_ISSUER}/.well-known/openid-configuration"
+    url = f"{OIDC_ISSUER}/.well-known/openid-configuration"
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(url)
