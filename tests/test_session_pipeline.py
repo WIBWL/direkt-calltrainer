@@ -3,6 +3,8 @@
 Covers:
   F-46  Live-Call-Interface: the listening / thinking / speaking state model
   F-01  the persona opens the call and then responds turn by turn
+  ADR 0102  in an ordinary call the user picks up first; the persona's
+        opening is the reply to that, and a reverse keeps its own
   F-12/F-52/R-52  the full transcript is assembled from the turns, and only
         at the end (nothing partial is exposed mid-call)
   ADR 0033  streamed pipeline: audio is produced chunk by chunk, first chunk
@@ -11,6 +13,8 @@ Covers:
         path: what the measurement puts on the Turn, and what it leaves there
         when it fails. What the statistics do with it: tests/test_metrics.py
 """
+
+from dataclasses import replace
 
 import pytest
 
@@ -213,3 +217,51 @@ async def test_tts_zero_audio_fails_turn(orch, fake_pipeline):
     assert failure(events).code == "tts_failed"
     assert completed(events) is None
     assert not audio_chunks(events)
+
+
+# --- ADR 0102: the user picks up ------------------------------------------
+
+
+async def test_an_ordinary_call_opens_with_the_reply_to_the_users_answering_line(orch, fake_pipeline):
+    """ADR 0102: the Persona rang, so the user answers first and the Persona's
+    first words are the reply to that -- asked for by the opening instruction,
+    placed after the user's line so it is what the model reads last."""
+    fake_pipeline.stt.transcripts = ["Beispiel GmbH, Müller am Apparat, guten Tag."]
+    fake_pipeline.llm.replies = ["Guten Tag Herr Müller, hier ist Thomas Brandt. Es geht um meinen Vertrag."]
+
+    events = await collect(orch.run_turn(b"webm-bytes", "turn.webm", "audio/webm"))
+
+    # The instruction closes the user's own message (ADR 0103) rather than
+    # standing as a second system message, which cost the Persona its name.
+    sent = fake_pipeline.llm.calls[0]
+    assert sent[-1]["role"] == "user"
+    assert sent[-1]["content"].startswith("Beispiel GmbH, Müller am Apparat, guten Tag.\n\n")
+    assert "the user has just picked up" in sent[-1]["content"]
+    # The greeting is the opening here, so the re-greeting guard lets it through.
+    assert len(fake_pipeline.llm.calls) == 1
+    assert audio_chunks(events)
+    assert orch.turns[0].user_text == "Beispiel GmbH, Müller am Apparat, guten Tag."
+    assert orch.turns[0].persona_text.startswith("Guten Tag Herr Müller")
+
+
+async def test_the_opening_instruction_is_spent_once_the_persona_has_been_heard(orch, fake_pipeline):
+    fake_pipeline.stt.transcripts = ["Müller, guten Tag.", "Worum geht es genau?"]
+    fake_pipeline.llm.replies = ["Hallo, hier ist Thomas Brandt wegen meines Vertrags.", "Um die Laufzeit."]
+
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+    await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
+
+    second = fake_pipeline.llm.calls[1]
+    assert not any("the user has just picked up" in m["content"] for m in second)
+
+
+async def test_a_reverse_never_gets_the_callers_opening_instruction(persona, scenario, fake_pipeline):
+    """In a reverse the Persona picked up; the caller's opener would cast it
+    as the one ringing (ADR 0070)."""
+    orch = SessionOrchestrator(persona, replace(scenario, reverse=True))
+    fake_pipeline.stt.transcripts = ["Guten Tag, ich rufe wegen meiner Rechnung an."]
+    fake_pipeline.llm.replies = ["Gern, worum geht es denn?"]
+
+    await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
+
+    assert not any("the user has just picked up" in m["content"] for m in fake_pipeline.llm.calls[0])

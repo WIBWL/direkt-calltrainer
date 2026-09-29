@@ -23,6 +23,8 @@ export interface BargeInSocket {
   callState: CallState;
   /** Report how much of the current reply was played before the user cut in. */
   sendInterrupt: (playedMs: number) => void;
+  /** Report that the user started speaking into silence (ADR 0102). */
+  sendSpeaking: () => void;
   endSession: () => void;
 }
 
@@ -84,8 +86,12 @@ export function useBargeIn(
     const { socket: s, playback: p, displayState: state } = latest.current;
     // Not a barge-in if the Persona was not talking: the user's own turn is
     // the normal case, and reporting an interrupt there would trim a reply
-    // that had already finished.
-    if (state === "listening") return;
+    // that had already finished. It is still worth telling the server that
+    // someone is talking, so it does not ask "Hallo?" over them (ADR 0102).
+    if (state === "listening") {
+      s.sendSpeaking();
+      return;
+    }
     s.sendInterrupt(p.interrupt());
   }, []);
 

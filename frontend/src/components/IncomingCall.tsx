@@ -10,9 +10,10 @@ import PersonaAvatar from "./PersonaAvatar";
  * the Persona is the one who rang (`_casting` in `session/prompting.py`), so
  * picking up is what the user actually does.
  *
- * The wait on it is real rather than staged: the Session is connected and the
- * opening line generated and held back until `session.activate` (ADR 0042),
- * which accepting is what sends.
+ * Accepting is also what hands the call to the user: the Persona does not say
+ * a word until they have answered it the way they would answer their own
+ * phone (ADR 0102), and its first line is the reply to that. Accepting sends
+ * `session.activate`, which starts the Session clock.
  *
  * Not shown for a reverse (ADR 0070): there the user is the caller, and asking
  * them to take an incoming call would have the roles the wrong way round on the

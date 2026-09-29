@@ -118,6 +118,7 @@ nav:
       - ADR 0099 - The Caller Opens the Transaction, a Domain Function Takes It: adr/0099-the-caller-opens-the-transaction.md
       - ADR 0100 - The Follow-Up and the Reverse Stay Two Routes, Sharing What Must Not Drift: adr/0100-follow-up-and-reverse-stay-two-routes.md
       - ADR 0101 - Four Structural Proposals Declined, So That They Are Not Proposed Again: adr/0101-four-structural-proposals-declined.md
+      - ADR 0102 - The User Picks Up First; Only a Reverse Is Answered by the Persona: adr/0102-the-user-picks-up-first.md
       - ADR 0103 - One System Message per Request; Per-Turn Instructions Travel in the User Turn: adr/0103-one-system-message-per-request.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs

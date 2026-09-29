@@ -32,8 +32,14 @@ def opening_instruction(pack: LanguagePack, reverse: bool = False) -> str:
     English example here was copied verbatim into every call, German ones
     included.
 
-    In a reverse (ADR 0070) the Persona still speaks first, it just says less:
-    it is answering a phone, so it may say who picked up and nothing else. The
+    Ordinarily the Persona rang and the User has just picked up (ADR 0102): the
+    instruction follows the User's own answering line and asks for the caller's
+    first words in reply to it -- the greeting returned, a name, the reason in
+    a clause. It is the one reply `_no_restart_rule` must not cover yet, which
+    is why it says so.
+
+    In a reverse (ADR 0070) the Persona speaks first, and says less: it is
+    answering a phone, so it may say who picked up and nothing else. The
     reason for the call is the User's to give, and a callee who guesses at it
     has answered the exercise before it started.
     """
@@ -55,11 +61,14 @@ def opening_instruction(pack: LanguagePack, reverse: bool = False) -> str:
             "stage directions. Reply with only that line."
         )
     return (
-        "The call is starting now: you are the one calling, and you speak "
-        "first. Open the conversation yourself with 1-2 short, realistic "
-        "sentences: a greeting, who you are, and — briefly — what you're "
-        "calling about (the question/concern from your role above). Invent "
-        "plausible details as you go.\n"
+        "You rang, and the user has just picked up: their last line is how "
+        "they answered the phone. Now open the conversation with 1-2 short, "
+        "realistic sentences: return the greeting, say who you are, and — "
+        "briefly — what you're calling about (the question/concern from your "
+        "role above). You have not greeted anyone or given your name yet, so "
+        "the rule against doing that again does not apply to this reply. Do "
+        "not repeat their answering line back, and do not treat it as a "
+        "question you have to answer. Invent plausible details as you go.\n"
         "Name the reason in a clause, not in a summary: what you want, in one "
         "breath. The background — what was agreed before, what has happened "
         "since, the figures and the dates — is yours to give when you are "

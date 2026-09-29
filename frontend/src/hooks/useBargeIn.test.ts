@@ -25,6 +25,7 @@ function fakes(callState: CallState, isPlaying: boolean, playedMs = 1234) {
   const socket: BargeInSocket = {
     callState,
     sendInterrupt: vi.fn(),
+    sendSpeaking: vi.fn(),
     endSession: vi.fn(),
   };
   const playback: BargeInPlayback = {
@@ -78,6 +79,22 @@ describe("barging in", () => {
 
     expect(playback.interrupt).not.toHaveBeenCalled();
     expect(socket.sendInterrupt).not.toHaveBeenCalled();
+  });
+
+  it("reports speech into silence, so no 'Hallo?' is asked over it", () => {
+    // ADR 0102: the user's audio arrives only once they finish; the start is
+    // all the server has to go on.
+    const { socket, playback } = fakes("listening", false);
+    render(socket, playback).result.current.bargeIn();
+
+    expect(socket.sendSpeaking).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not report speech over the Persona as speech into silence", () => {
+    const { socket, playback } = fakes("speaking", true);
+    render(socket, playback).result.current.bargeIn();
+
+    expect(socket.sendSpeaking).not.toHaveBeenCalled();
   });
 
   it("still fires while the tail of a reply plays out", () => {

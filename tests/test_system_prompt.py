@@ -165,6 +165,14 @@ def testopening_instruction_offers_several_openers_from_the_language_pack():
     assert "Do not reuse" in instruction
 
 
+def test_the_ordinary_opening_answers_the_users_pickup():
+    """ADR 0102: the user answers the phone first, so the opener is a reply to
+    their line, and it has to lift the no-restart rule for that one reply."""
+    instruction = opening_instruction(GERMAN)
+    assert "the user has just picked up" in instruction
+    assert "does not apply to this reply" in instruction
+
+
 def testopening_instruction_keeps_the_background_out_of_the_opening():
     """A Scenario whose `description` carries the whole case — which an
     authored one can, and a generated follow-up did — reaches the model as

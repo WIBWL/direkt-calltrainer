@@ -93,10 +93,12 @@ export interface TurnAudioMetaMessage {
   mime_type: string;
 }
 
-/** Sent the moment the client starts playing the Persona's opening line.
- * The server generates that line as soon as the socket connects (ADR 0042),
- * long before the user reaches the call screen, so this is what tells it where
- * t=0 on the Session's timeline actually is (ADR 0051). */
+/** Sent the moment the user accepts the call (or, in a reverse, leaves the
+ * briefing). In a reverse the Persona's answering line is generated as soon as
+ * the socket connects (ADR 0042), long before the call screen, so this is what
+ * tells the server where t=0 on the Session's timeline actually is (ADR 0051);
+ * in an ordinary call it also starts the wait for the user to speak first
+ * (ADR 0102). */
 export interface SessionActivateMessage {
   type: "session.activate";
 }
@@ -104,6 +106,15 @@ export interface SessionActivateMessage {
 /** The user hung up. The server replies with `session.ended`. */
 export interface SessionEndMessage {
   type: "session.end";
+}
+
+/** The user started speaking while the Persona was silent. Their audio
+ * reaches the server only once they finish, so this is how it knows not to
+ * ask "Hallo?" into a sentence still being recorded (ADR 0102). Sent on every
+ * confirmed speech start; the server reads it only before the user's first
+ * utterance. */
+export interface UserSpeakingMessage {
+  type: "user.speaking";
 }
 
 /** The user talked over the persona; cut the in-flight reply short (barge-in, ADR 0035). */
@@ -125,7 +136,8 @@ export type ClientMessage =
   | SessionActivateMessage
   | TurnAudioMetaMessage
   | SessionEndMessage
-  | TurnInterruptMessage;
+  | TurnInterruptMessage
+  | UserSpeakingMessage;
 
 // --- Server -> Client ---
 

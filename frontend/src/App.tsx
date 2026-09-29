@@ -422,8 +422,9 @@ export default function App() {
   );
 
   const handleConfirmed = useCallback(() => {
-    // Reveal the buffered opening line and switch to live playback.
-    // This is also the point at which the Session timeline starts.
+    // Switch to live playback and start the Session timeline. In a reverse
+    // this reveals the Persona's buffered answering line (ADR 0042); in an
+    // ordinary call there is none, the User answers first (ADR 0102).
     setIsMicrophoneMuted(false);
     accept();
     advance({ type: "callAccepted" });

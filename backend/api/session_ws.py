@@ -65,14 +65,7 @@ async def session_ws(websocket: WebSocket) -> None:
         await websocket.send_json({"type": "session.started", "session_id": str(session_id)})
 
         try:
-            # The persona speaks first (F-01): the opening Turn has no user
-            # utterance, but is otherwise a normal interruptible Turn.
-            outcome = await _run_turn_interruptible(
-                websocket,
-                orchestrator.run_opening_turn(),
-                orchestrator.start_playback,
-                orchestrator.note_barge_in,
-            )
+            outcome = await _open_call(websocket, orchestrator, scenario)
             if outcome == "interrupted" and orchestrator.ended:
                 reason = "completed"  # talked over the goodbye; the ending stands (ADR 0035)
             elif outcome in ("ok", "interrupted"):
@@ -277,21 +270,63 @@ _TurnOutcome = Literal["ok", "failed", "completed", "interrupted", "user"]  # af
 _SessionEndReason = Literal["user", "error", "completed"]     # sent to the client in session.ended
 
 
+async def _open_call(
+    websocket: WebSocket, orchestrator: SessionOrchestrator, scenario: Scenario
+) -> _TurnOutcome:
+    """Who speaks first, which is whoever picked up the phone (ADR 0102).
+
+    An ordinary Session is the Persona ringing the user, so the user answers
+    it -- "Firma X, Müller, guten Tag" -- and the Persona's first line is the
+    reply to that, generated like every other Turn once their audio is in.
+    Nothing is pre-warmed: there is nothing to say before somebody has picked
+    up. The client is told it is listening straight away, before the phone is
+    even accepted, because a VAD start in any other state is read as a
+    barge-in (`useBargeIn`).
+    If the user then says nothing, the Persona asks "Hallo?" into the line
+    (`run_pickup_prompt`), timed in `_next_turn_request`.
+
+    A reverse (ADR 0070) is the other way round: the user rang, so the Persona
+    picks up and speaks first, pre-warmed while the user reads their briefing
+    (ADR 0042). The opening Turn has no user utterance, but is otherwise a
+    normal interruptible Turn.
+    """
+    if not scenario.reverse:
+        await websocket.send_json({"type": "state", "value": "listening"})
+        return "ok"
+    return await _run_turn_interruptible(
+        websocket,
+        orchestrator.run_opening_turn(),
+        orchestrator.start_playback,
+        orchestrator.note_barge_in,
+    )
+
+
+# What `_next_turn_request` returns when the line stayed silent too long after
+# the pick-up (ADR 0102): not a request from the client, a request for a prompt.
+_SILENCE = "silence"
+
+
 async def _next_turn_request(
     websocket: WebSocket, orchestrator: SessionOrchestrator, on_activate: Callable[[], None]
-) -> dict | None:
+) -> dict | Literal["silence"] | None:
     """Handle control messages until one asks for a turn.
 
-    Returns that `turn.audio.meta` envelope, or None when the user ended the
-    Session. Anything else is handled and the wait continues: a frame that is
-    not a control message at all, an unrecognised type (client and server
-    versions need not match exactly), `session.activate`, and the barge-in over
-    the tail of a reply that had already finished on this side -- the server
-    streams audio ahead of playback, so that interrupt lands here, between
-    turns, and trims the just-finished reply to what was heard (ADR 0035).
+    Returns that `turn.audio.meta` envelope, None when the user ended the
+    Session, or `_SILENCE` when the user picked up and has said nothing for
+    long enough that the Persona should ask whether anybody is there
+    (ADR 0102). Anything else is handled and the wait continues: a frame that
+    is not a control message at all, an unrecognised type (client and server
+    versions need not match exactly), `session.activate`, `user.speaking`, and
+    the barge-in over the tail of a reply that had already finished on this
+    side -- the server streams audio ahead of playback, so that interrupt lands
+    here, between turns, and trims the just-finished reply to what was heard
+    (ADR 0035).
+
     """
     while True:
-        envelope = await _receive_json(websocket)
+        envelope = await _receive_json_within(websocket, orchestrator.pickup_prompt_delay())
+        if envelope == _SILENCE:
+            return _SILENCE
         if envelope is None:
             continue
         kind = envelope.get("type")
@@ -301,8 +336,28 @@ async def _next_turn_request(
             return envelope
         if kind == "session.activate":
             on_activate()
+        elif kind == "user.speaking":
+            orchestrator.note_user_speaking()
         elif kind == "turn.interrupt":
             orchestrator.note_late_barge_in(_played_ms(envelope))
+
+
+async def _receive_json_within(
+    websocket: WebSocket, seconds: float | None
+) -> dict | Literal["silence"] | None:
+    """`_receive_json`, or `_SILENCE` if nothing arrived within `seconds`
+    (None waits indefinitely).
+
+    Timed by cancelling the receive, which the turn race below already does to
+    its control task on every Turn: a message not yet received is not lost by
+    it.
+    """
+    if seconds is None:
+        return await _receive_json(websocket)
+    try:
+        return await asyncio.wait_for(_receive_json(websocket), seconds)
+    except TimeoutError:
+        return _SILENCE
 
 
 async def _run_session(
@@ -313,13 +368,22 @@ async def _run_session(
 
     Takes `on_activate` for the same reason _wait_for_control_message does:
     session.activate lands in whichever receive loop happens to own the socket
-    at that moment. The opening turn is usually already forwarded by the time
-    the user leaves the mic check, so that is normally this loop, not that one.
+    at that moment. In an ordinary call there is no opening turn to race it
+    (ADR 0102), and in a reverse that turn is usually already forwarded by the
+    time the user leaves the briefing, so it is normally this loop either way.
     """
     while True:
         envelope = await _next_turn_request(websocket, orchestrator, on_activate)
         if envelope is None:
             return "user"
+        if envelope == _SILENCE:
+            outcome = await _run_turn_interruptible(
+                websocket, orchestrator.run_pickup_prompt(),
+                orchestrator.start_playback, orchestrator.note_barge_in,
+            )
+            if outcome in ("ok", "interrupted"):
+                continue
+            return "error" if outcome == "failed" else outcome
 
         audio_bytes = await _receive_bytes(websocket)
         if audio_bytes is None:
@@ -446,9 +510,9 @@ async def _wait_for_control_message(
     session.end/disconnect ends the session, turn.interrupt is a barge-in
     (carrying how many ms of the reply the client played, ADR 0035).
 
-    session.activate is neither -- it usually arrives *during* the opening
-    turn, which is exactly the point (ADR 0051) -- so it starts the clock and
-    the wait continues.
+    session.activate is neither -- in a reverse it can arrive *during* the
+    opening turn, which is exactly the point (ADR 0051) -- so it starts the
+    clock and the wait continues.
     """
     while True:
         envelope = await _receive_json(websocket)

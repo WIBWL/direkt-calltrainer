@@ -62,8 +62,9 @@ export interface LiveCall {
   endCall: () => void;
   sendTurnAudio: (audio: Blob, mimeType: string) => void;
   /**
-   * The User picked up: reveal the buffered opening line and start the
-   * Session clock on the server, as one act (ADR 0042).
+   * The User picked up (or, in a reverse, is through to the Persona): reveal
+   * whatever opening audio is buffered — only a reverse has any (ADR 0102) —
+   * and start the Session clock on the server, as one act (ADR 0042).
    */
   accept: () => void;
 }

@@ -4,6 +4,8 @@ Covers:
   F-46  Live-Call-Interface (one WebSocket per session, state + audio frames)
   ADR 0033  streamed protocol: a JSON 'chunk' message then a raw binary frame
   ADR 0035  a 'turn.interrupt' control message is understood
+  ADR 0102  an ordinary call waits for the user to pick up; a reverse
+            is answered by the persona
   ADR 0041  the handshake resolves the ids through the database-backed
             library, faked here so the test needs no database
   Handshake robustness: a missing/!= 'session.start' or an unknown
@@ -17,6 +19,7 @@ driven directly through a fake WebSocket.
 
 import asyncio
 import json
+from dataclasses import replace
 
 import pytest
 from fastapi import WebSocketDisconnect
@@ -25,6 +28,7 @@ from backend.api import session_ws
 from backend.db import models as db_models
 from backend.session import persistence
 from backend.session.models import AudioChunk, Failed, StateChanged, TurnCompleted
+from backend.session.orchestrator import SessionOrchestrator
 from tests.conftest import TEST_AUTH, TEST_PERSONAS, TEST_SCENARIOS
 
 # session_ws's ASGI helpers are underscore-prefixed; driving them directly is
@@ -180,6 +184,9 @@ class _FakeOrchestrator:
 
     def start_playback(self):
         self.activated += 1
+
+    def pickup_prompt_delay(self):
+        return None
 
     def note_late_barge_in(self, played_ms):
         self.late_barge_ins.append(played_ms)
@@ -400,3 +407,104 @@ async def test_a_forwarder_that_already_failed_still_closes_the_turn():
         await session_ws._tear_down_turn(forwarder, turn)
 
     assert closed.is_set(), "the turn generator was closed all the same"
+
+
+# --- ADR 0102: who speaks first ------------------------------------------
+
+
+async def test_an_ordinary_call_waits_for_the_user_to_pick_up(persona, scenario, fake_pipeline):
+    """The Persona rang: nothing is generated before the user has answered, and
+    the client is told it is listening, so its first utterance is a Turn and
+    not a barge-in."""
+    ws = FakeWebSocket()
+    orch = SessionOrchestrator(persona, scenario)
+
+    outcome = await session_ws._open_call(ws, orch, scenario)
+
+    assert outcome == "ok"
+    assert ws.sent == [{"type": "state", "value": "listening"}]
+    assert not fake_pipeline.llm.calls
+    assert not orch.turns
+
+
+class _QuietWebSocket(FakeWebSocket):
+    """A client that says nothing while the opening Turn runs, rather than
+    one that has already gone away."""
+
+    async def receive_text(self):
+        await asyncio.Event().wait()
+
+
+async def test_a_reverse_call_is_answered_by_the_persona(persona, scenario, fake_pipeline):
+    """The user rang, so the Persona picks up and speaks first (ADR 0070)."""
+    reverse = replace(scenario, reverse=True)
+    fake_pipeline.llm.replies = ["Kundenservice, Brandt, was kann ich für Sie tun?"]
+    ws = _QuietWebSocket()
+    orch = SessionOrchestrator(persona, reverse)
+
+    outcome = await session_ws._open_call(ws, orch, reverse)
+
+    assert outcome == "ok"
+    assert any(isinstance(m, bytes) for m in ws.sent), "the answering line is spoken"
+    assert orch.turns[0].persona_text == "Kundenservice, Brandt, was kann ich für Sie tun?"
+    assert orch.turns[0].user_text == ""
+
+
+class _PromptingOrchestrator(_FakeOrchestrator):
+    """Due to ask "Hallo?" once, straight away; nothing after that."""
+
+    def __init__(self):
+        super().__init__()
+        self.prompts_run = 0
+        self.speaking = 0
+
+    def pickup_prompt_delay(self):
+        return 0.01 if self.prompts_run == 0 else None
+
+    def note_user_speaking(self):
+        self.speaking += 1
+
+    async def run_pickup_prompt(self):
+        self.prompts_run += 1
+        yield StateChanged(state="speaking")
+        yield AudioChunk(turn_seq=1, chunk_seq=1, audio=b"hallo")
+        yield TurnCompleted(turn_seq=1, ends_call=False)
+        yield StateChanged(state="listening")
+
+
+class _SilentFirst(FakeWebSocket):
+    """Says nothing at first -- the receive is cancelled by the silence timer --
+    and then plays out its messages."""
+
+    def __init__(self, incoming):
+        super().__init__(incoming)
+        self._silent = True
+
+    async def receive_text(self):
+        if self._silent:
+            self._silent = False
+            await asyncio.Event().wait()
+        return await super().receive_text()
+
+
+async def test_a_silent_line_gets_a_prompt_and_the_call_goes_on():
+    ws = _SilentFirst([{"type": "session.end"}])
+    orch = _PromptingOrchestrator()
+
+    reason = await session_ws._run_session(ws, orch, orch.start_playback)
+
+    assert reason == "user"
+    assert orch.prompts_run == 1
+    assert b"hallo" in ws.sent
+    assert {"type": "state", "value": "listening"} in ws.sent
+
+
+async def test_the_client_reporting_speech_reaches_the_orchestrator():
+    ws = FakeWebSocket([{"type": "user.speaking"}, {"type": "session.end"}])
+    orch = _PromptingOrchestrator()
+    orch.prompts_run = 1  # nothing due, so the report is all that happens
+
+    reason = await session_ws._run_session(ws, orch, orch.start_playback)
+
+    assert reason == "user"
+    assert orch.speaking == 1

@@ -35,6 +35,7 @@ const fake = vi.hoisted(() => ({
     sendTurnAudio: vi.fn(),
     sendInterrupt: vi.fn(),
     sendActivate: vi.fn(),
+    sendSpeaking: vi.fn(),
     endSession: vi.fn(),
   },
   onEnded: null as OnEnded | null,

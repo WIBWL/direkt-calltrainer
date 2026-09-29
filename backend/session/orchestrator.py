@@ -42,6 +42,7 @@ from backend.session.chunking import sentence_chunks
 from backend.session.heard import heard_text
 from backend.session.history import History
 from backend.session.measuring import attach_measurements
+from backend.session.pickup import PickupWatch
 from backend.session import repetition
 from backend.session import reply_checks as checks
 from backend.session.prompting import build_system_prompt, opening_instruction
@@ -283,6 +284,8 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         self.notes = CallNotes(persona, scenario)
         # Whether `session.activate` has already rebased the clock. See there.
         self._playback_started = False
+        # The "Hallo?" into a silent line after the user picked up (ADR 0102).
+        self._pickup = PickupWatch(self._pack.pickup_prompts, enabled=not scenario.reverse)
         # Only its first name is used, to spot the persona re-introducing
         # itself ("hier ist Thomas ...") a second time (ADR 0038).
         self._first_name = persona.name.split()[0].lower() if persona.name else ""
@@ -388,11 +391,14 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         return turn, reopening
 
     async def run_opening_turn(self) -> AsyncIterator[TurnEvent]:
-        """Have the Persona speak first: a freshly generated, varied call opener.
+        """Have the Persona speak first, before any user audio.
 
-        In a reverse (ADR 0070) it speaks first here too -- it is the one
-        picking up the phone -- and the instruction, not this Turn, is what
-        makes it say only that.
+        Only a reverse (ADR 0070) opens this way since ADR 0102: there the
+        Persona is the one picking up the phone, and the instruction, not this
+        Turn, is what makes it say only that. In an ordinary call the user
+        picks up, and the Persona's opening is the reply to their first Turn
+        (`_messages_for_turn`). Called on an ordinary Scenario it still asks
+        for a caller's opener, which is what the older tests drive it with.
         """
         turn, _ = self._new_or_reopened_turn()
         progress = _ReplyProgress()
@@ -409,6 +415,57 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
                 async for event in replies:
                     yield event
             self._reopen_turn = None
+        except (asyncio.CancelledError, GeneratorExit):
+            self._finalize_interrupted(turn, progress)
+            raise
+
+    def _persona_has_opened(self) -> bool:
+        """Whether the Persona has made its opening, heard at least in part:
+        any reply in the history other than a "Hallo?" into the silence after
+        the pick-up (ADR 0102), which asks whether anybody is there and says
+        nothing about who is calling or why. Read off the history rather than
+        the Turns because the history is what a barge-in trims and drops."""
+        return any(
+            not self._pickup.is_prompt(strip_interrupted_mark(reply))
+            for reply in self.history.replies()
+        )
+
+    def pickup_prompt_delay(self) -> float | None:
+        """Seconds until the Persona should ask whether anybody is there, or
+        None if nothing is to be asked (see `pickup.py`)."""
+        due = self._pickup.delay_ms(self.turns, self._elapsed_ms(), self._playback_started)
+        return None if due is None else due / 1000
+
+    def note_user_speaking(self) -> None:
+        """The client heard the user start to speak: a prompt now would talk
+        over them, so the silence is counted afresh."""
+        self._pickup.note_speaking(self._elapsed_ms())
+
+    async def run_pickup_prompt(self) -> AsyncIterator[TurnEvent]:
+        """Say the next "Hallo?" into a silent line (ADR 0102).
+
+        A fixed line, not a generated one, and a Turn of its own with no user
+        side -- like the reverse's opening, and interruptible the same way. It
+        goes into the history, so the model knows it asked, but it is not the
+        Persona's opening: that is still owed to the user's first words.
+        """
+        turn, _ = self._new_or_reopened_turn()
+        progress = _ReplyProgress()
+        line = self._pickup.next_line()
+        try:
+            async with contextlib.aclosing(self._speak(turn, line, progress)) as spoken:
+                async for event in spoken:
+                    yield event
+                    if isinstance(event, Failed):
+                        return
+            turn.persona_text = turn.persona_text.strip()
+            self.history.add_reply(turn.persona_text)
+            progress.committed = True
+            self._reopen_turn = None
+            yield TurnCompleted(turn_seq=turn.seq, ends_call=False)
+            # A barge-in over its tail still trims it to what was heard.
+            self._revisable = (turn, progress)
+            yield StateChanged(state="listening")
         except (asyncio.CancelledError, GeneratorExit):
             self._finalize_interrupted(turn, progress)
             raise
@@ -522,7 +579,14 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             # The whole call, unbounded on purpose: a Session is one phone call,
             # so the record cannot outgrow a context measured in six figures.
             view = self.history.messages
-        if closing:
+        if not self._scenario.reverse and not self._persona_has_opened():
+            # The user picked up and answered (ADR 0102), and the Persona has
+            # not yet said anything in reply to them, so this reply is its
+            # opening. Also the case after a barge-in dropped the first reply
+            # whole, and after a "Hallo?" into the silence: the opening is
+            # still owed. A reverse opens in `run_opening_turn` instead.
+            nudge = opening_instruction(self._pack)
+        elif closing:
             nudge = CLOSING_NUDGE
         elif interrupted is not None and view[-1]["role"] == "user":
             # Between the dashed line and the user's message, so the message
@@ -969,7 +1033,10 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         if not filters.guard or not text_chunk.strip():
             return text_chunk
         replies = self.history.replies()
-        if checks.reintroduces(text_chunk, replies, self._pack, self._first_name):
+        # Before the opening a greeting is correct, even with a "Hallo?"
+        # already in the history (ADR 0102).
+        if self._persona_has_opened() and checks.reintroduces(
+                text_chunk, replies, self._pack, self._first_name):
             raise _RegenerateReply(repetition.first_sentence(text_chunk))
         repeated = checks.repeats_earlier_opening(text_chunk, replies)
         if repeated is not None:

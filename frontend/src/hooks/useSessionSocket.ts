@@ -43,8 +43,10 @@ interface UseSessionSocketOptions {
  * state/audio-chunk/error/session.ended messages into hook state. Connects
  * as soon as a Session is committed to — which per ADR 0042 is the moment
  * the user leaves the selection screen, not the moment a Persona/Scenario
- * is picked — so the Persona's opening line generates in the background
- * while the user is still on the microphone check.
+ * is picked — so in a reverse the Persona's answering line generates in the
+ * background while the user is still reading their briefing. An ordinary
+ * call has nothing to prepare: the server reports "listening" at once and
+ * waits for the user to pick up and speak (ADR 0102).
  */
 export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionSocketOptions) {
   const [callState, setCallState] = useState<CallState>("thinking");
@@ -236,6 +238,12 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     if (!send({ type: "session.activate" })) pendingActivateRef.current = true;
   }, [send]);
 
+  /** The user started speaking while the Persona was silent (ADR 0102). Lost
+   * on a closed socket, which is harmless: it only postpones a "Hallo?". */
+  const sendSpeaking = useCallback(() => {
+    send({ type: "user.speaking" });
+  }, [send]);
+
   const endSession = useCallback(() => {
     if (send({ type: "session.end" })) return;
     // The handshake never finished, so the server will never send
@@ -250,5 +258,5 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     onEnded("user", [], null);
   }, [send, onEnded]);
 
-  return { callState, error, sendTurnAudio, sendInterrupt, sendActivate, endSession };
+  return { callState, error, sendTurnAudio, sendInterrupt, sendActivate, sendSpeaking, endSession };
 }
