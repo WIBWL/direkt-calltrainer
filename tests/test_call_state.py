@@ -61,9 +61,11 @@ async def test_the_model_reads_notes_plus_a_window_not_the_whole_history(persona
 
     view = fake_pipeline.llm.calls[-1]
     assert view[0]["role"] == "system", "the system prompt first"
-    assert view[1]["role"] == "system" and view[1]["content"].startswith(STATE_NOTES_FRAME)
-    assert "notes after exchange 4" in view[1]["content"], "the notes of every exchange before this Turn"
-    history = [m for m in view[2:] if m["role"] in ("user", "assistant")]
+    # Joined to the system prompt on the way out (ADR 0103): a second system
+    # message is one some backends read in place of the first.
+    assert f"\n\n{STATE_NOTES_FRAME}" in view[0]["content"]
+    assert "notes after exchange 4" in view[0]["content"], "the notes of every exchange before this Turn"
+    history = [m for m in view[1:] if m["role"] in ("user", "assistant")]
     assert len(history) == HISTORY_WINDOW, "the last three exchanges verbatim"
     assert USER[0] not in str(view), "the first exchange reaches the model only through the notes"
     assert USER[0] in [m["content"] for m in orch.history.messages], "but the full record keeps it"
@@ -74,7 +76,7 @@ async def test_no_notes_before_the_first_exchange_has_completed(persona, scenari
     orch = SessionOrchestrator(persona, scenario)
     await _run(orch, fake_pipeline, 1)
 
-    assert not any(m["content"].startswith(STATE_NOTES_FRAME) for m in fake_pipeline.llm.calls[0])
+    assert STATE_NOTES_FRAME not in str(fake_pipeline.llm.calls[0])
     assert len(fake_pipeline.llm.state_calls) == 1, "the refresh runs once the exchange is complete"
 
 
@@ -150,7 +152,7 @@ async def test_without_notes_the_model_is_handed_the_whole_conversation(
 
     view = fake_pipeline.llm.calls[-1]
     assert view[0]["role"] == "system", "the system prompt first"
-    assert not any(m["content"].startswith(STATE_NOTES_FRAME) for m in view), "no summary"
+    assert STATE_NOTES_FRAME not in str(view), "no summary"
     history = [m for m in view if m["role"] in ("user", "assistant")]
     assert len(history) > HISTORY_WINDOW, "not a window any more"
     assert USER[0] in [m["content"] for m in history], "the opening exchange, verbatim"

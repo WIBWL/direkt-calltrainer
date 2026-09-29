@@ -51,7 +51,7 @@ from backend.session.nudges import (
     GENERIC_CRITERION, GENERIC_CRITERION_REVERSE, INTERRUPTED_MARK, INTERRUPTED_NUDGE,
     REGENERATE_NUDGE, REPEAT_OPENING_NUDGE, RESUME_NUDGE, SETTLEMENT_CHECK,
     SETTLEMENT_CHECK_AFTER_REPLIES, SETTLEMENT_CHECK_REVERSE,
-    strip_interrupted_mark,
+    strip_interrupted_mark, wire_messages,
 )
 from backend.session.language_packs import LanguagePack, get_pack, is_phantom, signals_closing
 from backend.session.models import AudioChunk, Failed, StateChanged, Turn, TurnCompleted, TurnEvent
@@ -998,7 +998,7 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         # data is at stake here -- each completion is its own response, unlike
         # the pooled TTS socket of ADR 0044's amendment -- only a connection
         # held for nothing.
-        async with contextlib.aclosing(sentence_chunks(llm.stream_reply(messages))) as reply:
+        async with contextlib.aclosing(sentence_chunks(llm.stream_reply(wire_messages(messages)))) as reply:
             async for text_chunk in reply:
                 guarding = first_chunk
                 if guarding:

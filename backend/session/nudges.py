@@ -242,3 +242,68 @@ INTERRUPTED_NUDGE = (
     "yourself again. If they have just offered, promised or proposed "
     "something, take a position on that before anything else."
 )
+
+
+# ADR 0103: every request the live path sends carries exactly one system
+# message, and it is the first. The nudges above are built as system messages
+# because that is what they are -- instructions from the exercise, not words
+# anybody said -- but a backend is free to treat a second system message as it
+# likes, and Gemini's OpenAI-compatible endpoint keeps only one: with a nudge
+# after the system prompt, the Persona forgot its name, its case and at times
+# which side of the call it was on. Qwen/vLLM renders each in place, which is
+# why it went unnoticed until the backend changed. Only a single leading system
+# message followed by user and assistant turns means the same thing to every
+# chat API, so that is the shape that goes out.
+#
+# The frame is what keeps a note from reading as the user's own words, which
+# is where it now sits: said once, where the note is, rather than as a rule up
+# in the system prompt that the model would have to connect to it.
+TURN_NOTE_FRAME = (
+    "[A note to you from the exercise, not something the user said -- follow "
+    "it and never mention it:\n{note}]"
+)
+
+
+def wire_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    """The request as it goes out: one system message at the head, the rest
+    user and assistant turns (ADR 0103).
+
+    Every system message is folded into a neighbour rather than dropped, and
+    keeps its place relative to the conversation, because the place is the
+    point (ADR 0038): what sits nearest the reply is what the model follows.
+
+    * A run of system messages before the conversation starts (the system
+      prompt, then the call notes of ADR 0071) becomes one system message.
+    * A note followed by a user message opens that message -- the interruption
+      nudge, which stands before the user's words so that their words are the
+      last thing the model reads (ADR 0035).
+    * A note at the end closes the last user message, which is where every
+      other nudge stands; after anything but a user message it becomes one.
+
+    Pure, and returns new dicts: the list it reads is the live history.
+    """
+    out: list[dict[str, str]] = []
+    pending: list[str] = []
+    for message in messages:
+        role, content = message["role"], message["content"]
+        if role == "system":
+            if all(m["role"] == "system" for m in out):
+                if out:
+                    out[0] = {"role": "system", "content": f"{out[0]['content']}\n\n{content}"}
+                else:
+                    out.append({"role": "system", "content": content})
+            else:
+                pending.append(TURN_NOTE_FRAME.format(note=content))
+            continue
+        if pending and role == "user":
+            content = "\n\n".join([*pending, content])
+        elif pending:
+            out.append({"role": "user", "content": "\n\n".join(pending)})
+        pending = []
+        out.append({"role": role, "content": content})
+    if pending:
+        if out and out[-1]["role"] == "user":
+            out[-1] = {"role": "user", "content": "\n\n".join([out[-1]["content"], *pending])}
+        else:
+            out.append({"role": "user", "content": "\n\n".join(pending)})
+    return out

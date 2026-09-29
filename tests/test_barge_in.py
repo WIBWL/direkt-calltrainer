@@ -341,17 +341,18 @@ async def test_the_turn_after_an_interruption_tells_the_model_where_it_was_cut_o
     assert not any(isinstance(e, TurnCompleted) and e.ends_call for e in events), "the call goes on"
     sent = fake_pipeline.llm.calls[-1]
     assert sent[1]["content"] == fragment + INTERRUPTED_MARK, "the history line is marked"
-    # The nudge sits between the dashed line and the user's message, and quotes
-    # nothing: what the model sees last is the user's message, not the fragment.
-    assert [m["role"] for m in sent[1:]] == ["assistant", "system", "user"]
+    # The nudge sits between the dashed line and the user's words, and quotes
+    # nothing: what the model sees last is the user's words, not the fragment.
+    # It travels inside their message (ADR 0103), in front of what they said.
+    assert [m["role"] for m in sent[1:]] == ["assistant", "user"]
     assert "cut you off" in sent[2]["content"] and fragment not in sent[2]["content"]
-    assert sent[3]["content"] == "Moment, worum geht es genau?"
+    assert sent[2]["content"].endswith("\n\nMoment, worum geht es genau?")
     assert not any("Your previous reply in this call was" in m["content"] for m in sent), "anti-repeat nudge replaced"
 
     await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
-    systems = [m["content"] for m in fake_pipeline.llm.calls[-1] if m["role"] == "system"]
-    assert not any("cut you off" in s for s in systems), "only the one Turn"
-    assert any("Your previous reply in this call was" in s for s in systems), "back to the standing nudge"
+    last = fake_pipeline.llm.calls[-1][-1]["content"]
+    assert "cut you off" not in str(fake_pipeline.llm.calls[-1]), "only the one Turn"
+    assert "Your previous reply in this call was" in last, "back to the standing nudge"
 
 
 async def test_a_reply_that_reads_the_users_line_back_is_cut_to_the_answer(
@@ -448,7 +449,7 @@ async def test_a_reply_that_is_nothing_but_the_cut_off_sentence_is_re_asked_once
     assert not any(isinstance(e, TurnCompleted) and e.ends_call for e in events)
     assert len(fake_pipeline.llm.calls) == 3, "one re-ask"
     nudge = fake_pipeline.llm.calls[-1][-1]
-    assert nudge["role"] == "system" and "picked the sentence the user cut off back up" in nudge["content"]
+    assert nudge["role"] == "user" and "picked the sentence the user cut off back up" in nudge["content"]
     assert _CUT in nudge["content"]
     assert orch.turns[1].persona_text == "Freitag passt mir, danke."
     assert _CUT not in orch.history.messages[-1]["content"]

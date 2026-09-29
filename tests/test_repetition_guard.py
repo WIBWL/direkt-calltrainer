@@ -273,11 +273,10 @@ async def test_the_regeneration_nudge_quotes_the_rejected_opening(persona, scena
     await collect(orch.run_opening_turn())
     await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
 
+    # The re-ask travels inside the last user message (ADR 0103).
     retry_messages = fake_pipeline.llm.calls[-1]
-    assert any(
-        m["role"] == "system" and "Guten Tag, Thomas Brandt hier." in m["content"]
-        for m in retry_messages
-    )
+    assert retry_messages[-1]["role"] == "user"
+    assert "Guten Tag, Thomas Brandt hier." in retry_messages[-1]["content"]
 
 
 async def test_a_normal_turn_carries_a_nudge_quoting_the_previous_reply(persona, scenario, fake_pipeline):
@@ -294,10 +293,7 @@ async def test_a_normal_turn_carries_a_nudge_quoting_the_previous_reply(persona,
     await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
 
     sent = fake_pipeline.llm.calls[-1]
-    assert any(
-        m["role"] == "system" and "konkrete Zusage zum Preis" in m["content"]
-        for m in sent
-    )
+    assert sent[-1]["role"] == "user" and "konkrete Zusage zum Preis" in sent[-1]["content"]
 
 
 @pytest.mark.parametrize(
@@ -351,9 +347,9 @@ async def test_a_requested_repeat_swaps_the_anti_repeat_nudge_for_a_clarify_nudg
     await collect(orch.run_opening_turn())
     await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
 
-    systems = [m["content"] for m in fake_pipeline.llm.calls[-1] if m["role"] == "system"]
-    assert not any("previous reply in this call" in s for s in systems)
-    assert any("did not catch your previous reply" in s for s in systems)
+    last = fake_pipeline.llm.calls[-1][-1]["content"]
+    assert "previous reply in this call" not in last
+    assert "did not catch your previous reply" in last
 
 
 async def test_asking_again_after_a_rephrase_gets_a_firmer_nudge(persona, scenario, fake_pipeline):
@@ -374,8 +370,7 @@ async def test_asking_again_after_a_rephrase_gets_a_firmer_nudge(persona, scenar
     await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
     await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
 
-    systems = [m["content"] for m in fake_pipeline.llm.calls[-1] if m["role"] == "system"]
-    assert any("Ask which part is unclear" in s for s in systems)
+    assert "Ask which part is unclear" in fake_pipeline.llm.calls[-1][-1]["content"]
 
 
 async def test_re_dumping_an_older_reply_ends_the_call_even_when_a_repeat_was_asked(
@@ -523,7 +518,7 @@ async def test_a_reply_that_is_nothing_but_the_users_line_is_re_asked_once(perso
     assert completed(events).ends_call is False
     assert len(fake_pipeline.llm.calls) == 2
     retry = fake_pipeline.llm.calls[-1][-1]
-    assert retry["role"] == "system"
+    assert retry["role"] == "user"
     assert "repeated the user's own words" in retry["content"] and line in retry["content"]
     assert orch.turns[-1].persona_text.startswith("Gut, dann nehme ich die 36 Stunden")
 
@@ -587,7 +582,7 @@ async def test_a_reply_opening_with_a_sentence_already_said_is_regenerated_not_s
 
     assert completed(events).ends_call is False
     retry = fake_pipeline.llm.calls[-1]
-    assert retry[-1]["role"] == "system" and "already said exactly that" in retry[-1]["content"]
+    assert retry[-1]["role"] == "user" and "already said exactly that" in retry[-1]["content"]
     assert _LINE_A in retry[-1]["content"], "the repeated opening is quoted"
     spoken = orch.turns[-1].persona_text
     assert spoken.startswith("Eine Erstattung ja, das waere ein Anfang"), spoken
