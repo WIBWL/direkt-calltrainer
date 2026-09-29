@@ -44,7 +44,7 @@ services:
       retries: 10
 
   # Dev only (start-dev, embedded H2). Imports keycloak/direkt-realm.json on boot
-  # (ADR 0009): client `direkt-calltrainer`, users niklas, mathias, eberhard
+  # (ADR 0009): client `direkt-calltrainer`, users alice, bob, carol
   # (password = username), admin console admin/admin. Import is skipped if the
   # realm already exists, so after editing the JSON:
   #

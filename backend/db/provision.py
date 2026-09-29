@@ -78,8 +78,9 @@ def seed(db: DbSession) -> dict[str, int]:
 
 
 def _seed_tenants(db: DbSession) -> int:
-    """The pilot companies plus the `default` tenant (ADR 0060). Never
-    deactivated -- an authored row keeps pointing at the tenant it belonged to."""
+    """The `default` tenant (ADR 0060); companies are created on first login by
+    `backend/tenants.py`. Never deactivated -- an authored row keeps pointing
+    at the tenant it belonged to."""
     return sum(
         _upsert(db, Tenant, {"extern_ref": t["extern_ref"]}, {"name": t["name"]})[1]
         for t in TENANTS

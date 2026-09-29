@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-arc42's Verteilungssicht is still open. Beyond local Docker Compose, the running system needs an actual host for the pilot with Solox GmbH. Options considered would have included a commercial cloud provider or infrastructure provided by Solox itself.
+arc42's Verteilungssicht is still open. Beyond local Docker Compose, the running system needs an actual host for the pilot with the partner companies. Options considered would have included a commercial cloud provider or infrastructure provided by a pilot company itself.
 
 ## Decision
 

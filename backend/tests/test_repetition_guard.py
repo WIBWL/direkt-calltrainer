@@ -604,7 +604,7 @@ async def test_the_opening_checks_survive_a_first_chunk_the_filters_emptied(
     # the guard itself and never reaches `_clean_chunk`. Repeating a later
     # sentence is what passes the guard and is then dropped by the filter.
     said = "Die Preisanpassung war um zwoelf Prozent, ohne jede Aenderung am Leistungsumfang."
-    regreet = "Guten Tag, hier ist Thomas Brandt von der Firma Solox, es geht um die Kosten."
+    regreet = "Guten Tag, hier ist Thomas Brandt von der Firma Beispiel, es geht um die Kosten."
     clean = "Ich brauche dafuer eine belastbare Begruendung, sonst kommen wir hier nicht weiter."
     fake_pipeline.stt.transcripts = ["Was genau meinen Sie damit?"]
     fake_pipeline.llm.replies = [

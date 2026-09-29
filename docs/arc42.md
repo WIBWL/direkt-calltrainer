@@ -28,11 +28,11 @@ Weitere Qualitätsanforderungen geringerer Priorität sind in Kapitel 10 aufgef�
 
 | Rolle | Kontakt | Erwartung an das System |
 |---|---|---|
-| Fachlicher Ansprechpartner und Pilotnutzer | Nicolas Heyne, Solox GmbH (Entwicklung und Kundenkontakt) | Möchte eigene blinde Flecken im Sprechverhalten erkennen. Legt Wert auf einfache Bedienung und qualitatives Feedback statt auf Kennzahlen. Lehnt einen vertrieblichen Fokus für seine Rolle ab. |
-| Fachlicher Ansprechpartner und Pilotnutzer | Eckhard Herdt, APPOLLO Systems (CIO und Gründungsmitglied) | Möchte flüssiger und spontaner sprechen und den Umgang mit Einwänden trainieren. Erwartet eine visuelle Auswertung und Verbesserungsvorschläge entlang des eigenen Gesprächsleitfadens. Trainiert Angebots- und Preisgespräche. |
-| Support-Mitarbeitende | Solox GmbH | Nutzen das Training für kurze, lösungsorientierte Kundengespräche, etwa telefonische Problemklärung. |
-| Entwicklungs- und Projektteam | Solox GmbH | Nutzen das Training für längere, beratende Gesprächssituationen, etwa Schnittstellenthemen und Weiterentwicklung. |
-| Technisch geprägte Nutzer ohne vertriebliche Vorerfahrung | APPOLLO Systems | Führen Follow-up-Gespräche nach der Kaltakquise und müssen dabei technische Inhalte adressatengerecht vermitteln. |
+| Fachlicher Ansprechpartner und Pilotnutzer | Ansprechpartner, Pilotunternehmen A (Entwicklung und Kundenkontakt) | Möchte eigene blinde Flecken im Sprechverhalten erkennen. Legt Wert auf einfache Bedienung und qualitatives Feedback statt auf Kennzahlen. Lehnt einen vertrieblichen Fokus für seine Rolle ab. |
+| Fachlicher Ansprechpartner und Pilotnutzer | Ansprechpartner, Pilotunternehmen B (CIO und Gründungsmitglied) | Möchte flüssiger und spontaner sprechen und den Umgang mit Einwänden trainieren. Erwartet eine visuelle Auswertung und Verbesserungsvorschläge entlang des eigenen Gesprächsleitfadens. Trainiert Angebots- und Preisgespräche. |
+| Support-Mitarbeitende | Pilotunternehmen A | Nutzen das Training für kurze, lösungsorientierte Kundengespräche, etwa telefonische Problemklärung. |
+| Entwicklungs- und Projektteam | Pilotunternehmen A | Nutzen das Training für längere, beratende Gesprächssituationen, etwa Schnittstellenthemen und Weiterentwicklung. |
+| Technisch geprägte Nutzer ohne vertriebliche Vorerfahrung | Pilotunternehmen B | Führen Follow-up-Gespräche nach der Kaltakquise und müssen dabei technische Inhalte adressatengerecht vermitteln. |
 | Umsetzungsteam | Projektgruppe (intern) | Entwickelt das System iterativ, benötigt eine klare Architektur- und Anforderungsgrundlage. |
 
 # 2. Randbedingungen
@@ -48,7 +48,7 @@ Weitere Qualitätsanforderungen geringerer Priorität sind in Kapitel 10 aufgef�
 
 | ID | Randbedingung | Beschreibung | Quelle |
 |---|---|---|---|
-| C-01 | Sprache konfigurierbar | Das Training findet in der Sprache statt, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Die Sprache ist an die Persona gebunden und ergibt sich aus deren Auswahl; Szenarien sind sprachneutral und mit jeder Persona kombinierbar. Belegt sind Deutsch bei Solox sowie Englisch und teilweise Spanisch bei APPOLLO Systems. Siehe ADR 0043 (löst ADR 0022 ab). | R-35 |
+| C-01 | Sprache konfigurierbar | Das Training findet in der Sprache statt, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Die Sprache ist an die Persona gebunden und ergibt sich aus deren Auswahl; Szenarien sind sprachneutral und mit jeder Persona kombinierbar. Belegt sind Deutsch bei Pilotunternehmen A sowie Englisch und teilweise Spanisch bei Pilotunternehmen B. Siehe ADR 0043 (löst ADR 0022 ab). | R-35 |
 | C-04 | Datenschutz nach DSGVO | Alle Daten, insbesondere Sprachaufzeichnungen und personenbezogene Daten, werden DSGVO-konform verarbeitet. Die Randbedingung begrenzt die Umsetzung aller übrigen Ziele und steht nicht als gleichrangiges Ziel neben ihnen. | rechtliche Vorgabe |
 | C-05 | Kein kundenspezifisches Fachwissen vorausgesetzt | Fachliches Know-how zu einzelnen Kunden oder Systemen wird nicht abgebildet, da sich die Fachlichkeit je Kundenlandschaft unterscheidet. Der Fokus liegt auf Kommunikation statt Fachlichkeit. | R-40, R-41 |
 | C-06 | Gesprächsdauer | Die zu trainierenden Gespräche reichen von kurzen Rückfragen bis zu Gesprächen von einer Stunde. | R-03 |
@@ -248,7 +248,7 @@ Besonderheiten: Die Qualität dieses Szenarios ist zentral für die Akzeptanz de
 - Bei mehrteiligen Projektgesprächen (F-23, COULD) kann diese Aufzeichnung über mehrere Termine hinweg referenziert werden.
 - Alle gespeicherten Daten müssen DSGVO-konform verarbeitet werden (C-04).
 
-Besonderheiten: Dieses Szenario ist für den MVP nicht zwingend erforderlich (SHOULD/COULD), aber relevant für die kontinuierliche Nutzung als Trainingsinstrument (F-13), die Herr Heyne explizit gewünscht hat.
+Besonderheiten: Dieses Szenario ist für den MVP nicht zwingend erforderlich (SHOULD/COULD), aber relevant für die kontinuierliche Nutzung als Trainingsinstrument (F-13), die der Ansprechpartner von Pilotunternehmen A explizit gewünscht hat.
 
 # 7. Verteilungssicht
 
@@ -276,7 +276,7 @@ Sessiondaten werden bereits im MVP dauerhaft gespeichert, und zwar einmalig am E
 
 ## 8.2 Umgang mit Feedback und Bewertung
 
-Da Gespräche laut Herrn Heyne subjektiv wahrgenommen werden können, sollte das Feedback-Konzept durchgängig folgende Prinzipien verfolgen (gilt für alle Komponenten, die Feedback erzeugen oder anzeigen):
+Da Gespräche laut dem Ansprechpartner von Pilotunternehmen A subjektiv wahrgenommen werden können, sollte das Feedback-Konzept durchgängig folgende Prinzipien verfolgen (gilt für alle Komponenten, die Feedback erzeugen oder anzeigen):
 
 - Kein reiner Score als alleinige Bewertung (F-09)
 - Konkrete, nachvollziehbare Verbesserungsvorschläge statt abstrakter Metriken (F-10)
@@ -427,7 +427,7 @@ Die Risiken in 11.1 begleiten das Vorhaben unabhängig vom Umsetzungsstand. Die 
 
 | Nr. | Risiko | Beschreibung | Gegenmaßnahme |
 |---|---|---|---|
-| RI-03 | Widersprüchliche Erwartungen der Pilotunternehmen — **gelöst** | Solox lehnt einen vertrieblichen Fokus für die eigenen Rollen ab (R-46), APPOLLO Systems will ausdrücklich Angebots- und Preisgespräche sowie Einwandbehandlung trainieren (R-10, R-12). Beide sind Pilotnutzer. Das Risiko bestand darin, das System auf eine der beiden Erwartungen zuzuschneiden und damit für die andere Seite unpassend zu machen. Es wurde kurz nach seinem Aufkommen ausgeräumt. | **Gelöst durch das Führen mehrerer passender Szenarien statt einer Produktausrichtung.** F-03 führt ohnehin drei Szenario-Typen nebeneinander; das Angebots- und Preisgespräch ist einer davon und nicht der Zuschnitt des Werkzeugs. Jede Seite wählt die Szenarien, die zu ihren Rollen passen: Verhandlungsnahes Training steht bereit, ohne dass es jemand wählen muss. Damit gibt es keine Ausrichtung, gegen die sich ein Pilotunternehmen wehren müsste, und keine gesonderte Entscheidung zu treffen. Voraussetzung ist allein, dass beide Seiten in der Bibliothek tatsächlich besetzt sind — nachgewiesen im [Szenario- und Persona-Katalog](scenario-catalogue.md). |
+| RI-03 | Widersprüchliche Erwartungen der Pilotunternehmen — **gelöst** | Pilotunternehmen A lehnt einen vertrieblichen Fokus für die eigenen Rollen ab (R-46), Pilotunternehmen B will ausdrücklich Angebots- und Preisgespräche sowie Einwandbehandlung trainieren (R-10, R-12). Beide sind Pilotnutzer. Das Risiko bestand darin, das System auf eine der beiden Erwartungen zuzuschneiden und damit für die andere Seite unpassend zu machen. Es wurde kurz nach seinem Aufkommen ausgeräumt. | **Gelöst durch das Führen mehrerer passender Szenarien statt einer Produktausrichtung.** F-03 führt ohnehin drei Szenario-Typen nebeneinander; das Angebots- und Preisgespräch ist einer davon und nicht der Zuschnitt des Werkzeugs. Jede Seite wählt die Szenarien, die zu ihren Rollen passen: Verhandlungsnahes Training steht bereit, ohne dass es jemand wählen muss. Damit gibt es keine Ausrichtung, gegen die sich ein Pilotunternehmen wehren müsste, und keine gesonderte Entscheidung zu treffen. Voraussetzung ist allein, dass beide Seiten in der Bibliothek tatsächlich besetzt sind — nachgewiesen im [Szenario- und Persona-Katalog](scenario-catalogue.md). |
 | RI-04 | Fehlende kundenspezifische Fachlichkeit | Der bewusste Verzicht auf eine kundenspezifische Wissensbasis (C-05) vereinfacht die Umsetzung, könnte aber dazu führen, dass Gespräche für erfahrene Nutzer zu oberflächlich oder unrealistisch wirken. Abgefedert wird das durch die optionale, nutzergesteuerte Bereitstellung eigener Dokumente (F-26, F-45). | Frühes Nutzerfeedback beider Pilotunternehmen einholen. Umfang und Wirkung der nutzergesteuerten Dokumentenbereitstellung früh mit beiden Pilotunternehmen abgleichen. |
 | RI-05 | Subjektivität des Feedbacks | Gespräche werden von den Beteiligten unterschiedlich wahrgenommen (R-25). Ein maschinell erzeugtes qualitatives Feedback (F-09, F-10) könnte als unpassend, ungenau oder demotivierend empfunden werden, wenn es nicht sorgfältig formuliert ist. Betrifft unmittelbar Q-01, da Nachvollziehbarkeit die Voraussetzung für Vertrauen in die Rückmeldung ist. | Feedback als Wirkung auf den Gesprächspartner formulieren, nicht als objektives Urteil. Tonalität und Formulierungsrichtlinien festlegen und iterativ anhand echten Nutzerfeedbacks verfeinern. |
 | RI-06 | Geringe Akzeptanz bei komplexer Bedienung | In beiden Erhebungen wurde eine unklare oder überladene Benutzeroberfläche als zentrales Nutzungshemmnis genannt. Wird Q-02 nicht ausreichend beachtet, sinkt die Akzeptanz erheblich, unabhängig von der fachlichen Qualität des Trainings. | Frühzeitige Usability-Tests. Minimale Pflichteinstellungen bereits im ersten benutzbaren Prototyp umsetzen. |

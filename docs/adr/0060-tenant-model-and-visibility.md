@@ -2,8 +2,9 @@
 
 ## Status
 
-Accepted and implemented through phase 2, **amended on 2026-09-29** — see the
-amendment at the end. The caller's company now comes from Keycloak
+Accepted and implemented through phase 2, **amended twice on 2026-09-29** — see the
+amendments at the end; the second makes a company's row appear on first login
+instead of being seeded. The caller's company now comes from Keycloak
 Organizations, not from a `tenant` user attribute; the Decision's resolution
 order below no longer holds and is left as written. **Builds on ADR 0058** (User-Authored
 Scenarios): that decision established the row shape (`created_by`, `extern_id`,
@@ -129,7 +130,7 @@ feeding the same claim. A caller's company is the **alias of the one Keycloak
 Organization they are a member of**, read from the `organization` claim that
 Keycloak's built-in `organization` client scope puts in the access token
 (`backend/auth.py`). The alias matches `tenant.extern_ref`, so each company's
-Organization carries its seeded ref (`solox`, `appollo`) as alias. The `tenant`
+Organization carries its seeded ref (`company-a`, `company-b`) as alias. The `tenant`
 user attribute, its protocol mapper and its admin-only user-profile declaration
 are gone.
 
@@ -153,4 +154,26 @@ Nothing else in this ADR changes: the `tenant` table stays the application's own
 record of a company (its display `name` is ours, not Keycloak's), resolution is
 still per request and server-side, and there is still no membership management
 inside Calltrainer. A new company is still a seed change plus a deployment —
-now with an Organization of that alias in the realm.
+now with an Organization of that alias in the realm. *(Superseded by the
+second amendment below.)*
+
+## Amendment (2026-09-29): a company's row is created on first login
+
+The seed carries only the `default` tenant. The pilot companies were seeded
+rows, which put customers into every fresh database — a development one, a
+test one, a new production one — and made each new company a code change.
+Now `backend/tenants.py` inserts the `tenant` row (`ON CONFLICT DO NOTHING`)
+the first time an Organization alias resolves, with the alias as its `name`
+until someone changes it in the database.
+
+- **Why this trusts nothing new.** The alias comes from a verified token, and
+  Organization membership is admin-managed in Keycloak (see above); the row is
+  a record of a decision Keycloak already made. Keycloak is now the one place
+  a company is set up.
+- **An unknown alias is no longer a fallback case.** It becomes a company. A
+  renamed Organization alias therefore splits a company in two: the old row
+  keeps its shared Scenarios, the new one starts empty. Aliases are chosen
+  once. An alias longer than `extern_ref`'s 64 characters is logged and
+  resolves to `default`.
+- **Existing databases** keep whatever `tenant` rows they have: tenants are
+  never deleted or deactivated, since authored rows point at them.

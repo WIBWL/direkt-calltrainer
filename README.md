@@ -41,9 +41,9 @@ The live call needs the production build — voice detection does not load under
 
 | user | password | company (Organization) |
 |---|---|---|
-| `niklas` | `niklas` | Solox |
-| `mathias` | `mathias` | Solox |
-| `eberhard` | `eberhard` | APPOLLO |
+| `alice` | `alice` | Company A |
+| `bob` | `bob` | Company A |
+| `carol` | `carol` | Company B |
 
 Opening the app redirects to Keycloak; log in as any of them. There is nothing to configure and no roles — a valid token is all the app checks (ADR 0009).
 

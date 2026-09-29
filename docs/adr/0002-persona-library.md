@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-A Session's AI counterpart needs character traits (see ADR 0001 — Persona) that can vary independently of the Scenario. Stakeholder feedback from the pilot customer (Solox GmbH) calls for the roster of AI counterpart types to grow over time without reworking the core simulation.
+A Session's AI counterpart needs character traits (see ADR 0001 — Persona) that can vary independently of the Scenario. Stakeholder feedback from a pilot customer calls for the roster of AI counterpart types to grow over time without reworking the core simulation.
 
 ## Decision
 

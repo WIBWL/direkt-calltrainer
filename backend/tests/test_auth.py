@@ -63,12 +63,12 @@ def test_token_without_roles_claim_is_fine():
 def test_organization_alias_is_the_tenant():
     """ADR 0060: the `organization` claim (Keycloak Organizations, a list of
     aliases) is what `backend/tenants.py` resolves a company from."""
-    assert auth.verify_token(_token(organization=["solox"])).tenant == "solox"
+    assert auth.verify_token(_token(organization=["company-a"])).tenant == "company-a"
 
 
 def test_organization_map_with_attributes_reads_the_alias():
-    claim = {"appollo": {"id": "0b7e", "region": ["nord"]}}
-    assert auth.verify_token(_token(organization=claim)).tenant == "appollo"
+    claim = {"company-b": {"id": "0b7e", "region": ["nord"]}}
+    assert auth.verify_token(_token(organization=claim)).tenant == "company-b"
 
 
 def test_absent_empty_or_blank_organization_is_none():
@@ -80,11 +80,11 @@ def test_absent_empty_or_blank_organization_is_none():
 def test_more_than_one_organization_is_none():
     """The first of two is not a choice anybody made; a wrong company reads
     another one's shared Scenarios, the `default` tenant reads nobody's."""
-    assert auth.verify_token(_token(organization=["solox", "appollo"])).tenant is None
+    assert auth.verify_token(_token(organization=["company-a", "company-b"])).tenant is None
 
 
 def test_the_retired_tenant_claim_is_ignored():
-    assert auth.verify_token(_token(tenant="solox")).tenant is None
+    assert auth.verify_token(_token(tenant="company-a")).tenant is None
 
 
 @pytest.mark.parametrize(

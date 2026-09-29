@@ -17,7 +17,7 @@ the company? How are they shared with colleagues?
 > **F-59** — Tenant-scoped scenario library. Priority **COULD**.
 
 Core requirement: the storage owner is the **tenant**, not the individual person.
-A new hire at Solox should immediately see the scenarios Solox created, without
+A new hire at company A should immediately see the scenarios company A created, without
 anyone actively handing them over.
 
 ADR 0024 deliberately left storage open ("free-text Scenario and Persona input
@@ -35,7 +35,7 @@ flagged two open questions:
 
 | Building block | State | Consequence for this feature |
 |---|---|---|
-| **Keycloak realm** | **One** shared realm `direkt` for all DiReKT services **and** both pilot companies (Solox, APPOLLO). Not a realm per company. | A "tenant" must be modelled *inside* one realm, not by realm separation. |
+| **Keycloak realm** | **One** shared realm `direkt` for all DiReKT services **and** both pilot companies (company A, company B). Not a realm per company. | A "tenant" must be modelled *inside* one realm, not by realm separation. |
 | **Deployment** | **One** instance on the university server (ADR 0020). Not a deployment per company. | Tenant separation happens in application logic + data, not through separate instances/DBs. |
 | **Tenant entity** | Exists **nowhere** — not in the schema, the code, or Keycloak. | Has to be introduced. This is the real first decision, not the sharing. |
 | **User entity** | No `user`/`account` table. `session.subject_id` = Keycloak `sub`, pseudonymous, **no** foreign key (ADR 0031). | "Store with the user" today means: a `created_by` column holding the `sub` string, with no referential integrity. |
@@ -53,7 +53,7 @@ either/or. A scenario has **three independent properties**:
 | Axis | Column | Meaning | Example |
 |---|---|---|---|
 | **Authorship** | `created_by` (Keycloak `sub`) | Who wrote it? Drives edit rights, the "my scenarios" filter, attribution. | `alice` |
-| **Ownership** | `tenant_id` (FK, nullable) | Which tenant does it belong to? `NULL` = built-in / global scenario. | `solox` |
+| **Ownership** | `tenant_id` (FK, nullable) | Which tenant does it belong to? `NULL` = built-in / global scenario. | `company-a` |
 | **Visibility** | `visibility` (enum) | Who may see it in their library? | `tenant` |
 
 That answers the original question: **both**. A scenario is written by a *user*,
@@ -70,10 +70,10 @@ at least `tenant`.
 Keycloak 26 provides **Organizations**: multiple tenants *inside* one realm, each
 with its own members, invitation flows, and optionally its own identity provider.
 
-- One Organization per company in the `direkt` realm (`solox`, `appollo`).
+- One Organization per company in the `direkt` realm (`company-a`, `company-b`).
 - Assign the optional `organization` client scope to `direkt-calltrainer`; the
   access token then carries an `organization` claim, shaped
-  `"organization": { "solox": {} }` (alias → attributes).
+  `"organization": { "company-a": {} }` (alias → attributes).
 - The backend reads the organization from the JWT — **exactly the way it reads
   `sub` today** (`backend/auth.py`). No member management
   in Calltrainer, invitations included.
@@ -96,7 +96,7 @@ with its own members, invitation flows, and optionally its own identity provider
 
 ### Option B — derive the tenant from the email domain
 
-`alice@solox.de` → tenant `solox`. A config map from domain to `tenant`.
+`alice@company-a.example` → tenant `company-a`. A config map from domain to `tenant`.
 
 **Pro** — No Keycloak change. Uses the `email` claim that is already in the
 token. Implementable in an hour.
@@ -122,7 +122,7 @@ membership rows float without integrity too.
 ### Recommendation, layer 1
 
 **Target: Option A (Keycloak Organizations).** As a bridge, a thin `tenant`
-table in Calltrainer whose rows are seeded manually with Solox and APPOLLO, and
+table in Calltrainer whose rows are seeded manually with company A and company B, and
 tenant resolution in this order:
 
 1. `organization` claim in the token → `tenant.extern_ref`,
@@ -229,7 +229,7 @@ updated_at:  Mapped[datetime]
 class Tenant(Base):
     __tablename__ = "tenant"
     tenant_id:  Mapped[int]  = mapped_column(primary_key=True)
-    extern_ref: Mapped[str]  = mapped_column(String(64), unique=True)  # KC org alias or seed key 'solox'
+    extern_ref: Mapped[str]  = mapped_column(String(64), unique=True)  # KC org alias or seed key 'company-a'
     name:       Mapped[str]  = mapped_column(String(120))
 ```
 
@@ -263,7 +263,7 @@ both tables — don't solve it twice separately.
 | Phase | Content | Delivers |
 |---|---|---|
 | **0 — now** | Custom scenarios land as `visibility='private'`, `created_by=sub`, `tenant_id=NULL`. No sharing. Just: your own scenarios show up under "Mine". | ADR 0024 (scenario part), unblocks `personas_scenarios_alex` |
-| **1** | `tenant` table, seeded with Solox + APPOLLO. Tenant resolution via email-domain map / manual assignment. "Share with company" toggle → `visibility='tenant'`. | **R-58 / F-59** |
+| **1** | `tenant` table, seeded with company A + company B. Tenant resolution via email-domain map / manual assignment. "Share with company" toggle → `visibility='tenant'`. | **R-58 / F-59** |
 | **2** | Switch tenant resolution to the Keycloak `organization` claim; `tenant.extern_ref` = org alias. The domain map becomes the fallback. | Clean identity, Keycloak invitation flows |
 | **3 — optional** | `public` promotion with review; share links for cross-tenant one-offs. | Nice-to-have |
 

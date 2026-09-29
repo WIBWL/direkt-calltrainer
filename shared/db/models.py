@@ -223,8 +223,9 @@ class AuthoredContent(ReferenceRow):
 
 class Tenant(Base):
     """A company whose members share the Scenarios they author (ADR 0060, R-58).
-    Seeded: the pilot tenants plus `default`. `extern_ref` is the key a request
-    resolves to. Never deactivated: authored rows keep pointing at it."""
+    Only `default` is seeded; a company's row is created the first time its
+    Organization alias resolves (`backend/tenants.py`). `extern_ref` is the key a
+    request resolves to. Never deactivated: authored rows keep pointing at it."""
 
     __tablename__ = "tenant"
     tenant_id: Mapped[int] = mapped_column(primary_key=True)

@@ -37,7 +37,7 @@ The character traits of the AI-simulated conversation partner within a Session �
 _Avoid_: Scenario, character, counterpart
 
 **Tenant**:
-The company a User belongs to, and the owner of the Scenarios its members author (docs/adr/0060). One of three independent properties of an authored Scenario: authorship (who wrote it, docs/adr/0058), ownership (which Tenant it belongs to — none, for a shipped built-in), and visibility (who may see it). Distinct from the User: colleagues share a Tenant. The pilot Tenants are Solox and APPOLLO. Personas are curated, not authored, so they have no Tenant. In Keycloak a Tenant is an Organization, whose alias is the Tenant's reference; "Organization" names only that Keycloak object.
+The company a User belongs to, and the owner of the Scenarios its members author (docs/adr/0060). One of three independent properties of an authored Scenario: authorship (who wrote it, docs/adr/0058), ownership (which Tenant it belongs to — none, for a shipped built-in), and visibility (who may see it). Distinct from the User: colleagues share a Tenant. The pilot Tenants are two partner companies; only the catch-all `default` Tenant is seeded, and a company's Tenant is created the first time one of its members logs in. Personas are curated, not authored, so they have no Tenant. In Keycloak a Tenant is an Organization, whose alias is the Tenant's reference; "Organization" names only that Keycloak object.
 _Avoid_: Mandant (in code/schema — it stays "tenant"), organization (outside Keycloak), company, account
 
 **Language**:

@@ -6,7 +6,7 @@ Needs a seeded Postgres (skips without); callers resolve via their `organization
 import httpx
 import pytest
 
-from backend import auth
+from backend import auth, tenants
 from backend.app import app
 from backend.authored_text import FIELD_LIMITS
 from backend.tests.conftest import TEST_AUTH
@@ -16,10 +16,10 @@ from backend.tests.conftest import TEST_AUTH
 # No org -> both resolve to the `default` tenant.
 ALICE = auth.AuthContext(sub="alice", roles=[], token="t")
 BOB = auth.AuthContext(sub="bob", roles=[], token="t")
-# Same company (solox); a third in another company (appollo).
-ALICE_SOLOX = auth.AuthContext(sub="alice", roles=[], token="t", tenant="solox")
-BOB_SOLOX = auth.AuthContext(sub="bob", roles=[], token="t", tenant="solox")
-CAROL_APPOLLO = auth.AuthContext(sub="carol", roles=[], token="t", tenant="appollo")
+# Same company (company-a); a third in another company (company-b).
+ALICE_A = auth.AuthContext(sub="alice", roles=[], token="t", tenant="company-a")
+BOB_A = auth.AuthContext(sub="bob", roles=[], token="t", tenant="company-a")
+CAROL_B = auth.AuthContext(sub="carol", roles=[], token="t", tenant="company-b")
 
 _NEW = {
     "name": "Preisverhandlung mit Großkunde",
@@ -202,15 +202,15 @@ async def test_a_malformed_id_is_a_clean_404(client, as_user):
 async def test_sharing_makes_it_visible_to_a_colleague_not_to_other_companies(
     client, as_user,
 ):
-    as_user(ALICE_SOLOX)
+    as_user(ALICE_A)
     new_id = (await client.post("/api/scenarios", json=_NEW)).json()["id"]
 
     # Before sharing: a colleague does not see it.
-    as_user(BOB_SOLOX)
+    as_user(BOB_A)
     assert new_id not in {s["id"] for s in (await client.get("/api/scenarios")).json()}
 
     # Alice shares it with her company.
-    as_user(ALICE_SOLOX)
+    as_user(ALICE_A)
     shared = await client.put(f"/api/scenarios/{new_id}/visibility",
                               json={"visibility": "tenant"})
     assert shared.status_code == 200
@@ -225,7 +225,7 @@ async def test_sharing_makes_it_visible_to_a_colleague_not_to_other_companies(
     # call with it. Since ADR 0062 they can read it in full as well -- sharing
     # a case with the company while making it illegible to the company is not
     # a policy anyone chose -- but they still cannot edit it.
-    as_user(BOB_SOLOX)
+    as_user(BOB_A)
     card = {s["id"]: s for s in (await client.get("/api/scenarios")).json()}[new_id]
     assert card["origin"] == "tenant"
     assert card["shared"] is True
@@ -237,32 +237,32 @@ async def test_sharing_makes_it_visible_to_a_colleague_not_to_other_companies(
     assert (await client.patch(f"/api/scenarios/{new_id}", json=_NEW)).status_code == 404
 
     # Someone in another company still does not see it.
-    as_user(CAROL_APPOLLO)
+    as_user(CAROL_B)
     assert new_id not in {s["id"] for s in (await client.get("/api/scenarios")).json()}
 
 
 async def test_unsharing_hides_it_from_the_colleague_again(client, as_user):
-    as_user(ALICE_SOLOX)
+    as_user(ALICE_A)
     new_id = (await client.post("/api/scenarios", json=_NEW)).json()["id"]
     await client.put(f"/api/scenarios/{new_id}/visibility", json={"visibility": "tenant"})
     await client.put(f"/api/scenarios/{new_id}/visibility", json={"visibility": "private"})
 
-    as_user(BOB_SOLOX)
+    as_user(BOB_A)
     assert new_id not in {s["id"] for s in (await client.get("/api/scenarios")).json()}
 
 
 async def test_a_colleague_cannot_share_someone_elses_scenario(client, as_user):
-    as_user(ALICE_SOLOX)
+    as_user(ALICE_A)
     new_id = (await client.post("/api/scenarios", json=_NEW)).json()["id"]
 
-    as_user(BOB_SOLOX)
+    as_user(BOB_A)
     resp = await client.put(f"/api/scenarios/{new_id}/visibility",
                             json={"visibility": "tenant"})
     assert resp.status_code == 404
 
 
 async def test_a_user_cannot_promote_to_public(client, as_user):
-    as_user(ALICE_SOLOX)
+    as_user(ALICE_A)
     new_id = (await client.post("/api/scenarios", json=_NEW)).json()["id"]
     resp = await client.put(f"/api/scenarios/{new_id}/visibility",
                             json={"visibility": "public"})
@@ -287,14 +287,28 @@ async def test_a_user_with_no_company_cannot_share(client, as_user):
 async def test_tenant_endpoint_names_the_company_or_null(client, as_user):
     """The setup screen shows a `<company>` filter chip; `null` for a caller in
     the `default` tenant means no chip."""
-    as_user(ALICE_SOLOX)
-    assert (await client.get("/api/tenant")).json() == {"name": "Solox"}
+    as_user(ALICE_A)
+    assert (await client.get("/api/tenant")).json() == {"name": "company-a"}
 
-    as_user(CAROL_APPOLLO)
-    assert (await client.get("/api/tenant")).json() == {"name": "APPOLLO"}
+    as_user(CAROL_B)
+    assert (await client.get("/api/tenant")).json() == {"name": "company-b"}
 
     as_user(ALICE)  # no tenant claim, no e-mail -> default tenant
     assert (await client.get("/api/tenant")).json() == {"name": None}
+
+
+async def test_a_new_organization_gets_its_tenant_on_first_sight(client):  # pylint: disable=unused-argument
+    """Only `default` is seeded (ADR 0060): a company exists once its alias
+    first arrives, and every later request lands in that same row."""
+    first = tenants.resolve_tenant(ALICE_A)
+    assert (first.ref, first.name, first.is_default) == ("company-a", "company-a", False)
+    assert tenants.resolve_tenant(BOB_A).id == first.id
+    assert tenants.resolve_tenant(CAROL_B).id != first.id
+
+
+async def test_an_overlong_alias_lands_in_the_default_tenant(client):  # pylint: disable=unused-argument
+    ctx = auth.AuthContext(sub="dave", roles=[], token="t", tenant="x" * 65)
+    assert tenants.resolve_tenant(ctx).is_default
 
 
 # --- ADR 0072: the category an author may set -------------------------------

@@ -54,7 +54,7 @@ def test_seed_populates_the_reference_tables(migrated_database: str) -> None:
     assert counts["scenario"] > 0
     assert counts["language"] > 0
     assert counts["metric_type"] > 0
-    assert counts["tenant"] >= 3  # solox, appollo, default (ADR 0060)
+    assert counts["tenant"] == 1  # `default` only; companies arrive by login (ADR 0060)
 
 
 def test_seed_is_idempotent(migrated_database: str) -> None:

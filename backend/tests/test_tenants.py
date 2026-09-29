@@ -13,7 +13,7 @@ def _ctx(**kw):
 
 
 def test_tenant_claim_is_the_ref():
-    assert tenants.resolve_tenant_ref(_ctx(tenant="solox")) == "solox"
+    assert tenants.resolve_tenant_ref(_ctx(tenant="company-a")) == "company-a"
 
 
 def test_no_tenant_claim_is_the_default_tenant():
@@ -25,4 +25,4 @@ def test_a_blank_tenant_claim_falls_through_to_default():
 
 
 def test_the_claim_is_trimmed():
-    assert tenants.resolve_tenant_ref(_ctx(tenant="  appollo  ")) == "appollo"
+    assert tenants.resolve_tenant_ref(_ctx(tenant="  company-b  ")) == "company-b"

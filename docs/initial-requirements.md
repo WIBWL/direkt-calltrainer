@@ -2,14 +2,14 @@
 
 **Stand:** Entwurf
 
-**Geltungsbereich:** Anforderungen aus den bisher durchgeführten Erhebungen mit Solox und APPOLLO Systems, bestehend aus den Erstgesprächen und dem schriftlichen Rückfragenlauf vom 21.08.2026
+**Geltungsbereich:** Anforderungen aus den bisher durchgeführten Erhebungen mit Pilotunternehmen A und Pilotunternehmen B, bestehend aus den Erstgesprächen und dem schriftlichen Rückfragenlauf vom 21.08.2026
 
 | Erhebung                        | Kürzel | Datum      | Ansprechpartner |
 | :------------------------------ | :----- | :--------- | :-------------- |
-| Erstgespräch Solox GmbH         | `SO`   | 24.06.2026 | Nicolas Heyne   |
-| Erstgespräch APPOLLO Systems    | `AP`   | 22.07.2026 | Eckhard Herdt   |
-| Schriftverkehr Solox GmbH       | `SO-S` | 21.08.2026 | Nicolas Heyne   |
-| Schriftverkehr APPOLLO Systems  | `AP-S` | 21.08.2026 | Eckhard Herdt   |
+| Erstgespräch Pilotunternehmen A   | `SO`   | 24.06.2026 | Ansprechpartner A |
+| Erstgespräch Pilotunternehmen B   | `AP`   | 22.07.2026 | Ansprechpartner B |
+| Schriftverkehr Pilotunternehmen A | `SO-S` | 21.08.2026 | Ansprechpartner A |
+| Schriftverkehr Pilotunternehmen B | `AP-S` | 21.08.2026 | Ansprechpartner B |
 
 ## Zweck
 
@@ -115,7 +115,7 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 | R-32 | Der Nutzen des Trainers soll unmittelbar erkennbar und die Bedienung einfach sein. | SO 4.8, 4.10, AP 3.9 | Q   | Q-02           |
 | R-33 | Eine unklare oder überladene Oberfläche soll die Nutzung nicht erschweren.         | SO 4.9, AP 3.9       | Q   | Q-02             |
 | R-34 | Notwendige Einstellungen sollen klar sichtbar sein, Spezialoptionen zurücktreten.  | SO 4.9, 4.10         | Q   | Q-02, F-43            |
-| R-53 | Die Sprache der Benutzeroberfläche soll sich leicht wechseln lassen. Deutsch und Englisch sind dafür zu Beginn ausreichend. Für Solox ist Mehrsprachigkeit nicht zwingend, da mit den Kunden auf Deutsch kommuniziert wird. | SO-S 2, AP-S 2       | F   | F-56             |
+| R-53 | Die Sprache der Benutzeroberfläche soll sich leicht wechseln lassen. Deutsch und Englisch sind dafür zu Beginn ausreichend. Für Pilotunternehmen A ist Mehrsprachigkeit nicht zwingend, da mit den Kunden auf Deutsch kommuniziert wird. | SO-S 2, AP-S 2       | F   | F-56             |
 | R-54 | Die Beschriftungen der Oberfläche sollen vollständig und eindeutig sein, sodass die Bedeutung eines Bereichs ohne Suchen und Überlegen erkennbar ist. | SO-S 2               | Q   | Q-02             |
 | R-55 | Wo sich die Bedeutung nicht bereits aus den Vorlauftexten der Eingabefelder ergibt, sollen Tooltips und Hinweise weiterführende Informationen bereitstellen. | SO-S 2               | F   | F-57             |
 
@@ -123,7 +123,7 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 
 | ID   | Anforderung                                                                                                                                                                                                   | Quelle              | Typ | Bezug      |
 | :--- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------------------ | :-- | :--------- |
-| R-35 | Das Training soll in der Sprache stattfinden, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Belegt sind Deutsch bei Solox sowie Englisch und teilweise Spanisch bei APPOLLO Systems. | SO 4.3, AP 3.3      | C   | C-01 |
+| R-35 | Das Training soll in der Sprache stattfinden, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Belegt sind Deutsch bei Pilotunternehmen A sowie Englisch und teilweise Spanisch bei Pilotunternehmen B. | SO 4.3, AP 3.3      | C   | C-01 |
 | R-36 | Das Training soll am PC mit Headset durchführbar sein, analog zum Ablauf eines realen Telefonats.                                                                                                             | SO 5.1, 5.2         | C   | C-02       |
 | R-37 | Das Training soll auch am Smartphone nutzbar sein, da mobile Telefonie in beiden Unternehmen im Einsatz ist.                                                                                                     | SO 5.2, AP 4.2      | C   | C-03       |
 | R-38 | Eine Anbindung an die eingesetzte Telefonsoftware Starface ist denkbar.                                                                                                                                       | SO 5.1              | F   | F-29       |
@@ -158,7 +158,7 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 | :--- | :------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------------- | :-- | :--------- |
 | R-43 | Bestehende Gesprächsleitfäden und ihre Auswertung als Bewertungsgrundlage sind nicht Gegenstand des Trainings.                                                | AP 4.3, 4.4    | N   | *offen* |
 | R-45 | Klassische vertriebliche Kennzahlen wie Abschlussquote oder Umsatz sollen nicht als Erfolgsmaßstab dienen.                                                    | SO 6.2, AP 5.2 | N   | *offen*       |
-| R-46 | Ein stark vertriebslastiger Fokus passt nicht zu den Rollen bei Solox. Die Abgrenzung gilt unternehmensspezifisch und nicht produktweit: Vertriebsnahe Gespräche werden als einer von mehreren Szenario-Typen geführt (F-03), sodass jede Seite die passenden Szenarien wählt. Siehe RI-03. | SO 4.9         | N   | *offen* |
+| R-46 | Ein stark vertriebslastiger Fokus passt nicht zu den Rollen bei Pilotunternehmen A. Die Abgrenzung gilt unternehmensspezifisch und nicht produktweit: Vertriebsnahe Gespräche werden als einer von mehreren Szenario-Typen geführt (F-03), sodass jede Seite die passenden Szenarien wählt. Siehe RI-03. | SO 4.9         | N   | *offen* |
 | R-47 | Fernwartung und Bildschirmfreigabe sind Teil realer Support-Gespräche, aber nicht Gegenstand des Trainings.                                                   | SO 4.4, 5.1    | N   | *offen*    |
 
 ### Zusammenarbeit

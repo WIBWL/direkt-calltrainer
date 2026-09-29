@@ -74,50 +74,50 @@
   "users": [
     {
       "id": "00000000-0000-4000-8000-000000000001",
-      "username": "niklas",
+      "username": "alice",
       "enabled": true,
       "emailVerified": true,
-      "email": "niklas.heyder@solox.de",
-      "firstName": "Niklas",
-      "lastName": "Heyder",
-      "credentials": [{ "type": "password", "value": "niklas", "temporary": false }]
+      "email": "alice@company-a.example",
+      "firstName": "Alice",
+      "lastName": "Example",
+      "credentials": [{ "type": "password", "value": "alice", "temporary": false }]
     },
     {
       "id": "00000000-0000-4000-8000-000000000002",
-      "username": "mathias",
+      "username": "bob",
       "enabled": true,
       "emailVerified": true,
-      "email": "mathias.koehler@solox.de",
-      "firstName": "Mathias",
-      "lastName": "Köhler",
-      "credentials": [{ "type": "password", "value": "mathias", "temporary": false }]
+      "email": "bob@company-a.example",
+      "firstName": "Bob",
+      "lastName": "Example",
+      "credentials": [{ "type": "password", "value": "bob", "temporary": false }]
     },
     {
       "id": "00000000-0000-4000-8000-000000000003",
-      "username": "eberhard",
+      "username": "carol",
       "enabled": true,
       "emailVerified": true,
-      "email": "eberhard.hertling@appollo.systems",
-      "firstName": "Eberhard",
-      "lastName": "Hertling",
-      "credentials": [{ "type": "password", "value": "eberhard", "temporary": false }]
+      "email": "carol@company-b.example",
+      "firstName": "Carol",
+      "lastName": "Example",
+      "credentials": [{ "type": "password", "value": "carol", "temporary": false }]
     }
   ],
 
   "organizations": [
     {
-      "name": "Solox",
-      "alias": "solox",
+      "name": "Company A",
+      "alias": "company-a",
       "enabled": true,
-      "domains": [{ "name": "solox.de" }],
-      "members": [{ "username": "niklas" }, { "username": "mathias" }]
+      "domains": [{ "name": "company-a.example" }],
+      "members": [{ "username": "alice" }, { "username": "bob" }]
     },
     {
-      "name": "APPOLLO",
-      "alias": "appollo",
+      "name": "Company B",
+      "alias": "company-b",
       "enabled": true,
-      "domains": [{ "name": "appollo.systems" }],
-      "members": [{ "username": "eberhard" }]
+      "domains": [{ "name": "company-b.example" }],
+      "members": [{ "username": "carol" }]
     }
   ]
 }
