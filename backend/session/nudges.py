@@ -51,6 +51,34 @@ ANTI_REPEAT_NUDGE = (
     "were your own idea."
 )
 
+# The same nudge for a Persona the seed calls `hard`. Measured over the seeded
+# library (6 Personas x 5 Scenarios, `scripts/play_scenarios.py`), the four
+# German Personas were indistinguishable on every marker of tone: demands at
+# 0.9-1.1 per 1000 words, threats or named consequences at exactly 0.0 for all
+# of them, and Marcel Kropp -- the one seeded to refuse flatly -- came out the
+# *most* polite of the four. Character lives in the system prompt alone, which
+# this module's opening paragraph already calls too far up-context to bite,
+# while the nudge below sits nearest the reply and offers "give ground" as one
+# of three moves. So the standing nudge argued for de-escalation from the one
+# position that measurably moves the model.
+#
+# What changes is that clause and nothing else: the demand for something new
+# every turn stays, because it is about repetition rather than about how hard
+# the Persona pushes. Giving ground is not forbidden either -- it is simply no
+# longer offered as a move, leaving the Persona's own `behavior` to decide.
+ANTI_REPEAT_NUDGE_HARD = (
+    'Your previous reply in this call was:\n"{previous}"\n'
+    "Say something genuinely different now: react to what the user just said, "
+    "press a point you have not pressed yet, name what it costs you that this "
+    "is still open, or say what you will do instead — in new words. Do not "
+    "repeat or reword that reply, and do not greet or introduce yourself "
+    "again.\n"
+    "If the user has just put something on the table, respond to it — take "
+    "it, press it for the specifics it is still missing, or say why it falls "
+    "short — but never put that same offer forward yourself as though it "
+    "were your own idea."
+)
+
 # The same nudge for a reverse (ADR 0070), and the paragraph above is why it
 # needs one: its last three lines exist to stop the persona adopting the user's
 # proposal and re-presenting it as its own solution. Reversed, that is not a

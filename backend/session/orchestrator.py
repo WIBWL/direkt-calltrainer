@@ -47,7 +47,8 @@ from backend.session import repetition
 from backend.session import reply_checks as checks
 from backend.session.prompting import build_system_prompt, opening_instruction
 from backend.session.nudges import (
-    ANTI_REPEAT_NUDGE, ANTI_REPEAT_NUDGE_REVERSE, CLARIFY_AGAIN_NUDGE, CLARIFY_NUDGE,
+    ANTI_REPEAT_NUDGE, ANTI_REPEAT_NUDGE_HARD, ANTI_REPEAT_NUDGE_REVERSE,
+    CLARIFY_AGAIN_NUDGE, CLARIFY_NUDGE,
     CLOSING_NUDGE, ECHO_NUDGE,
     GENERIC_CRITERION, GENERIC_CRITERION_REVERSE, INTERRUPTED_MARK, INTERRUPTED_NUDGE,
     REGENERATE_NUDGE, REPEAT_OPENING_NUDGE, RESUME_NUDGE, SETTLEMENT_CHECK,
@@ -277,6 +278,9 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         self._language_id = persona.language_id
         self._pack = get_pack(persona.language_id)
         self._voice = persona.voice
+        # Kept as the one field rather than the whole Persona, like the three
+        # above: it decides which anti-repeat nudge a Turn gets (see below).
+        self._difficulty = persona.difficulty
         self._scenario = scenario
         # The caller's notes: what the model reads in place of the history
         # beyond the last few exchanges (ADR 0071), kept only while
@@ -602,7 +606,17 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
             # (ADR 0070): the persona is the side that puts things on the
             # table, so the clause forbidding that would undo the system
             # prompt from the nearest position in context.
-            frame = ANTI_REPEAT_NUDGE_REVERSE if self._scenario.reverse else ANTI_REPEAT_NUDGE
+            #
+            # A `hard` Persona gets the variant that does not offer giving
+            # ground as a move (see nudges.py): the casting wins over the
+            # difficulty, since a reverse has the Persona on the company's
+            # side, where yielding is the job rather than a softening.
+            if self._scenario.reverse:
+                frame = ANTI_REPEAT_NUDGE_REVERSE
+            elif self._difficulty == "hard":
+                frame = ANTI_REPEAT_NUDGE_HARD
+            else:
+                frame = ANTI_REPEAT_NUDGE
             nudge = (
                 frame.format(previous=self.history.previous_reply()) +
                 self._settlement_check()

@@ -58,6 +58,14 @@ class Persona:  # pylint: disable=too-many-instance-attributes
     # same order, same length. Built in one pass in `library._to_persona`, so
     # an objection and its label cannot fall out of step.
     objection_labels: tuple[str, ...] = ()
+    # How hard this Persona is to deal with (`easy`/`medium`/`hard`, the
+    # seed's own vocabulary). Read by the turn loop, not by the display: it
+    # picks which anti-repeat nudge a Turn gets, because the ordinary one
+    # offers "give ground" as a move and a Persona seeded as `hard` is one
+    # that does not. Defaulted rather than required: the column is NOT NULL
+    # and every seeded row carries it, so the default only serves constructions
+    # in tests, and a wrong value costs a nudge variant rather than a crash.
+    difficulty: str = "medium"
     # Display: the path this Persona's portrait is served from. Defaulted
     # rather than required, because it is display-only -- a Persona without a
     # picture plays exactly the same, and the UI shows its initials instead.
