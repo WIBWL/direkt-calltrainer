@@ -381,7 +381,7 @@ async def test_the_route_stores_it_as_the_users_own_private_scenario(
     assert row.active is True
     assert row.derived_from_session_id == db_session.query(Session).one().session_id
     # Stamped with the caller's company, which the worker could never do: it had
-    # no request and so no `tenant` claim to resolve one from (ADR 0060). From
+    # no request and so no `organization` claim to resolve one from (ADR 0060). From
     # here sharing is a `visibility` flip rather than a flip plus a late stamp.
     assert row.tenant_id is not None
 

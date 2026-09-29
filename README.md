@@ -39,7 +39,7 @@ The live call needs the production build — voice detection does not load under
 
 `dev-compose.yaml` brings its own Keycloak on `http://localhost:18081` and imports `keycloak/direkt-realm.json` — the `direkt-calltrainer` client and three fixed users:
 
-| user | password | company (`tenant`) |
+| user | password | company (Organization) |
 |---|---|---|
 | `niklas` | `niklas` | Solox |
 | `mathias` | `mathias` | Solox |

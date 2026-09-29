@@ -1,6 +1,6 @@
 """Resolving which company a caller belongs to (ADR 0060, R-58).
 
-The tenant comes from the `tenant` claim. `resolve_tenant_ref` is pure; the row lookup
+The tenant comes from the `organization` claim (read in `backend/auth.py`). `resolve_tenant_ref` is pure; the row lookup
 is covered against a real database in test_authored_content.py.
 """
 from backend import auth, tenants

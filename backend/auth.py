@@ -42,14 +42,33 @@ _bearer = HTTPBearer(auto_error=False)
 @dataclass(frozen=True)
 class AuthContext:
     """The verified caller. `sub` is the Keycloak user id, written as
-    `session.subject_id` (ADR 0031/0034). `tenant` is an admin-set Keycloak
-    attribute mapped into the token; it picks whose shared Scenarios the caller
-    sees (ADR 0060, `backend/tenants.py`). Missing means the `default` tenant."""
+    `session.subject_id` (ADR 0031/0034). `tenant` is the alias of the one
+    Keycloak Organization the caller is a member of, from the `organization`
+    claim; it picks whose shared Scenarios the caller sees (ADR 0060,
+    `backend/tenants.py`). Missing means the `default` tenant."""
 
     sub: str
     roles: list[str]
     token: str
     tenant: str | None = None
+
+
+def _organization(payload: dict) -> str | None:
+    """The alias of the caller's one Keycloak Organization, or `None`.
+
+    The `organization` client scope puts a list of aliases in the token (a map
+    alias → attributes once its mapper adds attributes; the keys are the same).
+    More than one is no answer rather than the first: the list's order is not a
+    choice anybody made, and a wrong company reads another's shared Scenarios.
+    Keycloak itself leaves the claim out for a multi-member user unless the
+    client asks for `organization:*`, so this only guards that case."""
+    claim = payload.get("organization")
+    if isinstance(claim, str):
+        claim = [claim]
+    if not isinstance(claim, (list, dict)):
+        return None
+    aliases = [a.strip() for a in claim if isinstance(a, str) and a.strip()]
+    return aliases[0] if len(aliases) == 1 else None
 
 
 @lru_cache(maxsize=1)
@@ -103,11 +122,7 @@ def verify_token(token: str) -> AuthContext:
 
     resource_access = payload.get("resource_access") or {}
     roles = list((resource_access.get(OIDC_AUDIENCE) or {}).get("roles") or [])
-    tenant = payload.get("tenant")
-    return AuthContext(
-        sub=sub, roles=roles, token=token,
-        tenant=tenant.strip() if isinstance(tenant, str) and tenant.strip() else None,
-    )
+    return AuthContext(sub=sub, roles=roles, token=token, tenant=_organization(payload))
 
 
 async def require_user(

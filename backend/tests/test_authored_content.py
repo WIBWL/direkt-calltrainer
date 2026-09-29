@@ -2,7 +2,7 @@
 
 Covers F-34, F-59/R-58 (tenant-shared library), ADR 0058 (owner-scoped CRUD), ADR 0060 (tenant/visibility),
 ADR 0059 (sanitising), ADR 0063 (field limits), ADR 0072 (category), ADR 0050 (extern_id).
-Needs a seeded Postgres (skips without); callers resolve via their `tenant` claim."""
+Needs a seeded Postgres (skips without); callers resolve via their `organization` claim."""
 import httpx
 import pytest
 

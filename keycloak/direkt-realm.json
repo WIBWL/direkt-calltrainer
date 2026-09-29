@@ -8,12 +8,13 @@
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": false,
   "editUsernameAllowed": false,
+  "organizationsEnabled": true,
 
   "components": {
     "org.keycloak.userprofile.UserProfileProvider": [
       {
         "providerId": "declarative-user-profile",
-        "config": { "kc.user.profile.config": ["{\"unmanagedAttributePolicy\":\"ADMIN_EDIT\",\"attributes\":[{\"name\":\"username\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]}},{\"name\":\"email\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]}},{\"name\":\"tenant\",\"displayName\":\"Company (direkt-calltrainer tenant claim)\",\"multivalued\":false,\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]}}]}"] }
+        "config": { "kc.user.profile.config": ["{\"unmanagedAttributePolicy\":\"ADMIN_EDIT\",\"attributes\":[{\"name\":\"username\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]}},{\"name\":\"email\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]}}]}"] }
       }
     ]
   },
@@ -39,7 +40,7 @@
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "+"
       },
-      "defaultClientScopes": ["basic", "acr", "web-origins", "profile", "email"],
+      "defaultClientScopes": ["basic", "acr", "web-origins", "profile", "email", "organization"],
       "optionalClientScopes": ["offline_access"],
       "protocolMappers": [
         {
@@ -65,18 +66,6 @@
             "id.token.claim": "true",
             "userinfo.token.claim": "true"
           }
-        },
-        {
-          "name": "direkt-calltrainer tenant",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-usermodel-attribute-mapper",
-          "config": {
-            "user.attribute": "tenant",
-            "claim.name": "tenant",
-            "jsonType.label": "String",
-            "access.token.claim": "true",
-            "id.token.claim": "false"
-          }
         }
       ]
     }
@@ -91,7 +80,6 @@
       "email": "niklas.heyder@solox.de",
       "firstName": "Niklas",
       "lastName": "Heyder",
-      "attributes": { "tenant": ["solox"] },
       "credentials": [{ "type": "password", "value": "niklas", "temporary": false }]
     },
     {
@@ -102,7 +90,6 @@
       "email": "mathias.koehler@solox.de",
       "firstName": "Mathias",
       "lastName": "Köhler",
-      "attributes": { "tenant": ["solox"] },
       "credentials": [{ "type": "password", "value": "mathias", "temporary": false }]
     },
     {
@@ -113,8 +100,24 @@
       "email": "eberhard.hertling@appollo.systems",
       "firstName": "Eberhard",
       "lastName": "Hertling",
-      "attributes": { "tenant": ["appollo"] },
       "credentials": [{ "type": "password", "value": "eberhard", "temporary": false }]
+    }
+  ],
+
+  "organizations": [
+    {
+      "name": "Solox",
+      "alias": "solox",
+      "enabled": true,
+      "domains": [{ "name": "solox.de" }],
+      "members": [{ "username": "niklas" }, { "username": "mathias" }]
+    },
+    {
+      "name": "APPOLLO",
+      "alias": "appollo",
+      "enabled": true,
+      "domains": [{ "name": "appollo.systems" }],
+      "members": [{ "username": "eberhard" }]
     }
   ]
 }

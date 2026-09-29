@@ -75,10 +75,12 @@ Locally, `keycloak/direkt-realm.json` sets all of this up; in the realm at `keyc
    - Valid post logout redirect URIs: `https://calltrainer.efre-direkt.de/*`
    - Web origins: `https://calltrainer.efre-direkt.de` (the SPA's; the backend's host never talks to Keycloak from a browser)
 2. **Audience mapper** on the client: type *Audience*, included custom audience `direkt-calltrainer`, added to the access token. Without it `backend/auth.py` rejects every token.
-3. **User profile**: declare the attribute `tenant`, *view* and *edit* **admin only**. This is a security boundary (ADR 0060): a user who can set their own `tenant` reads another company's shared Scenarios. Do not set the unmanaged attribute policy to *Enabled*.
-4. **Tenant mapper** on the client: type *User Attribute*, attribute `tenant`, claim `tenant`, added to the access token.
-5. **Users**: give each one a `tenant` whose value is a seeded tenant (`solox`, `appollo`; see `shared/db/seed_data.py`). An unknown value or none lands in the `default` tenant. A new company is a seed change plus a deployment.
+3. **Organizations** (ADR 0060): switch them on in *Realm settings*, and add the built-in `organization` client scope to the client as a **Default** scope (not *Optional*: the SPA does not ask for it). The token then carries `"organization": ["<alias>"]`.
+4. **One Organization per company**, its **alias** exactly a seeded tenant's `extern_ref` (`solox`, `appollo`; see `shared/db/seed_data.py`). The alias is what the backend matches; the name is only Keycloak's. A new company is a seed change plus a deployment.
+5. **Members**: add each user to their company's Organization. No Organization, an unknown alias, or more than one lands in the `default` tenant (Keycloak leaves the claim out for a member of several). Membership is a security boundary: a member reads the company's shared Scenarios, so members are added by an admin or by invitation — do not link an identity provider to an Organization in a way that lets it add users who are not the company's.
 6. Realm: *Require SSL* at least `external requests`. The development users `niklas`/`mathias`/`eberhard` do not exist there and must not.
+
+**Moving a realm off the old `tenant` attribute:** set up 3–5 *before* the backend image that reads Organizations goes out, since it ignores the `tenant` claim and every user would otherwise see only built-ins and their own Scenarios until they are members. Afterwards delete the client's *User Attribute* mapper for `tenant` and the `tenant` attribute from the user profile.
 
 ### Legal
 

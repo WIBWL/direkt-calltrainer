@@ -1,7 +1,8 @@
 """Which company a caller belongs to (ADR 0060, R-58).
 
-From the token's `tenant` claim -- an admin-set Keycloak attribute -- matched against
-`tenant.extern_ref`; missing or unknown means the seeded `default` tenant. The client
+From the alias of the caller's one Keycloak Organization -- the `organization` claim,
+read in `backend/auth.py` -- matched against `tenant.extern_ref`; none, several, or an
+unknown one means the seeded `default` tenant. The client
 never supplies one; `resolve_tenant_id` is the single entry point."""
 from __future__ import annotations
 

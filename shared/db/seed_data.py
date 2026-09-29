@@ -16,8 +16,8 @@ LANGUAGE_NAMES = {"de": "Deutsch", "en": "Englisch"}
 
 # Tenants (ADR 0060, R-58). The two pilot companies plus a `default` tenant that
 # every User with no company (dev users included) resolves to. `extern_ref` is
-# the stable key `backend/tenants.py` resolves to -- a Keycloak Organization
-# alias once that is enabled (phase 2), this string until then.
+# the stable key `backend/tenants.py` resolves to: the alias of the company's
+# Keycloak Organization, which must be exactly this string.
 TENANTS = [
     {"extern_ref": "default", "name": "Ohne Unternehmen"},
     {"extern_ref": "solox", "name": "Solox"},

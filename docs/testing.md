@@ -76,7 +76,7 @@ source of that content, and which imports without a database.
 | PDF text extraction for an authored Scenario | F-58, ADR 0024, ADR 0058, ADR 0059 | `test_scenario_documents.py` |
 | Follow-up Scenario drafted on request from a Session's feedback (the played case and the wrap-up carried forward, what the model is still not given, the route's refusals and idempotency, that it is stored once as the User's own private Scenario, and that it leaves the library when its Session does) | F-60, F-10, ADR 0011, ADR 0031, ADR 0043, ADR 0050, ADR 0051, ADR 0058, ADR 0059, ADR 0066, ADR 0067, ADR 0069, ADR 0070 | `test_followup_scenario.py` |
 | Reverse of a finished Session (the row it writes, the briefing, idempotency, the refusals, and what a deletion and the retention sweep take) | F-61, ADR 0043, ADR 0050, ADR 0051, ADR 0059, ADR 0066, ADR 0067, ADR 0070 | `test_reverse.py` |
-| Tenant resolution (org claim → e-mail domain → default) | R-58, ADR 0060 | `test_tenants.py` |
+| Tenant resolution (Organization claim → default) | R-58, ADR 0060 | `test_tenants.py` |
 | Sanitising authored Scenario text before it reaches the prompt | ADR 0024, ADR 0059 | `test_authored_text.py` |
 | Counterpart behaviour (LLM system prompt) | F-01, F-03, F-04, F-12, R-12, ADR 0043, ADR 0045, ADR 0033/0037/0038 | `test_system_prompt.py` |
 | The swapped casting a reverse runs under (prompt, opening, call-state notes, settlement check, per-turn anti-repeat nudge) | F-61, ADR 0038, ADR 0043, ADR 0045, ADR 0070, ADR 0071, ADR 0073 | `test_reverse_prompt.py` |

@@ -37,8 +37,8 @@ The character traits of the AI-simulated conversation partner within a Session �
 _Avoid_: Scenario, character, counterpart
 
 **Tenant**:
-The company a User belongs to, and the owner of the Scenarios its members author (docs/adr/0060). One of three independent properties of an authored Scenario: authorship (who wrote it, docs/adr/0058), ownership (which Tenant it belongs to — none, for a shipped built-in), and visibility (who may see it). Distinct from the User: colleagues share a Tenant. The pilot Tenants are Solox and APPOLLO. Personas are curated, not authored, so they have no Tenant.
-_Avoid_: Mandant (in code/schema — it stays "tenant"), organization, company, account
+The company a User belongs to, and the owner of the Scenarios its members author (docs/adr/0060). One of three independent properties of an authored Scenario: authorship (who wrote it, docs/adr/0058), ownership (which Tenant it belongs to — none, for a shipped built-in), and visibility (who may see it). Distinct from the User: colleagues share a Tenant. The pilot Tenants are Solox and APPOLLO. Personas are curated, not authored, so they have no Tenant. In Keycloak a Tenant is an Organization, whose alias is the Tenant's reference; "Organization" names only that Keycloak object.
+_Avoid_: Mandant (in code/schema — it stays "tenant"), organization (outside Keycloak), company, account
 
 **Language**:
 The language a Session's simulated conversation is conducted in. Not a Session parameter of its own: it follows from the selected Persona, which carries exactly one language and voice (docs/adr/0043, superseding the earlier per-Session model). German and English are supported, per Persona; a further language is a language pack plus a Persona that names it, never a global setting.

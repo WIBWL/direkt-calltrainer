@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted and implemented through phase 1. **Builds on ADR 0058** (User-Authored
+Accepted and implemented through phase 2, **amended on 2026-09-29** — see the
+amendment at the end. The caller's company now comes from Keycloak
+Organizations, not from a `tenant` user attribute; the Decision's resolution
+order below no longer holds and is left as written. **Builds on ADR 0058** (User-Authored
 Scenarios): that decision established the row shape (`created_by`, `extern_id`,
 `visibility`), the one-table model and the owner-scoped CRUD. This ADR adds the
 third axis — **ownership by a company** — and the sharing that R-58 / F-59
@@ -118,3 +121,36 @@ introduced.
 
 `CONTEXT.md` gains a **Tenant** term. The migrations and the ER diagram
 regenerate from `backend/db/models.py` as usual.
+
+## Amendment (2026-09-29): the tenant comes from the `organization` claim
+
+Phase 2 is no longer optional, and it replaces phase 1's source rather than
+feeding the same claim. A caller's company is the **alias of the one Keycloak
+Organization they are a member of**, read from the `organization` claim that
+Keycloak's built-in `organization` client scope puts in the access token
+(`backend/auth.py`). The alias matches `tenant.extern_ref`, so each company's
+Organization carries its seeded ref (`solox`, `appollo`) as alias. The `tenant`
+user attribute, its protocol mapper and its admin-only user-profile declaration
+are gone.
+
+- **Why one source, not a fallback.** Two ways to name a company are a pair that
+  can disagree, and the attribute was a security boundary only as long as
+  nobody loosened the realm's user profile. Membership in an Organization is
+  admin-managed by construction, and it is the structure the shared realm is
+  meant to use anyway.
+- **The scope is a default client scope.** The SPA asks for nothing. Keycloak
+  then leaves the claim out entirely for a member of several Organizations
+  (verified on 26.7; requesting `organization:*` would list them all, and
+  requesting a plain optional `organization` has the user pick one at login, as
+  Keycloak documents it — not tried here). No claim means `default` — the same as none, or an unknown alias.
+- **Several aliases are no answer.** Should the claim ever carry more than one,
+  the backend does not take the first: its order is not a choice anybody made,
+  and a wrong company reads another's shared Scenarios, where `default` reads
+  nobody's. The claim is a list of aliases, or a map alias → attributes when the
+  mapper adds attributes or the id; both are read by their aliases.
+
+Nothing else in this ADR changes: the `tenant` table stays the application's own
+record of a company (its display `name` is ours, not Keycloak's), resolution is
+still per request and server-side, and there is still no membership management
+inside Calltrainer. A new company is still a seed change plus a deployment —
+now with an Organization of that alias in the realm.
