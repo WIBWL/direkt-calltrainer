@@ -1,0 +1,3 @@
+# LF on every platform: a CRLF render-config.sh builds fine on Windows and then
+# stops the frontend container from starting; a CRLF build-and-push.sh fails at once.
+*.sh text eol=lf

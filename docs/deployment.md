@@ -21,6 +21,8 @@ scripts/build-and-push.sh                 # all three; or name some: frontend ba
 
 The script refuses to run unless HEAD carries a `v*` tag that has been pushed, and pushes each image twice: `:v1.2.3` (what a rollback pins) and `:latest` (what the stack runs and WUD watches). It builds with a buildx `docker-container` builder named `wud` and `--provenance=true`, because WUD's digest watching only works on an OCI index — a plain `docker push` of `latest` is never picked up (`direkt-infrastructure/public/README.md`). amd64 only: praat-parselmouth ships no Linux arm64 wheel. It needs bash 4 and `docker login registry.internal.efre-direkt.de`.
 
+On Windows, run it from Git Bash (bash 5, with Docker Desktop's `docker` on the PATH) or from WSL 2 with Docker Desktop's WSL integration, cloned inside the WSL filesystem. `.gitattributes` checks out every `*.sh` with LF whatever `core.autocrlf` says: a CRLF `build-and-push.sh` fails at once, but a CRLF `frontend/docker/render-config.sh` builds and pushes cleanly and then keeps the frontend container from starting on the server. A checkout made before `.gitattributes` existed keeps its CRLF files until `git rm --cached -r . && git reset --hard`, or a fresh clone.
+
 WUD checks hourly, pulls the new `latest`, recreates the container and prunes the old image. **The schema migrates itself when the new backend starts** — see "Every later deployment" for the dump to take first.
 
 ## Once, before the first start
