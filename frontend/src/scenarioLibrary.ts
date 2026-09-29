@@ -89,9 +89,13 @@ export interface ScenarioCard {
   name: string;
   short_description: string;
   /** The trainee's own briefing (ADR 0054): the role they answer in, the room
-   * they have, what a good outcome is. Shown before the call, never sent to the
+   * they have, and for a built-in the whole "Ihr Wissensstand" as `- ` lines.
+   * Shown after the microphone check and during the call, never sent to the
    * model. "" for a Scenario whose author left it empty. */
   briefing: string;
+  /** Who calls, why, and what is practised, as German display text. Shown on
+   * the setup screen once the card is picked. */
+  description: string;
   /** null = uncategorised (ADR 0072). */
   category: ScenarioCategory | null;
   origin: Origin;
@@ -252,7 +256,10 @@ export interface ScenarioDetail {
   short_description: string;
   briefing: string;
   description: string;
-  case_facts: string;
+  /** null = withheld because this is a built-in: its `briefing` says what the
+   * trainee's side knows, and the facts are the caller's (ADR 0054's
+   * amendment). */
+  case_facts: string | null;
   /** What the caller wants and the bar that settles it, in one field.
    * null = withheld because this is a built-in, whose caller's intent is the
    * answer key (ADR 0062). "" = its author left the field empty. */
@@ -284,7 +291,7 @@ export function toDraft(detail: ScenarioDetail): ScenarioDraft {
     short_description: detail.short_description,
     briefing: detail.briefing,
     description: detail.description,
-    case_facts: detail.case_facts,
+    case_facts: detail.case_facts ?? "",
     call_goal: detail.call_goal ?? "",
     category: detail.category,
   };

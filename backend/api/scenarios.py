@@ -156,6 +156,11 @@ def _card(scenario, subject: str) -> dict:
         # here in any case — this text is written to be read by whoever
         # plays the Scenario.
         "briefing": scenario.briefing,
+        # What the setup screen shows once the card is picked: who calls, why,
+        # and what is practised. The German twin for a built-in, whose own
+        # `description` is English prompt text (ADR 0043); an authored row's
+        # author wrote it in their own language.
+        "description": scenario.description_label or scenario.description,
         # Null for an uncategorised Scenario; the category filter then only
         # shows it under "Alle" (ADR 0072).
         "category": scenario.category,
@@ -209,8 +214,9 @@ def _detail(scenario, subject: str) -> dict:
     "withheld" from "the author left it empty". That field is the caller's
     *intent* and the bar by which the call is done; reading it in advance
     would hand the trainee the answer to the
-    exercise. `description` and `case_facts` are the situation, which comes
-    up in the call anyway, so they are served. A Scenario the caller or a
+    exercise. `description` is the situation and is served; `case_facts` is
+    withheld too, since the built-in's `briefing` states what the trainee's
+    side knows and the facts would add what only the caller knows. A Scenario the caller or a
     colleague authored withholds nothing: they wrote it, or work with the
     person who did.
 
@@ -233,7 +239,11 @@ def _detail(scenario, subject: str) -> dict:
         # because its author already wrote it in their own language. Same wire
         # name either way: the client shows one text and never both.
         "description": scenario.description_label or scenario.description,
-        "case_facts": scenario.case_facts_label or scenario.case_facts,
+        # A built-in withholds its case facts as well: they are the caller's
+        # side of the case, budget and notes included, and its `briefing`
+        # already carries everything the trainee's own company knows about
+        # this customer (ADR 0054's amendment).
+        "case_facts": None if built_in else (scenario.case_facts_label or scenario.case_facts),
         "call_goal": None if built_in else scenario.call_goal,
         # "" rather than null, so the editor's select has a value to sit on.
         "category": scenario.category or "",

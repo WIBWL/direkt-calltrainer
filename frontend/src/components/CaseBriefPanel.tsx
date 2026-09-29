@@ -1,19 +1,21 @@
-import ScenarioBriefing from "./ScenarioBriefing";
+import ScenarioBriefing, { StructuredText } from "./ScenarioBriefing";
 
 /**
- * What the trainee holds for an ordinary call: their own briefing (ADR 0054)
- * and the facts of the case.
+ * What the trainee holds for an ordinary call: their Wissensstand (the
+ * `briefing`, ADR 0054) and, for an authored Scenario, the facts of the case.
  *
- * The facts are the caller's own material — they are what the model playing
- * the caller is briefed with. Showing them is not a leak: the read-only info
- * panel behind a card's "i" already serves them for every Scenario, on the
- * argument that the situation comes up in the call anyway. What stays withheld
- * is `call_goal`, which is the answer key.
+ * A built-in serves no facts to the client (ADR 0054's amendment): its
+ * Wissensstand already lists what the trainee's own company knows about this
+ * customer, and the facts are the caller's side, notes and budget included. An
+ * authored Scenario still shows them, because its author wrote them to be read
+ * and its briefing is usually a few sentences of role. What stays withheld
+ * everywhere is `call_goal`, which is the answer key.
  *
  * Two variants, like `ReverseBriefPanel`: "prepare" is the screen between the
- * microphone check and the ringing phone and carries both halves; "call" sits
- * beside the state animation and carries the *facts* alone, since what one
- * reaches back for mid-call is a number, a date or a name.
+ * microphone check and the ringing phone; "call" sits beside the state
+ * animation. They carry the same text, because what one reaches back for
+ * mid-call — a number, a date, a name — is exactly what the Wissensstand is
+ * written as a list for.
  *
  * The "call" variant is the same deliberate exception to ADR 0033 that ADR 0070
  * takes for a reverse: the text says nothing about the conversation in
@@ -31,30 +33,22 @@ export default function CaseBriefPanel({
 }) {
   const facts = caseFacts?.trim();
 
-  if (variant === "call") {
-    if (!facts) return null;
-    // The eyebrow is the heading here, so the section takes its name from a
-    // label rather than from a heading hidden for the eye only.
-    return (
-      <section className="case-brief case-brief-call" aria-label="Fakten des Falls">
-        <div className="case-brief-eyebrow">FAKTEN DES FALLS</div>
-        <p className="case-brief-body">{facts}</p>
-      </section>
-    );
-  }
+  if (variant === "call" && !facts && !briefing?.trim()) return null;
 
   return (
-    <>
-      {/* The same component the setup screen uses, so the briefing reads
-          identically in both places rather than being written twice. */}
+    <div className={variant === "call" ? "case-brief-call" : undefined}>
+      {/* The same component in both places, so the Wissensstand reads
+          identically before and during the call. */}
       <ScenarioBriefing briefing={briefing} />
 
       {facts && (
-        <section className="case-brief">
+        <section className="case-brief" aria-label="Fakten des Falls">
           <div className="case-brief-eyebrow">FAKTEN DES FALLS</div>
-          <p className="case-brief-body">{facts}</p>
+          <div className="case-brief-body">
+            <StructuredText text={facts} />
+          </div>
         </section>
       )}
-    </>
+    </div>
   );
 }

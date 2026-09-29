@@ -14,7 +14,7 @@ import LanguageFlag from "./LanguageFlag";
 import LibraryPicker from "./LibraryPicker";
 import { cx } from "../utils/cx";
 import PersonaAvatar from "./PersonaAvatar";
-import ScenarioBriefing from "./ScenarioBriefing";
+import { ScenarioDescription } from "./ScenarioBriefing";
 import SelectionSummary from "./SelectionSummary";
 import SetupSection from "./SetupSection";
 
@@ -173,10 +173,11 @@ export default function SetupView({
           language={selectedPersona?.language ?? NOT_SELECTED}
         />
 
-        {/* The trainee's side of the case (ADR 0054). Here as well as on the
-            microphone check: which Scenario to pick is itself a decision, and
-            the card's one line says only what the caller wants. */}
-        <ScenarioBriefing briefing={selectedScenario?.briefing} />
+        {/* What the case is about: which Scenario to pick is itself a
+            decision, and the card's one line says only what the caller wants.
+            The Wissensstand with its figures follows after the microphone
+            check, once the Session is committed to (ADR 0054's amendment). */}
+        <ScenarioDescription description={selectedScenario?.description} />
 
         {/* Said before the call, not after it (ADR 0066). Someone who declined
             storage should learn that this training will leave no record while

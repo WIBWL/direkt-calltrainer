@@ -154,6 +154,10 @@ async def test_a_built_in_withholds_the_callers_intent(client, as_user):
     assert detail["call_goal"] is None
     # The situation is served, and the seed gives every built-in one.
     assert detail["description"]
+    # The facts are the caller's side; the Wissensstand in `briefing` is what
+    # the trainee's side knows (ADR 0054's amendment).
+    assert detail["case_facts"] is None
+    assert detail["briefing"]
 
 
 async def test_my_own_scenario_withholds_nothing(client, as_user):

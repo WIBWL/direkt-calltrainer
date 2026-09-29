@@ -265,7 +265,7 @@ export default function App() {
       .then((detail) => {
         if (cancelled) return;
         if (!committed.reverse) {
-          setCommittedCase({ briefing: detail.briefing, facts: detail.case_facts });
+          setCommittedCase({ briefing: detail.briefing, facts: detail.case_facts ?? "" });
         } else if (detail.reverse_brief) {
           setReverseBrief(detail.reverse_brief);
         }
@@ -697,9 +697,12 @@ export default function App() {
 
   if (screen === "call") {
     // A real answer and not "an element exists": `CaseBriefPanel` renders
-    // nothing when there are no facts, and the page widens to two columns on
-    // this, so asking the element would leave an empty second column.
-    const hasBrief = committed?.reverse === true || Boolean(committedCase?.facts.trim());
+    // nothing when there is neither a Wissensstand nor facts, and the page
+    // widens to two columns on this, so asking the element would leave an
+    // empty second column.
+    const hasBrief =
+      committed?.reverse === true ||
+      Boolean(committedCase?.briefing.trim() || committedCase?.facts.trim());
     const brief = hasBrief ? briefPanel("call") : null;
     return (
       <AppLayout

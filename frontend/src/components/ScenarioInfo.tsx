@@ -4,6 +4,7 @@ import { ApiError } from "../api";
 import { getScenario, type ScenarioDetail } from "../scenarioLibrary";
 import ConfirmDialog from "./ConfirmDialog";
 import Modal from "./Modal";
+import { StructuredText } from "./ScenarioBriefing";
 
 interface ScenarioInfoProps {
   /** The Scenario to describe — its `extern_id` (ADR 0050). */
@@ -29,9 +30,15 @@ interface ScenarioInfoProps {
  * says what the caller wants and the bar that settles the call, which is the
  * answer key to the exercise. It was withheld from built-ins for exactly that
  * reason (ADR 0043/0045) and reading it in advance spoils an authored one just
- * as thoroughly — the editor is where its author sees it again. */
-const SECTIONS: { key: keyof ScenarioDetail; label: string }[] = [
-  { key: "briefing", label: "Briefing" },
+ * as thoroughly — the editor is where its author sees it again.
+ *
+ * A built-in shows its description alone (ADR 0054's amendment): its
+ * Wissensstand is read after the microphone check, and its facts are the
+ * caller's, which the server withholds (`case_facts` null). An authored row
+ * still shows all three, its author having written each of them to be read. */
+const SECTIONS: { key: keyof ScenarioDetail; label: string; authoredOnly?: boolean }[] = [
+  { key: "description", label: "Worum es geht" },
+  { key: "briefing", label: "Ihr Wissensstand", authoredOnly: true },
   { key: "case_facts", label: "Fakten des Falls" },
 ];
 
@@ -142,10 +149,12 @@ export default function ScenarioInfo({
           {SECTIONS.map((section) => {
             const value = detail[section.key];
             if (typeof value !== "string" || value.length === 0) return null;
+            // A built-in is the row whose facts came back withheld.
+            if (section.authoredOnly && detail.case_facts === null) return null;
             return (
               <section className="persona-info-section" key={section.key}>
                 <h3>{section.label}</h3>
-                <p>{value}</p>
+                <StructuredText text={value} />
               </section>
             );
           })}

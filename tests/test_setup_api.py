@@ -172,13 +172,16 @@ async def test_scenarios_endpoint_lists_every_scenario_with_its_teaser(client):
 
 async def test_scenarios_endpoint_withholds_the_english_call_context(client):
     """ADR 0043: `description` is prompt input, not something the setup screen
-    renders — it would show the user English text in a German UI."""
+    renders — it would show the user English text in a German UI. The card's
+    `description` is the German twin instead (ADR 0054's amendment), which the
+    setup screen shows once the card is picked."""
     body = (await client.get("/api/scenarios")).json()
     served = {value for entry in body for value in entry.values()}
     for scenario in SEEDED_SCENARIOS:
         assert scenario["description"] not in served
-    for entry in body:
-        assert "description" not in entry
+    by_name = {entry["name"]: entry for entry in body}
+    for scenario in SEEDED_SCENARIOS:
+        assert by_name[scenario["name"]]["description"] == scenario["description_label"]
 
 
 async def test_scenarios_endpoint_withholds_the_case(client):
@@ -188,8 +191,8 @@ async def test_scenarios_endpoint_withholds_the_case(client):
     body = (await client.get("/api/scenarios")).json()
     for entry in body:
         assert set(entry) == {
-            "id", "name", "short_description", "briefing", "category", "origin",
-            "shared", "follow_up",
+            "id", "name", "short_description", "briefing", "description",
+            "category", "origin", "shared", "follow_up",
             # ADR 0070. Neither is prompt input: one is a casting marker,
             # the other names a Session the caller already owns.
             "reverse", "origin_session",
