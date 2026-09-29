@@ -116,6 +116,9 @@ nav:
       - ADR 0102 - One Place Decides a Shared Fact - Five Seams From the Tenth Review: adr/0102-one-place-decides-a-shared-fact.md
       - ADR 0103 - One OpenAI-Compatible Gateway, One Voice, and No Switches Between Them: adr/0103-one-openai-compatible-gateway-one-voice.md
       - ADR 0104 - Frontend, Backend and Worker as Three Images: adr/0104-frontend-backend-worker-images.md
+      - ADR 0105 - "Deutliche Artikulation" Is Retired from the Focus Catalogue: adr/0105-the-articulation-goal-is-retired.md
+      - ADR 0106 - The Dashboard Reads One Client-Side Load and Adds No Endpoint: adr/0106-the-dashboard-reads-one-client-side-load.md
+      - ADR 0107 - The Progress Report Is a Second Document on the Same Page Frame: adr/0107-the-progress-report-is-a-second-document.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
   # site is served at the root (mkdocs serve / mkdocs build + static server).
