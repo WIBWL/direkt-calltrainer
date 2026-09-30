@@ -117,7 +117,7 @@ Die Stimme des Nutzers und die Transkripte gehen nur an das Gateway, das im Stac
 
 # 4. Lösungsstrategie
 
-Dieses Kapitel fasst die tragenden Entscheidungen zusammen. Es begründet sie nicht — die Begründung steht jeweils im zugehörigen ADR, indiziert in Kapitel 9. Der Prototyp ist lauffähig; die hier genannten Entscheidungen sind damit umgesetzt und nicht mehr nur vorgesehen.
+Dieses Kapitel fasst die tragenden Entscheidungen zusammen. Es begründet sie nicht — die Begründung steht jeweils im zugehörigen ADR, indiziert in Kapitel 9. Die Anwendung ist lauffähig; die hier genannten Entscheidungen sind umgesetzt und nicht mehr nur vorgesehen.
 
 ## 4.1 Technologieentscheidungen
 
@@ -126,7 +126,7 @@ Dieses Kapitel fasst die tragenden Entscheidungen zusammen. Es begründet sie ni
 | Frontend | Single-Page-Anwendung in React und TypeScript, gebaut mit Vite und in einem eigenen Image von nginx ausgeliefert; das Backend läuft auf einem eigenen Host und erlaubt den Zugriff per CORS | 0008, 0104, 0107 |
 | Backend | Python mit FastAPI | 0012 |
 | Architekturstil | Geschichteter modularer Monolith für den Echtzeitpfad, asynchroner Worker für die Nachbereitung; drei Python-Pakete (`shared`, `backend`, `worker`) in einem uv-Workspace | 0018, 0108 |
-| Sprach- und Dialogmodelle | Uni-gehostetes DiReKT-Gateway für STT und LLM, je ein Modellname in `.env`; getrennt selbst gehostete lokale Modelle statt eines externen Anbieters | 0011, 0021, 0103 |
+| Sprach- und Dialogmodelle | Das OpenAI-kompatible DiReKT-Gateway für STT und LLM, je ein Modellname in der Konfiguration; dasselbe Dialogmodell für Gespräch und Nachbereitung | 0011, 0021, 0103 |
 | Sprachsynthese | KugelAudio, ohne Rückfallebene | 0040, 0103 |
 | Sprecherwechsel | Silero-VAD im Browser; das Turn-Ende wird erkannt, nicht per Knopfdruck gesetzt | 0036 |
 | Transport | Eine WebSocket-Verbindung je Session, Audio in Chunks in beide Richtungen | 0033, 0044 |
@@ -690,7 +690,7 @@ Jedes Szenario nennt einen Auslöser, die geforderte Reaktion und, wo es ihn gib
 
 # 11. Risiken und technische Schulden
 
-Die Risiken in 11.1 begleiten das Vorhaben unabhängig vom Umsetzungsstand. Die technischen Schulden in 11.2 sind demgegenüber Befunde am gebauten Prototyp: bewusst in Kauf genommene oder nachträglich erkannte Verkürzungen, die heute tragen, aber Folgekosten haben.
+Die Risiken in 11.1 begleiten das Vorhaben unabhängig vom Umsetzungsstand. Die technischen Schulden in 11.2 sind demgegenüber Befunde an der gebauten Anwendung: bewusst in Kauf genommene oder nachträglich erkannte Verkürzungen, die heute tragen, aber Folgekosten haben.
 
 ## 11.1 Risiken
 
