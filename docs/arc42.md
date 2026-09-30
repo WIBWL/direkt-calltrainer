@@ -117,7 +117,7 @@ Die Stimme des Nutzers und die Transkripte gehen nur an das Gateway, das im Stac
 
 # 4. Lösungsstrategie
 
-Dieses Kapitel fasst die tragenden Entscheidungen des ersten Prototyps zusammen. Es begründet sie nicht — die Begründung steht jeweils im zugehörigen ADR, indiziert in Kapitel 9. Der Prototyp ist lauffähig; die hier genannten Entscheidungen sind damit umgesetzt und nicht mehr nur vorgesehen.
+Dieses Kapitel fasst die tragenden Entscheidungen zusammen. Es begründet sie nicht — die Begründung steht jeweils im zugehörigen ADR, indiziert in Kapitel 9. Der Prototyp ist lauffähig; die hier genannten Entscheidungen sind damit umgesetzt und nicht mehr nur vorgesehen.
 
 ## 4.1 Technologieentscheidungen
 
@@ -144,35 +144,45 @@ Dieses Kapitel fasst die tragenden Entscheidungen des ersten Prototyps zusammen.
 Der Engpass ist die Kette aus Spracherkennung, Antwortgenerierung und Sprachsynthese. Sie wird nicht als Blockkette abgearbeitet, sondern an jeder Stelle überlappt:
 
 - Die Antwort wird gestreamt erzeugt und abschnittsweise synthetisiert; jeder Teilabschnitt geht an den Client, sobald er entsteht. Die Wiedergabe beginnt, bevor die Antwort fertig generiert ist (ADR 0033, ADR 0044).
-- Der Eröffnungssatz wird vorgewärmt, während der Nutzer den Mikrofontest durchläuft — die Wartezeit wird in eine Phase gelegt, in der ohnehin gewartet wird (ADR 0042).
+- Der Eröffnungssatz wird vorgewärmt, sobald sich der Nutzer auf ein Gespräch festlegt, und bis zur Annahme des Anrufs zurückgehalten — die Wartezeit liegt in Mikrofontest und Klingeln, in denen ohnehin gewartet wird (ADR 0042).
+- Die akustische Messung eines Redebeitrags läuft auf einem eigenen Thread parallel zur Spracherkennung und kostet keine Wartezeit (ADR 0048).
+- Das Dialogmodell liest statt des ganzen Verlaufs die letzten Wechsel und kurze Gesprächsnotizen, die im Hintergrund nach jedem Wechsel fortgeschrieben werden (ADR 0071).
 - Der Nutzer kann die Persona unterbrechen, statt ihre Antwort abwarten zu müssen (ADR 0035).
-- Alles Blockierende — Datenbankzugriffe, akustische Messung, Erzeugung der Rückmeldung — läuft außerhalb des Event-Loops, der das Audio streamt; die Nachbereitung erst nach Gesprächsende im Worker (ADR 0018, ADR 0019, ADR 0034).
-- Die Modelle laufen im eigenen Netz statt bei einem externen Anbieter, wodurch die Latenz kontrollierbar bleibt (ADR 0011, ADR 0021).
+- Alles Blockierende — Datenbankzugriffe, Erzeugung der Rückmeldung — läuft außerhalb des Event-Loops, der das Audio streamt; die Nachbereitung erst nach Gesprächsende im Worker (ADR 0018, ADR 0019, ADR 0034). Die Gesprächsschleife hängt von der Auswertung nicht ab (ADR 0090).
 
 ### Q-01 Genauigkeit und Nachvollziehbarkeit der Gesprächsanalyse
 
 - **Messen und Deuten sind getrennt.** Kennzahlen werden deterministisch berechnet; das Modell interpretiert sie, erzeugt sie aber nicht (ADR 0049).
-- **Keine erfundenen Normen.** Es gibt keinen Score und keine Zielkorridore, weil für diese Nutzergruppe keiner validiert ist; eine erfundene Schwelle wäre ein verkappter Score (ADR 0004, ADR 0051).
+- **Keine erfundenen Normen.** Es gibt keinen Score und keine Zielkorridore auf einer Rohzahl, weil für diese Nutzergruppe keiner validiert ist; eine erfundene Schwelle wäre ein verkappter Score (ADR 0004, ADR 0051). Die einzige Ausnahme ist eine Ampel auf einer *Einordnung* im einzelnen Gespräch, unter sieben Bedingungen — heute bei Sprachmelodie und Unterbrechungen (ADR 0078).
+- **Jede Kennzahl zeigt, woraus sie gewonnen wurde.** Jede Kachel führt auf eine eigene Seite mit den Gesprächsstellen oder dem Verlauf dahinter, gelesen aus den gespeicherten Daten und nie neu berechnet (ADR 0098). Eine Messung wird einmal gespeichert, ihre Einordnung bei jedem Lesen abgeleitet (ADR 0091).
 - **Nichts wird gegen die Persona gemessen.** Sie ist eine synthetische Stimme; ein Vergleich mit ihr würde eine TTS-Einstellung als Aussage über den Nutzer ausgeben (ADR 0051).
+- **Fortschritt ohne Urteil.** Die Fortschrittsansicht zeigt Werte über die Zeit, aber keine Zielbänder, keine Wertungsfarben und keinen Gesamtwert (ADR 0065, ADR 0095).
 - **Rückmeldung erst nach dem Gespräch**, damit sie den Gesprächsfluss nicht stört und im Zusammenhang beurteilt werden kann (ADR 0014).
 
 ### Q-02 Bedienbarkeit ohne Einarbeitung
 
-- Vor dem Training sind genau zwei Entscheidungen zu treffen: Persona und Szenario. Jede Kombination ist zulässig, es gibt nichts zu filtern und nichts falsch zu machen (ADR 0001, ADR 0015).
+- Pflicht vor dem Training sind nur Persona und Szenario. Jede Kombination ist zulässig (ADR 0001, ADR 0015). Die Szenarien lassen sich nach Herkunft und Art des Gesprächs filtern (ADR 0072); die Bibliothek öffnet auf den Vorschlägen, wenn es welche gibt.
 - Kartenauswahl statt Liste; die Sprache ist keine eigene Auswahl, sondern ergibt sich aus der Persona (ADR 0015, ADR 0043).
-- Während des Gesprächs wird kein Text angezeigt, nur der Zustand *zuhören / denken / sprechen*. Das Transkript erscheint vollständig danach (ADR 0014).
+- Der Weg durch ein Training ist eine einzige Übergangstabelle (ADR 0096). Ein Gespräch beginnt erst auf einen eigenen Knopfdruck: im gewöhnlichen Gespräch nimmt der Nutzer den klingelnden Anruf an (F-63), im Rollentausch bestätigt er, dass er sein Briefing gelesen hat.
+- Während des Gesprächs gibt es keine Mitschrift, nur den Zustand *zuhören / denken / sprechen* und, wo das Szenario sie hat, die Fakten des Falls; im Rollentausch das Briefing des Nutzers (ADR 0014, ADR 0070). Das Transkript erscheint vollständig danach.
+- Bewegung folgt der Systemeinstellung, Ton lässt sich abschalten, Diagramme tragen ihre Zahlen auch als Text (ADR 0097).
 
 ### C-04 Datenschutz als begrenzende Randbedingung
 
-- Sprachaufzeichnungen werden nicht gespeichert. Sie werden im Arbeitsspeicher gemessen und danach verworfen (ADR 0048).
+- Gespeichert wird nur mit Einwilligung; ohne sie läuft das Training vollständig, nur ohne Speicherung, Wrap-up und Historie (ADR 0066).
+- Gespeicherte Trainings laufen nach sechs Monaten ab; der Nutzer kann einzelne löschen, alle mit dem Widerruf löschen und seine Daten exportieren (ADR 0066, ADR 0067).
+- Sprachaufzeichnungen werden nicht gespeichert. Sie werden im Arbeitsspeicher gemessen und danach verworfen (ADR 0048). Gesprochenes wird nicht geloggt.
 - Sessiondaten werden einmalig am Gesprächsende geschrieben, nicht fortlaufend während des Gesprächs (ADR 0034).
-- Eine Session wird über eine nicht erratbare Kennung adressiert; der Primärschlüssel bleibt intern (ADR 0050).
+- Eine Session wird über eine nicht erratbare Kennung adressiert; der Primärschlüssel bleibt intern, und auf fremde Daten antwortet die API wie auf nicht vorhandene (ADR 0031, ADR 0050).
 
 ## 4.3 Organisatorische Ansätze
 
-- **Jede Architekturentscheidung wird als ADR festgehalten** (ADR 0000). Kapitel 9 ist nur der Index.
-- **Bibliotheksinhalte liegen in der Datenbank, nicht im Code** (ADR 0041). Neue Personas und Szenarien sind Daten, kein Deployment — Voraussetzung dafür, dass Nutzer sie später selbst anlegen (ADR 0024).
-- **Bewusst keine Abstraktionsschicht über STT, LLM und TTS** (ADR 0017). Bei drei Anbietern kostet sie mehr, als sie einbringt; ein Wechsel ist eine überschaubare Änderung an einer bekannten Stelle.
+- **Jede Architekturentscheidung wird als ADR festgehalten** (ADR 0000). Kapitel 9 ist nur der Index. Auch verworfene Umbauten werden festgehalten, damit sie nicht ohne neue Gründe wieder vorgeschlagen werden (ADR 0092, ADR 0101).
+- **Bibliotheksinhalte liegen in der Datenbank, nicht im Code** (ADR 0041). Neue Personas und mitgelieferte Szenarien sind Seed-Daten, eigene Szenarien legen Nutzer selbst an (ADR 0058).
+- **Bewusst keine Abstraktionsschicht über STT, LLM und TTS** (ADR 0017), und je Strecke genau ein Backend ohne Umschalter (ADR 0103). Ein Wechsel ist eine überschaubare Änderung an einer bekannten Stelle.
+- **Eine Tatsache wird an einer Stelle entschieden**, und alle, die sie brauchen, fragen dort (ADR 0102): etwa was ein Feedback-Bericht enthält, wie eine gespeicherte Session gelesen wird, in welcher Reihenfolge gelöscht wird.
+- **Der Aufrufer öffnet die Transaktion**, eine Domänenfunktion nimmt sie entgegen und committet nie (ADR 0099).
+- **Tests belegen Anforderungen.** Jede Testdatei nennt das Feature, die Anforderung oder den ADR, den sie belegt; im Frontend ist die Suite bewusst schmal und deckt Audiopfad, Ablaufsteuerung und die Rechnungen der Fortschrittsansicht ab (ADR 0094).
 
 # 5. Bausteinsicht
 
