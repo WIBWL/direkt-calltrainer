@@ -8,6 +8,12 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . ./
+# Before the build and a step of its own, so a failure names itself. `npm run
+# build` runs eslint and tsc but never vitest, which is the suite behind what the
+# dashboard claims out loud ("Ihr üblicher Bereich 118 bis 141") — pure functions
+# whose every failure renders perfectly, so nothing else catches them. Two
+# seconds, and no .env: vitest reads the same vite.config.ts as the build.
+RUN npm test
 # No settings are baked in: the OIDC issuer is read from the container's
 # environment at start (spa.conf.template serves it as /config.js).
 RUN npm run build
