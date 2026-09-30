@@ -36,8 +36,15 @@ async def attach_measurements(
         turn.user_acoustics_complete = False
         return
     started_ms = max(0, ended_ms - measured.duration_ms)
+    # The utterance begins at its first sound and ends at its last, not at the
+    # recording's edges: the VAD pads about 0.8 s in front and a second behind,
+    # and placed on those edges every reply started early enough to shorten
+    # its reaction time by the whole pad and to read as talking over the
+    # Persona (ADR 0108). The pauses below stay rebased on the recording's
+    # start, which is what their offsets are relative to.
     if turn.user_offset_ms is None:
-        turn.user_offset_ms = started_ms
+        turn.user_offset_ms = started_ms + measured.voice_start_ms
+    turn.user_end_ms = started_ms + measured.voice_end_ms
     turn.user_speech_ms += measured.duration_ms
     turn.user_phonation_ms += measured.phonation_ms
     turn.pauses.extend(Pause(started_ms + p.offset_ms, p.duration_ms) for p in measured.pauses)

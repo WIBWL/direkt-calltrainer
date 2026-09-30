@@ -32,7 +32,8 @@ class Turn:  # pylint: disable=too-many-instance-attributes
     # The two utterances placed on the Session's timeline, in milliseconds from
     # its start; None until that utterance has happened. The Persona's window is
     # modelled from the audio synthesized for it, because the server never
-    # learns when the client finished playing it.
+    # learns when the client finished playing it. The user's runs from the first
+    # sound to the last, the VAD's padding left out (ADR 0108), where measured.
     user_offset_ms: int | None = None
     user_end_ms: int | None = None
     persona_offset_ms: int | None = None
@@ -48,7 +49,8 @@ class Turn:  # pylint: disable=too-many-instance-attributes
 
     # Paraverbal facts about the user's speech (ADR 0048), already rebased onto
     # the Session's timeline, so a Turn spoken in several fragments needs no
-    # special case. Talk share divides by the recording length, pace by phonation.
+    # special case. `user_speech_ms` is the recordings' length, padding and
+    # all; no figure divides by it any more (ADR 0108), pace divides by phonation.
     user_speech_ms: int = 0
     user_phonation_ms: int = 0
     # False once any fragment of this Turn failed to measure: its words still

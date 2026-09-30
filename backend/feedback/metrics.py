@@ -14,7 +14,7 @@ from statistics import fmean
 
 from backend.db.models import ASPECT_HOW, ASPECT_WHAT
 from backend.feedback import hesitations, intonation
-from backend.feedback.calls import Conversation
+from backend.feedback.calls import Conversation, Reaction
 from backend.feedback.interruptions import classify
 from backend.session.language_packs import LANGUAGE_PACKS, LanguagePack
 
@@ -92,22 +92,34 @@ def measure(call: Conversation) -> list[Measurement]:
 
 def _talk_share(call: Conversation) -> Measurement | None:
     """F-24. The user's share of the speaking time (not wall-clock, so latency
-    counts for neither side). Audio duration on both sides: phonation would
-    strip the user's silences but not the Persona's.
+    counts for neither side). First sound to last on the user's side, the
+    synthesized audio on the Persona's: both with the pauses inside them, and
+    neither with the VAD's padding, which alone used to add about 1.8 s to
+    every user utterance (ADR 0108). Phonation would strip the user's pauses
+    but not the Persona's.
     """
-    spoken = call.user_speech_ms + call.persona_speech_ms
+    # The span rests on Praat's split into speech and silence; over a noise
+    # floor it would be the whole recording again, padding included (ADR 0085).
+    if not call.user_acoustics_complete or not _silence_found(call):
+        return None
     # Words with no measured speaking time behind them mean the measurement
     # failed (ADR 0048), not that the speaker stayed silent. Reporting the
     # share anyway would put a 0% or a 100% in front of the user as though it
     # had been measured -- exactly what `measure` refuses to do elsewhere.
-    if not call.user_acoustics_complete or not spoken:
+    if call.user_text and not call.user_voiced_ms:
         return None
-    if call.user_text and not call.user_speech_ms:
+    return talk_share_measurement(call.user_voiced_ms, call.persona_speech_ms)
+
+
+def talk_share_measurement(user_ms: int, persona_ms: int) -> Measurement | None:
+    """The stored shape of F-24. Shared with `scripts/backfill_voiced_span.py`,
+    which has the same two terms from stored figures; the guards on whether a
+    call may be measured stay with the deriver."""
+    spoken = user_ms + persona_ms
+    if not spoken:
         return None
     return Measurement(
-        "talk_share",
-        call.user_speech_ms * 100 / spoken,
-        {"user_ms": call.user_speech_ms, "persona_ms": call.persona_speech_ms},
+        "talk_share", user_ms * 100 / spoken, {"user_ms": user_ms, "persona_ms": persona_ms}
     )
 
 
@@ -371,9 +383,23 @@ def _reaction_time(call: Conversation) -> Measurement | None:
     """F-53. Average seconds between the Persona falling silent and the user
     starting to speak. The model's own thinking and speaking time falls outside
     this window by construction, so a slow gateway cannot read as hesitation."""
-    if not call.reactions:
+    return reaction_time_measurement(call.reactions)
+
+
+# Where a stored reaction time's gaps end, recorded with them. Since ADR 0108
+# that is the user's first sound; a row without the key was measured to the
+# start of the recording, 0.8 s of VAD padding early, and is what
+# `scripts/backfill_voiced_span.py` looks for.
+REACTION_MEASURED_TO = "first_sound"
+
+
+def reaction_time_measurement(reactions: Sequence[Reaction]) -> Measurement | None:
+    """The stored shape of F-53's reaction time. Shared with
+    `scripts/backfill_voiced_span.py`, which corrects the gaps of calls stored
+    before ADR 0108 and keeps their `at_ms` on the transcript's offsets."""
+    if not reactions:
         return None
-    gaps = [reaction.gap_ms for reaction in call.reactions]
+    gaps = [reaction.gap_ms for reaction in reactions]
     return Measurement(
         "reaction_time",
         fmean(gaps) / _MS_PER_SECOND,
@@ -386,23 +412,35 @@ def _reaction_time(call: Conversation) -> Measurement | None:
             # not a statistic per Turn, which ADR 0051 rules out.
             "gaps": [
                 {"at_ms": reaction.at_ms, "duration_ms": reaction.gap_ms}
-                for reaction in call.reactions
+                for reaction in reactions
             ],
+            "measured_to": REACTION_MEASURED_TO,
         },
     )
 
 
 def _phonation_share(call: Conversation) -> Measurement | None:
-    """F-51. How much of the user's own recording was speech rather than silence.
-    Systematically short of 100% (the VAD padding sits in the denominator), so a
-    reading against this user's own calls, not an absolute.
+    """F-51. How much of the user's speaking, first sound to last, was speech
+    rather than pausing. Not over the whole recording: the VAD's padding is a
+    fixed 1.8 s or so per utterance, and in the denominator it made the figure
+    a measure of how long the utterances were rather than of how fluently they
+    ran (ADR 0108). A call without a single pause reads 100%.
     """
-    if not call.user_acoustics_complete or not call.user_speech_ms or not _silence_found(call):
+    if not call.user_acoustics_complete or not call.user_phonation_ms or not _silence_found(call):
+        return None
+    return phonation_share_measurement(call.user_phonation_ms, call.user_voiced_ms)
+
+
+def phonation_share_measurement(phonation_ms: int, voiced_ms: int) -> Measurement | None:
+    """The stored shape of F-51's Redefluss. Shared with
+    `scripts/backfill_voiced_span.py`; `voiced_ms` is the span, phonation and
+    the pauses inside it (`Conversation.user_voiced_ms`)."""
+    if not voiced_ms:
         return None
     return Measurement(
         "phonation_share",
-        call.user_phonation_ms * 100 / call.user_speech_ms,
-        {"speech_ms": call.user_speech_ms, "phonation_ms": call.user_phonation_ms},
+        phonation_ms * 100 / voiced_ms,
+        {"voiced_ms": voiced_ms, "phonation_ms": phonation_ms},
     )
 
 

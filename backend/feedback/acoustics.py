@@ -125,6 +125,13 @@ class TurnAcoustics:
 
     duration_ms: int
     phonation_ms: int          # speaking time, pauses excluded
+    # Where the first sound begins and the last one ends in this recording.
+    # The client's VAD pads every recording, about 0.8 s before the first sound
+    # (vad-web's `preSpeechPadMs` default) and a full `redemptionMs` after the
+    # last (useMicrophoneVAD.ts); these two are what put the utterance on the
+    # call's timeline instead of its padding (ADR 0108).
+    voice_start_ms: int
+    voice_end_ms: int
     pauses: tuple[Pause, ...]
     # One sample per _SAMPLE_INTERVAL_MS; None while the speaker was silent.
     # Relative by nature: the browser's automatic gain control makes an
@@ -159,12 +166,14 @@ def analyze(wav_bytes: bytes) -> TurnAcoustics:
             # same threshold to its own segmentation below, but arrives at it
             # separately, so the two can disagree at the margin of a frame.
             sounding = db > np.percentile(db, 99) + _SILENCE_THRESHOLD_DB
-            pauses, phonation_s = _segment_silences(intensity, duration_s)
+            voice = _segment_silences(intensity, duration_s)
 
             return TurnAcoustics(
                 duration_ms=round(duration_s * 1000),
-                phonation_ms=round(phonation_s * 1000),
-                pauses=pauses,
+                phonation_ms=round(voice.phonation_s * 1000),
+                voice_start_ms=round(voice.start_s * 1000),
+                voice_end_ms=round(voice.end_s * 1000),
+                pauses=voice.pauses,
                 loudness_db=_sample(np.where(sounding, db, np.nan), duration_s),
                 pitch_hz=_pitch(sound),
             )
@@ -194,12 +203,24 @@ def _decode_wav(wav_bytes: bytes) -> tuple[np.ndarray, int]:
     return samples, sample_rate
 
 
-def _segment_silences(
-    intensity: parselmouth.Intensity, duration_s: float
-) -> tuple[tuple[Pause, ...], float]:
-    """Praat's silence segmentation, as pauses plus total speaking time.
+@dataclass(frozen=True)
+class _Voice:
+    """What Praat's segmentation says about one recording, in seconds."""
 
-    Pauses touching either end are dropped: the client's VAD trims around the
+    pauses: tuple[Pause, ...]
+    phonation_s: float
+    # The first sounding interval's start and the last one's end. Everything
+    # between them is either phonation or one of `pauses` -- Praat labels every
+    # stretch one or the other -- so the span is exactly their sum.
+    start_s: float
+    end_s: float
+
+
+def _segment_silences(intensity: parselmouth.Intensity, duration_s: float) -> _Voice:
+    """Praat's silence segmentation, as pauses, total speaking time and where
+    the sound begins and ends.
+
+    Pauses touching either end are dropped: the client's VAD pads around the
     utterance, so edge silence is its padding, not the user hesitating.
     """
     textgrid = call(
@@ -210,16 +231,21 @@ def _segment_silences(
     )
     pauses: list[Pause] = []
     phonation_s = 0.0
+    sounding: list[tuple[float, float]] = []
     for interval in range(1, call(textgrid, "Get number of intervals", 1) + 1):
         start = call(textgrid, "Get start time of interval", 1, interval)
         end = call(textgrid, "Get end time of interval", 1, interval)
         if call(textgrid, "Get label of interval", 1, interval) == "sounding":
             phonation_s += end - start
+            sounding.append((start, end))
         elif start > 0.0 and end < duration_s:
             pauses.append(
                 Pause(offset_ms=round(start * 1000), duration_ms=round((end - start) * 1000))
             )
-    return tuple(pauses), phonation_s
+    # No sounding interval at all is ruled out by the peak check in `analyze`;
+    # the whole recording is the honest fallback should Praat disagree.
+    first, last = (sounding[0][0], sounding[-1][1]) if sounding else (0.0, duration_s)
+    return _Voice(tuple(pauses), phonation_s, first, last)
 
 
 def _pitch(sound: parselmouth.Sound) -> tuple[float | None, ...]:

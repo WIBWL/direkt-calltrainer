@@ -55,22 +55,35 @@ def test_both_halves_of_the_grid_are_measured() -> None:
     assert {metric.aspect for metric in METRICS if metric.active} == set(METRIC_ASPECTS)
 
 
-def test_talk_share_compares_audio_duration_on_both_sides() -> None:
-    """F-24. Audio duration on both sides -- 4 s of user against 2 s of Persona
-    is two thirds. A silence-stripped numerator over an un-stripped denominator
-    would report Praat's segmentation as a smaller share (here, half)."""
-    values = _by_key(_measured_call())
+_PAUSE_MS = 500
 
-    assert values["talk_share"] == 4_000 * 100 / (4_000 + 2_000)
+
+def _call_with_a_pause() -> list[Turn]:
+    """The measured call with one pause inside the utterance: 2 s of speech and
+    0.5 s of pause make a 2.5 s span from first sound to last, inside a 4 s
+    recording -- three figures these tests keep apart."""
+    turns = _measured_call()
+    turns[1].pauses = [Pause(offset_ms=2_000, duration_ms=_PAUSE_MS)]
+    return turns
+
+
+def test_talk_share_counts_the_user_from_first_sound_to_last() -> None:
+    """F-24, ADR 0108. 2.5 s of user against 2 s of Persona. Not the 4 s
+    recording, whose extra 1.5 s is the VAD's padding and would read as two
+    thirds; not the 2 s of phonation alone, which strips the user's pause but
+    leaves the Persona's in and would read as half."""
+    values = _by_key(_call_with_a_pause())
+
+    assert values["talk_share"] == 2_500 * 100 / (2_500 + 2_000)
 
 
 def test_talk_share_detail_reports_the_same_unit_it_divided() -> None:
     """ADR 0029's detail carries the milliseconds the share was computed from,
     so a reader can check the percentage against them."""
-    call = conversation(_measured_call())
+    call = conversation(_call_with_a_pause())
     detail = next(m for m in measure(call) if m.key == "talk_share").detail
 
-    assert detail == {"user_ms": _AUDIO_MS, "persona_ms": 2_000}
+    assert detail == {"user_ms": _PHONATION_MS + _PAUSE_MS, "persona_ms": 2_000}
 
 
 def test_pace_divides_by_phonation_not_by_the_recording() -> None:
@@ -86,6 +99,15 @@ def test_reaction_time_is_measured_from_when_the_persona_stopped() -> None:
     """F-53. Reply at 1500 ms, Persona stopped at 1000 ms: half a second, with
     the gateway's latency outside the window by construction (ADR 0051)."""
     assert [r.gap_ms for r in conversation(_measured_call()).reactions] == [500]
+
+
+def test_reaction_time_records_what_its_gaps_end_at() -> None:
+    """ADR 0108. The marker `scripts/backfill_voiced_span.py` reads to leave a
+    call alone whose gaps already end at the first sound; without it a second
+    run would shift them by the padding again."""
+    detail = {m.key: m.detail for m in measure(conversation(_measured_call()))}
+
+    assert detail["reaction_time"]["measured_to"] == "first_sound"
 
 
 # --- A Turn that could not be measured (ADR 0048) --------------------------
@@ -106,9 +128,24 @@ def _call_with_one_unmeasured_turn() -> list[Turn]:
     ]
 
 
-def test_redefluss_is_the_share_of_the_recording_that_was_speech() -> None:
-    """F-51. 2 s of speech in a 4 s recording is 50%."""
-    assert _by_key(_measured_call())["phonation_share"] == 50.0
+def test_redefluss_is_the_share_of_the_span_that_was_speech() -> None:
+    """F-51, ADR 0108. 2 s of speech and 0.5 s of pause is 80%. Over the 4 s
+    recording it would be 50%, and the missing 30 points would be the VAD's
+    padding, the same for a fluent speaker as for a halting one."""
+    assert _by_key(_call_with_a_pause())["phonation_share"] == 80.0
+
+
+def test_redefluss_without_a_pause_is_complete() -> None:
+    """Nothing between the first sound and the last but speech."""
+    assert _by_key(_measured_call())["phonation_share"] == 100.0
+
+
+def test_redefluss_detail_names_the_span_it_divided_by() -> None:
+    """`voiced_ms`, not the `speech_ms` stored before ADR 0108: the page reads
+    the key to draw the two bars, and the old one held the padded recording."""
+    detail = {m.key: m.detail for m in measure(conversation(_call_with_a_pause()))}
+
+    assert detail["phonation_share"] == {"voiced_ms": 2_500, "phonation_ms": _PHONATION_MS}
 
 
 def test_redefluss_is_absent_where_the_acoustics_failed() -> None:
@@ -214,15 +251,16 @@ def test_a_recording_without_silence_drops_what_rests_on_silence() -> None:
     """No detectable silence drops what rests on silence (ADR 0085).
 
     Pauses, phonation share, pace, loudness span and run length would report noise as
-    speech; `run_length` is wrong twice over (phonation and runs). Talk share stays."""
+    speech; `run_length` is wrong twice over (phonation and runs). Talk share goes
+    with them since ADR 0108: its user side is the span that same split finds, and
+    over a noise floor that is the whole recording, padding included."""
     turns = _measured_call()
     turns[1].loudness_db = [60.0] * 100
 
     keys = set(_by_key(turns))
 
     assert not {"pauses", "phonation_share", "pace", "loudness",
-                "run_length"} & keys
-    assert "talk_share" in keys
+                "run_length", "talk_share"} & keys
 
 
 def test_ordinary_silence_keeps_them() -> None:
@@ -528,17 +566,16 @@ def test_an_uninterrupted_utterance_is_one_run() -> None:
 
 
 def test_a_pause_inside_an_utterance_splits_it_into_two_runs() -> None:
-    """The point of the metric. The speaking time has not changed and the
-    phonation share has not changed; what changed is that it came out in two
-    pieces instead of one, and this is the only figure that says so."""
+    """The point of the metric. The speaking time has not changed; what changed
+    is that it came out in two pieces instead of one."""
     turns = _measured_call()
     turns[1].pauses = [Pause(offset_ms=2_000, duration_ms=500)]
 
     values = _by_key(turns)
 
     assert values["run_length"] == _PHONATION_MS / 2 / 1_000
-    # ... while the two figures about the silence are unmoved by the split.
-    assert values["phonation_share"] == _by_key(_measured_call())["phonation_share"]
+    # ... while the tempo, which divides by that speaking time, is unmoved.
+    assert values["pace"] == _by_key(_measured_call())["pace"]
 
 
 def test_the_detail_carries_both_terms_of_the_denominator() -> None:

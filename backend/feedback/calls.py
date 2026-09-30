@@ -110,9 +110,9 @@ class Conversation:  # pylint: disable=too-many-instance-attributes  # a record 
     language_id: str | None = None
     # A reverse (ADR 0070): the user rang. Decides the opening's third part.
     reverse: bool = False
-    # How long the user's audio ran, and how much of that was speech rather
-    # than silence. Only the first is comparable with `persona_speech_ms`.
-    user_speech_ms: int = 0
+    # How much of the user's audio was speech rather than silence. With
+    # `pauses` it gives `user_voiced_ms`, the figure comparable with
+    # `persona_speech_ms`.
     user_phonation_ms: int = 0
     # False when a Turn's measurement failed, leaving both figures short by an
     # unknown amount (ADR 0048).
@@ -151,6 +151,17 @@ class Conversation:  # pylint: disable=too-many-instance-attributes  # a record 
     # established either way.
     timeline: tuple[Segment, ...] = ()
 
+    @property
+    def user_voiced_ms(self) -> int:
+        """How long the user spoke from first sound to last, summed over the
+        utterances: phonation plus the pauses inside it, without the padding
+        the VAD records at either end (ADR 0108). Praat labels every stretch
+        between the first sound and the last as one or the other, so the sum
+        is that span exactly -- and both terms are stored, so a stored call
+        yields the same figure as the live one.
+        """
+        return self.user_phonation_ms + sum(pause.duration_ms for pause in self.pauses)
+
 
 def conversation(
     turns: Sequence[Turn], language_id: str | None = None, reverse: bool = False
@@ -164,7 +175,7 @@ def conversation(
     pauses: list[Pause] = []
     loudness: list[float | None] = []
     pitch: list[float | None] = []
-    user_ms = user_phonation = persona_ms = persona_turns = 0
+    user_phonation = persona_ms = persona_turns = 0
     persona_stopped: int | None = None
 
     for turn in turns:
@@ -176,7 +187,6 @@ def conversation(
             reactions.append(
                 Reaction(turn.user_offset_ms, max(0, turn.user_offset_ms - persona_stopped))
             )
-        user_ms += turn.user_speech_ms
         user_phonation += turn.user_phonation_ms
         pauses.extend(turn.pauses)
         loudness.extend(turn.loudness_db)
@@ -193,7 +203,6 @@ def conversation(
         user_text=" ".join(turn.user_text for turn in turns if turn.user_text),
         language_id=language_id,
         reverse=reverse,
-        user_speech_ms=user_ms,
         user_phonation_ms=user_phonation,
         # Only Turns the user spoke in: the opening Turn has no audio to measure.
         user_acoustics_complete=all(

@@ -4,10 +4,13 @@ Covers F-46 (listening/thinking/speaking), F-01 (persona opens, then turn by tur
 F-12/F-52/R-52 (transcript only at the end), ADR 0033 (first audio chunk before the reply ends),
 ADR 0047/0048 (per-Turn acoustics inline and on failure; statistics: tests/test_metrics.py)."""
 
+import asyncio
+
 import pytest
 
 from backend.feedback.acoustics import AcousticsError, TurnAcoustics
-from backend.session.models import AudioChunk, StateChanged, TurnCompleted
+from backend.session.measuring import attach_measurements
+from backend.session.models import AudioChunk, StateChanged, Turn, TurnCompleted
 from backend.session.orchestrator import SessionOrchestrator
 from tests.conftest import audio_chunks, collect, completed, failure, states
 
@@ -124,15 +127,16 @@ async def test_transcript_is_assembled_across_turns_at_the_end(orch, fake_pipeli
 
 async def test_a_measured_turn_records_both_its_durations(orch, fake_pipeline, monkeypatch):
     """ADR 0047/0048. A recording that ran 1.5 s and held 0.9 s of speech puts
-    both figures on the Turn, in their own fields: talk share divides by the
-    first, speaking pace by the second."""
+    both figures on the Turn, in their own fields: the recording's length is
+    kept as the fact it is, speaking pace divides by the second."""
     monkeypatch.setattr(
         "backend.session.orchestrator.analyze",
         # Every field named, including the empty curves: TurnAcoustics carries
         # no defaults, so a new measurement cannot be added without every
         # construction of it being revisited.
         lambda _audio: TurnAcoustics(
-            duration_ms=1500, phonation_ms=900, pauses=(), loudness_db=(), pitch_hz=(),
+            duration_ms=1500, phonation_ms=900, voice_start_ms=300, voice_end_ms=1200,
+            pauses=(), loudness_db=(), pitch_hz=(),
         ),
     )
     fake_pipeline.stt.transcripts = ["Ich spreche mit einer Pause."]
@@ -143,6 +147,46 @@ async def test_a_measured_turn_records_both_its_durations(orch, fake_pipeline, m
     assert orch.turns[0].user_speech_ms == 1500
     assert orch.turns[0].user_phonation_ms == 900
     assert orch.turns[0].user_acoustics_complete is True
+
+
+def _measured(duration_ms: int, voice_start_ms: int, voice_end_ms: int) -> TurnAcoustics:
+    """A recording whose sound runs from `voice_start_ms` to `voice_end_ms`."""
+    return TurnAcoustics(
+        duration_ms=duration_ms, phonation_ms=voice_end_ms - voice_start_ms,
+        voice_start_ms=voice_start_ms, voice_end_ms=voice_end_ms,
+        pauses=(), loudness_db=(), pitch_hz=(),
+    )
+
+
+async def _done(acoustics: TurnAcoustics) -> "asyncio.Task[TurnAcoustics]":
+    return asyncio.create_task(asyncio.sleep(0, result=acoustics))
+
+
+async def test_a_reply_is_placed_at_its_first_sound_not_at_the_recording():
+    """ADR 0108. A 2.8 s recording that arrived at 10 s began at 7.2 s, but its
+    first 0.8 s are the VAD's lead-in and its last second the silence it waited
+    through: the user spoke from 8.0 s to 9.0 s. Placed on the recording's
+    edges, every reply started 0.8 s early -- a reaction time short by that
+    much and a start inside the Persona's line that never happened."""
+    turn = Turn(seq=1)
+
+    await attach_measurements(turn, await _done(_measured(2_800, 800, 1_800)), ended_ms=10_000)
+
+    assert (turn.user_offset_ms, turn.user_end_ms) == (8_000, 9_000)
+    # The pauses' offsets are relative to the recording, so they stay rebased
+    # on its start; only the utterance's own edges move.
+    assert turn.user_speech_ms == 2_800
+
+
+async def test_a_continued_turn_keeps_its_first_sound_and_takes_the_last():
+    """A Turn reopened after a barge-in (ADR 0035) begins where its first
+    fragment's sound began and ends where its last fragment's sound ended."""
+    turn = Turn(seq=1)
+
+    await attach_measurements(turn, await _done(_measured(2_800, 800, 1_800)), ended_ms=10_000)
+    await attach_measurements(turn, await _done(_measured(2_500, 700, 1_500)), ended_ms=14_000)
+
+    assert (turn.user_offset_ms, turn.user_end_ms) == (8_000, 13_000)
 
 
 @pytest.mark.parametrize(

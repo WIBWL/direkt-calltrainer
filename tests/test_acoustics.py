@@ -137,6 +137,36 @@ def test_a_flat_tone_has_almost_no_range() -> None:
     assert value < 1.0
 
 
+def _silence(seconds: float) -> np.ndarray:
+    return np.zeros(int(seconds * SAMPLE_RATE))
+
+
+def test_the_sound_is_found_inside_the_vads_padding() -> None:
+    """ADR 0108. The client's recordings open with about 0.8 s of lead-in and
+    close with the second of silence the VAD waited through; the sound between
+    is what the utterance is placed by. Praat's intensity window blurs an edge
+    by a few tens of milliseconds, hence the tolerance."""
+    measured = analyze(_wav(np.concatenate([_silence(0.8), _tone(150, 1.0), _silence(1.0)])))
+
+    assert measured.voice_start_ms == pytest.approx(800, abs=60)
+    assert measured.voice_end_ms == pytest.approx(1_800, abs=60)
+
+
+def test_the_span_between_first_and_last_sound_is_speech_plus_pauses() -> None:
+    """What `Conversation.user_voiced_ms` rests on: Praat labels every stretch
+    between the first sound and the last as sounding or as a pause, so their
+    sum is the span, and a stored call can be re-measured from the two."""
+    measured = analyze(_wav(np.concatenate(
+        [_silence(0.8), _tone(150, 0.8), _silence(0.5), _tone(150, 0.8), _silence(1.0)]
+    )))
+
+    span = measured.voice_end_ms - measured.voice_start_ms
+    pauses = sum(pause.duration_ms for pause in measured.pauses)
+
+    assert len(measured.pauses) == 1
+    assert measured.phonation_ms + pauses == pytest.approx(span, abs=2)
+
+
 def test_audio_too_short_to_analyse_is_refused_rather_than_guessed() -> None:
     """`analyze` raising is how a Turn ends up unmeasured, which the live path
     treats as normal (ADR 0048). Returning a made-up figure would be worse."""
