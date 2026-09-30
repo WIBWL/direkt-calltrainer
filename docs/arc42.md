@@ -315,7 +315,7 @@ Die Authentifizierung liegt außerhalb des eigentlichen Trainingsablaufs. `AuthG
 
 | Baustein | Verantwortung |
 |---|---|
-| `orchestrator.py` | Ein Gespräch: je Turn Spracherkennung, Antwortgenerierung und Sprachsynthese; die Schutzmechanismen gegen Wiederholung, verfrühtes oder ausbleibendes Gesprächsende. Je Strecke ein Wiederholungsversuch, danach ein sauberes Ende (ADR 0016, ADR 0033). |
+| `orchestrator.py` | Ein Gespräch: je Turn Spracherkennung, Antwortgenerierung und Sprachsynthese; die Schutzmechanismen gegen Wiederholung, verfrühtes oder ausbleibendes Gesprächsende. Spracherkennung und Dialogmodell bekommen einen Wiederholungsversuch, die Sprachsynthese keinen; danach endet der Turn sauber mit einem Fehlercode (ADR 0016, ADR 0033, ADR 0103). |
 | `prompting.py` | Systemprompt der Persona, Eröffnungsanweisung und der Prompt für die Gesprächsnotizen (ADR 0043, ADR 0045, ADR 0071). |
 | `nudges.py` | Anweisungen, die nur für eine einzige Antwort gelten und nie gespeichert werden (ADR 0035, ADR 0037, ADR 0038). |
 | `reply_checks.py`, `repetition.py` | Urteile über eine Antwort gegen die bisherigen Antworten — Wiederholung, erneute Begrüßung, Gesprächsende. Was ein Urteil auslöst und in welcher Reihenfolge, entscheidet der Orchestrator. |
@@ -341,7 +341,7 @@ Die Szenarien binden die Schritte an die Bausteine aus Kapitel 5. Frontend-Baust
 - Im Gespräch stellt `CallView` den Zustand dar; `useLiveCall` verbindet Socket, Wiedergabe und Unterbrechen. Silero-VAD im Browser erkennt das Ende eines Redebeitrags und schickt die Aufnahme als einen Turn (ADR 0036).
 - Je Turn ruft der Orchestrator die Spracherkennung (`stt.py`, Gateway) auf, streamt die Antwort des Dialogmodells (`shared/clients/llm.py`), prüft sie mit `reply_checks.py`, teilt sie in `chunking.py` in Sätze und lässt jeden Satz von `tts.py` bei KugelAudio synthetisieren. Die Audio-Teilstücke gehen sofort als `turn.audio.chunk` an den Client (ADR 0033, ADR 0044).
 - Spricht der Nutzer in eine Antwort hinein, verstummt die Wiedergabe im Client sofort, und der Client meldet, wie viel er gehört hat. `heard.py` kürzt die Antwort im Verlauf auf das Gehörte; die nächste Antwort bekommt einen einmaligen Hinweis aus `nudges.py` (ADR 0035).
-- Das Gespräch endet, wenn der Nutzer auflegt (nach Rückfrage), die Persona sich verabschiedet (ADR 0037) oder eine Strecke nach einem Wiederholungsversuch scheitert (ADR 0016). Der Client erhält `session.ended` mit dem vollständigen Transkript.
+- Das Gespräch endet, wenn der Nutzer auflegt (nach Rückfrage), die Persona sich verabschiedet (ADR 0037) oder eine Strecke endgültig scheitert (ADR 0016). Der Client erhält `session.ended` mit dem vollständigen Transkript.
 
 Besonderheiten: Der gesamte Zyklus muss in Echtzeit ablaufen (Q-03). Nichts Blockierendes läuft auf dem Event-Loop, der das Audio streamt; Datenbankzugriffe gehen über `asyncio.to_thread`. Die Gesprächsnotizen, die das Modell statt des älteren Verlaufs liest, werden nach jedem Wechsel im Hintergrund fortgeschrieben (`call_notes.py`, ADR 0071).
 
@@ -497,7 +497,7 @@ Betrifft alle Bausteine, die am Gesprächsfluss beteiligt sind:
 
 - Überlappende statt sequenzielle Verarbeitung der Kette aus Spracherkennung, Antwortgenerierung und Sprachsynthese; die Einzelheiten stehen in Kapitel 4.2 (Q-03).
 - Nichts Blockierendes auf dem Event-Loop, der das Audio streamt: Datenbankzugriffe und Messung laufen in eigenen Threads, die Nachbereitung im Worker (ADR 0018, ADR 0034).
-- Je Strecke ein Wiederholungsversuch, danach ein sauberes Ende des Gesprächs statt eines hängenden (ADR 0016). Es gibt keine Rückfallebene auf ein anderes Backend (ADR 0103).
+- Spracherkennung und Dialogmodell bekommen einen Wiederholungsversuch (das Dialogmodell nur, solange noch nichts gesendet wurde), die Sprachsynthese keinen, weil ein zweiter Versuch auf der gepoolten Verbindung in unbekanntem Zustand liefe. Danach endet der Turn mit einem Fehlercode statt zu hängen (ADR 0016, ADR 0044). Es gibt keine Rückfallebene auf ein anderes Backend (ADR 0103).
 - Unterbrechen ist jederzeit möglich; gespeichert wird nur, was der Nutzer tatsächlich gehört hat (ADR 0035).
 
 ## 8.6 Prompt und Modellverhalten
