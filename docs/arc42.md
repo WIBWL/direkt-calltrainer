@@ -7,10 +7,18 @@
 Im Gegensatz zu klassischen Verkaufstrainern liegt der Fokus nicht auf Abschlussquoten, sondern auf Kommunikation, Klarheit und Wirkung des Sprechenden, ohne dass umfangreiche kundenspezifische Fachkenntnisse vorausgesetzt werden (C-05):
 
 - Kommunikation, Klarheit und Wirkung des Sprechenden
-- Erkennung von Sprechverhalten (Redeanteil, Fragen, Sprechtempo, Wortanzahl, Reaktionszeit, Sprechpausen, Sprechlänge am Stück, Lautstärke, Sprachmelodie, Unterbrechungen, Redefluss, Füllwörter, Wiederholungen, Verzögerungslaute, Gesprächseinstieg — ADR 0051, ADR 0077, ADR 0078, ADR 0083 bis ADR 0086; angezeigt in zwei Hälften nach ADR 0082; seit ADR 0081 fünf davon zusätzlich getrennt nach fordernden und übrigen Gesprächsabschnitten)
+- Erkennung von Sprechverhalten über 16 Kennzahlen: Redeanteil, Fragen, Sprechtempo, gesprochene Wörter, Füllwörter, Gesprächseinstieg, Gesprächsabschluss, Wiederholungen, Verzögerungslaute, Reaktionszeit, Sprechpausen, Redefluss, Sprechlänge am Stück, Lautstärke, Sprachmelodie und Unterbrechungen (ADR 0051, ADR 0077, ADR 0078, ADR 0083 bis ADR 0086, ADR 0089). Angezeigt werden sie in zwei Hälften, *wie* und *was* gesprochen wurde (ADR 0082); fünf davon werden zusätzlich getrennt nach fordernden und übrigen Gesprächsabschnitten gemessen (ADR 0081).
 - Vermeidung von überlangen/überkomplexen Erklärungen
 
-Nach jedem Trainingsgespräch erhält der Nutzer ein qualitatives Wrap-up mit konkreten Verbesserungsvorschlägen statt eines reinen Scores.
+Nach jedem Trainingsgespräch erhält der Nutzer ein qualitatives Wrap-up mit konkreten Verbesserungsvorschlägen statt eines reinen Scores. Jede Kennzahl lässt sich bis zu den Gesprächsstellen aufklappen, aus denen sie gewonnen wurde (ADR 0098).
+
+Über das einzelne Gespräch hinaus bietet das System:
+
+- **Eigene Szenarien:** Nutzer verfassen Szenarien selbst, auch aus hochgeladenen PDF-Dokumenten, und können sie mit ihrem Unternehmen teilen (F-34, F-58, F-59; ADR 0058, ADR 0060).
+- **Aus einem Gespräch abgeleitete Übungen:** ein Folgeszenario, das denselben Fall zeitlich später fortführt und die Verbesserungspunkte verlangt (F-60, ADR 0069), und den Rollentausch, in dem der Nutzer anruft und die Persona seine Seite übernimmt (F-61, ADR 0070).
+- **Zufallsszenario** und **Anruf annehmen:** Ein Gespräch kann mit unbekanntem Anlass beginnen; ein gewöhnliches Gespräch beginnt mit einem klingelnden Telefon (F-62, F-63).
+- **Fokusziele und Vorschläge:** Nutzer wählen bis zu fünf Trainingsziele; daraus und aus ihrer Rolle ergeben sich Szenario-Vorschläge und nach jedem Gespräch bis zu zwei Angebote für das nächste (F-62, F-64; ADR 0076, ADR 0087).
+- **Historie und Fortschritt:** vergangene Trainings im Profil, eine Fortschrittsansicht über viele Trainings ohne Bewertung (F-13, F-48; ADR 0064, ADR 0065), Wrap-up und Fortschritt jeweils als PDF (F-64, ADR 0093).
 
 ## 1.2 Qualitätsziele
 
@@ -18,7 +26,7 @@ Nach jedem Trainingsgespräch erhält der Nutzer ein qualitatives Wrap-up mit ko
 |---|---|---|---|
 | 1 | Q-01 Genauigkeit und Nachvollziehbarkeit der Gesprächsanalyse | Die Analyse des Sprechverhaltens muss zutreffend sein und ihre Befunde auf konkrete Gesprächsstellen zurückführen können. Ohne Nachvollziehbarkeit verliert der Nutzer das Vertrauen in die Rückmeldung, insbesondere weil Gespräche subjektiv wahrgenommen werden. | R-19, R-25, R-26 |
 | 2 | Q-02 Bedienbarkeit ohne Einarbeitung | Ein Erstnutzer muss ohne Anleitung ein Training starten können. Eine unklare oder überladene Oberfläche wurde in beiden Erhebungen als zentrales Nutzungshemmnis genannt. | R-32, R-33, R-34 |
-| 3 | Q-03 Echtzeitfähigkeit des Gesprächsflusses | Die Verarbeitungskette aus Spracherkennung, Antwortgenerierung und Sprachsynthese muss schnell genug sein, dass ein natürlicher Gesprächsfluss entsteht. Das Ziel treibt die offenen Technologieentscheidungen. | Systementwurf |
+| 3 | Q-03 Echtzeitfähigkeit des Gesprächsflusses | Die Verarbeitungskette aus Spracherkennung, Antwortgenerierung und Sprachsynthese muss schnell genug sein, dass ein natürlicher Gesprächsfluss entsteht. Das Ziel hat die Technologieentscheidungen in Kapitel 4 getrieben. | Systementwurf |
 
 Datenschutzkonformität ist kein Qualitätsziel, sondern eine nicht verhandelbare Randbedingung und als C-04 in Kapitel 2 geführt.
 
