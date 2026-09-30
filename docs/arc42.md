@@ -52,12 +52,20 @@ Weitere Qualitätsanforderungen geringerer Priorität sind in Kapitel 10 aufgef�
 | C-02 | Nutzung am PC mit Headset | Das Training ist am Arbeitsplatzrechner mit angeschlossenem Headset durchführbar; besondere Hardware ist nicht erforderlich. | R-36 |
 | C-03 | Nutzung am Smartphone | Das Training ist auch auf einem mobilen Gerät nutzbar. Mobile Telefonie ist in beiden Pilotunternehmen im Einsatz. | R-37 |
 
+Aus dem Projektumfeld kommen weitere technische Vorgaben hinzu, die keine eigene Anforderung haben:
+
+- **Betrieb in der DiReKT-Infrastruktur.** Die Anwendung läuft auf dem DiReKT-Host bei Hetzner; der Stack wird im Repository `direkt-infrastructure` geführt, nicht in diesem (ADR 0020 mit Statusvermerk, ADR 0108).
+- **Modellzugang über das DiReKT-Gateway.** Spracherkennung und Dialogmodell sind über den OpenAI-kompatiblen Endpunkt des Projekts erreichbar; welche Modelle dort bereitstehen, entscheidet nicht dieses Projekt (ADR 0011, ADR 0103).
+- **Anmeldung über den DiReKT-Keycloak.** Konten und Unternehmenszugehörigkeit werden dort verwaltet, nicht in der Anwendung (ADR 0009, ADR 0031, ADR 0060).
+- **HTTPS.** Der Browser gibt das Mikrofon nur in einem sicheren Kontext frei.
+- **amd64.** Die Messbibliothek `praat-parselmouth` liefert kein Linux-Paket für arm64; die Images werden deshalb nur für amd64 gebaut.
+
 ## 2.2 Organisatorische Randbedingungen
 
 | ID | Randbedingung | Beschreibung | Quelle |
 |---|---|---|---|
-| C-01 | Sprache konfigurierbar | Das Training findet in der Sprache statt, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Die Sprache ist an die Persona gebunden und ergibt sich aus deren Auswahl; Szenarien sind sprachneutral und mit jeder Persona kombinierbar. Belegt sind Deutsch bei Pilotunternehmen A sowie Englisch und teilweise Spanisch bei Pilotunternehmen B. Siehe ADR 0043 (löst ADR 0022 ab). | R-35 |
-| C-04 | Datenschutz nach DSGVO | Alle Daten, insbesondere Sprachaufzeichnungen und personenbezogene Daten, werden DSGVO-konform verarbeitet. Die Randbedingung begrenzt die Umsetzung aller übrigen Ziele und steht nicht als gleichrangiges Ziel neben ihnen. | rechtliche Vorgabe |
+| C-01 | Sprache konfigurierbar | Das Training findet in der Sprache statt, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Die Sprache ist an die Persona gebunden und ergibt sich aus deren Auswahl; Szenarien sind sprachneutral und mit jeder Persona kombinierbar. Belegt sind Deutsch bei Pilotunternehmen A sowie Englisch und teilweise Spanisch bei Pilotunternehmen B. Umgesetzt sind Deutsch und Englisch; eine weitere Sprache ist ein Sprachpaket plus eine Persona, die sie spricht. Siehe ADR 0043 (löst ADR 0022 ab). | R-35 |
+| C-04 | Datenschutz nach DSGVO | Alle Daten, insbesondere Sprachaufzeichnungen und personenbezogene Daten, werden DSGVO-konform verarbeitet. Die Randbedingung begrenzt die Umsetzung aller übrigen Ziele und steht nicht als gleichrangiges Ziel neben ihnen. Wie sie umgesetzt ist, beschreibt Kapitel 8.1. | rechtliche Vorgabe |
 | C-05 | Kein kundenspezifisches Fachwissen vorausgesetzt | Fachliches Know-how zu einzelnen Kunden oder Systemen wird nicht abgebildet, da sich die Fachlichkeit je Kundenlandschaft unterscheidet. Der Fokus liegt auf Kommunikation statt Fachlichkeit. | R-40, R-41 |
 | C-06 | Gesprächsdauer | Die zu trainierenden Gespräche reichen von kurzen Rückfragen bis zu Gesprächen von einer Stunde. | R-03 |
 | C-07 | Zielgruppe | Zur Zielgruppe gehören Personen mit direktem Kundenkontakt in Support- sowie beratenden Projektrollen und Personen mit technischem Hintergrund ohne vertriebliche Vorerfahrung. | R-01, R-02 |
