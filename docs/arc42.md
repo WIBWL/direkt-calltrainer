@@ -258,7 +258,12 @@ Die wichtigsten Frontend-Bausteine sind:
 - `SetupView`: Auswahl von Szenario und Persona sowie Vorbereitung des Trainings. Erst der bewusste Start erzeugt eine Session; die reine Auswahl löst noch keine Verbindung zum Backend aus (ADR 0042).
 - `MicCheck`: Prüfung des Mikrofonzugriffs und des ausgewählten Eingabegeräts vor Gesprächsbeginn.
 - `CallView`: Darstellung des laufenden Trainingsgesprächs. Während des Gesprächs werden nur die für den Gesprächszustand notwendigen Informationen angezeigt; das vollständige Transkript erscheint erst nach Gesprächsende (ADR 0014).
-- `FeedbackView`: Darstellung des qualitativen Wrap-ups sowie der berechneten Gesprächskennzahlen nach Abschluss einer Session (F-09, F-10, F-53).
+- `BriefScreen` und `IncomingCall`: die Ausgangslage des Falls bzw. im Rollentausch das Briefing des Nutzers, dann das klingelnde Telefon, dessen Annahme das Gespräch beginnt (F-63, ADR 0070).
+- `FeedbackWaiting`: Warte-Bildschirm, solange das Wrap-up erzeugt wird; das Transkript bleibt erreichbar.
+- `FeedbackView`: Darstellung des qualitativen Wrap-ups sowie der berechneten Gesprächskennzahlen nach Abschluss einer Session (F-09, F-10, F-53). Jede Kennzahl führt auf eine eigene Seite mit ihren Belegen (`SessionMetricView`, ADR 0098).
+- `PastSessionView` und `SessionHistory`: ein vergangenes Training und die Liste aller Trainings im Profil (F-48).
+- `ScenarioEditor`: Anlegen und Bearbeiten eigener Szenarien, auch aus hochgeladenen PDFs (F-34, F-58).
+- `FocusDialog`: die Frage nach Fokuszielen, Rolle und Gesprächsarten beim ersten Start (F-62).
 - `ProgressView` und zugehörige Detailansichten: Darstellung mehrerer abgeschlossener Trainings und ihrer Entwicklung über die Zeit (F-13).
 
 Die Logik des Trainingsablaufs ist von der Darstellung getrennt. `useTrainingRun` verwaltet die aktuell gebundene Session sowie die Daten, die über das Gesprächsende hinaus benötigt werden. `useLiveCall` bündelt die Logik des laufenden Gesprächs und verbindet WebSocket-Kommunikation, Audiowiedergabe und Unterbrechungsverhalten. Dadurch bleiben die sichtbaren Komponenten weitgehend auf Darstellung und Benutzerinteraktion beschränkt.
