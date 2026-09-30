@@ -325,49 +325,57 @@ Die Gesprächsschleife importiert aus der Auswertung nur `acoustics` und nie das
 
 # 6. Laufzeitsicht
 
-*Die Laufzeitsicht baut auf der Bausteinsicht aus Kapitel 5 auf. Für den Frontend-Anteil werden die dort beschriebenen Komponenten und Hooks den einzelnen Schritten des Trainingsablaufs zugeordnet. Die Backend-seitige Verarbeitung wird weiterhin auf funktionaler Ebene beschrieben.*
+Die Szenarien binden die Schritte an die Bausteine aus Kapitel 5. Frontend-Bausteine stehen in Kapitel 5.2.1, Backend-Bausteine in 5.2.2 und 5.3, der Worker in 5.2.3.
 
 ## 6.1 Szenario 1: Start und Ablauf eines Trainingsgesprächs
 
-- Der Nutzer öffnet die Trainingsvorbereitung. `SetupView` stellt die verfügbaren Szenarien und Personas dar und übergibt die Auswahl an den in `App.tsx` gehaltenen Trainingszustand.
-- Erst mit dem bewussten Start des Trainings wird über `useTrainingRun` eine Session gebunden (ADR 0042). Die reine Auswahl von Szenario und Persona erzeugt noch keine Gesprächsverbindung.
-- Vor dem Gespräch führt `MicCheck` die Prüfung des Mikrofonzugriffs und des ausgewählten Eingabegeräts durch. Das ausgewählte Gerät wird anschließend in den laufenden Trainingszustand übernommen.
-- Der Wechsel zwischen Vorbereitung, Mikrofonprüfung und Gespräch wird über die in `trainingFlow.ts` definierte Ablaufsteuerung koordiniert (ADR 0096).
-- Im laufenden Gespräch stellt `CallView` den Gesprächszustand dar. `useLiveCall` bündelt dabei die WebSocket-Kommunikation, die Audiowiedergabe und das Unterbrechen der Persona.
-- Die Sprache des Nutzers wird an das Backend übertragen und dort per Speech-to-Text verarbeitet. Das KI-Backend generiert anschließend die Antwort der simulierten Persona (F-01, F-04), die per Text-to-Speech erzeugt und über die bestehende WebSocket-Verbindung an das Frontend zurückgegeben wird.
-- Dieser Zyklus aus Sprechen, Erkennen, Antworten und Ausgeben wiederholt sich, bis die Session beendet wird. Nach Gesprächsende übernimmt `useTrainingRun` das Transkript und die Kennung der abgeschlossenen Session für die anschließende Auswertung.
+- Der Nutzer öffnet die Trainingsvorbereitung. `SetupView` stellt die verfügbaren Szenarien und Personas dar (`GET /api/scenarios`, `GET /api/personas`, gelesen über `library.py`) und übergibt die Auswahl an den in `App.tsx` gehaltenen Trainingszustand. Beim Zufallsszenario wird erst beim Start gezogen (F-62).
+- Erst mit dem bewussten Start des Trainings wird über `useTrainingRun` eine Session gebunden. `useSessionSocket` öffnet die WebSocket-Verbindung und sendet `session.start` mit Token, Persona und Szenario. `session_ws.py` prüft das Token, lädt beide über `library.py`, eingeschränkt auf Nutzer und Unternehmen, und lässt den Orchestrator den Eröffnungssatz der Persona schon jetzt erzeugen und synthetisieren (ADR 0042).
+- Währenddessen prüft `MicCheck` Mikrofonzugriff und Eingabegerät. Danach zeigt der Client, wo vorhanden, die Ausgangslage des Falls und dann das klingelnde Telefon (`IncomingCall`, F-63); im Rollentausch stattdessen das Briefing des Nutzers (ADR 0070). Den Wechsel zwischen diesen Schritten bestimmt `trainingFlow.ts` (ADR 0096).
+- Mit der Annahme des Anrufs sendet der Client `session.activate`. Ab hier läuft die Zeitachse der Session, und der zurückgehaltene Eröffnungssatz wird abgespielt.
+- Im Gespräch stellt `CallView` den Zustand dar; `useLiveCall` verbindet Socket, Wiedergabe und Unterbrechen. Silero-VAD im Browser erkennt das Ende eines Redebeitrags und schickt die Aufnahme als einen Turn (ADR 0036).
+- Je Turn ruft der Orchestrator die Spracherkennung (`stt.py`, Gateway) auf, streamt die Antwort des Dialogmodells (`shared/clients/llm.py`), prüft sie mit `reply_checks.py`, teilt sie in `chunking.py` in Sätze und lässt jeden Satz von `tts.py` bei KugelAudio synthetisieren. Die Audio-Teilstücke gehen sofort als `turn.audio.chunk` an den Client (ADR 0033, ADR 0044).
+- Spricht der Nutzer in eine Antwort hinein, verstummt die Wiedergabe im Client sofort, und der Client meldet, wie viel er gehört hat. `heard.py` kürzt die Antwort im Verlauf auf das Gehörte; die nächste Antwort bekommt einen einmaligen Hinweis aus `nudges.py` (ADR 0035).
+- Das Gespräch endet, wenn der Nutzer auflegt (nach Rückfrage), die Persona sich verabschiedet (ADR 0037) oder eine Strecke nach einem Wiederholungsversuch scheitert (ADR 0016). Der Client erhält `session.ended` mit dem vollständigen Transkript.
 
-Besonderheiten: Der gesamte Zyklus muss in Echtzeit ablaufen (Q-03), da Verzögerungen den natürlichen Gesprächsfluss stören. Die sichtbaren Zustände und die technische Gesprächslogik sind im Frontend getrennt: `CallView` übernimmt die Darstellung, während `useLiveCall` und die darunterliegenden Hooks die laufende Kommunikation und Audiowiedergabe steuern. Parallel zur Gesprächssimulation läuft die Analyse des Sprechverhaltens aus Szenario 2.
+Besonderheiten: Der gesamte Zyklus muss in Echtzeit ablaufen (Q-03). Nichts Blockierendes läuft auf dem Event-Loop, der das Audio streamt; Datenbankzugriffe gehen über `asyncio.to_thread`. Die Gesprächsnotizen, die das Modell statt des älteren Verlaufs liest, werden nach jedem Wechsel im Hintergrund fortgeschrieben (`call_notes.py`, ADR 0071).
 
 ## 6.2 Szenario 2: Analyse des Sprechverhaltens während des Gesprächs
 
-- Während der Nutzer spricht, misst die Analyse-Komponente je Redebeitrag nur die Rohgrößen, die am Audio ablesbar sind (Aufnahmedauer, reine Sprechzeit ohne Pausen, Pausen, Lautstärke) und rechnet sie auf die Zeitachse der Session um.
+- Während die Spracherkennung läuft, misst `measuring.py` mit `shared/feedback/acoustics.py` (Praat) auf einem eigenen Thread die Rohgrößen des Redebeitrags: Aufnahmedauer, reine Sprechzeit, Pausen, Lautstärke- und Tonhöhenverlauf. Die Ergebnisse hängen an der Zeitachse des Turns (`shared/turn.py`); das Audio wird danach verworfen (ADR 0048).
 - Redeanteil und Sprechtempo teilen durch verschiedene Größen: der Redeanteil durch die Aufnahmedauer, weil nur diese mit der synthetisierten Persona-Stimme vergleichbar ist, das Sprechtempo durch die reine Sprechzeit.
-- Die Kennzahlen entstehen erst am Gesprächsende aus allen Redebeiträgen zusammen und beschreiben jeweils das ganze Gespräch — Menge und Begründung siehe ADR 0051, Kennzahlenliste F-53.
 - Die Antwortzeit der KI wird mitgemessen und keinem Sprecher zugerechnet, damit sie nicht als Gesprächslücke des Nutzers erscheint (ADR 0051).
-- Schlägt die Messung eines Redebeitrags fehl, hält der Redebeitrag das fest: Redeanteil und Sprechtempo entfallen dann für das ganze Gespräch, und aus diesem Beitrag wird keine Reaktionszeit abgeleitet. Eine fehlende Zahl ist ehrlicher als eine, die still zu niedrig ausfällt (ADR 0048, ADR 0051).
+- Die Kennzahlen entstehen erst am Gesprächsende: `shared/feedback/calls.py` fasst alle Turns zu einem Gespräch zusammen, `shared/feedback/metrics.py` leitet daraus die 16 Kennzahlen ab, die jeweils das ganze Gespräch beschreiben (ADR 0051).
+- Schlägt die Messung eines Redebeitrags fehl, hält der Redebeitrag das fest, und die Kennzahlen, die davon abhängen, entfallen für das ganze Gespräch. Findet die Messung in der Aufnahme keine Stille, entfallen die fünf Kennzahlen, die auf der Trennung von Sprache und Stille beruhen (ADR 0085). Eine fehlende Zahl ist ehrlicher als eine, die still falsch ausfällt.
 - Ergebnisse werden für das spätere Wrap-up gesammelt, nicht während des Gesprächs angezeigt (ADR 0014).
 
-Besonderheiten: Diese Analyse läuft parallel zur eigentlichen Gesprächssimulation (Szenario 1), ohne den Gesprächsfluss zu unterbrechen. Die gesammelten Daten dienen als Grundlage für Szenario 3.
+Besonderheiten: Die Gesprächsschleife importiert aus der Auswertung nur `acoustics` und nie das ORM (ADR 0090). Erst nach Gesprächsende verbindet `persistence.py` beide Seiten.
 
-## 6.3 Szenario 3: Erstellung des Wrap-ups nach Gesprächsende
+## 6.3 Szenario 3: Speicherung und Wrap-up nach Gesprächsende
 
-- Nach Beendigung des Gesprächs durch den Nutzer wertet die Feedback-Komponente die gesammelten Analyseergebnisse aus Szenario 2 aus.
-- Es wird eine qualitative Zusammenfassung (Wrap-up) erstellt – keine reine Zahl/Score (F-09).
-- Konkrete, umsetzbare Verbesserungsvorschläge werden formuliert und nach Möglichkeit mit konkreten Gesprächsstellen verknüpft (F-10).
-- Ein eigener Textblock beurteilt die phasengerechte Sprache (F-42): Der Abschluss wird darin stärker gewichtet als die Gesprächsmitte, weil er die Erinnerung an das ganze Gespräch überproportional prägt – als Textgewicht, nicht als Punktabzug (ADR 0056).
-- Das Wrap-up wird dem Nutzer angezeigt.
+- Nach Gesprächsende ruft `session_ws.py` `persistence.persist_session` auf. Innerhalb derselben Transaktion fragt `consent.py`, ob der Nutzer der Speicherung zugestimmt hat; ohne Zustimmung wird nichts geschrieben, und der Nutzer behält nur das Transkript auf dem Bildschirm (ADR 0066).
+- Mit Zustimmung werden Session, Äußerungen, Messungen, Unterbrechungs-Befunde und eine Job-Zeile mit Status `queued` in einer Transaktion geschrieben (ADR 0034). Danach stellt `shared/feedback/queue.py` den Job in Redis ein; gelingt das nicht, wird die Job-Zeile auf `failed` gesetzt.
+- Der Worker (`worker/generator.py`) liest die gespeicherte Session über `shared/feedback/stored.py` und schreibt mit einem Modellaufruf das Wrap-up: Zusammenfassung, Stärken und Verbesserungen mit Bezug auf konkrete Gesprächsstellen und Fokusziele (F-09, F-10, ADR 0080), phasengerechte Sprache (F-42, ADR 0056), Passung des Tons zum Anlass (ADR 0079) und die fordernden Gesprächsstellen. Das Modell deutet die Messungen, es erzeugt keine (ADR 0049).
+- `worker/segments.py` misst anhand dieser Stellen fünf Kennzahlen getrennt über die fordernden Abschnitte und den Rest (ADR 0081).
+- Der Client zeigt währenddessen einen Warte-Bildschirm (`FeedbackWaiting`) und fragt `GET /api/sessions/{id}` in Abständen ab (`useSessionFeedback`), bis das Wrap-up vorliegt; danach zeigt `FeedbackView` Wrap-up, Kennzahlen und Transkript. Das Transkript ist auch während des Wartens erreichbar.
+- Ist die Erzeugung gescheitert, kann der Nutzer sie neu anstoßen (`POST /api/sessions/{id}/feedback`). Das Wrap-up entsteht dabei aus Transkript und gespeicherten Messungen, nie aus Audio.
 
-Besonderheiten: Die Qualität dieses Szenarios ist zentral für die Akzeptanz des Tools (siehe Qualitätsziele, Kapitel 1). Ein optionaler Score (F-14, COULD) kann ergänzend angezeigt werden, ersetzt aber nie das qualitative Feedback.
+Besonderheiten: Die Qualität dieses Szenarios ist zentral für die Akzeptanz des Tools (siehe Qualitätsziele, Kapitel 1). Ein Score (F-14, COULD) ist nicht umgesetzt; ADR 0004 und ADR 0051 schließen ihn aus.
 
-## 6.4 Szenario 4: Aufzeichnung und langfristige Nutzung (optional/should)
+## 6.4 Szenario 4: Folgeszenario und Rollentausch anfordern
 
-- Sofern vorgesehen (F-12, SHOULD), wird das Gespräch aufgezeichnet und dokumentiert.
-- Die Aufzeichnung ermöglicht dem Nutzer eine spätere, fundiertere Reflexion über die reine Erinnerung hinaus.
-- Bei mehrteiligen Projektgesprächen (F-23, COULD) kann diese Aufzeichnung über mehrere Termine hinweg referenziert werden.
-- Alle gespeicherten Daten müssen DSGVO-konform verarbeitet werden (C-04).
+- Unter dem Wrap-up bietet der Feedback-Bericht (`FeedbackReport`) zwei Übungen an, sofern der Nutzer im Gespräch mindestens dreimal gesprochen hat: das Folgeszenario und den Rollentausch. Dieselben Angebote stehen auf der Seite eines vergangenen Trainings.
+- Ein Knopfdruck ruft `POST /api/sessions/{id}/follow-up` bzw. `POST /api/sessions/{id}/reverse` auf. `followups.py` entwirft aus den Verbesserungspunkten den nächsten Anruf in derselben Sache; `reversals.py` übersetzt den gespielten Fall in ein Briefing für den Nutzer. Beides ist ein Modellaufruf; das Ergebnis wird über `library.py` als eigenes Szenario des Nutzers gespeichert (ADR 0069, ADR 0070).
+- Beide Routen sind idempotent: ein zweiter Knopfdruck liefert das bereits geschriebene Szenario zurück (ADR 0100).
+- Ein zweiter Knopfdruck startet das Gespräch mit derselben Persona, ohne erneuten Mikrofontest.
+- Daneben schlägt `recommendations.py` bis zu zwei bestehende Szenarien für das nächste Gespräch vor (F-64, ADR 0087).
 
-Besonderheiten: Dieses Szenario ist für den MVP nicht zwingend erforderlich (SHOULD/COULD), aber relevant für die kontinuierliche Nutzung als Trainingsinstrument (F-13), die der Ansprechpartner von Pilotunternehmen A explizit gewünscht hat.
+## 6.5 Szenario 5: Historie, Fortschritt und Löschung
+
+- Das Profil lädt die eigenen Trainings seitenweise über `GET /api/sessions`; die Abfrage ist auf die Kennung des Nutzers eingeschränkt (ADR 0064). Ein Eintrag öffnet die Seite des vergangenen Trainings, die die Session einmal liest und nicht abfragt.
+- Die Fortschrittsansicht lädt dieselbe Liste und rechnet im Browser; es gibt keinen eigenen Endpunkt dafür. Sie zeigt Werte über die Zeit ohne Zielbänder und Wertungsfarben (ADR 0065, ADR 0095).
+- Löscht der Nutzer ein Training (`DELETE /api/sessions/{id}`) oder widerruft er seine Einwilligung (`POST /api/consent`), entfernt `deletion.remove` die Sessions samt allem, was daran hängt; beim Widerruf in derselben Transaktion wie die Entscheidung (ADR 0066, ADR 0102). Das Einwilligungsprotokoll selbst bleibt erhalten (ADR 0068).
+- `app.py` startet beim Hochfahren und danach täglich den Aufbewahrungslauf, der Sessions nach sechs Monaten löscht, sofern der Nutzer das nicht abgeschaltet hat (ADR 0067).
 
 # 7. Verteilungssicht
 
@@ -636,7 +644,7 @@ Stand: main vom 30.09.2026. Die Spalte *Art* unterscheidet, ob eine Schuld bewus
 
 | Nr. | Schuld | Art | Wirkung | Abtragen durch |
 |---|---|---|---|---|
-| TS-01 | Kapitel 6 (Laufzeitsicht) bindet nur den Frontend-Anteil an die Bausteine aus Kapitel 5; die Backend-Schritte sind weiterhin funktional beschrieben. | aufgefallen | Wer einen Ablauf im Backend nachvollziehen will, muss die beteiligten Module aus dem Code erschließen. | Die Backend-Schritte der Szenarien in Kapitel 6 an die Bausteine aus Kapitel 5.2.2 bis 5.3 binden. |
+| TS-01 | Kapitel 5 (Bausteinsicht) war unausgefüllt, Kapitel 6 (Laufzeitsicht) deshalb nicht an Bausteine gebunden — **abgetragen** | aufgefallen | Neue Mitwirkende mussten die Struktur aus dem Code erschließen. | **Abgetragen:** Kapitel 5 beschreibt Frontend, Backend, Worker und `shared` bis zur dritten Ebene, Kapitel 6 bindet die Szenarien an diese Bausteine, Kapitel 7 beschreibt die Verteilung. |
 
 ### Prüfbarkeit
 
