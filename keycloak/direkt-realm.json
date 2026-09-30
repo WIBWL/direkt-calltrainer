@@ -19,6 +19,14 @@
     ]
   },
 
+  "roles": {
+    "client": {
+      "direkt-calltrainer": [
+        { "name": "calltrainer-user", "description": "May use the Calltrainer at all (ADR 0109)." }
+      ]
+    }
+  },
+
   "clients": [
     {
       "clientId": "direkt-calltrainer",
@@ -80,7 +88,8 @@
       "email": "alice@company-a.example",
       "firstName": "Alice",
       "lastName": "Example",
-      "credentials": [{ "type": "password", "value": "alice", "temporary": false }]
+      "credentials": [{ "type": "password", "value": "alice", "temporary": false }],
+      "clientRoles": { "direkt-calltrainer": ["calltrainer-user"] }
     },
     {
       "id": "00000000-0000-4000-8000-000000000002",
@@ -90,7 +99,8 @@
       "email": "bob@company-a.example",
       "firstName": "Bob",
       "lastName": "Example",
-      "credentials": [{ "type": "password", "value": "bob", "temporary": false }]
+      "credentials": [{ "type": "password", "value": "bob", "temporary": false }],
+      "clientRoles": { "direkt-calltrainer": ["calltrainer-user"] }
     },
     {
       "id": "00000000-0000-4000-8000-000000000003",
@@ -100,7 +110,18 @@
       "email": "carol@company-b.example",
       "firstName": "Carol",
       "lastName": "Example",
-      "credentials": [{ "type": "password", "value": "carol", "temporary": false }]
+      "credentials": [{ "type": "password", "value": "carol", "temporary": false }],
+      "clientRoles": { "direkt-calltrainer": ["calltrainer-user"] }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "username": "dave",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "dave@example.org",
+      "firstName": "Dave",
+      "lastName": "Example",
+      "credentials": [{ "type": "password", "value": "dave", "temporary": false }]
     }
   ],
 

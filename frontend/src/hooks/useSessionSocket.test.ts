@@ -79,3 +79,51 @@ describe("useSessionSocket audio gating on barge-in", () => {
     expect(onAudioChunk).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("useSessionSocket after the server refuses the call", () => {
+  // ADR 0109: a caller over the open-call cap (or without the role) is told
+  // why in an `error` frame and the socket is closed before any Session
+  // exists. The end-call button must still leave the call screen.
+  async function renderRefusedSession() {
+    const onEnded = vi.fn();
+    const view = renderHook(() =>
+      useSessionSocket({ session: SESSION, onAudioChunk: vi.fn(), onEnded }),
+    );
+    await act(async () => {
+      latestSocket().simulateOpen();
+    });
+    act(() => {
+      latestSocket().serverJson({
+        type: "error",
+        code: "too_many_calls",
+        message: "Sie führen bereits zu viele Gespräche gleichzeitig.",
+      });
+      latestSocket().close();
+    });
+    return { ...view, onEnded };
+  }
+
+  it("shows the server's reason", async () => {
+    const { result } = await renderRefusedSession();
+    expect(result.current.error).toBe("Sie führen bereits zu viele Gespräche gleichzeitig.");
+  });
+
+  it("ends locally when the user hangs up, with no Session to wait for", async () => {
+    const { result, onEnded } = await renderRefusedSession();
+    act(() => {
+      result.current.endSession();
+    });
+    expect(onEnded).toHaveBeenCalledWith("user", [], null);
+  });
+
+  it("does not end locally a call that had started and then lost its socket", async () => {
+    // That one has a Session on the server, stored as aborted; inventing an
+    // ending here would send the screen to a wrap-up of a call that has none.
+    const { result, onEnded } = await renderSpeakingSession();
+    act(() => {
+      latestSocket().close();
+      result.current.endSession();
+    });
+    expect(onEnded).not.toHaveBeenCalled();
+  });
+});

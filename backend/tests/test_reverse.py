@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session as DbSession
 from shared.db.models import Feedback, FeedbackPoint, Scenario, Session, Tenant
 from shared.language_packs import get_pack
 from shared.tests.fixtures import asked, stub_completions
-from backend import consent, deletion, library, retention
+from backend import consent, deletion, library, limits, retention
 from backend.api.sessions import MIN_USER_UTTERANCES
 from backend.reversals import (
     FIELD_LIMITS, GOAL_LIMIT, MAX_GOALS, ReverseError, draft_brief,
@@ -356,6 +356,41 @@ async def test_a_second_press_returns_the_same_reverse_without_asking_the_model(
     assert second.json()["id"] == first.json()["id"]
     assert len(calls) == 1
     assert db_session.query(Scenario).filter_by(reverse=True).count() == 1
+
+
+async def test_past_the_hourly_budget_no_new_one_is_drafted(
+    api_client: httpx.AsyncClient, db_session: DbSession,
+    reference_data, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR 0109: 429 before the model is asked. The budget is shared with the
+    follow-up (`test_followup_scenario.py` holds the same test)."""
+    _give_the_scenario_a_case(db_session)
+    extern_id = a_finished_session()
+    calls = stub_completions(monkeypatch, _REPLY)
+    monkeypatch.setattr(limits, "SCENARIO_DRAFTS", limits.RateLimit(0, 3600))
+
+    response = await api_client.post(f"/api/sessions/{extern_id}/reverse")
+
+    assert response.status_code == 429
+    assert not calls
+    assert db_session.query(Scenario).filter_by(reverse=True).count() == 0
+
+
+async def test_one_already_drafted_is_returned_past_the_budget(
+    api_client: httpx.AsyncClient, db_session: DbSession,
+    reference_data, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only a draft the model writes counts: the stored one costs nothing."""
+    _give_the_scenario_a_case(db_session)
+    extern_id = a_finished_session()
+    stub_completions(monkeypatch, _REPLY)
+    first = await api_client.post(f"/api/sessions/{extern_id}/reverse")
+    monkeypatch.setattr(limits, "SCENARIO_DRAFTS", limits.RateLimit(0, 3600))
+
+    again = await api_client.post(f"/api/sessions/{extern_id}/reverse")
+
+    assert again.status_code == 200
+    assert again.json()["id"] == first.json()["id"]
 
 
 async def test_two_overlapping_requests_still_yield_one_reverse(

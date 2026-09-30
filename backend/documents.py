@@ -1,31 +1,31 @@
 """Turn the PDFs a User uploads while authoring a Scenario into a fact list (F-58).
 
 Text-layer PDFs only (no OCR), condensed **together** in one `llm.complete(think=True)`
-call; nothing is stored. Limits: `MAX_UPLOAD_MB` per file, `MAX_TOTAL_UPLOAD_MB` per
-request, output cut to `MAX_TEXT`. If the LLM fails, the raw text returns, unsummarised."""
+call; nothing is stored. Limits: `MAX_UPLOAD_MB` per file (`pdf_text.py`, which reads
+each one in a child process), `MAX_TOTAL_UPLOAD_MB` and `MAX_DOCUMENTS` per request,
+output cut to `MAX_TEXT`. If the LLM fails, the raw text returns, unsummarised."""
 from __future__ import annotations
 
-import io
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from pypdf import PdfReader
-from pypdf.errors import PdfReadError
-
 from shared.clients import llm
 from backend.authored_text import FIELD_LIMITS, clean
+from backend.pdf_text import MAX_UPLOAD_BYTES, TOO_LARGE, DocumentError, labelled
 
-# Every upload is read into memory before it is parsed, so both ceilings are
-# memory bounds, not policy ones -- and the total matters as much as the single
-# file now that a request may carry several. The numbers live once, here, and
-# the German messages below are built from them: a literal "5 MB" in a string
-# drifts the first time this changes.
-MAX_UPLOAD_MB = 5
-MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
+# Every upload is read into memory before it is parsed, so the total is a
+# memory bound like the per-file one in `pdf_text.py` -- and matters as much
+# now that a request may carry several. The German messages below are built
+# from the numbers: a literal "20 MB" in a string drifts the first time this
+# changes.
 MAX_TOTAL_UPLOAD_MB = 20
 MAX_TOTAL_UPLOAD_BYTES = MAX_TOTAL_UPLOAD_MB * 1024 * 1024
-_TOO_LARGE = f"Die Datei ist größer als {MAX_UPLOAD_MB} MB."
 _BATCH_TOO_LARGE = f"Die Dokumente sind zusammen größer als {MAX_TOTAL_UPLOAD_MB} MB."
+# How many files one request may carry. Each is read in a process of its own,
+# one after the other, so the count bounds the request's time as the sizes
+# bound its memory.
+MAX_DOCUMENTS = 10
+_TOO_MANY = f"Es können höchstens {MAX_DOCUMENTS} Dokumente auf einmal gelesen werden."
 # A file name is a label, never content: long enough to tell two documents
 # apart in a message and in the prompt, short enough that it cannot become a
 # paragraph of its own.
@@ -56,11 +56,6 @@ _SUMMARY_SYSTEM = (
 )
 
 
-class DocumentError(ValueError):
-    """The upload is not a usable text-layer PDF. The message is shown to the
-    User as-is, so it is in German."""
-
-
 def document_name(filename: str | None) -> str:
     """A file name fit to put in a message and in the prompt. It is User-supplied
     text on its way to a model, so it goes through `clean()` like every other
@@ -68,20 +63,13 @@ def document_name(filename: str | None) -> str:
     return clean(filename or "").strip()[:MAX_NAME] or "Dokument"
 
 
-def _named(name: str, message: str) -> str:
-    """`message`, saying which file it is about. A lone upload names nothing --
-    the User has exactly one file in mind and the name would be noise -- but one
-    bad file among several has to be identifiable, or the whole batch is."""
-    return f"{name}: {message}" if name else message
-
-
 def reject_oversize_upload(size: int | None, name: str = "") -> None:
     """Raise if the upload's *declared* size is over the per-file limit -- called
     before `await file.read()` so the route never buffers a huge file. `size` is
-    None when the client sends no Content-Length; `extract_pdf_text` then
-    catches it on the real byte count."""
+    None when the client sends no Content-Length; `read_pdf` then catches it
+    on the real byte count."""
     if size is not None and size > MAX_UPLOAD_BYTES:
-        raise DocumentError(_named(name, _TOO_LARGE))
+        raise DocumentError(labelled(name, TOO_LARGE))
 
 
 def reject_oversize_batch(total: int) -> None:
@@ -93,44 +81,10 @@ def reject_oversize_batch(total: int) -> None:
         raise DocumentError(_BATCH_TOO_LARGE)
 
 
-def extract_pdf_text(data: bytes, name: str = "") -> tuple[str, int]:
-    """The full extracted text of a text-layer PDF plus its page count. Every
-    page is read -- the upload gates are the only bound (`summarise_facts` then
-    hands the whole text to the model). Raises DocumentError for anything that
-    is not a readable text PDF; `name` puts the offending file in the message
-    where a request carried more than one."""
-    if not data:
-        raise DocumentError(_named(name, "Die Datei ist leer."))
-    if len(data) > MAX_UPLOAD_BYTES:
-        raise DocumentError(_named(name, _TOO_LARGE))
-
-    try:
-        reader = PdfReader(io.BytesIO(data))
-    except (PdfReadError, OSError, ValueError) as e:
-        raise DocumentError(
-            _named(name, "Die Datei konnte nicht als PDF gelesen werden.")
-        ) from e
-
-    if reader.is_encrypted:
-        raise DocumentError(_named(name, "Das PDF ist passwortgeschützt."))
-
-    parts = []
-    for page in reader.pages:
-        try:
-            parts.append(page.extract_text() or "")
-        except (PdfReadError, KeyError, ValueError):
-            parts.append("")  # a broken page is skipped, not fatal
-    text = clean("\n".join(parts))
-
-    if not text.strip():
-        raise DocumentError(
-            _named(
-                name,
-                "In diesem PDF wurde kein Text gefunden. Eingescannte oder "
-                "abfotografierte Dokumente werden nicht unterstützt.",
-            )
-        )
-    return text, len(reader.pages)
+def reject_too_many(count: int) -> None:
+    """Raise if one request carries more than `MAX_DOCUMENTS` files."""
+    if count > MAX_DOCUMENTS:
+        raise DocumentError(_TOO_MANY)
 
 
 @dataclass(frozen=True)

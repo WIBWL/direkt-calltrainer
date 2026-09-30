@@ -380,7 +380,7 @@ export const MAX_DOCUMENTS_TOTAL_MB = 20;
  * form body to the browser. */
 export function extractPdfs(files: File[]): Promise<DocumentText> {
   const form = new FormData();
-  // Repeated under one name, which is what the route's `list[UploadFile]` reads.
+  // Repeated under one name, which the route reads as `form.getlist("files")`.
   for (const file of files) form.append("files", file);
   return apiFetch<DocumentText>("/api/scenarios/document", { method: "POST", body: form });
 }

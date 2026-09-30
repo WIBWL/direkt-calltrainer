@@ -2,7 +2,9 @@
 
 Covers F-46, ADR 0033 (JSON 'chunk' then binary frame), ADR 0035 ('turn.interrupt'), ADR 0041
 (library faked); a bad handshake or unknown id closes with 1002, a bad token with 1008
-(F-50/ADR 0009). Driven through a fake WebSocket, since TestClient breaks on httpx 0.28."""
+(F-50/ADR 0009); a caller without the role, one over the open-call cap and a silent socket
+close with 1008, a call past its time limit ends, an oversized turn is skipped (ADR 0109).
+Driven through a fake WebSocket, since TestClient breaks on httpx 0.28."""
 
 import asyncio
 import json
@@ -11,6 +13,7 @@ import pytest
 from fastapi import WebSocketDisconnect
 
 from shared.db import models as db_models
+from backend import auth, limits
 from backend.api import session_ws
 from backend.session import persistence
 from backend.session.events import AudioChunk, Failed, StateChanged, TurnCompleted
@@ -80,6 +83,11 @@ class FakeWebSocket:
 
 
 _DISCONNECT = object()
+
+
+def _far_deadline() -> float:
+    """A call deadline no test here reaches."""
+    return asyncio.get_running_loop().time() + 3600
 
 
 async def test_handshake_accepts_a_valid_session_start(fake_library):
@@ -194,7 +202,7 @@ async def test_run_session_routes_a_between_turns_interrupt_to_the_orchestrator(
     ])
     orch = _FakeOrchestrator()
 
-    reason = await session_ws._run_session(ws, orch, orch.start_playback)
+    reason = await session_ws._run_session(ws, orch, orch.start_playback, deadline=_far_deadline())
 
     assert reason == "user"
     assert orch.late_barge_ins == [1500]
@@ -215,7 +223,7 @@ async def test_a_barge_in_over_the_goodbye_ends_the_session_instead_of_reviving_
     ])
     orch = _FakeOrchestrator()
 
-    reason = await session_ws._run_session(ws, orch, orch.start_playback)
+    reason = await session_ws._run_session(ws, orch, orch.start_playback, deadline=_far_deadline())
 
     assert reason == "completed"
     assert orch.turns_run == 1, "no further Turn on a finished call"
@@ -367,3 +375,102 @@ async def test_a_forwarder_that_already_failed_still_closes_the_turn():
         await session_ws._tear_down_turn(forwarder, turn)
 
     assert closed.is_set(), "the turn generator was closed all the same"
+
+
+# --- Access and caps (ADR 0109) --------------------------------------------
+
+
+class SilentWebSocket(FakeWebSocket):
+    """A client that opens the socket and never says anything."""
+
+    async def receive_json(self):
+        await asyncio.Event().wait()
+
+    async def receive_text(self):
+        await asyncio.Event().wait()
+
+
+def _error_codes(ws: FakeWebSocket) -> list[str]:
+    return [m["code"] for m in ws.sent if isinstance(m, dict) and m.get("type") == "error"]
+
+
+async def test_a_socket_that_never_sends_session_start_is_closed(monkeypatch):
+    """Nobody is known before `session.start`; an open socket that says nothing
+    would otherwise hold its connection for as long as the client likes."""
+    monkeypatch.setattr(session_ws, "HANDSHAKE_TIMEOUT_S", 0.05)
+    ws = SilentWebSocket()
+    assert await session_ws._handshake(ws) is None
+    assert ws.closed[0] == 1008
+
+
+async def test_a_caller_without_the_role_is_refused_and_told_why(monkeypatch, fake_library):
+    outsider = auth.AuthContext(sub="outsider", roles=[], token="t")
+    monkeypatch.setattr(session_ws, "authenticate_ws", lambda msg: outsider)
+    ws = FakeWebSocket([_START])
+    assert await session_ws._handshake(ws) is None
+    assert ws.closed[0] == 1008
+    assert _error_codes(ws) == ["not_admitted"]
+
+
+async def test_a_call_over_the_open_call_cap_is_refused(monkeypatch, fake_library):
+    monkeypatch.setattr(limits, "OPEN_CALLS", limits.CallSlots(0))
+    served = []
+
+    async def serve(*_args):
+        served.append(True)
+
+    monkeypatch.setattr(session_ws, "_serve_call", serve)
+    ws = FakeWebSocket([_START])
+    await session_ws.session_ws(ws)
+    assert not served, "no Persona spoke on a refused call"
+    assert ws.closed[0] == 1008
+    assert _error_codes(ws) == ["too_many_calls"]
+
+
+async def test_a_call_gives_its_slot_back_however_it_ends(monkeypatch, fake_library):
+    """Two calls in a row on a cap of one: the first one's slot has to be free
+    again, including when the call died with an exception."""
+    monkeypatch.setattr(limits, "OPEN_CALLS", limits.CallSlots(1))
+    served = []
+
+    async def serve(*_args):
+        served.append(True)
+        raise RuntimeError("the call fell over")
+
+    monkeypatch.setattr(session_ws, "_serve_call", serve)
+    for _ in range(2):
+        with pytest.raises(RuntimeError):
+            await session_ws.session_ws(FakeWebSocket([_START]))
+    assert len(served) == 2
+
+
+async def test_a_call_past_its_time_limit_ends_between_turns():
+    """Stored and wrapped up like a call that ran its course, and the User is
+    told why it ended."""
+    ws = SilentWebSocket()
+    orch = _FakeOrchestrator()
+    deadline = asyncio.get_running_loop().time() + 0.05
+
+    reason = await session_ws._run_session(ws, orch, orch.start_playback, deadline=deadline)
+
+    assert reason == "completed"
+    assert _error_codes(ws) == ["time_limit"]
+    assert orch.turns_run == 0
+
+
+async def test_an_oversized_turn_never_reaches_the_pipeline(monkeypatch):
+    """Whisper is only ever sent `MAX_TURN_AUDIO_BYTES`; the client, waiting on
+    a reply, is sent back to listening and the call goes on."""
+    monkeypatch.setattr(session_ws, "MAX_TURN_AUDIO_BYTES", 10)
+    ws = FakeWebSocket([
+        {"type": "turn.audio.meta", "turn_seq": 1, "mime_type": "audio/wav"},
+        b"x" * 11,
+        {"type": "session.end"},
+    ])
+    orch = _FakeOrchestrator()
+
+    reason = await session_ws._run_session(ws, orch, orch.start_playback, deadline=_far_deadline())
+
+    assert reason == "user"
+    assert orch.turns_run == 0
+    assert {"type": "state", "value": "listening"} in ws.sent

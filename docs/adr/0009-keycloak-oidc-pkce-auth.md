@@ -35,3 +35,5 @@ Built for this stack (FastAPI) and its WebSocket data path.
 ## Status update (September 2026)
 
 The client and the audience are both named `direkt-calltrainer` now, replacing `calltrainer-frontend` and `calltrainer` above, so the application is referred to by one name in Keycloak. The decision itself is unchanged.
+
+**"No role check" is superseded by ADR 0109:** a caller needs the client role `calltrainer-user`, and one without it is answered 403 (REST) or refused at the socket's handshake.

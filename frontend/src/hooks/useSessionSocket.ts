@@ -226,11 +226,12 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     if (send({ type: "session.end" })) return;
     // The handshake never finished, so the server will never send
     // session.ended — end locally instead, so the end-call button always
-    // works, even in the brief window before the connection is established.
+    // works: in the brief window before the connection is established, and
+    // after the server refused the call and closed the socket (ADR 0109).
+    if (sessionIdRef.current !== null) return;
     const ws = wsRef.current;
-    if (ws?.readyState !== WebSocket.CONNECTING) return;
-    console.debug("[WS] ending before connection was established");
-    ws.close();
+    console.debug("[WS] ending a call that never started");
+    if (ws?.readyState === WebSocket.CONNECTING) ws.close();
     // No handshake means no Session was ever created, let alone persisted,
     // so there is no id and no Feedback to wait for.
     onEnded("user", [], null);

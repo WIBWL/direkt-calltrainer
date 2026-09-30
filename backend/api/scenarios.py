@@ -7,9 +7,11 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from openai import OpenAIError
 from pydantic import BaseModel, Field
+# Starlette's, not FastAPI's subclass: it is what `request.form()` returns.
+from starlette.datastructures import UploadFile
 
 from shared.db.models import SCENARIO_CATEGORIES, VISIBILITY_TENANT
 from backend import library, recommendations
@@ -18,15 +20,16 @@ from backend.auth import AuthContext, require_user
 from backend.authored_text import FIELD_LIMITS, WIRE_FIELD_LIMITS, clean
 from backend.documents import (
     MAX_TEXT,
-    DocumentError,
     ExtractedDocument,
     document_name,
-    extract_pdf_text,
     merge_document_text,
     reject_oversize_batch,
     reject_oversize_upload,
+    reject_too_many,
     summarise_facts,
 )
+from backend import limits
+from backend.pdf_text import DocumentError, read_pdf
 from backend.tenants import ResolvedTenant
 
 logger = logging.getLogger(__name__)
@@ -293,6 +296,7 @@ async def _read_documents(uploads: list[UploadFile]) -> list[ExtractedDocument]:
     oversized file through. One unusable document fails the whole batch."""
     if not uploads:
         raise DocumentError("Es wurde keine Datei ausgewählt.")
+    reject_too_many(len(uploads))
 
     documents: list[ExtractedDocument] = []
     # Named only when there is more than one: a lone upload needs no label, and
@@ -306,22 +310,35 @@ async def _read_documents(uploads: list[UploadFile]) -> list[ExtractedDocument]:
         data = await upload.read()
         total += len(data)
         reject_oversize_batch(total)
-        text, pages = extract_pdf_text(data, label)
+        text, pages = await read_pdf(data, label)
         documents.append(ExtractedDocument(name=name, pages=pages, text=text))
     return documents
 
 
 @router.post("/document")
-async def extract_document(files: list[UploadFile] = File(...)) -> dict:
+async def extract_document(
+    request: Request, user: AuthContext = Depends(require_user)
+) -> dict:
     """Condense uploaded text-layer PDFs into one fact list for Fakten (F-58).
 
     All files in one model call, so shared facts are not repeated. Stores
     nothing. `summarised` is False when the LLM was unreachable and the raw
-    (truncated) text is returned instead."""
-    try:
-        documents = await _read_documents(files)
-    except DocumentError as e:
-        raise HTTPException(status_code=422, detail=str(e)) from e
+    (truncated) text is returned instead. 429 past the caller's hourly budget.
+
+    The form is parsed here rather than declared as a `files` parameter:
+    FastAPI reads a declared body before it resolves any dependency, so the
+    upload would be parsed -- and spooled to disk -- for a caller the login
+    check then turns away (ADR 0109)."""
+    limits.enforce(limits.DOCUMENT_SUMMARIES, user.sub)
+    # Starlette's own file cap (1000) is left alone: past it, it answers a bare
+    # English 400, and `_read_documents` refuses anything over MAX_DOCUMENTS in
+    # German. The bytes are bounded by `body_limit.py` either way.
+    async with request.form() as form:
+        files = [f for f in form.getlist("files") if isinstance(f, UploadFile)]
+        try:
+            documents = await _read_documents(files)
+        except DocumentError as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
 
     raw = merge_document_text(documents)
     try:

@@ -131,7 +131,7 @@ Dieses Kapitel fasst die tragenden Entscheidungen des ersten Prototyps zusammen.
 | Transport | Eine WebSocket-Verbindung je Session, Audio in Chunks in beide Richtungen | 0033, 0044 |
 | Persistenz | Eigene PostgreSQL-Instanz, SQLAlchemy 2.0, Alembic-Migrationen aus den ORM-Metadaten | 0010, 0025, 0026, 0027 |
 | Hintergrundverarbeitung | Redis mit RQ als Job-Queue | 0019 |
-| Authentifizierung | Keycloak, OIDC Authorization Code Flow mit PKCE | 0009 |
+| Authentifizierung | Keycloak, OIDC Authorization Code Flow mit PKCE; Zugang nur mit der Client-Rolle `calltrainer-user` | 0009, 0109 |
 | Paraverbale Messung | Praat über Parselmouth | 0047 |
 | Betrieb | DiReKT-Host bei Hetzner, Docker Compose hinter Traefik (`direkt-infrastructure`), drei Images aus einer Registry | 0020, 0104, 0107, 0108 |
 
@@ -194,7 +194,7 @@ Die wichtigsten Frontend-Bausteine sind:
 
 Die Logik des Trainingsablaufs ist von der Darstellung getrennt. `useTrainingRun` verwaltet die aktuell gebundene Session sowie die Daten, die über das Gesprächsende hinaus benötigt werden. `useLiveCall` bündelt die Logik des laufenden Gesprächs und verbindet WebSocket-Kommunikation, Audiowiedergabe und Unterbrechungsverhalten. Dadurch bleiben die sichtbaren Komponenten weitgehend auf Darstellung und Benutzerinteraktion beschränkt.
 
-Die Authentifizierung liegt außerhalb des eigentlichen Trainingsablaufs. `AuthGate` schützt die geschützten Routen und bindet die Anwendung über OIDC an Keycloak an (ADR 0009). Die Routen für Training, Profil, Fortschritt und vergangene Sessions werden zentral in `main.tsx` aufgebaut.
+Die Authentifizierung liegt außerhalb des eigentlichen Trainingsablaufs. `AuthGate` schützt die geschützten Routen und bindet die Anwendung über OIDC an Keycloak an (ADR 0009); ein Konto ohne die Client-Rolle `calltrainer-user` sieht statt der Anwendung einen Hinweis, dass es nicht freigeschaltet ist, und das Backend beantwortet jede seiner Anfragen mit 403 (ADR 0109). Die Routen für Training, Profil, Fortschritt und vergangene Sessions werden zentral in `main.tsx` aufgebaut.
 
 ## 5.2 Ebene 2
 

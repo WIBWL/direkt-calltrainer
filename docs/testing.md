@@ -55,7 +55,8 @@ source of that content, and which imports without a database.
 
 | Area | Feature / ADR | Test file |
 |---|---|---|
-| Keycloak bearer-token verification | F-31, F-50, ADR 0009 | `test_auth.py` |
+| Keycloak bearer-token verification, and the `calltrainer-user` role every router requires (403 without it) | F-31, F-50, ADR 0009, ADR 0109 | `test_auth.py` |
+| What one request and one account may cost: the per-account counters, the body ceiling that answers before the login check, and an anonymous upload never parsed | ADR 0109 | `test_request_limits.py` |
 | Storage consent: the gate on the write path, version staleness, withdrawal deletes | F-49, F-31, ADR 0031, ADR 0034, ADR 0066 | `test_consent.py` |
 | Six-month retention: the boundary, the per-account suspension, idempotence | F-49, ADR 0031, ADR 0066, ADR 0067 | `test_retention.py` |
 | Focus goals: the five-goal limit at the backend, "no focus" as a decision, the catalogue, that deleting trainings leaves the selection alone, and the role and call types stored beside it | F-62, ADR 0031, ADR 0041, ADR 0066, ADR 0076 | `test_focus_goals.py` |
@@ -73,7 +74,7 @@ source of that content, and which imports without a database.
 | No test reaches the development database | ADR 0034 | `test_database_isolation.py` |
 | Persona & scenario library: row mapping + seeded content | F-01, F-03, F-04, R-07..R-10, R-12, ADR 0041, ADR 0043, ADR 0045, ADR 0064 | `test_persona_scenario_library.py` |
 | User-authored Scenarios: ownership, tenant visibility, sharing | F-34, F-59, R-58, ADR 0024, ADR 0050, ADR 0058, ADR 0059, ADR 0060, ADR 0064 | `test_authored_content.py` |
-| PDF text extraction for an authored Scenario | F-58, ADR 0024, ADR 0058, ADR 0059 | `test_scenario_documents.py` |
+| PDF text extraction for an authored Scenario (in a child process killed on overrun, the document count, the hourly budget) | F-58, ADR 0024, ADR 0058, ADR 0059, ADR 0109 | `test_scenario_documents.py` |
 | Follow-up Scenario drafted on request from a Session's feedback (the played case and the wrap-up carried forward, what the model is still not given, the route's refusals and idempotency, that it is stored once as the User's own private Scenario, and that it leaves the library when its Session does) | F-60, F-10, ADR 0011, ADR 0031, ADR 0043, ADR 0050, ADR 0051, ADR 0058, ADR 0059, ADR 0066, ADR 0067, ADR 0069, ADR 0070 | `test_followup_scenario.py` |
 | Reverse of a finished Session (the row it writes, the briefing, idempotency, the refusals, and what a deletion and the retention sweep take) | F-61, ADR 0043, ADR 0050, ADR 0051, ADR 0059, ADR 0066, ADR 0067, ADR 0070 | `test_reverse.py` |
 | Tenant resolution (Organization claim → default) | R-58, ADR 0060 | `test_tenants.py` |
@@ -94,7 +95,7 @@ source of that content, and which imports without a database.
 | TTS runs on KugelAudio alone: a failure surfaces instead of being answered in another voice | ADR 0103 | `test_tts_backend.py` |
 | A KugelAudio stream left before `final` drops the pooled socket and re-warms; the orchestrator closes an abandoned stream at once (the one-chunk audio offset after a barge-in) | ADR 0044 (amendment) | `test_tts_stream_reset.py` |
 | What the TTS backend is handed (German thousands separator + ordinals) | ADR 0033, ADR 0044 | `test_speech_text.py` |
-| WebSocket wire protocol & handshake (+ token in `session.start`) | F-46, F-50, ADR 0009, ADR 0033, ADR 0035 | `test_websocket_protocol.py` |
+| WebSocket wire protocol & handshake (+ token in `session.start`; the role, the open-call cap, the handshake timeout, the call's time limit and the per-turn audio cap) | F-46, F-50, ADR 0009, ADR 0033, ADR 0035, ADR 0109 | `test_websocket_protocol.py` |
 | Centralized logging (session-tagged, kept for the whole run) | ADR 0039, ADR 0055 | `test_logging.py` |
 | Persistence schema (ORM metadata) and the invariants the database enforces (unique measurement/turn) | ADR 0025/0026/0029/0032/0051/0053, F-09, F-12, F-14 | `test_persistence_schema.py` |
 | Session statistics: what each metric divides by, and what suppresses it | F-08, F-24, F-35, F-36, F-41, F-51, F-53, F-63, F-65, ADR 0047, ADR 0048, ADR 0051, ADR 0082, ADR 0083, ADR 0085, ADR 0086, ADR 0089 | `test_metrics.py` |

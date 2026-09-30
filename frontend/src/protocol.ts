@@ -142,10 +142,18 @@ export interface TurnCompletedMessage {
   turn_seq: number;
 }
 
-/** A pipeline leg failed past its retry (ADR 0016); the Session ends after this. */
+/** A pipeline leg failed past its retry (ADR 0016), the call was refused at
+ * the handshake (no role, too many open calls) or ran into its time limit (ADR
+ * 0109); the Session ends after this. `message` is German, for the screen. */
 export interface ErrorMessage {
   type: "error";
-  code: "stt_failed" | "llm_failed" | "tts_failed";
+  code:
+    | "stt_failed"
+    | "llm_failed"
+    | "tts_failed"
+    | "not_admitted"
+    | "too_many_calls"
+    | "time_limit";
   message: string;
 }
 

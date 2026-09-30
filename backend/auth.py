@@ -2,7 +2,8 @@
 
 The SPA sends the access token in the `Authorization` header on REST and inside
 the `session.start` message on the WebSocket; this verifies it against the JWKS.
-No role *check* (ADR 0009); `roles` is carried so one can be added later."""
+A valid token is not enough: the caller also needs the client role
+`calltrainer-user` (ADR 0109), since every route can cause model work."""
 
 import asyncio
 import logging
@@ -32,6 +33,11 @@ OIDC_ISSUER = required("OIDC_ISSUER").rstrip("/")
 # to Calltrainer tokens (keycloak/direkt-realm.json).
 OIDC_AUDIENCE = "direkt-calltrainer"
 
+# The client role (on `direkt-calltrainer`) that admits a caller at all (ADR
+# 0109). A constant for the reason the audience is: a role name that disagrees
+# with the realm only locks everyone out, which is loud, not silently wrong.
+REQUIRED_ROLE = "calltrainer-user"
+
 _ALGORITHMS = ["RS256"]
 
 # HTTPBearer(auto_error=False): we raise our own 401 so the message is ours and
@@ -51,6 +57,11 @@ class AuthContext:
     roles: list[str]
     token: str
     tenant: str | None = None
+
+    @property
+    def admitted(self) -> bool:
+        """Whether the caller holds `REQUIRED_ROLE`."""
+        return REQUIRED_ROLE in self.roles
 
 
 def _organization(payload: dict) -> str | None:
@@ -125,11 +136,18 @@ def verify_token(token: str) -> AuthContext:
     return AuthContext(sub=sub, roles=roles, token=token, tenant=_organization(payload))
 
 
+# What a logged-in caller without the role is told, on REST and on the socket.
+NOT_ADMITTED = "Ihr Konto ist für den Calltrainer nicht freigeschaltet."
+
+
 async def require_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> AuthContext:
-    """FastAPI dependency: requires a valid bearer JWT, returns the caller.
-    Override it in tests via `app.dependency_overrides[require_user]`."""
+    """FastAPI dependency: requires a valid bearer JWT carrying `REQUIRED_ROLE`,
+    returns the caller. 401 without a valid token, 403 without the role -- the
+    one is fixed by logging in, the other is not, and the SPA must not send the
+    User round the login again for it. Override it in tests via
+    `app.dependency_overrides[require_user]`."""
     if credentials is None or not credentials.credentials:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing bearer token")
     # Off the event loop. Verifying a token is a synchronous HTTP round trip
@@ -137,12 +155,18 @@ async def require_user(
     # cache does not hold forces a fresh fetch past it, which any caller can
     # produce at will. The container runs a single worker, so that round trip
     # stalled every call streaming audio on this loop (Q-03, ADR 0034).
-    return await asyncio.to_thread(verify_token, credentials.credentials)
+    caller = await asyncio.to_thread(verify_token, credentials.credentials)
+    if not caller.admitted:
+        logger.warning("Caller without the %s role refused", REQUIRED_ROLE)
+        raise HTTPException(status.HTTP_403_FORBIDDEN, NOT_ADMITTED)
+    return caller
 
 
 def authenticate_ws(message: dict) -> AuthContext | None:
     """Verify the `token` carried in a WebSocket `session.start` message.
-    Returns the caller, or `None` if the token is missing/invalid."""
+    Returns the caller, or `None` if the token is missing/invalid. Whether the
+    caller holds the role is `AuthContext.admitted`, the handshake's to check,
+    since it answers the two differently."""
     token = message.get("token")
     if not isinstance(token, str) or not token:
         return None

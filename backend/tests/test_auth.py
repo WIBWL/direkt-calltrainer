@@ -1,18 +1,22 @@
 """Keycloak bearer-token verification (backend/auth.py; F-31, F-50, ADR 0009).
 
 A valid token is accepted and its `sub`/roles surfaced; a bad token is a 401,
-not a 500; a JWKS/infra failure is *not* masked as a 401.
+not a 500; a JWKS/infra failure is *not* masked as a 401; a valid token without
+the `calltrainer-user` role is a 403 on every route (ADR 0109).
 """
 
 import time
 
+import httpx
 import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 from jwt.exceptions import PyJWKClientConnectionError
 
 from backend import auth
+from backend.app import app
 
 # pylint: disable=missing-function-docstring,too-few-public-methods
 
@@ -163,3 +167,79 @@ def test_authenticate_ws_reads_the_handshake_token():
     assert auth.authenticate_ws({"token": _token()}).sub == "user-123"
     assert auth.authenticate_ws({}) is None
     assert auth.authenticate_ws({"token": "not-a-jwt"}) is None
+
+
+# --- The role gate (ADR 0109) ------------------------------------------------
+
+
+def _bearer(token: str) -> HTTPAuthorizationCredentials:
+    return HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+
+
+def _admitted(**overrides) -> str:
+    return _token(resource_access={auth.OIDC_AUDIENCE: {"roles": [auth.REQUIRED_ROLE]}},
+                  **overrides)
+
+
+async def test_a_caller_with_the_role_is_admitted():
+    caller = await auth.require_user(_bearer(_admitted()))
+    assert caller.sub == "user-123"
+    assert caller.admitted
+
+
+@pytest.mark.parametrize(
+    "resource_access",
+    [
+        {},
+        {auth.OIDC_AUDIENCE: {"roles": ["trainer"]}},
+        # The same name as a role of another client is not this client's role.
+        {"some-other-client": {"roles": [auth.REQUIRED_ROLE]}},
+    ],
+    ids=["no-roles", "other-role", "other-client"],
+)
+async def test_a_valid_token_without_the_role_is_403(resource_access):
+    """403, not 401: logging in again cannot fix it, and the SPA sends a 401
+    round the login."""
+    with pytest.raises(HTTPException) as e:
+        await auth.require_user(_bearer(_token(resource_access=resource_access)))
+    assert e.value.status_code == 403
+
+
+def test_a_realm_role_of_the_same_name_does_not_count():
+    """Only the client role admits; a realm role is anybody's to hand out in a
+    realm shared with other services."""
+    ctx = auth.verify_token(_token(realm_access={"roles": [auth.REQUIRED_ROLE]}))
+    assert not ctx.admitted
+
+
+@pytest.fixture
+async def unauthorised_client():
+    """The app with the real `require_user`, and no database behind it: every
+    request here is refused before one would be needed."""
+    app.dependency_overrides.pop(auth.require_user, None)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+
+
+@pytest.mark.parametrize(
+    "method,path",
+    [
+        ("GET", "/api/personas"),
+        ("GET", "/api/scenarios"),
+        ("POST", "/api/scenarios/document"),
+        ("GET", "/api/sessions"),
+        ("POST", "/api/sessions/00000000-0000-0000-0000-000000000000/reverse"),
+        ("POST", "/api/sessions/00000000-0000-0000-0000-000000000000/follow-up"),
+        ("GET", "/api/me/data"),
+        ("GET", "/api/consent"),
+        ("GET", "/api/focus"),
+        ("GET", "/api/tenant"),
+    ],
+)
+async def test_every_router_refuses_a_caller_without_the_role(unauthorised_client, method, path):
+    response = await unauthorised_client.request(
+        method, path, headers={"Authorization": f"Bearer {_token()}"}
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == auth.NOT_ADMITTED

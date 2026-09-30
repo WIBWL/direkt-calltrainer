@@ -19,7 +19,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from shared.logging_config import session_id_scope
 from shared.feedback import jobs
 from shared.feedback.calls import utterances
-from backend.auth import AuthContext, authenticate_ws
+from backend.auth import NOT_ADMITTED, AuthContext, authenticate_ws
+from backend import limits
+from backend.limits import MAX_CALL_S, MAX_TURN_AUDIO_BYTES
 from backend.tenants import resolve_tenant_id
 from backend import library
 from backend.personas import Persona
@@ -31,6 +33,16 @@ from backend.session.orchestrator import SessionOrchestrator
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# How long a new socket may take to send `session.start`. Until then nobody is
+# known, so an open socket that says nothing would hold its connection forever.
+HANDSHAKE_TIMEOUT_S = 10.0
+
+_TOO_MANY_CALLS = (
+    "Sie führen bereits zu viele Gespräche gleichzeitig. Bitte beenden Sie "
+    "zuerst ein anderes Gespräch."
+)
+_TIME_LIMIT = f"Das Gespräch wurde nach {MAX_CALL_S // 60} Minuten automatisch beendet."
 
 
 @router.websocket("/ws/session")
@@ -44,8 +56,25 @@ async def session_ws(websocket: WebSocket) -> None:
         return
     persona, scenario, auth = handshake
 
+    # Through the module, not a bound name: a test swaps in fresh counters.
+    slots = limits.OPEN_CALLS
+    if not slots.claim(auth.sub):
+        logger.warning("Handshake refused: subject=%s has too many open calls", auth.sub)
+        await _refuse(websocket, "too_many_calls", _TOO_MANY_CALLS, "Too many open calls")
+        return
+    try:
+        await _serve_call(websocket, persona, scenario, auth)
+    finally:
+        slots.release(auth.sub)
+
+
+async def _serve_call(
+    websocket: WebSocket, persona: Persona, scenario: Scenario, auth: AuthContext
+) -> None:
+    """One admitted call, from the Persona's first line to the stored Session."""
     session_id = uuid.uuid4()
     started_at = datetime.now(UTC)
+    deadline = asyncio.get_running_loop().time() + MAX_CALL_S
     # The log file keeps every Session for the process's lifetime (ADR 0055);
     # session_id_scope is what tags this call's lines so they stay separable.
     with session_id_scope(str(session_id)):
@@ -68,7 +97,9 @@ async def session_ws(websocket: WebSocket) -> None:
             if outcome == "interrupted" and orchestrator.ended:
                 reason = "completed"  # talked over the goodbye; the ending stands (ADR 0035)
             elif outcome in ("ok", "interrupted"):
-                reason = await _run_session(websocket, orchestrator, orchestrator.start_playback)
+                reason = await _run_session(
+                    websocket, orchestrator, orchestrator.start_playback, deadline=deadline
+                )
             else:
                 # The opening Turn itself ended the Session: "failed" is the Turn
                 # vocabulary for what the client is told as "error"; "completed"
@@ -155,15 +186,30 @@ def _load_selection(
     return persona, scenario
 
 
+async def _refuse(websocket: WebSocket, code: str, message: str, reason: str) -> None:
+    """Close a socket the caller may not use, telling the User why first: the
+    close reason never reaches the call screen, an `error` frame does. A
+    client already gone is nobody to tell."""
+    with contextlib.suppress(WebSocketDisconnect, RuntimeError, OSError):
+        await websocket.send_json({"type": "error", "code": code, "message": message})
+        # Policy Violation (1008; https://websocket.org/reference/close-codes/)
+        await websocket.close(code=1008, reason=reason)
+
+
 async def _session_start_frame(websocket: WebSocket) -> dict | None:
     """The first frame if it is a `session.start` object, else None with the
     socket closed (unless it disconnected).
 
     Reachable unauthenticated, so every shape needs an answer: a binary frame
-    is a KeyError, non-JSON a decode error, a JSON scalar/array has no `.get()`."""
+    is a KeyError, non-JSON a decode error, a JSON scalar/array has no `.get()`,
+    and silence past `HANDSHAKE_TIMEOUT_S` a close."""
     try:
-        start = await websocket.receive_json()
+        start = await asyncio.wait_for(websocket.receive_json(), HANDSHAKE_TIMEOUT_S)
     except WebSocketDisconnect:
+        return None
+    except TimeoutError:
+        logger.warning("Handshake failed: no session.start within %.0f s", HANDSHAKE_TIMEOUT_S)
+        await websocket.close(code=1008, reason="Expected session.start")
         return None
     except (KeyError, json.JSONDecodeError, TypeError):
         logger.warning("Handshake failed: first frame is not a JSON object")
@@ -193,6 +239,10 @@ async def _handshake(websocket: WebSocket) -> tuple[Persona, Scenario, AuthConte
         logger.warning("Handshake failed: missing or invalid token")
         # Policy Violation (1008; https://websocket.org/reference/close-codes/)
         await websocket.close(code=1008, reason="Authentication required")
+        return None
+    if not auth.admitted:
+        logger.warning("Handshake refused: caller lacks the required role")
+        await _refuse(websocket, "not_admitted", NOT_ADMITTED, "Not admitted")
         return None
 
     persona_id = start.get("persona_id")
@@ -252,15 +302,31 @@ async def _next_turn_request(
 
 
 async def _run_session(
-    websocket: WebSocket, orchestrator: SessionOrchestrator, on_activate: Callable[[], None]
+    websocket: WebSocket,
+    orchestrator: SessionOrchestrator,
+    on_activate: Callable[[], None],
+    *,
+    deadline: float,
 ) -> _SessionEndReason:
-    """Run until the user ends the session ("user"), a turn fails ("error") or
-    the persona ends the call ("completed").
+    """Run until the user ends the session ("user"), a turn fails ("error"),
+    the persona ends the call ("completed") or `deadline` (event-loop time)
+    passes while nobody is speaking ("completed" too: the call ran its course,
+    and is stored and wrapped up like one -- ADR 0109).
 
     Takes `on_activate` because session.activate lands in whichever receive
     loop owns the socket at that moment -- usually this one."""
+    loop = asyncio.get_running_loop()
     while True:
-        envelope = await _next_turn_request(websocket, orchestrator, on_activate)
+        try:
+            # Cancelling a receive is safe: nothing is in flight between turns.
+            envelope = await asyncio.wait_for(
+                _next_turn_request(websocket, orchestrator, on_activate),
+                max(0.0, deadline - loop.time()),
+            )
+        except TimeoutError:
+            logger.info("Call reached its %d-minute limit; ending it", MAX_CALL_S // 60)
+            await websocket.send_json({"type": "error", "code": "time_limit", "message": _TIME_LIMIT})
+            return "completed"
         if envelope is None:
             return "user"
 
@@ -271,6 +337,13 @@ async def _run_session(
             # message type above, so the turn is skipped rather than the
             # Session ended.
             logger.warning("Expected a binary audio frame after turn.audio.meta; skipping the turn")
+            continue
+        if len(audio_bytes) > MAX_TURN_AUDIO_BYTES:
+            # Never sent to Whisper (ADR 0109). The client is waiting on a
+            # reply, so it is told to listen again, as after a barge-in.
+            logger.warning("Turn audio of %d bytes over the %d-byte cap; skipping the turn",
+                           len(audio_bytes), MAX_TURN_AUDIO_BYTES)
+            await websocket.send_json({"type": "state", "value": "listening"})
             continue
 
         turn = orchestrator.run_turn(audio_bytes, "turn.webm", envelope.get("mime_type"))

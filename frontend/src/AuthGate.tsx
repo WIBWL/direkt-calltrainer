@@ -6,11 +6,16 @@ import AuthStatusView from "./components/AuthStatusView";
 
 import { userManager } from "./auth";
 import LoginView from "./components/LoginView";
+import NoAccessView from "./components/NoAccessView";
+import { oidcClientId } from "./oidcConfig";
+import { holdsRequiredRole } from "./utils/access";
 
 /**
- * Renders `children` only for an authenticated user; a splash while the session
- * is restored or a redirect is in flight, else the login screen. `isLoading` is
- * checked first so the login prompt does not flash on every page load.
+ * Renders `children` only for an authenticated user holding the
+ * `calltrainer-user` role (ADR 0109); a splash while the session is restored or
+ * a redirect is in flight, the login screen without a session, and a "not
+ * admitted" screen without the role. `isLoading` is checked first so the login
+ * prompt does not flash on every page load.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const auth = useAuth();
@@ -41,6 +46,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   if (auth.isAuthenticated) {
+    if (!holdsRequiredRole(auth.user?.access_token ?? "", oidcClientId)) {
+      return <NoAccessView onLogout={() => void auth.signoutRedirect()} />;
+    }
     return <>{children}</>;
   }
 

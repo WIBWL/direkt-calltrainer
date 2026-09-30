@@ -2,7 +2,9 @@
 
 Covers F-58 (one or several PDFs, condensed together), ADR 0024/0058 (the document helper),
 ADR 0059 (text sanitised, framed as a document), ADR 0011 (condensed in thinking mode, off the
-live path). `extract_pdf_text` is pure; the LLM is faked (`conftest.py`)."""
+live path), ADR 0109 (each PDF read in a child process that is killed on overrun; an hourly
+budget per User). `extract_pdf_text` is pure; the LLM is faked (`conftest.py`)."""
+import time
 from types import SimpleNamespace
 
 import httpx
@@ -11,16 +13,15 @@ from openai import APIConnectionError
 
 from backend.documents import (
     MAX_TOTAL_UPLOAD_BYTES,
-    MAX_UPLOAD_BYTES,
-    DocumentError,
     ExtractedDocument,
     document_name,
-    extract_pdf_text,
     merge_document_text,
     reject_oversize_batch,
     reject_oversize_upload,
     summarise_facts,
 )
+from backend import limits, pdf_text
+from backend.pdf_text import MAX_UPLOAD_BYTES, DocumentError, extract_pdf_text, read_pdf
 
 # pylint: disable=missing-function-docstring,redefined-outer-name
 # pylint: disable=import-outside-toplevel,unused-argument
@@ -314,3 +315,60 @@ async def test_endpoint_needs_a_token(client):
         files=[("files", ("x.pdf", _pdf("x"), "application/pdf"))],
     )
     assert resp.status_code == 401
+
+
+async def test_endpoint_refuses_more_documents_than_one_request_may_carry(client, monkeypatch):
+    from backend import documents
+
+    monkeypatch.setattr(documents, "MAX_DOCUMENTS", 1)
+    resp = await client.post(
+        "/api/scenarios/document",
+        files=[
+            ("files", ("a.pdf", _pdf("Eins."), "application/pdf")),
+            ("files", ("b.pdf", _pdf("Zwei."), "application/pdf")),
+        ],
+    )
+    assert resp.status_code == 422
+    assert "höchstens" in resp.json()["detail"]
+
+
+async def test_endpoint_answers_429_past_the_hourly_budget(client, fake_llm, monkeypatch):
+    monkeypatch.setattr(limits, "DOCUMENT_SUMMARIES", limits.RateLimit(1, 3600))
+    upload = [("files", ("angebot.pdf", _pdf("40 Sitze."), "application/pdf"))]
+
+    assert (await client.post("/api/scenarios/document", files=upload)).status_code == 200
+    resp = await client.post("/api/scenarios/document", files=upload)
+
+    assert resp.status_code == 429
+    assert len(fake_llm) == 1, "the refused request never reached the model"
+
+
+# --- the child process (ADR 0109) -----------------------------------------
+
+
+async def test_read_pdf_reads_in_a_child_what_extraction_reads_in_place():
+    data = _pdf("Kunde: 14 Lizenzen.")
+    assert await read_pdf(data) == extract_pdf_text(data)
+
+
+async def test_read_pdf_names_the_file_in_the_childs_refusal():
+    with pytest.raises(DocumentError, match="^scan.pdf: In diesem PDF wurde kein Text"):
+        await read_pdf(_pdf(""), "scan.pdf")
+
+
+async def test_a_child_that_overruns_is_killed(monkeypatch):
+    """A crafted PDF can make pypdf loop; the route must not wait on it."""
+    monkeypatch.setattr(pdf_text, "_CHILD_ARGS", ("-c", "import time; time.sleep(60)"))
+    monkeypatch.setattr(pdf_text, "READ_TIMEOUT_S", 0.5)
+    started = time.monotonic()
+    with pytest.raises(DocumentError, match="zu lange"):
+        await read_pdf(_pdf("x"))
+    assert time.monotonic() - started < 10
+
+
+async def test_a_child_that_dies_is_an_unreadable_file(monkeypatch):
+    """Out of memory under the ceiling, or any crash: the User is told the file
+    could not be read, not shown a 500."""
+    monkeypatch.setattr(pdf_text, "_CHILD_ARGS", ("-c", "raise MemoryError"))
+    with pytest.raises(DocumentError, match="nicht als PDF gelesen"):
+        await read_pdf(_pdf("x"))

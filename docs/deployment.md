@@ -64,7 +64,7 @@ What is deliberately a constant in the code rather than a setting:
 
 ### Traefik
 
-The two routers use the shared `websecure` entrypoint and the `*.efre-direkt.de` wildcard certificate. HTTPS is not optional: the browser grants the microphone only in a secure context. A headers middleware (`calltrainer-headers`, on both routers) sets `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and `Permissions-Policy: microphone=(self), camera=(), geolocation=()`; the frontend container compresses its own files.
+The two routers use the shared `websecure` entrypoint and the `*.efre-direkt.de` wildcard certificate. HTTPS is not optional: the browser grants the microphone only in a secure context. A headers middleware (`calltrainer-headers`, on both routers) sets `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and `Permissions-Policy: microphone=(self), camera=(), geolocation=()`; the frontend container compresses its own files and sends the `Content-Security-Policy` and `X-Frame-Options` itself (ADR 0109), since the policy names the API and Keycloak hosts it reads from `API_URL` and `OIDC_ISSUER`. Traefik should not set a second CSP. Request bodies are capped by the backend itself (1 MB, 21 MB for the PDF upload, `backend/body_limit.py`).
 
 **Check on the first deployment:** a call's WebSocket can sit quiet for a while when the User thinks. Traefik v3's entrypoint timeouts apply to the shared `websecure` entrypoint; if calls are cut off after about a minute of silence, raise `respondingTimeouts` there (in `public/compose.yml`, affecting every service), since nothing in the Calltrainer's stack can.
 
@@ -77,12 +77,13 @@ Locally, `keycloak/direkt-realm.json` sets all of this up; in the realm at `keyc
    - Valid post logout redirect URIs: `https://calltrainer.efre-direkt.de/*`
    - Web origins: `https://calltrainer.efre-direkt.de` (the SPA's; the backend's host never talks to Keycloak from a browser)
 2. **Audience mapper** on the client: type *Audience*, included custom audience `direkt-calltrainer`, added to the access token. Without it `backend/auth.py` rejects every token.
-3. **Organizations** (ADR 0060): switch them on in *Realm settings*, and add the built-in `organization` client scope to the client as a **Default** scope (not *Optional*: the SPA does not ask for it). The token then carries `"organization": ["<alias>"]`.
-4. **One Organization per company.** Its **alias** becomes the tenant's `extern_ref`: the backend creates the `tenant` row the first time a member of that Organization logs in, so a new company needs no deployment. Choose the alias carefully (at most 64 characters) — renaming it later creates a second, empty tenant and orphans the first one's shared Scenarios. The company name the app shows starts as the alias; change it with `UPDATE tenant SET name = '…' WHERE extern_ref = '<alias>'`. Keycloak's Organization name is not read.
-5. **Members**: add each user to their company's Organization. No Organization, or more than one, lands in the `default` tenant (Keycloak leaves the claim out for a member of several). Membership is a security boundary: a member reads the company's shared Scenarios, so members are added by an admin or by invitation — do not link an identity provider to an Organization in a way that lets it add users who are not the company's.
-6. Realm: *Require SSL* at least `external requests`. The development users `alice`/`bob`/`carol` do not exist there and must not.
+3. **The role** (ADR 0109): a *client* role `calltrainer-user` on `direkt-calltrainer` (*Clients → direkt-calltrainer → Roles*), and a mapper that puts the client's roles into the access token as `resource_access.direkt-calltrainer.roles` — Keycloak's built-in `roles` client scope does, as a default scope; the JSON file's `direkt-calltrainer roles` mapper does the same explicitly. Assign the role to everyone who may train, best through a group (*Groups → Role mapping → Assign role → Filter by clients*). A user without it logs in and sees "Ihr Konto ist für den Calltrainer nicht freigeschaltet"; every API request answers 403. **Assign it before the backend image that checks it goes out**, or every user is locked out until it is. A grant or withdrawal takes effect at the user's next token refresh (within the access token lifespan), not at once.
+4. **Organizations** (ADR 0060): switch them on in *Realm settings*, and add the built-in `organization` client scope to the client as a **Default** scope (not *Optional*: the SPA does not ask for it). The token then carries `"organization": ["<alias>"]`.
+5. **One Organization per company.** Its **alias** becomes the tenant's `extern_ref`: the backend creates the `tenant` row the first time a member of that Organization logs in, so a new company needs no deployment. Choose the alias carefully (at most 64 characters) — renaming it later creates a second, empty tenant and orphans the first one's shared Scenarios. The company name the app shows starts as the alias; change it with `UPDATE tenant SET name = '…' WHERE extern_ref = '<alias>'`. Keycloak's Organization name is not read.
+6. **Members**: add each user to their company's Organization. No Organization, or more than one, lands in the `default` tenant (Keycloak leaves the claim out for a member of several). Membership is a security boundary: a member reads the company's shared Scenarios, so members are added by an admin or by invitation — do not link an identity provider to an Organization in a way that lets it add users who are not the company's.
+7. Realm: *Require SSL* at least `external requests`. The development users `alice`/`bob`/`carol`/`dave` do not exist there and must not. On the client, *Direct access grants* off: the password grant logs in past everything the login page enforces (the development realm keeps it on for scripts).
 
-**Moving a realm off the old `tenant` attribute:** set up 3–5 *before* the backend image that reads Organizations goes out, since it ignores the `tenant` claim and every user would otherwise see only built-ins and their own Scenarios until they are members. Afterwards delete the client's *User Attribute* mapper for `tenant` and the `tenant` attribute from the user profile.
+**Moving a realm off the old `tenant` attribute:** set up 4–6 *before* the backend image that reads Organizations goes out, since it ignores the `tenant` claim and every user would otherwise see only built-ins and their own Scenarios until they are members. Afterwards delete the client's *User Attribute* mapper for `tenant` and the `tenant` attribute from the user profile.
 
 ### Legal
 
@@ -115,7 +116,7 @@ Must report OK for STT, LLM and TTS. The same check runs at startup (`Startup ch
 ### Acceptance
 
 1. `https://calltrainer-backend.efre-direkt.de/health/ready` answers 200.
-2. Log in at `https://calltrainer.efre-direkt.de` through Keycloak and land back in the app.
+2. Log in at `https://calltrainer.efre-direkt.de` through Keycloak and land back in the app. An account without the `calltrainer-user` role lands on the "nicht freigeschaltet" screen instead.
 3. Grant consent and hold a call (the microphone prompt appears, the Persona answers audibly). The browser's network tab shows the API requests going to `calltrainer-backend.` without CORS errors.
 4. After the call the wrap-up appears (if not: `docker compose ps -a` — is `calltrainer-worker` running?).
 5. The training shows in the history on the profile page; delete it once.
@@ -137,7 +138,7 @@ Rolling back the code is pinning the previous version's tag in the stack (`callt
 - **Logs**: stdout only, one JSON object per line (ADR 0105), collected by Alloy into Loki (`direkt-infrastructure/internal/`); `docker compose logs calltrainer-backend` on the host. The Session id is the `session` field. Neither the backend nor the worker logs spoken content.
 - **Retention**: the six-month deletion runs daily inside the app (ADR 0067). `docker compose exec calltrainer-backend python -m backend.scripts.apply_retention` shows what is due.
 - **Missing wrap-ups**: `docker compose ps -a`, then `docker compose exec calltrainer-backend python -m backend.scripts.requeue_feedback --apply`.
-- **Capacity**: gunicorn runs one worker process. How many concurrent calls that carries has not been measured; test it before a larger group of users.
+- **Capacity**: gunicorn runs one worker process. How many concurrent calls that carries has not been measured; test it before a larger group of users. Keep it at one: the per-account caps (two open calls, 30 minutes per call, 20 PDF summaries and 20 drafts an hour — ADR 0109) are counted in that process, and a second would double them.
 
 ## Backups — deliberately not set up
 

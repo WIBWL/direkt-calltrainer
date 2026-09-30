@@ -24,6 +24,7 @@ from backend.api._loading import FOR_RETRY, SESSION_SUBTREE, WITH_WRAPUP, owned_
 from backend.api.deps import current_tenant_id
 from backend.auth import AuthContext, require_user
 from backend.followups import FollowUpError, PlayedCall, draft_follow_up
+from backend import limits
 from backend.reversals import ReverseError, draft_brief
 
 logger = logging.getLogger(__name__)
@@ -235,6 +236,7 @@ async def create_reverse(
     existing = await asyncio.to_thread(library.restore_reverse, material.session_pk)
     if existing is not None:
         return _reverse_response(existing)
+    limits.enforce(limits.SCENARIO_DRAFTS, caller.sub)  # only a drafted one counts (ADR 0109)
 
     try:
         brief = await draft_brief(
@@ -347,6 +349,7 @@ async def create_follow_up(
     existing = await asyncio.to_thread(library.restore_follow_up, material.session_pk)
     if existing is not None:
         return _follow_up_response(existing)
+    limits.enforce(limits.SCENARIO_DRAFTS, caller.sub)  # only a drafted one counts (ADR 0109)
 
     try:
         draft = await draft_follow_up(material.call)

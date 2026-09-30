@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from shared.db.models import Feedback, FeedbackPoint, Measurement, Scenario, Session
 from shared.tests.fixtures import asked, stub_completions
-from backend import deletion, library, retention
+from backend import deletion, library, limits, retention
 from backend.authored_text import FIELD_LIMITS
 from backend.followups import FollowUpError, PlayedCall, draft_follow_up
 from backend.tests.conftest import DRAFTED_FROM_TURNS, TEST_AUTH, a_finished_session
@@ -511,6 +511,41 @@ async def test_a_second_press_returns_the_same_one_without_asking_the_model(
     assert first == second
     assert len(calls) == 1
     assert len(_follow_ups(db_session)) == 1
+
+
+async def test_past_the_hourly_budget_no_new_one_is_drafted(
+    api_client: httpx.AsyncClient, db_session: DbSession,
+    reference_data, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR 0109: 429 before the model is asked. The budget is shared with the
+    reverse (`test_reverse.py` holds the same test)."""
+    extern_id = a_finished_session()
+    _store_feedback(db_session, _IMPROVEMENTS)
+    calls = stub_completions(monkeypatch, _REPLY)
+    monkeypatch.setattr(limits, "SCENARIO_DRAFTS", limits.RateLimit(0, 3600))
+
+    response = await _ask_for_one(api_client, extern_id)
+
+    assert response.status_code == 429
+    assert not calls
+    assert not _follow_ups(db_session)
+
+
+async def test_one_already_drafted_is_returned_past_the_budget(
+    api_client: httpx.AsyncClient, db_session: DbSession,
+    reference_data, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only a draft the model writes counts: the stored one costs nothing."""
+    extern_id = a_finished_session()
+    _store_feedback(db_session, _IMPROVEMENTS)
+    stub_completions(monkeypatch, _REPLY)
+    first = (await _ask_for_one(api_client, extern_id)).json()
+    monkeypatch.setattr(limits, "SCENARIO_DRAFTS", limits.RateLimit(0, 3600))
+
+    again = await _ask_for_one(api_client, extern_id)
+
+    assert again.status_code == 200
+    assert again.json() == first
 
 
 async def test_a_removed_follow_up_comes_back(

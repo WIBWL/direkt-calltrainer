@@ -38,7 +38,7 @@ from shared.clients import llm  # noqa: E402
 from shared.db import models as db_models  # noqa: E402
 from shared.db.session import session_scope  # noqa: E402
 from shared.turn import Turn  # noqa: E402
-from backend import auth, library  # noqa: E402
+from backend import auth, library, limits  # noqa: E402
 from backend.app import app  # noqa: E402
 from backend.clients import stt, tts  # noqa: E402
 from backend.personas import Persona, PersonaVoice  # noqa: E402
@@ -113,13 +113,24 @@ def load_seed_module():
     return seed_data
 
 
-# A fixed caller for tests that don't care about auth (most of them).
-TEST_AUTH = auth.AuthContext(sub="test-subject", roles=[], token="test-token")
+# A fixed caller for tests that don't care about auth (most of them): one the
+# role gate admits (ADR 0109).
+TEST_AUTH = auth.AuthContext(sub="test-subject", roles=[auth.REQUIRED_ROLE], token="test-token")
 
 
 @pytest.fixture
 def auth_ctx():
     return TEST_AUTH
+
+
+@pytest.fixture(autouse=True)
+def _fresh_limits(monkeypatch):
+    """The per-User caps count in the process and every test calls as
+    `TEST_AUTH`, so without this the suite would run into its own 429s."""
+    open_calls, summaries, drafts = limits.fresh()
+    monkeypatch.setattr(limits, "OPEN_CALLS", open_calls)
+    monkeypatch.setattr(limits, "DOCUMENT_SUMMARIES", summaries)
+    monkeypatch.setattr(limits, "SCENARIO_DRAFTS", drafts)
 
 
 @pytest.fixture(autouse=True)

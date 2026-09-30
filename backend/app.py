@@ -23,6 +23,7 @@ from backend.api.session_ws import router as session_ws_router
 from backend.api.sessions import router as sessions_router
 from backend.api.tenant import router as tenant_router
 from backend.auth import check_realm
+from backend.body_limit import BodyLimit
 from backend.clients import tts
 from backend.clients.health import check_backends
 from backend.db.provision import provision
@@ -105,6 +106,9 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
 )
+# Before CORS, so CORS wraps it: a 413 without the CORS headers reaches the
+# SPA as a network error rather than as the refusal it is (ADR 0109).
+app.add_middleware(BodyLimit)
 # The SPA's origin in a deployment, where it is another host (ADR 0107).
 cors.install(app)
 

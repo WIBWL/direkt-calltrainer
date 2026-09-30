@@ -53,14 +53,16 @@ RUN adduser --uid 5678 --disabled-password --gecos "" appuser
 # Env: every setting in .env.example (ADR 0106), any as NAME_FILE; CORS_ORIGINS
 # optional. No ENTRYPOINT: migrations and seeding run in the app's lifespan
 # handler (backend/db/provision.py). The scripts come along for
-# `docker compose exec ... python -m backend.scripts.<name>`.
+# `docker compose exec ... python -m backend.scripts.<name>`. One worker process
+# on purpose: the per-User caps (backend/limits.py) are counted in it, and a
+# second would double them. The worker class lowers the WebSocket frame ceiling.
 FROM python-runtime AS backend
 COPY --from=backend-deps /opt/venv /opt/venv
 COPY shared  ./shared
 COPY backend ./backend
 USER appuser
 EXPOSE 8000
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "-k", "uvicorn.workers.UvicornWorker", "--timeout", "120", "backend.app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "-k", "backend.gunicorn_worker.Worker", "--timeout", "120", "backend.app:app"]
 
 
 # Env: DIREKT_URL, DIREKT_API_KEY, LLM_MODEL, POSTGRES_URL, REDIS_URL, and
