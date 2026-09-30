@@ -177,9 +177,66 @@ Der Engpass ist die Kette aus Spracherkennung, Antwortgenerierung und Sprachsynt
 
 ## 5.1 Whitebox Gesamtsystem
 
-Das System besteht aus einem browserbasierten Frontend, dem FastAPI-Backend, einem asynchronen Worker sowie den angebundenen Sprach- und Dialogdiensten. Der Echtzeitpfad des Trainings läuft zwischen Frontend und Backend über eine WebSocket-Verbindung; die Nachbereitung wird nach Gesprächsende getrennt davon verarbeitet (ADR 0018, ADR 0019, ADR 0033).
+Das System besteht aus einem browserbasierten Frontend, dem FastAPI-Backend, einem asynchronen Worker sowie den angebundenen Sprach- und Dialogdiensten. Der Echtzeitpfad des Trainings läuft zwischen Frontend und Backend über eine WebSocket-Verbindung; die Nachbereitung wird nach Gesprächsende getrennt davon verarbeitet (ADR 0018, ADR 0019, ADR 0033). Backend und Worker teilen sich den Code für Datenbank, Messung und Sprachmodell über das Paket `shared` (ADR 0108).
 
-### Frontend
+```text
+                          Browser
+            ┌────────────────────────────────┐
+            │  Frontend (React/TypeScript)   │
+            └───────┬────────────────┬───────┘
+          REST /api │                │ WebSocket /ws/session
+                    ▼                ▼          OIDC ┌──────────┐
+            ┌────────────────────────────────┐ ◄──── │ Keycloak │
+            │        Backend (FastAPI)       │       └──────────┘
+            │ API · Live-Gespräch · Löschung │ ──── STT ────► ┌──────────────────┐
+            └──┬──────────────┬──────────────┘ ──── LLM ────► │ DiReKT-Gateway   │
+               │ Job-ID       │ SQL            ──── TTS ──┐   └──────────────────┘
+               ▼              ▼                           ▼            ▲
+          ┌─────────┐   ┌────────────┐           ┌────────────┐        │ LLM
+          │  Redis  │   │ PostgreSQL │           │ KugelAudio │        │
+          └────┬────┘   └─────▲──────┘           └────────────┘        │
+               │ Job          │ SQL                                    │
+               ▼              │                                        │
+            ┌────────────────────────────────┐                         │
+            │   Worker (Wrap-up-Erzeugung)   │ ────────────────────────┘
+            └────────────────────────────────┘
+        Backend und Worker importieren beide das Paket `shared`.
+```
+
+**Begründung.** Der Echtzeitpfad (Sprechen, Erkennen, Antworten, Ausgeben) darf durch nichts verlangsamt werden, was erst nach dem Gespräch gebraucht wird. Deshalb liegt die Erzeugung des Wrap-ups in einem eigenen Prozess, der über eine Warteschlange angestoßen wird (ADR 0018, ADR 0019). Was beide Prozesse brauchen, steht in `shared`; `shared` importiert keines der beiden anderen Pakete, und Backend und Worker importieren einander nicht. Den Job übergibt das Backend dem Worker über dessen Namen, nicht über einen Import (ADR 0108; `backend/tests/test_module_dependencies.py` hält das fest).
+
+**Enthaltene Bausteine**
+
+| Baustein | Verantwortung |
+|---|---|
+| Frontend (`frontend/`) | Single-Page-Anwendung: Trainingsablauf, Mikrofon und Sprechererkennung (VAD) im Browser, Wiedergabe der Persona-Stimme, Darstellung von Wrap-up, Verlauf und Fortschritt (Kapitel 5.2.1). |
+| Backend (`backend/`) | REST-API und die WebSocket-Route des Live-Gesprächs; führt je Turn Spracherkennung, Antwortgenerierung und Sprachsynthese aus, misst die Sprechweise, speichert die Session nach Gesprächsende und stellt den Wrap-up-Job ein. Verwaltet Bibliothek, Einwilligung, Löschung und Aufbewahrung (Kapitel 5.2.2). |
+| Worker (`worker/`) | Erzeugt je eingestelltem Job das Wrap-up einer abgeschlossenen Session und die Kennzahlen über die fordernden Gesprächsabschnitte (Kapitel 5.2.3). |
+| Shared (`shared/`) | Datenbankschema, Datenbankzugriff, Seed-Daten und Migrationen; der Messcode und das Kennzahlen-Inventar; der Client für das Sprachmodell; Job-Status und Warteschlange; Sprachpakete, Logging und das Lesen der Einstellungen (Kapitel 5.2.4). |
+
+**Externe Systeme**
+
+| System | Rolle |
+|---|---|
+| PostgreSQL | Speichert Sessions, Transkripte, Messungen, Wrap-ups, Bibliothek, Einwilligungen und Fokusziele (ADR 0010). |
+| Redis | Warteschlange zwischen Backend und Worker (ADR 0019). Übergeben wird nur der Primärschlüssel der Session, nie Transkript oder Audio. |
+| Keycloak | Anmeldung per OIDC mit PKCE (ADR 0009); liefert über Organizations die Unternehmenszugehörigkeit (ADR 0060). |
+| DiReKT-Gateway | OpenAI-kompatibler Endpunkt für Spracherkennung (Whisper) und Dialogmodell (ADR 0011, ADR 0103). |
+| KugelAudio | Sprachsynthese, ohne Rückfallebene (ADR 0040, ADR 0103). |
+
+**Wichtige Schnittstellen**
+
+| Schnittstelle | Zwischen | Beschreibung |
+|---|---|---|
+| REST unter `/api` | Frontend → Backend | Bibliothek (`/api/personas`, `/api/scenarios`, `/api/tenant`), gespeicherte Trainings (`/api/sessions`), Einwilligung (`/api/consent`), Fokusziele (`/api/focus`) und die eigenen Daten (`/api/me`). Jede Route verlangt ein Bearer-Token; auf fremde Ressourcen antwortet sie mit 404 (ADR 0031, ADR 0050). |
+| WebSocket `/ws/session` | Frontend ↔ Backend | Eine Verbindung je Session. Das Token reist in der ersten Nachricht (`session.start`), weil ein Browser einem WebSocket keinen Header mitgeben kann. Audio geht in beide Richtungen in Stücken; die Antwort der Persona wird abschnittsweise gestreamt (ADR 0033, ADR 0044). |
+| `/health`, `/health/ready` | Betrieb → Backend | Lebendigkeit ohne Abhängigkeiten, Bereitschaft mit Datenbankprüfung. |
+| Job-Warteschlange | Backend → Worker | Ein Job je gespeicherter Session, adressiert über den Funktionsnamen `worker.generator.generate_feedback` (`shared/feedback/queue.py`). |
+| Datenbank | Backend, Worker → PostgreSQL | SQLAlchemy über `shared/db/session.py`. Eine Domänenfunktion bekommt die offene Session übergeben und committet nie; die Transaktion öffnet der Aufrufer (ADR 0099). |
+
+## 5.2 Ebene 2
+
+### 5.2.1 Frontend
 
 Das Frontend ist als Single-Page-Anwendung mit React und TypeScript umgesetzt (ADR 0008). Es bildet den vollständigen Trainingsablauf aus Sicht des Nutzers ab und übernimmt die Darstellung der einzelnen Trainingsschritte, die clientseitige Zustandsverwaltung sowie die Kommunikation mit den HTTP- und WebSocket-Schnittstellen des Backends.
 
@@ -195,15 +252,65 @@ Die wichtigsten Frontend-Bausteine sind:
 
 Die Logik des Trainingsablaufs ist von der Darstellung getrennt. `useTrainingRun` verwaltet die aktuell gebundene Session sowie die Daten, die über das Gesprächsende hinaus benötigt werden. `useLiveCall` bündelt die Logik des laufenden Gesprächs und verbindet WebSocket-Kommunikation, Audiowiedergabe und Unterbrechungsverhalten. Dadurch bleiben die sichtbaren Komponenten weitgehend auf Darstellung und Benutzerinteraktion beschränkt.
 
+API-Aufrufe liegen je Ressource in einem eigenen Modul (`sessions.ts`, `scenarioLibrary.ts`, `personas.ts`); `api.ts` ist nur der Transport und stellt jeder Anfrage die Adresse des Backends aus `/config.js` voran (ADR 0107). Die Anzeigeeigenschaften jeder Kennzahl stehen an einer Stelle (`utils/metrics.ts`), ebenso, was Feedback-Seite und PDF sagen (`utils/reportOutline.ts`, ADR 0102). Das Feedback-PDF entsteht im Browser (ADR 0093).
+
 Die Authentifizierung liegt außerhalb des eigentlichen Trainingsablaufs. `AuthGate` schützt die geschützten Routen und bindet die Anwendung über OIDC an Keycloak an (ADR 0009). Die Routen für Training, Profil, Fortschritt und vergangene Sessions werden zentral in `main.tsx` aufgebaut.
 
-## 5.2 Ebene 2
+### 5.2.2 Backend
 
-*TODO: Detaillierung der einzelnen Bausteine aus Kapitel 5.1.*
+| Baustein | Verantwortung |
+|---|---|
+| `app.py` | FastAPI-Anwendung. Beim Start: Prüfung der drei Modellstrecken (`clients/health.py`), Migration und Seeding der Datenbank (`db/provision.py`), täglicher Aufbewahrungslauf (`retention.py`). Ein Fehlschlag in Prüfung oder Provisionierung wird protokolliert, verhindert den Start aber nicht. |
+| `auth.py`, `cors.py` | Prüft das Bearer-Token gegen Keycloak und liest daraus Nutzerkennung (`sub`) und Organisation; erlaubt den Zugriff vom Host des Frontends (ADR 0107). |
+| `api/` | Ein Router je Ressource. `session_ws.py` ist die Route des Live-Gesprächs; `served.py` baut die drei Formen, in denen eine gespeicherte Session ausgeliefert wird (Verlaufszeile, Detail, Export); `_loading.py` ist das gemeinsame Laden mit Eigentumsprüfung in der Abfrage. |
+| `session/` | Das Live-Gespräch (Kapitel 5.3). |
+| `clients/` | Spracherkennung (`stt.py`) über das Gateway und Sprachsynthese (`tts.py`) über KugelAudio, jeweils ohne Rückfallebene; `speech_text.py` bereitet Zahlen und Daten für die Aussprache auf. |
+| `feedback/` | Die Lesart einer gespeicherten Messung: Erklärung, Skala und Stufe je Kennzahl (`readings.py`, `explanations.py`). Die Stufe wird bei jedem Lesen abgeleitet, nicht gespeichert (ADR 0091). |
+| `library.py`, `personas.py`, `scenarios.py` | Die einzige Stelle, die die Tabellen `persona` und `scenario` liest und schreibt, eingeschränkt auf Nutzer und Unternehmen des Aufrufers (ADR 0041, ADR 0058, ADR 0060); dazu die Wertobjekte ohne Datenbankzugriff. |
+| `authored_text.py`, `documents.py` | Bereinigt selbst verfasste Szenario-Texte, bevor sie Prompt-Inhalt werden (ADR 0059); verdichtet hochgeladene PDFs zu einer Faktenliste, ohne sie zu speichern (F-58). |
+| `followups.py`, `reversals.py` | Folgeszenario und Rollentausch aus einer abgeschlossenen Session, auf Anforderung des Nutzers (ADR 0069, ADR 0070, ADR 0100). |
+| `recommendations.py`, `focus.py` | Szenario-Vorschläge aus Rolle, Gesprächsarten und Fokuszielen; die Fokusziele selbst (ADR 0076, ADR 0087). |
+| `tenants.py` | Ordnet den Aufrufer einem Unternehmen zu und legt dessen Zeile beim ersten Login an (ADR 0060). |
+| `consent.py`, `deletion.py`, `retention.py` | Ob gespeichert werden darf (ADR 0066), die eine Stelle, die Nutzerdaten löscht (`deletion.remove`, ADR 0102), und die Aufbewahrungsfrist von sechs Monaten (ADR 0067). |
+| `scripts/` | Betriebswerkzeuge: Prüfung der Modellstrecken, erneutes Einstellen von Wrap-ups, Aufbewahrung, Nachberechnung von Kennzahlen für ältere Sessions, Lasttest der Datenbank. |
+
+### 5.2.3 Worker
+
+| Baustein | Verantwortung |
+|---|---|
+| `__main__.py` | Startet den RQ-Worker (`python -m worker`). Kein Request-Zyklus, dieselbe Datenbank wie das Backend. |
+| `generator.py` | Schreibt das Wrap-up einer Session mit einem Modellaufruf: Zusammenfassung, Stärken, Verbesserungen, phasengerechte Sprache (ADR 0056), Passung des Tons zum Anlass (ADR 0079) und die fordernden Gesprächsstellen (ADR 0081). Das Modell deutet gemessene Kennzahlen, es erzeugt keine (ADR 0049). |
+| `segments.py` | Misst fünf Kennzahlen getrennt über die fordernden Abschnitte und den Rest des Gesprächs, mit derselben Ableitung wie für das ganze Gespräch (ADR 0081). |
+
+### 5.2.4 Shared
+
+| Baustein | Verantwortung |
+|---|---|
+| `db/` | Schema (`models.py`, ADR 0026), Datenbankzugriff (`session.py`), Seed-Inhalte für Personas, Szenarien und Fokusziele (`seed_data.py`, ADR 0041) und die Alembic-Migrationen (ADR 0027). |
+| `feedback/` | Messung und Kennzahlen: `acoustics.py` misst ein Turn-Audio mit Praat und ist der einzige Import von Parselmouth (ADR 0047); `metrics.py` ist das Inventar aller Kennzahlen samt Ableitung; `intonation.py`, `interruptions.py` und `hesitations.py` sind Einzelauswertungen; `calls.py`, `rows.py` und `stored.py` bringen ein Gespräch in die Datenbank und wieder heraus; `jobs.py` und `queue.py` sind Status und Warteschlange des Wrap-up-Jobs. |
+| `clients/` | Konfiguration des Gateways und der Client für das Dialogmodell (`llm.py`), den Backend und Worker beide nutzen. |
+| `turn.py` | Die Zeitachse eines laufenden Gesprächs, die das Live-Gespräch füllt und die Auswertung liest. |
+| `language_packs.py` | Was am Prompt nicht englisch sein kann: Beispiele, Muster für Verabschiedung und Wiederholung, gesprochene Sätze — je Sprache ein Paket (ADR 0043). |
+| `env.py`, `logging_config.py` | Die einzige Stelle, die Einstellungen liest; jede ist Pflicht und kann aus einer Datei kommen (ADR 0106). Logging nur auf stdout, in den Images als JSON (ADR 0105). |
 
 ## 5.3 Ebene 3
 
-*TODO: Detaillierung der einzelnen Bausteine aus Kapitel 5.2.*
+### 5.3.1 Live-Gespräch (`backend/session/`)
+
+| Baustein | Verantwortung |
+|---|---|
+| `orchestrator.py` | Ein Gespräch: je Turn Spracherkennung, Antwortgenerierung und Sprachsynthese; die Schutzmechanismen gegen Wiederholung, verfrühtes oder ausbleibendes Gesprächsende. Je Strecke ein Wiederholungsversuch, danach ein sauberes Ende (ADR 0016, ADR 0033). |
+| `prompting.py` | Systemprompt der Persona, Eröffnungsanweisung und der Prompt für die Gesprächsnotizen (ADR 0043, ADR 0045, ADR 0071). |
+| `nudges.py` | Anweisungen, die nur für eine einzige Antwort gelten und nie gespeichert werden (ADR 0035, ADR 0037, ADR 0038). |
+| `reply_checks.py`, `repetition.py` | Urteile über eine Antwort gegen die bisherigen Antworten — Wiederholung, erneute Begrüßung, Gesprächsende. Was ein Urteil auslöst und in welcher Reihenfolge, entscheidet der Orchestrator. |
+| `history.py`, `call_notes.py` | Der vollständige Verlauf eines Gesprächs, nur über benannte Operationen änderbar; die Gesprächsnotizen, die das Modell statt des älteren Verlaufs liest (ADR 0071, ADR 0075). |
+| `heard.py` | Was der Nutzer von einer gestreamten Antwort tatsächlich gehört hat, wenn er sie unterbricht (ADR 0035). |
+| `chunking.py` | Teilt den Token-Strom des Modells in satzgroße Stücke für die Synthese (ADR 0033). |
+| `measuring.py` | Hängt die akustische Messung einer Äußerung an ihren Turn; gemessen wird parallel zur Spracherkennung (ADR 0048). |
+| `persistence.py` | Schreibt die Session nach Gesprächsende in einer Transaktion, sofern eine Einwilligung vorliegt, und legt den Wrap-up-Job an (ADR 0034, ADR 0066). |
+| `events.py` | Die Ereignisse, die der Orchestrator an die WebSocket-Route liefert. |
+
+Die Gesprächsschleife importiert aus der Auswertung nur `acoustics` und nie das ORM; erst `persistence.py` verbindet beide, nach Gesprächsende (ADR 0090).
 
 # 6. Laufzeitsicht
 
@@ -255,11 +362,63 @@ Besonderheiten: Dieses Szenario ist für den MVP nicht zwingend erforderlich (SH
 
 ## 7.1 Infrastruktur Ebene 1
 
-*TODO: Übersichtsdiagramm, Begründung, Qualitäts-/Leistungsmerkmale sowie Zuordnung von Bausteinen zu Infrastruktur ergänzen, sobald Kapitel 4/5 vorliegen.*
+Betrieben wird auf dem DiReKT-Host bei Hetzner, neben der Dataplatform (ADR 0020 mit Statusvermerk, ADR 0108). Der Stack, der die Anwendung ausführt, steht nicht in diesem Repository, sondern in `direkt-infrastructure` (`public/calltrainer/compose.yml`). Dieses Repository baut nur die drei Images und legt sie in der Registry ab. Die Schritte zur Inbetriebnahme stehen in `docs/deployment.md`.
+
+```text
+ Browser ──HTTPS──► calltrainer.efre-direkt.de ─────────► calltrainer-frontend (nginx, SPA)
+    │
+    ├──HTTPS/WSS──► calltrainer-backend.efre-direkt.de ─► calltrainer-backend (gunicorn/uvicorn)
+    │                        (Traefik, TLS)                    │   │   │
+    └──HTTPS──► keycloak.efre-direkt.de                        │   │   └──► KugelAudio (TTS, extern)
+                                                               │   └──────► litellm:4000 (DiReKT-Gateway: STT, LLM)
+                                                               ▼                     ▲
+                          calltrainer-db (Postgres 17) ◄── calltrainer-worker ───────┘
+                          calltrainer-redis           ◄──┘
+```
+
+**Begründung.** Frontend, Backend und Worker sind drei Images aus einem gemeinsamen `Dockerfile` (ADR 0104, ADR 0108), damit jedes nur enthält, was es braucht, und der Worker ohne Request-Zyklus neben dem Backend laufen kann. SPA und API liegen auf zwei Hosts; das Backend erlaubt den Zugriff vom Host des Frontends per CORS (ADR 0107). HTTPS ist Pflicht, weil der Browser das Mikrofon nur in einem sicheren Kontext freigibt.
+
+**Qualitäts- und Leistungsmerkmale**
+
+- Das Backend läuft mit einem gunicorn-Prozess. Wie viele gleichzeitige Gespräche er trägt, ist nicht gemessen.
+- Die Images sind nur für amd64 gebaut, weil `praat-parselmouth` kein Linux-Paket für arm64 liefert.
+- Jeder Dienst trägt `restart: unless-stopped`. Fällt der Worker aus, laufen Gespräche weiter und Wrap-ups bleiben in der Warteschlange.
+- Es gibt keine regelmäßigen Backups (siehe RI-02, TS-17).
+
+**Zuordnung der Bausteine**
+
+| Baustein (Kapitel 5) | Container | Host / Netz |
+|---|---|---|
+| Frontend | `calltrainer-frontend` (nginx, Port 80) | `calltrainer.efre-direkt.de` über Traefik |
+| Backend | `calltrainer-backend` (gunicorn mit uvicorn-Worker, Port 8000) | `calltrainer-backend.efre-direkt.de` über Traefik |
+| Worker | `calltrainer-worker` | kein eigener Host |
+| PostgreSQL | `calltrainer-db` (Postgres 17) | nur im Stack-Netz `calltrainer_internal` |
+| Redis | `calltrainer-redis` | nur im Stack-Netz `calltrainer_internal` |
+| DiReKT-Gateway | `litellm` auf demselben Host, erreicht als `http://litellm:4000` über das Netz `proxy` | außerhalb des Stacks |
+| Keycloak | `keycloak.efre-direkt.de`, Realm `direkt` | außerhalb des Stacks |
+| KugelAudio | Dienst im Internet | extern |
 
 ## 7.2 Infrastruktur Ebene 2
 
-*TODO: Detaillierung einzelner Infrastrukturelemente (Diagramm + Erläuterungen).*
+### Netze
+
+Worker, Postgres und Redis liegen im Netz `calltrainer_internal` des Stacks. Backend und Worker sind zusätzlich im Netz `proxy`, über das sie das Gateway auf demselben Host erreichen, ohne über die öffentliche Adresse zu gehen. Frontend und Backend hängen hinter Traefik, der TLS mit dem Wildcard-Zertifikat für `*.efre-direkt.de` beendet und auf beiden Routern Sicherheits-Header setzt (unter anderem `Strict-Transport-Security` und eine `Permissions-Policy`, die das Mikrofon nur für die eigene Seite erlaubt).
+
+### Konfiguration und Geheimnisse
+
+Jede Einstellung ist Pflicht und kann aus einer Datei gelesen werden (ADR 0106). Die drei Geheimnisse — Gateway-Schlüssel, KugelAudio-Schlüssel, Datenbankpasswort — sind Docker Secrets; alle übrigen Werte stehen im `compose.yml` des Stacks. Das Frontend-Image ist in jeder Umgebung dasselbe: Issuer und Adresse des Backends schreibt es beim Containerstart in `/config.js`.
+
+### Auslieferung
+
+`scripts/build-and-push.sh` baut die drei Images, nur von einem Commit mit gepushtem `v*`-Tag, und legt sie unter `registry.internal.efre-direkt.de/calltrainer-{frontend,backend,worker}` mit Versions-Tag und `latest` ab. WUD prüft stündlich, zieht ein neues `latest` und erzeugt die Container neu. Das Backend migriert das Schema beim Start selbst. Weil es keinen Rückweg für ein migriertes Schema gibt, wird vor jeder Auslieferung ein Dump gezogen und nach erfolgreicher Auslieferung wieder gelöscht, da er Transkripte enthält. Ein Rollback der Anwendung pinnt den vorherigen Versions-Tag im Stack.
+
+### Logs
+
+Die Container schreiben nur auf stdout, ein JSON-Objekt je Zeile (ADR 0105). Alloy sammelt die Ausgabe in Loki (`direkt-infrastructure/internal/`). Gesprochene Inhalte werden nicht geloggt.
+
+### Lokale Entwicklung
+
+Lokal laufen Backend, Worker und Frontend direkt auf dem Rechner; `dev-compose.yaml` startet nur Postgres, Redis und Keycloak, jeweils nur auf der Loopback-Adresse. Vite leitet `/api`, `/ws` und `/health` an das Backend weiter, sodass der Browser nur einen Origin sieht und kein CORS nötig ist.
 
 # 8. Querschnittliche Konzepte
 
@@ -466,7 +625,7 @@ Stand: main vom 30.09.2026. Die Spalte *Art* unterscheidet, ob eine Schuld bewus
 
 | Nr. | Schuld | Art | Wirkung | Abtragen durch |
 |---|---|---|---|---|
-| TS-01 | Kapitel 5 (Bausteinsicht) ist nur für das Frontend ausgefüllt, Kapitel 7 (Verteilungssicht) gar nicht; die Backend-Seite von Kapitel 6 (Laufzeitsicht) ist deshalb nicht an Bausteine gebunden. | aufgefallen | Die Struktur von Backend, Worker und `shared` sowie ihre Verteilung sind nirgends in der Architekturdokumentation beschrieben. Neue Mitwirkende müssen sie aus dem Code erschließen. | Kapitel 5 um Backend, Worker und `shared` ergänzen, Kapitel 7 aus ADR 0104 bis 0108 nachziehen, danach die Backend-Schritte in Kapitel 6 an die Bausteine binden. |
+| TS-01 | Kapitel 6 (Laufzeitsicht) bindet nur den Frontend-Anteil an die Bausteine aus Kapitel 5; die Backend-Schritte sind weiterhin funktional beschrieben. | aufgefallen | Wer einen Ablauf im Backend nachvollziehen will, muss die beteiligten Module aus dem Code erschließen. | Die Backend-Schritte der Szenarien in Kapitel 6 an die Bausteine aus Kapitel 5.2.2 bis 5.3 binden. |
 
 ### Prüfbarkeit
 
