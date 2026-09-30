@@ -446,40 +446,90 @@ Lokal laufen Backend, Worker und Frontend direkt auf dem Rechner; `dev-compose.y
 
 # 8. Querschnittliche Konzepte
 
-Querschnittliche Konzepte betreffen mehrere Bausteine/Komponenten gleichzeitig und werden deshalb zentral dokumentiert statt in jedem Baustein wiederholt. Basierend auf dem Erstgespräch und der Feature-Liste lassen sich folgende Konzepte bereits jetzt beschreiben:
+Querschnittliche Konzepte betreffen mehrere Bausteine gleichzeitig und werden deshalb zentral dokumentiert statt in jedem Baustein wiederholt.
 
-## 8.1 Datenschutz und Datensicherheit
+## 8.1 Datenschutz
 
-Da Sprachaufzeichnungen und personenbezogene Daten verarbeitet werden, muss das System durchgängig DSGVO-konform gestaltet sein (C-04). Dies betrifft insbesondere:
+Da Sprache und personenbezogene Daten verarbeitet werden, ist das System durchgängig auf die DSGVO ausgerichtet (C-04).
 
-- Verarbeitung und Speicherung von Sprachdaten (Gesprächsaufzeichnungen, F-12)
-- Speicherung von Fortschrittsdaten einzelner Nutzer (F-13)
-- Übertragung von Sprachdaten an externe Dienste (z. B. Speech-to-Text-, Text-to-Speech- oder LLM-APIs)
+**Was gespeichert wird.** Gespeichert werden Session-Metadaten, Transkripte, Messungen, Befunde und Wrap-ups, einmal am Ende des Gesprächs (ADR 0034). Sprachaufnahmen werden nie gespeichert: Sie werden im Arbeitsspeicher gemessen und danach verworfen (ADR 0048). Gesprochenes wird in keinem Log festgehalten, weder die Worte des Nutzers noch die der Persona (`backend/tests/test_transcript_logging.py`).
 
-Sessiondaten werden bereits im MVP dauerhaft gespeichert, und zwar einmalig am Ende der Session in die projekteigene, uni-gehostete PostgreSQL-Datenbank (ADR 0010): Session-Metadaten, Transkripte, Messungen und Feedback. Sprachaufzeichnungen werden nicht gespeichert und existieren nur für die Dauer der laufenden Session. Sobald Nutzerkonten existieren (ADR 0009), ist die Einwilligung des Nutzers die alleinige Grundlage dafür, eine Session einer identifizierten Person zuzuordnen; der Nutzer kann sie jederzeit widerrufen und seine Daten selbst löschen. Solange es keine Konten gibt, ist der Datenschutzhinweis vor der ersten Aufzeichnung (F-49) Voraussetzung für die Nutzung (siehe ADR 0034, der ADR 0023 ablöst).
+**Einwilligung.** Gespeichert wird nur mit Einwilligung (ADR 0066). `consent.py` ist die einzige Stelle, die das beantwortet; die Schreibroutine fragt innerhalb ihrer eigenen Transaktion und unter einer Sperre je Nutzer, sodass ein Widerruf nicht zwischen Prüfung und Schreiben fallen kann. Bei einem Fehler wird nicht gespeichert. Ohne Einwilligung bleibt das Training vollständig nutzbar, nur ohne Speicherung, Wrap-up und Historie; so ist die Einwilligung freiwillig. Entscheidungen werden angehängt, nie überschrieben, und sind versioniert: Ändert sich der Hinweistext, wird `CURRENT_VERSION` erhöht und die Einwilligung neu erfragt.
 
-## 8.2 Umgang mit Feedback und Bewertung
+**Aufbewahrung und Löschung.** Gespeicherte Trainings laufen nach sechs Monaten ab, sofern der Nutzer das nicht abschaltet (ADR 0067). Der Nutzer kann ein einzelnes Training löschen, mit dem Widerruf alle löschen und seine Daten als Datei exportieren. Alle Löschpfade laufen über `deletion.remove`, das die Reihenfolge festlegt (ADR 0102): Folgeszenarien werden deaktiviert, Rollentausch-Szenarien bei Widerruf und Ablauf gelöscht, beim Löschen eines einzelnen Trainings nicht (ADR 0069, ADR 0070). Das Einwilligungsprotokoll wird nie gelöscht, weil es der einzige Nachweis ist, dass die erfolgte Speicherung erlaubt war (ADR 0068). Fokusziele sind eine Einstellung, keine Trainingsdaten, und bleiben von der Löschung unberührt (ADR 0076).
 
-Da Gespräche laut dem Ansprechpartner von Pilotunternehmen A subjektiv wahrgenommen werden können, sollte das Feedback-Konzept durchgängig folgende Prinzipien verfolgen (gilt für alle Komponenten, die Feedback erzeugen oder anzeigen):
+**Auftragsverarbeitung.** Die Datenschutzerklärung nennt Hetzner (Hosting) und KugelAudio (Sprachausgabe) als Auftragsverarbeiter. Die Stimme des Nutzers und die Transkripte gehen an das DiReKT-Gateway, der Text der Persona an KugelAudio. Die Prüfung der Datenschutzerklärung durch den Datenschutzbeauftragten steht aus (RI-02).
 
-- Kein reiner Score als alleinige Bewertung (F-09)
-- Konkrete, nachvollziehbare Verbesserungsvorschläge statt abstrakter Metriken (F-10)
-- Optionaler Score nur ergänzend, nie ersetzend (F-14)
+**Backups.** Es gibt keine regelmäßigen Backups. Die Löschpfade sind heute vollständig, weil keine Kopien existieren; wer Backups einführt, muss im selben Schritt eine Aufbewahrungsregel in ADR 0066 festhalten.
 
-## 8.3 Benutzerführung und UI-Konsistenz
+## 8.2 Sicherheit, Eigentum und Sichtbarkeit
 
-Gilt übergreifend für alle Bildschirme/Interaktionspunkte des Systems:
+- **Authentifizierung.** Jede Route unter `/api` und der Aufbau des Gesprächs verlangen ein Keycloak-Token; das Backend prüft Signatur und Zielgruppe (ADR 0009). Beim WebSocket reist das Token in der ersten Nachricht. Es gibt keine Rollenprüfung.
+- **Eigentum.** Die Anwendung hat keine eigene Nutzertabelle; Daten gehören der Nutzerkennung (`sub`) aus dem Token (ADR 0031). Eigentum ist eine Bedingung in der Abfrage, keine Prüfung danach. Auf eine fremde Session antwortet die API mit 404 wie auf eine nicht vorhandene, weil 403 die Existenz bestätigen würde (ADR 0050). Nach außen sichtbar ist nur die nicht erratbare `extern_id`, nie der Primärschlüssel.
+- **Unternehmen und Sichtbarkeit.** Ein eigenes Szenario ist privat oder mit dem Unternehmen geteilt (ADR 0058, ADR 0060). Die Unternehmenszugehörigkeit kommt aus Keycloak Organizations; Mitglieder werden von einem Administrator verwaltet, der Client kann sie weder senden noch setzen. Mitgelieferte Szenarien und alle Personas gehören keinem Unternehmen.
+- **Eigene Texte im Prompt.** Selbst verfasster Szenariotext wird beim Schreiben bereinigt (Steuerzeichen, das Ende-Signal der Persona und ähnliche Marker) und im Prompt als Information, nicht als Anweisung gerahmt (ADR 0059). Feldlängen kommen aus einer einzigen Quelle im Backend (ADR 0063).
+- **Angriffsfläche.** Die automatische API-Dokumentation von FastAPI ist abgeschaltet. CORS erlaubt nur den Host des Frontends und keine Cookies (ADR 0107). Geheimnisse liegen im Betrieb als Docker Secrets vor (ADR 0106).
 
-- Pflichteinstellungen vor einem Training werden auf ein Minimum reduziert und deutlich sichtbar dargestellt (Q-02)
-- Zusatz- und Spezialoptionen werden getrennt und weniger prominent angeboten (Q-02)
-- Einfache, intuitive Bedienung ohne Einarbeitungsaufwand (Q-02)
+## 8.3 Umgang mit Feedback und Bewertung
 
-## 8.4 Echtzeitverarbeitung
+Gespräche werden von den Beteiligten unterschiedlich wahrgenommen (R-25). Für alle Bausteine, die Feedback erzeugen oder anzeigen, gilt deshalb:
 
-Betrifft alle Komponenten, die am Gesprächsfluss beteiligt sind (Spracherkennung, KI-Antwortgenerierung, Sprachsynthese):
+- **Kein Score.** Es gibt keinen Gesamtwert für ein Gespräch oder einen Nutzer (ADR 0004); F-14 ist bewusst nicht umgesetzt.
+- **Keine erfundenen Normen.** Keine Kennzahl trägt einen Zielbereich, weil keiner für diese Nutzergruppe validiert ist (ADR 0051). Das Wrap-up darf eine Zahl nicht gegen eine Norm beurteilen, und Zusammenfassung und Phasen-Absatz nennen keine Zahlen.
+- **Ampeln nur unter Bedingungen.** Eine Einordnung im einzelnen Gespräch darf eine Ampel tragen, wenn sie ADR 0078s sieben Bedingungen erfüllt: Farbe auf einer Einordnung, nie auf einer Rohzahl; die ganze Skala sichtbar; nie Farbe allein; als *Einschätzung* bezeichnet samt der Population, aus der die Grenzen stammen; Farbe und Wortlaut kommen aus dem Backend; die Richtung jeder Farbe ist festgehalten; nur im einzelnen Gespräch. Heute gilt das für Sprachmelodie und Unterbrechungen.
+- **Messung und Lesart getrennt.** Eine Messung wird einmal gespeichert, ihre Einordnung bei jedem Lesen abgeleitet, sodass eine neu kalibrierte Skala auch alte Sessions erreicht (ADR 0091).
+- **Jede Zahl zeigt ihre Belege.** Jede Kennzahl hat eine Erklärung und eine eigene Seite mit den Gesprächsstellen, aus denen sie gewonnen wurde, gelesen aus den gespeicherten Daten und nie neu berechnet (ADR 0098).
+- **Nichts gegen die Persona.** Die Persona ist synthetisch; ein Vergleich mit ihr würde eine TTS-Einstellung als Aussage über den Nutzer ausgeben (ADR 0051).
+- **Beschreibung als Fließtext.** Was sich nicht als einzelne Zahl sagen lässt — ob der Ton mit der Phase des Gesprächs mitging, ob er zum Anlass passte —, steht als Absatz des Modells, ausdrücklich als dessen Lesart gekennzeichnet (ADR 0056, ADR 0079).
+- **Fortschritt ohne Urteil.** Die Fortschrittsansicht zeigt Werte über die Zeit und den eigenen üblichen Bereich, aber keine Zielbänder, keine Pfeile und keine Wertungsfarben. Farbe bezeichnet dort eine Familie von Kennzahlen, nie einen Wert (ADR 0065, ADR 0095). Die Lautstärke wird nie zwischen Gesprächen verglichen, weil sie ebenso vom Mikrofon wie vom Sprecher abhängt.
 
-- Durchgängige Anforderung an geringe Latenz, um einen natürlichen Gesprächsfluss zu ermöglichen (Q-03)
-- Umgesetzt wird das durch überlappende statt sequenzielle Verarbeitung der Kette aus Spracherkennung, Antwortgenerierung und Sprachsynthese; die Einzelheiten stehen in Kapitel 4.2
+## 8.4 Benutzerführung und Barrierefreiheit
+
+- Pflicht vor einem Training sind nur Persona und Szenario; alles Weitere hat Vorgaben (Q-02, ADR 0013).
+- Der Weg durch ein Training ist eine einzige, reine Übergangstabelle (`trainingFlow.ts`); nur ein Helfer wechselt den Bildschirm (ADR 0096). Während Mikrofontest und Gespräch ist die Navigation aus dem Kopfbereich gesperrt, weil das Verlassen der Seite die Verbindung abbrechen würde.
+- Was nicht rückgängig zu machen ist — Gespräch beenden, ein Szenario löschen —, fragt vorher nach.
+- Bewegung folgt der Systemeinstellung (`prefers-reduced-motion`), automatisch startender Ton lässt sich abschalten, Diagramme tragen ihre Zahlen auch als Text; eine Farbe steht nie allein (ADR 0097). Die Erklärung zur Barrierefreiheit nennt EN 301 549; eine BITV-Selbstbewertung der Anwendung steht aus.
+- Die Oberfläche ist deutsch. Ein Stylesheet für alle Komponenten, bewusst nicht aufgeteilt (ADR 0092).
+
+## 8.5 Echtzeitverarbeitung
+
+Betrifft alle Bausteine, die am Gesprächsfluss beteiligt sind:
+
+- Überlappende statt sequenzielle Verarbeitung der Kette aus Spracherkennung, Antwortgenerierung und Sprachsynthese; die Einzelheiten stehen in Kapitel 4.2 (Q-03).
+- Nichts Blockierendes auf dem Event-Loop, der das Audio streamt: Datenbankzugriffe und Messung laufen in eigenen Threads, die Nachbereitung im Worker (ADR 0018, ADR 0034).
+- Je Strecke ein Wiederholungsversuch, danach ein sauberes Ende des Gesprächs statt eines hängenden (ADR 0016). Es gibt keine Rückfallebene auf ein anderes Backend (ADR 0103).
+- Unterbrechen ist jederzeit möglich; gespeichert wird nur, was der Nutzer tatsächlich gehört hat (ADR 0035).
+
+## 8.6 Prompt und Modellverhalten
+
+- **Englische Prompts, Sprache aus der Persona.** Prompt-Inhalte sind englisch; was nicht englisch sein kann (Beispiele, Muster für Verabschiedung und Wiederholung, gesprochene Sätze), liefert ein Sprachpaket je Sprache (ADR 0043).
+- **Ein Systemprompt, kurz und gegliedert.** Jede Regel darin geht auf ein Transkript zurück, in dem das Modell ohne sie falsch lag (ADR 0071). Anweisungen, die nur für eine Antwort gelten, werden je Turn eingefügt und nie gespeichert (ADR 0035, ADR 0037, ADR 0038).
+- **Schutzmechanismen in Code, nicht nur im Prompt.** Wiederholungen, erneute Begrüßung und das Gesprächsende werden an der fertigen Antwort geprüft; was daraus folgt und in welcher Reihenfolge, entscheidet der Orchestrator (ADR 0037, ADR 0038, ADR 0073).
+- **Was das Modell nie liest.** Das Briefing des Nutzers, das Rollentausch-Briefing, die Kategorie eines Szenarios und den Zweck eines Folgeszenarios (ADR 0045, ADR 0054, ADR 0069, ADR 0070, ADR 0072). Ein Ziel, das man dem Anrufer gibt, verfolgt er — und verrät die Lösung.
+- **Deuten, nicht messen.** Das Modell bekommt die gemessenen Werte und deutet sie; Zahlen erzeugt es nicht (ADR 0049).
+
+## 8.7 Persistenz
+
+- Tabellen, Spalten und die Schnittstelle zum Frontend sind durchgängig englisch benannt; Deutsch steht nur in nutzersichtbaren Inhalten (ADR 0026, ADR 0057, ADR 0061).
+- Constraint- und Indexnamen kommen aus einer Namenskonvention (ADR 0053); jede Fremdschlüsselspalte ist indiziert (ADR 0052). Vokabulare wie Status oder Sprecher sind CHECK-Constraints, keine Postgres-Enums.
+- Eigentumskanten löschen kaskadierend, Referenztabellen nicht; eine Session lässt sich damit per ORM wie per SQL samt allem Zugehörigen löschen.
+- Migrationen werden aus dem ORM erzeugt und vor dem Anwenden gelesen (ADR 0027). Beim Start migriert und befüllt das Backend die Datenbank selbst, unter einer Postgres-Advisory-Sperre, damit zwei Instanzen nicht gleichzeitig migrieren. Der Abgleich mit den Seed-Daten deaktiviert nur mitgelieferte Zeilen, nie von Nutzern verfasste.
+- Zeitstempel sind zeitzonenbehaftet und werden in UTC geschrieben.
+- Eine Domänenfunktion bekommt die offene Datenbanksitzung und committet nie; die Transaktion öffnet der Aufrufer — Route, Job oder Skript (ADR 0099).
+
+## 8.8 Konfiguration, Logging und Betrieb
+
+- Jede Einstellung ist Pflicht und wird nur über `shared/env.py` gelesen; es gibt keine Standardwerte im Code, und jede Einstellung kann aus einer Datei kommen (`NAME_FILE`), so übergibt der Betrieb seine Geheimnisse (ADR 0106).
+- Logs gehen nur auf stdout, in den Images als ein JSON-Objekt je Zeile mit der Session-Kennung (ADR 0105).
+- Beim Start prüft das Backend jede der drei Modellstrecken mit einer echten Anfrage und protokolliert Ausfälle, ohne den Start zu verhindern. `/health` meldet nur, dass der Prozess lebt; `/health/ready` prüft zusätzlich die Datenbank.
+
+## 8.9 Testbarkeit
+
+- Jede Testdatei nennt das Feature, die Anforderung oder den ADR, den sie belegt; die Zuordnung steht in `docs/testing.md`.
+- Die meisten Backend-Tests brauchen weder Netz noch Datenbank noch Zugangsdaten: STT, LLM und TTS sind gefälscht. Persistenztests legen je Lauf eine eigene Wegwerf-Datenbank an und überspringen sich ohne erreichbaren Server (TS-04).
+- Paketgrenzen und die Abhängigkeitsrichtung zwischen Gesprächsschleife und Auswertung sind per Test festgehalten (ADR 0090, ADR 0108).
+- Das Frontend wird durch einen strikten TypeScript-Compiler, eine bewusst schmale Vitest-Suite und ESLint mit den React-Hook-Regeln geprüft (ADR 0094).
+- flake8 und pylint laufen ohne Befund; eine bewusste Ausnahme trägt ihre Begründung in der Zeile.
 
 # 9. Architekturentscheidungen
 
