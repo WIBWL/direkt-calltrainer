@@ -651,7 +651,7 @@ Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentation
 
 # 10. Qualitätsanforderungen
 
-## 10.1 Quality Requirements Overview
+## 10.1 Übersicht der Qualitätsanforderungen
 
 | ID | Kategorie | ISO 25010 | Beschreibung | Herkunft |
 |---|---|---|---|---|
@@ -667,7 +667,26 @@ Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentation
 
 ## 10.2 Qualitätsszenarien
 
-TODO
+Jedes Szenario nennt einen Auslöser, die geforderte Reaktion und, wo es ihn gibt, den Test, der die Reaktion festhält. Szenarien ohne Test sind als solche gekennzeichnet; für sie fehlt bislang ein messbarer Nachweis.
+
+| Nr. | Qualität | Szenario | Geforderte Reaktion | Nachweis |
+|---|---|---|---|---|
+| QS-01 | Q-01 | Ein Nutzer sieht eine Kennzahl im Wrap-up und will wissen, woher sie kommt. | Jede aktive Kennzahl hat eine Erklärung und führt auf eine Seite mit den Gesprächsstellen oder dem Verlauf dahinter, gelesen aus den gespeicherten Daten (ADR 0098). | `backend/tests/test_metric_readings.py::test_every_active_metric_is_explained` |
+| QS-02 | Q-01, Q-04 | Eine Einordnung trägt eine Ampel. | Die Stufe steht auch in Worten da, die Skala trägt auf jeder Stufe eine Farbe oder auf keiner, und die Farbe kommt aus dem Backend (ADR 0078). | `backend/tests/test_metric_readings.py` |
+| QS-03 | Q-01, Q-04 | Das Modell schreibt ein Wrap-up. | Zusammenfassung und Phasen-Absatz enthalten keine Messwerte; Zahlen stehen nur in Stärken, Verbesserungen und dort, wo die Regel zur Passung des Tons sie erlaubt. | `worker/tests/test_wrapup_prompt.py` |
+| QS-04 | Q-02 | Ein Nutzer will ein Gespräch beginnen. | Die Übergangstabelle kennt nur einen Weg in das Gespräch, den eigenen Knopfdruck auf dem klingelnden Telefon bzw. unter dem Rollentausch-Briefing; ein Folgeszenario überspringt den Mikrofontest, nie die Ausgangslage (ADR 0096). | `frontend/src/trainingFlow.test.ts` |
+| QS-05 | Q-03 | Die Persona antwortet mit mehreren Sätzen. | Die Wiedergabe beginnt mit dem ersten synthetisierten Satz, bevor die Antwort fertig generiert ist (ADR 0033, ADR 0044). | `backend/tests/test_session_pipeline.py::test_reply_audio_streams_in_multiple_chunks`, `backend/tests/test_chunking.py`; eine Latenzmessung je Teilstrecke unter Last fehlt (RI-01). |
+| QS-06 | Q-03 | Der Nutzer spricht in eine Antwort der Persona hinein. | Die Wiedergabe verstummt sofort, und im Verlauf steht nur, was der Nutzer tatsächlich gehört hat (ADR 0035). | `backend/tests/test_barge_in.py`, `frontend/src/hooks/useBargeIn.test.ts`, `frontend/src/hooks/useStreamedAudioPlayback.test.ts` |
+| QS-07 | Q-07 | Die Spracherkennung, das Dialogmodell oder die Sprachsynthese fällt während des Gesprächs aus. | Spracherkennung und Dialogmodell bekommen einen Wiederholungsversuch, die Synthese keinen; danach endet der Turn mit einem Fehlercode je Strecke, und das Gespräch wird beendet. Es wird nie still in einer anderen Stimme weitergesprochen (ADR 0016, ADR 0103). | `backend/tests/test_pipeline_failure.py`, `backend/tests/test_tts_backend.py` |
+| QS-08 | Q-07 | Ein Modell ist beim Start der Anwendung nicht erreichbar. | Das Backend startet trotzdem und protokolliert je Strecke, was fehlt, auch bei einem Rate-Limit oder einer Zeitüberschreitung in Worten. | `backend/tests/test_startup_checks.py` |
+| QS-09 | Q-07 | Der Worker läuft nicht oder die Warteschlange ist nicht erreichbar. | Gespräche laufen weiter; das Transkript wird angezeigt. Ist der Job nicht einstellbar, zeigt die Session `failed` statt eines endlosen Wartens, und der Nutzer kann das Wrap-up neu anstoßen. | `worker/tests/test_feedback_job_status.py::test_a_job_that_was_never_queued_is_marked_failed` |
+| QS-10 | Q-08 | Ein anderes Modell soll für Spracherkennung oder Dialog eingesetzt werden. | Der Wechsel ist eine Änderung des Modellnamens in der Konfiguration, solange das Gateway die OpenAI-kompatible Schnittstelle spricht (ADR 0103). Die auf Qwen3 abgestimmten Sampling-Parameter gelten dabei nicht automatisch mit (TS-16). | kein automatischer Test |
+| QS-11 | Q-09, C-04 | Ein Nutzer hat nicht eingewilligt oder widerruft während des Gesprächs. | Nichts wird gespeichert; die Prüfung fällt zum Schreibzeitpunkt, und kann sie nicht beantwortet werden, wird nicht gespeichert (ADR 0066). | `backend/tests/test_consent.py` |
+| QS-12 | Q-09, C-04 | Ein Nutzer ruft die Session eines anderen Nutzers auf oder versucht sie zu löschen. | Die API antwortet mit 404 wie auf eine nicht vorhandene Session; Export und Übersicht enthalten nie fremde Daten (ADR 0031, ADR 0050). | `backend/tests/test_api.py::test_another_users_session_is_not_readable`, `backend/tests/test_data_rights.py` |
+| QS-13 | Q-09, C-04 | Ein gespeichertes Training wird älter als sechs Monate. | Der tägliche Lauf löscht es samt allem Zugehörigen, außer der Nutzer hat die Frist abgeschaltet (ADR 0067). | `backend/tests/test_retention.py` |
+| QS-14 | Q-09, C-04 | Das Backend protokolliert ein Gespräch. | Weder die Worte des Nutzers noch die der Persona erscheinen im Log. | `backend/tests/test_transcript_logging.py` |
+| QS-15 | Q-06 | Ein Nutzer will ein Gespräch einer anderen Art üben. | Die Bibliothek enthält Szenarien aller vier Kategorien, jede mit jeder Persona spielbar; eigene Szenarien kommen hinzu (ADR 0001, ADR 0072). | `backend/tests/test_persona_scenario_library.py` prüft, dass Support- und Preisgespräche belegt sind; die vier Kategorien selbst prüft kein Test. |
+| QS-16 | Q-05 | Ein Nutzer trainiert über Wochen. | Jedes gespeicherte Training erhält ein Wrap-up; die Fortschrittsansicht zeigt den Verlauf über alle Trainings ohne Wertung (ADR 0065). | `frontend/src/utils/progressStats.test.ts`; ob die Regelmäßigkeit die Annahme sichert, ist erst im Pilotbetrieb prüfbar. |
 
 # 11. Risiken und technische Schulden
 
