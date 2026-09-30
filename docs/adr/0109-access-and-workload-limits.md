@@ -6,13 +6,13 @@ Accepted (amends ADR 0009's "no role check")
 
 ## Context
 
-Every route that reaches the LLM, Whisper or KugelAudio sat behind a login, and nothing more: any account the realm would issue a `direkt-calltrainer` token to could use the app, in the shared DiReKT realm, with no bound on how much it spent. One account — or one stolen token — could hold any number of calls open, keep a call running indefinitely, send 16 MB audio frames to Whisper, and have 20 MB of PDF text summarised as often as it liked.
+Every route that reaches the LLM, Whisper or KugelAudio sat behind a login, and nothing more: any account the realm would issue a `calltrainer-frontend` token to could use the app, in the shared DiReKT realm, with no bound on how much it spent. One account — or one stolen token — could hold any number of calls open, keep a call running indefinitely, send 16 MB audio frames to Whisper, and have 20 MB of PDF text summarised as often as it liked.
 
 A security review also found that work reached the backend *before* the login check. FastAPI reads a route's declared body before it resolves any dependency, so an anonymous client could make the backend parse any body — a multipart upload spooled to disk, and, under Starlette 0.35, form fields buffered in memory without limit. A WebSocket could be opened and left silent forever. And one crafted PDF, parsed by pure-Python pypdf on the backend's one event loop, froze every live call.
 
 ## Decision
 
-**A role, not just a login.** A caller needs the client role `calltrainer-user` on `direkt-calltrainer` (`resource_access.direkt-calltrainer.roles`, `REQUIRED_ROLE` in `backend/auth.py`). A client role, not a realm role: in a realm shared with other services, a realm role of that name is anybody's to hand out. `require_user` answers **403** without it — not 401, which the SPA answers by sending the User round the login again, which cannot help. The socket's handshake refuses with an `error` frame (`not_admitted`) and close code 1008. The SPA reads the role from the access token and shows a "not admitted" screen with a logout button instead of the app (`utils/access.ts`, `NoAccessView`); the backend's check is the one that counts.
+**A role, not just a login.** A caller needs the client role `calltrainer-user` on `calltrainer-frontend` (`resource_access.calltrainer-frontend.roles`, `REQUIRED_ROLE` in `backend/auth.py`). A client role, not a realm role: in a realm shared with other services, a realm role of that name is anybody's to hand out. `require_user` answers **403** without it — not 401, which the SPA answers by sending the User round the login again, which cannot help. The socket's handshake refuses with an `error` frame (`not_admitted`) and close code 1008. The SPA reads the role from the access token and shows a "not admitted" screen with a logout button instead of the app (`utils/access.ts`, `NoAccessView`); the backend's check is the one that counts.
 
 **Caps per account** (`backend/limits.py`, counted per `sub`):
 

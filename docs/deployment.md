@@ -59,8 +59,8 @@ What is deliberately a constant in the code rather than a setting:
 
 | Value | Where |
 |---|---|
-| Keycloak client id `direkt-calltrainer` | `frontend/src/oidcConfig.ts` |
-| Token audience `direkt-calltrainer` | `backend/auth.py` (`OIDC_AUDIENCE`) |
+| Keycloak client id `calltrainer-frontend` | `frontend/src/oidcConfig.ts`, `backend/auth.py` (`OIDC_CLIENT_ID`) |
+| Token audience `calltrainer-backend` | `backend/auth.py` (`OIDC_AUDIENCE`) |
 
 ### Traefik
 
@@ -72,12 +72,12 @@ The two routers use the shared `websecure` entrypoint and the `*.efre-direkt.de`
 
 Locally, `keycloak/direkt-realm.json` sets all of this up; in the realm at `keycloak.efre-direkt.de` it has to be done by hand. The JSON file is the template.
 
-1. **Client** `direkt-calltrainer`: public (client authentication off), standard flow on, PKCE `S256`.
+1. **Client** `calltrainer-frontend`: public (client authentication off), standard flow on, PKCE `S256`.
    - Valid redirect URIs: `https://calltrainer.efre-direkt.de/*`
    - Valid post logout redirect URIs: `https://calltrainer.efre-direkt.de/*`
    - Web origins: `https://calltrainer.efre-direkt.de` (the SPA's; the backend's host never talks to Keycloak from a browser)
-2. **Audience mapper** on the client: type *Audience*, included custom audience `direkt-calltrainer`, added to the access token. Without it `backend/auth.py` rejects every token.
-3. **The role** (ADR 0109): a *client* role `calltrainer-user` on `direkt-calltrainer` (*Clients → direkt-calltrainer → Roles*), and a mapper that puts the client's roles into the access token as `resource_access.direkt-calltrainer.roles` — Keycloak's built-in `roles` client scope does, as a default scope; the JSON file's `direkt-calltrainer roles` mapper does the same explicitly. Assign the role to everyone who may train, best through a group (*Groups → Role mapping → Assign role → Filter by clients*). A user without it logs in and sees "Ihr Konto ist für den Calltrainer nicht freigeschaltet"; every API request answers 403. **Assign it before the backend image that checks it goes out**, or every user is locked out until it is. A grant or withdrawal takes effect at the user's next token refresh (within the access token lifespan), not at once.
+2. **Audience mapper** on the client: type *Audience*, included custom audience `calltrainer-backend`, added to the access token. Without it `backend/auth.py` rejects every token.
+3. **The role** (ADR 0109): a *client* role `calltrainer-user` on `calltrainer-frontend` (*Clients → calltrainer-frontend → Roles*), and a mapper that puts the client's roles into the access token as `resource_access.calltrainer-frontend.roles` — Keycloak's built-in `roles` client scope does, as a default scope; the JSON file's `calltrainer-frontend roles` mapper does the same explicitly. Assign the role to everyone who may train, best through a group (*Groups → Role mapping → Assign role → Filter by clients*). A user without it logs in and sees "Ihr Konto ist für den Calltrainer nicht freigeschaltet"; every API request answers 403. **Assign it before the backend image that checks it goes out**, or every user is locked out until it is. A grant or withdrawal takes effect at the user's next token refresh (within the access token lifespan), not at once.
 4. **Organizations** (ADR 0060): switch them on in *Realm settings*, and add the built-in `organization` client scope to the client as a **Default** scope (not *Optional*: the SPA does not ask for it). The token then carries `"organization": ["<alias>"]`.
 5. **One Organization per company.** Its **alias** becomes the tenant's `extern_ref`: the backend creates the `tenant` row the first time a member of that Organization logs in, so a new company needs no deployment. Choose the alias carefully (at most 64 characters) — renaming it later creates a second, empty tenant and orphans the first one's shared Scenarios. The company name the app shows starts as the alias; change it with `UPDATE tenant SET name = '…' WHERE extern_ref = '<alias>'`. Keycloak's Organization name is not read.
 6. **Members**: add each user to their company's Organization. No Organization, or more than one, lands in the `default` tenant (Keycloak leaves the claim out for a member of several). Membership is a security boundary: a member reads the company's shared Scenarios, so members are added by an admin or by invitation — do not link an identity provider to an Organization in a way that lets it add users who are not the company's.

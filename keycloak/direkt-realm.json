@@ -21,7 +21,7 @@
 
   "roles": {
     "client": {
-      "direkt-calltrainer": [
+      "calltrainer-frontend": [
         { "name": "calltrainer-user", "description": "May use the Calltrainer at all (ADR 0109)." }
       ]
     }
@@ -29,8 +29,8 @@
 
   "clients": [
     {
-      "clientId": "direkt-calltrainer",
-      "name": "direkt-calltrainer",
+      "clientId": "calltrainer-frontend",
+      "name": "calltrainer-frontend",
       "description": "The only client that performs a login. Public + PKCE, because the SPA cannot keep a secret (ADR 0009).",
       "enabled": true,
       "protocol": "openid-connect",
@@ -52,22 +52,22 @@
       "optionalClientScopes": ["offline_access"],
       "protocolMappers": [
         {
-          "name": "direkt-calltrainer audience",
+          "name": "calltrainer-backend audience",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "config": {
-            "included.custom.audience": "direkt-calltrainer",
+            "included.custom.audience": "calltrainer-backend",
             "access.token.claim": "true",
             "id.token.claim": "false"
           }
         },
         {
-          "name": "direkt-calltrainer roles",
+          "name": "calltrainer-frontend roles",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-client-role-mapper",
           "config": {
-            "usermodel.clientRoleMapping.clientId": "direkt-calltrainer",
-            "claim.name": "resource_access.direkt-calltrainer.roles",
+            "usermodel.clientRoleMapping.clientId": "calltrainer-frontend",
+            "claim.name": "resource_access.calltrainer-frontend.roles",
             "jsonType.label": "String",
             "multivalued": "true",
             "access.token.claim": "true",
@@ -89,7 +89,7 @@
       "firstName": "Alice",
       "lastName": "Example",
       "credentials": [{ "type": "password", "value": "alice", "temporary": false }],
-      "clientRoles": { "direkt-calltrainer": ["calltrainer-user"] }
+      "clientRoles": { "calltrainer-frontend": ["calltrainer-user"] }
     },
     {
       "id": "00000000-0000-4000-8000-000000000002",
@@ -100,7 +100,7 @@
       "firstName": "Bob",
       "lastName": "Example",
       "credentials": [{ "type": "password", "value": "bob", "temporary": false }],
-      "clientRoles": { "direkt-calltrainer": ["calltrainer-user"] }
+      "clientRoles": { "calltrainer-frontend": ["calltrainer-user"] }
     },
     {
       "id": "00000000-0000-4000-8000-000000000003",
@@ -111,7 +111,7 @@
       "firstName": "Carol",
       "lastName": "Example",
       "credentials": [{ "type": "password", "value": "carol", "temporary": false }],
-      "clientRoles": { "direkt-calltrainer": ["calltrainer-user"] }
+      "clientRoles": { "calltrainer-frontend": ["calltrainer-user"] }
     },
     {
       "id": "00000000-0000-4000-8000-000000000004",

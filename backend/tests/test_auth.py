@@ -43,7 +43,7 @@ def _token(**overrides) -> str:
         "iss": auth.OIDC_ISSUER,
         "aud": auth.OIDC_AUDIENCE,
         "exp": int(time.time()) + 300,
-        "resource_access": {auth.OIDC_AUDIENCE: {"roles": ["trainer"]}},
+        "resource_access": {auth.OIDC_CLIENT_ID: {"roles": ["trainer"]}},
     }
     payload.update(overrides)
     # None removes a claim rather than setting it to null, so a test can ask
@@ -95,11 +95,13 @@ def test_the_retired_tenant_claim_is_ignored():
     "bad",
     [
         {"aud": "some-other-service"},
+        # Addressed to the client that logs in, not to the API.
+        {"aud": auth.OIDC_CLIENT_ID},
         {"iss": "http://evil.invalid/realms/x"},
         {"exp": int(time.time()) - 10},
         {"sub": None},
     ],
-    ids=["wrong-audience", "wrong-issuer", "expired", "no-subject"],
+    ids=["wrong-audience", "client-audience", "wrong-issuer", "expired", "no-subject"],
 )
 def test_bad_token_is_401(bad):
     with pytest.raises(HTTPException) as e:
@@ -177,7 +179,7 @@ def _bearer(token: str) -> HTTPAuthorizationCredentials:
 
 
 def _admitted(**overrides) -> str:
-    return _token(resource_access={auth.OIDC_AUDIENCE: {"roles": [auth.REQUIRED_ROLE]}},
+    return _token(resource_access={auth.OIDC_CLIENT_ID: {"roles": [auth.REQUIRED_ROLE]}},
                   **overrides)
 
 
@@ -191,7 +193,7 @@ async def test_a_caller_with_the_role_is_admitted():
     "resource_access",
     [
         {},
-        {auth.OIDC_AUDIENCE: {"roles": ["trainer"]}},
+        {auth.OIDC_CLIENT_ID: {"roles": ["trainer"]}},
         # The same name as a role of another client is not this client's role.
         {"some-other-client": {"roles": [auth.REQUIRED_ROLE]}},
     ],

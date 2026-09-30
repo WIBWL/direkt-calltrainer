@@ -6,7 +6,7 @@ import { REQUIRED_ROLE, holdsRequiredRole } from "./access";
  * an admitted User out of the app or shows an outsider a screen whose every
  * request then fails — so both directions are pinned. */
 
-const CLIENT = "direkt-calltrainer";
+const CLIENT = "calltrainer-frontend";
 
 /** An unsigned JWT with `payload`; nothing here checks the signature. */
 function token(payload: object): string {

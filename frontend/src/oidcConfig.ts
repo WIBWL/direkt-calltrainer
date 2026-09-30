@@ -7,7 +7,7 @@ import { oidcIssuer } from "./config";
 export const oidcAuthority: string = oidcIssuer;
 
 /** The public Keycloak client that performs the login (see keycloak/direkt-realm.json). */
-export const oidcClientId = "direkt-calltrainer";
+export const oidcClientId = "calltrainer-frontend";
 
 /**
  * Where Keycloak sends the user back: always the SPA origin, so the realm needs

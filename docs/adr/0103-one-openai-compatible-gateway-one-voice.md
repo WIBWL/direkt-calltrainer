@@ -38,4 +38,4 @@ Losing KugelAudio now breaks calls instead of degrading them quietly. That is th
 
 ## Status update (September 2026)
 
-`OIDC_CLIENT_ID` is gone from `.env` again: the client is named `direkt-calltrainer` in every realm, so the SPA carries it as a constant in `frontend/src/oidcConfig.ts`. Only `OIDC_ISSUER` is still read through the widened `envPrefix`. The model names stay in `.env` as decided above.
+`OIDC_CLIENT_ID` is gone from `.env` again: the client is named `calltrainer-frontend` in every realm, so the SPA carries it as a constant in `frontend/src/oidcConfig.ts`. Only `OIDC_ISSUER` is still read through the widened `envPrefix`. The model names stay in `.env` as decided above.

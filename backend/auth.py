@@ -30,10 +30,15 @@ OIDC_ISSUER = required("OIDC_ISSUER").rstrip("/")
 # A constant, not config: a value that disagrees with the realm just yields 401s
 # rather than a boot failure, so hard-coding it is safer than an env var nobody
 # would notice was wrong. This is the audience the realm's audience-mapper adds
-# to Calltrainer tokens (keycloak/direkt-realm.json).
-OIDC_AUDIENCE = "direkt-calltrainer"
+# to Calltrainer tokens (keycloak/direkt-realm.json). It names the API, not the
+# client the SPA logs in with.
+OIDC_AUDIENCE = "calltrainer-backend"
 
-# The client role (on `direkt-calltrainer`) that admits a caller at all (ADR
+# The client the SPA logs in with, whose client roles the token carries under
+# `resource_access` (frontend/src/oidcConfig.ts names the same client).
+OIDC_CLIENT_ID = "calltrainer-frontend"
+
+# The client role (on `OIDC_CLIENT_ID`) that admits a caller at all (ADR
 # 0109). A constant for the reason the audience is: a role name that disagrees
 # with the realm only locks everyone out, which is loud, not silently wrong.
 REQUIRED_ROLE = "calltrainer-user"
@@ -132,7 +137,7 @@ def verify_token(token: str) -> AuthContext:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "token has no subject")
 
     resource_access = payload.get("resource_access") or {}
-    roles = list((resource_access.get(OIDC_AUDIENCE) or {}).get("roles") or [])
+    roles = list((resource_access.get(OIDC_CLIENT_ID) or {}).get("roles") or [])
     return AuthContext(sub=sub, roles=roles, token=token, tenant=_organization(payload))
 
 
