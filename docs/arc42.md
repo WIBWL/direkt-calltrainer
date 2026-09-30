@@ -84,51 +84,36 @@ Aus dem Projektumfeld kommen weitere technische Vorgaben hinzu, die keine eigene
 
 Der fachliche Kontext beschreibt, mit welchen Kommunikationspartnern das System aus fachlicher/inhaltlicher Sicht interagiert.
 
-### Nutzer (Support-Mitarbeitende / Projekt- & Entwicklungsmitarbeitende)
+### Nutzer
 
-Führt ein simuliertes Telefongespräch mit der KI-Persona, sowohl in kürzeren Support-Szenarien als auch in längeren Beratungsgesprächen (F-03). Gibt Sprache ein, erhält Sprache/Antworten der KI zurück sowie im Anschluss ein qualitatives Wrap-up mit Verbesserungsvorschlägen.
+Führt simulierte Telefongespräche mit einer KI-Persona in Szenarien unterschiedlicher Art (F-03): Betrieb und Störung, Beratung und Anforderung, Preis und Kondition, Abschluss und Einwand (ADR 0072). Gibt Sprache ein und erhält Sprache der Persona zurück, nach dem Gespräch das Transkript und, sofern er der Speicherung zugestimmt hat, ein qualitatives Wrap-up mit Kennzahlen. Legt eigene Szenarien an, wählt Fokusziele, sieht seine Historie und seinen Fortschritt und entscheidet über Speicherung und Löschung seiner Daten (ADR 0066, ADR 0067).
+
+### Unternehmen (Mandant)
+
+Das Unternehmen, dem ein Nutzer angehört. Von Nutzern verfasste Szenarien können mit dem eigenen Unternehmen geteilt werden, sodass Kollegen damit trainieren (F-59, ADR 0060). Die Zugehörigkeit legt ein Administrator im Keycloak fest; die Anwendung verwaltet sie nicht.
 
 ### KI-Gesprächspartner (Persona)
 
-Simuliert einen externen Kunden im Gespräch. Die Persona kann aus einer erweiterbaren Persona-Bibliothek stammen (F-04). Reagiert auf Inhalt, Tonfall und Gesprächsführung des Nutzers.
+Simuliert den Gesprächspartner: in einem gewöhnlichen Gespräch den Anrufer mit seinem Anliegen, im Rollentausch die Seite, die abnimmt (ADR 0070). Die Persona stammt aus einer kuratierten Bibliothek mit fester Sprache und Stimme (F-04, ADR 0041, ADR 0043); Nutzer legen keine eigenen Personas an. Reagiert auf Inhalt und Gesprächsführung des Nutzers.
 
 ### Feedback-/Auswertungskomponente
 
-Erstellt nach Gesprächsende das qualitative Wrap-up (F-09) inkl. konkreter Verbesserungsvorschläge (F-10), basierend auf den Kennzahlen des Gesprächs (F-53) und dem Lautstärkeverlauf (F-37). Die Kennzahlen beschreiben jeweils das ganze Gespräch, nicht einzelne Redebeiträge (ADR 0051). Ergänzend entsteht im selben Modellaufruf ein Textblock zur phasengerechten Sprache (F-42): ob der Sprachstil über Einstieg, Kernanliegen und Abschluss hinweg mitgewandert ist. Er ist bewusst Fließtext und keine Kennzahl, weil er eine Veränderung über das Gespräch hinweg beschreibt, die keine einzelne Zahl trägt (ADR 0056).
+Erstellt nach Gesprächsende das qualitative Wrap-up (F-09) inkl. konkreter Verbesserungsvorschläge (F-10), basierend auf den Kennzahlen des Gesprächs (F-53) und dem Transkript. Die Kennzahlen beschreiben das ganze Gespräch, nicht einzelne Redebeiträge (ADR 0051); fünf davon werden zusätzlich über die fordernden Gesprächsabschnitte und den Rest gemessen (ADR 0081). Ergänzend entstehen im selben Modellaufruf ein Textblock zur phasengerechten Sprache (F-42, ADR 0056) und eine Einschätzung, ob der Ton zum Anlass des Gesprächs passte (ADR 0079). Beide sind bewusst Fließtext und keine Kennzahl. Das Modell deutet die gemessenen Werte, erzeugt sie aber nicht (ADR 0049).
 
 ## 3.2 Technischer Kontext
 
 Der technische Kontext beschreibt die technischen Schnittstellen und Kanäle, über die die fachliche Kommunikation stattfindet.
 
-### Nutzer-Endgerät (PC + Headset)
+| Partner | Kanal / Schnittstelle | Was übertragen wird |
+|---|---|---|
+| Browser des Nutzers (PC mit Headset, C-02) | HTTPS: REST unter `/api`, WebSocket `/ws/session` | Ein- und Ausgabe des Gesprächs als Audio in Stücken, das Ende eines Redebeitrags erkennt der Browser selbst (Silero-VAD, ADR 0036); dazu alle Bildschirmdaten über REST. |
+| DiReKT-Gateway | OpenAI-kompatible HTTP-API | Spracherkennung: die Aufnahme eines Redebeitrags, eine Anfrage je Turn (Whisper). Dialogmodell: der Prompt mit Verlauf, die Antwort wird gestreamt; dasselbe Modell schreibt Wrap-up, Folgeszenario, Rollentausch-Briefing und Dokument-Zusammenfassung (ADR 0011, ADR 0103). |
+| KugelAudio | Anbieter-SDK über eine gepoolte WebSocket-Verbindung | Der Text der Persona-Antwort, abschnittsweise; zurück kommt Audio in Teilstücken, die sofort an den Browser weitergereicht werden (ADR 0040, ADR 0044). Keine Rückfallebene (ADR 0103). |
+| Keycloak | OIDC (Authorization Code Flow mit PKCE) | Anmeldung im Browser; das Backend prüft das Zugriffstoken gegen die Schlüssel des Realms und liest daraus Nutzerkennung und Organisation (ADR 0009, ADR 0060). |
+| PostgreSQL | SQL | Sessions, Transkripte, Messungen, Wrap-ups, Bibliothek, Einwilligungen, Fokusziele. Keine Audiodaten (ADR 0048). |
+| Redis | RQ-Warteschlange | Die Kennung einer gespeicherten Session für den Wrap-up-Job (ADR 0019). |
 
-**Kanal / Schnittstelle:** Audio-Ein-/Ausgabe (Mikrofon, Lautsprecher/Headset)
-
-Primärer Zugangsweg im MVP (C-02). Erfasst Sprachsignal des Nutzers, gibt Sprachausgabe der KI wieder.
-
-### Spracherkennung (Speech-to-Text)
-
-**Kanal / Schnittstelle:** Interne Schnittstelle
-
-Wandelt die gesprochene Nutzereingabe in Text um, als Grundlage für Sprachanalyse (F-36, F-41, F-08, F-51) und KI-Antwortgenerierung.
-
-### Sprachsynthese (Text-to-Speech)
-
-**Kanal / Schnittstelle:** Interne Schnittstelle
-
-Wandelt die KI-Antwort in gesprochene Sprache um, um ein reales Telefongespräch zu simulieren.
-
-### KI-/Sprachmodell-Backend
-
-**Kanal / Schnittstelle:** API (z. B. LLM-Anbieter)
-
-Generiert die inhaltlichen Antworten der simulierten Persona sowie das Wrap-up/Feedback am Ende des Gesprächs.
-
-### Datenspeicher
-
-**Kanal / Schnittstelle:** Interne Schnittstelle
-
-Speichert ggf. Gesprächsaufzeichnungen (F-12, SHOULD) und Fortschrittsdaten (F-13, COULD) DSGVO-konform (C-04).
+Die Stimme des Nutzers und die Transkripte gehen nur an das Gateway, das im Stack als `litellm` auf demselben Host erreicht wird und an die Modelle der Universität weiterreicht. KugelAudio erhält den Text der Persona, nicht die Stimme des Nutzers.
 
 # 4. Lösungsstrategie
 
