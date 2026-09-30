@@ -28,11 +28,11 @@ Weitere Qualitätsanforderungen geringerer Priorität sind in Kapitel 10 aufgef�
 
 | Rolle | Kontakt | Erwartung an das System |
 |---|---|---|
-| Fachlicher Ansprechpartner und Pilotnutzer | Nicolas Heyne, Solox GmbH (Entwicklung und Kundenkontakt) | Möchte eigene blinde Flecken im Sprechverhalten erkennen. Legt Wert auf einfache Bedienung und qualitatives Feedback statt auf Kennzahlen. Lehnt einen vertrieblichen Fokus für seine Rolle ab. |
-| Fachlicher Ansprechpartner und Pilotnutzer | Eckhard Herdt, APPOLLO Systems (CIO und Gründungsmitglied) | Möchte flüssiger und spontaner sprechen und den Umgang mit Einwänden trainieren. Erwartet eine visuelle Auswertung und Verbesserungsvorschläge entlang des eigenen Gesprächsleitfadens. Trainiert Angebots- und Preisgespräche. |
-| Support-Mitarbeitende | Solox GmbH | Nutzen das Training für kurze, lösungsorientierte Kundengespräche, etwa telefonische Problemklärung. |
-| Entwicklungs- und Projektteam | Solox GmbH | Nutzen das Training für längere, beratende Gesprächssituationen, etwa Schnittstellenthemen und Weiterentwicklung. |
-| Technisch geprägte Nutzer ohne vertriebliche Vorerfahrung | APPOLLO Systems | Führen Follow-up-Gespräche nach der Kaltakquise und müssen dabei technische Inhalte adressatengerecht vermitteln. |
+| Fachlicher Ansprechpartner und Pilotnutzer | Ansprechpartner, Pilotunternehmen A (Entwicklung und Kundenkontakt) | Möchte eigene blinde Flecken im Sprechverhalten erkennen. Legt Wert auf einfache Bedienung und qualitatives Feedback statt auf Kennzahlen. Lehnt einen vertrieblichen Fokus für seine Rolle ab. |
+| Fachlicher Ansprechpartner und Pilotnutzer | Ansprechpartner, Pilotunternehmen B (CIO und Gründungsmitglied) | Möchte flüssiger und spontaner sprechen und den Umgang mit Einwänden trainieren. Erwartet eine visuelle Auswertung und Verbesserungsvorschläge entlang des eigenen Gesprächsleitfadens. Trainiert Angebots- und Preisgespräche. |
+| Support-Mitarbeitende | Pilotunternehmen A | Nutzen das Training für kurze, lösungsorientierte Kundengespräche, etwa telefonische Problemklärung. |
+| Entwicklungs- und Projektteam | Pilotunternehmen A | Nutzen das Training für längere, beratende Gesprächssituationen, etwa Schnittstellenthemen und Weiterentwicklung. |
+| Technisch geprägte Nutzer ohne vertriebliche Vorerfahrung | Pilotunternehmen B | Führen Follow-up-Gespräche nach der Kaltakquise und müssen dabei technische Inhalte adressatengerecht vermitteln. |
 | Umsetzungsteam | Projektgruppe (intern) | Entwickelt das System iterativ, benötigt eine klare Architektur- und Anforderungsgrundlage. |
 
 # 2. Randbedingungen
@@ -48,7 +48,7 @@ Weitere Qualitätsanforderungen geringerer Priorität sind in Kapitel 10 aufgef�
 
 | ID | Randbedingung | Beschreibung | Quelle |
 |---|---|---|---|
-| C-01 | Sprache konfigurierbar | Das Training findet in der Sprache statt, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Die Sprache ist an die Persona gebunden und ergibt sich aus deren Auswahl; Szenarien sind sprachneutral und mit jeder Persona kombinierbar. Belegt sind Deutsch bei Solox sowie Englisch und teilweise Spanisch bei APPOLLO Systems. Siehe ADR 0043 (löst ADR 0022 ab). | R-35 |
+| C-01 | Sprache konfigurierbar | Das Training findet in der Sprache statt, in der die Kundengespräche des jeweiligen Unternehmens geführt werden. Die Sprache ist an die Persona gebunden und ergibt sich aus deren Auswahl; Szenarien sind sprachneutral und mit jeder Persona kombinierbar. Belegt sind Deutsch bei Pilotunternehmen A sowie Englisch und teilweise Spanisch bei Pilotunternehmen B. Siehe ADR 0043 (löst ADR 0022 ab). | R-35 |
 | C-04 | Datenschutz nach DSGVO | Alle Daten, insbesondere Sprachaufzeichnungen und personenbezogene Daten, werden DSGVO-konform verarbeitet. Die Randbedingung begrenzt die Umsetzung aller übrigen Ziele und steht nicht als gleichrangiges Ziel neben ihnen. | rechtliche Vorgabe |
 | C-05 | Kein kundenspezifisches Fachwissen vorausgesetzt | Fachliches Know-how zu einzelnen Kunden oder Systemen wird nicht abgebildet, da sich die Fachlichkeit je Kundenlandschaft unterscheidet. Der Fokus liegt auf Kommunikation statt Fachlichkeit. | R-40, R-41 |
 | C-06 | Gesprächsdauer | Die zu trainierenden Gespräche reichen von kurzen Rückfragen bis zu Gesprächen von einer Stunde. | R-03 |
@@ -122,18 +122,19 @@ Dieses Kapitel fasst die tragenden Entscheidungen des ersten Prototyps zusammen.
 
 | Bereich | Entscheidung | ADR |
 |---|---|---|
-| Frontend | Single-Page-Anwendung in React und TypeScript, vom Backend mit ausgeliefert | 0008 |
+| Frontend | Single-Page-Anwendung in React und TypeScript, gebaut mit Vite und in einem eigenen Image von nginx ausgeliefert; das Backend läuft auf einem eigenen Host und erlaubt den Zugriff per CORS | 0008, 0104, 0107 |
 | Backend | Python mit FastAPI | 0012 |
-| Architekturstil | Geschichteter modularer Monolith für den Echtzeitpfad, asynchroner Worker für die Nachbereitung | 0018 |
-| Sprach- und Dialogmodelle | Uni-gehostetes DiReKT-Gateway für STT und LLM; getrennt selbst gehostete lokale Modelle statt eines externen Anbieters | 0011, 0021 |
-| Sprachsynthese | KugelAudio als Standard, DiReKT als Rückfallebene | 0040 |
+| Architekturstil | Geschichteter modularer Monolith für den Echtzeitpfad, asynchroner Worker für die Nachbereitung; drei Python-Pakete (`shared`, `backend`, `worker`) in einem uv-Workspace | 0018, 0108 |
+| Sprach- und Dialogmodelle | Uni-gehostetes DiReKT-Gateway für STT und LLM, je ein Modellname in `.env`; getrennt selbst gehostete lokale Modelle statt eines externen Anbieters | 0011, 0021, 0103 |
+| Sprachsynthese | KugelAudio, ohne Rückfallebene | 0040, 0103 |
 | Sprecherwechsel | Silero-VAD im Browser; das Turn-Ende wird erkannt, nicht per Knopfdruck gesetzt | 0036 |
 | Transport | Eine WebSocket-Verbindung je Session, Audio in Chunks in beide Richtungen | 0033, 0044 |
 | Persistenz | Eigene PostgreSQL-Instanz, SQLAlchemy 2.0, Alembic-Migrationen aus den ORM-Metadaten | 0010, 0025, 0026, 0027 |
 | Hintergrundverarbeitung | Redis mit RQ als Job-Queue | 0019 |
-| Authentifizierung | Keycloak, OIDC Authorization Code Flow mit PKCE | 0009 |
+| Authentifizierung | Keycloak, OIDC Authorization Code Flow mit PKCE; die Unternehmenszugehörigkeit kommt aus Keycloak Organizations | 0009, 0060 |
 | Paraverbale Messung | Praat über Parselmouth | 0047 |
-| Betrieb | Uni-gehosteter Server, Docker Compose | 0020 |
+| Konfiguration und Logging | Jede Einstellung ist Pflicht und kann aus einer Datei kommen; Logs nur auf stdout, in den Images als JSON | 0105, 0106 |
+| Betrieb | DiReKT-Host bei Hetzner, Docker Compose hinter Traefik (`direkt-infrastructure`), drei Images aus einer Registry | 0020, 0104, 0107, 0108 |
 
 ## 4.2 Ansatz je Qualitätsziel
 
@@ -176,15 +177,25 @@ Der Engpass ist die Kette aus Spracherkennung, Antwortgenerierung und Sprachsynt
 
 ## 5.1 Whitebox Gesamtsystem
 
-*TODO: Komponenten der obersten Ebene (z. B. Engine für Anrufsimulation, Sprachanalyse, Feedback-Engine, Frontend).*
+Das System besteht aus einem browserbasierten Frontend, dem FastAPI-Backend, einem asynchronen Worker sowie den angebundenen Sprach- und Dialogdiensten. Der Echtzeitpfad des Trainings läuft zwischen Frontend und Backend über eine WebSocket-Verbindung; die Nachbereitung wird nach Gesprächsende getrennt davon verarbeitet (ADR 0018, ADR 0019, ADR 0033).
 
-*\<Übersichtsdiagramm\>*
+### Frontend
 
-*Begründung: \<Erläuternder Text\>*
+Das Frontend ist als Single-Page-Anwendung mit React und TypeScript umgesetzt (ADR 0008). Es bildet den vollständigen Trainingsablauf aus Sicht des Nutzers ab und übernimmt die Darstellung der einzelnen Trainingsschritte, die clientseitige Zustandsverwaltung sowie die Kommunikation mit den HTTP- und WebSocket-Schnittstellen des Backends.
 
-*Enthaltene Bausteine: \<Beschreibung der enthaltenen Bausteine (Blackboxen)\>*
+`App.tsx` koordiniert den Trainingsablauf. Der Wechsel zwischen den einzelnen Ansichten wird über die in `trainingFlow.ts` definierte Ablaufsteuerung bestimmt (ADR 0096). Zustände, die mehrere Ansichten betreffen, werden in spezialisierte Hooks und Contexts ausgelagert.
 
-*Wichtige Schnittstellen: \<Beschreibung wichtiger Schnittstellen\>*
+Die wichtigsten Frontend-Bausteine sind:
+
+- `SetupView`: Auswahl von Szenario und Persona sowie Vorbereitung des Trainings. Erst der bewusste Start erzeugt eine Session; die reine Auswahl löst noch keine Verbindung zum Backend aus (ADR 0042).
+- `MicCheck`: Prüfung des Mikrofonzugriffs und des ausgewählten Eingabegeräts vor Gesprächsbeginn.
+- `CallView`: Darstellung des laufenden Trainingsgesprächs. Während des Gesprächs werden nur die für den Gesprächszustand notwendigen Informationen angezeigt; das vollständige Transkript erscheint erst nach Gesprächsende (ADR 0014).
+- `FeedbackView`: Darstellung des qualitativen Wrap-ups sowie der berechneten Gesprächskennzahlen nach Abschluss einer Session (F-09, F-10, F-53).
+- `ProgressView` und zugehörige Detailansichten: Darstellung mehrerer abgeschlossener Trainings und ihrer Entwicklung über die Zeit (F-13).
+
+Die Logik des Trainingsablaufs ist von der Darstellung getrennt. `useTrainingRun` verwaltet die aktuell gebundene Session sowie die Daten, die über das Gesprächsende hinaus benötigt werden. `useLiveCall` bündelt die Logik des laufenden Gesprächs und verbindet WebSocket-Kommunikation, Audiowiedergabe und Unterbrechungsverhalten. Dadurch bleiben die sichtbaren Komponenten weitgehend auf Darstellung und Benutzerinteraktion beschränkt.
+
+Die Authentifizierung liegt außerhalb des eigentlichen Trainingsablaufs. `AuthGate` schützt die geschützten Routen und bindet die Anwendung über OIDC an Keycloak an (ADR 0009). Die Routen für Training, Profil, Fortschritt und vergangene Sessions werden zentral in `main.tsx` aufgebaut.
 
 ## 5.2 Ebene 2
 
@@ -196,16 +207,19 @@ Der Engpass ist die Kette aus Spracherkennung, Antwortgenerierung und Sprachsynt
 
 # 6. Laufzeitsicht
 
-*Hinweis: Die Laufzeitsicht baut methodisch auf der Bausteinsicht (Kapitel 5) auf, die noch nicht ausgearbeitet ist. Die technischen Grundentscheidungen stehen inzwischen fest und sind in Kapitel 4 beschrieben; die Szenarien hier sind aber weiterhin auf funktionaler Ebene formuliert und nicht an konkrete Bausteine gebunden. Sobald Kapitel 5 vorliegt, sind sie entsprechend zu binden (siehe TS-01).*
+*Die Laufzeitsicht baut auf der Bausteinsicht aus Kapitel 5 auf. Für den Frontend-Anteil werden die dort beschriebenen Komponenten und Hooks den einzelnen Schritten des Trainingsablaufs zugeordnet. Die Backend-seitige Verarbeitung wird weiterhin auf funktionaler Ebene beschrieben.*
 
 ## 6.1 Szenario 1: Start und Ablauf eines Trainingsgesprächs
 
-- Der Nutzer startet ein neues Training und wählt (minimal) eine Persona bzw. ein Szenario aus (z. B. Support-Fall oder Beratungsgespräch, F-03, Q-02: möglichst wenige Pflichtangaben).
-- Das System initiiert die Gesprächssimulation: Der Nutzer spricht über PC/Headset, die Sprache wird in Echtzeit in Text umgewandelt (Speech-to-Text).
-- Das KI-Backend generiert eine Antwort der simulierten Persona (F-01, F-04), die per Text-to-Speech in gesprochene Sprache umgewandelt und ausgegeben wird.
-- Dieser Zyklus (Sprechen → Erkennen → Antworten → Aussprechen) wiederholt sich fortlaufend, bis der Nutzer das Gespräch beendet. Sowohl kurze Support-Calls als auch längere Beratungsgespräche werden dabei unterstützt (F-03).
+- Der Nutzer öffnet die Trainingsvorbereitung. `SetupView` stellt die verfügbaren Szenarien und Personas dar und übergibt die Auswahl an den in `App.tsx` gehaltenen Trainingszustand.
+- Erst mit dem bewussten Start des Trainings wird über `useTrainingRun` eine Session gebunden (ADR 0042). Die reine Auswahl von Szenario und Persona erzeugt noch keine Gesprächsverbindung.
+- Vor dem Gespräch führt `MicCheck` die Prüfung des Mikrofonzugriffs und des ausgewählten Eingabegeräts durch. Das ausgewählte Gerät wird anschließend in den laufenden Trainingszustand übernommen.
+- Der Wechsel zwischen Vorbereitung, Mikrofonprüfung und Gespräch wird über die in `trainingFlow.ts` definierte Ablaufsteuerung koordiniert (ADR 0096).
+- Im laufenden Gespräch stellt `CallView` den Gesprächszustand dar. `useLiveCall` bündelt dabei die WebSocket-Kommunikation, die Audiowiedergabe und das Unterbrechen der Persona.
+- Die Sprache des Nutzers wird an das Backend übertragen und dort per Speech-to-Text verarbeitet. Das KI-Backend generiert anschließend die Antwort der simulierten Persona (F-01, F-04), die per Text-to-Speech erzeugt und über die bestehende WebSocket-Verbindung an das Frontend zurückgegeben wird.
+- Dieser Zyklus aus Sprechen, Erkennen, Antworten und Ausgeben wiederholt sich, bis die Session beendet wird. Nach Gesprächsende übernimmt `useTrainingRun` das Transkript und die Kennung der abgeschlossenen Session für die anschließende Auswertung.
 
-Besonderheiten: Der gesamte Zyklus muss in Echtzeit ablaufen (Q-03), da Verzögerungen den natürlichen Gesprächsfluss stören. Parallel zur eigentlichen Konversation läuft die Analyse des Sprechverhaltens (Szenario 2) mit.
+Besonderheiten: Der gesamte Zyklus muss in Echtzeit ablaufen (Q-03), da Verzögerungen den natürlichen Gesprächsfluss stören. Die sichtbaren Zustände und die technische Gesprächslogik sind im Frontend getrennt: `CallView` übernimmt die Darstellung, während `useLiveCall` und die darunterliegenden Hooks die laufende Kommunikation und Audiowiedergabe steuern. Parallel zur Gesprächssimulation läuft die Analyse des Sprechverhaltens aus Szenario 2.
 
 ## 6.2 Szenario 2: Analyse des Sprechverhaltens während des Gesprächs
 
@@ -235,7 +249,7 @@ Besonderheiten: Die Qualität dieses Szenarios ist zentral für die Akzeptanz de
 - Bei mehrteiligen Projektgesprächen (F-23, COULD) kann diese Aufzeichnung über mehrere Termine hinweg referenziert werden.
 - Alle gespeicherten Daten müssen DSGVO-konform verarbeitet werden (C-04).
 
-Besonderheiten: Dieses Szenario ist für den MVP nicht zwingend erforderlich (SHOULD/COULD), aber relevant für die kontinuierliche Nutzung als Trainingsinstrument (F-13), die Herr Heyne explizit gewünscht hat.
+Besonderheiten: Dieses Szenario ist für den MVP nicht zwingend erforderlich (SHOULD/COULD), aber relevant für die kontinuierliche Nutzung als Trainingsinstrument (F-13), die der Ansprechpartner von Pilotunternehmen A explizit gewünscht hat.
 
 # 7. Verteilungssicht
 
@@ -263,7 +277,7 @@ Sessiondaten werden bereits im MVP dauerhaft gespeichert, und zwar einmalig am E
 
 ## 8.2 Umgang mit Feedback und Bewertung
 
-Da Gespräche laut Herrn Heyne subjektiv wahrgenommen werden können, sollte das Feedback-Konzept durchgängig folgende Prinzipien verfolgen (gilt für alle Komponenten, die Feedback erzeugen oder anzeigen):
+Da Gespräche laut dem Ansprechpartner von Pilotunternehmen A subjektiv wahrgenommen werden können, sollte das Feedback-Konzept durchgängig folgende Prinzipien verfolgen (gilt für alle Komponenten, die Feedback erzeugen oder anzeigen):
 
 - Kein reiner Score als alleinige Bewertung (F-09)
 - Konkrete, nachvollziehbare Verbesserungsvorschläge statt abstrakter Metriken (F-10)
@@ -298,10 +312,10 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0005 | No Automated Enterprise/CRM Integration, No Sales KPIs | angenommen | C-05, F-26, F-45, R-45 |
 | ADR 0006 | Training Language Is German Only for the MVP | abgelöst durch ADR 0022 | C-01, R-35 |
 | ADR 0007 | Primary Access via PC + Headset, Mobile Optional | angenommen | C-02, C-03 |
-| ADR 0008 | Frontend Built with React and TypeScript | angenommen | F-46, F-50 |
+| ADR 0008 | Frontend Built with React and TypeScript | angenommen (geändert durch ADR 0104: eigenes Frontend-Image statt Auslieferung durch FastAPI) | F-46, F-50 |
 | ADR 0009 | Authentication via Keycloak (OIDC Authorization Code Flow + PKCE) | angenommen | C-04, F-31, F-50 |
 | ADR 0010 | Own PostgreSQL Instance for Session Persistence | angenommen | C-04, F-12, F-13 |
-| ADR 0011 | LLM Backend Is the University-Hosted DiReKT Gateway, Self-Contained | angenommen (durch ADR 0021 eingegrenzt) | Q-03, C-04, F-01 |
+| ADR 0011 | LLM Backend Is the University-Hosted DiReKT Gateway, Self-Contained | angenommen (durch ADR 0021 eingegrenzt; durch ADR 0103 wieder für STT und Dialog gültig) | Q-03, C-04, F-01 |
 | ADR 0012 | Backend Built with Python and FastAPI | angenommen | Q-03 |
 | ADR 0013 | Minimal Required Setup, Advanced Options Separate | angenommen | Q-02, F-43, R-34 |
 | ADR 0014 | Speech-Behavior Feedback Surfaces Only in the Post-Call Wrap-Up | angenommen (eingegrenzt durch ADR 0051) | F-09, F-36, F-37, F-51, F-53 |
@@ -310,17 +324,17 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0017 | No Provider Abstraction Layer for STT/LLM/TTS | angenommen | |
 | ADR 0018 | Layered Modular Monolith for the Real-Time Path, Async Feedback Worker | angenommen | Q-03, F-09 |
 | ADR 0019 | Redis + RQ for the Feedback Job Queue | angenommen | F-09 |
-| ADR 0020 | Deployment on a University-Hosted Server | angenommen | C-04 |
+| ADR 0020 | Deployment on a University-Hosted Server | angenommen, mit Statusvermerk: betrieben wird auf dem DiReKT-Host bei Hetzner; der Deployment-Teil ist durch ADR 0108 überholt | C-04 |
 | ADR 0021 | STT and TTS Run as Separately Self-Hosted Local Models | angenommen | Q-03, C-04, F-01 |
 | ADR 0022 | Language as Independent Session Parameter | abgelöst durch ADR 0043 (löst ADR 0006 ab) | C-01, R-35 |
 | ADR 0023 | No Session Data Persisted Beyond the MVP; Consent-Gated Storage After | abgelöst durch ADR 0034 | C-04, F-12, F-13, F-48, F-49 |
-| ADR 0024 | User-Authored Scenario Context and Personas (Post-MVP) | angenommen | F-04, F-26, F-34, F-45 |
+| ADR 0024 | User-Authored Scenario Context and Personas (Post-MVP) | angenommen (für Szenarien umgesetzt durch ADR 0058) | F-04, F-26, F-34, F-45 |
 | ADR 0025 | SQLAlchemy 2.0 as ORM | angenommen | |
 | ADR 0026 | Normalized Relational Schema for Session Persistence | angenommen | F-12, F-13 |
 | ADR 0027 | Alembic Migrations Autogenerated from ORM Metadata | angenommen | |
 | ADR 0028 | No Secondary Indexes Beyond Primary/Foreign Keys Yet | abgelöst durch ADR 0052 | |
 | ADR 0029 | JSONB for Flexible Per-Measurement Detail Data | angenommen | |
-| ADR 0030 | ER Diagram Generated from ORM Metadata | angenommen | |
+| ADR 0030 | ER Diagram Generated from ORM Metadata | angenommen, geändert | |
 | ADR 0031 | Pseudonymous subject_id Placeholder Instead of a User Foreign Key | angenommen | C-04, F-31 |
 | ADR 0032 | AnalysisJob as a Persisted Entity for Async Job Status | angenommen | Q-07, F-09 |
 | ADR 0033 | Streaming Session Pipeline via Chunked TTS over WebSocket | angenommen | Q-03, F-01, F-46 |
@@ -329,8 +343,8 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0036 | VAD Confirmed-Speech Threshold Instead of a Backchannel Word List | angenommen | Q-03, F-01 |
 | ADR 0037 | Closing-Intent Detection Is Regex-Based, Not an LLM Classifier | angenommen | Q-07, F-01 |
 | ADR 0038 | Guard Against Degenerate Repetition; Guarantee a Closing Line on Backstopped Endings | angenommen | Q-07, F-01 |
-| ADR 0039 | Centralized Logging — Colored Console, Per-Session-Truncated File, Not Committed | angenommen (Datei-Truncation überarbeitet durch ADR 0055) | |
-| ADR 0040 | TTS Defaults to KugelAudio with a DiReKT Fallback; Gemini Removed | angenommen (grenzt die TTS-Hälfte von ADR 0021 ein) | Q-03, Q-07, C-04, F-01 |
+| ADR 0039 | Centralized Logging — Colored Console, Per-Session-Truncated File, Not Committed | angenommen (Datei-Truncation überarbeitet durch ADR 0055, Logdatei entfallen durch ADR 0105) | |
+| ADR 0040 | TTS Defaults to KugelAudio with a DiReKT Fallback; Gemini Removed | angenommen, Rückfallebene später entfernt (ADR 0103); grenzt die TTS-Hälfte von ADR 0021 ein | Q-03, Q-07, C-04, F-01 |
 | ADR 0041 | Personas and Scenarios Loaded from the Database | angenommen | F-03, F-04 |
 | ADR 0042 | Opening Turn Pre-Warmed at Session Commitment, Not on Selection | angenommen | Q-03, F-01 |
 | ADR 0043 | English Prompt Content, Session Language Bound to the Persona | angenommen (löst ADR 0022 ab) | C-01, R-35, F-03, F-04 |
@@ -344,10 +358,16 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0051 | Statistics Describe the Whole Session and Carry No Invented Norms | angenommen (grenzt ADR 0014/0047/0048 ein) | Q-01, F-53, F-12 |
 | ADR 0052 | Index Every Foreign-Key Column | angenommen (löst ADR 0028 ab) | Q-03, F-12 |
 | ADR 0053 | Deterministic Constraint Names and Database-Enforced Vocabularies | angenommen | |
-| ADR 0054 | The Scenario Briefs the Trainee, Not Only the Persona | vorgeschlagen (erweitert ADR 0045) | Q-01, C-05, R-43 |
-| ADR 0055 | Log File Kept for the Whole Run, Not Truncated per Session | angenommen (überarbeitet ADR 0039) | |
+| ADR 0054 | The Scenario Briefs the Trainee, Not Only the Persona | angenommen und umgesetzt (erweitert ADR 0045) | Q-01, C-05, R-43 |
+| ADR 0055 | Log File Kept for the Whole Run, Not Truncated per Session | abgelöst durch ADR 0105 (überarbeitete ADR 0039) | |
 | ADR 0056 | Phase-Appropriate Language Is a Paragraph, Not a Metric | angenommen (ergänzt ADR 0049/0051) | F-42, F-09 |
-| ADR 0057 | English Wire Vocabulary | angenommen (ergänzt ADR 0026) | |
+| ADR 0057 | English Wire Vocabulary | angenommen (ergänzt ADR 0026, erweitert durch ADR 0061) | |
+| ADR 0058 | User-Authored Scenarios | angenommen und umgesetzt (setzt ADR 0024 für Szenarien um) | F-34, F-58 |
+| ADR 0059 | User-Authored Scenario Text Is Information, Not Instructions | angenommen (ergänzt ADR 0058) | F-34, F-58 |
+| ADR 0060 | Tenant Model and Company Sharing for Authored Scenarios | angenommen, bis Phase 2 umgesetzt, zweimal ergänzt (Unternehmen über Keycloak Organizations, Anlage beim ersten Login) | F-59, R-58, C-04 |
+| ADR 0061 | English Wire Vocabulary for the Scenario Library | angenommen (erweitert ADR 0057) | |
+| ADR 0062 | A Scenario Read View, Withholding the Caller's Intent | angenommen (ändert ADR 0058) | F-34 |
+| ADR 0063 | Scenario Field Limits Served From One Source | angenommen (verfeinert ADR 0059) | F-34 |
 | ADR 0064 | A Per-User Session History, With Ownership as the Query | angenommen (löst die „kein Listing"-Position ab) | F-13, F-48, F-31, C-04 |
 | ADR 0065 | Progress Is Shown Without Being Judged | angenommen (erweitert ADR 0004/0051) | Q-01, F-13 |
 | ADR 0066 | Consent Is What Permits a Session to Be Stored | angenommen (schränkt ADR 0034 ein) | C-04, F-49, F-31, F-12 |
@@ -355,11 +375,11 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0068 | The Consent Log Outlives the Data It Permitted | angenommen (präzisiert ADR 0066) | C-04, F-49 |
 | ADR 0069 | The Follow-up Scenario Is Written From the Feedback and Stored | angenommen, zweimal ergänzt (der Nutzer fragt ihn an; der Entwurf führt denselben Fall fort) | F-60, F-09, F-10, F-58 |
 | ADR 0070 | Reverse — Replaying a Session With the Roles Swapped | angenommen (setzt ADR 0043 und ADR 0033 punktuell aus, ergänzt ADR 0066) | F-61, F-09, F-49 |
-| ADR 0071 | The Model Reads Its Notes and the Last Exchanges, Not the Whole History | angenommen (eingeschränkt durch ADR 0075) | Q-03, Q-07 |
+| ADR 0071 | The Model Reads Its Notes and the Last Exchanges, Not the Whole History | angenommen (eingeschränkt durch ADR 0075; seit ADR 0103 wieder ohne Einschränkung, da es nur noch ein Dialogmodell gibt) | Q-03, Q-07 |
 | ADR 0072 | The Scenario Category as a Closed Vocabulary | angenommen | F-03, F-43, F-44 |
 | ADR 0073 | The Settlement Check Rides on the Per-Turn Nudge | angenommen (verfeinert ADR 0037 und ADR 0038) | Q-01, Q-03 |
-| ADR 0074 | Dialogue Generation May Run on Gemini, Under One Switch and on Two Models | angenommen (kehrt ADR 0040s Entfernung des Gemini-Pfads um, schränkt ADR 0011 auf STT ein) | Q-03, Q-08, C-04 |
-| ADR 0075 | The Caller’s Notes Are Kept Only Where the Model Cannot Read Its Own History | angenommen (schränkt ADR 0071 auf das Gateway ein) | Q-03, Q-08 |
+| ADR 0074 | Dialogue Generation May Run on Gemini, Under One Switch and on Two Models | ersetzt durch ADR 0103 | Q-03, Q-08, C-04 |
+| ADR 0075 | The Caller’s Notes Are Kept Only Where the Model Cannot Read Its Own History | durch ADR 0103 eingegrenzt: die Notizen werden immer geführt | Q-03, Q-08 |
 | ADR 0076 | Focus Goals as a Stored Selection | angenommen, ergänzt (das Ziel zur Lautstärke ist zurückgezogen; die Auswahl steuert die Szenario-Empfehlungen) | F-62, F-13, C-04 |
 | ADR 0077 | The Liveliness Reading Moves to the Pitch Variation Quotient | angenommen (ändert ADR 0051s Ausnahme für F-35) | F-35, Q-01, Q-04 |
 | ADR 0078 | A Classification May Carry a Traffic Light | angenommen (ändert ADR 0004 und ADR 0051, lässt ADR 0065 unberührt) | Q-01, Q-04, F-35, F-51 |
@@ -374,8 +394,27 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0087 | What to Play Next Is Chosen From the Library | angenommen | F-64, F-62 |
 | ADR 0088 | Sprachmelodie Is a Tile, and Its Page Carries the Drawing | angenommen (kehrt die Block-Darstellung um) | F-35, F-53 |
 | ADR 0089 | The Closing Is Read as Three Parts, in the User's Last Two Turns | angenommen (Gegenstück zu ADR 0086; löst ADR 0080s Einordnung des Gesprächsabschlusses ab) | F-65, F-62 |
+| ADR 0090 | The Live Call Does Not Depend on the Analysis of a Finished One | angenommen | Q-03 |
+| ADR 0091 | A Measurement Is Stored; a Reading Is Derived on Every Read | angenommen | Q-01, F-35, F-51 |
+| ADR 0092 | One Stylesheet, Not One per Component | angenommen (gemessene und verworfene Umstellung) | |
+| ADR 0093 | The Feedback PDF Is Built in the Browser | angenommen | F-64, C-04 |
+| ADR 0094 | The Frontend Is Checked by a Strict Compiler, a Narrow Test Suite and the Hook Rules | angenommen, alle drei Teile umgesetzt | |
+| ADR 0095 | On the Progress View, Colour Names a Family and Never a Value | angenommen (ergänzt ADR 0065, lässt ADR 0078 unberührt) | F-13, Q-01 |
+| ADR 0096 | The Training Flow Is One Transition Table | angenommen, ergänzt am 19.09.2026 | Q-02, F-60, F-61, F-62, F-63 |
+| ADR 0097 | Motion Yields to the System Setting, Sound Can Be Stopped, Charts Carry Their Numbers in Text | angenommen, ergänzt am 19.09.2026 | Q-02, F-61, F-62, F-63 |
+| ADR 0098 | Every Kennzahl Opens Onto Its Evidence, and the Evidence Is Never Recomputed | angenommen (baut auf ADR 0091 auf) | Q-01, F-51, F-53 |
+| ADR 0099 | The Caller Opens the Transaction, a Domain Function Takes It | angenommen | C-04 |
+| ADR 0100 | The Follow-Up and the Reverse Stay Two Routes, Sharing What Must Not Drift | angenommen | F-60, F-61 |
+| ADR 0101 | Four Structural Proposals Declined, So That They Are Not Proposed Again | angenommen | F-64 |
+| ADR 0102 | One Place Decides a Shared Fact — Five Seams From the Tenth Review | angenommen | C-04, F-13, F-64 |
+| ADR 0103 | One OpenAI-Compatible Gateway, One Voice, and No Switches Between Them | angenommen (löst ADR 0074 ab, ändert ADR 0040 und ADR 0075, stellt ADR 0011 für beide Modellstrecken wieder her) | Q-03, Q-07, Q-08 |
+| ADR 0104 | Frontend, Backend and Worker as Three Images | angenommen (ändert ADR 0008; gemeinsamer Origin abgelöst durch ADR 0107, Build durch ADR 0108) | |
+| ADR 0105 | Logs Go to Stdout Only, JSON in the Images | angenommen (löst ADR 0055 ab, ändert ADR 0039) | |
+| ADR 0106 | Every Setting Required, Any From a File | angenommen | |
+| ADR 0107 | The API on Its Own Host, Behind CORS | angenommen (löst den Teil „ein Origin“ von ADR 0104 ab) | |
+| ADR 0108 | Three Packages, One Dockerfile, Deployed From the Infrastructure Repository | angenommen (ändert ADR 0104; überholt den Deployment-Teil von ADR 0020) | |
 
-Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug; ADR 0017, 0025, 0027 bis 0030, 0039, 0055 und 0057 sind reine Wartbarkeits-, Werkzeug- oder Schemaentscheidungen ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
+Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug; ADR 0017, 0025, 0027 bis 0030, 0039, 0055, 0057, 0061, 0092, 0094 sowie 0104 bis 0108 sind reine Wartbarkeits-, Werkzeug- oder Schemaentscheidungen ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 
 # 10. Qualitätsanforderungen
 
@@ -407,60 +446,63 @@ Die Risiken in 11.1 begleiten das Vorhaben unabhängig vom Umsetzungsstand. Die 
 
 | Nr. | Risiko | Beschreibung | Gegenmaßnahme |
 |---|---|---|---|
-| RI-01 | Echtzeitfähigkeit der Sprach- und LLM-Schnittstellen | Die Kombination aus Spracherkennung, Antwortgenerierung und Sprachsynthese muss in Echtzeit ablaufen (Q-03). Externe Schnittstellen können Latenzschwankungen aufweisen, die den natürlichen Gesprächsfluss beeinträchtigen. | Die technische Festlegung ist erfolgt (Kapitel 4): Modelle im eigenen Netz, gestreamte Verarbeitung statt Blockkette, Vorwärmen des Eröffnungssatzes. Das Risiko ist damit gemindert, aber nicht ausgeräumt — die Modelle laufen auf geteilter Hardware (ADR 0020), und die Latenz je Teilstrecke wird bislang nicht systematisch gemessen. Offen: Messpunkte je Teilstrecke, um den Engpass unter Last zu bestimmen. |
-| RI-02 | Unklare Datenschutz-Umsetzung | Datenschutzkonformität ist eine nicht verhandelbare Randbedingung (C-04). Hosting-Ort und Einwilligungsprozess sind grundsätzlich entschieden (ADR 0034). Das Risiko ist gestiegen, seit Sessiondaten bereits im MVP gespeichert werden: Es gibt damit auch im MVP dauerhaft gespeicherte Daten, aber noch keine festgelegte Speicherdauer, keine Aufbewahrungsfrist und mangels Nutzerkonten keine Einwilligungsverwaltung. Der technische Löschpfad existiert inzwischen — die Fremdschlüssel kaskadieren in der Datenbank (ADR 0052/0053) —, aber niemand ruft ihn auf: Es fehlen die Frist und die Selbstbedienungsfunktion. | Speicherdauer festlegen und Löschfunktion umsetzen, bevor Nutzer außerhalb der Pilotgruppe das System verwenden. Datenschutzhinweis (F-49) vor der ersten Aufzeichnung als Voraussetzung behandeln. Einwilligungsoberfläche zusammen mit der Authentifizierung (ADR 0009) planen, nicht nachträglich ergänzen. |
+| RI-01 | Echtzeitfähigkeit der Sprach- und LLM-Schnittstellen | Die Kombination aus Spracherkennung, Antwortgenerierung und Sprachsynthese muss in Echtzeit ablaufen (Q-03). Externe Schnittstellen können Latenzschwankungen aufweisen, die den natürlichen Gesprächsfluss beeinträchtigen. | Die technische Festlegung ist erfolgt (Kapitel 4): Spracherkennung und Dialogmodell auf dem Uni-gehosteten DiReKT-Gateway, gestreamte Verarbeitung statt Blockkette, Vorwärmen des Eröffnungssatzes. Das Risiko ist damit gemindert, aber nicht ausgeräumt — jede der drei Strecken hat genau ein Backend und keine Rückfallebene (ADR 0103), und die Latenz je Teilstrecke wird bislang nicht systematisch gemessen. Offen: Messpunkte je Teilstrecke, um den Engpass unter Last zu bestimmen. |
+| RI-02 | Datenschutz-Umsetzung | Datenschutzkonformität ist eine nicht verhandelbare Randbedingung (C-04). Die technischen Voraussetzungen sind umgesetzt: Gespeichert wird nur mit Einwilligung (ADR 0066), gespeicherte Trainings laufen nach sechs Monaten ab (ADR 0067), der Nutzer kann einzelne Trainings löschen, seine Daten exportieren und mit dem Widerruf alles löschen; Audio wird nie gespeichert (ADR 0048), und Gesprochenes wird nicht geloggt. Offen ist, was kein Code liefern kann: Die Datenschutzerklärung ist noch nicht vom Datenschutzbeauftragten geprüft. Außerdem gibt es keine Backups — wer sie einführt, schafft eine Kopie, die kein Löschpfad erreicht. | Prüfung durch den Datenschutzbeauftragten, bevor Nutzer außerhalb der Pilotgruppe das System verwenden. Backups nur zusammen mit einer Aufbewahrungsregel in ADR 0066 einführen. |
 
 ### Fachliche Risiken
 
 | Nr. | Risiko | Beschreibung | Gegenmaßnahme |
 |---|---|---|---|
-| RI-03 | Widersprüchliche Erwartungen der Pilotunternehmen — **gelöst** | Solox lehnt einen vertrieblichen Fokus für die eigenen Rollen ab (R-46), APPOLLO Systems will ausdrücklich Angebots- und Preisgespräche sowie Einwandbehandlung trainieren (R-10, R-12). Beide sind Pilotnutzer. Das Risiko bestand darin, das System auf eine der beiden Erwartungen zuzuschneiden und damit für die andere Seite unpassend zu machen. Es wurde kurz nach seinem Aufkommen ausgeräumt. | **Gelöst durch das Führen mehrerer passender Szenarien statt einer Produktausrichtung.** F-03 führt ohnehin drei Szenario-Typen nebeneinander; das Angebots- und Preisgespräch ist einer davon und nicht der Zuschnitt des Werkzeugs. Jede Seite wählt die Szenarien, die zu ihren Rollen passen: Verhandlungsnahes Training steht bereit, ohne dass es jemand wählen muss. Damit gibt es keine Ausrichtung, gegen die sich ein Pilotunternehmen wehren müsste, und keine gesonderte Entscheidung zu treffen. Voraussetzung ist allein, dass beide Seiten in der Bibliothek tatsächlich besetzt sind — nachgewiesen im [Szenario- und Persona-Katalog](scenario-catalogue.md). |
+| RI-03 | Widersprüchliche Erwartungen der Pilotunternehmen — **gelöst** | Pilotunternehmen A lehnt einen vertrieblichen Fokus für die eigenen Rollen ab (R-46), Pilotunternehmen B will ausdrücklich Angebots- und Preisgespräche sowie Einwandbehandlung trainieren (R-10, R-12). Beide sind Pilotnutzer. Das Risiko bestand darin, das System auf eine der beiden Erwartungen zuzuschneiden und damit für die andere Seite unpassend zu machen. Es wurde kurz nach seinem Aufkommen ausgeräumt. | **Gelöst durch das Führen mehrerer passender Szenarien statt einer Produktausrichtung.** F-03 führt ohnehin drei Szenario-Typen nebeneinander; das Angebots- und Preisgespräch ist einer davon und nicht der Zuschnitt des Werkzeugs. Jede Seite wählt die Szenarien, die zu ihren Rollen passen: Verhandlungsnahes Training steht bereit, ohne dass es jemand wählen muss. Damit gibt es keine Ausrichtung, gegen die sich ein Pilotunternehmen wehren müsste, und keine gesonderte Entscheidung zu treffen. Voraussetzung ist allein, dass beide Seiten in der Bibliothek tatsächlich besetzt sind — nachgewiesen im [Szenario- und Persona-Katalog](scenario-catalogue.md). |
 | RI-04 | Fehlende kundenspezifische Fachlichkeit | Der bewusste Verzicht auf eine kundenspezifische Wissensbasis (C-05) vereinfacht die Umsetzung, könnte aber dazu führen, dass Gespräche für erfahrene Nutzer zu oberflächlich oder unrealistisch wirken. Abgefedert wird das durch die optionale, nutzergesteuerte Bereitstellung eigener Dokumente (F-26, F-45). | Frühes Nutzerfeedback beider Pilotunternehmen einholen. Umfang und Wirkung der nutzergesteuerten Dokumentenbereitstellung früh mit beiden Pilotunternehmen abgleichen. |
 | RI-05 | Subjektivität des Feedbacks | Gespräche werden von den Beteiligten unterschiedlich wahrgenommen (R-25). Ein maschinell erzeugtes qualitatives Feedback (F-09, F-10) könnte als unpassend, ungenau oder demotivierend empfunden werden, wenn es nicht sorgfältig formuliert ist. Betrifft unmittelbar Q-01, da Nachvollziehbarkeit die Voraussetzung für Vertrauen in die Rückmeldung ist. | Feedback als Wirkung auf den Gesprächspartner formulieren, nicht als objektives Urteil. Tonalität und Formulierungsrichtlinien festlegen und iterativ anhand echten Nutzerfeedbacks verfeinern. |
 | RI-06 | Geringe Akzeptanz bei komplexer Bedienung | In beiden Erhebungen wurde eine unklare oder überladene Benutzeroberfläche als zentrales Nutzungshemmnis genannt. Wird Q-02 nicht ausreichend beachtet, sinkt die Akzeptanz erheblich, unabhängig von der fachlichen Qualität des Trainings. | Frühzeitige Usability-Tests. Minimale Pflichteinstellungen bereits im ersten benutzbaren Prototyp umsetzen. |
 
 ## 11.2 Technische Schulden
 
-Stand: erster lauffähiger Prototyp. Die Spalte *Art* unterscheidet, ob eine Schuld bewusst eingegangen wurde oder nachträglich aufgefallen ist — nur die zweite Sorte ist ein Versäumnis.
+Stand: main vom 30.09.2026. Die Spalte *Art* unterscheidet, ob eine Schuld bewusst eingegangen wurde oder nachträglich aufgefallen ist — nur die zweite Sorte ist ein Versäumnis.
 
 ### Architekturdokumentation
 
 | Nr. | Schuld | Art | Wirkung | Abtragen durch |
 |---|---|---|---|---|
-| TS-01 | Kapitel 5 (Bausteinsicht) ist unausgefüllt, Kapitel 6 (Laufzeitsicht) ist deshalb nicht an Bausteine gebunden. | aufgefallen | Der Prototyp ist gebaut, aber seine Struktur ist nirgends dokumentiert. Neue Mitwirkende müssen sie aus dem Code erschließen. | Kapitel 5 aus dem bestehenden Code nachziehen, danach die Szenarien in Kapitel 6 an die Bausteine binden. |
+| TS-01 | Kapitel 5 (Bausteinsicht) ist nur für das Frontend ausgefüllt, Kapitel 7 (Verteilungssicht) gar nicht; die Backend-Seite von Kapitel 6 (Laufzeitsicht) ist deshalb nicht an Bausteine gebunden. | aufgefallen | Die Struktur von Backend, Worker und `shared` sowie ihre Verteilung sind nirgends in der Architekturdokumentation beschrieben. Neue Mitwirkende müssen sie aus dem Code erschließen. | Kapitel 5 um Backend, Worker und `shared` ergänzen, Kapitel 7 aus ADR 0104 bis 0108 nachziehen, danach die Backend-Schritte in Kapitel 6 an die Bausteine binden. |
 
 ### Prüfbarkeit
 
 | Nr. | Schuld | Art | Wirkung | Abtragen durch |
 |---|---|---|---|---|
 | TS-02 | Es gibt kein Eval-Setup für Prompt-Änderungen. | bewusst | Jede Änderung am Systemprompt — und damit an F-01 — ist argumentiert, nicht gemessen. Ob eine Kürzung oder eine neue Regel das Gespräch verbessert, ist derzeit Meinung. | Kleines Eval-Skript: dieselbe Persona × Szenario, N Läufe mit und ohne Änderung, Vergleich von Antwortlänge und Turn-Anzahl. Der Rücklauf synthetisierter Sprache durch die Spracherkennung hat sich bereits als objektiver Prüfgriff bewährt. |
-| TS-03 | Das Frontend hat keinen Testrunner. | bewusst | Sprecherwechsel, Wiedergabe-Warteschlange und Unterbrechen sind ausschließlich manuell geprüft. Genau dort lagen bereits Fehler, die kein Backend-Test finden konnte. | Testrunner einrichten und zuerst die Wiedergabe-Warteschlange abdecken. |
+| TS-03 | Das Frontend hat keinen Testrunner — **abgetragen** | bewusst | Sprecherwechsel, Wiedergabe-Warteschlange und Unterbrechen waren ausschließlich manuell geprüft. Genau dort lagen bereits Fehler, die kein Backend-Test finden konnte. | **Abgetragen durch ADR 0094:** Vitest deckt die Nebenläufigkeit des Live-Gesprächs (`useStreamedAudioPlayback`, `useSessionSocket`, `useBargeIn`, `useLiveCall`, `useTrainingRun`), die Übergangstabelle des Trainingsablaufs und die reinen Funktionen hinter den Aussagen der Fortschrittsansicht ab. |
 | TS-04 | Tests konnten sich stillschweigend selbst überspringen: Datenbanktests fanden ihre Zugangsdaten im Container nicht und meldeten sich als *übersprungen* statt als Fehler. | aufgefallen | 49 Tests prüften über längere Zeit nichts, ohne dass es auffiel; nach Behebung fanden sie vier echte Fehler. | Ein übersprungener Test darf im Regellauf nicht unbemerkt bleiben — Zugangsdaten im Container verfügbar machen und die Suite mit einer Mindestzahl ausgeführter Tests absichern. |
-| TS-05 | Der Vite-Dev-Server startet die Anwendung nicht mehr; die WASM-Bausteine der Spracherkennung im Browser scheitern dort. | aufgefallen | Frontend-Änderungen sind nur über den Produktionsbuild im Container prüfbar. Das verlängert jede Rückkopplungsschleife spürbar. | Ursache im Zusammenspiel von Vite und onnxruntime-web klären, sonst dauerhaft auf den Containerpfad festlegen und den Dev-Server aus der Dokumentation nehmen. |
+| TS-05 | Der Vite-Dev-Server startet die Anwendung nicht mehr; die WASM-Bausteine der Spracherkennung im Browser scheitern dort. | aufgefallen | Änderungen am Gespräch sind nur über den Produktionsbuild prüfbar (`npm run build:watch` und `npm run preview`). Das verlängert jede Rückkopplungsschleife spürbar. | Ursache im Zusammenspiel von Vite und onnxruntime-web klären, sonst dauerhaft auf den Containerpfad festlegen und den Dev-Server aus der Dokumentation nehmen. |
+| TS-15 | Die Schwellen zweier Einordnungen sind vorläufige Arbeitswerte: die Ampel der Unterbrechungen (`GREEN_MAX_COUNT`, `YELLOW_MAX_COUNT` in `interruptions.py`) und die beiden Konstanten der Verzögerungslaute (ADR 0084). | bewusst | Die Einordnungen erfüllen die Bedingungen aus ADR 0078, die Zahlen dahinter sind nicht belegt. Das berührt Q-01 unmittelbar. | Gegen reale Aufnahmen kalibrieren, sobald der Pilotbetrieb Daten liefert. |
 
 ### Umsetzung
 
 | Nr. | Schuld | Art | Wirkung | Abtragen durch |
 |---|---|---|---|---|
 | TS-06 | Datenbankmigrationen kollidieren, ohne dass die Versionsverwaltung einen Konflikt meldet — die Dateien heißen verschieden und werden kommentarlos vereinigt. | aufgefallen | Der Fehler zeigt sich erst beim Anwendungsstart. Einmal aufgetreten, mit dem Ergebnis, dass Gespräche unbemerkt nicht gespeichert wurden. | Nach jedem Zusammenführen die Anzahl der Migrations-Endpunkte prüfen, nicht die Konfliktliste. Automatisierbar. |
-| TS-07 | Das Schema ist englisch benannt, die Schnittstelle zum Frontend deutsch; eine Übersetzungsschicht liegt dazwischen. | bewusst | Jede Umbenennung muss an zwei Stellen gedacht werden. Wird die Schicht übersehen, bricht die Oberfläche, ohne dass ein Backend-Test anschlägt. | Vor der ersten externen Schnittstelle entscheiden, welche der beiden Sprachen die Schnittstelle führt. |
-| TS-08 | Eine Tabelle für Einzelbefunde besteht im Schema, hat aber weder Schreiber noch Leser. | bewusst | Totes Schema. Es kostet nichts im Betrieb, täuscht aber eine Funktion vor, die es nicht gibt. | Entweder mit dem Pilotbetrieb befüllen oder entfernen. |
+| TS-07 | Das Schema ist englisch benannt, die Schnittstelle zum Frontend deutsch; eine Übersetzungsschicht liegt dazwischen — **abgetragen** | bewusst | Jede Umbenennung musste an zwei Stellen gedacht werden. | **Abgetragen durch ADR 0057 und ADR 0061:** Schema und Schnittstelle sind durchgängig englisch; Deutsch steht nur noch in nutzersichtbaren Inhalten. |
+| TS-08 | Eine Tabelle für Einzelbefunde besteht im Schema, hat aber weder Schreiber noch Leser — **abgetragen** | bewusst | Totes Schema, das eine Funktion vortäuschte, die es nicht gab. | **Abgetragen durch F-51:** Jede harte Unterbrechung schreibt einen `Finding` (live in `persistence.py`, für ältere Sessions über `backfill_interruptions`); gelesen wird er auf der Detailroute und im Export. |
 | TS-09 | Die Python-Version ist festgenagelt, weil die verwendete ORM-Fassung auf neueren Fassungen nicht mehr lädt. | aufgefallen | Sicherheitsaktualisierungen der Sprachumgebung sind blockiert. | ORM anheben, danach die Festlegung nachziehen. |
-| TS-10 | Für die Zeilenenden gibt es keine im Projekt hinterlegte Konvention, obwohl auf verschiedenen Betriebssystemen gearbeitet wird. | aufgefallen | Änderungen erscheinen größer, als sie sind; Zeilenenden verrauschen die Historie. | Konvention hinterlegen. |
-| TS-11 | Für die Sprachsynthese besteht nur auf Deutsch eine funktionierende Rückfallebene. | aufgefallen | Fällt der Standardanbieter aus, liest bei einer englischsprachigen Persona ein deutsches Stimmmodell den englischen Text. Es kommt Audio, es wird kein Fehler gemeldet, und auffallen würde es nur am Klang. | Englische Rückfallebene beschaffen oder den Ausfall hörbar machen, statt still falsch zu synthetisieren. |
+| TS-10 | Für die Zeilenenden gibt es keine im Projekt hinterlegte Konvention, obwohl auf verschiedenen Betriebssystemen gearbeitet wird. | aufgefallen | Änderungen erscheinen größer, als sie sind; Zeilenenden verrauschen die Historie. Die `.gitattributes` legt LF bisher nur für Shell-Skripte fest, weil ein CRLF-Skript den Frontend-Container am Start hindert. | Konvention auf alle Textdateien ausweiten. |
+| TS-11 | Für die Sprachsynthese besteht nur auf Deutsch eine funktionierende Rückfallebene — **abgetragen** | aufgefallen | Fiel der Standardanbieter aus, las bei einer englischsprachigen Persona ein deutsches Stimmmodell den englischen Text. Es kam Audio, es wurde kein Fehler gemeldet, und auffallen wäre es nur am Klang. | **Abgetragen durch ADR 0103: die Rückfallebene ist entfernt.** Von den beiden vorgeschlagenen Wegen — englische Rückfallebene beschaffen oder den Ausfall hörbar machen — ist der zweite gegangen: Ein Ausfall von KugelAudio beendet den Turn mit `tts_failed`, statt ihn still in der falschen Stimme zu synthetisieren. |
+| TS-16 | `.env.example` nennt `gemma-4-26B-A4B-it` als Dialogmodell, `shared/clients/llm.py` sendet aber auf Qwen3 abgestimmte Sampling-Parameter (`chat_template_kwargs`, `top_k`, `min_p`, `presence_penalty` 1,5). | aufgefallen | Ob das eingetragene Modell diese Parameter so annimmt und wie sie dort wirken, ist nicht gemessen. Die Abstimmung in `docs/research/model-parameters.md` gilt für ein anderes Modell. | Parameter gegen das eingesetzte Modell messen und entweder anpassen oder die Wahl des Modells begründen. |
 
 ### Inhalt
 
 | Nr. | Schuld | Art | Wirkung | Abtragen durch |
 |---|---|---|---|---|
-| TS-12 | Von den drei Szenario-Typen aus F-03 ist in der Bibliothek bislang einer belegt. | bewusst | F-03 ist ein MUST und noch nicht erfüllt. Die Bibliothek bildet die Arbeitswirklichkeit nur eines der beiden Pilotunternehmen ab — was RI-03 entgegensteht. | Die im Szenario- und Persona-Katalog aufbereiteten Kandidaten anlegen; die Belege dafür liegen vor. |
-| TS-13 | Der Trainee erhält vor dem Gespräch keine Einweisung in seinen Fall, während die Persona Fallfakten, Anrufziel und Erfolgsbedingung im Prompt hat. | aufgefallen | Der Nutzer verteidigt eine Position, die er nicht kennt. Betrifft unmittelbar Q-01: Eine Rückmeldung zur Argumentation ist nicht haltbar, wenn nie gesagt wurde, wofür argumentiert werden sollte. | Umsetzung nach ADR 0054. |
+| TS-12 | Von den drei Szenario-Typen aus F-03 ist in der Bibliothek bislang einer belegt — **abgetragen** | bewusst | F-03 war ein nicht erfülltes MUST; die Bibliothek bildete die Arbeitswirklichkeit nur eines der beiden Pilotunternehmen ab. | **Abgetragen:** Die Bibliothek enthält 17 Szenarien in den vier Kategorien der ADR 0072 (Betrieb & Störung, Beratung & Anforderung, Preis & Kondition, Abschluss & Einwand), siehe [Szenario- und Persona-Katalog](scenario-catalogue.md). |
+| TS-13 | Der Trainee erhält vor dem Gespräch keine Einweisung in seinen Fall, während die Persona Fallfakten, Anrufziel und Erfolgsbedingung im Prompt hat — **abgetragen** | aufgefallen | Der Nutzer verteidigte eine Position, die er nicht kannte. | **Abgetragen durch ADR 0054:** Jedes Szenario trägt ein `briefing` für den Trainee, das nie in einen Prompt gelangt. |
 
 ### Betrieb und Datenschutz
 
 | Nr. | Schuld | Art | Wirkung | Abtragen durch |
 |---|---|---|---|---|
-| TS-14 | Der technische Löschpfad besteht, aber es gibt weder eine Aufbewahrungsfrist noch eine Selbstbedienungsfunktion. | bewusst | Gespeicherte Sessiondaten wachsen unbegrenzt. Voraussetzung für jede Nutzung außerhalb der Pilotgruppe. | Frist festlegen und Löschfunktion umsetzen; siehe RI-02, mit dem diese Schuld denselben Gegenstand hat. |
+| TS-14 | Der technische Löschpfad besteht, aber es gibt weder eine Aufbewahrungsfrist noch eine Selbstbedienungsfunktion — **abgetragen** | bewusst | Gespeicherte Sessiondaten wuchsen unbegrenzt. | **Abgetragen durch ADR 0066 und ADR 0067:** Speicherung nur mit Einwilligung, Löschung beim Widerruf, Ablauf nach sechs Monaten mit täglichem Lauf, Löschen einzelner Trainings und Datenexport im Profil. Alle Löschpfade laufen über `deletion.remove` (ADR 0102). |
+| TS-17 | Es gibt keine Backups und keinen erprobten Rückweg für ein ausgerolltes Schema: Die Migrationskette ist in beide Richtungen nur auf einer leeren Datenbank getestet, und das Downgrade über `d7f41c9b3a26` scheitert auf befüllten Daten absichtlich. | bewusst | Ein verlorenes Volume verliert alle gespeicherten Trainings; eine fehlerhafte Migration lässt sich nicht zurückrollen. Backups einzuführen ist zugleich eine Datenschutzfrage (RI-02). | Vor jedem Deployment einen Dump ziehen; Backups nur zusammen mit einer Aufbewahrungsregel in ADR 0066 einführen. |
 
 # 12. Glossar
 
