@@ -2815,14 +2815,12 @@ p.follow-up-error {
 }
 
 /* Shown below the live conversation as a supporting reference with no scroll
-   box of its own. A little more horizontal space and breathing room improve
-   readability without giving the facts more visual weight than the call.
-   It wraps the Wissensstand and the facts, so the gap between the two is set
-   here rather than by the panels' own bottom margins. */
+   box of its own. A plain wrapper around the Wissensstand and the facts: no
+   background or padding of its own, since each panel carries its own and a
+   second ground would show as a frame around them, and the gap between the
+   two is set here rather than by the panels' own bottom margins. */
 .case-brief-call {
   margin: 0 auto;
-  padding: 1.4rem 1.6rem;
-  background: var(--color-surface);
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
