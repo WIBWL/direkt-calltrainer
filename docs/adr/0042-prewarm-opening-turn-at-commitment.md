@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Since ADR 0102 it applies to the reverse only: in an ordinary call the User answers the phone first and nothing is pre-warmed.
+Accepted. Since ADR 0110 it applies to the reverse only: in an ordinary call the User answers the phone first and nothing is pre-warmed.
 
 ## Context
 

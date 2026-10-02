@@ -1,16 +1,8 @@
-"""The caller's own Session history: `GET /api/sessions` (F-13, F-48).
+"""The caller's own Session history: `GET /api/sessions` (F-13, F-48; ADR 0028, 0052).
 
-The read side ADR 0028 and ADR 0052 both named as the condition for revisiting
-themselves. Two things are load-bearing here and neither is visible in a happy
-path, so both get a test of their own: the listing is filtered by `subject_id`
-rather than checked after the fact, and its order is total rather than merely
-mostly-determined — a tie on `started_at` broken by nothing would let one row
-appear on two pages or on none.
-
-What the listing deliberately does *not* carry is checked too. `detail_json`
-would drag the whole loudness curve of every Session into a list view, and the
-wrap-up would give `status` a second meaning on the same resource (ADR 0057).
-"""
+Pins what a happy path hides: filtering by `subject_id` in the query, a total order (a tie on
+`started_at` would put a row on two pages or none), and what the listing leaves out
+(`detail_json`, the wrap-up text -- ADR 0057)."""
 
 # pylint: disable=duplicate-code
 # Fixture data is repeated per test module on purpose: a test carrying its own
@@ -95,16 +87,10 @@ async def test_history_returns_the_newest_session_first(
 async def test_sessions_sharing_a_timestamp_still_have_one_order(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """`started_at` comes from the client's `session.activate`, so two Sessions
-    can genuinely share one. Without the tiebreak Postgres may order them
-    differently on each read, and a paginated client would see a row twice or
-    not at all.
+    """Sessions can share a `started_at`, so the order needs a tiebreak.
 
-    Asserted as the property the tiebreak actually protects rather than as a
-    stable byte-for-byte answer: paging one row at a time through Sessions that
-    all share an instant has to yield each of them exactly once. Under a
-    partial order the pages are free to overlap, and a row would go missing in
-    exchange for one seen twice.
+    Asserted as the property it protects: paging one row at a time through Sessions
+    sharing an instant yields each exactly once.
     """
     written = {str(persist(started_at=JULY)) for _ in range(5)}
 
@@ -239,16 +225,10 @@ async def test_measurements_travel_with_each_session(
 async def test_the_loudness_curve_stays_out_of_the_listing(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """`detail_json` is the per-Session course of a metric. Multiplied by a
-    page of Sessions it dwarfs everything else in the payload, and no view
-    across Sessions plots it — the detail route is where it belongs.
+    """The exact key set, so an addition is a decision: `detail_json` (the metric's
+    course) would dwarf a page and belongs on the detail route.
 
-    The exact key set is asserted rather than just the absence of `detail`, so
-    that anything added here is a decision and not a drift. `active` was added
-    deliberately for the progress view (F-13): a Session measured before a
-    metric was renamed points at the retired metric type, which carries the same
-    display name as its replacement, and nothing else on the wire distinguishes
-    them.
+    `active` is deliberate (F-13): it tells a retired metric from its same-named replacement.
     """
     persist(turns=MEASURED_TURNS)
 
@@ -262,12 +242,8 @@ async def test_the_loudness_curve_stays_out_of_the_listing(
 async def test_the_listing_says_whether_a_wrap_up_exists_but_not_what_it_says(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """A row carries the wrap-up's availability, never its text.
-
-    Whether one exists decides what the row promises when clicked, so the list
-    needs it. The narrative itself belongs to the detail route, and a page of
-    summaries would dwarf everything else here for a view that shows none of
-    them.
+    """A row carries the wrap-up's availability (what a click promises), never its text,
+    which belongs to the detail route.
     """
     persist(turns=MEASURED_TURNS)
 
@@ -381,9 +357,8 @@ def _write_feedback(
 ) -> None:
     """Give the stored Session a wrap-up, the way the worker would.
 
-    `points` are (kind, focus-goal key or None, text). The key is resolved
-    against the seeded catalogue rather than invented, for conftest's reason:
-    a made-up key would let a test pass on a goal the real system has retired.
+    `points` are (kind, focus-goal key or None, text); keys resolve against the seeded
+    catalogue, so a retired goal cannot pass unnoticed.
     """
     session_id = db.query(Session).one().session_id
     feedback = Feedback(

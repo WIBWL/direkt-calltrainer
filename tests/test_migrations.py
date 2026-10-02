@@ -1,25 +1,10 @@
 """The migration chain, in both directions (ADR 0027, ADR 0052, ADR 0053).
 
-`downgrade()` is the half that never gets exercised by normal work, and
-autogenerate reliably produces a broken one — unnamed constraints it cannot
-drop, and NOT NULL columns added without a backfill. These tests run the whole
-chain rather than the newest revision, so a later revision cannot quietly break
-an earlier one's downgrade.
-
-**What "both directions" means here, exactly:** on an *empty* database, which is
-what `empty_database` hands these tests. The chain is not reversible once there
-are rows — `d7f41c9b3a26` widened `persona.traits` past the 120 characters it
-came from, so rolling back past it fails on any seeded database with
-`value too long for type character varying(120)`. That is deliberate (the
-migration says so: truncating silently would be worse), but it means a green run
-here is not a promise that a deployed schema can be rolled back. It cannot, and
-there are no backups either.
-
-Also pinned here rather than in a file of their own, because both are properties
-of the chain as a whole: every constraint follows the naming convention on
-`Base.metadata` (ADR 0053), without which autogenerate emits constraints whose
-`downgrade()` cannot run, and every foreign-key column is indexed (ADR 0052).
-"""
+The whole chain runs, so a later revision cannot break an earlier downgrade.
+Only on an *empty* database: `d7f41c9b3a26` widened `persona.traits`, so rolling
+back past it fails on seeded data, deliberately. A green run is no promise a
+deployed schema can be rolled back. Also pins the naming convention (ADR 0053)
+and that every foreign-key column is indexed (ADR 0052)."""
 from sqlalchemy import create_engine, inspect, text
 
 from backend.db.models import Base
@@ -73,13 +58,10 @@ def test_full_round_trip_restores_the_same_schema(empty_database: str) -> None:
 
 
 def test_turn_holds_one_utterance_per_row(empty_database: str) -> None:
-    """Guards the decision that a stored Turn is one utterance of one speaker,
-    not a whole exchange (ADR 0026).
+    """A stored Turn is one utterance of one speaker, not an exchange (ADR 0026).
 
-    A Turn is an exchange in memory (CONTEXT.md's "Turn" entry, and
-    backend/session/models.py holds it that way), but it is stored flattened —
-    that is what gives every line its own offset and makes the
-    Gesprächsprotokoll timestamped. `utterances()` performs the flattening.
+    Flattened by `utterances()`, which gives every line its own offset for the
+    timestamped Gesprächsprotokoll.
     """
     alembic_upgrade(empty_database)
 

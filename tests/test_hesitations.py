@@ -1,13 +1,8 @@
-"""Hesitation sounds, read off the pitch contour (F-51).
+"""Hesitation sounds, read off the pitch contour (F-51, ADR 0084, ADR 0048).
 
-Covers:
-  F-51      "äh"/"ähm" are the one filler the transcript cannot count, since
-            Whisper drops them; a held, flat, voiced stretch is what they leave
-  ADR 0084  held, flat, voiced stretches, with provisional thresholds
-  ADR 0048  absent when a Turn's acoustics failed, not undercounted
-
-Synthetic 10 ms contours with known answers; no audio and no Praat.
-"""
+Whisper drops "äh"/"ähm", so they are found as held, flat, voiced stretches
+(provisional thresholds); absent, not undercounted, when acoustics failed.
+Synthetic 10 ms contours; no audio and no Praat."""
 
 import math
 

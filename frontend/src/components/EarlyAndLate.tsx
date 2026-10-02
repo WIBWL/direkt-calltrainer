@@ -1,25 +1,9 @@
 import { formatRange, halves, type MetricSeries } from "../utils/progressStats";
 
 /**
- * The user's earlier trainings and their recent ones, described side by side.
- *
- * The page's answer to the question the dashboard has never answered — "has
- * anything changed?" — given under the constraint that it may not answer it.
- * ADR 0065 rules out a delta, an arrow and any word for a direction, and
- * ADR 0051 rules out the norm that would be needed to say whether a change was
- * an improvement. What is left, and what this is, is the construction ADR 0081
- * already uses for the two stretches of a single call: put two descriptions
- * beside each other, compute nothing between them, and say so.
- *
- * Nothing here is derived from the pair. Each column is a median widened by its
- * own half's spread, exactly as the overall band is, and the two are laid out
- * side by side rather than one above the other precisely so that neither reads
- * as coming after the other in an argument.
- *
- * Deliberately on the metric's own page and not on the overview. A reader on
- * this page has asked about one figure; sixteen of these on the overview would
- * be sixteen invitations to read a direction into a pair of ranges, which is
- * how a comparison becomes a score without anybody deciding to build one.
+ * Earlier and recent trainings side by side, each a median widened by its own spread.
+ * Nothing is computed between them — no delta, arrow or direction (ADR 0065/0051; ADR
+ * 0081's two-stretch construction). Only on a metric's own page, never the overview.
  */
 export default function EarlyAndLate({ series }: { series: MetricSeries }) {
   const split = halves(series);

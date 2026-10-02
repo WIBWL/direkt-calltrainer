@@ -1,21 +1,10 @@
 import type { ReactNode } from "react";
 
 /**
- * The trainee's own side of the case (ADR 0054), shown as "Ihr Wissensstand".
- *
- * Everything else a Session knows about the case addresses the caller: the four
- * prompt fields brief the model that plays it. This is the only text written to
- * whoever picks up the phone — the role they answer in, the room they have, and
- * what their own company knows about this customer.
- *
- * A component rather than markup because it is rendered twice: between the
- * microphone check and the ringing phone, and beside the call itself, where one
- * reaches back for a number mid-sentence — which is why a built-in's text is a
- * list of `- ` lines rather than a paragraph (see `StructuredText`).
- *
- * Renders nothing for a Scenario without one — a Scenario authored before the
- * field existed has none, and an empty panel with a heading is worse than no
- * panel.
+ * The trainee's own side of the case (ADR 0054), shown as "Ihr Wissensstand" — the only text addressed to
+ * whoever picks up, not to the model. Rendered after the microphone check and again with the call, where one
+ * reaches back for a number mid-sentence, hence a built-in's `- ` list (`StructuredText`). Renders nothing for
+ * a Scenario without one.
  */
 export default function ScenarioBriefing({ briefing }: { briefing: string | undefined }) {
   if (!briefing?.trim()) return null;

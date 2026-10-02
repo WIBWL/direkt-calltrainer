@@ -2,19 +2,14 @@ site_name: Calltrainer
 site_description: AI-powered phone conversation trainer
 docs_dir: docs
 
-# Regenerates the ER diagram from backend/db/models.py before every build, so
-# that docs/datenmodell.md never goes stale. If that fails (no Graphviz), the
-# docs are built with the checked-in diagram instead.
-hooks:
-  - scripts/mkdocs_hooks.py
-
 nav:
   - Home: index.md
-  - Initial Requirements: initial_requirements.md
+  - Initial Requirements: initial-requirements.md
   - Features: features.md
   - Szenario- und Persona-Katalog: scenario-catalogue.md
-  - Datenmodell: datenmodell.md
-  - Dashboard-Konzept: dashboard-konzept.md
+  - Dashboard-Konzept: dashboard-concept.md
+  - Deployment: deployment.md
+  - Codebase Notes: codebase-notes.md
   - Architecture Decisions:
       - ADR 0000 - Record Architecture Decisions: adr/0000-record-architecture-decisions.md
       - ADR 0001 - Separate Scenario and Persona Concepts: adr/0001-separate-scenario-and-persona.md
@@ -118,8 +113,13 @@ nav:
       - ADR 0099 - The Caller Opens the Transaction, a Domain Function Takes It: adr/0099-the-caller-opens-the-transaction.md
       - ADR 0100 - The Follow-Up and the Reverse Stay Two Routes, Sharing What Must Not Drift: adr/0100-follow-up-and-reverse-stay-two-routes.md
       - ADR 0101 - Four Structural Proposals Declined, So That They Are Not Proposed Again: adr/0101-four-structural-proposals-declined.md
-      - ADR 0102 - The User Picks Up First; Only a Reverse Is Answered by the Persona: adr/0102-the-user-picks-up-first.md
-      - ADR 0103 - One System Message per Request; Per-Turn Instructions Travel in the User Turn: adr/0103-one-system-message-per-request.md
+      - ADR 0102 - One Place Decides a Shared Fact - Five Seams From the Tenth Review: adr/0102-one-place-decides-a-shared-fact.md
+      - ADR 0103 - One OpenAI-Compatible Gateway, One Voice, and No Switches Between Them: adr/0103-one-openai-compatible-gateway-one-voice.md
+      - ADR 0104 - Frontend, Backend and Worker as Three Images: adr/0104-frontend-backend-worker-images.md
+      - ADR 0105 - "Deutliche Artikulation" Is Retired from the Focus Catalogue: adr/0105-the-articulation-goal-is-retired.md
+      - ADR 0106 - The Dashboard Reads One Client-Side Load and Adds No Endpoint: adr/0106-the-dashboard-reads-one-client-side-load.md
+      - ADR 0107 - The Progress Report Is a Second Document on the Same Page Frame: adr/0107-the-progress-report-is-a-second-document.md
+      - ADR 0110 - The User Picks Up First; Only a Reverse Is Answered by the Persona: adr/0110-the-user-picks-up-first.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
   # site is served at the root (mkdocs serve / mkdocs build + static server).

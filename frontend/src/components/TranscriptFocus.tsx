@@ -1,25 +1,9 @@
 import { createContext, useContext, type ReactNode } from "react";
 
 /**
- * Showing the reader the line a sentence of the wrap-up is about.
- *
- * Every strength and every improvement point carries the Turn it was written
- * about (`feedback_point.turn_id`), and the screen has printed that moment as a
- * timestamp since the points existed. A timestamp is not something a reader can
- * act on: "2:48" is checkable only by somebody who remembers the call, which is
- * nobody a minute after it ended. The transcript holding that very line sits
- * three inches below, collapsed.
- *
- * So the timestamp becomes a control, and this is the wire between the two
- * halves. It is a context and not a prop because the two are not neighbours:
- * `FeedbackScreen` owns the transcript and takes the report as a finished
- * element, so there is nothing to hand a callback down through.
- *
- * **Null means there is no transcript on this screen**, and a point then renders
- * its timestamp as the plain text it always was. That is a real case rather
- * than a defensive one: `FeedbackReport` is also drawn into the downloadable
- * report and could be drawn anywhere else, and a button that does nothing is
- * worse than no button.
+ * Lets a wrap-up point's timestamp (`feedback_point.turn_id`) open the transcript at that line; a context because
+ * `FeedbackScreen` owns the transcript and takes the report finished. **Null = no transcript on this screen**
+ * (e.g. the downloadable report): the timestamp stays plain text rather than a button that does nothing.
  */
 export interface TranscriptFocus {
   /** Open the transcript and bring the line spoken at this offset into view. */

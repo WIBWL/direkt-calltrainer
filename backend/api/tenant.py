@@ -1,11 +1,8 @@
 """The caller's tenant, for the setup screen (ADR 0060).
 
-`GET /api/tenant` tells the frontend which tenant the caller resolved to, so the
-Scenario library can show a tenant filter chip and badge with the real name.
-`null` means the caller is in the `default` tenant — no company, no chip. The
-resolution itself is server-side (`backend/tenants.py`); the client never sends
-or sets a tenant.
-"""
+`GET /api/tenant` names the tenant for the library's filter chip and badge;
+`null` means the `default` tenant (no chip). Resolution is server-side
+(`backend/tenants.py`); the client never sends or sets a tenant."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends

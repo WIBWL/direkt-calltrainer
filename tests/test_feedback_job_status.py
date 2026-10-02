@@ -1,19 +1,8 @@
 """The AnalysisJob row behind the post-call poll (ADR 0032, F-09, F-10).
 
-The wrap-up is generated asynchronously (ADR 0018/0019), so this row is the
-only thing that tells the finished-call screen whether to keep polling: it is
-written `queued` with the Session (ADR 0034), moved by the worker, and read
-back by `GET /api/sessions/{extern_id}` as `status` (ADR 0050).
-
-That makes it a quiet failure path. If a transition stops being written, the
-wrap-up still lands in the database and the client still polls -- it just gives
-up on its own deadline and shows the user a failure that did not happen. These
-tests pin the whole lifecycle, including the cases where the row would
-otherwise describe a job that no longer exists, or one that finished.
-
-Postgres has to be running (`docker compose up -d db`); without it the database
-fixtures skip.
-"""
+Written `queued` with the Session (ADR 0034), moved by the worker, served as
+`status` (ADR 0050). A missing transition fails quietly: the client gives up and
+shows a failure that did not happen. Needs Postgres; skips without."""
 
 # pylint: disable=duplicate-code
 # Fixture data is repeated per test module on purpose: a test carrying its own
@@ -79,11 +68,9 @@ def _job(db: DbSession, session_id: int) -> AnalysisJob:
 
 
 def _stub_model(monkeypatch, reply) -> None:
-    """Replace the wrap-up's model call. `reply` is the text to answer with, or
-    a callable invoked instead (to observe state, or to fail).
+    """Replace the wrap-up's model call with `reply` (text, or a callable).
 
-    The keyword-only arguments mirror `llm.complete`'s real signature, which the
-    generator calls with `think=True`.
+    The keyword-only arguments mirror `llm.complete`'s real signature.
     """
     async def complete(messages: list[dict[str, str]], *,
                        max_tokens: int | None = None, think: bool = False) -> str:
@@ -173,18 +160,11 @@ def test_a_points_goal_is_resolved_against_the_catalogue(
     db_session: DbSession, app_database: str, monkeypatch: pytest.MonkeyPatch,
     goal: str, expected: str | None,
 ) -> None:
-    """The tag decides whether a point can be counted across trainings, so what
-    happens to a bad one matters.
+    """A bad focus-goal tag becomes NULL, never an error.
 
-    Dropped to NULL, never raised on: a point with a good observation and a
-    made-up key is still a good observation, and losing the wrap-up over its
-    label would be the wrong trade. A wrong key is worse than none, because it
-    puts the point into somebody's tally of a weakness they do not have.
-
-    The two habit goals are refused at this end as well as in the prompt. A
-    rule the model can ignore is not a constraint, and neither goal is anything
-    a single call could show.
-    """
+    Losing the wrap-up over a label is the wrong trade, but a wrong key would count a
+    weakness the person does not have. The two habit goals are refused here as well
+    as in the prompt, since a single call cannot show them."""
     _store()
     session_id = db_session.query(Session).one().session_id
     _stub_model(monkeypatch, json.dumps({
@@ -360,10 +340,8 @@ def test_a_call_with_nothing_in_it_is_summarised_without_the_model(
 ) -> None:
     """A training broken off before a word was said.
 
-    O5 asks the model for this one sentence, and a 4B model (ADR 0011) answers
-    it in the English the rule is written in -- "nothing to review", on a German
-    screen. There is nothing to interpret in an empty call, so nothing is asked:
-    the sentence is written here, in the Session's own language.
+    Nothing is asked of the model: a 4B model answers O5 in English on a German
+    screen, so the sentence is written here in the Session's language.
     """
     asked: list = []
     _stub_model(monkeypatch, lambda messages: asked.append(messages) or _REPLY)
@@ -431,10 +409,8 @@ def test_a_job_without_a_timestamp_is_not_working() -> None:
 
 # --- Asking for a wrap-up again (POST /api/sessions/{extern_id}/feedback) ----
 #
-# The state these cover used to be a dead end on screen: a failed wrap-up was
-# one sentence and no way out, while the work was still possible -- it is
-# written from the stored Transcript and Measurements, never from audio
-# (ADR 0048/0049). The only route back ran inside the container.
+# A failed wrap-up can be regenerated from the stored Transcript and
+# Measurements (ADR 0048/0049).
 
 
 def _queue_spy(monkeypatch, fail: bool = False) -> list[int]:

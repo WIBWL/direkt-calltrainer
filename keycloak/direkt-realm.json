@@ -13,15 +13,15 @@
     "org.keycloak.userprofile.UserProfileProvider": [
       {
         "providerId": "declarative-user-profile",
-        "config": { "kc.user.profile.config": ["{\"unmanagedAttributePolicy\":\"ADMIN_EDIT\",\"attributes\":[{\"name\":\"username\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]}},{\"name\":\"email\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]}},{\"name\":\"tenant\",\"displayName\":\"Company (calltrainer tenant claim)\",\"multivalued\":false,\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]}}]}"] }
+        "config": { "kc.user.profile.config": ["{\"unmanagedAttributePolicy\":\"ADMIN_EDIT\",\"attributes\":[{\"name\":\"username\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]}},{\"name\":\"email\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]}},{\"name\":\"tenant\",\"displayName\":\"Company (direkt-calltrainer tenant claim)\",\"multivalued\":false,\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]}}]}"] }
       }
     ]
   },
 
   "clients": [
     {
-      "clientId": "calltrainer-frontend",
-      "name": "calltrainer-frontend",
+      "clientId": "direkt-calltrainer",
+      "name": "direkt-calltrainer",
       "description": "The only client that performs a login. Public + PKCE, because the SPA cannot keep a secret (ADR 0009).",
       "enabled": true,
       "protocol": "openid-connect",
@@ -43,22 +43,22 @@
       "optionalClientScopes": ["offline_access"],
       "protocolMappers": [
         {
-          "name": "calltrainer-audience",
+          "name": "direkt-calltrainer audience",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "config": {
-            "included.custom.audience": "calltrainer",
+            "included.custom.audience": "direkt-calltrainer",
             "access.token.claim": "true",
             "id.token.claim": "false"
           }
         },
         {
-          "name": "calltrainer roles",
+          "name": "direkt-calltrainer roles",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-client-role-mapper",
           "config": {
-            "usermodel.clientRoleMapping.clientId": "calltrainer-frontend",
-            "claim.name": "resource_access.calltrainer.roles",
+            "usermodel.clientRoleMapping.clientId": "direkt-calltrainer",
+            "claim.name": "resource_access.direkt-calltrainer.roles",
             "jsonType.label": "String",
             "multivalued": "true",
             "access.token.claim": "true",
@@ -67,7 +67,7 @@
           }
         },
         {
-          "name": "calltrainer tenant",
+          "name": "direkt-calltrainer tenant",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-attribute-mapper",
           "config": {

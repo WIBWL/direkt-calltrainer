@@ -1,27 +1,8 @@
-"""What a stored Measurement says beyond its figure, and the shape ADR 0078
-requires it to say it in.
+"""What a stored Measurement says beyond its figure, in ADR 0078's required shape.
 
-`backend/feedback/readings.py` holds one entry per metric that carries an
-explanation, a scale or a step derived on read. Those three used to be three
-tables inside `backend/api/sessions.py`, where a metric key could be misspelt
-or outlive its metric and the route would go on serving a dictionary nobody
-could match to anything.
-
-The conditions pinned here are ADR 0078's, and they are pinned structurally
-rather than left to care: a scale that loses its words, or gains a colour on
-one step and not the next, is a traffic light asserting a direction it never
-wrote down.
-
-Covers:
-  F-35, F-51  the two readings that carry a step
-  F-53        every active metric carries an explanation, which is what makes
-              its tile openable at all
-  F-53        the metric explained at length that deliberately carries none
-  ADR 0051    a figure is measured once and stored; a step is not a figure
-  ADR 0063    the text lives beside the threshold, not copied into the client
-  ADR 0078    what a light on a metric may claim, and under which conditions
-  F-37        the loudness course, derived on read and served to the screen
-"""
+`readings.py` holds explanation, scale and derived step per metric. Covers F-35,
+F-51 (steps), F-53 (every active metric explained), F-37 (loudness course), ADR 0051,
+ADR 0063 (text beside the threshold) and ADR 0078's conditions, pinned structurally."""
 import pytest
 
 from backend.feedback import intonation, metrics, readings
@@ -36,16 +17,10 @@ def test_every_explained_key_is_a_metric_that_exists():
 
 
 def test_every_active_metric_is_explained():
-    """The condition behind "every tile opens".
+    """Every active metric is explained: the condition behind "every tile opens".
 
-    A Kennzahl tile on the wrap-up screen becomes a link when this module
-    speaks for its metric -- that is what `MetricSection` reads `metric_notes`
-    for. Three of sixteen used to, so thirteen tiles stated a figure and
-    offered no way to see what it was read off.
-
-    Pinned as a rule and not as a count: a metric added to the inventory
-    without a word about it is exactly the drift `readings.py` was split out to
-    make visible, and it would arrive silently again.
+    `MetricSection` links a tile only when `metric_notes` covers its metric. Pinned as
+    a rule, not a count, so a new metric without a word about it fails here.
     """
     active = {m.key for m in metrics.METRICS if m.active}
     assert active <= readings.explained_keys(), sorted(active - readings.explained_keys())
@@ -108,10 +83,8 @@ def test_a_measurement_with_no_detail_stays_without_one():
 
 # --- A reading is not written down (ADR 0091) --------------------------------
 #
-# Everything above is the reading side. This is the invariant the module exists
-# for, and it had no test: F-51's step was being stored in the measurement's
-# detail and served back from there, which is exactly what ADR 0091 forbids and
-# exactly what ADR 0077 had already had to undo once for F-35.
+# The invariant the module exists for: a step is derived on read, never stored
+# in the measurement's detail (ADR 0077 had to undo exactly that for F-35).
 
 _READING_KEYS = frozenset({
     "light", "light_label",
@@ -122,9 +95,8 @@ _READING_KEYS = frozenset({
 def test_no_measurement_stores_a_step_or_a_colour():
     """The detail a call writes holds facts and no judgement about them.
 
-    Named keys rather than a diff against `served_detail`: a key that is both
-    stored and derived would make the diff empty, which is the very state this
-    has to catch.
+    Named keys, not a diff against `served_detail`: a key both stored and derived
+    would make the diff empty.
     """
     from tests.test_metrics import _call_with_a_barge_in  # pylint: disable=import-outside-toplevel
     from backend.feedback.calls import conversation  # pylint: disable=import-outside-toplevel
@@ -135,14 +107,10 @@ def test_no_measurement_stores_a_step_or_a_colour():
 
 
 def test_a_recalibrated_threshold_reaches_a_call_already_measured(monkeypatch):
-    """The property the split is for, stated end to end.
+    """A recalibrated threshold reaches a call already measured.
 
-    The two numbers behind F-51's light are invented working values, and the
-    module says so: they are meant to be recalibrated once the pilot has data.
-    A stored step survives that recalibration, and then the interface shows a
-    figure coloured by the old scale beside a legend built from the new one --
-    a red 3 next to a legend putting 3 in the yellow band, with the current
-    step marked in a band the number is not in.
+    F-51's thresholds are invented working values meant to be recalibrated; a stored
+    step would show an old-scale colour beside a legend built from the new scale.
     """
     from backend.feedback import interruptions  # pylint: disable=import-outside-toplevel
 

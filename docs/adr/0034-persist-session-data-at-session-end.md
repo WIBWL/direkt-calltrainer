@@ -51,3 +51,17 @@ The reason is that the original rule charges the wrong party. The training did h
 What does not change: the write still happens once, after the call, off the event loop, and it still cannot affect the live path. What the user loses on a disconnect is the `session.ended` message and with it the transcript in the browser — the connection it would travel on is gone — but the Session itself is readable from the history afterwards, which it was not before.
 
 `session.status` is therefore the only place this distinction lives. Anything that counts trainings reads `completed`; anything that lists them shows both.
+
+## Amendment, 2026-09-24: the rule above was half-kept, and a figure needs a second one
+
+"Every cross-Session view counting the former" was a clause, and a clause is not an implementation. An audit of the progress view found it honoured in two places and broken in three. The calendar counted finished trainings; the three figures above it, the Scenario × Persona grid beside it and every metric series below it counted every stored row. So a card read "17 Trainings" next to a calendar showing fourteen marks under a line saying only completed ones are counted, and the downloadable report reproduced the split onto a sheet where nobody can ask which figure is right. One of the breaks was pinned by a test, which argued — correctly, and on other grounds — that a cell saying 2 must not open onto three rows.
+
+The rule is now one function, `progressStats.completedOnly`, and the five readers go through it rather than each spelling out the same filter, which is how four of them came to disagree (ADR 0102).
+
+**The second rule is new and is not about the status at all.** Whether a call's *figures* may join a series is a different question from whether it counts as a training, and this ADR never asked it. An abandoned call is stored with its full measurements — `_write_analysis` runs whatever the status — so a call hung up after twenty seconds contributed a talk share and a speaking pace measured over two sentences, as an equal point in a band describing every other call.
+
+Filtering those out by status would have been the obvious move and is the wrong one. `aborted` also means a dropped connection or a closed laptop, so a call that ran nine minutes and died at the end of them is a complete measurement, and discarding it would throw away good data to catch a different problem. The problem is the short call, and a short call is short whether it ended tidily or not.
+
+So: `progressStats.readable` keeps the calls of at least `MIN_CALL_MS` (60 s) for the series, applied once inside `selectionSeries` so no caller can forget it. The figure is **set, not measured**, like `MIN_SESSIONS_FOR_SERIES`, and it is a floor on describability rather than a judgement of the call — which keeps it clear of ADR 0051, since nothing here compares a value to a threshold. A call whose length cannot be worked out is kept: the rule is "drop what is known to be too short", not "drop what cannot be checked".
+
+The two rules stay two, and both are said out loud. A training left out of the courses is still counted in the record, still in the calendar and still in the history; the screen says how many were set aside, beside the switch where the selection is stated, and the report says it on its first page. A course drawn over fewer calls than the line above it names is otherwise a quiet subtraction, and on paper it is one nobody can question.

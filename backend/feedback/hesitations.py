@@ -1,5 +1,4 @@
 """Hesitation sounds ("äh", "ähm", "hm") read off the pitch contour (F-51).
-
 Whisper drops them, so the transcript cannot count them. What they leave in the
 audio is a held, voiced sound whose pitch barely moves, where running speech
 moves several times a second. An estimate: a drawn-out "jaaa" has the same shape.

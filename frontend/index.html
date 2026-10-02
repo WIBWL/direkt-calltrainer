@@ -9,6 +9,9 @@
 </head>
 <body>
   <div id="root"></div>
+  <!-- Runtime settings from the container's environment (spa.conf.template); a classic
+       script, so it has run before the deferred module below. -->
+  <script src="/config.js"></script>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

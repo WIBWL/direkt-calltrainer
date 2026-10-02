@@ -1,0 +1,81 @@
+# Production override, only ever on top of compose.yaml:
+#   docker compose -f compose.yaml -f compose.prod.yaml up -d --build
+# Drops the local Keycloak, the localhost issuer and every published port. TLS and
+# routing belong to the external reverse proxy, which reaches the frontend and the
+# backend over the shared Docker network PROXY_NETWORK. Steps: docs/deployment.md.
+# `!reset`/`!override` need Docker Compose >= 2.24.4; without them a list or map here
+# would be *merged* into compose.yaml's, which is wrong for ports and depends_on.
+
+x-logging: &logging
+  # Docker's own json-file log grows without limit unless told otherwise.
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  frontend:
+    environment:
+      # Served to the SPA at runtime. `:?` makes `up` fail outright instead of
+      # silently falling back to compose.yaml's localhost default, whose login
+      # points at nothing.
+      OIDC_ISSUER: ${OIDC_ISSUER:?set OIDC_ISSUER in .env}
+    # Static files only: the external proxy sends /api, /ws and /health to the
+    # backend itself (frontend/static.nginx.conf).
+    command: ["nginx", "-c", "/etc/nginx/static.nginx.conf", "-g", "daemon off;"]
+    ports: !reset []
+    # Serving files does not need the backend up.
+    depends_on: !reset {}
+    # The proxy's network is shared with other stacks, where a bare `frontend`
+    # could resolve to someone else's container; the proxy uses the alias.
+    networks:
+      default:
+      proxy:
+        aliases: [calltrainer-frontend]
+    develop: !reset {}
+    logging: *logging
+
+  backend:
+    environment:
+      # compose.yaml pins both to the local Keycloak, and `environment` wins
+      # over `env_file` -- so the .env value would never arrive without this.
+      OIDC_ISSUER: ${OIDC_ISSUER:?set OIDC_ISSUER in .env}
+      # Empty means unset (backend/auth.py): the keys are found through the
+      # issuer's own discovery document, which the container can reach.
+      OIDC_JWKS_URL: ""
+    # The deployed Keycloak is external, so the local one is not a dependency.
+    depends_on: !override
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      default:
+      proxy:
+        aliases: [calltrainer-backend]
+    develop: !reset {}
+    logging: *logging
+
+  worker:
+    develop: !reset {}
+    logging: *logging
+
+  redis:
+    logging: *logging
+
+  db:
+    # Nothing on the host needs it; `docker compose exec db psql` still works.
+    ports: !reset []
+    logging: *logging
+
+  # The local development Keycloak (start-dev, admin/admin, issuer pinned to
+  # localhost) is never started here. The deployment uses the realm at
+  # OIDC_ISSUER. Starting it anyway takes `--profile local-keycloak`.
+  keycloak:
+    profiles: ["local-keycloak"]
+
+networks:
+  # Created and owned by the external reverse proxy's stack, not this one.
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:?set PROXY_NETWORK in .env}

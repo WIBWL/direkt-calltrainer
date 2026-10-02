@@ -1,14 +1,8 @@
-"""Barge-in / eager interruption of an in-flight turn.
+"""Barge-in / eager interruption of an in-flight turn (ADR 0035).
 
-Covers ADR 0035:
-  * tearing down the turn generator mid-flight finalizes the turn at once
-  * if no audio was played yet, the SAME turn stays open and the next
-    utterance is appended onto the pending question ("wait, also -")
-  * only the utterances whose audio the client reports it played through are
-    committed to history; anything streamed ahead but unheard is discarded
-  * a client that sends no playback position falls back to committing every
-    dispatched chunk (the pre-ADR-0035-revision behaviour)
-"""
+Tearing down the turn finalizes it at once; with no audio played the same turn
+reopens and the next utterance is appended; only played-through utterances enter
+history; a client sending no playback position commits every dispatched chunk."""
 
 # pylint: disable=duplicate-code
 # Fixture data is repeated per test module on purpose: a test carrying its own
@@ -133,20 +127,11 @@ async def test_interrupt_commits_only_what_played_through(persona, scenario, fak
 async def test_interrupt_inside_the_first_sentence_keeps_the_words_that_played(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """A cut inside the very first sentence keeps its word-prefix like any
-    other cut (ADR 0035), rather than discarding the reply.
+    """A cut inside the very first sentence keeps its word-prefix (ADR 0035).
 
-    That sentence carries no checkpoint yet: a checkpoint is written per
-    *finished* chunk, while its audio goes out sub-chunk by sub-chunk as
-    KugelAudio produces it (ADR 0044) -- so the client is already playing a
-    sentence the server has not finished synthesizing. Measured against the
-    finished chunks alone this cut found nothing heard at all and dropped a
-    reply the user was listening to, leaving the Turn open and the next
-    utterance appended onto a question that had already been answered.
-
-    The reopened-Turn case that remains is a cut before any audio at all, which
-    `test_interrupt_before_any_audio_reopens_the_same_turn` covers.
-    """
+    That sentence has no checkpoint yet (they are written per finished chunk, while
+    audio streams per sub-chunk, ADR 0044), so it must not be read as "nothing heard"
+    and reopen the Turn. A cut before any audio is the other test's case."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
     reply = "Ein ganzer Satz den der Nutzer fast sofort abschneidet."
     fake_pipeline.stt.transcripts = ["Erste Haelfte."]
@@ -341,18 +326,17 @@ async def test_the_turn_after_an_interruption_tells_the_model_where_it_was_cut_o
     assert not any(isinstance(e, TurnCompleted) and e.ends_call for e in events), "the call goes on"
     sent = fake_pipeline.llm.calls[-1]
     assert sent[1]["content"] == fragment + INTERRUPTED_MARK, "the history line is marked"
-    # The nudge sits between the dashed line and the user's words, and quotes
-    # nothing: what the model sees last is the user's words, not the fragment.
-    # It travels inside their message (ADR 0103), in front of what they said.
-    assert [m["role"] for m in sent[1:]] == ["assistant", "user"]
+    # The nudge sits between the dashed line and the user's message, and quotes
+    # nothing: what the model sees last is the user's message, not the fragment.
+    assert [m["role"] for m in sent[1:]] == ["assistant", "system", "user"]
     assert "cut you off" in sent[2]["content"] and fragment not in sent[2]["content"]
-    assert sent[2]["content"].endswith("\n\nMoment, worum geht es genau?")
+    assert sent[3]["content"] == "Moment, worum geht es genau?"
     assert not any("Your previous reply in this call was" in m["content"] for m in sent), "anti-repeat nudge replaced"
 
     await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
-    last = fake_pipeline.llm.calls[-1][-1]["content"]
-    assert "cut you off" not in str(fake_pipeline.llm.calls[-1]), "only the one Turn"
-    assert "Your previous reply in this call was" in last, "back to the standing nudge"
+    systems = [m["content"] for m in fake_pipeline.llm.calls[-1] if m["role"] == "system"]
+    assert not any("cut you off" in s for s in systems), "only the one Turn"
+    assert any("Your previous reply in this call was" in s for s in systems), "back to the standing nudge"
 
 
 async def test_a_reply_that_reads_the_users_line_back_is_cut_to_the_answer(
@@ -386,11 +370,9 @@ async def test_a_reply_that_reads_the_users_line_back_is_cut_to_the_answer(
 
 # --- The cut-off sentence must not come back in any form (ADR 0035) --------
 #
-# Live, three times in one day: after a barge-in the model's next reply began
-# with the sentence the user had just talked over -- finished this time -- and
-# only then said what it had to say. Verbatim repeats are the dedup's; these
-# are the two forms it cannot see: the sentence restarted from the top, and its
-# tail continued mid-sentence.
+# Seen live: the next reply restated the sentence the user had talked over.
+# Verbatim repeats are the dedup's; these are the forms it cannot see: restarted
+# from the top, and its tail continued mid-sentence.
 
 _FIRST = "Das ist okay, aber ich will den Termin vor dem 8. September."
 _CUT = "Sagen Sie mir, bis wann Sie das dann genau schaffen?"
@@ -449,7 +431,7 @@ async def test_a_reply_that_is_nothing_but_the_cut_off_sentence_is_re_asked_once
     assert not any(isinstance(e, TurnCompleted) and e.ends_call for e in events)
     assert len(fake_pipeline.llm.calls) == 3, "one re-ask"
     nudge = fake_pipeline.llm.calls[-1][-1]
-    assert nudge["role"] == "user" and "picked the sentence the user cut off back up" in nudge["content"]
+    assert nudge["role"] == "system" and "picked the sentence the user cut off back up" in nudge["content"]
     assert _CUT in nudge["content"]
     assert orch.turns[1].persona_text == "Freitag passt mir, danke."
     assert _CUT not in orch.history.messages[-1]["content"]
@@ -528,20 +510,11 @@ async def test_new_or_reopened_turn_bookkeeping(persona, scenario):
 
 
 def test_a_reply_nobody_heard_is_not_counted_as_persona_speech(persona):
-    """A discarded reply leaves the measured speaking time with the Transcript.
+    """A discarded reply is not counted as Persona speaking time (ADR 0035).
 
-    The Persona's window is modelled from audio *dispatched* -- the server
-    never learns when the client finished playing -- so after a barge-in it
-    runs past anything anybody heard, by the whole reply where none of it
-    played. `persona_speech_ms` is the denominator of F-53's Redeanteil, and
-    the same reply was being counted once as speaking time while the Turn
-    count, the timeline and the Transcript all left it out (ADR 0035).
-
-    Stated over the folded Turn rather than through a call, because the two
-    halves of this hold independently: the window is cut back where a played
-    position is known, and a Turn with no Persona line is not counted whether
-    or not it was.
-    """
+    The Persona's window is modelled from dispatched audio, so after a barge-in it
+    overruns what was heard. `persona_speech_ms` divides F-53's Redeanteil, so an
+    unheard reply would count there while the Transcript leaves it out."""
     dropped = Turn(seq=1, user_text="Erste Haelfte der Frage.", persona_text="",
                    persona_offset_ms=1000, persona_end_ms=101000)
 
@@ -574,12 +547,9 @@ async def test_the_trim_leaves_the_dispatched_end_alone(
 ):
     """Two ends, and the trim touches one of them.
 
-    `persona_end_ms` is heard speech, which F-53's Redeanteil divides by.
-    `persona_dispatched_end_ms` is what was sent, which F-51 measures "the
-    Persona still had this much to say" against. Trimming both -- which is what
-    a single field amounts to -- turned that measurement into the delay between
-    the user starting to speak and the client's cut arriving.
-    """
+    `persona_end_ms` is heard speech (F-53's Redeanteil); `persona_dispatched_end_ms`
+    is what was sent (F-51's "still had this much to say"). Trimming both would turn
+    F-51's figure into the client's barge-in delay."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 100000)
     fake_pipeline.stt.transcripts = ["Erste Haelfte der Frage."]
     fake_pipeline.llm.replies = ["Es geht um die Exportfunktion, die seit elf Tagen nicht geht."]
@@ -600,11 +570,8 @@ async def test_the_cut_off_words_are_kept_beside_the_transcript(
 ):
     """`turn.persona_unheard` holds what had been synthesized but not played.
 
-    It is deliberately outside the Transcript and outside the model's history --
-    ADR 0035 keeps both to the heard words -- and exists so the wrap-up's
-    drill-down can show what the Persona had been about to say, struck through.
-    Nothing exercised it: the field is written here and read two modules away,
-    and no test set or asserted it in between.
+    Kept outside the Transcript and the model's history (ADR 0035), for the wrap-up's
+    drill-down to show struck through. Written here and read two modules away.
     """
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 100000)
     reply = "Es geht um die Exportfunktion, die seit elf Tagen nicht mehr laeuft."

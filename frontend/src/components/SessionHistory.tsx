@@ -10,21 +10,9 @@ import { formatClock, formatDateTime } from "../utils/time";
 import { useSessionDeletion } from "./DeleteSessionPrompt";
 
 /**
- * The user's past trainings (F-48), each one a row that opens the wrap-up that
- * was generated for it back then (F-13's data, without F-13's judgement — see
- * ADR 0065: this lists what happened, it does not rate it).
- *
- * One line per training on purpose. A history is read by scanning it for the
- * one call you are thinking of, so what earns its place in a row is what tells
- * two calls apart: when it was, which scenario, and with whom.
- *
- * Only the newest few are shown, the rest one press at a time
- * (`useSessionHistory`), so the sections below stay on the same screen.
- *
- * Deleting is offered on the row itself rather than only inside the training:
- * clearing out a handful of old calls should not mean opening and leaving each
- * one. The confirmation is what carries the weight (ADR 0066) — the deletion is
- * final and reaches the wrap-up and the figures with it.
+ * The user's past trainings (F-48), one row each, listing without rating (ADR 0065). A row shows what tells
+ * calls apart: when, which scenario, with whom. The newest few are shown, more on demand (`useSessionHistory`).
+ * Deletion is offered per row; the confirmation carries the weight, since it is final (ADR 0066).
  */
 export default function SessionHistory() {
   const { sessions, total, state, hasMore, loadingMore, showMore, removeSession } =
@@ -133,12 +121,8 @@ function SessionRow({
 
       {/* Outside the Link, not inside it: a button nested in an anchor is
           invalid markup and clicking it would navigate as well as delete. */}
-      {/* The bin slides out to the right and a check and a cross take its
-          place: the question is asked where the button was, without a panel
-          opening under the row and pushing the rest of the list down. All
-          three stay mounted and are hidden by `visibility`, which is what lets
-          the bin animate out rather than vanish, and what keeps whichever is
-          hidden out of the tab order. */}
+      {/* The bin slides out and a check and a cross take its place. All three stay mounted, hidden by
+          `visibility`, so the bin can animate and hidden controls leave the tab order. */}
       <div
         className={cx("session-row-actions", confirming && "is-confirming")}
         role="group"
@@ -240,13 +224,8 @@ function CrossIcon() {
 }
 
 /**
- * What the row promises when it is clicked.
- *
- * Three states, not two: a Session that ended a moment ago genuinely has a
- * wrap-up on its way (ADR 0019), and labelling that as having none would be
- * wrong for as long as it takes the worker to run. A job that failed, by
- * contrast, will not produce anything later — saying so is the whole point,
- * because the screen used to imply the opposite.
+ * What the row promises. Three states: a just-ended Session really has a wrap-up on its way (ADR 0019), while
+ * a failed job will never produce one.
  */
 function feedbackChip(session: SessionSummary): { label: string; tone: string } {
   if (session.has_feedback) {

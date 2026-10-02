@@ -11,13 +11,13 @@ Calltrainer is a use case built within [EFRE-DiReKT](https://efre-direkt.de/), a
 
 ## Architecture
 
-FastAPI backend, React + TypeScript frontend, one Docker image. Speech-to-text and dialogue generation run through the EFRE-DiReKT gateway, an OpenAI-compatible model gateway. Text-to-speech runs on KugelAudio by default and falls back to the gateway's own TTS model if KugelAudio fails or `SKIP_KUGELAUDIO` is set. Dialogue generation can optionally be moved to Gemini (`GEMINI=yes`, see ADR 0074). No local models are needed.
+FastAPI backend, React + TypeScript frontend, one Docker image. Speech-to-text and dialogue generation run through the EFRE-DiReKT gateway — an OpenAI-compatible endpoint, named with one model per step in `.env`. Text-to-speech runs on KugelAudio. One backend per leg, no fallbacks and no switches between them (ADR 0103). No local models are needed.
 
 > **Note:** The EFRE-DiReKT gateway is only reachable from its own network - connect via VPN before running the app.
 
 ## 1. Setup
 
-Copy `.env.example` to `.env` and fill in the real `DIREKT_API_KEY`, plus `KUGELAUDIO_API_KEY` for the default speech output (or set `SKIP_KUGELAUDIO` to use the gateway's TTS instead).
+Copy `.env.example` to `.env` and fill in the real `DIREKT_API_KEY` and `KUGELAUDIO_API_KEY`.
 
 ## 2. Run the App
 
@@ -25,13 +25,13 @@ Copy `.env.example` to `.env` and fill in the real `DIREKT_API_KEY`, plus `KUGEL
 docker compose up --build
 ```
 
-Builds the frontend too (multi-stage Dockerfile) and serves everything on `http://localhost:8391`.
+Builds three images — `frontend` (the SPA, served by nginx, which forwards `/api`, `/ws` and `/health`), `backend` and `worker` — and serves everything on `http://localhost:8391`.
 
-For development, add `--watch` (`docker compose up --build --watch`) to have the container pick up code changes automatically: backend edits are synced in and the app restarts without a full rebuild, while frontend edits and `requirements.txt` changes trigger a rebuild.
+For development, add `--watch` (`docker compose up --build --watch`) to have the containers pick up code changes automatically: backend edits are synced into the backend and worker, which restart without a full rebuild, while frontend edits and `requirements.txt` changes trigger a rebuild.
 
 ## 3. Login (Keycloak)
 
-`docker compose up` brings its own Keycloak on `http://localhost:18081` and imports `keycloak/direkt-realm.json` — the `calltrainer-frontend` client and three fixed users:
+`docker compose up` brings its own Keycloak on `http://localhost:18081` and imports `keycloak/direkt-realm.json` — the `direkt-calltrainer` client and three fixed users:
 
 | user | password | company (`tenant`) |
 |---|---|---|
@@ -54,6 +54,6 @@ The Keycloak admin console is at <http://localhost:18081> with `admin` / `admin`
 The full architecture documentation - arc42 and every Architecture Decision Record (ADR) - is served via [MkDocs](https://www.mkdocs.org):
 
 ```powershell
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 mkdocs serve
 ```

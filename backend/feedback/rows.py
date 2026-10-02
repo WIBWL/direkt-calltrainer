@@ -1,20 +1,7 @@
-"""Turning measured figures into the rows that store them.
-
-`metrics.py` measures and knows nothing of the database; this is the other half
-of that split -- the one place a `Measurement` value becomes a `measurement`
-row. Four writers needed it and each wrote it out: the live path
-(`session/persistence.py`), the wrap-up's segment pass
-(`feedback/generator.py`) and the backfill scripts, every one of them with its
-own copy of the metric-id lookup, the same `Decimal(f"{value:.4f}")` and the
-same silent drop of a key the inventory does not know.
-
-Silent is what it no longer is. A metric whose key is not seeded cannot be
-stored -- the row it would point at does not exist -- but a figure vanishing
-from every Session with a passing test suite is the kind of failure this
-application is least able to see, so it is logged with the key that caused it.
-Dropping rather than raising stays: the alternative is losing the whole
-Session's statistics, and provision.py seeds the inventory from the same
-`METRICS` tuple, so this can only happen against a database behind the code.
+"""Turning measured figures into `measurement` rows: the one place for the live
+path, the segment pass and the backfill scripts. An unseeded key is dropped
+(not raised, which would lose the whole Session's figures) but logged, since a
+silently vanishing figure is the failure this application is worst at seeing.
 """
 
 from __future__ import annotations
@@ -48,15 +35,9 @@ def measurements(
     session_id: int | None = None,
     backfilled: bool = False,
 ) -> list[db_models.Measurement]:
-    """Unattached rows for `values`, in order, skipping keys the seed lacks.
-
-    Unattached on purpose: the live path assigns them to `session.measurements`
-    and the segment pass adds them by `session_id`, and a helper that picked one
-    of those would be a writer with a flag rather than a shared shape.
-
-    `backfilled` marks a row as reconstructed rather than measured when the call
-    ended. The figure is identical either way, but a row that says where it came
-    from is worth the one key.
+    """Unattached rows for `values`, in order, skipping keys the seed lacks; each
+    caller attaches them its own way. `backfilled` marks a row as reconstructed
+    rather than measured when the call ended.
     """
     rows = []
     for value in values:

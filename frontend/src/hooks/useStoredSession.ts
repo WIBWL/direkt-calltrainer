@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { SessionDetail } from "../protocol";
-import { getSession } from "../sessions";
+import { readStoredSession } from "../sessions";
 
 /** "missing" is what `sessions.getSession` reports as null — no such Session,
  *  or not the caller's (ADR 0031/0050), which are deliberately the same
@@ -9,21 +9,10 @@ import { getSession } from "../sessions";
 export type StoredSessionState = "loading" | "ready" | "missing" | "failed";
 
 /**
- * One stored Session, read once.
- *
- * The counterpart to `useSessionFeedback`, and the difference is the point:
- * that hook polls because it runs the moment a call ends, when a wrap-up
- * genuinely is being generated (ADR 0019). Opened from the history days later
- * nothing is in flight, and polling would only spend a minute implying
- * otherwise.
- *
- * A Session without a wrap-up is therefore `ready` here, not an error: the
- * Transcript and figures are still there, and the caller says plainly that the
- * narrative is not.
- *
- * `reload` is the one thing that reads it twice: once a follow-up has been
- * created from this Session (F-60), so the detail route's `follow_up` carries
- * the new row.
+ * One stored Session, read once. Unlike `useSessionFeedback` it never polls
+ * (ADR 0019): nothing is in flight days later, so a missing wrap-up is `ready`,
+ * not an error. `reload` re-reads past the cache in `sessions.ts`, after a
+ * follow-up was created (F-60).
  */
 export function useStoredSession(sessionId: string | null) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
@@ -45,7 +34,7 @@ export function useStoredSession(sessionId: string | null) {
 
     void (async () => {
       try {
-        const data = await getSession(sessionId);
+        const data = await readStoredSession(sessionId, nonce > 0);
         if (cancelled) return;
         if (data === null) return setState("missing");
         setDetail(data);

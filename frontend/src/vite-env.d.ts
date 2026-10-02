@@ -1,10 +1,7 @@
 /// <reference types="vite/client" />
 
-interface ImportMetaEnv {
-  readonly VITE_OIDC_ISSUER: string;
-  readonly VITE_OIDC_CLIENT_ID?: string;
-}
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
+interface Window {
+  // Set by /config.js from the container's environment (spa.conf.template); the
+  // backend reads the same name.
+  readonly OIDC_ISSUER?: string;
 }

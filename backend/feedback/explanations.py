@@ -1,28 +1,7 @@
-"""The text behind each metric's "i", in the user's own language.
-
-ADR 0098: every active metric carries one, and that is what makes its tile on
-the wrap-up screen open at all.
-
-One constant per metric, read by `readings.py` at request time and served on
-the Session detail route. Not stored with the Measurement and not copied into
-the frontend: the wording is edited together with the derivation it describes,
-and a copy in the client would be the first thing to go stale (the arrangement
-ADR 0063 chose for the field limits).
-
-**Why here and not beside each deriver.** `metrics.py` holds the inventory and
-the arithmetic and is already near pylint's module ceiling; thirteen paragraphs
-of German prose would push it past. Two texts stay where they are all the same,
-and the line is not arbitrary: `intonation.EXPLANATION` and
-`interruptions.EXPLANATION` explain a *scale*, and ADR 0078's fifth condition
-puts the wording beside the threshold it describes. What is collected here
-explains a figure that no boundary is claimed for.
-
-**What one of these says**, in this order: what is counted, how it was arrived
-at, what it is worth, and where it stops being trustworthy. The last part is
-not decoration. None of these figures has a validated target for this
-population (ADR 0004/0051), so a reader told only what a number means will
-supply a direction for it themselves. Plain German, no dashes: it is read by
-somebody who has just come out of a call.
+"""The text behind each metric's "i", one per active metric (ADR 0098), served by
+`readings.py` and never copied into the frontend. Texts explaining a *scale* stay
+beside their thresholds (ADR 0078). Each says what is counted, how, what it is
+worth and where it stops being trustworthy: no figure has a target (ADR 0004/0051).
 """
 
 TALK_SHARE = (

@@ -1,5 +1,4 @@
 import { currentAccessToken, userManager } from "./auth";
-import type { PersonaDetail } from "./protocol";
 
 /** A non-2xx reply from the backend. */
 export class ApiError extends Error {
@@ -36,17 +35,9 @@ async function reauthenticate(): Promise<void> {
 }
 
 /**
- * Authenticated request, answered with the raw response. `path` is a same-origin
- * absolute path ("/api/…"): the backend serves this SPA, so there is no separate
- * API host (see CLAUDE.md). The bearer token is read from the live OIDC session
- * at call time (see auth.ts), so a rotated token is picked up automatically and
- * callers never pass one. A server 401 (we had a token, it was rejected)
+ * The one place a request is authorised; raw response (`apiFetch` for JSON).
+ * The token is read from the live OIDC session at call time (auth.ts). A 401
  * triggers a re-login redirect; any other non-2xx throws an `ApiError`.
- * Mirrors direkt-dataplatform's api.ts.
- *
- * The one place a request is authorised, so a JSON call, an upload and a
- * download cannot handle an expired session three different ways. Use
- * `apiFetch` for JSON; this is for the answers that are not.
  */
 export async function authorizedFetch(path: string, init?: RequestInit): Promise<Response> {
   const token = await currentAccessToken();
@@ -81,7 +72,3 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return (response.status === 204 ? null : await response.json()) as T;
 }
 
-/** The read-only detail behind a Persona card (ADR 0058: Personas are
- * curated, so there is nothing to write back). */
-export const getPersona = (id: string) =>
-  apiFetch<PersonaDetail>(`/api/personas/${id}`);

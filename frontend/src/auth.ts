@@ -4,12 +4,9 @@ import { oidcAuthority, oidcClientId, oidcRedirectUri } from "./oidcConfig";
 import { ROUTES } from "./routes";
 
 /**
- * The app's single UserManager and the source of truth for the access token.
- *
- * Constructed here (not by react-oidc-context from settings) so api.ts and
- * useSessionSocket.ts can read the live token at request time
- * (`userManager.getUser()`) rather than a copy captured during render — silent
- * renew is then picked up automatically.
+ * The app's single UserManager, the source of truth for the access token.
+ * Built here (not by react-oidc-context) so api.ts and useSessionSocket.ts read
+ * the live token at request time rather than a render-time copy, which picks up silent renew.
  */
 export const userManager = new UserManager({
   authority: oidcAuthority,

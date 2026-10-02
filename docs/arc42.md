@@ -144,7 +144,7 @@ Dieses Kapitel fasst die tragenden Entscheidungen zusammen. Es begründet sie ni
 Der Engpass ist die Kette aus Spracherkennung, Antwortgenerierung und Sprachsynthese. Sie wird nicht als Blockkette abgearbeitet, sondern an jeder Stelle überlappt:
 
 - Die Antwort wird gestreamt erzeugt und abschnittsweise synthetisiert; jeder Teilabschnitt geht an den Client, sobald er entsteht. Die Wiedergabe beginnt, bevor die Antwort fertig generiert ist (ADR 0033, ADR 0044).
-- Der Eröffnungssatz wird vorgewärmt, sobald sich der Nutzer auf ein Gespräch festlegt, und bis zur Annahme des Anrufs zurückgehalten — die Wartezeit liegt in Mikrofontest und Klingeln, in denen ohnehin gewartet wird (ADR 0042).
+- Im gewöhnlichen Gespräch meldet sich der Nutzer zuerst, und der erste Satz der Persona ist die Antwort darauf (ADR 0110). Nur im Rollentausch, wo die Persona abnimmt, wird ihr Eröffnungssatz vorgewärmt, sobald sich der Nutzer festlegt, und bis zur Annahme zurückgehalten (ADR 0042).
 - Die akustische Messung eines Redebeitrags läuft auf einem eigenen Thread parallel zur Spracherkennung und kostet keine Wartezeit (ADR 0048).
 - Das Dialogmodell liest statt des ganzen Verlaufs die letzten Wechsel und kurze Gesprächsnotizen, die im Hintergrund nach jedem Wechsel fortgeschrieben werden (ADR 0071).
 - Der Nutzer kann die Persona unterbrechen, statt ihre Antwort abwarten zu müssen (ADR 0035).
@@ -335,9 +335,9 @@ Die Szenarien binden die Schritte an die Bausteine aus Kapitel 5. Frontend-Baust
 ## 6.1 Szenario 1: Start und Ablauf eines Trainingsgesprächs
 
 - Der Nutzer öffnet die Trainingsvorbereitung. `SetupView` stellt die verfügbaren Szenarien und Personas dar (`GET /api/scenarios`, `GET /api/personas`, gelesen über `library.py`) und übergibt die Auswahl an den in `App.tsx` gehaltenen Trainingszustand. Beim Zufallsszenario wird erst beim Start gezogen (F-62).
-- Erst mit dem bewussten Start des Trainings wird über `useTrainingRun` eine Session gebunden. `useSessionSocket` öffnet die WebSocket-Verbindung und sendet `session.start` mit Token, Persona und Szenario. `session_ws.py` prüft das Token, lädt beide über `library.py`, eingeschränkt auf Nutzer und Unternehmen, und lässt den Orchestrator den Eröffnungssatz der Persona schon jetzt erzeugen und synthetisieren (ADR 0042).
+- Erst mit dem bewussten Start des Trainings wird über `useTrainingRun` eine Session gebunden. `useSessionSocket` öffnet die WebSocket-Verbindung und sendet `session.start` mit Token, Persona und Szenario. `session_ws.py` prüft das Token, lädt beide über `library.py`, eingeschränkt auf Nutzer und Unternehmen, und lässt im Rollentausch den Eröffnungssatz der Persona schon jetzt erzeugen und synthetisieren (ADR 0042); im gewöhnlichen Gespräch ist nichts vorzubereiten (ADR 0110).
 - Währenddessen prüft `MicCheck` Mikrofonzugriff und Eingabegerät. Danach zeigt der Client, wo vorhanden, die Ausgangslage des Falls und dann das klingelnde Telefon (`IncomingCall`, F-63); im Rollentausch stattdessen das Briefing des Nutzers (ADR 0070). Den Wechsel zwischen diesen Schritten bestimmt `trainingFlow.ts` (ADR 0096).
-- Mit der Annahme des Anrufs sendet der Client `session.activate`. Ab hier läuft die Zeitachse der Session, und der zurückgehaltene Eröffnungssatz wird abgespielt.
+- Mit der Annahme des Anrufs sendet der Client `session.activate`. Ab hier läuft die Zeitachse der Session. Der Nutzer meldet sich, die Persona antwortet; schweigt er, fragt sie nach vier Sekunden „Hallo?“ (`pickup.py`, ADR 0110). Im Rollentausch wird stattdessen der zurückgehaltene Eröffnungssatz abgespielt.
 - Im Gespräch stellt `CallView` den Zustand dar; `useLiveCall` verbindet Socket, Wiedergabe und Unterbrechen. Silero-VAD im Browser erkennt das Ende eines Redebeitrags und schickt die Aufnahme als einen Turn (ADR 0036).
 - Je Turn ruft der Orchestrator die Spracherkennung (`stt.py`, Gateway) auf, streamt die Antwort des Dialogmodells (`shared/clients/llm.py`), prüft sie mit `reply_checks.py`, teilt sie in `chunking.py` in Sätze und lässt jeden Satz von `tts.py` bei KugelAudio synthetisieren. Die Audio-Teilstücke gehen sofort als `turn.audio.chunk` an den Client (ADR 0033, ADR 0044).
 - Spricht der Nutzer in eine Antwort hinein, verstummt die Wiedergabe im Client sofort, und der Client meldet, wie viel er gehört hat. `heard.py` kürzt die Antwort im Verlauf auf das Gehörte; die nächste Antwort bekommt einen einmaligen Hinweis aus `nudges.py` (ADR 0035).
@@ -579,7 +579,7 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0039 | Centralized Logging — Colored Console, Per-Session-Truncated File, Not Committed | angenommen (Datei-Truncation überarbeitet durch ADR 0055, Logdatei entfallen durch ADR 0105) | |
 | ADR 0040 | TTS Defaults to KugelAudio with a DiReKT Fallback; Gemini Removed | angenommen, Rückfallebene später entfernt (ADR 0103); grenzt die TTS-Hälfte von ADR 0021 ein | Q-03, Q-07, C-04, F-01 |
 | ADR 0041 | Personas and Scenarios Loaded from the Database | angenommen | F-03, F-04 |
-| ADR 0042 | Opening Turn Pre-Warmed at Session Commitment, Not on Selection | angenommen | Q-03, F-01 |
+| ADR 0042 | Opening Turn Pre-Warmed at Session Commitment, Not on Selection | angenommen, seit ADR 0110 nur für den Rollentausch | Q-03, F-01 |
 | ADR 0043 | English Prompt Content, Session Language Bound to the Persona | angenommen (löst ADR 0022 ab) | C-01, R-35, F-03, F-04 |
 | ADR 0044 | Forward KugelAudio's Audio Sub-Chunks; No Persistent Streaming Session | angenommen (verfeinert die TTS-Strecke aus ADR 0033) | Q-03, F-01, F-46 |
 | ADR 0045 | Case Facts, Call Goal and Success Condition on the Scenario; Objections on the Persona | angenommen (erweitert ADR 0001) | F-01, F-03, F-04, R-12 |
@@ -646,6 +646,7 @@ Die Architekturentscheidungen werden als eigenständige Dokumente (ADRs) im Ordn
 | ADR 0106 | Every Setting Required, Any From a File | angenommen | |
 | ADR 0107 | The API on Its Own Host, Behind CORS | angenommen (löst den Teil „ein Origin“ von ADR 0104 ab) | |
 | ADR 0108 | Three Packages, One Dockerfile, Deployed From the Infrastructure Repository | angenommen (ändert ADR 0104; überholt den Deployment-Teil von ADR 0020) | |
+| ADR 0110 | The User Picks Up First; Only a Reverse Is Answered by the Persona | angenommen (grenzt ADR 0042 auf den Rollentausch ein) | F-01, F-63 |
 
 Leere Zellen in *Betrifft* sind bewusst gesetzt: ADR 0000 ist eine Dokumentationskonvention ohne Anforderungsbezug; ADR 0017, 0025, 0027 bis 0030, 0039, 0055, 0057, 0061, 0092, 0094 sowie 0104 bis 0108 sind reine Wartbarkeits-, Werkzeug- oder Schemaentscheidungen ohne Entsprechung in Anforderungsliste oder Feature-Katalog.
 

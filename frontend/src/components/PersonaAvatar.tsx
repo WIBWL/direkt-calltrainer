@@ -18,21 +18,9 @@ interface PersonaAvatarProps {
 }
 
 /**
- * A Persona's portrait, with its initials as the fallback.
- *
- * Decorative everywhere it is used (`alt=""`): the card, the info panel and the
- * call screen all name the Persona in text right beside the picture, so a
- * screen reader that read the image too would say the name twice. It carries
- * no information the text does not.
- *
- * A missing file falls back to the initials rather than to a broken image. The
- * pairing lives in the database and the file in the frontend bundle (ADR 0041
- * keeps Persona content in the table), so the two can be out of step for one
- * deploy — and a Persona with no picture is fully playable either way.
- *
- * The picture sits inside the slot rather than being it, so that a slot can
- * scale and shift the image within its own frame. The fallback takes the same
- * slot, which is what keeps the two the same size.
+ * A Persona's portrait, decorative (`alt=""`, the name is always beside it). A missing file falls back to the
+ * initials: the database pairing and the bundled file can be out of step for a deploy (ADR 0041). The image sits
+ * inside the slot so the slot can scale and shift it; the fallback takes the same slot, keeping the size.
  */
 export default function PersonaAvatar({ name, src, className }: PersonaAvatarProps) {
   const [failed, setFailed] = useState(false);

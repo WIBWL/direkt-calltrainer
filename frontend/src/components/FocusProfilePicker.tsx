@@ -2,11 +2,9 @@ import type { FocusRole } from "../protocol";
 import { CATEGORIES, CATEGORY_LABELS, type ScenarioCategory } from "../scenarioLibrary";
 
 /**
- * The role and the kinds of call a User takes (F-62) — what the Scenario
- * suggestions are made from. Shared by the first-run focus screen and the profile.
- *
- * Picking a role fills in the call types it usually means; they stay freely
- * adjustable, since a role is a guess about someone's work and they know better.
+ * The User's role and kinds of call (F-62), from which Scenario suggestions are made.
+ * Shared by the first-run screen and the profile. A role prefills its usual call types,
+ * which stay freely adjustable.
  */
 export default function FocusProfilePicker({
   roles,

@@ -3,21 +3,9 @@ import { describe, expect, it } from "vitest";
 import { segment, session } from "../test/sessions";
 import { pairFor, segmentTrainings } from "./segmentStats";
 
-/**
- * Pairing up the demanding stretches of a call with the rest (ADR 0081).
- *
- * The data behind "Souveränität unter Druck", and the one focus goal answered
- * by a comparison rather than by a series. What the specs guard is mostly what
- * this module must *not* do: it puts two figures side by side and computes no
- * difference, no ratio and no direction, because how large a gap means
- * something is exactly the norm ADR 0051 declines to invent.
- *
- * The one real piece of logic is which metrics reach the goal's page at all.
- * The loudness is sound within a call — same microphone on both sides — and
- * misleading in a column running down a page of trainings, so it is kept on the
- * single call and dropped here. That is one call to `comparableAcrossCalls` and
- * nothing in the type system notices if it goes.
- */
+/** Pairing a call's demanding stretches with the rest (ADR 0081): two figures, no
+ * difference, ratio or direction (ADR 0051). Also pins that loudness is dropped
+ * across trainings — one `comparableAcrossCalls` call no type would miss. */
 
 /** A training with a pressure/rest pair for each metric named. */
 const withPairs = (

@@ -5,15 +5,9 @@ import type { RetentionState } from "../protocol";
 import { formatDate } from "../utils/time";
 
 /**
- * The automatic deletion after six months, and the switch that suspends it
- * (ADR 0067).
- *
- * The period is the default and the switch is the exception, which is why the
- * text leads with the date rather than with the control: the useful thing to
- * know is when your oldest training goes, not that a toggle exists.
- *
- * Switching it off is not confirmed. It destroys nothing, and a confirmation
- * on the harmless direction would make the harmful ones look equally routine.
+ * The six-month automatic deletion and the switch that suspends it (ADR 0067). Leads with the date, not the
+ * control. Switching off is not confirmed: it destroys nothing, and confirming the harmless direction would
+ * make the harmful ones look routine.
  */
 export default function RetentionSettings({
   retention,

@@ -1,17 +1,8 @@
-"""What the TTS backend is handed, as opposed to what the Transcript keeps.
+"""What the TTS backend is handed, as opposed to what the Transcript keeps (ADR 0033/0044).
 
-Covers ADR 0033 / ADR 0044: a full stop after a digit is both a German
-thousands separator and a German ordinal, and it reaches the pipeline looking
-exactly like a sentence end — which splits the reply into two synthesis calls
-with an audible gap and drops the voice into falling intonation mid-sentence.
-`backend/clients/speech_text.py` removes it at the TTS boundary only; the
-Transcript keeps "1.400 Euro" and "6. Juli", which is what a reader wants.
-
-The `der`/`des` cases come from a measurement rather than from reasoning: over
-734 recorded persona replies (`scripts/play_scenarios.py`), the rule cleared 36
-of 39 mid-sentence stops, and all three it left standing were an ordinal in
-subject position after "der".
-"""
+A full stop after a digit (thousands separator, ordinal) looks like a sentence end and splits
+synthesis mid-sentence; `speech_text.py` removes it at the TTS boundary only. The `der`/`des`
+cases are measured: the only stops left over 734 replies were ordinals after "der"."""
 
 import pytest
 

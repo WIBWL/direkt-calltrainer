@@ -1,11 +1,7 @@
-"""The feedback job's state machine (ADR 0019/0032).
-
-`GET /api/sessions/{extern_id}` serves the newest feedback job's status as the
-Session's `status`, and the post-call screen polls on it: a row left at
-"queued" or "running" is a spinner that stops only on the client's own timeout.
-
-The row is created with the Session, in its transaction
-(backend/session/persistence.py); every transition afterwards lives here.
+"""The feedback job's state machine (ADR 0019/0032). The post-call screen polls
+the newest job's status, so a row stuck open is a spinner that never ends. The
+row is created with the Session (session/persistence.py); every later
+transition lives here.
 """
 
 from __future__ import annotations
@@ -24,35 +20,17 @@ logger = logging.getLogger(__name__)
 # user can already read into an error.
 _OPEN = frozenset({db_models.JOB_QUEUED, db_models.JOB_RUNNING})
 
-# How long a queued job may wait before it is considered stale, and how long one
-# may run. Generous: the wrap-up is a single LLM call against a gateway that is
-# occasionally slow, and nobody is blocked while it works.
-#
-# It lives here rather than in `queue.py`, which owns the Redis side: every
-# reader of it is asking the question below, and importing it from there meant
-# pulling Redis into the REST layer -- which is why both readers deferred the
-# import inside a function and then answered the question twice.
+# How long a job may wait or run before it is stale. Generous: one LLM call on
+# an occasionally slow gateway. Here rather than in `queue.py` so asking
+# `is_live` does not pull Redis into the REST layer.
 JOB_TIMEOUT_S = 300
 
 
 def is_live(job: db_models.AnalysisJob, *, include_queued: bool) -> bool:
-    """Whether this job may still be working.
-
-    False for a terminal row, and for one that has not moved in longer than a
-    job may run: the worker holding it is gone -- killed, timed out, or
-    restarted -- and nothing will ever move it off `running`, which is the gap
-    ADR 0032 names.
-
-    `include_queued` is the one thing the two callers differ on, so it is a
-    parameter rather than a second copy of this. A reader deciding what to show
-    (`api/sessions.py`) asks about a *running* row only: a queued one is not
-    abandoned, it is waiting. A writer deciding whether to queue a second job
-    (`scripts/requeue_feedback.py`) must count a queued one as working, or it
-    queues a duplicate and both write the same Session.
-
-    They did answer it separately, and differently: one coerced a naive
-    timestamp and the other would have raised on it, one guarded against a
-    missing timestamp and the other did not. Both defences are here now.
+    """Whether this job may still be working: open and moved within JOB_TIMEOUT_S
+    (a dead worker never moves it off `running`, ADR 0032). A reader asks with
+    `include_queued=False`; a writer deciding whether to queue again must pass
+    True, or it queues a duplicate that races the first.
     """
     if job.status not in _OPEN:
         return False
@@ -72,11 +50,8 @@ def is_live(job: db_models.AnalysisJob, *, include_queued: bool) -> bool:
 
 
 def newest(session: db_models.Session) -> db_models.AnalysisJob | None:
-    """The newest feedback job of a Session already loaded, or None.
-
-    The same question `latest` asks, for a caller that holds the row rather
-    than a primary key -- three places picked the maximum out of
-    `session.jobs` by hand, and a fourth was about to.
+    """The newest feedback job of a Session already loaded, or None -- `latest`
+    for a caller holding the row rather than a primary key.
     """
     found = [job for job in session.jobs if job.kind == db_models.JOB_KIND_FEEDBACK]
     return max(found, key=lambda job: job.job_id) if found else None
@@ -90,31 +65,10 @@ BLOCKED_WORKING = "working"
 
 
 def retry_blocked(session: db_models.Session) -> str | None:
-    """Why this Session's wrap-up may not be queued again, or None if it may.
-
-    One rule for the two callers that ask it: the route a User presses
-    (`api/sessions.py`) and the backlog script (`scripts/requeue_feedback.py`).
-    They had the same rule written twice, and only the script's copy had ever
-    been corrected -- it queued a job that was two minutes into its model call
-    until `is_live` was given `include_queued`.
-
-    The three refusals, in the order they are asked:
-
-    `done` -- a wrap-up exists. `feedback.session_id` is UNIQUE, so a second
-    job would write nothing and be recorded as failed for a Session the User
-    can already read.
-
-    `empty` -- no Turns. There is nothing to summarise, and a model asked to
-    summarise an empty conversation writes a paragraph describing nothing.
-
-    `working` -- a job may still be running. Queued counts as working here
-    (unlike on the read side, which shows a queued row as waiting): two jobs
-    would race for the same Session.
-
-    A job that says `done` while no wrap-up exists is *not* refused. The script
-    used to skip it, on a list of retryable statuses; that state is a bug
-    somewhere else, and refusing to retry it leaves the User in a dead end with
-    a status that says everything is fine.
+    """Why this Session's wrap-up may not be queued again, or None if it may; the
+    one rule for `api/sessions.py` and `scripts/requeue_feedback.py`. Refusals:
+    `done` (a wrap-up exists), `empty` (no Turns), `working` (queued counts). A
+    job saying `done` with no wrap-up is deliberately *not* refused.
     """
     if session.feedback is not None:
         return BLOCKED_DONE
@@ -137,10 +91,8 @@ def latest(db: DbSession, session_id: int) -> db_models.AnalysisJob | None:
 
 
 def mark(db: DbSession, session_id: int, status: str, error_text: str | None = None) -> None:
-    """Move the job to `status`, inside the caller's transaction.
-
-    The worker's own writer: it runs the job, so it overwrites whatever state
-    it finds, and creates the row where a Session has none.
+    """Move the job to `status`, inside the caller's transaction. The worker's
+    writer: it overwrites any state and creates the row if missing.
     """
     job = latest(db, session_id)
     if job is None:
@@ -158,15 +110,9 @@ def mark(db: DbSession, session_id: int, status: str, error_text: str | None = N
 
 
 def mark_failed(session_id: int, error_text: str) -> None:
-    """Fail the job from outside the worker, in a transaction of its own.
-
-    For the caller that has committed the row and then finds the work will
-    never happen -- the enqueue to Redis failing after the Session was written.
-    Not being the process that runs the job, it leaves a terminal state alone.
-
-    Never raises. Every caller is already handling a failure of its own and
-    must not be handed a second one; the status row is worth less than the
-    transcript on its way to the user either way.
+    """Fail the job from outside the worker (e.g. the enqueue failed), in its own
+    transaction, leaving a terminal state alone. Never raises: every caller is
+    already handling a failure of its own.
     """
     try:
         with session_scope() as db:

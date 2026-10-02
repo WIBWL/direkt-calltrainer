@@ -1,19 +1,9 @@
 import { useEffect, type ReactNode } from "react";
 
 /**
- * The app's modal shell: a backdrop, a panel, and the two ways out of it —
- * Escape and a press on the backdrop.
- *
- * Shared by the Scenario editor and the two read-only info panels, so the
- * panels on the setup screen read as one thing and close the same way.
- *
- * `onDismiss` answers both. An owner with a question open over its panel
- * (`overlay`, a `ConfirmDialog`) closes that question first rather than the
- * panel: the question handles no Escape of its own, because two `window`
- * listeners fire in registration order and the panel's would win (see
- * `ConfirmDialog`). A press on the backdrop cannot reach the owner while the
- * question is open anyway — the question covers the backdrop and keeps its own
- * presses to itself.
+ * The app's modal shell: backdrop, panel, dismissed by Escape or a backdrop press. With a `ConfirmDialog` open
+ * (`overlay`), `onDismiss` must close the question first: it handles no Escape itself, since two `window`
+ * listeners fire in registration order and the panel's would win (see `ConfirmDialog`).
  */
 export default function Modal({
   labelledBy,

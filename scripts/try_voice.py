@@ -1,12 +1,6 @@
-"""
-Auditions KugelAudio voices without going through a Session.
-
-Synthesizes one line per voice id, writes it to a .wav you can play, and feeds
-it back through STT. The round-trip is the point: a voice can return audio of
-the right length and still be unintelligible (voice 285 turned an ordinary
-opening line into "nowadays are torn in a vacuum or parker"), which nothing
-but listening -- or this -- catches. A transcript that comes back close to the
-input means the voice is usable.
+"""Auditions KugelAudio voices without a Session: one line per voice id to a .wav,
+fed back through STT -- a voice can return audio of the right length and still be
+unintelligible, which only this round-trip (or listening) catches.
 
 Run from the project root, with an active .venv:
     python scripts/try_voice.py 1071 1018 1656

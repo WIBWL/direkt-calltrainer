@@ -1,29 +1,8 @@
-"""Degenerate-repetition guard, re-introduction regeneration, and the
-guaranteed closing line.
+"""Degenerate-repetition guard, re-introduction regeneration, and the guaranteed closing line (ADR 0038).
 
-Covers ADR 0038:
-  * a reply that repeats any earlier persona message (not just the
-    immediately preceding one -- the model oscillates A-B-A-B), or repeats a
-    sentence within itself, is treated as "the model has nothing left to
-    say" and ends the call
-  * on a backstopped ending (repetition, or an unprompted [CALL_END] that
-    was never nudged) a fixed sign-off is synthesised and appended -- taken
-    from the Persona's language pack since ADR 0043, because it is spoken
-    aloud and so cannot follow the prompt frame into English
-
-  * a reply *most* of which was already in its predecessor -- a fresh opening
-    sentence in front of the same block, which the verbatim check never sees
-    -- ends the call the same way. This is the gap ADR 0038's own Consequences
-    name: a differently-worded repetition of the same content escapes a
-    whole-reply check. It is a share of the reply and not a count of
-    sentences, so a caller quoting one figure again while moving the call on
-    is left alone.
-
-  * a reply that *opens* by greeting or re-introducing after the call is
-    under way is caught on its first chunk, before any audio, and the model
-    is re-asked once with an explicit nudge -- the call carries on rather
-    than ending, because the reply was never spoken.
-"""
+Pins: repeating any earlier persona message (A-B-A-B) or itself ends the call; a reply mostly
+restating its predecessor behind a fresh opening ends it too (share, not count); a backstopped
+ending appends the language pack's sign-off (ADR 0043); a re-greeting opening is re-asked once."""
 
 import pytest
 
@@ -273,10 +252,11 @@ async def test_the_regeneration_nudge_quotes_the_rejected_opening(persona, scena
     await collect(orch.run_opening_turn())
     await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
 
-    # The re-ask travels inside the last user message (ADR 0103).
     retry_messages = fake_pipeline.llm.calls[-1]
-    assert retry_messages[-1]["role"] == "user"
-    assert "Guten Tag, Thomas Brandt hier." in retry_messages[-1]["content"]
+    assert any(
+        m["role"] == "system" and "Guten Tag, Thomas Brandt hier." in m["content"]
+        for m in retry_messages
+    )
 
 
 async def test_a_normal_turn_carries_a_nudge_quoting_the_previous_reply(persona, scenario, fake_pipeline):
@@ -293,7 +273,10 @@ async def test_a_normal_turn_carries_a_nudge_quoting_the_previous_reply(persona,
     await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
 
     sent = fake_pipeline.llm.calls[-1]
-    assert sent[-1]["role"] == "user" and "konkrete Zusage zum Preis" in sent[-1]["content"]
+    assert any(
+        m["role"] == "system" and "konkrete Zusage zum Preis" in m["content"]
+        for m in sent
+    )
 
 
 @pytest.mark.parametrize(
@@ -347,9 +330,9 @@ async def test_a_requested_repeat_swaps_the_anti_repeat_nudge_for_a_clarify_nudg
     await collect(orch.run_opening_turn())
     await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
 
-    last = fake_pipeline.llm.calls[-1][-1]["content"]
-    assert "previous reply in this call" not in last
-    assert "did not catch your previous reply" in last
+    systems = [m["content"] for m in fake_pipeline.llm.calls[-1] if m["role"] == "system"]
+    assert not any("previous reply in this call" in s for s in systems)
+    assert any("did not catch your previous reply" in s for s in systems)
 
 
 async def test_asking_again_after_a_rephrase_gets_a_firmer_nudge(persona, scenario, fake_pipeline):
@@ -370,7 +353,8 @@ async def test_asking_again_after_a_rephrase_gets_a_firmer_nudge(persona, scenar
     await collect(orch.run_turn(b"a", "turn.webm", "audio/webm"))
     await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))
 
-    assert "Ask which part is unclear" in fake_pipeline.llm.calls[-1][-1]["content"]
+    systems = [m["content"] for m in fake_pipeline.llm.calls[-1] if m["role"] == "system"]
+    assert any("Ask which part is unclear" in s for s in systems)
 
 
 async def test_re_dumping_an_older_reply_ends_the_call_even_when_a_repeat_was_asked(
@@ -518,7 +502,7 @@ async def test_a_reply_that_is_nothing_but_the_users_line_is_re_asked_once(perso
     assert completed(events).ends_call is False
     assert len(fake_pipeline.llm.calls) == 2
     retry = fake_pipeline.llm.calls[-1][-1]
-    assert retry["role"] == "user"
+    assert retry["role"] == "system"
     assert "repeated the user's own words" in retry["content"] and line in retry["content"]
     assert orch.turns[-1].persona_text.startswith("Gut, dann nehme ich die 36 Stunden")
 
@@ -582,7 +566,7 @@ async def test_a_reply_opening_with_a_sentence_already_said_is_regenerated_not_s
 
     assert completed(events).ends_call is False
     retry = fake_pipeline.llm.calls[-1]
-    assert retry[-1]["role"] == "user" and "already said exactly that" in retry[-1]["content"]
+    assert retry[-1]["role"] == "system" and "already said exactly that" in retry[-1]["content"]
     assert _LINE_A in retry[-1]["content"], "the repeated opening is quoted"
     spoken = orch.turns[-1].persona_text
     assert spoken.startswith("Eine Erstattung ja, das waere ein Anfang"), spoken
@@ -610,16 +594,10 @@ async def test_a_regeneration_that_loops_again_still_ends_the_call(
 async def test_the_opening_checks_survive_a_first_chunk_the_filters_emptied(
     persona, scenario, fake_pipeline
 ):
-    """The opening checks stay armed until a chunk with *words in it* has been
-    seen, and a chunk the repeat filter emptied is not one (ADR 0035/0038).
+    """Opening checks stay armed until a chunk with words in it is seen (ADR 0035/0038).
 
-    The disarming flag used to be read from `_guard_opening`'s own return value,
-    before `_clean_chunk` ran -- so a first chunk that survived the guard and
-    was then emptied by `drop_said_sentences` counted as the chunk that had
-    been seen. The second chunk, the first one actually spoken, walked past
-    every opening check: the re-greeting, the echo of the user's line and the
-    repeated opening all went out audibly, which is the defect ADR 0038's
-    third front exists to prevent.
+    A first chunk emptied by `drop_said_sentences` must not disarm them, or the first
+    chunk actually spoken skips the re-greeting, echo and repeated-opening checks.
     """
     # `said` is deliberately *not* the opening's first sentence: the guard
     # compares first sentences, so a chunk repeating one of those is caught by

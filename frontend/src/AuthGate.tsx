@@ -8,10 +8,9 @@ import { userManager } from "./auth";
 import LoginView from "./components/LoginView";
 
 /**
- * Renders `children` only for an authenticated user. While the session is being
- * restored or a redirect is in flight it shows a splash; otherwise the login
- * screen. Branching on `isLoading` first avoids flashing the login prompt on
- * every page load while the session is silently restored from storage.
+ * Renders `children` only for an authenticated user; a splash while the session
+ * is restored or a redirect is in flight, else the login screen. `isLoading` is
+ * checked first so the login prompt does not flash on every page load.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const auth = useAuth();
@@ -22,13 +21,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   const showsLogin = !auth.isLoading && !auth.activeNavigator && !auth.isAuthenticated;
 
-  // Fetch the discovery document while the login screen is being read, not when
-  // the button is pressed. `signinRedirect` needs it and would otherwise fetch
-  // it there, putting a round trip to Keycloak (~200 ms) between the click and
-  // the navigation, which reads as a stalled button. MetadataService keeps it in
-  // memory, so the press finds it already loaded. Deliberately ignoring a
-  // failure: this is a warm-up, and `signinRedirect` fetches it again and
-  // surfaces the error on the path that actually depends on it.
+  // Warm up the discovery document while the login screen is read, so the
+  // button press does not wait ~200 ms on Keycloak. A failure is ignored:
+  // `signinRedirect` fetches it again and surfaces the error there.
   useEffect(() => {
     if (showsLogin) void userManager.metadataService.getMetadata().catch(() => undefined);
   }, [showsLogin]);

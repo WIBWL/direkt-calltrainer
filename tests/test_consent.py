@@ -1,14 +1,8 @@
 """Storage consent and what follows from withdrawing it (F-49, ADR 0066).
 
-The decisive test in this file is `test_a_session_is_not_stored_without_consent`
-— everything else describes bookkeeping, that one is the only thing standing
-between a subject who said no and a stored record of their call.
-
-Two properties get their own tests because neither is visible in a happy path:
-the check is made when the Session is written rather than when it starts, so a
-withdrawal *during* a call still takes effect; and it fails closed, so a
-database that cannot answer the question does not get the benefit of the doubt.
-"""
+The decisive test is `test_a_session_is_not_stored_without_consent`. Two more
+properties: consent is checked at write time (a withdrawal mid-call counts), and
+the check fails closed."""
 
 # pylint: disable=duplicate-code
 # Fixture data is repeated per test module on purpose: a test carrying its own
@@ -149,19 +143,12 @@ async def test_a_session_is_stored_once_consent_is_given(
 async def test_a_session_is_not_stored_without_consent(
     app_database: str, db_session: DbSession  # pylint: disable=unused-argument
 ) -> None:
-    """The one that matters. Persisting is guarded at the point of writing, so
-    a subject who never agreed leaves no stored record of their call.
+    """The one that matters: a subject who never agreed leaves no stored record.
 
-    Driven through `_record`, the WebSocket layer's own write path. The guard
-    itself has since moved *into* `persist_session`, so that it commits with
-    the write it authorises (see the test below); this one stays because the
-    path the live call actually takes has to be the one under test.
-
-    `app_database` is requested for its effect and not its value, and it is
-    load-bearing: without it `session_scope()` cannot reach a database at all,
-    the write fails on its own, and this test goes green whether the guard
-    exists or not. It did exactly that until a mutation run caught it.
-    """
+    Driven through `_record`, the path the live call takes (the guard itself sits in
+    `persist_session`, see below). `app_database` is load-bearing: without it the
+    write fails on its own and this test passes whether the guard exists or not.
+    A mutation run caught exactly that."""
     # Imported here so a collection-time import does not pull in the live path.
     from backend.api import session_ws  # pylint: disable=import-outside-toplevel
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
@@ -179,13 +166,9 @@ def test_the_writer_itself_refuses_without_consent(
 ) -> None:
     """The guard sits inside the write transaction, not in front of it.
 
-    Asked from outside, the answer was already some milliseconds old when the
-    INSERT it authorised committed -- long enough for a withdrawal in another
-    tab to record itself and delete every Session that existed *at that
-    moment*, leaving this one behind with no deletion path ever to reach it
-    (ADR 0066). So `persist_session` asks for itself, under the same advisory
-    lock the withdrawal takes, and answers None rather than writing.
-    """
+    Asked from outside, a withdrawal could commit between the answer and the INSERT
+    and leave this Session unreachable by any deletion path (ADR 0066). So
+    `persist_session` asks under the withdrawal's advisory lock and returns None."""
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
 
     written = persistence.persist_session(persistence.FinishedCall(
@@ -202,9 +185,7 @@ async def test_withdrawing_mid_call_still_prevents_the_write(
 ) -> None:
     """Consent is read when the Session is written, not when it starts.
 
-    A call can run for minutes. If the check happened at the handshake, its
-    answer would be that old by the time the row is written, and someone who
-    withdrew while talking would find the call stored anyway.
+    A call runs for minutes; someone who withdrew while talking must not be stored.
     """
     from backend.api import session_ws  # pylint: disable=import-outside-toplevel
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
@@ -222,12 +203,10 @@ async def test_withdrawing_mid_call_still_prevents_the_write(
 
 
 def test_an_unanswerable_question_fails_closed(monkeypatch) -> None:
-    """A database that cannot be reached must not be read as "go ahead".
+    """An unreachable database must not be read as "go ahead".
 
-    Everywhere else a database failure is logged and stepped over, because
-    losing a wrap-up beats losing a call. Here that same reflex would store
-    data on a guess, which is the single outcome consent exists to prevent —
-    so this is the one place that fails the other way.
+    Elsewhere database failures are stepped over; here that would store data on a
+    guess, the one outcome consent exists to prevent.
     """
     def explode():
         raise RuntimeError("database is gone")
@@ -356,14 +335,10 @@ def _started():
 def test_a_withdrawal_under_an_older_version_still_blocks_the_write(
     app_database: str, db_session: DbSession  # pylint: disable=unused-argument
 ) -> None:
-    """A stale *no* is not asked again (ADR 0066's exception), and it must not
-    become a yes by going stale either.
+    """A stale *no* is not asked again (ADR 0066's exception), nor becomes a yes.
 
-    `decision_required` is False for a withdrawal without looking at the
-    version -- that is the exception, and the ADR only said so after a review
-    found the paragraph claiming the opposite. `allows_storage` does look at
-    the version, and the two answers have to point the same way: nothing
-    stored, and the dialog left closed.
+    `decision_required` ignores the version for a withdrawal; `allows_storage` does
+    not. Both must agree: nothing stored, and the dialog left closed.
     """
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
 

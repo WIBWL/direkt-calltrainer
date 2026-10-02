@@ -1,21 +1,8 @@
-"""The training focus a User picks, and the catalogue behind it (F-62, ADR 0076).
+"""The training focus a User picks, and its catalogue (F-62, ADR 0076).
 
-Three properties carry this file.
-
-The limit is the feature: a focus that covers everything is not a focus, so the
-sixth goal has to be refused by the *backend* and not merely greyed out in the
-interface — a limit only the client enforces is not a limit.
-
-"No focus" and "not asked yet" are different states. The first-run dialog opens
-on exactly one of them, and getting that wrong means either asking a user who
-already answered, every time they load the app, or never asking at all.
-
-And a selection is a setting, not training data: deleting your trainings, by
-whatever route, must leave the goals you picked alone. That one is asserted
-here rather than in the deletion tests because it is a property of this feature
-— nothing in `deletion.py` mentions focus, and this test is what would notice
-if something did.
-"""
+The sixth goal is refused by the backend, not only greyed out in the client.
+"No focus" and "not asked yet" are distinct, or the first-run dialog misfires.
+A focus is a setting, not training data: deleting trainings leaves it alone."""
 
 # pylint: disable=duplicate-code
 # Fixture data is repeated per test module on purpose: a test carrying its own

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { useFocusContext } from "../FocusContext";
 import { useAccount } from "../hooks/useAccount";
 import type { SessionDetail, SessionTurn, TranscriptEntry } from "../protocol";
 import { downloadFeedbackPdf } from "../utils/feedbackPdf";
 import { initialsOf } from "../utils/initials";
 import { prefersReducedMotion } from "../utils/motion";
+import { callMeta } from "../utils/reportOutline";
 import { formatOffset } from "../utils/time";
 import { TranscriptFocusProvider } from "./TranscriptFocus";
 
@@ -24,34 +26,18 @@ interface FeedbackScreenProps {
    * generated, and for a call that was never stored (ADR 0066) — the download
    * is then the protocol alone, and says so. */
   detail?: SessionDetail | null;
-  /** What leads away from this screen, first in the actions row: home after a
-   * call, back to the profile in the history. The one thing the two screens
-   * are allowed to differ in. */
+  /** What leads away from this screen, first in the actions row: preparation
+   * after a call, back to the profile in the history. The one thing the two
+   * screens are allowed to differ in. */
   actions?: ReactNode;
   /** Anything that belongs *under* the transcript — the history's delete. */
   children?: ReactNode;
 }
 
 /**
- * The feedback screen: the wrap-up, the whole of it as a file to take away
- * (F-64), and the Transcript either inside that file or read here.
- *
- * Used by both screens that show a wrap-up — after a call, and a past training
- * opened from the profile — so they cannot drift apart. They did: one report
- * under two titles, with the history's transcript a plain list where the
- * post-call screen had a panel that opens. Only the actions row still differs,
- * which is what `actions` and `children` are for.
- *
- * The download is the *feedback*, not the log: everything the page shows, in
- * its order, transcript last (`utils/feedbackPdf.ts`). For a training run
- * without consent that file is the only copy of any of it (ADR 0066).
- *
- * The transcript stays collapsed beside the download rather than printed in
- * full, which pushed everything commenting on it off the screen — a question
- * about one line is not worth a file, and a file to check a detail is a detour.
- *
- * The server flattens the exchanges, so the ordering lives in one place rather
- * than being reconstructed here (ADR 0051).
+ * The feedback screen, shared by the post-call screen and a past training so the two
+ * cannot drift; only `actions` and `children` differ. The download is the whole wrap-up
+ * (`utils/feedbackPdf.ts`), without consent the only copy (ADR 0066).
  */
 export default function FeedbackScreen({
   transcript,
@@ -73,6 +59,9 @@ export default function FeedbackScreen({
   // The User's own initials on their lines, from the ID token — the Persona is
   // the one with a fixed name here, and "D" for "Du" named nobody.
   const account = useAccount();
+  // Handed to the file so a point there names its goal as it does on the page.
+  const { focus: picked } = useFocusContext();
+  const meta = callMeta(personaName, scenarioName, detail?.reverse);
 
   // What the file is called on the button, and what it will hold: without a
   // wrap-up there is no feedback to download, only the protocol. The two
@@ -107,9 +96,8 @@ export default function FeedbackScreen({
         transcript,
         personaName,
         scenarioName,
-        feedback: detail?.feedback ?? null,
-        measurements: detail?.measurements ?? [],
-        turns: detail?.turns ?? [],
+        detail: detail ?? null,
+        goals: picked?.goals ?? [],
       });
     } catch (e) {
       console.debug("[feedback pdf] failed", e);
@@ -122,26 +110,20 @@ export default function FeedbackScreen({
   const body = (
     <>
       <div className="feedback-intro">
-        <div className="eyebrow">TRAINING ABGESCHLOSSEN</div>
         <h1 className="feedback-title">Ihr Gesprächsfeedback</h1>
       </div>
 
-      {/* Which training this was, directly under the title. It sits here
-          rather than in the report, because it describes the call and not the
-          wrap-up: a Session whose wrap-up never got written still has a case
-          and a partner, and the history used to be the only screen that said
-          so. Which side the User was on is part of that — the transcript below
-          reads very differently depending on it (ADR 0070). */}
+      {/* Which training this was. Here rather than in the report because it describes
+          the call: a Session with no wrap-up still has a case, a partner and a side
+          (ADR 0070). */}
       <div className="feedback-meta" aria-label="Trainingsdetails">
-        {scenarioName && <span>{scenarioName}</span>}
-        {scenarioName && (
+        {meta.scenario && <span>{meta.scenario}</span>}
+        {meta.scenario && (
           <span className="feedback-meta-separator" aria-hidden="true">
             ·
           </span>
         )}
-        <span>
-          {detail?.reverse ? `Rollentausch: Sie riefen an, ${personaName} nahm ab` : personaName}
-        </span>
+        <span>{meta.reversal ? `Rollentausch: ${meta.reversal}` : meta.partner}</span>
       </div>
 
       {feedback}
@@ -197,7 +179,6 @@ export default function FeedbackScreen({
         <section className="feedback-transcript-section" id={logId}>
           <div className="feedback-transcript-heading">
             <div>
-              <div className="feedback-transcript-eyebrow">GESPRÄCH IM DETAIL</div>
               <h2 className="feedback-transcript-title">Vollständiges Transkript</h2>
             </div>
 

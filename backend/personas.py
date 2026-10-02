@@ -1,24 +1,17 @@
-"""The Persona value objects the backend works with.
+"""The Persona value objects the backend works with (loaded via `backend/library.py`,
+ADR 0041), kept free of database access for `backend/session/`.
 
-The Personas themselves live in the database and are loaded through
-`backend/library.py` (ADR 0041); this module only defines their shape, so
-that `backend/session/` can depend on it without pulling in database access.
-
-Two kinds of text hang off a Persona (ADR 0043): the prompt fields the model
-reads, which are English, and the display fields the setup UI shows, which are
-in the UI language. `language_id` names neither of those — it is the language
-the Persona actually speaks in.
-
-A Persona carries the *manner* and nothing about the situation (ADR 0045):
-how it conducts itself, and the objections it tends to raise. What the call is
-about belongs to the Scenario.
-"""
+Prompt fields are English, display fields in the UI language, `language_id` is what the
+Persona speaks (ADR 0043). A Persona carries the *manner*, never the situation (ADR 0045)."""
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
 class PersonaVoice:
-    tts_voice: str
+    """How this Persona sounds. One field, because there is one speech
+    backend (ADR 0103); it stays a value type rather than a bare int so a
+    second voice parameter has somewhere to go."""
+
     kugelaudio_voice_id: int
 
 
@@ -58,14 +51,10 @@ class Persona:  # pylint: disable=too-many-instance-attributes
     # same order, same length. Built in one pass in `library._to_persona`, so
     # an objection and its label cannot fall out of step.
     objection_labels: tuple[str, ...] = ()
-    # How hard this Persona is to deal with (`easy`/`medium`/`hard`, the
-    # seed's own vocabulary). Read by the turn loop, not by the display: it
-    # picks which anti-repeat nudge a Turn gets, because the ordinary one
-    # offers "give ground" as a move and a Persona seeded as `hard` is one
-    # that does not. Defaulted rather than required: the column is NOT NULL
-    # and every seeded row carries it, so the default only serves constructions
-    # in tests, and a wrong value costs a nudge variant rather than a crash.
-    difficulty: str = "medium"
+    # Read by the turn loop, not by the display: picks which anti-repeat nudge
+    # a Turn gets, because the ordinary one offers "give ground" as a move and
+    # a `hard` Persona is one that does not.
+    hard: bool = False
     # Display: the path this Persona's portrait is served from. Defaulted
     # rather than required, because it is display-only -- a Persona without a
     # picture plays exactly the same, and the UI shows its initials instead.

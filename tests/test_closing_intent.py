@@ -1,13 +1,8 @@
-"""Closing-intent detection.
+"""Closing-intent detection (ADR 0037, ADR 0043).
 
-Covers ADR 0037: a deterministic regex (no LLM classifier) recognises two
-categories of user signal that the call is over — an explicit farewell, or a
-request to postpone / continue elsewhere — and nudges the persona to end.
-
-ADR 0043: the patterns match the *user's* transcribed speech, which is in the
-Persona's language, so they live in the language pack rather than in the
-English prompt frame. Both packs are exercised here.
-"""
+A deterministic regex spots a farewell or a request to postpone and nudges the
+persona to end. The patterns match the user's speech, so they live in the
+language pack; both packs are exercised."""
 
 from dataclasses import replace
 
@@ -217,13 +212,10 @@ def _standing_nudge(orch, replies=3):
 
 
 def test_standing_nudge_restates_the_settlement_bar(persona, scenario):
-    """The criterion the call ends on is carried on every turn past the
-    opening, not only in the system prompt.
+    """The settlement criterion is carried on every turn past the opening.
 
-    Played over the whole seeded library (`scripts/play_scenarios.py`), no
-    pairing ever closed on the Turn its condition was met: the permission sat
-    far up-context while the nudge next to the reply offered nothing but moves
-    that carry the call on.
+    Across the whole seeded library no pairing closed on the Turn its condition was
+    met while that permission sat only far up in the system prompt.
     """
     with_condition = replace(scenario, call_goal="a refund date is named")
     nudge = _standing_nudge(SessionOrchestrator(persona, with_condition))
@@ -233,12 +225,10 @@ def test_standing_nudge_restates_the_settlement_bar(persona, scenario):
 
 
 def test_standing_nudge_does_not_spell_out_the_marker(persona, scenario):
-    """The first cut of this nudge ended on "finish your reply with exactly this
-    marker: [CALL_END]", and the persona duly appended it to its own opening
-    question: 32 of 34 pairings hung up by probe 3. Read as an instruction
-    rather than a condition, the marker in this position is the instruction.
-    The closing protocol stays in the system prompt; the nudge only points at
-    it."""
+    """The nudge only points at the closing protocol, never spells out [CALL_END].
+
+    Spelled out there, the persona read it as an instruction: 32 of 34 pairings hung
+    up by probe 3."""
     nudge = _standing_nudge(SessionOrchestrator(persona, scenario))
 
     assert "[CALL_END]" not in nudge

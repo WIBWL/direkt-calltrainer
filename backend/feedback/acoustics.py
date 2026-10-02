@@ -1,14 +1,7 @@
 """Paraverbal measurement of one Turn's audio via Praat (ADR 0047).
 
-The only module that imports parselmouth: everything else in the backend sees
-plain numbers. Pure and synchronous -- no network, no database, no domain
-vocabulary -- so it can be tested against synthetic waveforms alone.
-
-What it produces is deliberately raw and additive: a duration, the silent
-stretches inside the utterance, and two curves sampled at a fixed rate, one of
-loudness and one of pitch. All of it concatenates across Turns without
-weighting or interpolation, which is what lets the Session's statistics
-describe the whole call rather than one utterance at a time (ADR 0051).
+The only module that imports parselmouth; pure, so testable on synthetic tones.
+Output is raw and additive, so it concatenates across Turns (ADR 0051).
 """
 
 from __future__ import annotations
@@ -36,30 +29,15 @@ _PITCH_FLOOR_HZ = 75.0
 # second pass ever sees it.
 _PITCH_CEILING_HZ = 600.0
 
-# The pitch analysis grid. Praat's own default (0.75 / floor, about 10 ms at
-# our floor), and emphatically *not* the 100 ms the loudness curve is sampled
-# at: measured against synthetic contours of known range, that coarser grid
-# understated a 3 Hz contour by 1.4 semitones and a 4 Hz one by 3.6, because
-# speech intonation carries real movement around the syllable rate of 4 to 8 Hz
-# and a 10 Hz sampler aliases it. The curve is thinned to the display grid
-# afterwards; the statistics are computed on this one.
+# The pitch analysis grid: Praat's default, and *not* the loudness curve's
+# 100 ms, which aliases intonation at the syllable rate (ADR 0077). The curve is
+# thinned for display afterwards; the statistics are computed on this grid.
 _PITCH_STEP_S = 0.01
 
-# The second pass's floor and ceiling, as multiples of the first pass's own
-# quartiles (De Looze & Hirst's two-pass procedure). A window that follows the
-# speaker is what keeps a 116 Hz voice from being read at 483 Hz -- an octave
-# error that a fixed window cannot rule out and that the percentile trim only
-# just caught in the recordings this was checked against.
-#
-# The ceiling is 2.5 and not the 1.5 the procedure was first published with.
-# The two figures are a real disagreement in the literature and not a typo:
-# De Looze (2010) derived 1.5 * q3, and Hirst (2011) reports that on expressive
-# speech that ceiling sits below the speaker's own rises and produces systematic
-# octave *halving* -- the tracker, denied the true frequency, returns half of
-# it. Since this application measures people arguing a case on the telephone,
-# expressive rises are the normal material and the later figure is the one to
-# follow. It costs a little of the protection against octave doubling at the top
-# end, which is why the percentile trim in intonation.py stays where it is.
+# Second-pass window as multiples of the first pass's quartiles (De Looze &
+# Hirst). The ceiling is 2.5 (Hirst 2011), not De Looze's 1.5, which sits below
+# expressive rises and causes octave *halving* -- not a typo (ADR 0077). The
+# percentile trim in intonation.py still guards the top end.
 _PITCH_FLOOR_FACTOR = 0.75
 _PITCH_CEILING_FACTOR = 2.5
 # Below this many voiced frames the first pass has not established anything to
@@ -94,16 +72,8 @@ class Pause:
 @dataclass(frozen=True)
 class TurnFacts:
     """What is kept of one user utterance once its audio is gone (ADR 0081).
-
-    The subset of `TurnAcoustics` a later measurement needs, on the Session's
-    timeline rather than the utterance's, and in a shape that survives a round
-    trip through JSONB. The pitch curve is not part of it: no metric computed
-    per segment reads it, and the intonation is a reading over a whole call
-    (F-35).
-
-    Facts and not statistics, which is the whole of why storing them per
-    utterance does not reopen ADR 0051: nothing here is a rate, a share or a
-    figure anybody is shown.
+    The subset of `TurnAcoustics` segment metrics need, on the Session's
+    timeline; facts, never statistics or anything shown (ADR 0051).
     """
 
     speech_ms: int
@@ -148,11 +118,8 @@ class TurnFacts:
 
 @dataclass(frozen=True)
 class TurnAcoustics:
-    """Raw acoustic facts about one user utterance.
-
-    Deliberately not domain metrics: the mapping onto MetricType rows, and every
-    judgment about what counts as too fast or too quiet, lives in metrics.py.
-    Offsets are relative to the start of this utterance; the caller rebases
+    """Raw acoustic facts about one user utterance; metrics.py maps them onto
+    MetricType rows. Offsets are relative to this utterance; the caller rebases
     them onto the Session's timeline.
     """
 
@@ -163,16 +130,9 @@ class TurnAcoustics:
     # Relative by nature: the browser's automatic gain control makes an
     # absolute level a statement about the user's headset (ADR 0047).
     loudness_db: tuple[float | None, ...]
-    # Fundamental frequency on the *pitch* grid (_PITCH_STEP_S, 10 ms), which
-    # is emphatically not the loudness curve's 100 ms above: ten samples a
-    # second alias a syllable rate of four to five, and reading intonation off
-    # that grid is the defect ADR 0077 removed. None wherever the frame carried
-    # no voicing -- which is most consonants, every pause and any breath, so a
-    # dense curve is not to be expected and its gaps are not failures (F-35).
-    #
-    # Hertz, not semitones, and unconverted on purpose: this module produces
-    # facts, and the conversion to a speaker-relative interval is a judgment
-    # about what to compare against, which belongs in metrics.py.
+    # F0 on the 10 ms pitch grid, not the loudness grid (ADR 0077). None where
+    # unvoiced (consonants, pauses), so gaps are expected, not failures (F-35).
+    # Hertz on purpose: converting to semitones is metrics.py's judgment.
     pitch_hz: tuple[float | None, ...]
 
 
@@ -213,10 +173,8 @@ def analyze(wav_bytes: bytes) -> TurnAcoustics:
 
 
 def _decode_wav(wav_bytes: bytes) -> tuple[np.ndarray, int]:
-    """Decode the 16-bit PCM WAV the client sends into mono float samples.
-
-    parselmouth.Sound reads paths and arrays, not bytes, so the alternative
-    would be a temp file per Turn. The client always sends 16 kHz mono
+    """Decode the client's 16-bit PCM WAV into mono float samples (parselmouth
+    takes arrays, not bytes). The client sends 16 kHz mono
     (frontend/src/utils/wav.ts); the channel fold is belt-and-braces.
     """
     try:
@@ -265,28 +223,10 @@ def _segment_silences(
 
 
 def _pitch(sound: parselmouth.Sound) -> tuple[float | None, ...]:
-    """The fundamental frequency at 10 ms, measured twice (F-35).
-
-    Two passes, which is the standard procedure for F0 and the reason this is
-    not one line. A single pass has to be given a floor and a ceiling before
-    anything is known about the voice, and a window wide enough for every
-    speaker is wide enough to admit octave errors: a frame of creak read an
-    octave down, a frame of noise read an octave up. In the first recordings
-    this was checked against, a 116 Hz voice produced a frame at 483 Hz, four
-    times its own median and hard against the ceiling.
-
-    So the first pass only establishes the register, and the second measures
-    inside a window built from that speaker's own quartiles (De Looze & Hirst).
-    A doubled frame then falls outside the ceiling and is simply not returned,
-    rather than being trimmed away afterwards and hoped about.
-
-    Unvoiced frames come back as 0.0 and become None here: a zero would be a
-    measured frequency of nothing, and averaging it in would pull every figure
-    derived from this curve towards a value nobody produced.
-
-    Returns an empty tuple when the tracker finds nothing, which a Turn of pure
-    noise or whispering legitimately produces. The caller treats that as a
-    missing curve, not as an error -- the rest of the measurement is still good.
+    """The fundamental frequency at 10 ms, in two passes (F-35): the first finds
+    the register, the second measures inside the speaker's own quartile window
+    (De Looze & Hirst) to keep octave errors out. Unvoiced frames are None,
+    never 0.0; an empty result is a missing curve, not an error.
     """
     first = _track(sound, _PITCH_FLOOR_HZ, _PITCH_CEILING_HZ)
     voiced = first[first > 0]
@@ -303,16 +243,8 @@ def _pitch(sound: parselmouth.Sound) -> tuple[float | None, ...]:
     )
     # A narrowed window that finds *almost* nothing is a sign the first pass was
     # noise, not that the speaker fell silent; keep the wider reading there.
-    #
-    # An absolute floor of a tenth of a second, so it only catches the case it
-    # names. It cannot notice a second pass that keeps most of the contour and
-    # loses one genuine excursion below the new floor -- the ceiling sits 15.9
-    # ST above q3 while the floor sits 5.0 ST below q1, so the bottom of the
-    # window is much the tighter of the two, and ADR 0077 argues the ceiling at
-    # length and says nothing about the floor. On speech-like contours the loss
-    # is a handful of frames and changes no reading; the case is recorded here
-    # rather than guarded against, because a guard would need a number with as
-    # little behind it as the one it was protecting.
+    # Known gap: a low excursion below the (tighter) new floor is lost
+    # unnoticed; on speech-like contours that is a handful of frames.
     return _as_curve(refined if (refined > 0).sum() >= _MIN_FRAMES_FOR_REFINEMENT else first)
 
 
@@ -335,14 +267,9 @@ def _as_curve(frequencies: np.ndarray) -> tuple[float | None, ...]:
 
 def _sample(values: np.ndarray, duration_s: float) -> tuple[float | None, ...]:
     """Thin a frame-rate curve to roughly one point per _SAMPLE_INTERVAL_MS,
-    NaN -> None.
-
-    Roughly: the point count is rounded, then spread over the whole turn, so
-    the real spacing is duration / round(duration / 100 ms) -- 87.5 ms on a
-    0.35 s turn, 106.7 ms on a 0.32 s one. Readers treat it as exactly 100 ms
-    (`frontend/src/utils/loudness.ts`, `metrics._SMOOTH_POINTS`), which is
-    accurate to within 2.5 % from two seconds up and drifts on a call made of
-    very short turns.
+    NaN -> None. The real spacing is duration / round(duration / 100 ms);
+    readers assume exactly 100 ms (`frontend/src/utils/loudness.ts`,
+    `metrics._SMOOTH_POINTS`), accurate within 2.5 % from two seconds up.
     """
     points = max(2, round(duration_s * 1000 / _SAMPLE_INTERVAL_MS))
     if values.size > points:

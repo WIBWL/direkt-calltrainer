@@ -14,20 +14,10 @@ import {
   withDerived,
 } from "./metrics";
 
-/**
- * A metric's display facts (ADR 0082), the one table every screen reads.
- *
- * It replaced six scattered tables, and the two things that made those wrong
- * are exactly what is pinned here: a figure formatted by a rule that disagreed
- * with another screen's rule — the same reaction time read "1.8 s" on the
- * wrap-up and "1,8 s" on the progress table — and a metric nobody had described,
- * which rendered as "4.0" and vanished from views it should have been in.
- *
- * `MetricKey` already makes a missing entry a compile error, and
- * `tests/test_metrics.py` pins the union against the backend inventory. What
- * neither can see is whether the entry says the right thing, which is what the
- * cases below are for.
- */
+/** A metric's display facts (ADR 0082), the one table every screen reads.
+ * `MetricKey` and `tests/test_metrics.py` guarantee an entry exists; these cases
+ * pin that it says the right thing (one number format everywhere, no metric
+ * rendering as "4.0" or missing from a view). */
 
 const measurement = (over: Partial<Measurement> & Pick<Measurement, "key">): Measurement => ({
   name: over.key,

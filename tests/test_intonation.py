@@ -1,14 +1,8 @@
 """The five figures read off a pitch contour (F-35).
 
-Constructed contours in Hertz, at the 10 ms grid `acoustics.py` produces: no
-audio, no Praat, no database. The point of this file is that each figure
-measures the thing it claims to and not one of the others, because that
-separation is the whole reason there are five of them instead of one.
-
-The case that matters most is the pair at the top: a wide-but-slow contour and a
-narrow-but-lively one. A single range figure calls the first one expressive and
-the second one flat, which is backwards for a listener.
-"""
+Constructed 10 ms contours in Hertz; no audio, Praat or database. Each figure must
+measure its own thing: a single range calls a wide-but-slow contour expressive and
+a narrow-but-lively one flat, which is backwards for a listener."""
 from dataclasses import fields
 from pathlib import Path
 
@@ -138,13 +132,9 @@ def test_a_sentence_that_lifts_at_the_end_is_read_as_rising() -> None:
 
 
 def test_a_small_final_movement_counts_as_level() -> None:
-    """Below the threshold a listener hears wobble, not a direction. Reading
-    every twitch as an intention would make the counts meaningless.
+    """Below the threshold a listener hears wobble, not a direction.
 
-    Half the threshold, which is the magnitude this is about. It was written
-    with a semitone-to-Hertz conversion too many and came to a twenty-fourth of
-    it -- 0.03 ST, a movement so small that the test stayed green for any
-    threshold above 0.04 and proved nothing about the edge it names.
+    Tested at half the threshold, so the edge itself is what is exercised.
     """
     half_of_it = 120 * 2 ** (TERMINAL_FLAT_ST / 2 / 12)
     barely = _steady(120, 60) + _sweep(120, half_of_it, 40)
@@ -163,11 +153,8 @@ def test_a_movement_over_the_threshold_is_a_direction() -> None:
 def test_a_short_utterance_is_judged_against_its_own_window() -> None:
     """The threshold is derived per window, not taken from the constant.
 
-    TERMINAL_FLAT_ST states the glissando threshold across the full 400 ms.
-    An utterance with only MIN_TERMINAL_FRAMES of voiced speech is read over
-    70 ms, where the perceptual floor is 4.6 ST -- nearly six times as much.
-    Applied unchanged there, a 1 ST movement nobody can hear was counted as a
-    falling ending, and short utterances are most of a phone call.
+    A short utterance is read over ~70 ms, where the perceptual floor is 4.6 ST, not
+    the 400 ms figure; unchanged, inaudible movements counted as endings.
     """
     # The call is long enough to be read at all; the *utterance* is the short
     # one, which is what the ending is taken from.
@@ -276,14 +263,10 @@ def test_thinning_takes_the_median_of_each_window_not_a_sample() -> None:
 
 
 def test_the_grid_constant_matches_the_analysis() -> None:
-    """The movement figure divides by it. If this drifts from acoustics.py, the
-    semitones per second silently change by the same factor -- and so do the
-    voiced milliseconds behind the reading's floor, every Hold's duration and
-    the stored `curve_step_ms`.
+    """The step constant matches the analysis's, not the literal 10.
 
-    Against the analysis constant, not against 10. Asserting the literal was
-    the drift it claimed to catch: `acoustics._PITCH_STEP_S` could be halved
-    and this would stay green, which is the whole failure it describes.
+    Movement, voiced milliseconds, Hold durations and `curve_step_ms` all scale with
+    it, so a drift would silently change every one of them.
     """
     from backend.feedback import acoustics  # pylint: disable=import-outside-toplevel
 
@@ -299,12 +282,9 @@ def test_an_ending_is_read_from_voiced_frames_only() -> None:
 
 
 def test_the_endings_the_frontend_reads_are_the_ones_measured() -> None:
-    """The count travels as `endings.falling/rising/level` and the page words
-    exactly those three; a fourth kind added here would render as nothing.
+    """The endings are `falling/rising/level`, exactly as the frontend words them.
 
-    Pinned against the frontend's own interface. An enum of the three values
-    used to stand in for this and was pinned only against itself, so a new
-    field on `Endings` would have left it green.
+    Pinned against the frontend's own interface: a fourth kind would render as nothing.
     """
     page = (
         Path(__file__).resolve().parent.parent /
@@ -333,12 +313,9 @@ def test_a_flat_voice_and_a_moving_one_differ_in_the_quotient() -> None:
 
 
 def test_the_quotient_is_measured_per_window_and_not_over_the_whole_call() -> None:
-    """The reason it is windowed at all.
+    """The quotient is windowed so drift between registers is not read as movement.
 
-    A speaker who holds one register for a minute and then another for a minute
-    has moved their voice hardly at all within any phrase, but the two levels
-    laid end to end look like a wide spread to any statistic taken over the
-    whole contour. Windowing is what keeps the drift out of the figure.
+    Two steady registers side by side look like a wide spread over the whole contour.
     """
     per_window = PVQ_WINDOW_MS // STEP_MS
     two_registers = _steady(110, per_window) + _steady(190, per_window)
@@ -381,14 +358,9 @@ def test_a_call_too_short_for_one_window_is_still_measured() -> None:
 
 
 # --- The three-step reading of the quotient ---------------------------------
-# The one part of this module that judges. These tests pin the boundaries, not
-# because the numbers are established for this population -- they are not -- but
-# so that changing one is a deliberate act with a test to update.
-#
-# The reading used to sit on the range, on five steps derived here by
-# converting quoted F0 standard deviations to a percentile span. A literature
-# review found nothing behind either half of that derivation, so it moved to the
-# figure Hincks measured against human liveliness ratings.
+# The one part of this module that judges (ADR 0077). The boundaries are pinned
+# not because they are established for this population but so that changing one
+# is a deliberate act.
 
 
 def test_each_step_of_the_scale_is_reachable() -> None:
@@ -410,14 +382,10 @@ def test_an_unmeasured_quotient_gets_no_step() -> None:
 
 
 def test_a_monotone_contour_reads_as_monotone_and_a_lively_one_as_lively() -> None:
-    """End to end over the measurement, not over the thresholds: a voice that
-    barely moves and one that works in every phrase must not land on the same
-    step, which is the whole point of the feature.
+    """End to end: a barely moving voice and a lively one land on different steps.
 
-    Six semitones peak to peak for the lively case, and the figure is worth
-    knowing: four semitones of the same alternation comes to a quotient of 0.115
-    and reads as monotone. The boundary is not generous, which is the sort of
-    thing only an end-to-end case surfaces.
+    Six semitones peak to peak for the lively case; four would read as monotone
+    (quotient 0.115), so the boundary is not generous.
     """
     flat = profile(_steady(120, 400), ())
     lively = profile(_zigzag(120, 6.0, 20, 400), ())
@@ -462,13 +430,10 @@ def test_the_top_step_is_not_the_red_one() -> None:
 
 
 def test_the_step_is_derived_when_the_session_is_read() -> None:
-    """Not stored with the Measurement, on purpose.
+    """The step is derived on read, never stored with the Measurement.
 
-    The figures are measurements and are written once; the step is a judgement
-    on thresholds nothing has validated for this population, so it is computed
-    on every read. That is what let the scale be replaced outright without a
-    migration and without leaving old trainings labelled by one that no longer
-    exists.
+    The thresholds are unvalidated, so the scale can be replaced without a migration
+    and without old trainings keeping a withdrawn label.
     """
     served = served_detail(RANGE_KEY, {"median_hz": 120.0, "pvq": 0.18})
 
@@ -582,14 +547,10 @@ def test_a_step_is_read_only_from_enough_voiced_speech() -> None:
 
 
 def test_the_level_threshold_is_the_glissando_threshold_over_the_window() -> None:
-    """Derived, not chosen, and this pins the derivation rather than the number.
+    """The level threshold is derived, and this pins the derivation (ADR 0077).
 
-    Below the glissando threshold a pitch movement is not heard as a movement at
-    all. Over a window of T seconds that threshold, G = GLISSANDO_ST_S2 / T**2
-    semitones per second, comes to GLISSANDO_ST_S2 / T semitones across the
-    window itself. The figure this replaced was hand-set at 2.0 semitones, two
-    and a half times the perceptual floor, which filed endings as level that a
-    listener hears as falling or rising.
+    Glissando threshold G = GLISSANDO_ST_S2 / T**2 ST/s over a window of T seconds is
+    GLISSANDO_ST_S2 / T semitones across it; below that no movement is heard.
     """
     window_s = TERMINAL_WINDOW_MS / 1000
 

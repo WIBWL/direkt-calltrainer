@@ -1,20 +1,15 @@
-"""FastAPI app: REST endpoints for setup data, WebSocket route for the live session, static frontend."""
+"""FastAPI app: REST endpoints for setup data, WebSocket route for the live session."""
 
 import asyncio
 import contextlib
 import logging
-import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.status import HTTP_404_NOT_FOUND
 
 from backend.api.account import router as account_router
 from backend.api.consent import router as consent_router
@@ -26,7 +21,7 @@ from backend.api.sessions import router as sessions_router
 from backend.api.tenant import router as tenant_router
 from backend.auth import check_realm
 from backend.clients import tts
-from backend.clients.config import DIREKT_URL, GEMINI, LLM_FEEDBACK_MODEL, LLM_MODEL, LOG_TRANSCRIPTS
+from backend.clients.config import DIREKT_URL
 from backend.clients.health import check_backends
 from backend.db.provision import provision
 from backend.db.session import session_scope
@@ -39,30 +34,11 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
-    """Check the dependencies before the first request, so an unreachable
-    backend shows up as a boot-time log line, not a 500 far from its cause.
-    The checks only log — a dead dependency does not stop the boot.
+    """Check the dependencies before the first request, so a dead one is a boot-time
+    log line rather than a 500 far from its cause. The checks only log.
 
-    The DiReKT gateway is only reachable from its own network; off it, every
-    pipeline call 403s like a credentials problem, so the hint names the real
-    cause."""
-    if LOG_TRANSCRIPTS:
-        # Loud, once, at boot. The switch writes what people say aloud into a
-        # file that no deletion path reaches (ADR 0066), which is fine while
-        # diagnosing a model and not fine in a running pilot — so the one thing
-        # it must never be is quiet.
-        logger.warning(
-            "LOG_TRANSCRIPTS is on: spoken content is being written to the log file. "
-            "That log is personal data and is not covered by any deletion path. "
-            "Turn it off for anything but local debugging."
-        )
-    if GEMINI:
-        # Said once at boot because the alternative is a silent one: STT and TTS
-        # stay on the gateway, the startup check names a model but not where it
-        # ran, and a stray GEMINI=yes in someone's `.env` would look like the
-        # gateway having a good day (ADR 0011, ADR 0074).
-        logger.info("Dialogue generation is on Gemini: %s live, %s for feedback",
-                    LLM_MODEL, LLM_FEEDBACK_MODEL)
+    Off the DiReKT gateway's network every pipeline call 403s like a credentials
+    problem, so the hint names the real cause."""
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             await client.get(DIREKT_URL)
@@ -92,17 +68,9 @@ _SWEEP_INTERVAL_S = 24 * 60 * 60
 async def _retention_loop() -> None:
     """Delete expired Sessions, once at startup and daily after that (ADR 0067).
 
-    Inside the app rather than as a cron entry or a scheduled Redis job. A cron
-    entry is a second place to deploy and a second thing to forget; a job queued
-    six months ahead does not survive a Redis restart. This asks the database
-    what is expired every time it wakes, so a missed run delays a deletion
-    rather than cancelling it.
-
-    Every failure is caught and the loop continues. A retention sweep that dies
-    on one bad night and never runs again is the failure mode worth designing
-    against: nothing would report it, and the period would quietly stop being
-    enforced.
-    """
+    In-process rather than cron or a scheduled Redis job (which would not survive a
+    Redis restart); it asks the database each time, so a missed run only delays.
+    Every failure is caught: a sweep that dies silently stops enforcing the period."""
     while True:
         try:
             removed = await asyncio.to_thread(retention.sweep_now)
@@ -119,9 +87,7 @@ async def _retention_loop() -> None:
 def _provision_database() -> None:
     """Migrate and seed on startup, so a fresh `docker compose up` is usable.
 
-    Non-fatal, like the backend check above: without it every Session fails to
-    persist and silently loses its Feedback, but the call itself still works,
-    so a database problem must not stop the app from booting.
+    Non-fatal: without it Sessions are not persisted, but calls still work.
     """
     try:
         logger.info("Database provisioned, reference rows created: %s", provision())
@@ -130,16 +96,16 @@ def _provision_database() -> None:
         logger.exception("Database provisioning failed - Sessions will not be persisted")
 
 
-app = FastAPI(title="CallTrainer API", lifespan=lifespan)
-
-# For a Vite dev server on :5173 against a host `uvicorn` — not a supported
-# workflow (the app runs via Docker, SPA served same-origin), so nothing depends
-# on this; kept only to spare a developer who tries it an opaque CORS wall.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+# No API docs or published schema (`/docs`, `/redoc`, `/openapi.json` would expose
+# every route without a login); the SPA's wire types live in frontend/src/protocol.ts.
+# No CORS middleware: the frontend container proxies /api, /ws and /health, so
+# the SPA and the API share an origin (frontend/nginx.conf).
+app = FastAPI(
+    title="CallTrainer API",
+    lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 app.include_router(personas_router)
@@ -150,8 +116,6 @@ app.include_router(sessions_router)
 app.include_router(consent_router)
 app.include_router(focus_router)
 app.include_router(account_router)
-
-FRONTEND_DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
 
 @app.get("/health")
@@ -177,54 +141,3 @@ def readiness() -> dict[str, str]:
         logger.error("Readiness check failed: %s", e)
         raise HTTPException(status_code=503, detail="Database unavailable") from e
     return {"status": "ready"}
-
-
-# The setup lists (backend/api/personas.py, scenarios.py) require a valid
-# Keycloak token (ADR 0009). The static SPA mount below stays open so the login
-# screen can load in the first place.
-
-
-class SinglePageApp(StaticFiles):
-    """Static files, with the client-side router's paths falling back to
-    `index.html`.
-
-    The SPA owns routes like `/profil` that exist only in the browser. Plain
-    `StaticFiles` 404s them, so the app worked until the first reload or shared
-    link -- the failure only appears when someone types the URL rather than
-    clicking their way to it, which is why it is worth handling here rather
-    than noticing it in the pilot.
-
-    Two things deliberately keep their 404. A path under `/api` or `/ws` that
-    reaches this mount is an unknown endpoint, and answering it with a page
-    would turn a clear 404 into a JSON parse error in the caller. So is any
-    path that looks like a file: a mistyped bundle or a missing image must
-    fail as itself, not as HTML that a script tag then chokes on.
-    """
-
-    # Reserved for the API and the live session; never the SPA's to route.
-    _SERVER_PREFIXES = ("/api", "/ws", "/health")
-
-    async def get_response(self, path: str, scope):
-        try:
-            return await super().get_response(path, scope)
-        except StarletteHTTPException as e:
-            # StaticFiles signals "no such file" by raising, not by returning a
-            # 404 response -- so this has to be caught rather than inspected.
-            # Anything that is not a 404 (a 405, a path escaping the root) is
-            # not ours to reinterpret.
-            if e.status_code != HTTP_404_NOT_FOUND or not self._is_client_route(path):
-                raise
-        return await super().get_response("index.html", scope)
-
-    def _is_client_route(self, path: str) -> bool:
-        """True where a 404 should be answered with the app instead."""
-        # The mount strips its own prefix, so `path` arrives relative.
-        request_path = "/" + path.lstrip("/")
-        if request_path.startswith(self._SERVER_PREFIXES):
-            return False
-        # A dot in the last segment means the caller asked for a file, not a
-        # route -- "/profil" falls back, "/assets/main.js" stays a 404.
-        return "." not in request_path.rsplit("/", 1)[-1]
-
-
-app.mount("/", SinglePageApp(directory=FRONTEND_DIST_DIR, html=True, check_dir=False), name="frontend")

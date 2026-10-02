@@ -2,7 +2,7 @@
 
 ## 1 Zweck und Geltungsbereich
 
-Dieser Katalog beschreibt Trainingsfälle auf fachlicher Ebene, bevor sie als Datensätze angelegt werden. Er ist die Zwischenstufe zwischen der Anforderungsliste (`initial_requirements.md`) und dem Inhalt der Bibliothek.
+Dieser Katalog beschreibt Trainingsfälle auf fachlicher Ebene, bevor sie als Datensätze angelegt werden. Er ist die Zwischenstufe zwischen der Anforderungsliste (`initial-requirements.md`) und dem Inhalt der Bibliothek.
 
 Für jeden Eintrag ist ausgewiesen, **worauf er zurückgeht**: eine Anforderung (`R-xx`), eine Randbedingung (`C-xx`) oder — wenn kein Beleg vorliegt — `Systementwurf`. Das ist dieselbe Konvention wie in der Spalte *Herkunft* des Feature-Katalogs, und sie ist der Grund, warum dieser Katalog überhaupt geführt wird: Ein Trainingsfall ohne Belegkette ist eine Erfindung, und das soll man ihm ansehen.
 
@@ -406,7 +406,7 @@ Alle Szenarien dieses Abschnitts sind **Vorschläge**. Für Profil B fehlt eine 
 
 > **Kein eigenes Szenario.** Die Sprache hängt seit ADR 0043 an der **Persona**, nicht am Szenario — Szenarien sind sprachneutral. „Englisches Szenario" ist damit keine Kategorie: Man wählt eine englischsprachige Persona zu einem beliebigen Szenario. S-14 bleibt als *Hinweis* im Katalog stehen, wird aber **nicht** als eigener Datensatz angelegt. Nach einem Training bietet der Nachgesprächsbildschirm dasselbe Szenario mit einer Persona der anderen Sprache ausdrücklich an (F-64, ADR 0087).
 >
-> **C-01 verbietet Englisch nicht — im Gegenteil.** Die Randbedingung heißt „Sprache konfigurierbar" und führt Englisch ausdrücklich als belegt (R-35). Die frühere Beschränkung auf Deutsch stand in **ADR 0006, und die ist abgelöst** (0006 → 0022 → 0043). Es gibt zwei englischsprachige Personas und ein englisches Language Pack. Die verbleibende Einschränkung ist rein technisch: Der DiReKT-Fallback hält nur deutsche Stimmen vor, eine englische Persona hängt damit an der Verfügbarkeit von KugelAudio.
+> **C-01 verbietet Englisch nicht — im Gegenteil.** Die Randbedingung heißt „Sprache konfigurierbar" und führt Englisch ausdrücklich als belegt (R-35). Die frühere Beschränkung auf Deutsch stand in **ADR 0006, und die ist abgelöst** (0006 → 0022 → 0043). Es gibt bereits zwei englischsprachige Personas und ein englisches Language Pack. Eine technische Einschränkung bleibt nicht: Seit ADR 0103 spricht jede Persona über KugelAudio und über nichts anderes, deutsch wie englisch — die frühere Rückfallebene, die nur deutsche Stimmen vorhielt, ist entfernt.
 >
 > Ein Feature „Training auf Englisch" existiert nicht; die in einer früheren Fassung genannte ID **F-25 gibt es im Feature-Katalog nicht**. Die Sprache wird über C-01 und R-35 geführt, die Umschaltung der *Oberfläche* getrennt davon über F-56.
 
@@ -505,7 +505,7 @@ Im Katalog stehen zwölf von vierzehn Szenarien Profil A offen. In der Bibliothe
 | Eintrag | Blockiert durch |
 |---|---|
 | S-06 | sitzungsübergreifendes Gedächtnis (F-23, COULD, nicht gebaut). Das Folgeszenario deckt die „informierte" Variante ab, siehe 5.1 |
-| S-14 | nichts — bewusst kein Datensatz. Englisch ist über zwei Personas spielbar; einzige technische Hürde: der DiReKT-Fallback hält keine englischen Stimmen vor |
+| S-14 | **nicht** durch C-01 — dort ist Englisch belegt (R-35); seit ADR 0043 hängt die Sprache an der Persona, also ist S-14 kein eigenes Szenario |
 | P-07 | Auslegung von R-04 (siehe 7) |
 | P-13 | Rückfrage zum tatsächlichen Eskalationsgrad (siehe 7) |
 | jede neue Persona | eine ausgewählte KugelAudio-Stimme und ein Porträt; ohne Stimme bleibt sie inaktiv, `tests/test_persona_scenario_library.py` prüft beides |

@@ -1,18 +1,8 @@
 """The conversation as the model has been told it: the full record of one call.
 
-A list of chat messages -- the system prompt, then the user's and the Persona's
-lines in order -- which the orchestrator used to hold as a bare list and change
-by index from seven places: `[-1]["content"] = ...` to extend a reopened
-question, to append the fallback goodbye and to trim a reply to what was heard;
-`.pop()` to drop a reply nobody heard; and a scan for `"assistant"` in four
-readers. Every one of those was correct only because of where in a Turn it
-ran. The operations are named here instead, and each says what it assumes.
-
-What the *model* reads on a given Turn is not this -- it may be a window of it
-plus the caller's notes (ADR 0071), and it carries a nudge that is never stored
-(`nudges.py`). This is what the guards, the barge-in trims and the Transcript
-work on (ADR 0035, ADR 0038), and it must only ever hold what the user heard.
-"""
+Changed only through named operations that say what they assume. The model may read
+only a window plus notes and a nudge (ADR 0071); this is what the guards, trims and
+Transcript work on (ADR 0035, ADR 0038), and it holds only what the user heard."""
 
 from __future__ import annotations
 

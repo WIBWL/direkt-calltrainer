@@ -3,15 +3,9 @@ import { useAuth } from "react-oidc-context";
 import { initialsOf } from "../utils/initials";
 
 /**
- * The signed-in user, as the interface needs them.
- *
- * Everything here comes out of the ID token — there is no account endpoint to
- * call, and deliberately so: identity lives in Keycloak and the app keeps no
- * User table of its own (ADR 0031). What the profile screen shows is therefore
- * exactly what the realm asserts, and none of it is the app's to edit.
- *
- * Every field is optional in OIDC and Keycloak only fills what the account has,
- * so each one degrades on its own rather than blanking the screen.
+ * The signed-in user, read from the ID token alone: identity lives in Keycloak
+ * and the app keeps no User table (ADR 0031), so none of it is editable here.
+ * Every OIDC claim is optional, so each field degrades on its own.
  */
 export interface Account {
   /** Best available human name; falls back to the username, then to a label. */

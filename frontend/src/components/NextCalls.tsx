@@ -2,11 +2,8 @@ import { useFocusContext } from "../FocusContext";
 import { recommendationReason, type NextCallOffer } from "../scenarioLibrary";
 
 /**
- * What to play next (F-64): Scenarios that already exist, one press to start.
- *
- * Unlike the follow-up and the reverse beside it, nothing is written first, so
- * starting begins the call at once — skipping the microphone check, which was
- * in use seconds ago. Each offer names its reason.
+ * What to play next (F-64): existing Scenarios, one press to start. Nothing is written first, so starting
+ * begins the call at once, skipping the microphone check. Each offer names its reason.
  */
 export default function NextCalls({
   offers,
@@ -21,7 +18,6 @@ export default function NextCalls({
 
   return (
     <section className="card next-calls" aria-labelledby="next-calls-title">
-      <div className="next-step-eyebrow">ALS NÄCHSTES</div>
       <h2 className="next-step-title" id="next-calls-title">Aus Ihrer Bibliothek</h2>
       <ul className="next-calls-list">
         {offers.map((offer) => (

@@ -4,12 +4,15 @@
 
 Accepted (partially supersedes ADR 0021's TTS half — see below)
 
-**Status update:** the `DEBUG` flag named below is now `SKIP_KUGELAUDIO` — same
-meaning, same default, renamed for the leg it moves, alongside `GEMINI`
-(ADR 0074). A switch called DEBUG reads like general verbosity and is the one an
-operator might set on a whim, while what it actually does is trade the hosted
-voice for a fallback measured 2–3x slower. The Gemini removal decided below was
-itself reversed by ADR 0074.
+**Status update (ADR 0103):** both halves of this ADR have since been
+undone, in opposite directions. The DiReKT fallback and the flag that forced it
+— `DEBUG`, renamed `SKIP_KUGELAUDIO` along the way — are **gone**: KugelAudio is
+the only speech output, and a failure ends the Turn instead of being answered
+in another voice, because the fallback hid the outage it was meant to survive
+(a pilot ran all day in the slower voice with a green boot log). The Gemini
+removal decided below was reversed by ADR 0074 and then decided again, for
+good, by ADR 0103. What survives from this ADR is the reasoning for KugelAudio
+being the voice at all.
 
 ## Context
 

@@ -1,30 +1,8 @@
-"""The Persona and Scenario library: the mapping, and the seeded content.
+"""The Persona and Scenario library: the row mapping (`library.py`, in memory) and the seed content.
 
-Since ADR 0041 the library is database-backed, so there are two separate
-things to check and this module keeps them apart:
-
-  * `backend/library.py` maps a database row onto the frozen value object the
-    rest of the backend passes around. Tested on rows built in memory — no
-    database, per this suite's no-infrastructure rule.
-  * `scripts/seed_reference_data.py` carries the library's initial content
-    (ADR 0041), so the requirements about *what* the library covers are
-    asserted against the seed data, which is importable without a database.
-
-Covers:
-  F-04  customer persona library  (extensible; cost-critical customers,
-        managing directors / IT leads focused on strategy & budget)
-  F-44  the selection card and the info panel behind it -- here the portrait
-        each seeded Persona carries
-  F-03  scenario types  (support cases, pricing/offer talks, ...)
-  F-01  the counterpart reflects conversational dynamics, not just facts
-  R-07  cost-critical customer   R-08  budget-focused decision maker
-  R-09  support + consulting     R-10  offer/price negotiation
-  ADR 0041  Personas and Scenarios are loaded from the database
-  ADR 0043  prompt fields are English, display fields are in the UI language;
-            a Persona's language is its own, a Scenario carries none
-  ADR 0045  the Scenario carries the case, the Persona carries the objections
-  R-12  spontaneous objections
-"""
+Covers: F-01, F-03, F-04, F-44 (portraits), R-07, R-08, R-09, R-10, R-12;
+ADR 0041 (database-backed), ADR 0043 (English prompt fields, per-Persona language),
+ADR 0045 (Scenario carries the case, Persona the objections)."""
 
 import pathlib
 import re
@@ -40,7 +18,7 @@ from backend.session.language_packs import LANGUAGE_PACKS
 from tests.conftest import load_seed_module
 
 # _to_persona/_to_scenario are the mapping this module is about.
-# pylint: disable=missing-function-docstring,protected-access
+# pylint: disable=missing-function-docstring
 # pylint: disable=use-implicit-booleaness-not-comparison
 
 SEED = load_seed_module()
@@ -56,17 +34,13 @@ def _persona_row(**overrides):
     fields = {
         "key": "row-persona",
         "extern_id": _PERSONA_EXTERN_ID,
-        "created_by": None,
-        "visibility": models.VISIBILITY_PUBLIC,
         "name": "Thomas Brandt",
         "role_label": "Geschäftsführer, Fokus auf Strategie & Budget",
         "role": "Managing director of a mid-sized company",
         "traits": "matter-of-fact, time-conscious",
         "behavior": "You press for concrete answers.",
         "training_goal": "",
-        "difficulty": "mittel",
         "language_code": "de",
-        "tts_voice": "de_male",
         "kugelaudio_voice_id": 1885,
         "active": True,
         "language": models.Language(code="de", name="Deutsch"),
@@ -97,13 +71,12 @@ def test_persona_mapping_keeps_display_and_prompt_fields_apart():
 
 
 def test_persona_mapping_carries_language_and_both_voices():
-    """ADR 0041/0043: the language is the Persona's own, and it names a voice
-    for each TTS backend (ADR 0040: KugelAudio default, EFRE fallback)."""
+    """ADR 0041/0043: the language is the Persona's own, and so is its one
+    voice (ADR 0103: KugelAudio, and nothing behind it)."""
     persona = _to_persona(_persona_row())
     assert persona.language_id == "de"
     assert persona.language_name == "Deutsch"
     assert isinstance(persona.voice, PersonaVoice)
-    assert persona.voice.tts_voice == "de_male"
     assert persona.voice.kugelaudio_voice_id == 1885
 
 
@@ -195,13 +168,9 @@ def test_every_seeded_persona_speaks_a_language_that_has_a_pack(entry):
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_every_offered_persona_has_its_own_voice(entry):
-    """ADR 0040/0041: voice is a per-Persona property, and both backends need
-    an identity — KugelAudio by default, the DiReKT model as fallback.
+    """ADR 0041/0103: each Persona has its own KugelAudio voice.
 
-    A Persona still waiting for a KugelAudio voice is seeded `active: False`
-    and is the one case where the id may be missing; the test below is what
-    keeps that from turning into a Persona on offer that cannot speak."""
-    assert entry["tts_voice"]
+    Only an inactive Persona (still waiting for a voice) may lack the id."""
     if entry.get("active", True):
         assert isinstance(entry["kugelaudio_voice_id"], int)
 
@@ -422,12 +391,8 @@ _PROMPT_FIELDS = ("description", "case_facts", "call_goal")
 
 @pytest.mark.parametrize("entry", SEED.SCENARIOS, ids=lambda e: e["id"])
 def test_seeded_scenario_prompt_fields_are_english(entry):
-    """ADR 0043: a Scenario carries no language of its own, which is what lets
-    any Persona run it. German in one of these fields would reach a Persona
-    speaking English and is invisible until someone plays that pairing.
-
-    This caught a real one: `call_goal` ended "...what it will cost, ohne
-    Fachbegriffe" after an edit that was only meant to remove a dash.
+    """ADR 0043: Scenario prompt fields carry no language, so German here reaches an
+    English Persona unnoticed. Caught a real one ("..., ohne Fachbegriffe" in `call_goal`).
     """
     for field in _PROMPT_FIELDS:
         text = entry[field]
@@ -458,48 +423,37 @@ def test_seeded_persona_objections_are_english(entry):
 
 # --- the seeded portraits (F-44) ----------------------------------------
 #
-# The pairing of Persona and picture lives in the table (ADR 0041) while the
-# file is a frontend asset, so the two can drift apart without anything
-# failing at runtime: a wrong path is a missing image, and the UI quietly
-# falls back to the initials. These two tests are what make that a red test
-# instead.
+# The pairing lives in the table, the file in the frontend, so they can drift
+# silently (the UI falls back to initials). These tests make that a red test.
 _PORTRAIT_DIR = pathlib.Path(__file__).resolve().parents[1] / "frontend" / "public" / "personas"
 
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_every_seeded_persona_carries_a_portrait_named_after_it(entry):
-    """The path is derived from the Persona's own id, so renaming one — which
-    is a new row anyway (see seed_data.py) — renames its picture too."""
-    assert entry["avatar_url"] == f"/personas/{entry['id']}.webp"
+    """The file is named after the Persona's name, first-last in lower case
+    and nothing else -- not after its id, which carries the role as well."""
+    slug = entry["name"].lower().replace(" ", "-")
+    assert entry["avatar_url"] == f"/personas/{slug}.webp"
 
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_every_seeded_portrait_is_a_file_that_exists(entry):
     """The other half: the path the row carries has to name a file the app
     actually serves. `frontend/public/` is copied into `frontend/dist/` by the
-    Vite build, which is the directory the backend serves."""
+    Vite build, which is the directory the frontend container serves."""
     served = _PORTRAIT_DIR / pathlib.PurePosixPath(entry["avatar_url"]).name
     assert served.is_file(), f"{entry['id']}: no portrait at {entry['avatar_url']}"
 
 
 # --- the seed fits the columns it is written into -----------------------
 #
-# Nothing above this point would catch a seed value that is simply too long
-# for its column: the seed is a dict of strings and every assertion here reads
-# it as one. The database is the only thing that enforces a length, and it
-# does so at provisioning -- inside one transaction, so the first over-long
-# value drops *every* seeded row and the app answers /api/scenarios with a 500
-# (which is how `persona.traits` outgrew varchar(120) and took the whole
-# library down with it). These two tests put that failure here instead, where
-# it costs a test run rather than a deployment.
-#
-# Seed field -> column, mirroring `provision._seed_personas` /
-# `_seed_scenarios`. Only the fields that land in a column with a length are
-# worth listing; a Text column has no limit to check.
+# Only the database enforces a length, at provisioning, in one transaction: one
+# over-long value drops every seeded row and /api/scenarios answers 500 (as
+# `persona.traits` once did). Maps seed field -> column, mirroring `provision._seed_*`.
 _PERSONA_COLUMNS = {
     "id": "key", "name": "name", "role_label": "role_label", "role": "role",
-    "traits": "traits", "avatar_url": "avatar_url", "difficulty": "difficulty",
-    "language_id": "language_code", "tts_voice": "tts_voice",
+    "traits": "traits", "avatar_url": "avatar_url",
+    "language_id": "language_code",
 }
 _SCENARIO_COLUMNS = {
     "id": "key", "name": "title", "short_description": "short_description",

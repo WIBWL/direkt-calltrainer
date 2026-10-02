@@ -1,18 +1,8 @@
 """Paraverbal measurement against synthetic audio (F-35, F-37, F-51, ADR 0047).
 
-The one place the real Praat analysis runs in the suite. Everything else hands
-`metrics.py` the numbers `analyze()` would have produced, which keeps those
-tests fast and free of a C extension — but leaves the measurement itself
-unproven, and the pitch curve of F-35 is exactly the kind of thing that is
-either right or quietly a factor of two out.
-
-Synthetic waveforms, so the answer is known in advance: a 120 Hz tone is 120 Hz,
-and a tone that steps to 180 Hz spans 12·log2(180/120) ≈ 7.02 semitones. No
-recording, no fixture, no network.
-
-What these tests do not check is whether Praat tracks *speech* well. That is a
-property of Praat, established elsewhere and not this suite's to re-derive.
-"""
+The one place real Praat runs in the suite; everything else fakes `analyze()`.
+Synthetic tones make the answer known: 120 Hz stepping to 180 Hz spans ≈ 7.02
+semitones. Whether Praat tracks *speech* well is not this suite's to prove."""
 import io
 import math
 import wave
@@ -70,14 +60,10 @@ def test_a_steady_tone_is_measured_at_its_own_frequency() -> None:
 
 
 def test_the_pitch_curve_is_measured_on_the_fine_grid() -> None:
-    """Ten milliseconds, not the hundred the loudness curve is sampled at.
+    """Ten milliseconds, not the loudness curve's hundred.
 
-    The two grids were the same once, and that was a defect rather than a
-    feature: measured against synthetic contours of known range, a 100 ms
-    sampler understated a 3 Hz contour by 1.4 semitones and a 4 Hz one by 3.6,
-    because speech intonation carries real movement around the syllable rate.
-    Nothing plots the two curves against each other, so nothing was lost by
-    separating them, and the stored curve is thinned back down for display.
+    A 100 ms sampler understated a 3 Hz contour by 1.4 semitones and a 4 Hz one by
+    3.6, since intonation moves at the syllable rate. Thinned only for display.
     """
     measured = analyze(_wav(_tone(150, 2.0)))
 

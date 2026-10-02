@@ -1,18 +1,9 @@
 """The live session loop: STT -> streamed dialogue -> chunked TTS per turn.
 
-Covers:
-  F-46  Live-Call-Interface: the listening / thinking / speaking state model
-  F-01  the persona opens the call and then responds turn by turn
-  ADR 0102  in an ordinary call the user picks up first; the persona's
-        opening is the reply to that, and a reverse keeps its own
-  F-12/F-52/R-52  the full transcript is assembled from the turns, and only
-        at the end (nothing partial is exposed mid-call)
-  ADR 0033  streamed pipeline: audio is produced chunk by chunk, first chunk
-        before the whole reply is finished
-  ADR 0047/0048  each Turn's acoustics are measured inline, off the critical
-        path: what the measurement puts on the Turn, and what it leaves there
-        when it fails. What the statistics do with it: tests/test_metrics.py
-"""
+Covers F-46 (listening/thinking/speaking), F-01 (persona opens, then turn by turn),
+ADR 0110 (in an ordinary call the user picks up first; a reverse keeps its own opening),
+F-12/F-52/R-52 (transcript only at the end), ADR 0033 (first audio chunk before the reply ends),
+ADR 0047/0048 (per-Turn acoustics inline and on failure; statistics: tests/test_metrics.py)."""
 
 from dataclasses import replace
 
@@ -219,11 +210,11 @@ async def test_tts_zero_audio_fails_turn(orch, fake_pipeline):
     assert not audio_chunks(events)
 
 
-# --- ADR 0102: the user picks up ------------------------------------------
+# --- ADR 0110: the user picks up ------------------------------------------
 
 
 async def test_an_ordinary_call_opens_with_the_reply_to_the_users_answering_line(orch, fake_pipeline):
-    """ADR 0102: the Persona rang, so the user answers first and the Persona's
+    """ADR 0110: the Persona rang, so the user answers first and the Persona's
     first words are the reply to that -- asked for by the opening instruction,
     placed after the user's line so it is what the model reads last."""
     fake_pipeline.stt.transcripts = ["Beispiel GmbH, Müller am Apparat, guten Tag."]
@@ -231,11 +222,9 @@ async def test_an_ordinary_call_opens_with_the_reply_to_the_users_answering_line
 
     events = await collect(orch.run_turn(b"webm-bytes", "turn.webm", "audio/webm"))
 
-    # The instruction closes the user's own message (ADR 0103) rather than
-    # standing as a second system message, which cost the Persona its name.
     sent = fake_pipeline.llm.calls[0]
-    assert sent[-1]["role"] == "user"
-    assert sent[-1]["content"].startswith("Beispiel GmbH, Müller am Apparat, guten Tag.\n\n")
+    assert sent[-2] == {"role": "user", "content": "Beispiel GmbH, Müller am Apparat, guten Tag."}
+    assert sent[-1]["role"] == "system"
     assert "the user has just picked up" in sent[-1]["content"]
     # The greeting is the opening here, so the re-greeting guard lets it through.
     assert len(fake_pipeline.llm.calls) == 1

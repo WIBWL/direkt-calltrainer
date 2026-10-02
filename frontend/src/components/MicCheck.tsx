@@ -1,16 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { MicDevice } from "../hooks/useMicrophoneDevices";
 import { useMicrophoneLevel } from "../hooks/useMicrophoneLevel";
 
 const HEARD_THRESHOLD = 0.02;
+const REQUIRED_HEARD_DURATION_MS = 450;
 
-/** The states of the test, as one value: the pairs of booleans this replaces
- * could express combinations that never exist ("passed but not started"), and
- * every panel below had to spell out which pair it meant. "failed" is a state
- * of its own because a microphone that never opened has no level to wait for —
- * without it the running panel waits forever. */
-type TestPhase = "idle" | "running" | "failed" | "passed";
+/** The test's states as one value, so impossible boolean pairs cannot arise. "failed" is its own state
+ * because a microphone that never opened has no level to wait for — the running panel would wait forever. */
+type TestPhase = "idle" | "starting" | "running" | "failed" | "passed";
 
 interface MicCheckProps {
   /** null = browser default. */
@@ -44,21 +42,42 @@ export default function MicCheck({
   const { level, error, start, stop } = useMicrophoneLevel(deviceId);
 
   const [phase, setPhase] = useState<TestPhase>("idle");
+  const heardDurationRef = useRef(0);
+  const lastLevelTimestampRef = useRef<number | null>(null);
 
   // Scale the small RMS input range to a percentage for visual and accessible feedback.
   const meterPercentage = Math.min(Math.round(level * 400), 100);
 
   useEffect(() => {
-    if (phase !== "running" || level < HEARD_THRESHOLD) return;
+    if (phase !== "running") {
+      lastLevelTimestampRef.current = null;
+      return;
+    }
+
+    const now = performance.now();
+    const previousTimestamp = lastLevelTimestampRef.current;
+    lastLevelTimestampRef.current = now;
+
+    if (level >= HEARD_THRESHOLD && previousTimestamp !== null) {
+      heardDurationRef.current += Math.min(now - previousTimestamp, 100);
+    }
+
+    if (heardDurationRef.current < REQUIRED_HEARD_DURATION_MS) return;
 
     setPhase("passed");
     stop();
   }, [phase, level, stop]);
 
   const startTest = async () => {
-    setPhase("running");
-    if (await start()) {
+    heardDurationRef.current = 0;
+    lastLevelTimestampRef.current = null;
+    setPhase("starting");
+
+    const opened = await start();
+    if (opened === null) return; // a device change restarted the test meanwhile
+    if (opened) {
       onDevicesRefresh(); // labels are only real once permission was granted
+      setPhase("running");
     } else {
       setPhase("failed");
     }
@@ -67,15 +86,13 @@ export default function MicCheck({
   // Picking a different device while the meter is live must not keep the old
   // stream open — restart against the new one instead of silently ignoring it.
   useEffect(() => {
-    if (phase === "running") void startTest();
+    if (phase === "starting" || phase === "running") void startTest();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a deviceId change (not every re-render) should restart the running test
   }, [deviceId]);
 
   return (
     <>
       <section className="setup-intro mic-check-intro" aria-labelledby="mic-check-page-title">
-        <div className="eyebrow">Training vorbereiten</div>
-
         <h1 id="mic-check-page-title">Mikrofon testen</h1>
 
         <p className="setup-intro-description">
@@ -87,18 +104,16 @@ export default function MicCheck({
       {/* No SetupSection here: this screen has one box and no numbered steps to
           count off, and the page heading above already names it. */}
       <section className="setup-section">
-        {/* No visible label over it: the page heading already says this is the
-            microphone test and the control's own value names the device, so the
-            word only repeated what stood under it. The <dl> went with it — a
-            description list with nothing to describe is markup for a pairing
-            that no longer exists — and the accessible name moved onto the
-            <select>, so it is gone from the screen and not from the screen
-            reader. */}
+        {/* The visible label makes the device selector easier to identify while the
+            selected option continues to name the active microphone. */}
+        <label className="mic-device-label" htmlFor="mic-device-select">
+          Mikrofon auswählen
+        </label>
+
         <div className="mic-device-information">
           <select
             id="mic-device-select"
             className="mic-device-select"
-            aria-label="Mikrofon"
             value={deviceId ?? ""}
             onChange={(e) => onDeviceChange(e.target.value || null)}
           >
@@ -126,12 +141,17 @@ export default function MicCheck({
           </div>
         )}
 
-        {phase === "running" && (
+        {(phase === "starting" || phase === "running") && (
           <div className="mic-test-panel">
             <div className="mic-test-panel-copy">
-              <h3>Mikrofontest läuft</h3>
+              <h3>
+                {phase === "starting" ? "Mikrofon wird vorbereitet" : "Mikrofontest läuft"}
+              </h3>
+
               <p className="mic-check-hint">
-                Sagen Sie ein paar Worte, um Ihr Mikrofon zu testen.
+                {phase === "starting"
+                  ? "Das Mikrofon wird initialisiert. Einen Moment bitte."
+                  : "Sagen Sie ein paar Worte, um Ihr Mikrofon zu testen."}
               </p>
             </div>
 
@@ -147,7 +167,7 @@ export default function MicCheck({
             </div>
 
             <p className="mic-test-status" role="status" aria-live="polite">
-              Warte auf Audiosignal …
+              {phase === "starting" ? "Mikrofon wird initialisiert …" : "Warte auf Audiosignal …"}
             </p>
           </div>
         )}
@@ -208,7 +228,7 @@ export default function MicCheck({
       </section>
 
       <button className="back-to-start-button" type="button" onClick={onCancel}>
-        Zur Startseite
+        Zurück zur Vorbereitung
       </button>
     </>
   );

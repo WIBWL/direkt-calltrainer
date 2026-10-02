@@ -1,24 +1,52 @@
 name: direkt-calltrainer
 services:
-  app:
-    image: direkt-calltrainer
+  # The SPA and the one port the browser talks to. nginx serves the build and
+  # forwards /api, /ws and /health to the backend (frontend/nginx.conf), so the
+  # app stays same-origin: no CORS, and Keycloak redirects back to this port.
+  frontend:
     # Nothing here comes back on its own otherwise: a Docker restart, an OOM
     # kill or a crash leaves the container down. On the worker that is silent
     # -- calls keep working and wrap-ups simply never appear -- which is
     # exactly how a dead worker went unnoticed for hours.
+    restart: unless-stopped
+    build:
+      context: ./frontend
+    environment:
+      # Served to the SPA at runtime as /config.js (frontend/spa.conf.template). Same
+      # name the backend reads, same .env line.
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:18081/realms/direkt}
+    ports:
+      # Host port is deliberately non-standard to avoid clashes (e.g. mkdocs,
+      # other uvicorn/Django apps, all default to 8000).
+      - 8391:80
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      # 127.0.0.1, not localhost: nginx listens on IPv4 only.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    develop:
+      watch:
+        - action: rebuild
+          path: ./frontend
+          ignore:
+            - node_modules/
+            - dist/
+            - public/vad/
+
+  backend:
     restart: unless-stopped
     # Pinned: praat-parselmouth ships no Linux aarch64 wheel, so an arm64 build
     # falls back to the source tarball and fails to compile in python-slim.
     platform: linux/amd64
     build:
       context: .
-      dockerfile: ./Dockerfile
+      dockerfile: ./backend/Dockerfile
       platforms:
         - linux/amd64
-      args:
-        # The SPA needs these at `npm run build` time (see Dockerfile).
-        VITE_OIDC_ISSUER: ${VITE_OIDC_ISSUER:-http://localhost:18081/realms/direkt}
-        VITE_OIDC_CLIENT_ID: ${VITE_OIDC_CLIENT_ID:-calltrainer-frontend}
     env_file:
       - .env
     environment:
@@ -33,10 +61,7 @@ services:
       # over the compose network instead (backend/auth.py's OIDC_JWKS_URL).
       OIDC_ISSUER: http://localhost:18081/realms/direkt
       OIDC_JWKS_URL: http://keycloak:8080/realms/direkt/protocol/openid-connect/certs
-    ports:
-      # Host port is deliberately non-standard to avoid clashes (e.g. mkdocs,
-      # other uvicorn/Django apps, all default to 8000). Container stays 8000.
-      - 8391:8000
+    # No published port: the browser reaches it through the frontend.
     volumes:
       - ./logs:/app/logs
     depends_on:
@@ -64,35 +89,22 @@ services:
         - action: sync+restart
           path: ./backend
           target: /app/backend
-        # Anything that needs `pip install` or the frontend build re-run:
-        # cheap enough to just rebuild the image from scratch.
         - action: rebuild
           path: ./requirements.txt
-        - action: rebuild
-          path: ./frontend
-          ignore:
-            - node_modules/
-            - dist/
 
-  # The Feedback worker (ADR 0018/0019): same image and code as the app, a
+  # The Feedback worker (ADR 0018/0019): the backend's code in its own image, a
   # different process. It only ever touches Postgres and the LLM gateway, so
   # it needs no port of its own and nothing depends on it being up for a call
   # to run -- a stopped worker just means wrap-ups queue until it returns.
   worker:
-    image: direkt-calltrainer
-    # Nothing here comes back on its own otherwise: a Docker restart, an OOM
-    # kill or a crash leaves the container down. On the worker that is silent
-    # -- calls keep working and wrap-ups simply never appear -- which is
-    # exactly how a dead worker went unnoticed for hours.
     restart: unless-stopped
-    # Same image as app, so the same pin applies.
+    # Same dependencies as the backend, so the same pin applies.
     platform: linux/amd64
     build:
       context: .
-      dockerfile: ./Dockerfile
+      dockerfile: ./backend/worker.Dockerfile
       platforms:
         - linux/amd64
-    command: ["python", "-m", "backend.worker"]
     env_file:
       - .env
     environment:
@@ -137,17 +149,10 @@ services:
 
   db:
     image: postgres:17
-    # Not streamed by `docker compose up`; `docker compose logs db` still has
-    # every line. Its output is startup/shutdown chatter plus, during a test
-    # run, one checkpoint per throwaway database (tests/conftest.py creates and
-    # drops one per persistence test, and CREATE/DROP DATABASE each force one)
-    # -- a few hundred lines describing 30 ms of work apiece, burying the two
-    # services worth watching.
-    #
-    # `attach: false` rather than a Postgres log level, because there is no log
-    # level that drops this and keeps errors: `log_min_messages` ranks LOG above
-    # ERROR, so raising it past the startup chatter silences real errors too
-    # (verified -- a division by zero stopped being logged).
+    # Not streamed by `docker compose up` (`docker compose logs db` has it all):
+    # test runs produce hundreds of checkpoint lines. `attach: false` rather than
+    # a log level, because `log_min_messages` ranks LOG above ERROR, so raising it
+    # past the chatter silences real errors too (verified).
     attach: false
     # Checkpoint logging off on top of that, so a test run does not fill the
     # captured log either. Turn it back on before diagnosing real I/O.
@@ -158,40 +163,33 @@ services:
     # exactly how a dead worker went unnoticed for hours.
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
+      # Fixed, matching DEFAULT_USER/DEFAULT_DATABASE in backend/db/session.py.
+      # Applied only when the volume is created, so existing volumes carry
+      # "trainer" -- do not switch to the image's default "postgres".
+      POSTGRES_USER: trainer
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: trainer
     ports:
-      # Loopback only. The application never uses this: app and worker reach
-      # the database as `db` over the compose network. It is published for
-      # host-side work alone -- psql, a GUI client, `pytest` against a real
-      # server -- and a bare "5432:5432" would bind every interface, which
-      # matters because no deployment is decided yet (ADR 0020) and this file
-      # is the only description of how the system runs.
+      # Loopback only, for host-side work (psql, pytest); app and worker reach
+      # the database as `db`. A bare "5432:5432" would bind every interface
+      # (ADR 0020).
       - 127.0.0.1:5432:5432
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U trainer -d trainer"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # Local identity provider (ADR 0009). `start-dev` keeps realms in an embedded
-  # H2 file, so no DB of its own. `--import-realm` reads keycloak/direkt-realm.json
-  # at boot: the calltrainer-frontend client and the dev users
-  # niklas/mathias/eberhard (password = username). Import is SKIPPED if the
-  # realm already exists, so after editing the JSON:
+  # Local identity provider (ADR 0009), realm from keycloak/direkt-realm.json.
+  # Import is SKIPPED if the realm exists: after editing the JSON,
   # `docker compose down -v && docker compose up`.
-  # KC_HOSTNAME fixes the issuer to localhost:18081 no matter which host the
-  # token request arrived on; --hostname-strict=false lets the app container
-  # reach it as `keycloak:8080` for the JWKS. Host port 18081, not 18080, so it
-  # can run alongside another local Keycloak on the default port.
+  # KC_HOSTNAME pins the issuer to localhost:18081; --hostname-strict=false lets
+  # the app reach it as `keycloak:8080` for the JWKS.
   keycloak:
-    # Not streamed by `docker compose up` -- `docker compose logs keycloak`
-    # still has every line. It prints dozens of lines of Quarkus banner and
-    # realm import at every start and nothing afterwards, so in the foreground
-    # it is pure startup noise around the two services worth watching.
+    # Not streamed by `docker compose up` (startup noise only);
+    # `docker compose logs keycloak` still has every line.
     attach: false
     image: quay.io/keycloak/keycloak:26.7
     # Nothing here comes back on its own otherwise: a Docker restart, an OOM
@@ -209,19 +207,10 @@ services:
       # compose logs; WARN keeps the "started in Ns" line and errors.
       KC_LOG_LEVEL: WARN
     ports:
-      # Loopback only, for the same reason as the database -- and more so here:
-      # the admin console below is reachable with admin/admin. Nothing is lost,
-      # KC_HOSTNAME pins the issuer to localhost anyway, so a login from
-      # another machine could not work regardless.
-      #
-      # Both loopback addresses, and that is not redundant: Windows resolves
-      # `localhost` to ::1 first, so an IPv4-only binding makes every browser
-      # request to Keycloak open a connection that goes nowhere and fall back
-      # to 127.0.0.1 once the attempt times out -- a flat ~200 ms on each, paid
-      # five times over while the login page loads. The app's port carries no
-      # interface prefix and therefore listens on both anyway; here the prefix
-      # is what keeps it off the network, so the second address has to be
-      # spelled out.
+      # Loopback only: the admin console is reachable with admin/admin.
+      # Both loopback addresses are needed: Windows resolves `localhost` to ::1
+      # first, and an IPv4-only binding costs ~200 ms per request on the
+      # fallback to 127.0.0.1.
       - 127.0.0.1:18081:8080
       - "[::1]:18081:8080"
     volumes:

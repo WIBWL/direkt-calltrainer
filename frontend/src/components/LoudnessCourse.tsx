@@ -21,23 +21,9 @@ const HEIGHT = PLOT_TOP + PLOT_H;
 const LABEL_MARGIN = 70;
 
 /**
- * The loudness curve across the call (F-37), drawn from what Praat measured
- * (ADR 0047/0051) and stored in `Measurement.detail` (ADR 0029).
- *
- * No figure accompanies it, deliberately: the Measurement's value is a dB span
- * (95th percentile minus 5th) that reads like a level without being one and has
- * no validated norm to be placed against (ADR 0004/0051). The course can be
- * shown without inventing one, against a band drawn from the call's own samples.
- *
- * The horizontal axis is the user's **own speaking time**, not the call clock:
- * backend/session/models.py concatenates their Turns and inserts nothing for
- * the Persona's. Left is early and right is late, but a session timestamp would
- * be a lie — hence the axis label.
- *
- * Inline SVG rather than a charting library: a band, a line and two markers.
- * What they are drawn from is read off the call by the server and arrives in
- * the Measurement's detail (ADR 0091), so the sentence the wrap-up writes about
- * the same course cannot disagree with this picture.
+ * The loudness curve (F-37, ADR 0029/0047), with no figure: the dB span reads like a level
+ * without being one (ADR 0004/0051). The x axis is the user's own speaking time, not the
+ * call clock. Everything drawn is computed server-side (ADR 0091), matching the wrap-up.
  */
 export default function LoudnessCourse({ curve }: LoudnessCourseProps) {
   const x = (index: number) => (index / (curve.points - 1)) * WIDTH;

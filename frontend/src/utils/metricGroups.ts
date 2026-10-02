@@ -1,28 +1,9 @@
 import type { MetricAspect } from "../protocol";
 
-/**
- * Which family a metric belongs to, and the colour that says so (F-13).
- *
- * **Colour here is identity, never judgement.** ADR 0065 rules out colour that
- * means good or bad, not colour that means "these belong together". Two
- * structural rules hold the line:
- *
- * 1. **The hue hangs off the metric, not its value.** Nothing here takes a
- *    number, so a value can never move a colour — which is what a traffic light
- *    does.
- * 2. **Red, amber and green do not appear.** ADR 0078's traffic light already
- *    spent those three on the single-call view; reusing one as an identity hue
- *    would collide with a reserved meaning.
- *
- * Slots 1, 5 and 7 of the documented categorical palette, validated as an
- * all-pairs set against a white card: CVD ΔE 13.0 against a target of 8,
- * normal-vision ΔE 16.3 against a floor of 15. Magenta sits at 2.69 against the
- * 3:1 line, which the palette permits where the value is readable another way —
- * every tile prints its figure and the detail level repeats it as a table.
- *
- * Three and not ten: a hue per metric would be eight colours on one screen,
- * where adjacent pairs stop being separable under a colour vision deficiency.
- */
+/** A metric's family and its colour (F-13): identity, never judgement (ADR 0065).
+ * Nothing here takes a value, so a figure cannot move a colour, and red, amber and
+ * green are reserved for ADR 0078's traffic light. Palette slots 1, 5 and 7,
+ * validated as a set of three (CVD ΔE 13.0); a hue per metric would not separate. */
 
 export type MetricGroup = "speech" | "content" | "activity";
 
@@ -40,22 +21,16 @@ export const GROUPS: Record<MetricGroup, GroupStyle> = {
   speech: { label: "Sprechweise", color: "var(--series-speech)" },
   // Slot 5, magenta.
   content: { label: "Gesprächsinhalt", color: "var(--series-content)" },
-  // Slot 7, violet. Counting what somebody did needs no norm at all, which is
-  // why the two charts in this family are the only ones on the screen that
-  // carry no caveat. No Kennzahl belongs to this family, so `groupOf` never
-  // returns it: the activity charts read `--series-activity` from the
-  // stylesheet directly. The entry stays so the third hue is declared beside
-  // the other two, which is the set of three the palette was validated as.
+  // Slot 7, violet. `groupOf` never returns it (the activity charts read
+  // `--series-activity` directly); declared here so the validated set of three
+  // stays together.
   activity: { label: "Aktivität", color: "var(--series-activity)" },
 };
 
 /**
- * The family of one metric, from the `aspect` the schema already stores.
- *
- * Read off the wire rather than mapped here: `metric_type.aspect` is assigned in
- * `backend/feedback/metrics.py` and travels with every measurement, so a metric
- * added there needs no edit in the frontend. A measurement with no aspect falls
- * to `speech`, matching the backend's own fallback for an unclassified metric.
+ * The family of one metric, from the served `metric_type.aspect` (assigned in
+ * `backend/feedback/metrics.py`). No aspect falls to `speech`, matching the
+ * backend's fallback.
  */
 export function groupOf(aspect: MetricAspect | null | undefined): MetricGroup {
   return aspect === "what" ? "content" : "speech";

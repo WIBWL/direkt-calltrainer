@@ -13,15 +13,8 @@ import MetricScale from "./MetricScale";
 import SegmentComparison from "./SegmentComparison";
 
 /**
- * One metric of one training, in full (F-51's interruptions, F-35's intonation).
- *
- * Its own page rather than a panel inside the wrap-up. The excerpts run to
- * several lines each, a call with four interruptions would push everything
- * below it off the screen, and this is something a user may want to link to or
- * come back to. Back is the browser's.
- *
- * Reads the Session once and never polls, like `PastSessionView`: whatever the
- * database holds for a finished call is final.
+ * One metric of one training in full, on its own route so it can be linked and left with Back. Reads the
+ * Session once and never polls, like `PastSessionView`.
  */
 export default function SessionMetricView() {
   const { sessionId, metricKey } = useParams<{ sessionId: string; metricKey: string }>();
@@ -100,15 +93,8 @@ export default function SessionMetricView() {
 
         {note && <p className="metric-note">{note}</p>}
 
-        {/* The way up. Everything else on this screen is about one call, and
-            "is it always like this?" is exactly the question somebody asks in
-            front of a figure — but until now the connection ran one way only:
-            the progress view linked down into a training and nothing led back.
-
-            Not for the loudness: its dB span is the recording's level, so it
-            is kept out of every cross-call view (`comparableAcrossCalls`), and
-            a link promising a course would promise the one thing that view
-            refuses to draw. */}
+        {/* The way up to the same metric across trainings. Not for loudness: kept out of every cross-call
+            view (`comparableAcrossCalls`), since its dB span is the recording's level. */}
         {comparableAcrossCalls(measurement.key) && (
           <p className="metric-page-across">
             <Link to={progressMetricPath(measurement.key)}>
@@ -159,18 +145,9 @@ export default function SessionMetricView() {
 }
 
 /**
- * The transcript around one interruption (F-51).
- *
- * A timestamp alone tells the user that something happened at 2:48, which they
- * cannot check against a memory of the call. What they can check is the
- * sentence: their own line, the Persona's line it cut into, and what the
- * Persona had been about to say next.
- *
- * That last part is the counterfactual and is styled as one. It is not part of
- * the transcript and never was heard: the server keeps it aside precisely so it
- * cannot leak into the conversation the model reads (ADR 0035). For calls
- * recorded before it was kept it is simply absent, which the block says rather
- * than leaving a gap.
+ * The transcript around one interruption (F-51): the user's line, the Persona's line it cut into, and what the
+ * Persona had been about to say. That last part was never heard and is kept aside so it cannot reach the
+ * model's history (ADR 0035); styled as such, and absent for older calls, which the block says.
  */
 function InterruptionDetail({
   findings,

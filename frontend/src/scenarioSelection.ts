@@ -1,16 +1,7 @@
 /**
- * What the selection screen shows of the library, and which case is picked.
- *
- * Pure functions over the cards and the two filter rows (ADR 0072), so the
- * rules can be tested without rendering a screen — the same move
- * `trainingFlow.ts` made for where a press leads. They used to be two helpers,
- * two memos, two count matrices and an effect inside `App.tsx`, where the one
- * rule every one of them serves was a comment: **the summary under the grid
- * never names a case that is not on the screen above it.**
- *
- * `useScenarioLibrary` holds the state these read; `scenarioLibrary.ts` holds
- * the routes and what a card means. This is the part in between: which cards
- * a given pair of filters leaves, and what the selection does about it.
+ * What the selection screen shows and which case is picked: pure functions over
+ * the cards and both filter rows (ADR 0072). The rule they serve: **the summary
+ * under the grid never names a case that is not on screen.**
  */
 
 import {
@@ -50,15 +41,10 @@ export function startingFilters(scenarios: ScenarioCard[]): Filters {
     : DEFAULT_FILTERS;
 }
 
-/** The Scenario to start on: the random Scenario (F-62), which is the one tile
- * that stands outside both filters and is therefore always on screen. It is
- * also the only opening selection that cannot be the wrong one — every other
- * default silently proposes a case the User did not choose.
- *
- * It needs a pool to draw from, so for a library holding nothing but reverses
- * and follow-ups this falls back to the first card the starting filters show —
- * the first of all, for a library those filters leave empty — which keeps the
- * summary at the bottom of the screen from naming a card that is not on it. */
+/** The Scenario to start on: the random tile (F-62), always on screen and never
+ * a case the User did not choose. With nothing drawable it falls back to the
+ * first card the starting filters show (else the first of all), so the summary
+ * never names a card that is not on screen. */
 export function firstSelectable(scenarios: ScenarioCard[]): string | null {
   if (scenarios.some(isDrawable)) return RANDOM_SCENARIO_ID;
   const filters = startingFilters(scenarios);
@@ -66,14 +52,9 @@ export function firstSelectable(scenarios: ScenarioCard[]): string | null {
 }
 
 /**
- * The cards the grid shows, by name.
- *
- * By name, not by origin group: the grid badges every card with where it
- * comes from, so grouping by that said the same thing twice and left no way
- * to find a Scenario one already knows the name of. `localeCompare` with an
- * explicit locale, because an umlaut has to sort with its base letter rather
- * than after Z. The random Scenario is not in here — the picker draws it in a
- * fixed first place ahead of this list.
+ * The cards the grid shows, sorted by name (the badge already shows origin).
+ * Explicit locale so an umlaut sorts with its base letter, not after Z. The
+ * random tile is not in here; the picker puts it first.
  */
 export function visibleScenarios(scenarios: ScenarioCard[], filters: Filters): ScenarioCard[] {
   return scenarios
@@ -90,12 +71,9 @@ export function drawPool(scenarios: ScenarioCard[], filters: Filters): ScenarioC
 }
 
 /**
- * How many cards each option of each row would yield.
- *
- * Each row is counted against the *other* row's selection, never its own
- * (ADR 0072), so an option's number is what picking it would actually yield.
- * Every level 1 value is counted, "tenant" included: that costs nothing when
- * the caller has no company, and the picker decides whether to offer it.
+ * How many cards each option would yield, counted against the *other* row's
+ * selection (ADR 0072). "tenant" is always counted; the picker decides whether
+ * to offer it.
  */
 export function filterCounts(
   scenarios: ScenarioCard[],
@@ -111,15 +89,9 @@ export function filterCounts(
 }
 
 /**
- * The selection after the filters changed.
- *
- * A filter change can put the summary out of step with the grid two ways: the
- * random tile stops being offered, or the card that was picked is filtered
- * away. Either way the selection falls back to the tile, which is where the
- * screen opens; only with nothing left to fall back to is nothing selected.
- * Falling back rather than clearing is the point: clearing left the summary
- * empty even after the User filtered their way back to a library full of
- * cases.
+ * The selection after the filters changed: if the random tile is gone or the pick
+ * was filtered away, fall back to the tile rather than clearing, which left the
+ * summary empty. Nothing is selected only when there is nothing to fall back to.
  */
 export function keptSelection(
   current: string | null,

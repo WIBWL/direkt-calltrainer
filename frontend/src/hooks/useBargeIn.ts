@@ -3,19 +3,9 @@ import { useCallback, useRef } from "react";
 import type { CallState } from "../protocol";
 
 /**
- * The wire between hearing the user start talking and telling the server how
- * much of the Persona's reply they actually heard (ADR 0035).
- *
- * One line used to carry the whole guarantee — `socket.sendInterrupt(
- * playback.interrupt())`, written twice in `App.tsx`. Both hooks had their own
- * tests; the line between them had none, and `interrupt()`'s return value is
- * easy to drop, which would silently keep words in the transcript that nobody
- * heard.
- *
- * What it deliberately does not do: the four mechanisms that make a barge-in
- * actually stop the audio — the epoch counter, the master gain, stopping the
- * scheduled sources, and the socket refusing further chunks — stay where they
- * are. This owns when they are asked for, not how they work.
+ * Tells the server how much of the Persona's reply the user heard when they cut
+ * in (ADR 0035); dropping `interrupt()`'s return silently keeps unheard words.
+ * Owns *when* a barge-in is asked for, not the mechanisms that stop the audio.
  */
 
 /** What this needs of the session socket, and nothing more. */
@@ -23,7 +13,7 @@ export interface BargeInSocket {
   callState: CallState;
   /** Report how much of the current reply was played before the user cut in. */
   sendInterrupt: (playedMs: number) => void;
-  /** Report that the user started speaking into silence (ADR 0102). */
+  /** Report that the user started speaking into silence (ADR 0110). */
   sendSpeaking: () => void;
   endSession: () => void;
 }
@@ -37,21 +27,14 @@ export interface BargeInPlayback {
 
 export interface BargeIn {
   /**
-   * What the call screen shows.
-   *
-   * The server sends "listening" the moment the Turn completes, but the last
-   * chunk can still be playing out locally — so this holds at "speaking" until
-   * playback has actually finished. It is the only answer to "is the Persona
-   * still talking?" that accounts for both sides, and both callbacks below
-   * branch on it.
+   * What the call screen shows. The server sends "listening" when the Turn
+   * completes while the last chunk may still be playing, so this holds at
+   * "speaking" until playback finishes. Both callbacks below branch on it.
    */
   displayState: CallState;
   /**
-   * The user started speaking over the Persona.
-   *
-   * Stable for the life of the component, because `useMicrophoneVAD` wires
-   * this into `MicVAD.new` once and never rewires it — the callback given on
-   * the first render is the one that fires for the whole call.
+   * The user started speaking over the Persona. Stable for the component's
+   * life: `useMicrophoneVAD` wires it into `MicVAD.new` once and never rewires.
    */
   bargeIn: () => void;
   /** Hang up. Reports the played position first where the Persona was still
@@ -67,17 +50,9 @@ export function useBargeIn(
     socket.callState === "listening" && playback.isPlaying ? "speaking" : socket.callState;
 
   /**
-   * The current everything, refreshed each render and read only from the two
-   * callbacks below.
-   *
-   * They cannot close over `socket` and `playback` directly: they must keep one
-   * identity (see `bargeIn`), so a closure would hold the first render's
-   * values forever. Reading through a ref also removes what used to hold this
-   * together by luck — the callbacks captured `sendInterrupt`, `endSession` and
-   * `interrupt`, which are stable today only because four separate dependency
-   * arrays happen to be empty. A single dependency added to any of them would
-   * have frozen barge-in against a dead socket, with no type error and no
-   * failing test.
+   * Latest values for the two callbacks below, which must keep one identity
+   * (see `bargeIn`): closing over `socket`/`playback` would freeze the first
+   * render's values and leave barge-in wired to a dead socket, silently.
    */
   const latest = useRef({ socket, playback, displayState });
   latest.current = { socket, playback, displayState };
@@ -87,7 +62,7 @@ export function useBargeIn(
     // Not a barge-in if the Persona was not talking: the user's own turn is
     // the normal case, and reporting an interrupt there would trim a reply
     // that had already finished. It is still worth telling the server that
-    // someone is talking, so it does not ask "Hallo?" over them (ADR 0102).
+    // someone is talking, so it does not ask "Hallo?" over them (ADR 0110).
     if (state === "listening") {
       s.sendSpeaking();
       return;

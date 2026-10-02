@@ -8,27 +8,9 @@ import { formatOffset } from "../utils/time";
 import LoudnessCourse from "./LoudnessCourse";
 
 /**
- * What a figure was read off, on the metric's own page (ADR 0098).
- *
- * Every tile on the wrap-up screen leads here now, and a page that repeated the
- * tile's number in a larger font would be worse than no link at all. So each
- * metric shows its evidence: the words that were counted, the passages that
- * were found, the pauses that were measured.
- *
- * **Nothing here is computed from scratch.** Every block reads the `detail` the
- * measurement was stored with (ADR 0029) or quotes the stored transcript. That
- * is deliberate and not laziness: a second arithmetic in the client would
- * eventually disagree with the first, and the screen would state two different
- * figures for one call. Where the detail does not hold something, the block
- * says so rather than deriving a substitute.
- *
- * **And nothing here judges.** No target, no colour, no "too many" (ADR
- * 0004/0051). The blocks answer one question only: what is behind this number?
- * A reader who can see the four sentences that were counted can decide for
- * themselves what they are worth, which is the whole point of showing them.
- *
- * Intonation and interruptions are absent on purpose: both already have a block
- * of their own on this page, older and richer than anything here.
+ * What a figure was read off, on the metric's own page (ADR 0098). Nothing is recomputed: blocks read the stored
+ * `detail` (ADR 0029) or quote the transcript, since a second client-side arithmetic would eventually disagree.
+ * Missing detail is said, not derived. Nothing judges (ADR 0004/0051). Intonation and interruptions have own blocks.
  */
 export default function MetricEvidence({
   measurement,
@@ -120,11 +102,8 @@ function number(value: unknown): number | null {
 // --- The blocks --------------------------------------------------------------
 
 /**
- * Both sides' speaking time, as the ratio it was divided into.
- *
- * The Persona's bar is drawn as plainly as the user's and carries no comment:
- * it is a synthesized voice at a fixed rate, so a remark about it would be a
- * remark about a setting (ADR 0051).
+ * Both sides' speaking time. The Persona's bar carries no comment: it is a synthesized voice at a fixed rate,
+ * so a remark about it would be about a setting (ADR 0051).
  */
 function TalkShare({ detail }: { detail: Record<string, unknown> }) {
   const user = number(detail.user_ms);
@@ -162,11 +141,8 @@ function Bar({ label, ms, share }: { label: string; ms: number; share: number })
 }
 
 /**
- * Every question that was counted, quoted.
- *
- * Cut at the question marks themselves and not at sentence boundaries, so the
- * list holds exactly as many entries as the figure says. A list that came out
- * one short would leave a reader counting rather than reading.
+ * Every question that was counted, quoted. Cut at the question marks, not at sentence boundaries, so the list
+ * holds exactly as many entries as the figure says.
  */
 function Questions({
   detail,
@@ -235,11 +211,8 @@ function WordCount({ detail }: { detail: Record<string, unknown> }) {
 }
 
 /**
- * The filler words themselves, and where they fell.
- *
- * The words come from the stored detail, the sentences from the transcript. The
- * marked word inside a quote is the same string that was counted, so a reader
- * can check the count against the call rather than take it.
+ * The filler words (from the stored detail) and the sentences they fell in (from the transcript). The marked
+ * word is the same string that was counted, so the count can be checked against the call.
  */
 function Fillers({
   detail,
@@ -385,11 +358,8 @@ function Closing({
 }
 
 /**
- * A checklist's parts, said in words.
- *
- * "Nicht erkannt" and never "fehlt": the parts are found by the phrases they
- * are usually wrapped in, and a greeting worded some other way slips past them
- * (ADR 0086). The distinction is the whole reason this is not a score.
+ * A checklist's parts, in words. "Nicht erkannt", never "fehlt": parts are found by their usual phrasing, and a
+ * greeting worded differently slips past (ADR 0086).
  */
 function PartList({ measurement }: { measurement: Measurement }) {
   const parts = metricParts(measurement);
@@ -408,11 +378,8 @@ function PartList({ measurement }: { measurement: Measurement }) {
 }
 
 /**
- * Every pause that went into the average, in the order they happened.
- *
- * On the user's own speaking time, like the loudness course above it: the
- * stored offsets count the user's turns concatenated, and nothing in the strip
- * stands for the Persona talking.
+ * Every pause that went into the average, in order, on the user's own speaking time: the stored offsets count
+ * the user's turns concatenated, so nothing in the strip stands for the Persona talking.
  */
 function Pauses({ detail }: { detail: Record<string, unknown> }) {
   const events = Array.isArray(detail.pause_events)
@@ -514,17 +481,9 @@ function RunLength({ detail }: { detail: Record<string, unknown> }) {
 }
 
 /**
- * Every silence that went into the average, and the exchange the longest one
- * stood in.
- *
- * The exchange is the part worth showing. "Ihre längste Pause war 4,1 s" is a
- * fact nobody can do anything with; the question that was waiting through it
- * usually explains it, and sometimes justifies it — a pause before answering an
- * objection is not the same event as a pause before a name.
- *
- * Takes every Turn rather than only the user's: what stood before the silence
- * is the Persona's line, matched on the offset the gap was measured from, so
- * the two cannot disagree about which exchange this was.
+ * Every silence that went into the average, and the exchange the longest one stood in — the question waiting
+ * through a pause usually explains it. Takes every Turn, not only the user's: the Persona's line before the
+ * silence is matched on the offset the gap was measured from, so the two cannot disagree.
  */
 function ReactionTime({
   detail,
@@ -619,12 +578,8 @@ function Pace({ detail }: { detail: Record<string, unknown> }) {
 }
 
 /**
- * The held sounds, in the utterances they fell in.
- *
- * Quoted by turn and not pinned to a word: what was measured is a stretch of
- * flat voicing, and the transcript does not contain it at all -- the speech
- * recogniser removes exactly these sounds. Naming the sentence is as close as
- * the stored facts allow, and claiming more precision would be inventing it.
+ * The held sounds, quoted by the utterance they fell in, not pinned to a word: the recogniser removes exactly
+ * these sounds from the transcript, so the sentence is as precise as the stored facts allow.
  */
 function Hesitations({
   detail,

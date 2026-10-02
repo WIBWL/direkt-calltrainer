@@ -5,23 +5,9 @@ import { sessionPath } from "../routes";
 import { formatDateTime } from "../utils/time";
 
 /**
- * The trainings behind one cell, each a link into itself.
- *
- * The calendar and the variety grid both describe what somebody did and, until
- * this existed, both ended there: a cell said "2 Trainings" and the only way to
- * those two was the history in the profile, by date, by hand. That is the one
- * block on the progress screen from which nothing followed, against the rule
- * the concept takes from Verbert et al. — a block nothing follows from does not
- * belong on the screen.
- *
- * Details on demand rather than a route of its own: the list is two or three
- * rows, it belongs beside the cell it explains, and a `/fortschritt/tag/…` page
- * would be a third level for something the second already holds.
- *
- * It states what it is showing in its own heading. The list appears some way
- * from the cell that was pressed — under the calendar, under the grid — so
- * "Trainings am 14. September" is what connects the two, and it is also what a
- * screen reader hears when focus moves here.
+ * The trainings behind one calendar or variety-grid cell, each a link, so those blocks lead somewhere. Shown in
+ * place rather than as a route of its own. Its heading ("Trainings am 14. September") ties the list to the
+ * pressed cell and is what a screen reader hears.
  */
 export default function TrainingLinks({
   title,

@@ -1,25 +1,16 @@
-"""Buffers streamed LLM tokens into TTS-sized chunks.
+"""Buffers streamed LLM tokens into TTS-sized chunks (ADR 0033).
 
-The seam the streaming pipeline (ADR 0033) turns on: regrouping the model's
-tokens into sentence-sized pieces so each can be synthesised and start playing
-while the rest of the reply is still generating.
-"""
+Sentence-sized pieces can be synthesised and start playing while the rest of the
+reply is still generating."""
 
 import re
 from collections.abc import AsyncIterator
 
-# A full stop straight after a digit is not the end of a sentence: German
-# writes ordinals and thousands that way ("6. Juli", "1.400"), and the tokens
-# arrive split exactly there, so the buffer ends at that stop long before the
-# rest of the number does. Flushing there splits one sentence across two
-# synthesis calls -- an audible gap, "1." and "500 Euro" spoken as "eins" and
-# "fünfhundert", and the halves stored as "1. 500" in the history the model
-# then reads back. It also put that sentence out of reach of the
-# sentence-level dedup (ADR 0038), which compares whole sentences.
-# `clients/speech_text.py` takes the characters back out before the text is
-# spoken; this keeps the chunk whole on the way there. The cost is that a
-# sentence genuinely ending in a number ("Wir zahlen 850.") no longer flushes
-# early -- it goes out with the next one, or as the trailing remainder.
+# A full stop straight after a digit is not a sentence end: German ordinals and
+# thousands ("6. Juli", "1.400") arrive split there, and flushing would split one
+# sentence across two synthesis calls (an audible gap, "1. 500" in the history,
+# and out of reach of the sentence dedup, ADR 0038). Cost: "Wir zahlen 850." no
+# longer flushes early. `clients/speech_text.py` removes the stop before speaking.
 _SENTENCE_END_RE = re.compile(r"(?<!\d)[.!?]\s*$")
 # A listening test at 40/150, 80/250 and 120/300 chars found 80/250 most
 # natural: smaller chunks were choppier (no prosody continuity into the next),

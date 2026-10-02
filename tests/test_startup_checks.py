@@ -1,19 +1,8 @@
-"""What the boot check reports when a backend does not answer.
+"""What the boot check reports when a backend does not answer (ADR 0011/0103).
 
-Covers:
-  ADR 0074  dialogue generation on Gemini; the models are named in `.env` and
-            a wrong one has to surface at boot rather than mid-call
-  ADR 0011  the gateway's own model, checked the same way
-
-The check only logs -- `lifespan` boots either way -- so its whole value is the
-sentence it writes. Two ways of losing that sentence are pinned here, both seen
-in a real log: `asyncio.wait_for`'s TimeoutError carries no message, so the line
-ended in a bare dash; and the OpenAI client retried a 429 twice with backoff
-*inside* the check's own deadline, so a rate-limited model never got to report
-its rate limit and timed out instead.
-
-The backends are faked (`conftest.py`); nothing here reaches a network.
-"""
+The check only logs, so its sentence is its whole value. Pins two ways it got lost: a bare
+TimeoutError has no message, and client retries on a 429 inside the check's deadline turned
+a rate limit into a timeout. Backends are faked (`conftest.py`)."""
 import asyncio
 import logging
 
@@ -31,7 +20,7 @@ from backend.clients import health, llm
 def _rate_limit() -> RateLimitError:
     return RateLimitError(
         "429 RESOURCE_EXHAUSTED: quota exceeded",
-        response=httpx.Response(429, request=httpx.Request("POST", "http://gemini")),
+        response=httpx.Response(429, request=httpx.Request("POST", "http://gateway")),
         body=None,
     )
 
@@ -68,18 +57,12 @@ async def test_the_llm_check_asks_for_a_single_attempt(recording_client):
     assert recording_client == {"max_retries": 0}
 
 
-async def test_the_wrap_up_check_asks_for_one_too(recording_client):
-    with pytest.raises(RateLimitError):
-        await health._check_feedback_llm()
-    assert recording_client == {"max_retries": 0}
-
-
 async def test_a_rate_limited_model_reports_its_own_429(recording_client, caplog):
     caplog.set_level(logging.ERROR, logger="backend.clients.health")
-    assert await health._run_check("LLM", health._check_llm, "gemini-3.5-flash-lite") is False
+    assert await health._run_check("LLM", health._check_llm, "Qwen3-4B-AWQ") is False
     line = caplog.records[-1].getMessage()
     assert "RESOURCE_EXHAUSTED" in line
-    assert "gemini-3.5-flash-lite" in line
+    assert "Qwen3-4B-AWQ" in line
 
 
 async def test_a_timeout_says_so_instead_of_trailing_off(monkeypatch, caplog):

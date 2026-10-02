@@ -3,31 +3,17 @@ import type { ReactNode } from "react";
 import { cx } from "../utils/cx";
 
 /**
- * The heading of a section: eyebrow, title, and whatever belongs at its
- * right-hand end.
- *
- * It sits *above* the white box rather than inside it, and every section does
- * the same — which was the point of introducing it. Half of the feedback page's
- * sections used to carry their heading inside the box and half above it, so
- * two blocks of the same kind looked like two different kinds of thing.
- *
- * A box may still hold a title of its own, but only for an *item* inside a
- * section: the two offers in the next-steps block are each a thing you can
- * pick, not a section of the page.
- *
- * Its own module because two screens use it: the wrap-up and the progress
- * dashboard, which took the same headings so that the page reading many
- * trainings and the page reading one speak the same visual language.
+ * A section heading (title, optional right-hand content), always *above* the white box. A box holds a
+ * title only for an item within a section. Shared by the wrap-up and the progress dashboard so both speak the
+ * same visual language.
  */
 export default function SectionHeading({
-  eyebrow,
   title,
   id,
-  icon,
   aside,
+  icon,
   tone,
 }: {
-  eyebrow: string;
   title: string;
   /** For a section that names itself by its heading (`aria-labelledby`). */
   id?: string;
@@ -46,7 +32,6 @@ export default function SectionHeading({
       )}
 
       <div className="feedback-section-heading">
-        <div className="feedback-section-eyebrow">{eyebrow}</div>
         <h2 className="feedback-section-title" id={id}>
           {title}
         </h2>

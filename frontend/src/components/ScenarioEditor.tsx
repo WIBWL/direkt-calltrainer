@@ -518,14 +518,8 @@ export default function ScenarioEditor({
                           }))
                         }
                       >
-                        {/* Marked like the other answers that have to be
-                            given, and "Ohne Kategorie" is one of them —
-                            which is why it is not in `canSave`: the field
-                            cannot be left unanswered, because it starts on
-                            a valid answer. A Scenario that fits none of the
-                            four is better uncategorised than filed wrongly
-                            (ADR 0072); it then shows under "Alle" and under
-                            no category. */}
+                        {/* "Ohne Kategorie" is a valid answer, so the field needs no `canSave` check: better
+                            uncategorised than filed wrongly (ADR 0072). */}
                         <option value="">Ohne Kategorie</option>
                         {CATEGORIES.map((c) => (
                           <option key={c} value={c}>

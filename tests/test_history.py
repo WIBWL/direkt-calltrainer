@@ -1,14 +1,8 @@
 """The call's record as the model has been told it (`backend/session/history.py`).
 
-Covers:
-  ADR 0035  a reply is trimmed to, or dropped for, what the user heard
-  ADR 0038  the repetition guards read the Persona's earlier replies
-  ADR 0071  the model's window is the system prompt plus the latest messages
-
-The orchestrator changed this list by index from seven places; the named
-operations are pinned here without a pipeline, a model or an event loop. The
-barge-in and repetition suites still drive the same record end to end.
-"""
+Covers ADR 0035 (trim/drop to what was heard), ADR 0038 (repetition guards read
+earlier replies) and ADR 0071 (system prompt plus latest messages). The named
+operations are pinned without a pipeline, a model or an event loop."""
 from backend.session.history import History
 
 # pylint: disable=missing-function-docstring

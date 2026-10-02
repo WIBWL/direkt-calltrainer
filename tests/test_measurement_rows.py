@@ -1,19 +1,8 @@
 """One measured figure becoming one stored row (`backend/feedback/rows.py`).
 
-Covers:
-  ADR 0029  the figure and its `detail_json`
-  ADR 0051  a Measurement belongs to a Session, and since ADR 0081 to one
-            stretch of it -- which is the `segment` these rows carry
-  ADR 0057  the metric keys are English, and a row can only be written against
-            a seeded `metric_type`
-
-Four writers built these rows by hand -- the live path, the wrap-up's segment
-pass and two backfill scripts -- each with its own metric-id lookup, its own
-rounding and its own silent drop of an unseeded key. This pins the shared one.
-
-No database: the rows are constructed, not flushed. What is being tested is the
-shape they are given, which is exactly what four copies could disagree about.
-"""
+Covers ADR 0029 (figure and `detail_json`), ADR 0051/0081 (per Session and
+`segment`) and ADR 0057 (English keys, seeded `metric_type` only). Pins the one
+shared builder the four writers use. No database: rows are built, not flushed."""
 import logging
 
 from backend.db import models as db_models

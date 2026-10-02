@@ -88,6 +88,17 @@ drei und mehr), ein leerer Tag sein Datum, der heutige einen Ring. Gezählt
 werden nur abgeschlossene Trainings. Ein abgebrochenes Gespräch wird weder
 gezählt noch eigens markiert, denn die Frage lautet, wann jemand trainiert hat.
 
+Das gilt seit dem zweiten Nachtrag zu ADR 0034 für den ganzen Block, nicht mehr
+nur für den Kalender. Die drei Zahlen und das Raster daneben zählten jedes
+gespeicherte Gespräch mit, sodass die Karte „17 Trainings" neben einem Kalender
+mit vierzehn Marken stand und das PDF denselben Widerspruch auf Papier
+wiederholte. Dieselbe Regel steht jetzt an einer Stelle
+(`progressStats.completedOnly`). Für die Kennzahlen gilt eine **zweite** Regel,
+und die fragt nach der Länge statt nach dem Status: Ein Gespräch unter einer
+Minute liefert keine Zahlen mehr in die Kurven, ein neun Minuten langes bleibt
+drin, auch wenn es an einem Netzabbruch endete. Wie viele dabei wegfallen, steht
+neben dem Zeitraumschalter und auf der ersten Seite des PDF.
+
 Gezeigt wird ein Monat, beim Aufruf der laufende; zwei Pfeile blättern zurück
 bis zum Monat des ältesten Trainings und wieder vor. Sechs Monate
 nebeneinander waren eine Wand aus Rastern, in der ausgerechnet der gesuchte
@@ -345,11 +356,13 @@ abgebrochen), also Aktivität und Vielfalt.
 
 ### 4.2 Abdeckung der Fokusziele
 
-Der Katalog aus F-62 hat 14 Ziele. „Souveräne Lautstärke“ stand hier bis zur
-Ergänzung von ADR 0076 und ist zurückgezogen: Gemessen wird der Pegel der
-Aufnahme, und der sagt genauso viel über Mikrofon und Sitzabstand wie über die
-sprechende Person. Die Kennzahl `loudness` bleibt, das Ziel nicht. Was heute mit
-Daten hinterlegt werden kann:
+Der Katalog aus F-62 hat 13 Ziele. Zwei sind zurückgezogen, und beide aus
+demselben Grund. „Souveräne Lautstärke“ ging mit der Ergänzung zu ADR 0076:
+Gemessen wird der Pegel der Aufnahme, und der sagt genauso viel über Mikrofon
+und Sitzabstand wie über die sprechende Person. Die Kennzahl `loudness` bleibt,
+das Ziel nicht. „Deutliche Artikulation“ ging mit ADR 0105, der die Frage
+beantwortet, die weiter unten in diesem Abschnitt an die Projektleitung
+gestellt war. Was heute mit Daten hinterlegt werden kann:
 
 | Fokusziel | Heute belegbar durch | Lücke |
 |---|---|---|
@@ -361,14 +374,13 @@ Daten hinterlegt werden kann:
 | Regelmäßiges Training | Sitzungsdaten | keine |
 | Trainingsvielfalt | Persona × Szenario | keine |
 | Lebendige Sprachmelodie | `intonation` (Tonhöhenumfang in Halbtönen, plus Kurve) | keine |
-| Deutliche Artikulation | Auswertungstext, und der dünn | keine Messung, und es ist keine geplant (siehe unten) |
 | Souveränität unter Druck | `pace`, `pauses`, `run_length`, `loudness`, `talk_share`, je über die fordernden Stellen und über den Rest (ADR 0081) | welche Stellen fordernd waren, entscheidet die Auswertung und nicht eine Messung |
 | Souveräner Gesprächseinstieg | `opening`: Begrüßung, eigener Name und Hilfsangebot bzw. Anliegen im ersten Beitrag, dazu dessen Tempo (ADR 0086) | ob der Einstieg *zugewandt* klang, steht nur im Auswertungstext |
 | Sichere Einwandbehandlung | Auswertungstext | keine Messung |
 | Klarer Gesprächsabschluss | `closing`: Zusammenfassung, konkreter nächster Schritt und Verabschiedung in den letzten zwei Beiträgen (ADR 0089), dazu Auswertungstext und `phase_language` | ob das Richtige zusammengefasst und ein tragfähiger Schritt vereinbart wurde, bleibt Text |
 | Empathie und Kundenorientierung | Auswertungstext | keine Messung, laut Katalog auch keine geplant |
 
-Elf Ziele sind also heute mit Zahlen unterlegbar, drei nur mit Text. Zuletzt
+Elf Ziele sind also heute mit Zahlen unterlegbar, zwei nur mit Text. Zuletzt
 hinzugekommen ist der Gesprächsabschluss (ADR 0089), das Gegenstück zum
 Einstieg. Eines der elf ist der Sonderfall: „Souveränität unter Druck“ wird nicht als Verlauf
 gezeigt, sondern als Vergleich zweier Abschnitte innerhalb eines Gesprächs
@@ -378,9 +390,9 @@ Das ist kein Mangel des Dashboards, sondern der Umsetzungsstand. Der Entwurf
 muss beides tragen können, und ein Ziel ohne Messung darf keine leere Kachel
 erzeugen (Abschnitt 6).
 
-**Die Artikulation bekommt keine Messung, und das ist eine Entscheidung und kein
-Rückstand.** Sie stand als letzter offener Punkt in Stufe 3. Drei Gründe, jeder
-für sich ausreichend:
+**Die Artikulation bekommt keine Messung, und das Ziel ist deshalb aus dem
+Katalog genommen** (ADR 0105). Beides ist eine Entscheidung und kein Rückstand.
+Drei Gründe, jeder für sich ausreichend:
 
 * **Das Mikrofon ist nicht herauszurechnen.** Undeutlichkeit zeigt sich in der
   spektralen Schärfe des Signals, und die hängt von Mikrofon, Abstand und der
@@ -397,19 +409,24 @@ für sich ausreichend:
   ab wann jemand undeutlich spricht. Für diese Nutzergruppe ist nichts
   validiert, und ADR 0051 verbietet die Erfindung genau hier.
 
-Was bleibt, ist der Auswertungstext, und der ist bei diesem Ziel **dünner als bei
+Geblieben wäre der Auswertungstext, und der ist bei diesem Ziel **dünner als bei
 den beiden anderen Textzielen**: Ob ein Abschluss klar war, steht im Gesagten und
 ist aus dem Transkript lesbar. Ob jemand deutlich gesprochen hat, steht gerade
 nicht darin. Das Modell kann dazu nur etwas sagen, wenn es im Transkript
 Nachfragen des Gegenübers findet („Wie bitte?“), und das ist ein schwaches
-Indiz. Daraus folgt eine Frage an die Projektleitung, die hier nicht allein
-entschieden wird: **Soll „Deutliche Artikulation“ im Katalog bleiben?** Ein Ziel
-anzubieten, zu dem die Anwendung dauerhaft fast nichts sagen kann, ist dieselbe
-Art von Versprechen, wegen der die Lautstärke gegangen ist. Bis das entschieden
-ist, bleibt das Ziel wählbar, und `focus_goal.evidence` steht auf
-`interpretive` statt wie bisher auf `mixed` — die Spalte sagt, wie weit ein Ziel
-ableitbar ist, und „gemischt“ war eine Zusage auf eine Messung, die nicht
-kommt.
+Indiz. Es ist sogar schwächer, als es hier zuerst stand: Die Persona verhört
+sich nie, sie liest ein Transkript. Eine Nachfrage von ihr sagt etwas über die
+Erkennerqualität und über das Modell, nicht über die sprechende Person.
+
+Daraus folgte eine Frage an die Projektleitung, die an dieser Stelle nicht
+allein entschieden wurde: **Soll „Deutliche Artikulation“ im Katalog bleiben?**
+Sie ist mit Nein beantwortet (ADR 0105). Ein Ziel anzubieten, zu dem die
+Anwendung dauerhaft fast nichts sagen kann, ist dieselbe Art von Versprechen,
+wegen der die Lautstärke gegangen ist, und hier eine Stufe schlimmer: Bei der
+Lautstärke blieb wenigstens der Vergleich innerhalb eines Gesprächs. Die Zeile
+wird beim Seeding deaktiviert und nicht gelöscht, wer sie gewählt hatte,
+behält vier Ziele, und die Anforderung F-38 bleibt in der Featureliste stehen,
+denn die Anwendung erfüllt sie nicht und soll das auch sagen.
 
 ### 4.3 Zwei methodische Vorbehalte, die in die Oberfläche gehören
 
@@ -449,7 +466,7 @@ Einstellungen, während das Dashboard eine Arbeitsansicht ist.
 
 Stand nach der Überarbeitung (September 2026). Die Buchstaben der Abschnitte
 unten sind die ursprünglichen, die Reihenfolge auf dem Bildschirm ist A mit dem
-Aktivitätsteil, dann der Zeitraumschalter, dann B, D mit E und C.
+Aktivitätsteil, dann der Zeitraumschalter, dann B, D mit E und C, zuletzt F.
 
 ```
 +-----------------------------------------------------------------------+
@@ -493,6 +510,8 @@ Aktivitätsteil, dann der Zeitraumschalter, dann B, D mit E und C.
 |  ● Gesprächsinhalt                                                     |
 |  Fragen           4         ~~~~\/~~~      3 bis 6                 12  |
 |  Gesprächseinstieg 3 Teile  [3][2][3][3]   in 9 von 12 alle 3      12  |
++-----------------------------------------------------------------------+
+|  [ Fortschritt herunterladen ]                                         |  F
 +-----------------------------------------------------------------------+
 ```
 
@@ -615,6 +634,42 @@ Drei Wege, in dieser Rangfolge:
 Der Vorschlag nennt immer, woher er kommt („weil der Abschluss in Ihren letzten
 Auswertungen dreimal genannt wurde“). Eine Empfehlung ohne Begründung ist an
 dieser Stelle eine Anweisung.
+
+### F. Mitnehmen
+
+Ganz unten ein Knopf: **Fortschritt herunterladen**
+(`frontend/src/utils/progressPdf.ts`). Das Dashboard ist das, was jemand in ein
+Gespräch mit einer Ausbilderin oder einer Führungskraft mitnimmt, und bis dahin
+ging das nur als Bildschirmfoto je Block.
+
+Die Datei trägt, was die Seite trägt, in der Reihenfolge der Seite: die
+Aufzeichnung dessen, was trainiert wurde, über alle gespeicherten Gespräche,
+die Fokusziele, was die
+Auswertungen wiederholt nennen, und jede Kennzahl mit ihrem üblichen Bereich und
+einem gezeichneten Verlauf — gelesen über die Trainings, die die Schalter
+auswählen, was die erste Seite in Worten sagt.
+
+Drei Dinge stehen bewusst **nicht** darin:
+
+* **Der Kalender.** Zwölf Monatsraster sind vier Seiten Kästchen. Was ein Leser
+  daraus mitnimmt — wie viele Trainings in welchen Monat fielen — ist eine
+  Liste, und eine Liste ist das, was ein Blatt Papier gut kann.
+* **Jede Wertung.** Kein Zielwert, keine Ampel, kein Pfeil, keine Differenz
+  zwischen einem früheren und einem späteren Wert, keine Gesamtnote
+  (ADR 0004, ADR 0051, ADR 0065). Auf Papier ist die Regel schärfer als auf dem
+  Bildschirm: Ein Blatt, das jemand anderem in die Hand gegeben wird, liest sich
+  als Beurteilung der Person, solange nicht dasteht, dass es keine ist. Es steht
+  zweimal da, unter dem Titel und am Fuß.
+* **Eine Route auf dem Server.** Gebaut wird im Browser, aus den Zahlen, die die
+  Seite ohnehin hält. Ein zweiter Weg zu denselben Zahlen ist genau das, was
+  Abschnitt 9 ausschließt; dass die Feedback-Datei aus demselben Grund im
+  Browser gebaut wird, kommt hinzu (ADR 0066).
+
+Der Knopf sitzt, wo der Feedback-Bildschirm seinen hat: in derselben
+Aktionszeile und mit deren Klassen, nicht mit einer Kopie ihrer Regeln. Das
+Seitengerüst beider Dokumente — Banner, Schriften, Palette, Überschrift, Absatz,
+Seitenumbruch — ist `frontend/src/utils/pdfDocument.ts`, damit die zwei Dateien,
+die diese Anwendung schreibt, wie eine Anwendung aussehen.
 
 ## 6. Zustände
 
@@ -769,6 +824,12 @@ Vorschlag, damit die spätere Umsetzung nicht am Datenweg hängt:
   auch eine Kachel und einen Übungsvorschlag bekommt, hängt an zwei Tabellen im
   Frontend, die still danebenliegen können; `tests/test_focus_goal_coverage.py`
   und `tests/test_recommendations.py` halten beide gegen den gesäten Katalog.
+* **Die Mitnahme ist ebenfalls kein Endpunkt.** Das PDF (Abschnitt F) wird im
+  Browser gebaut, aus den Sitzungen, die für die Ansicht ohnehin geladen sind.
+  Eine Serverroute dafür wäre der zweite Weg zu denselben Zahlen, den der erste
+  Punkt ausschließt, und sie müsste die Auswahl der Schalter noch einmal
+  nachbilden. jsPDF und die Schriften werden erst beim Druck auf den Knopf
+  geholt, liegen also nicht im Startbündel.
 * **Auf Anfrage berechnet, nicht materialisiert.** Sechs Monate Aufbewahrung
   begrenzen die Datenmenge je Konto auf eine Größenordnung, die eine Abfrage
   ohne Aggregattabelle trägt. Eine Aggregattabelle wäre eine zweite Wahrheit,
@@ -821,6 +882,7 @@ Offene Fragen an die Projektleitung, die ich nicht allein entscheiden sollte:
 | 1 (gebaut) | Kopf, Kennzahlen mit Verläufen, Fokuszielkacheln für die acht messbaren Ziele, alle Zustände aus Abschnitt 6, Detailebene | Nur vorhandene Daten. Kein Schemaeingriff. |
 | 2 (gebaut) | Bereich D und E, dazu die zweite Ebene für Kennzahl und Fokusziel mit den zitierten Aussagen | Zuordnung im Generator, eine Spalte, ADR aus Abschnitt 10. Erledigt durch ADR 0080 (`feedback_point.focus_goal_id`, Migration `d4c81b70e2a5`) samt der redaktionellen Tabelle in `utils/practiceRoutes.ts` und der Ergänzung zu ADR 0064 für den Text auf der Liste. |
 | 3 (abgeschlossen) | Fokusziele ohne Messung mit Zahlen unterlegen | Gebaut: Sprachmelodie (F-35), Unterbrechungen (F-51), Abschnittswerte für „Souveränität unter Druck“ (ADR 0081). Verworfen mit Begründung: Füllwörter (Whisper normalisiert sie weg), das Fokusziel zur Lautstärke (misst das Mikrofon mit), die Artikulation (Abschnitt 4.2). Keine offenen Punkte mehr. |
+| 4 (gebaut) | Bereich F: die Ansicht als PDF zum Mitnehmen | Nur vorhandene Daten und kein Schemaeingriff — gebaut im Browser aus den Sitzungen, die die Ansicht ohnehin lädt (`utils/progressPdf.ts`), auf dem Seitengerüst, das aus der Feedback-Datei herausgelöst wurde (`utils/pdfDocument.ts`). Nachträglich ergänzt, nicht ursprünglich geplant: Der Bedarf kam aus dem Gebrauch, weil die Seite sonst nur als Bildschirmfoto in ein Gespräch mitzunehmen war. |
 
 Stufe 1 ist für sich genommen brauchbar und hält jede bestehende Entscheidung
 ein. Das ist der Zuschnitt, mit dem angefangen werden sollte.

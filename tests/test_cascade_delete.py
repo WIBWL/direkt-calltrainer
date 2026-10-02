@@ -1,14 +1,8 @@
-"""Deleting a Session must take its whole subtree with it and leave the shared
-reference data alone.
+"""Deleting a Session takes its whole subtree and leaves reference data alone.
 
-This is the mechanism behind ADR 0034's promise that a User can delete their own
-data. The cascade is declared twice on purpose: `ON DELETE` on the foreign key so
-the database enforces it even for raw SQL, and `cascade="all, delete-orphan"`
-with `passive_deletes=True` on the relationship so the ORM lets it do the work.
-Both paths are pinned down below, including the awkward case: a FeedbackPoint
-references a Turn but is owned by the Feedback, so the two have to unwind in an
-order that does not trip the foreign key.
-"""
+Behind ADR 0034's user deletion. Pinned both ways: `ON DELETE` for raw SQL and
+ORM cascades with `passive_deletes=True`, including FeedbackPoint -> Turn, which
+must unwind in an order that does not trip the foreign key."""
 from datetime import UTC, datetime
 
 import pytest
@@ -181,11 +175,10 @@ def test_raw_sql_delete_also_clears_the_subtree(db_session: DbSession) -> None:
 
 @pytest.mark.usefixtures("session_with_full_subtree")
 def test_a_metric_type_in_use_cannot_be_deleted(db_session: DbSession) -> None:
-    """The same rule as for a Persona, and the one the schema used to state
-    twice over: `measurement` refuses the delete while `finding` and
-    `feedback_point` once offered to null their reference instead. They no
-    longer do -- a reference table is undeletable while anything points at it,
-    without exception (ADR 0026).
+    """A metric type in use is undeletable, like a Persona (ADR 0026).
+
+    No referencing table (`measurement`, `finding`, `feedback_point`) may null the
+    reference instead: reference tables do not cascade, without exception.
     """
     with pytest.raises(IntegrityError):
         db_session.execute(text("DELETE FROM metric_type"))

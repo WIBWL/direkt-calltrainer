@@ -3,21 +3,10 @@ import { describe, expect, it } from "vitest";
 import { session, tag } from "../test/sessions";
 import { MIN_MENTIONS, mentionSummary, mentionsFor, statementsFor } from "./goalMentions";
 
-/**
- * Counting what the wrap-ups said (ADR 0080, the dashboard's block D).
- *
- * This is the arithmetic most easily misread on the whole screen: it produces a
- * count over a denominator, and a count over a denominator is one careless
- * change away from being a score. The cases below pin the three decisions that
- * keep it a frequency of statements — counted per training, divided by the
- * trainings that could have said something, and shown only from a real
- * threshold — plus the ordering, which has to be stable or the same data
- * renders differently on two reads.
- *
- * A wrong denominator here does not fail anywhere. It writes "in 4 von 6
- * Auswertungen genannt" where the truth is 4 of 9, and the user has no way to
- * check it.
- */
+/** Counting what the wrap-ups said (ADR 0080, block D). Pins what keeps it a
+ * frequency, not a score: per training, over trainings that could have said it,
+ * from a threshold, in stable order. A wrong denominator fails nowhere; it just
+ * tells the user "4 von 6" where the truth is 4 of 9. */
 
 describe("the denominator", () => {
   it("counts only the trainings whose wrap-up carried an assignment", () => {

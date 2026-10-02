@@ -1,0 +1,35 @@
+# The static half of the frontend container, included by both nginx configs.
+# The image's entrypoint renders it to /etc/nginx/conf.d/spa.conf at start,
+# substituting only variables set in the environment -- nginx's own stay.
+
+include /etc/nginx/mime.types;
+default_type application/octet-stream;
+server_tokens off;
+access_log off;
+sendfile on;
+
+gzip on;
+gzip_types text/css application/javascript text/javascript application/json
+           image/svg+xml application/wasm;
+
+root /usr/share/nginx/html;
+
+# The OIDC issuer from the container's environment, so one image serves every
+# realm. index.html loads it before the app; an unset variable yields "" and
+# oidcConfig.ts refuses to start.
+location = /config.js {
+    default_type "text/javascript; charset=utf-8";
+    add_header Cache-Control no-store;
+    return 200 'window.OIDC_ISSUER = "${OIDC_ISSUER}";\n';
+}
+
+# A reload or shared link to a client route such as /profil gets the app.
+location / {
+    try_files $uri /index.html;
+}
+
+# A missing path whose last segment has a dot asked for a file and stays a
+# 404 -- "/assets/main.js" must not come back as index.html.
+location ~ \.[^/]*$ {
+    try_files $uri =404;
+}

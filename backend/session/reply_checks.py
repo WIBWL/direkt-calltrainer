@@ -1,26 +1,72 @@
 """Verdicts on one reply against the replies already given in this call.
 
-Each check answers one question about a reply the model has just produced --
-does it repeat, restate, restart the call, or end on a demand -- and none of
-them does anything about the answer. What a verdict leads to (dropping a
-sentence, regenerating, vetoing an end marker, ending the call) and in which
-order the checks run is the orchestrator's, because that order *is* the
-behaviour (ADR 0035, ADR 0037, ADR 0038).
-
-They sat on `SessionOrchestrator` as methods whose only state was the history
-they read, so testing one meant driving a whole Turn through a faked pipeline.
-They take the replies as a list here, oldest first -- `History.replies()` --
-and `repetition.py` stays the layer below: how much of one text is in another,
-without knowing what a reply or a call is.
-"""
+Each check answers one question and acts on none: what a verdict leads to, and
+in which order, is the orchestrator's, since that order *is* the behaviour
+(ADR 0035, ADR 0037, ADR 0038). `repetition.py` is the text layer below."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from backend.session import repetition
 from backend.session.language_packs import LanguagePack
 from backend.session.nudges import strip_interrupted_mark
+
+
+@dataclass(frozen=True)
+class Ending:
+    """Whether a finished reply ends the call, and why."""
+
+    ends: bool
+    # Why, each reason on its own: they are logged together.
+    marker: bool
+    closing: bool
+    repeated: bool
+    restates: bool
+    said_goodbye: bool
+    # A fallback goodbye has to be spoken after the reply.
+    needs_fallback: bool
+
+
+def ending(  # pylint: disable=too-many-arguments  # the reasons a call ends, each its own input
+    text: str,
+    replies: Sequence[str],
+    *,
+    marker: bool,
+    closing: bool,
+    allow_repetition: bool,
+    pack: LanguagePack,
+) -> Ending:
+    """Whether a finished reply ends the call, and whether a goodbye must follow.
+
+    `marker` is the model's [CALL_END], already past ADR 0037's veto; `closing`
+    backstops it on a Turn the user closed. On a repeat request, repeating the
+    *previous* reply is the answer, but an older one is still a loop (ADR 0038).
+    `said_goodbye` catches the obedient model: it withholds the marker on a reply
+    voicing a reservation, then signs off anyway, which left the call hanging.
+    The fallback goodbye is needed where nobody asked for one (repeat, unprompted
+    marker), never where the reply said its own, and always on a wordless reply."""
+    spoke = bool(text)
+    repeated = spoke and (
+        repetition.has_repeated_sentence(text) or
+        repeats_earlier(text, replies, exclude_last=allow_repetition) or
+        (not allow_repetition and repeats_last(text, replies))
+    )
+    restates = spoke and not allow_repetition and restates_previous(text, replies)
+    said_goodbye = spoke and not marker and bool(pack.farewell_re.search(text))
+    ends = marker or closing or repeated or restates or said_goodbye
+    return Ending(
+        ends=ends,
+        marker=marker,
+        closing=closing,
+        repeated=repeated,
+        restates=restates,
+        said_goodbye=said_goodbye,
+        needs_fallback=ends and (
+            not spoke or repeated or restates or (marker and not closing)
+        ),
+    )
 
 
 def repeats_last(text: str, replies: Sequence[str]) -> bool:
@@ -31,19 +77,10 @@ def repeats_last(text: str, replies: Sequence[str]) -> bool:
 
 
 def repeats_earlier(text: str, replies: Sequence[str], *, exclude_last: bool = False) -> bool:
-    """True if this reply reproduces one the persona gave further back than the
-    previous Turn, verbatim modulo case and whitespace -- an A-B-A-B
-    oscillation, which `repeats_last` walks straight past because the repeat is
-    two Turns back.
-
-    A trivially short reply ("Ja, genau.") can recur across the call without
-    being a loop, so only substantial ones count here -- unlike `repeats_last`,
-    where an exact back-to-back repeat is degenerate at any length.
-
-    `exclude_last` drops the immediately previous reply from the search: when
-    the user asked to hear it again, reproducing *that* one is the answer, but
-    reproducing one from further back is still a loop.
-    """
+    """True if this reply reproduces, verbatim modulo case, one given further back
+    than the previous Turn (an A-B-A-B oscillation `repeats_last` misses). Short
+    replies don't count. `exclude_last` skips the previous reply when the user
+    asked to hear it again."""
     candidate = text.strip().lower()
     if len(candidate) < repetition.MIN_LOOP_REPLY_CHARS:
         return False
@@ -58,15 +95,10 @@ def restates_previous(text: str, replies: Sequence[str]) -> bool:
 
 
 def reintroduces(first_chunk: str, replies: Sequence[str], pack: LanguagePack, first_name: str) -> bool:
-    """Whether a reply *opens* by greeting or re-introducing after the call is
-    already under way -- the model restarting the call instead of continuing
-    it. Judged on the first chunk, before it is spoken, so the reply can be
-    regenerated rather than the call ended.
-
-    Narrow on purpose: a greeting at the very start of the reply, plus either
-    the persona's own first name or the opening's wording carried over. A late
-    "Guten Tag" mirrored back at a user who greeted first is the one legitimate
-    case, and it still costs only a regeneration."""
+    """Whether a reply *opens* by greeting or re-introducing mid-call, judged on
+    the first chunk so it can be regenerated rather than the call ended. Narrow:
+    a greeting at the very start plus the persona's first name or the opening's
+    wording; a mirrored late "Guten Tag" costs only a regeneration."""
     if not replies:  # the opening Turn -- greeting is correct here
         return False
     opener = first_chunk.strip()
@@ -81,13 +113,10 @@ def reintroduces(first_chunk: str, replies: Sequence[str], pack: LanguagePack, f
 
 
 def repeats_earlier_opening(first_chunk: str, replies: Sequence[str]) -> str | None:
-    """The first sentence of `first_chunk` if the persona has already said
-    exactly that sentence earlier in the call, else None. The pre-synthesis
-    form of `repeats_earlier` / `repeats_last`: after two barge-ins the history
-    holds short cut-off lines that a 4B model reproduces readily, and an exact
-    repeat spoken out loud can only be answered by ending the call, so it is
-    caught before synthesis and regenerated once instead. Short openers
-    ("Ja, genau.") recur naturally and don't count."""
+    """The first sentence of `first_chunk` if the persona already said exactly
+    that earlier in the call, else None. Pre-synthesis form of `repeats_earlier`:
+    a 4B model readily reproduces short cut-off lines, and a spoken repeat can only
+    end the call, so it is regenerated once instead. Short openers don't count."""
     opening = repetition.first_sentence(first_chunk)
     if len(opening) < repetition.MIN_LOOP_REPLY_CHARS:
         return None

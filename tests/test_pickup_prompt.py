@@ -1,7 +1,7 @@
 """A "Hallo?" into a silent line after the user picked up.
 
 Covers:
-  ADR 0102  in an ordinary call the user answers first; if they say nothing,
+  ADR 0110  in an ordinary call the user answers first; if they say nothing,
             the Persona asks whether anybody is there -- twice at most, never
             into speech the client has reported, never in a reverse -- and its
             real opening is still owed to the user's first words

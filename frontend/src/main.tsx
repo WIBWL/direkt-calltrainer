@@ -24,29 +24,19 @@ import { ROUTES } from "./routes";
 import "./index.css";
 
 const onSigninCallback = (user: User | undefined) => {
-  // Keycloak always returns to the origin (`oidcRedirectUri`), so the path in
-  // the URL bar at this moment is "/" regardless of where the user was headed.
-  // Two separate things have to happen, and only one of them is a navigation:
-  //
-  // Stripping `?code=&state=` is required for silent renew to work, and has to
-  // go through the History API because React Router must not treat the OIDC
-  // callback as a location worth keeping in the back stack.
-  //
-  // Returning to the requested page cannot happen here. `replaceState` fires no
-  // event, so the router would never learn the path changed — the URL bar would
-  // say /profil while the training screen stayed on screen. It is handed to
-  // <ReturnToRequestedPage /> below, which navigates through the router.
+  // Keycloak always returns to "/". Stripping `?code=&state=` (needed for silent
+  // renew) goes through the History API so the callback stays out of the back
+  // stack. Returning to the requested page must NOT happen here: `replaceState`
+  // fires no event, so the router would keep the old screen under the new URL.
+  // <ReturnToRequestedPage /> below navigates through the router instead.
   const returnTo = (user?.state as { returnTo?: string } | undefined)?.returnTo;
   if (returnTo) rememberReturnTo(returnTo);
   window.history.replaceState({}, document.title, ROUTES.training);
 };
 
 /**
- * Sends the user to the page they originally asked for, once.
- *
- * Only ever fires after a login redirect, because that is the only thing that
- * writes the stored path — an ordinary reload of /profil finds nothing here and
- * stays where it is.
+ * Sends the user to the page they originally asked for, once. Fires only after
+ * a login redirect, the only writer of the stored path.
  */
 function ReturnToRequestedPage() {
   const navigate = useNavigate();
@@ -60,14 +50,9 @@ function ReturnToRequestedPage() {
 }
 
 /**
- * The routes that may only be reached once the two first-run questions are
- * answered: whether trainings may be stored (ADR 0066) and what the user wants
- * to focus on (ADR 0076).
- *
- * Nested, so they are asked one after the other rather than on top of each
- * other, and in this order: consent is the one with a legal basis behind it,
- * and the focus question is asked of a user who has already decided what
- * happens to their data.
+ * Routes reachable only once the two first-run questions are answered: storage
+ * consent (ADR 0066), then focus (ADR 0076). Nested so they come one after the
+ * other, the one with a legal basis first.
  */
 function ConsentGate() {
   return (
@@ -106,13 +91,10 @@ createRoot(document.getElementById("root")!).render(
               <Route element={<ConsentGate />}>
                 <Route path={ROUTES.training} element={<App />} />
                 <Route path={ROUTES.profile} element={<ProfileView />} />
-                {/* The three dashboard screens share one load of the
-                    history and one selection of trainings (see
-                    ProgressContext.tsx). Nested here rather than mounted with
-                    the other providers, because the training flow needs
-                    neither and should not pay for the request. The provider
-                    stays mounted while the router moves between the three, so
-                    walking into a detail and back asks for nothing. */}
+                {/* One history load and selection for the three dashboard
+                    screens (ProgressContext.tsx), mounted here so the training
+                    flow does not pay for the request, and kept mounted across
+                    the three so moving between them refetches nothing. */}
                 <Route
                   element={
                     <ProgressProvider>

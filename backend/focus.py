@@ -1,22 +1,8 @@
-"""The training focus a User has picked, and the catalogue it comes from
-(F-62, ADR 0076).
+"""The training focus a User has picked, and its catalogue (F-62, ADR 0076).
 
-The single place the `focus_goal`, `focus_selection` and `focus_selection_goal`
-tables are read and written — `backend/library.py`'s role for the Scenario
-library, and for the same reason: the scoping rule is one rule, and a second
-query somewhere else is how it comes to hold in one place and not the other.
-
-Every read and write here is scoped by the caller's own `sub`. The client never
-supplies a subject, so there is no form of these requests that is about somebody
-else and none to authorise or refuse (ADR 0031/0064).
-
-A selection is a *setting*, not training data: it says what a User wants to work
-on, not what they said in a call. Consent (ADR 0066) covers the storage of
-Sessions, so no consent guard sits on this path, and `backend/deletion.py` does
-not remove a selection when Sessions go — deleting your trainings must not
-silently reset the goals you picked. `retention_preference` is the same kind of
-row and is treated the same way.
-"""
+The single place the `focus_goal`, `focus_selection` and `focus_selection_goal` tables
+are read and written, always scoped by the caller's `sub` (ADR 0031/0064). A selection
+is a *setting*: no consent guard, and `backend/deletion.py` never removes it."""
 from __future__ import annotations
 
 import logging
@@ -31,13 +17,8 @@ from backend.db.seed_data import FOCUS_GROUP_NAMES, TRAINING_ROLE_CATALOGUE
 
 logger = logging.getLogger(__name__)
 
-# How many goals one subject may focus on at once.
-#
-# Five, and the number is the whole of the rule: a focus that covers everything
-# is not a focus, and a limit the interface enforces but the API does not is not
-# a limit. The client reads it from `/api/focus` rather than carrying its own
-# copy, so the two cannot disagree (the same reason ADR 0063 gives for the
-# editor's field limits).
+# How many goals one subject may focus on at once. Enforced here, and served
+# via `/api/focus` so the client never carries its own copy (as in ADR 0063).
 MAX_GOALS = 5
 
 
@@ -55,12 +36,9 @@ class Goal:
 
 @dataclass(frozen=True)
 class Selection:
-    """What one subject has decided, if anything.
-
-    `decided` and an empty `keys` are different answers to different questions:
-    a subject who continued without a focus has decided, and must not be asked
-    again. Only a subject with no row at all is undecided.
-    """
+    """What one subject has decided, if anything. `decided` with empty `keys`
+    means "continued without a focus" and must not be asked again; only a subject
+    with no row at all is undecided."""
 
     decided: bool
     decided_at: datetime | None
@@ -77,12 +55,8 @@ class Selection:
 
 
 def groups() -> list[dict[str, str]]:
-    """The catalogue's headings, in catalogue order.
-
-    Served alongside the goals rather than held in the frontend: the goal text
-    already comes from the database, and a heading kept somewhere else is a
-    second place to edit when the catalogue changes.
-    """
+    """The catalogue's headings, in catalogue order -- served rather than held in
+    the frontend, so a catalogue change is edited in one place."""
     return [{"key": key, "name": name} for key, name in FOCUS_GROUP_NAMES.items()]
 
 
@@ -148,14 +122,8 @@ def _checked(
 ) -> tuple[list[str], dict[str, db_models.FocusGoal], list[str]]:
     """What `set_selection` may store, or the refusal that stops it.
 
-    Everything the request has to prove before a row is touched: the goals fit
-    in MAX_GOALS, exist and are active; the role and the call types are in their
-    vocabularies. Separate from the write below so that neither half has to be
-    read to follow the other -- and so the write is what its own locals are
-    about.
-
-    Returns the de-duplicated goal keys, the goal rows they name, and the
-    de-duplicated call types.
+    Checks goals (count, existence, active), role and call types. Returns the
+    de-duplicated goal keys, the goal rows and the de-duplicated call types.
     """
     wanted = list(dict.fromkeys(keys))  # de-duplicated, order preserved
     if len(wanted) > MAX_GOALS:
@@ -182,12 +150,8 @@ def _checked(
     kinds = list(dict.fromkeys(categories or ()))
     strange = [kind for kind in kinds if kind not in db_models.SCENARIO_CATEGORIES]
     if strange:
-        # Only the first few are named. The goals are capped at MAX_GOALS before
-        # they are looked up, the call types are not, and the whole list came
-        # back in the 400's body -- a request with a hundred thousand invented
-        # types answered with a body the same size. Nothing leaks and React
-        # escapes it; it is amplification, and naming three is as useful to the
-        # caller as naming all of them.
+        # Name only the first few: the call types are not capped, and echoing
+        # all of them in the 400 body let a huge request amplify its answer.
         more = f" (and {len(strange) - 3} more)" if len(strange) > 3 else ""
         raise UnknownChoice(f"unknown call type(s): {', '.join(strange[:3])}{more}")
 
@@ -203,16 +167,8 @@ def set_selection(
 ) -> Selection:
     """Replace the subject's focus with `keys`. An empty list is "no focus".
 
-    Role and call types are replaced along with it: the client always sends the
-    whole selection, so leaving them out means "none".
-
-    Replaced rather than merged: the selection is a set of at most five, and the
-    client always sends the whole of it, so a partial update would need a second
-    call to remove anything and could leave the row in a state nobody chose.
-
-    Raises UnknownGoal / TooManyGoals, which the route turns into a 400 — both
-    mean the request was wrong, and silently dropping the surplus would store a
-    focus the user did not pick.
+    Role and call types are replaced too; the client always sends the whole
+    selection. Raises UnknownGoal / TooManyGoals (a 400), never truncates.
     """
     wanted, rows, kinds = _checked(db, keys, role, categories)
 
@@ -278,12 +234,8 @@ def _as_selection(db: DbSession, row: db_models.FocusSelection) -> Selection:
 
 
 def _selected_keys(db: DbSession, selection_id: int) -> tuple[str, ...]:
-    """The selected keys in catalogue order.
-
-    Ordered by the catalogue and not by when they were picked: the selection is
-    a set of at most five and nothing about it is ranked, so an order of its own
-    would suggest a priority the user never expressed.
-    """
+    """The selected keys in catalogue order -- the selection is unranked, so
+    pick order would suggest a priority the user never expressed."""
     rows = (
         db.query(db_models.FocusGoal.key)
         .join(

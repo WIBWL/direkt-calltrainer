@@ -1,22 +1,8 @@
 """The persistence schema (SQLAlchemy models), and what the database enforces.
 
-Covers:
-  ADR 0026  normalized schema for session persistence
-  ADR 0025  SQLAlchemy ORM as the single source of truth
-  ADR 0026  metric types carry a `feature_id` linking a measurement back to
-            a feature in docs/features.md (F-24, F-35..F-38, F-51, ...)
-  ADR 0029  measurement detail is JSONB
-  ADR 0051  one set of statistics per Session, not per Turn
-  ADR 0053  invariants the code assumes are enforced by the database
-  F-09/F-14  Feedback row: qualitative summary (NOT NULL) + optional score
-  F-12      Turn transcripts are stored
-
-Two halves. The first asserts against the mapper metadata and needs no
-infrastructure. The second, below, writes to a real database, because a
-constraint that is only declared is not the same as one the server applies --
-and these particular constraints exist to catch a writer that the tests above
-cannot see.
-"""
+Covers ADR 0025, 0026 (incl. metric `feature_id`: F-24, F-35..F-38, F-51), 0029, 0051, 0053; F-09/F-14, F-12.
+First half checks mapper metadata; the second writes to a real database, since a declared
+constraint is not proof the server applies it."""
 
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -88,18 +74,25 @@ def test_reference_entities_are_keyed_by_a_stable_business_key():
 
 
 def test_authored_reference_rows_carry_an_external_id_and_ownership():
-    """ADR 0058: Persona and Scenario also hold User-authored rows now, so each
+    """ADR 0058: Scenario holds User-authored rows beside the shipped ones, so it
     carries an unguessable `extern_id` (the wire id, ADR 0050), a `created_by`
     (NULL for a built-in) and a CHECK-guarded `visibility`. The `key` slug is
     nullable -- an authored row has none."""
-    for model in (models.Persona, models.Scenario):
-        cols = {c.name: c for c in model.__table__.columns}
-        assert cols["extern_id"].unique
-        assert cols["key"].nullable
-        assert cols["created_by"].nullable
-        checks = {c.name for c in model.__table__.constraints
-                  if c.__class__.__name__ == "CheckConstraint"}
-        assert f"ck_{model.__tablename__}_visibility_valid" in checks
+    cols = {c.name: c for c in models.Scenario.__table__.columns}
+    assert cols["extern_id"].unique
+    assert cols["key"].nullable
+    assert cols["created_by"].nullable
+    checks = {c.name for c in models.Scenario.__table__.constraints
+              if c.__class__.__name__ == "CheckConstraint"}
+    assert "ck_scenario_visibility_valid" in checks
+
+
+def test_a_persona_is_addressed_by_extern_id_and_carries_no_authorship():
+    """ADR 0058: a Persona is curated, never authored, so it has the wire id and
+    nothing of the authorship columns a Scenario needs."""
+    cols = {c.name for c in models.Persona.__table__.columns}
+    assert models.Persona.__table__.c.extern_id.unique
+    assert not cols & {"created_by", "tenant_id", "visibility"}
 
 
 def test_measurement_value_is_numeric():

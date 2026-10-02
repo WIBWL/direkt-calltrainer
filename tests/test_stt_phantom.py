@@ -1,11 +1,7 @@
-"""Whisper's phantom transcripts do not become Turns (ADR 0071; the guard
-docs/research/model-parameters.md left open).
+"""Whisper's phantom transcripts do not become Turns (ADR 0071; docs/research/model-parameters.md).
 
-On near-silence Whisper invents a phrase -- "Vielen Dank.", "Amen.", a
-subtitle credit -- or a non-speech annotation like "*Titelm*" or "[Musik]".
-One such 9-character transcript became a real Turn in a live call and derailed
-the persona. A transcript that is nothing but one of these gets no reply and
-no history entry; the Session returns to listening.
+On near-silence Whisper invents a phrase ("Vielen Dank.") or an annotation ("*Titelm*"); one
+derailed a live call. Such a transcript gets no reply and no history entry.
 """
 
 import pytest
@@ -68,14 +64,8 @@ async def test_a_phantom_on_a_reopened_turn_does_not_stretch_the_user_window(
 ):
     """A phantom after a barge-in leaves the reopened Turn exactly as it was.
 
-    A fresh Turn is popped when the transcript turns out to be a phantom, but a
-    reopened one has to stay -- it still holds the question the user was in the
-    middle of. Its end was being written before the phantom check, so a cough
-    transcribed as "Vielen Dank." pushed `user_end_ms` out to the cough while
-    the measured speaking time stayed where it was. That span is the
-    utterance's duration in the Transcript and on the timeline F-51 reads its
-    overlaps off, so it would have run from the user's first word to a noise
-    seconds later.
+    Its end must not be written before the phantom check, or a cough stretches
+    `user_end_ms` and the utterance's span on the F-51 timeline.
     """
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 100000)
     fake_pipeline.stt.transcripts = ["Erste Haelfte der Frage.", "Vielen Dank."]

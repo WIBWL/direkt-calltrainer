@@ -6,12 +6,9 @@ import type { CommittedSession } from "./useSessionSocket";
 import type { TranscriptEntry } from "../protocol";
 
 /**
- * The three rules that bind the connection to its audio, which used to be
- * held by comments beside three effects in `App.tsx`.
- *
- * The socket and the playback are replaced by plain fakes: their own specs
- * cover the WebSocket and the Web Audio graph, and what is under test here is
- * only what this hook asks of them, and when.
+ * The three rules that bind the connection to its audio. Socket and playback
+ * are plain fakes: their own specs cover WebSocket and Web Audio; this tests
+ * only what the hook asks of them, and when.
  */
 
 type OnEnded = (

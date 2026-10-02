@@ -1,4 +1,4 @@
-"""When the Persona asks whether anybody is on the line (ADR 0102).
+"""When the Persona asks whether anybody is on the line (ADR 0110).
 
 In an ordinary call the Persona rang and the user answers first. A user who
 accepts the call and then says nothing would otherwise hear nothing at all, for

@@ -16,21 +16,10 @@ interface ConfirmDialogProps {
 }
 
 /**
- * The app's own "are you sure?", laid over the panel that asked it.
- *
- * Not `window.confirm`: a native dialog is drawn by the browser, in its own
- * look and away from the thing it is about, breaking out of the app in the one
- * moment the User is asked to think about what is in front of them. It also
- * prefixes the app's origin, which reads as a warning about the page rather
- * than a question from it.
- *
- * Positioned `absolute; inset: 0`, so it mounts as a child of the full-screen
- * backdrop owning the panel underneath (`.editor-backdrop`) and covers that.
- *
- * Escape is deliberately *not* handled here: every screen using this already
- * listens for it, and two `window` listeners fire in registration order, so the
- * panel's older one would win and close everything. The owner therefore handles
- * Escape for both and closes the inner one first.
+ * The app's own "are you sure?" (not `window.confirm`), laid over the panel that asked;
+ * `absolute; inset: 0`, so it mounts inside the owner's backdrop (`.editor-backdrop`).
+ * Escape is deliberately *not* handled here: the owner's older `window` listener would
+ * fire first and close everything, so the owner handles Escape and closes this first.
  */
 export default function ConfirmDialog({
   title,
