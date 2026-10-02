@@ -1,7 +1,7 @@
 """The reverse of a finished Session: the same call, roles swapped (F-61, ADR 0070).
 
 Also covers ADR 0043 (suspended: the played case reaches the client), 0051 (no statistics as
-input), 0059 (briefing cleaned), 0050 (foreign Session is 404), 0011 (thinking mode off the live path).
+input), 0059 (briefing cleaned), 0050 (foreign Session is 404), 0103's amendment (no thinking).
 Model faked (`conftest.py`); route and library tests need Postgres, else they skip."""
 
 import json
@@ -135,15 +135,16 @@ async def test_the_prompt_keeps_the_previous_call_out_of_the_briefing(
     assert "Say nothing about the previous call" in asked(calls)
 
 
-async def test_the_briefing_is_asked_in_thinking_mode(
+async def test_the_briefing_is_asked_without_thinking(
     monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Off the live path, so the latency is free (ADR 0011)."""
+    """Off the live path, but the User waits on the button: the trace made that
+    three minutes where the briefing alone takes 10 s (ADR 0103's amendment)."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await _draft()
 
-    assert calls[0][1] is True
+    assert calls[0][1] is False
 
 
 async def test_the_five_fields_come_back_as_the_panel_expects_them(

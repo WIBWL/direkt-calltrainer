@@ -233,7 +233,7 @@ def _messages(material: str) -> list[dict[str, str]]:
 
 
 async def draft_follow_up(call: PlayedCall) -> dict[str, str]:
-    """One draft, cleaned and capped, ready to store (thinking mode, ADR 0011).
+    """One draft, cleaned and capped, ready to store.
 
     Propagates OpenAIError; raises FollowUpError when nothing usable came back.
     Both become a 503. Own retry loop rather than `llm.complete_json`: it also
@@ -242,10 +242,10 @@ async def draft_follow_up(call: PlayedCall) -> dict[str, str]:
     for attempt in range(2):  # initial attempt + one retry
         raw = await llm.complete(
             messages,
-            # No cap: the fields are bounded by their own limits, and the
-            # thinking trace needs whatever room it takes.
+            # No cap: the fields are bounded by their own limits. No thinking
+            # either -- the User is waiting on the button, and the trace made
+            # that 160 s where the draft alone takes 10 (ADR 0103's amendment).
             max_tokens=None,
-            think=True,
         )
         try:
             draft = _Draft.model_validate_json(llm.json_object(raw)).sanitised()

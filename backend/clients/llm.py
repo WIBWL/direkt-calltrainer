@@ -88,14 +88,18 @@ async def stream_reply(
             yield delta
 
 
-# The wrap-up is a whole document, generated in thinking mode, so this covers the
-# trace too; running out inside the trace yields no answer. Capped rather than
-# None so a repetition loop cannot run to the RQ job timeout.
+# The wrap-up is a whole document; a measured one is about 500 tokens. Capped
+# rather than None so a repetition loop cannot run to the RQ job timeout. The
+# number dates from when the wrap-up ran in thinking mode and the budget had to
+# cover the trace as well: on gemma-4-26B-A4B-it the trace alone took 9-10k
+# tokens, every wrap-up came back empty at exactly this cap, and no cap fits --
+# the model's context is 16k and the prompt takes 5k of it. So nothing off the
+# live path thinks any more (ADR 0103's amendment).
 _MAX_FEEDBACK_TOKENS = 4000
 
 # Its own read timeout: the client-wide TIMEOUT bounds the gap between streamed
-# chunks, but this call is not streamed, and 4000 tokens plus a trace on the 4B
-# model takes minutes. Kept below `queue.JOB_TIMEOUT_S` (300 s, not imported: no
+# chunks, but this call is not streamed, and a full 4000 tokens takes over a
+# minute. Kept below `queue.JOB_TIMEOUT_S` (300 s, not imported: no
 # dependency on the queue) so the request fails inside the job and is recorded.
 _FEEDBACK_TIMEOUT_S = 240.0
 
@@ -109,8 +113,12 @@ async def complete(
 ) -> str:
     """One non-streamed completion off the live path: wrap-up (ADR 0049), document
     summary (F-58), follow-up draft (F-60). `max_tokens=None` leaves only the context
-    window as a bound; `think=True` is slower but writes markedly better (the wrap-up's
-    German needs it); `retries` as in `stream_reply`. Same model as the reply (ADR 0103)."""
+    window as a bound; `retries` as in `stream_reply`. Same model as the reply (ADR 0103).
+
+    `think=True` asks for a reasoning trace first. No caller passes it on the current
+    model: the trace is 6-10k tokens there, minutes per call and more than the wrap-up's
+    budget (ADR 0103's amendment, docs/research/model-parameters.md). It stays for a
+    model that needs the revision pass, as Qwen3-4B's German did -- measure before use."""
     # This path is reached only from the worker, so the log line is the one
     # place its parameters are ever visible. `stream_reply` logs its own.
     logger.info("LLM completion (%s, max_tokens=%s, think=%s)...", LLM_MODEL, max_tokens, think)
@@ -192,11 +200,13 @@ async def complete_json(
 ) -> _Model | None:
     """One structured answer off the live path, retried once; None if neither parsed.
 
-    Thinking mode and no token cap, since running out inside the trace yields no
-    answer (see `_strip_reasoning`). Returns None rather than raising: what an
-    unusable answer means is the caller's to decide (the reverse briefing: a 503)."""
+    No thinking: the User is waiting on a button, and the trace made that three
+    minutes where the answer alone takes ten seconds (ADR 0103's amendment). No token
+    cap either, the fields being bounded by their own limits. Returns None rather
+    than raising: what an unusable answer means is the caller's to decide (the
+    reverse briefing: a 503)."""
     for attempt in range(2):  # initial attempt + one retry
-        raw = await complete(messages, max_tokens=None, think=True)
+        raw = await complete(messages, max_tokens=None)
         try:
             return model.model_validate_json(json_object(raw))
         except (ValidationError, ValueError) as e:

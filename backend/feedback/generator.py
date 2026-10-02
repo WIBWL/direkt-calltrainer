@@ -658,13 +658,14 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
 
 async def _ask(dossier: str, language: str, reverse: bool = False) -> _Wrapup:
     """One attempt plus one retry, then a narrative-only fallback (ADR 0049).
-    Thinking mode: German prose from an English brief on a 4B model (ADR 0011)
-    needs the revision pass, and time is free in the worker (ADR 0018/0019).
+    Not in thinking mode (ADR 0103's amendment): it was, for Qwen3-4B's German,
+    but on the gateway's current model the trace alone outruns `llm.complete`'s
+    token cap, so both attempts came back empty and every call got the fallback.
     """
     messages = _messages(dossier, language, reverse)
     raw = ""
     for attempt in range(2):  # initial attempt + one retry
-        raw = await llm.complete(messages, think=True)
+        raw = await llm.complete(messages)
         try:
             return _Wrapup.model_validate_json(llm.json_object(raw))
         except (ValidationError, ValueError) as e:

@@ -2,7 +2,7 @@
 
 Covers ADR 0069 (asked for by the User, one per Session), ADR 0043/0070 (played case
 reaches the model), ADR 0051, 0058, 0059, 0066/0067 (retired with its Session) and
-ADR 0011 (thinking mode off the live path). Model faked; storage tests need Postgres."""
+ADR 0103's amendment (no thinking off the live path). Model faked; storage tests need Postgres."""
 
 import json
 import uuid
@@ -178,13 +178,14 @@ async def test_the_prompt_forbids_naming_the_exercise_to_the_caller(
     assert "Never mention feedback, coaching, training, practice" in system
 
 
-async def test_the_draft_is_asked_in_thinking_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Off the live path, so the latency is free (ADR 0011)."""
+async def test_the_draft_is_asked_without_thinking(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Off the live path, but the User waits on the button: the trace made that
+    160 s where the draft alone takes 10 (ADR 0103's amendment)."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await draft_follow_up(_CALL)
 
-    assert calls[0][1] is True
+    assert calls[0][1] is False
 
 
 async def test_the_seven_fields_come_back_as_the_library_expects_them(

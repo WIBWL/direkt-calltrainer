@@ -3,6 +3,12 @@
 # substituting only variables set in the environment -- nginx's own stay.
 
 include /etc/nginx/mime.types;
+# onnxruntime-web loads its WASM glue with import() from /vad/*.mjs, and a
+# browser refuses a module that is not served as JavaScript. nginx's mime.types
+# knows "js" only, so without this the voice detection never starts.
+types {
+    text/javascript mjs;
+}
 default_type application/octet-stream;
 server_tokens off;
 access_log off;

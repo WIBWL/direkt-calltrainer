@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (supersedes ADR 0074; amends ADR 0040 and ADR 0075; restores ADR 0011 to both model legs)
+Accepted (supersedes ADR 0074; amends ADR 0040 and ADR 0075; restores ADR 0011 to both model legs). **Amended on 2026-10-02** — see the amendment at the end: the post-call texts no longer run in thinking mode.
 
 ## Context
 
@@ -39,3 +39,15 @@ Losing KugelAudio now breaks calls instead of degrading them quietly. That is th
 ## Status update (September 2026)
 
 `OIDC_CLIENT_ID` is gone from `.env` again: the client is named `direkt-calltrainer` in every realm, so the SPA carries it as a constant in `frontend/src/oidcConfig.ts`. Only `OIDC_ISSUER` is still read through the widened `envPrefix`. The model names stay in `.env` as decided above.
+
+## Amendment, 2026-10-02: nothing written after the call runs in thinking mode
+
+"One set of sampling parameters, one request shape" held, and that was the problem: the shape was Qwen3-4B's, and the name in `.env` became `gemma-4-26B-A4B-it` once the gateway stopped serving Qwen3 to the project's key. The Consequences above say the gateway "serves nothing but `Qwen3-4B-AWQ`"; that is no longer so, and what follows is what the first other model did with a request nobody had re-measured.
+
+ADR 0011 put the post-call texts in thinking mode because a 4B model writing German from an English brief needed the revision pass, and time is free in the worker. On Gemma the pass is 6 500 to 10 000 tokens long. The wrap-up's budget is 4 000 (`llm._MAX_FEEDBACK_TOKENS`), so both attempts ended inside the trace with nothing after it, the fallback was stored, and four of the first five calls on the new model got a wrap-up with no points — after 2:35 min each in a queue that runs one job at a time. The follow-up draft and the reverse briefing carry no cap and did finish, in 160 and 185 seconds, behind a button somebody is watching.
+
+**Decided:** the wrap-up, the follow-up draft, the reverse briefing and the PDF fact list are all asked with thinking off. Each then answers in 10 to 14 seconds with JSON that validates. `llm.complete` keeps its `think` parameter and `_strip_reasoning` — a model that needs the pass may come back — but no caller passes it, and four tests that pinned thinking mode now pin its absence. The live reply is untouched; it never thought.
+
+**Rejected: a larger cap.** The model's context is 16 384 tokens and the wrap-up prompt for a 21-Turn call is 5 056 of them. The one thinking run that completed used 15 705 and took up to 246 s against a 240 s request timeout. A longer call would fail on the window or on the clock, so the cap that fits today's call is the bug again next week.
+
+**What it costs** is whatever the trace bought, and that is only partly known: the thinking run named two improvement points where the other named one, and the German was not compared at all. The measurements, and the list of what they do not show, are the 2026-10-02 addendum in `docs/research/model-parameters.md`. The general lesson is the one the Consequences already drew and this ADR then walked into: the request shape belongs to the model, so a changed `LLM_MODEL` is a change to measure, not an `.env` edit.

@@ -206,7 +206,7 @@ async def draft_brief(
 ) -> dict:
     """One briefing, cleaned and capped, ready to store on the reverse.
 
-    `llm.complete_json` owns thinking mode and the retry (shared with F-60).
+    `llm.complete_json` owns the retry (shared with F-60).
     Propagates OpenAIError; raises ReverseError when nothing parsed -- no fallback,
     since an unreadable briefing is worse than a button saying try again."""
     messages = _messages(

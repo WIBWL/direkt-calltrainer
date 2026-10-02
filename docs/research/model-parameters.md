@@ -141,6 +141,65 @@ was longer than the entire server pipeline, and is now 700 ms.
 
 ---
 
+## Addendum 2026-10-02 — `gemma-4-26B-A4B-it` writes everything after the call without thinking
+
+`LLM_MODEL` is `gemma-4-26B-A4B-it` now; `Qwen3-4B-AWQ` answers 403 for the
+project's key. `llm.complete` kept the request it had been given for Qwen3, and
+four wrap-ups out of five came back empty: two attempts of 76–78 s each whatever
+the length of the call, `Wrap-up did not validate: no JSON object in the
+response` twice, the narrative-only fallback, no points. 2:35 min per job, on a
+queue that runs them one after another. The fifth, for a call of one line,
+finished in 55 s — with its summary in English.
+
+Measured from the backend container against stored Sessions, read-only, the
+prompts built by the application's own functions. One run per row except where
+a range is given; the thinking rows ran two to four at a time, so their times
+are on the high side.
+
+| Call | Request | Time | Reasoning tokens | Outcome |
+|---|---|---|---|---|
+| Wrap-up, 21 Turns | thinking, `max_tokens 4000` (as shipped) | 82 s | 3999 of 4000 | empty, `finish_reason: length` |
+| Wrap-up, 21 Turns | thinking, `max_tokens 11000` | 220–246 s | 8 867–10 147 | valid, 2 improvement points |
+| Wrap-up, 21 Turns | `enable_thinking: false` | 10–14 s | 0 | valid, 1 improvement point |
+| Wrap-up, 21 Turns | no `chat_template_kwargs` at all | 14 s | 0 | valid, 1 improvement point |
+| Follow-up draft | thinking, no cap | 161 s | 6 527 | valid |
+| Follow-up draft | `enable_thinking: false` | 10 s | 0 | valid, every required field filled |
+| Reverse briefing | thinking, no cap | 185 s | 7 792 | valid |
+| Reverse briefing | `enable_thinking: false` | 10 s | 0 | valid |
+
+What that settled (ADR 0103's amendment):
+
+* **The trace, not the answer, used the budget.** The gateway runs a reasoning
+  parser: the trace arrives as `reasoning_content` and `content` is empty when
+  the budget ends inside it — which is why `_strip_reasoning` never logged an
+  unclosed `<think>`. The answer itself is about 500 tokens.
+* **No cap rescues thinking for the wrap-up.** The model's context is 16 384
+  tokens (`max_tokens 16000` is a 400) and the prompt for a 21-Turn call takes
+  5 056 of them. The run that finished used 15 705 and took up to 246 s against
+  `_FEEDBACK_TIMEOUT_S` of 240: a longer call fails on one limit or the other.
+* **Gemma does not think unless asked.** Leaving `chat_template_kwargs` out
+  gives the same answer as `enable_thinking: false`; the code keeps sending the
+  explicit `false`.
+* **So no caller passes `think=True` any more** — the wrap-up, the follow-up
+  draft, the reverse briefing and the PDF fact list. The parameter and
+  `_strip_reasoning` stay in `llm.complete` for a model that needs the pass.
+
+Not established, and worth knowing before anybody argues from this table:
+
+* **The wording was not compared**, only shape and counts. The one visible
+  difference is the second improvement point; no run named a strength.
+* **The PDF fact list was not measured.** It makes the same call and shares the
+  same context window with its document, which argues the same way.
+* **Whether Qwen3 would still pass with its old request** could not be checked.
+* **The pressure marks look wrong in every variant**: 9 or 10 of the partner's
+  11 utterances marked as pressing (ADR 0081), with and without thinking. That
+  is the prompt or the model, not this parameter —
+  `scripts/inspect_pressure_segments.py` is the tool for it.
+* The live path's sampling (`temperature 0.7, top_p 0.8, top_k 20, min_p 0,
+  presence_penalty 1.5`) is still Qwen3's and still unmeasured on Gemma.
+
+---
+
 ## LLM — `Qwen3-4B-AWQ`
 
 ### Current call (`backend/clients/llm.py`)
@@ -168,6 +227,11 @@ Everything not listed falls back to **vLLM defaults**: `temperature 1.0`,
 Qwen3 thinking mode is catastrophic here: multi‑second first‑token latency and
 no usable output within any sane token budget. The current code is right; this
 note is so nobody "cleans up" the `extra_body`.
+
+> **The two paragraphs below describe Qwen3 and no longer describe the code.**
+> On `gemma-4-26B-A4B-it` the trace did eat the budget, and raising the cap was
+> not an option: see the [addendum of 2026-10-02](#addendum-2026-10-02-gemma-4-26b-a4b-it-writes-everything-after-the-call-without-thinking).
+> Nothing off the live path runs in thinking mode now.
 
 **Where thinking *is* used:** `llm.complete(think=True)` for the PDF fact
 extraction (F‑58, `backend/documents.py`). That call is off the live path — the
