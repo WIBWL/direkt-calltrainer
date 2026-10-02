@@ -88,6 +88,11 @@ class LanguagePack:
     agreement_re: re.Pattern[str]
     sign_off_re: re.Pattern[str]
     fallback_closing_line: str
+    # What the Persona says when it has rung and nobody speaks after the pick
+    # up (ADR 0110), one line per silence, in order; spoken as written, not
+    # generated, because a caller checking the line is there says the same
+    # two words everywhere and a model round trip would only delay them.
+    pickup_prompts: tuple[str, ...]
 
 
 # Whisper's non-speech annotations -- "*Titelm*", "[Musik]", "(Applaus)" -- are
@@ -288,6 +293,7 @@ _GERMAN = LanguagePack(
         re.IGNORECASE,
     ),
     fallback_closing_line="Vielen Dank für Ihre Zeit. Auf Wiederhören.",
+    pickup_prompts=("Hallo?", "Hallo? Hören Sie mich?"),
 )
 
 
@@ -423,6 +429,7 @@ _ENGLISH = LanguagePack(
         re.IGNORECASE,
     ),
     fallback_closing_line="Thank you for your time. Goodbye.",
+    pickup_prompts=("Hello?", "Hello? Can you hear me?"),
 )
 
 

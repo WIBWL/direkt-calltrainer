@@ -1,7 +1,8 @@
 """Which nudge a reply gets (`backend/session/nudges.py::for_turn`), as a precedence table.
 
 Covers ADR 0037 (goodbye push first), ADR 0035 (cut-off push next, before the user's message),
-ADR 0038 (clarify pushes, then the anti-repeat reminder), ADR 0070 (reverse turns it around),
+ADR 0038 (clarify pushes, then the anti-repeat reminder; a `hard` Persona's variant),
+ADR 0070 (reverse turns it around, and outranks the `hard` variant),
 ADR 0073 (settlement check rides on the reminder alone, after the opening)."""
 
 from backend.session import nudges
@@ -15,7 +16,7 @@ def _for(**over):
     situation = {
         "closing": False, "interrupted": False, "repeat_requests": 0,
         "previous_reply": PREVIOUS, "replies": nudges.SETTLEMENT_CHECK_AFTER_REPLIES,
-        "reverse": False, "call_goal": "einen Termin",
+        "reverse": False, "hard": False, "call_goal": "einen Termin",
     }
     return nudges.for_turn(**(situation | over))
 
@@ -50,6 +51,19 @@ def test_the_settlement_check_is_withheld_over_the_opening():
 
 def test_a_reverse_turns_the_reminder_around():
     assert _for(reverse=True).content.startswith(
+        nudges.ANTI_REPEAT_NUDGE_REVERSE.format(previous=PREVIOUS)
+    )
+
+
+def test_a_hard_persona_is_not_offered_giving_ground():
+    assert _for(hard=True).content.startswith(
+        nudges.ANTI_REPEAT_NUDGE_HARD.format(previous=PREVIOUS)
+    )
+    assert "give ground" not in nudges.ANTI_REPEAT_NUDGE_HARD
+
+
+def test_the_casting_outranks_the_hardness():
+    assert _for(reverse=True, hard=True).content.startswith(
         nudges.ANTI_REPEAT_NUDGE_REVERSE.format(previous=PREVIOUS)
     )
 

@@ -314,8 +314,9 @@ export default function App() {
   );
 
   const handleConfirmed = useCallback(() => {
-    // Reveal the buffered opening line and switch to live playback.
-    // This is also the point at which the Session timeline starts.
+    // Switch to live playback and start the Session timeline. In a reverse
+    // this reveals the Persona's buffered answering line (ADR 0042); in an
+    // ordinary call there is none, the User answers first (ADR 0110).
     setIsMicrophoneMuted(false);
     accept();
     advance({ type: "callAccepted" });
@@ -566,11 +567,11 @@ export default function App() {
 
   if (screen === "call") {
     // Asked of the data, not the element: `CaseBriefPanel` renders nothing
-    // without facts. A reverse's briefing sits beside the call; ordinary case
-    // facts go below it, so the live call keeps visual priority.
+    // without a Wissensstand or facts. A reverse's briefing sits beside the
+    // call; an ordinary case goes below it, so the live call keeps visual priority.
     const briefPlacement: BriefPlacement | null = committed?.reverse
       ? "beside"
-      : committedCase?.facts.trim()
+      : committedCase?.briefing.trim() || committedCase?.facts.trim()
         ? "below"
         : null;
     return (

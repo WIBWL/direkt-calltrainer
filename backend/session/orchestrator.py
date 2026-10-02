@@ -25,6 +25,7 @@ from backend.session.chunking import sentence_chunks
 from backend.session.heard import Cut, SpokenReply
 from backend.session.history import History
 from backend.session.measuring import attach_measurements
+from backend.session.pickup import PickupWatch
 from backend.session import repetition
 from backend.session import reply_checks as checks
 from backend.session.prompting import build_system_prompt, opening_instruction
@@ -184,6 +185,8 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         self._language_id = persona.language_id
         self._pack = get_pack(persona.language_id)
         self._voice = persona.voice
+        # Decides which anti-repeat nudge a Turn gets (`nudges.for_turn`).
+        self._hard = persona.hard
         self._scenario = scenario
         # The caller's notes: what the model reads in place of the history
         # beyond the last few exchanges (ADR 0071). Public so a test can wait
@@ -191,6 +194,8 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         self.notes = CallNotes(persona, scenario)
         # Whether `session.activate` has already rebased the clock. See there.
         self._playback_started = False
+        # The "Hallo?" into a silent line after the user picked up (ADR 0110).
+        self._pickup = PickupWatch(self._pack.pickup_prompts, enabled=not scenario.reverse)
         # Only its first name is used, to spot the persona re-introducing
         # itself ("hier ist Thomas ...") a second time (ADR 0038).
         self._first_name = persona.name.split()[0].lower() if persona.name else ""
@@ -277,9 +282,10 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         return turn, reopening
 
     async def run_opening_turn(self) -> AsyncIterator[TurnEvent]:
-        """Have the Persona speak first: a freshly generated, varied call opener.
-        In a reverse (ADR 0070) it is the one picking up, and the instruction
-        makes it say only that."""
+        """Have the Persona speak first, before any user audio. Since ADR 0110
+        only a reverse (ADR 0070) opens this way: there the Persona picks up,
+        and the instruction makes it say only that. In an ordinary call the
+        user picks up and the opening is the reply to their first Turn."""
         turn, _ = self._new_or_reopened_turn()
         progress = _ReplyProgress()
         try:
@@ -295,6 +301,57 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
                 async for event in replies:
                     yield event
             self._reopen_turn = None
+        except (asyncio.CancelledError, GeneratorExit):
+            self._finalize_interrupted(turn, progress)
+            raise
+
+    def _persona_has_opened(self) -> bool:
+        """Whether the Persona has made its opening, heard at least in part:
+        any reply in the history other than a "Hallo?" into the silence after
+        the pick-up (ADR 0110), which asks whether anybody is there and says
+        nothing about who is calling or why. Read off the history rather than
+        the Turns because the history is what a barge-in trims and drops."""
+        return any(
+            not self._pickup.is_prompt(strip_interrupted_mark(reply))
+            for reply in self.history.replies()
+        )
+
+    def pickup_prompt_delay(self) -> float | None:
+        """Seconds until the Persona should ask whether anybody is there, or
+        None if nothing is to be asked (see `pickup.py`)."""
+        due = self._pickup.delay_ms(self.turns, self._elapsed_ms(), self._playback_started)
+        return None if due is None else due / 1000
+
+    def note_user_speaking(self) -> None:
+        """The client heard the user start to speak: a prompt now would talk
+        over them, so the silence is counted afresh."""
+        self._pickup.note_speaking(self._elapsed_ms())
+
+    async def run_pickup_prompt(self) -> AsyncIterator[TurnEvent]:
+        """Say the next "Hallo?" into a silent line (ADR 0110).
+
+        A fixed line, not a generated one, and a Turn of its own with no user
+        side -- like the reverse's opening, and interruptible the same way. It
+        goes into the history, so the model knows it asked, but it is not the
+        Persona's opening: that is still owed to the user's first words.
+        """
+        turn, _ = self._new_or_reopened_turn()
+        progress = _ReplyProgress()
+        line = self._pickup.next_line()
+        try:
+            async with contextlib.aclosing(self._speak(turn, line, progress)) as spoken:
+                async for event in spoken:
+                    yield event
+                    if isinstance(event, Failed):
+                        return
+            turn.persona_text = turn.persona_text.strip()
+            self.history.add_reply(turn.persona_text)
+            progress.committed = True
+            self._reopen_turn = None
+            yield TurnCompleted(turn_seq=turn.seq, ends_call=False)
+            # A barge-in over its tail still trims it to what was heard.
+            self._revisable = (turn, progress)
+            yield StateChanged(state="listening")
         except (asyncio.CancelledError, GeneratorExit):
             self._finalize_interrupted(turn, progress)
             raise
@@ -376,17 +433,27 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         """What the model reads for this reply: the system prompt, the caller's
         notes plus the last `HISTORY_WINDOW` messages verbatim (ADR 0071; a 4B
         model misreads the raw history past a handful of exchanges), and this
-        turn's transient nudge from `nudges.for_turn`, never stored."""
+        turn's transient nudge, never stored.
+
+        Until the Persona has said anything in reply to the user who picked up
+        (ADR 0110) that nudge is the opening instruction -- also after a
+        barge-in dropped the first reply whole, or after a "Hallo?" into the
+        silence. A reverse opens in `run_opening_turn` instead. Otherwise the
+        nudge comes from `nudges.for_turn`."""
         view = [self.history.system(), *self.notes.message(), *self.history.recent(HISTORY_WINDOW)]
-        nudge = nudges.for_turn(
-            closing=closing,
-            interrupted=interrupted is not None and view[-1]["role"] == "user",
-            repeat_requests=self._repeat_requests_in_a_row,
-            previous_reply=self.history.previous_reply(),
-            replies=len(self.history.replies()),
-            reverse=self._scenario.reverse,
-            call_goal=self._scenario.call_goal,
-        )
+        if not self._scenario.reverse and not self._persona_has_opened():
+            nudge: nudges.TurnNudge | None = nudges.TurnNudge(opening_instruction(self._pack))
+        else:
+            nudge = nudges.for_turn(
+                closing=closing,
+                interrupted=interrupted is not None and view[-1]["role"] == "user",
+                repeat_requests=self._repeat_requests_in_a_row,
+                previous_reply=self.history.previous_reply(),
+                replies=len(self.history.replies()),
+                reverse=self._scenario.reverse,
+                hard=self._hard,
+                call_goal=self._scenario.call_goal,
+            )
         if nudge is None:
             return view
         message = {"role": "system", "content": nudge.content}
@@ -742,7 +809,10 @@ class SessionOrchestrator:  # pylint: disable=too-many-instance-attributes  # on
         if not filters.guard or not text_chunk.strip():
             return text_chunk
         replies = self.history.replies()
-        if checks.reintroduces(text_chunk, replies, self._pack, self._first_name):
+        # Before the opening a greeting is correct, even with a "Hallo?"
+        # already in the history (ADR 0110).
+        if self._persona_has_opened() and checks.reintroduces(
+                text_chunk, replies, self._pack, self._first_name):
             raise _RegenerateReply(repetition.first_sentence(text_chunk))
         repeated = checks.repeats_earlier_opening(text_chunk, replies)
         if repeated is not None:

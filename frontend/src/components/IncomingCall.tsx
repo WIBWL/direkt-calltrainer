@@ -5,7 +5,8 @@ import PersonaAvatar from "./PersonaAvatar";
 
 /**
  * The phone ringing before an ordinary call (F-63): the Persona rang (`_casting`), so the
- * user accepts, which sends `session.activate` (ADR 0042). Not for a reverse (ADR 0070).
+ * user accepts, which sends `session.activate` (ADR 0042), and speaks first: the Persona's first line
+ * is the reply to their answer (ADR 0110). Not for a reverse (ADR 0070).
  * The ringtone is stoppable (WCAG 1.4.2) and remembered; the switch's target is 24px (2.5.8).
  */
 

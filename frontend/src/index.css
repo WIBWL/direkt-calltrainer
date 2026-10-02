@@ -2815,12 +2815,20 @@ p.follow-up-error {
 }
 
 /* Shown below the live conversation as a supporting reference with no scroll
-   box of its own. A little more horizontal space and breathing room improve
-   readability without giving the facts more visual weight than the call. */
+   box of its own. A plain wrapper around the Wissensstand and the facts: no
+   background or padding of its own, since each panel carries its own and a
+   second ground would show as a frame around them, and the gap between the
+   two is set here rather than by the panels' own bottom margins. */
 .case-brief-call {
   margin: 0 auto;
-  padding: 1.4rem 1.6rem;
-  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.case-brief-call > .scenario-briefing,
+.case-brief-call > .case-brief {
+  margin: 0;
 }
 
 /* Longer case descriptions benefit from slightly more leading during the
@@ -2830,7 +2838,7 @@ p.follow-up-error {
 }
 
 @media (min-width: 1080px) {
-  .case-brief-call {
+  .case-brief-call > .case-brief {
     max-width: none;
   }
 }
@@ -9338,6 +9346,29 @@ a.recurring-item:focus-visible {
   /* Not muted: on the screen before the call this is one of only two things
      to read, and on the setup screen it is what the selection is judged by. */
   color: var(--color-navy-900);
+}
+
+.scenario-briefing-body + .scenario-briefing-body {
+  margin-top: 0.5rem;
+}
+
+/* The Wissensstand as a list (see `StructuredText`): one fact per line,
+   because mid-call one looks for a number rather than reading a paragraph. */
+.scenario-briefing-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--color-navy-900);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.scenario-briefing-list li + li {
+  margin-top: 0.3rem;
+}
+
+.scenario-briefing-list ol {
+  margin: 0.3rem 0 0;
+  padding-left: 1.3rem;
 }
 
 

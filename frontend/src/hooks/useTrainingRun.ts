@@ -78,7 +78,7 @@ export function useTrainingRun() {
       .then((detail) => {
         if (cancelled) return;
         if (!committed.reverse) {
-          setCommittedCase({ briefing: detail.briefing, facts: detail.case_facts });
+          setCommittedCase({ briefing: detail.briefing, facts: detail.case_facts ?? "" });
         } else if (detail.reverse_brief) {
           setReverseBrief(detail.reverse_brief);
         }

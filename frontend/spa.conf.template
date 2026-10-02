@@ -3,12 +3,6 @@
 # substituting only variables set in the environment -- nginx's own stay.
 
 include /etc/nginx/mime.types;
-# onnxruntime-web loads its WASM glue with import() from /vad/*.mjs, and a
-# browser refuses a module that is not served as JavaScript. nginx's mime.types
-# knows "js" only, so without this the voice detection never starts.
-types {
-    text/javascript mjs;
-}
 default_type application/octet-stream;
 server_tokens off;
 access_log off;
@@ -32,6 +26,16 @@ location = /config.js {
 # A reload or shared link to a client route such as /profil gets the app.
 location / {
     try_files $uri /index.html;
+}
+
+# onnxruntime-web's WASM glue (public/vad/*.mjs) is imported as a module, which
+# a browser refuses under any type but JavaScript -- and nginx's mime.types has
+# no entry for .mjs, so it went out as octet-stream and the VAD never started.
+# Before the rule below, since regex locations match in order.
+location ~ \.mjs$ {
+    types { }
+    default_type "text/javascript; charset=utf-8";
+    try_files $uri =404;
 }
 
 # A missing path whose last segment has a dot asked for a file and stays a

@@ -47,6 +47,7 @@ def _to_persona(row: models.Persona) -> Persona:
         role=row.role,
         traits=row.traits,
         behavior=row.behavior,
+        hard=row.hard,
         # Sorted here rather than left to the relationship's `order_by`: that
         # only orders what the database returns, so the mapping would depend on
         # how the row was obtained. `position` (ADR 0026) is the authored

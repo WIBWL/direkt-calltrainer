@@ -121,6 +121,7 @@ nav:
       - ADR 0107 - The Progress Report Is a Second Document on the Same Page Frame: adr/0107-the-progress-report-is-a-second-document.md
       - ADR 0108 - The VAD's Padding Is Not Speech: adr/0108-the-vad-padding-is-not-speech.md
       - ADR 0109 - A Call's Figures Are Placed Against the User's Own Usual Range: adr/0109-a-call-placed-against-the-users-own-range.md
+      - ADR 0110 - The User Picks Up First; Only a Reverse Is Answered by the Persona: adr/0110-the-user-picks-up-first.md
   # arc42 is one long page; the chapter entries below are anchor links into it.
   # MkDocs only accepts site-absolute URLs as nav links, so these assume the docs
   # site is served at the root (mkdocs serve / mkdocs build + static server).

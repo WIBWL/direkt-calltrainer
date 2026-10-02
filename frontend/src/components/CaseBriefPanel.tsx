@@ -1,9 +1,10 @@
-import ScenarioBriefing from "./ScenarioBriefing";
+import ScenarioBriefing, { StructuredText } from "./ScenarioBriefing";
 
 /**
- * The trainee's briefing (ADR 0054) and the case facts, which the info panel already
- * serves; `call_goal`, the answer key, stays withheld. "prepare" shows both; "call" shows
- * the facts alone mid-call (ADR 0070's exception to ADR 0033). Not for a random Scenario (F-62).
+ * The trainee's Wissensstand (`briefing`, ADR 0054) and, for an authored Scenario, the case facts;
+ * a built-in serves no facts (ADR 0054's amendment), and `call_goal`, the answer key, stays withheld
+ * everywhere. "prepare" and "call" carry the same text, the latter below the live call (ADR 0070's
+ * exception to ADR 0033). Not for a random Scenario (F-62).
  */
 export default function CaseBriefPanel({
   briefing,
@@ -16,36 +17,26 @@ export default function CaseBriefPanel({
 }) {
   const facts = caseFacts?.trim();
 
-  if (variant === "call") {
-    if (!facts) return null;
+  if (variant === "call" && !facts && !briefing?.trim()) return null;
 
-    return (
-      <section
-        className="case-brief case-brief-call"
-        aria-labelledby="case-brief-call-title"
-      >
-        <h3 id="case-brief-call-title" className="case-brief-title">
-          Fakten des Falls
-        </h3>
-        <p className="case-brief-body">{facts}</p>
-      </section>
-    );
-  }
+  const titleId = variant === "call" ? "case-brief-call-title" : "case-brief-title";
 
   return (
-    <>
-      {/* The same component the setup screen uses, so the briefing reads
-          identically in both places rather than being written twice. */}
+    <div className={variant === "call" ? "case-brief-call" : undefined}>
+      {/* The same component in both places, so the Wissensstand reads
+          identically before and during the call. */}
       <ScenarioBriefing briefing={briefing} />
 
       {facts && (
-        <section className="case-brief" aria-labelledby="case-brief-title">
-          <h3 id="case-brief-title" className="case-brief-title">
+        <section className="case-brief" aria-labelledby={titleId}>
+          <h3 id={titleId} className="case-brief-title">
             Fakten des Falls
           </h3>
-          <p className="case-brief-body">{facts}</p>
+          <div className="case-brief-body">
+            <StructuredText text={facts} />
+          </div>
         </section>
       )}
-    </>
+    </div>
   );
 }

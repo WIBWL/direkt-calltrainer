@@ -38,6 +38,25 @@ ANTI_REPEAT_NUDGE = (
     "were your own idea."
 )
 
+# The form for a Persona seeded `hard`. Measured over the seeded library
+# (`scripts/play_scenarios.py`), the German Personas were indistinguishable in
+# tone, and Marcel Kropp -- seeded to refuse flatly -- came out the most polite:
+# the standing nudge above sits nearest the reply and offers "give ground" as a
+# move, which outweighs a character set far up in the system prompt. Only that
+# clause goes; giving ground is not forbidden, just no longer offered.
+ANTI_REPEAT_NUDGE_HARD = (
+    'Your previous reply in this call was:\n"{previous}"\n'
+    "Say something genuinely different now: react to what the user just said, "
+    "press a point you have not pressed yet, name what it costs you that this "
+    "is still open, or say what you will do instead — in new words. Do not "
+    "repeat or reword that reply, and do not greet or introduce yourself "
+    "again.\n"
+    "If the user has just put something on the table, respond to it — take "
+    "it, press it for the specifics it is still missing, or say why it falls "
+    "short — but never put that same offer forward yourself as though it "
+    "were your own idea."
+)
+
 # The reverse form (ADR 0070): the ordinary one's last lines forbid putting an
 # offer forward, which reversed is the persona's job and would contradict the
 # casting from the position nearest the reply. Only the demand for something new stays.
@@ -228,13 +247,16 @@ def for_turn(  # pylint: disable=too-many-arguments  # each is one situation the
     previous_reply: str,
     replies: int,
     reverse: bool,
+    hard: bool,
     call_goal: str,
 ) -> TurnNudge | None:
     """The one nudge this reply gets, or None, in order of precedence.
 
     Closing (ADR 0037) > interrupted (ADR 0035; only where the view ends on the
     user's message) > repeat request, firmer the second time (ADR 0038) > the
-    anti-repeat reminder plus the settlement check, turned around for a reverse (ADR 0070)."""
+    anti-repeat reminder plus the settlement check, turned around for a reverse (ADR 0070)
+    and without "give ground" for a `hard` Persona -- the casting wins, since a
+    reverse puts the Persona on the side where yielding is the job."""
     if closing:
         return TurnNudge(CLOSING_NUDGE)
     if interrupted:
@@ -244,7 +266,12 @@ def for_turn(  # pylint: disable=too-many-arguments  # each is one situation the
     if repeat_requests == 1:
         return TurnNudge(CLARIFY_NUDGE)
     if previous_reply:
-        frame = ANTI_REPEAT_NUDGE_REVERSE if reverse else ANTI_REPEAT_NUDGE
+        if reverse:
+            frame = ANTI_REPEAT_NUDGE_REVERSE
+        elif hard:
+            frame = ANTI_REPEAT_NUDGE_HARD
+        else:
+            frame = ANTI_REPEAT_NUDGE
         return TurnNudge(
             frame.format(previous=previous_reply) +
             settlement_check(replies, reverse=reverse, call_goal=call_goal)

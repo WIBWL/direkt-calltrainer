@@ -271,6 +271,11 @@ class Persona(ReferenceRow, Base):
     # voice cannot be played, and what says so is `active` below, which the
     # seed pairs with this column.
     kugelaudio_voice_id: Mapped[int | None] = mapped_column(Integer)
+    # Read by the turn loop, not shown anywhere: a `hard` Persona gets the
+    # anti-repeat nudge that does not offer giving ground (`nudges.for_turn`).
+    # A flag rather than the `difficulty` scale migration 5d9a3f7c21e8 dropped,
+    # because this is the one distinction anything reads.
+    hard: Mapped[bool] = mapped_column(Boolean, default=False)
     # Retired Personas are deactivated, never deleted: Session rows reference
     # them, and a past Session has to stay readable.
     active: Mapped[bool] = mapped_column(Boolean, default=True)

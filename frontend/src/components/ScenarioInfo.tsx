@@ -4,6 +4,7 @@ import { ApiError } from "../api";
 import { getScenario, type ScenarioDetail } from "../scenarioLibrary";
 import ConfirmDialog from "./ConfirmDialog";
 import Modal from "./Modal";
+import { StructuredText } from "./ScenarioBriefing";
 
 interface ScenarioInfoProps {
   /** The Scenario to describe — its `extern_id` (ADR 0050). */
@@ -22,9 +23,12 @@ interface ScenarioInfoProps {
 }
 
 /** Text rows in the editor's order; empty or withheld fields are left out. `call_goal` is never shown: it is
- * the answer key to the exercise (ADR 0043/0045), for built-in and authored Scenarios alike. */
-const SECTIONS: { key: keyof ScenarioDetail; label: string }[] = [
-  { key: "briefing", label: "Briefing" },
+ * the answer key to the exercise (ADR 0043/0045), for built-in and authored Scenarios alike. A built-in shows
+ * its description alone (ADR 0054's amendment): its Wissensstand is read after the microphone check and its
+ * facts are the caller's (`case_facts` null). */
+const SECTIONS: { key: keyof ScenarioDetail; label: string; authoredOnly?: boolean }[] = [
+  { key: "description", label: "Worum es geht" },
+  { key: "briefing", label: "Ihr Wissensstand", authoredOnly: true },
   { key: "case_facts", label: "Fakten des Falls" },
 ];
 
@@ -115,10 +119,12 @@ export default function ScenarioInfo({
           {SECTIONS.map((section) => {
             const value = detail[section.key];
             if (typeof value !== "string" || value.length === 0) return null;
+            // A built-in is the row whose facts came back withheld.
+            if (section.authoredOnly && detail.case_facts === null) return null;
             return (
               <section className="persona-info-section" key={section.key}>
                 <h3>{section.label}</h3>
-                <p>{value}</p>
+                <StructuredText text={value} />
               </section>
             );
           })}
