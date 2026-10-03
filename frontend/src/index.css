@@ -5270,6 +5270,16 @@ a.consent-button {
   letter-spacing: -0.015em;
 }
 
+/* The room above a second-level page's section heading. `.progress-page h2`
+   zeroes its margin, and a `.card` brings none below itself, so a heading that
+   followed a card sat flush against it and one that followed a grey note only
+   a paragraph's margin under it -- closer to the box above than to the box it
+   heads. Collapses with a preceding note's margin, so both cases come out the
+   same. */
+.app-page-narrow.progress-page > h2 {
+  margin-top: 30px;
+}
+
 .app-page-narrow.progress-page > h2 + .card {
   margin-top: 14px;
 }
