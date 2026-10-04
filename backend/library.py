@@ -229,12 +229,15 @@ def create_scenario(
     subject: str,
     tenant_id: int | None,
     derived_from_session_id: int | None = None,
+    description_label: str | None = None,
 ) -> Scenario:
     """Author a private Scenario (ADR 0058), stamped with the caller's tenant so
     sharing is later a `visibility` flip (ADR 0060).
 
     The single write path into `scenario`, follow-ups included (ADR 0069). No
-    tenant claim passes None; `set_scenario_visibility` stamps it on first share."""
+    tenant claim passes None; `set_scenario_visibility` stamps it on first share.
+    `description_label` is a follow-up's: the trainee's "Worum es geht", which
+    its `description` (the caller's) cannot be. Never an authored field."""
     with session_scope() as db:
         row = models.Scenario(
             created_by=subject,
@@ -242,6 +245,7 @@ def create_scenario(
             visibility=models.VISIBILITY_PRIVATE,
             active=True,
             derived_from_session_id=derived_from_session_id,
+            description_label=description_label,
             **_sanitised(data, _SCENARIO_FIELDS),
         )
         db.add(row)
@@ -359,7 +363,11 @@ def create_follow_up(
     two overlapping requests the loser reads the winner's row instead of raising;
     None only if that row has meanwhile gone too."""
     try:
-        return create_scenario(draft, subject, tenant_id, derived_from_session_id=session_id)
+        return create_scenario(
+            draft, subject, tenant_id,
+            derived_from_session_id=session_id,
+            description_label=draft.get("description_label") or None,
+        )
     except IntegrityError:
         return restore_follow_up(session_id)
 

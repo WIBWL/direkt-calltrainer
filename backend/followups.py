@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ValidationError
 
-from backend.authored_text import WIRE_FIELD_LIMITS, clean, fit
+from backend.authored_text import FIELD_LIMITS, WIRE_FIELD_LIMITS, clean, fit
 from backend.clients import llm
 
 logger = logging.getLogger(__name__)
@@ -40,11 +40,16 @@ class FollowUpError(RuntimeError):
 # The fields `ScenarioInput` requires of a User (the three case fields may be
 # empty, ADR 0045). A draft missing one of them is not a Scenario, and storing
 # it would put a row in the library that POST /api/scenarios would have refused.
-_REQUIRED = ("name", "short_description", "description")
+# Plus the trainee's "Worum es geht": without it the info panel falls back to
+# `description`, the caller's own "Sie rufen an, weil ...", and the trainee
+# reads that the call is theirs to make.
+_REQUIRED = ("name", "short_description", "description", "description_label")
 
 
 class _Draft(BaseModel):
-    """The six authorable fields (`backend/api/scenarios.py`'s ScenarioInput).
+    """The six authorable fields (`backend/api/scenarios.py`'s ScenarioInput),
+    and `situation`: the trainee's "Worum es geht", stored as the
+    `description_label` a built-in carries for the same panel.
 
     All defaulted, so a missing optional key costs only that field. `_REQUIRED`
     is checked after cleaning, since a field can clean to nothing.
@@ -52,6 +57,7 @@ class _Draft(BaseModel):
 
     name: str = ""
     short_description: str = ""
+    situation: str = ""
     briefing: str = ""
     description: str = ""
     case_facts: str = ""
@@ -59,11 +65,14 @@ class _Draft(BaseModel):
 
     def sanitised(self) -> dict[str, str]:
         """Cleaned and capped to what the authoring API enforces (ADR 0059/0063),
-        so the editor shows exactly the text that would be stored."""
-        return {
+        so the editor shows exactly the text that would be stored. `situation`
+        is capped like the `description` it stands in for on the screen."""
+        draft = {
             field: fit(clean(getattr(self, field)), cap)
             for field, cap in WIRE_FIELD_LIMITS.items()
         }
+        draft["description_label"] = fit(clean(self.situation), FIELD_LIMITS["description"])
+        return draft
 
 
 # --- Prompt ---------------------------------------------------------------
@@ -107,7 +116,8 @@ def _messages(material: str) -> list[dict[str, str]]:
     Numbered because a small model (ADR 0011) loses mid-paragraph rules; the ones
     it breaks otherwise are S1, S2 and S5.
     """
-    caps = ", ".join(f"{field} {cap}" for field, cap in WIRE_FIELD_LIMITS.items())
+    limits = {**WIRE_FIELD_LIMITS, "situation": FIELD_LIMITS["description"]}
+    caps = ", ".join(f"{field} {cap}" for field, cap in limits.items())
     system = (
         "# Role\n"
         "You design one exercise for a telephone-training tool. A trainee has "
@@ -126,8 +136,8 @@ def _messages(material: str) -> list[dict[str, str]]:
         "The tool plays the caller and the trainee answers the phone. Three "
         "of the fields you write -- description, case_facts, call_goal -- are "
         "handed to the model that plays that caller, as its briefing. The "
-        "other three -- name, short_description, briefing -- are read by the "
-        "trainee before they start and never by the "
+        "other four -- name, short_description, situation, briefing -- are "
+        "read by the trainee before they start and never by the "
         "caller.\n"
         "\n"
         "# Rules for the caller's briefing\n"
@@ -171,10 +181,20 @@ def _messages(material: str) -> list[dict[str, str]]:
         "twelve German words -- because it is a teaser on a selection card, "
         "not a summary; count them before you answer. Anything longer is cut "
         "off mid-sentence. The situation itself belongs in description, which "
-        "has five times the room. This and briefing are the two places where "
-        "the purpose of the exercise may be said out loud -- the caller reads "
-        "neither.\n"
-        "C3. briefing: the trainee's own side of the case, in three short "
+        "has five times the room. This, situation and briefing are the places "
+        "where the purpose of the exercise may be said out loud -- the caller "
+        "reads none of them.\n"
+        "C3. situation: what the trainee is told the call is about before "
+        "they pick it, in two or three sentences, written about the people "
+        'rather than to them -- "der Kunde", "die Kundin", never "Sie". Say '
+        "that the caller from the last call rings again and why, as far as "
+        "the trainee could know it from the matter, then close with one "
+        'sentence starting "Geübt wird" that names what this call practises. '
+        "It is description seen from the trainee's end of the line: they are "
+        "the one who is rung and picks up, never the one who calls. Never "
+        'copy description, which is addressed to the caller and reads "Sie '
+        'rufen an".\n'
+        "C4. briefing: the trainee's own side of the case, in three short "
         'sentences addressed to them as "Sie". Say exactly three things and '
         "stop: the role they answer the phone in, the room they have (what "
         "they may offer, promise or escalate), and what counts as a good "
@@ -187,9 +207,9 @@ def _messages(material: str) -> list[dict[str, str]]:
         "\n"
         "# Output\n"
         "Answer with a single JSON object and nothing else.\n"
-        "O1. Exactly these six keys, spelled exactly like this, all six "
-        "always present: name, short_description, briefing, description, "
-        "case_facts, call_goal. The keys are identifiers: "
+        "O1. Exactly these seven keys, spelled exactly like this, all seven "
+        "always present: name, short_description, situation, briefing, "
+        "description, case_facts, call_goal. The keys are identifiers: "
         "never translate them, never add one.\n"
         "O2. Every value is written in German. The keys stay as they are."
         ' German is written with its own letters: "ä", "ö", "ü" and "ß", never '
@@ -203,6 +223,8 @@ def _messages(material: str) -> list[dict[str, str]]:
         '{"name": "short title of the situation", '
         '"short_description": "one sentence to the trainee about what this call '
         'will demand of them", '
+        '"situation": "for the trainee, about the people: the caller from the '
+        'last call rings again, and why; then one sentence starting Geübt wird", '
         '"briefing": "three sentences to the trainee: the role they answer '
         'in, the room they have, and what a good outcome is", '
         '"description": "the situation this time, told to the caller: who '
@@ -213,14 +235,15 @@ def _messages(material: str) -> list[dict[str, str]]:
         "\n"
         "# Before you answer, check silently\n"
         "The three caller fields say nothing about feedback, training or what "
-        "is being practised; nothing in them addresses the trainee; the case is "
+        "is being practised; nothing in them addresses the trainee; situation "
+        "has the caller ring the trainee, never the other way round; the case is "
         "the one you were given, carried forward rather than repeated or "
         "swapped for another; description is one or two sentences and states no "
         "fact that case_facts already carries; the bar in call_goal is one a "
         "vague answer would fail; and the room briefing gives the trainee is "
         "room the caller would actually accept.\n"
         "\n"
-        "The six keys stay in English. Every value is written in German. Your "
+        "The seven keys stay in English. Every value is written in German. Your "
         "entire answer is the JSON object, starting with { and ending with }."
     )
     return [

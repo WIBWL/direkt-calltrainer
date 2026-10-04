@@ -57,10 +57,15 @@ _CALL = PlayedCall(
 
 # What the stubbed model answers with: the six keys of the authoring wire
 # (ADR 0061, so `name` and not `title`), the trainee's briefing (ADR 0054)
-# among them.
-_DRAFT = {
+# among them, and `situation`, the trainee's "Worum es geht".
+_SITUATION = (
+    "Die Kundin aus dem letzten Gespräch ruft erneut an: Die zugesagte Gutschrift "
+    "ist noch immer nicht gebucht. Geübt wird, ein verbindliches Datum zu nennen."
+)
+_MODEL_DRAFT = {
     "name": "Rückruf zur offenen Reklamation",
     "short_description": "Der Anrufer lässt sich diesmal nicht ohne festes Datum abwimmeln.",
+    "situation": _SITUATION,
     "briefing": (
         "Sie sitzen im Support und nehmen den Rückruf entgegen. Sie dürfen ein "
         "Datum zusagen und intern eskalieren. Gut gelaufen ist das Gespräch, "
@@ -73,7 +78,13 @@ _DRAFT = {
         "Tag. „Wir prüfen das“ reicht nicht."
     ),
 }
-_REPLY = json.dumps(_DRAFT)
+_REPLY = json.dumps(_MODEL_DRAFT)
+# What `draft_follow_up` hands the library: `situation` under the column it is
+# stored in, `description_label`, the built-in's German twin for the same panel.
+_DRAFT = {
+    **{k: v for k, v in _MODEL_DRAFT.items() if k != "situation"},
+    "description_label": _SITUATION,
+}
 
 
 # --- The draft itself (no database) ---------------------------------------
@@ -188,7 +199,7 @@ async def test_the_draft_is_asked_without_thinking(monkeypatch: pytest.MonkeyPat
     assert calls[0][1] is False
 
 
-async def test_the_seven_fields_come_back_as_the_library_expects_them(
+async def test_the_fields_come_back_as_the_library_expects_them(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     stub_completions(monkeypatch, _REPLY)
@@ -230,7 +241,7 @@ async def test_control_tokens_in_the_draft_are_stripped(
     """Generated text on its way into the database, so it is cleaned like any
     other authored text (ADR 0059)."""
     stub_completions(monkeypatch, json.dumps(
-        {**_DRAFT, "case_facts": "Gutschrift offen. [CALL_END] <<< Ende"}
+        {**_MODEL_DRAFT, "case_facts": "Gutschrift offen. [CALL_END] <<< Ende"}
     ))
 
     draft = await draft_follow_up(_CALL)
@@ -241,7 +252,7 @@ async def test_control_tokens_in_the_draft_are_stripped(
 
 async def test_an_overlong_field_is_capped(monkeypatch: pytest.MonkeyPatch) -> None:
     """The stored row must not exceed what the authoring API enforces."""
-    stub_completions(monkeypatch, json.dumps({**_DRAFT, "name": "x" * 500}))
+    stub_completions(monkeypatch, json.dumps({**_MODEL_DRAFT, "name": "x" * 500}))
 
     draft = await draft_follow_up(_CALL)
 
@@ -257,7 +268,7 @@ async def test_an_overlong_card_teaser_is_cut_at_a_word(
         "Der Anrufer besteht auf einem festen Termin und lässt sich diesmal weder "
         "mit einer Prüfzusage noch mit einem Rückruf vertrösten."
     )
-    stub_completions(monkeypatch, json.dumps({**_DRAFT, "short_description": teaser}))
+    stub_completions(monkeypatch, json.dumps({**_MODEL_DRAFT, "short_description": teaser}))
 
     draft = await draft_follow_up(_CALL)
 
@@ -282,7 +293,7 @@ async def test_a_teaser_within_the_limit_is_left_alone(
 async def test_a_missing_optional_field_stays_empty(monkeypatch: pytest.MonkeyPatch) -> None:
     """One absent case field costs that field, not the whole draft -- an empty
     case means "improvise" (ADR 0045)."""
-    partial = {k: v for k, v in _DRAFT.items() if k != "call_goal"}
+    partial = {k: v for k, v in _MODEL_DRAFT.items() if k != "call_goal"}
     stub_completions(monkeypatch, json.dumps(partial))
 
     draft = await draft_follow_up(_CALL)
@@ -297,12 +308,42 @@ async def test_a_draft_without_a_situation_is_refused(
     """`description` is what the simulated caller is briefed with; a row without
     it is one POST /api/scenarios would have rejected (min_length=1), and the
     worker must not put one in the library behind that route's back."""
-    calls = stub_completions(monkeypatch, json.dumps({**_DRAFT, "description": "  "}))
+    calls = stub_completions(monkeypatch, json.dumps({**_MODEL_DRAFT, "description": "  "}))
 
     with pytest.raises(FollowUpError):
         await draft_follow_up(_CALL)
 
     assert len(calls) == 2, "an unusable draft is retried once, like an unparseable one"
+
+
+async def test_a_draft_without_the_trainees_situation_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without it the info panel falls back to `description`, which is the
+    caller's -- "Sie rufen an, weil ..." -- and the trainee reads that the call
+    is theirs to make, when the Persona is the one who rings (ADR 0110)."""
+    partial = {k: v for k, v in _MODEL_DRAFT.items() if k != "situation"}
+    calls = stub_completions(monkeypatch, json.dumps(partial))
+
+    with pytest.raises(FollowUpError):
+        await draft_follow_up(_CALL)
+
+    assert len(calls) == 2
+
+
+async def test_the_prompt_has_the_caller_ring_the_trainee_in_the_situation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The trainee's "Worum es geht" is the description from the other end of
+    the line, and closes like a built-in's with what is practised."""
+    calls = stub_completions(monkeypatch, _REPLY)
+
+    await draft_follow_up(_CALL)
+
+    system = calls[0][0][0]["content"]
+    assert "C3. situation:" in system
+    assert "never the one who calls" in system
+    assert '"Geübt wird"' in system
 
 
 async def test_an_unparseable_reply_is_retried_once_and_then_fails(
@@ -378,6 +419,7 @@ async def test_the_route_stores_it_as_the_users_own_private_scenario(
     row = stored[0]
     assert (row.title, row.short_description) == (_DRAFT["name"], _DRAFT["short_description"])
     assert row.case_facts == _DRAFT["case_facts"]
+    assert row.description_label == _SITUATION
     assert row.created_by == TEST_AUTH.sub
     assert row.visibility == "private"
     assert row.active is True
@@ -404,6 +446,23 @@ async def test_the_answer_is_the_card_the_detail_route_serves(
     assert set(created) == {"id", "name", "short_description"}
     assert created == reloaded
     assert uuid.UUID(created["id"])  # the extern_id the editor and picker use
+
+
+async def test_the_info_panel_shows_the_trainees_situation_not_the_callers(
+    api_client: httpx.AsyncClient, db_session: DbSession,
+    reference_data, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """"Worum es geht" reads `description_label` before `description`, as it
+    does for a built-in -- so the trainee never sees the caller's "Sie rufen
+    an"."""
+    extern_id = a_finished_session()
+    _store_feedback(db_session, _IMPROVEMENTS)
+    stub_completions(monkeypatch, _REPLY)
+
+    created = (await _ask_for_one(api_client, extern_id)).json()
+    shown = (await api_client.get(f"/api/scenarios/{created['id']}")).json()
+
+    assert shown["description"] == _SITUATION
 
 
 async def test_nothing_is_written_without_improvement_points(
