@@ -54,59 +54,71 @@ export default function Sparkline({
 
   return (
     <div className="sparkline-wrap">
-      <svg
-        className="sparkline"
-        viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="none"
-        role="img"
-        aria-label={describe(series)}
-        style={{ color }}
-      >
-        {series.band && (
-          <rect
-            className="sparkline-band"
-            x={0}
-            y={Math.max(0, y(series.band.high))}
-            width={width}
-            height={Math.max(1, Math.min(height, y(series.band.low)) - Math.max(0, y(series.band.high)))}
-          />
-        )}
-
-        {values.length > 1 && <polygon className="sparkline-area" points={area} />}
-        {values.length > 1 && <polyline className="sparkline-line" points={line} />}
-
-        {showDots &&
-          series.points.map((p, index) => (
-            <circle
-              className={
-                index === shown ? "sparkline-dot is-current" : "sparkline-dot"
-              }
-              key={p.sessionId}
-              cx={x(index)}
-              cy={y(p.value)}
-              r={index === shown ? 4 : values.length > 20 ? 1.8 : 2.4}
-            />
-          ))}
-
-        {/* The hit areas sit last so they take the pointer, and they are wider
-            than the marks they stand for -- a 2px dot is not a target. One per
-            point rather than a crosshair over the whole box, because the x
-            axis here is a sequence of trainings and not a continuum: there is
-            no value between two of them to read off. */}
-        {interactive &&
-          series.points.map((p, index) => (
+      <div className="sparkline-plot">
+        <svg
+          className="sparkline"
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
+          role="img"
+          aria-label={describe(series)}
+          style={{ color }}
+        >
+          {series.band && (
             <rect
-              key={`hit-${p.sessionId}`}
-              className="sparkline-hit"
-              x={index === 0 ? 0 : x(index) - width / (values.length - 1 || 1) / 2}
-              y={0}
-              width={width / (values.length > 1 ? values.length - 1 : 1)}
-              height={height}
-              onMouseEnter={() => setActive(index)}
-              onMouseLeave={() => setActive(null)}
+              className="sparkline-band"
+              x={0}
+              y={Math.max(0, y(series.band.high))}
+              width={width}
+              height={Math.max(1, Math.min(height, y(series.band.low)) - Math.max(0, y(series.band.high)))}
             />
-          ))}
-      </svg>
+          )}
+
+          {values.length > 1 && <polygon className="sparkline-area" points={area} />}
+          {values.length > 1 && <polyline className="sparkline-line" points={line} />}
+
+          {/* The hit areas sit last so they take the pointer, and they are wider
+              than the marks they stand for -- a 2px dot is not a target. One per
+              point rather than a crosshair over the whole box, because the x
+              axis here is a sequence of trainings and not a continuum: there is
+              no value between two of them to read off. */}
+          {interactive &&
+            series.points.map((p, index) => (
+              <rect
+                key={`hit-${p.sessionId}`}
+                className="sparkline-hit"
+                x={index === 0 ? 0 : x(index) - width / (values.length - 1 || 1) / 2}
+                y={0}
+                width={width / (values.length > 1 ? values.length - 1 : 1)}
+                height={height}
+                onMouseEnter={() => setActive(index)}
+                onMouseLeave={() => setActive(null)}
+              />
+            ))}
+        </svg>
+
+        {/* The dots are HTML laid over the SVG, not circles in it: the SVG is stretched to the card's width
+            (`preserveAspectRatio="none"`), which would stretch a circle into an oval on a wide window. Placed
+            by percentage, sized in pixels, so they stay round at any width. */}
+        {showDots && (
+          <div className="sparkline-dots" aria-hidden="true" style={{ color }}>
+            {series.points.map((p, index) => {
+              const diameter = index === shown ? 8 : values.length > 20 ? 3.6 : 4.8;
+              return (
+                <span
+                  className={index === shown ? "sparkline-dot is-current" : "sparkline-dot"}
+                  key={p.sessionId}
+                  style={{
+                    left: `${(x(index) / width) * 100}%`,
+                    top: `${(y(p.value) / height) * 100}%`,
+                    width: diameter,
+                    height: diameter,
+                  }}
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* A line under the chart rather than a tooltip: it cannot cover marks and needs no positioning. Kept
           when empty so tiles do not shift on hover. `aria-hidden`: the accessible name and the detail table

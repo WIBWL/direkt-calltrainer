@@ -5739,6 +5739,9 @@ a.consent-button {
    160px tall. */
 .progress-page .metric-table-card .metric-table .sparkline {
   height: 36px;
+}
+
+.progress-page .metric-table-card .metric-table .sparkline-plot {
   margin-bottom: 0;
 }
 
@@ -6370,6 +6373,19 @@ button.calendar-day {
   display: block;
 }
 
+/* The box the dots are placed in: exactly the SVG's box, so a dot's
+   percentage position lands on the line. Any margin goes here, never on the
+   SVG, or the box would be taller than the chart. */
+.sparkline-plot {
+  position: relative;
+}
+
+.sparkline-dots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 .sparkline {
   display: block;
   width: 100%;
@@ -6405,18 +6421,19 @@ button.calendar-day {
 }
 
 .sparkline-dot {
-  fill: currentColor;
+  position: absolute;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translate(-50%, -50%);
   opacity: 0.55;
-  transition: opacity 120ms ease, r 120ms ease;
+  transition: opacity 120ms ease, width 120ms ease, height 120ms ease;
 }
 
 /* The reading the line under the chart is showing. A ring of surface colour
    around it so it stays legible where the line runs under it. */
 .sparkline-dot.is-current {
   opacity: 1;
-  stroke: var(--color-surface);
-  stroke-width: 2;
-  paint-order: stroke;
+  box-shadow: 0 0 0 2px var(--color-surface);
 }
 
 .sparkline-hit {
@@ -6456,6 +6473,9 @@ button.calendar-day {
 
 .progress-page .card .sparkline {
   height: 160px;
+}
+
+.progress-page .card .sparkline-plot {
   margin-bottom: 0.75rem;
 }
 
