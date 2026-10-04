@@ -1,8 +1,8 @@
-# ADR 0107: The Progress Report Is a Second Document on the Same Page Frame
+# ADR 0113: The Progress Report Is a Second Document on the Same Page Frame
 
 ## Status
 
-Accepted, and written after the fact. The report has existed since F-13's fourth stage; ADR 0093 covers the feedback file and never mentions this one, so the second of the two documents this application writes had no decision recorded anywhere but in `docs/dashboard-concept.md` section F. The companion to ADR 0093, and it takes its data path from ADR 0106.
+Accepted, and written after the fact. The report has existed since F-13's fourth stage; ADR 0093 covers the feedback file and never mentions this one, so the second of the two documents this application writes had no decision recorded anywhere but in `docs/dashboard-concept.md` section F. The companion to ADR 0093, and it takes its data path from ADR 0112.
 
 ## Context
 
@@ -14,9 +14,9 @@ Two things had to be decided and only one of them had a precedent. ADR 0093 sett
 
 **A second PDF, built in the browser from the numbers the page already holds, on the page frame extracted from the first.**
 
-### Built in the browser, for ADR 0106's reason rather than ADR 0093's
+### Built in the browser, for ADR 0112's reason rather than ADR 0093's
 
-The figures are in the client because the dashboard loaded them there. A server route would be a second path to the same numbers, which ADR 0106 rules out, and it would additionally have to reimplement both switches to know which trainings the reader had selected. `buildProgressPdf` is exported without a caller in this repository, exactly as `buildFeedbackPdf` is, so the layout can be rendered and looked at outside a browser — which is how it was designed and checked.
+The figures are in the client because the dashboard loaded them there. A server route would be a second path to the same numbers, which ADR 0112 rules out, and it would additionally have to reimplement both switches to know which trainings the reader had selected. `buildProgressPdf` is exported without a caller in this repository, exactly as `buildFeedbackPdf` is, so the layout can be rendered and looked at outside a browser — which is how it was designed and checked.
 
 jsPDF and the fonts are fetched on the press, so neither sits in the initial bundle.
 

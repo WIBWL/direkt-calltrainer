@@ -33,7 +33,7 @@ describe("backingOf", () => {
   });
 
   it("knows nothing of the retired Artikulation and says so honestly", () => {
-    // ADR 0105 retired the goal. A key the catalogue no longer names has to
+    // ADR 0111 retired the goal. A key the catalogue no longer names has to
     // reach the fallback, not a leftover entry: a tile drawn from a stale row
     // would go on offering a goal the application withdrew.
     const retired = backingOf("articulation");
@@ -70,7 +70,7 @@ describe("the catalogue's shape", () => {
 
     // docs/dashboard-concept.md section 4.2. Pinned as a count because the
     // honest answer differs per goal, and a goal quietly moving between
-    // buckets is what changes what the screen claims. Thirteen since ADR 0105
+    // buckets is what changes what the screen claims. Thirteen since ADR 0111
     // retired the Artikulation, which was one of the text goals.
     expect(count("metric")).toBe(8);
     expect(count("segment")).toBe(1);

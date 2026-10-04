@@ -1684,7 +1684,7 @@ FOCUS_GOALS = [
     # so calls are not comparable. Deactivated, not deleted -- selections
     # reference it (ADR 0076); the `loudness` metric stays.
     #
-    # The articulation goal is retired the same way (ADR 0105): the same argument
+    # The articulation goal is retired the same way (ADR 0111): the same argument
     # one step further, with no comparison within one recording either, and
     # Whisper normalises swallowed endings away. F-38 stays in the feature list
     # as a requirement answered with a reasoned no (ADR 0084).

@@ -360,7 +360,7 @@ Der Katalog aus F-62 hat 13 Ziele. Zwei sind zurückgezogen, und beide aus
 demselben Grund. „Souveräne Lautstärke“ ging mit der Ergänzung zu ADR 0076:
 Gemessen wird der Pegel der Aufnahme, und der sagt genauso viel über Mikrofon
 und Sitzabstand wie über die sprechende Person. Die Kennzahl `loudness` bleibt,
-das Ziel nicht. „Deutliche Artikulation“ ging mit ADR 0105, der die Frage
+das Ziel nicht. „Deutliche Artikulation“ ging mit ADR 0111, der die Frage
 beantwortet, die weiter unten in diesem Abschnitt an die Projektleitung
 gestellt war. Was heute mit Daten hinterlegt werden kann:
 
@@ -391,7 +391,7 @@ muss beides tragen können, und ein Ziel ohne Messung darf keine leere Kachel
 erzeugen (Abschnitt 6).
 
 **Die Artikulation bekommt keine Messung, und das Ziel ist deshalb aus dem
-Katalog genommen** (ADR 0105). Beides ist eine Entscheidung und kein Rückstand.
+Katalog genommen** (ADR 0111). Beides ist eine Entscheidung und kein Rückstand.
 Drei Gründe, jeder für sich ausreichend:
 
 * **Das Mikrofon ist nicht herauszurechnen.** Undeutlichkeit zeigt sich in der
@@ -420,7 +420,7 @@ Erkennerqualität und über das Modell, nicht über die sprechende Person.
 
 Daraus folgte eine Frage an die Projektleitung, die an dieser Stelle nicht
 allein entschieden wurde: **Soll „Deutliche Artikulation“ im Katalog bleiben?**
-Sie ist mit Nein beantwortet (ADR 0105). Ein Ziel anzubieten, zu dem die
+Sie ist mit Nein beantwortet (ADR 0111). Ein Ziel anzubieten, zu dem die
 Anwendung dauerhaft fast nichts sagen kann, ist dieselbe Art von Versprechen,
 wegen der die Lautstärke gegangen ist, und hier eine Stufe schlimmer: Bei der
 Lautstärke blieb wenigstens der Vergleich innerhalb eines Gesprächs. Die Zeile

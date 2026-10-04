@@ -68,7 +68,7 @@ def _call_with_a_pause() -> list[Turn]:
 
 
 def test_talk_share_counts_the_user_from_first_sound_to_last() -> None:
-    """F-24, ADR 0108. 2.5 s of user against 2 s of Persona. Not the 4 s
+    """F-24, ADR 0114. 2.5 s of user against 2 s of Persona. Not the 4 s
     recording, whose extra 1.5 s is the VAD's padding and would read as two
     thirds; not the 2 s of phonation alone, which strips the user's pause but
     leaves the Persona's in and would read as half."""
@@ -102,7 +102,7 @@ def test_reaction_time_is_measured_from_when_the_persona_stopped() -> None:
 
 
 def test_reaction_time_records_what_its_gaps_end_at() -> None:
-    """ADR 0108. The marker `scripts/backfill_voiced_span.py` reads to leave a
+    """ADR 0114. The marker `scripts/backfill_voiced_span.py` reads to leave a
     call alone whose gaps already end at the first sound; without it a second
     run would shift them by the padding again."""
     detail = {m.key: m.detail for m in measure(conversation(_measured_call()))}
@@ -129,7 +129,7 @@ def _call_with_one_unmeasured_turn() -> list[Turn]:
 
 
 def test_redefluss_is_the_share_of_the_span_that_was_speech() -> None:
-    """F-51, ADR 0108. 2 s of speech and 0.5 s of pause is 80%. Over the 4 s
+    """F-51, ADR 0114. 2 s of speech and 0.5 s of pause is 80%. Over the 4 s
     recording it would be 50%, and the missing 30 points would be the VAD's
     padding, the same for a fluent speaker as for a halting one."""
     assert _by_key(_call_with_a_pause())["phonation_share"] == 80.0
@@ -141,7 +141,7 @@ def test_redefluss_without_a_pause_is_complete() -> None:
 
 
 def test_redefluss_detail_names_the_span_it_divided_by() -> None:
-    """`voiced_ms`, not the `speech_ms` stored before ADR 0108: the page reads
+    """`voiced_ms`, not the `speech_ms` stored before ADR 0114: the page reads
     the key to draw the two bars, and the old one held the padded recording."""
     detail = {m.key: m.detail for m in measure(conversation(_call_with_a_pause()))}
 
@@ -252,7 +252,7 @@ def test_a_recording_without_silence_drops_what_rests_on_silence() -> None:
 
     Pauses, phonation share, pace, loudness span and run length would report noise as
     speech; `run_length` is wrong twice over (phonation and runs). Talk share goes
-    with them since ADR 0108: its user side is the span that same split finds, and
+    with them since ADR 0114: its user side is the span that same split finds, and
     over a noise floor that is the whole recording, padding included."""
     turns = _measured_call()
     turns[1].loudness_db = [60.0] * 100

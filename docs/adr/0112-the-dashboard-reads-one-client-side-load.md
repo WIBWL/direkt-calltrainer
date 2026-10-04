@@ -1,8 +1,8 @@
-# ADR 0106: The Dashboard Reads One Client-Side Load and Adds No Endpoint
+# ADR 0112: The Dashboard Reads One Client-Side Load and Adds No Endpoint
 
 ## Status
 
-Accepted, and written after the fact. The arrangement it records has been built since F-13's first stage and argued at length in `docs/dashboard-concept.md` section 9; what it never had was an ADR, so the decision lived only in a concept document beside the screen's visual choices. ADR 0107 leans on it for the report on paper.
+Accepted, and written after the fact. The arrangement it records has been built since F-13's first stage and argued at length in `docs/dashboard-concept.md` section 9; what it never had was an ADR, so the decision lived only in a concept document beside the screen's visual choices. ADR 0113 leans on it for the report on paper.
 
 Narrows nothing and reverses nothing. It states the data path all three dashboard screens share, and the three alternatives that were declined.
 

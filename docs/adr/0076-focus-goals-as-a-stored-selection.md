@@ -9,7 +9,7 @@ part of this change.
 
 **Amended:** the catalogue is thirteen goals, not fifteen. "Souveräne
 Lautstärke" is retired — see the amendments at the end. "Deutliche Artikulation"
-is retired too, by ADR 0105, on the same argument one step further.
+is retired too, by ADR 0111, on the same argument one step further.
 
 **Amended 2026-09-11** — the selection now also carries a role and call types,
 and the setup screen reads it to suggest Scenarios. See the amendment at the end.
@@ -185,7 +185,7 @@ same room are not comparable if they used a headset once and a laptop the next
 time, and nothing in the application knows which it was. A goal that promised a
 reading of vocal presence would have reported the input device.
 
-So the catalogue drops to fourteen, and to thirteen once ADR 0105 retires the
+So the catalogue drops to fourteen, and to thirteen once ADR 0111 retires the
 articulation on the same ground. `position` closes the gap; the row is
 deactivated by the seeding and not deleted, as this ADR already requires, and
 the goal leaves the served selection of anyone who had picked it

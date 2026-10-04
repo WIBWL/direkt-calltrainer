@@ -1,4 +1,4 @@
-"""Correct the figures the VAD's padding distorted, for Sessions stored before ADR 0108.
+"""Correct the figures the VAD's padding distorted, for Sessions stored before ADR 0114.
 
     python scripts/backfill_voiced_span.py            # show what would change
     python scripts/backfill_voiced_span.py --apply    # write it

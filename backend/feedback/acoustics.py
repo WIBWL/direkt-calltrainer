@@ -129,7 +129,7 @@ class TurnAcoustics:
     # The client's VAD pads every recording, about 0.8 s before the first sound
     # (vad-web's `preSpeechPadMs` default) and a full `redemptionMs` after the
     # last (useMicrophoneVAD.ts); these two are what put the utterance on the
-    # call's timeline instead of its padding (ADR 0108).
+    # call's timeline instead of its padding (ADR 0114).
     voice_start_ms: int
     voice_end_ms: int
     pauses: tuple[Pause, ...]

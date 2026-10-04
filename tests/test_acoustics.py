@@ -142,7 +142,7 @@ def _silence(seconds: float) -> np.ndarray:
 
 
 def test_the_sound_is_found_inside_the_vads_padding() -> None:
-    """ADR 0108. The client's recordings open with about 0.8 s of lead-in and
+    """ADR 0114. The client's recordings open with about 0.8 s of lead-in and
     close with the second of silence the VAD waited through; the sound between
     is what the utterance is placed by. Praat's intensity window blurs an edge
     by a few tens of milliseconds, hence the tolerance."""

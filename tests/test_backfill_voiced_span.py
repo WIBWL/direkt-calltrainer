@@ -1,7 +1,7 @@
-"""ADR 0108's backfill: a call stored with the VAD's padding in its figures,
+"""ADR 0114's backfill: a call stored with the VAD's padding in its figures,
 corrected from what was stored. Runs the script's own `backfill` against a
 throwaway database, the rows written through the real write path and then put
-back into the shape the live path gave them before ADR 0108."""
+back into the shape the live path gave them before ADR 0114."""
 
 from decimal import Decimal
 
@@ -79,7 +79,7 @@ def _figures(db: DbSession) -> dict[str, Measurement]:
     }
 
 
-def _as_stored_before_adr_0108(db: DbSession) -> None:
+def _as_stored_before_adr_0114(db: DbSession) -> None:
     """Put the three figures back the way the live path wrote them: the talk
     share over the recordings' length, the Redefluss with `speech_ms`, the
     reaction time without saying what its gaps end at."""
@@ -101,7 +101,7 @@ def test_the_talk_share_is_recomputed_over_the_voiced_span(
     """2 x (1.5 s + 0.5 s) of user against 5 s of Persona: 44.4 %, where the
     padded recordings made it 60.3 %."""
     persist(turns=_call())
-    _as_stored_before_adr_0108(db_session)
+    _as_stored_before_adr_0114(db_session)
 
     backfill_voiced_span.backfill(apply=True)
 
@@ -116,7 +116,7 @@ def test_the_redefluss_is_recomputed_over_the_voiced_span(
 ) -> None:
     """3 s of speech in 4 s from first sound to last, not in 7.6 s of recording."""
     persist(turns=_call())
-    _as_stored_before_adr_0108(db_session)
+    _as_stored_before_adr_0114(db_session)
 
     backfill_voiced_span.backfill(apply=True)
 
@@ -134,7 +134,7 @@ def test_the_reaction_time_is_moved_to_the_estimated_first_sound(
     and 0.1 s to 0.75 and 0.85 s. `at_ms` stays on the transcript's offsets,
     which is how the page finds the reply."""
     persist(turns=_call())
-    _as_stored_before_adr_0108(db_session)
+    _as_stored_before_adr_0114(db_session)
 
     backfill_voiced_span.backfill(apply=True)
 
@@ -154,13 +154,13 @@ def test_a_second_run_changes_nothing(
     """Idempotent, as every backfill here is -- and for the reaction time that
     is not a courtesy: a second shift would move each reply by the padding again."""
     persist(turns=_call())
-    _as_stored_before_adr_0108(db_session)
+    _as_stored_before_adr_0114(db_session)
     backfill_voiced_span.backfill(apply=True)
 
     assert backfill_voiced_span.backfill(apply=True) == 0
 
 
-def test_a_call_stored_after_adr_0108_is_left_alone(
+def test_a_call_stored_after_adr_0114_is_left_alone(
     db_session: DbSession, app_database: str, inventory: None
 ) -> None:
     """The live path's own figures already agree with what the script would write."""
@@ -174,7 +174,7 @@ def test_a_dry_run_writes_nothing(
 ) -> None:
     """Without `--apply` the run reports the Session and leaves every figure."""
     persist(turns=_call())
-    _as_stored_before_adr_0108(db_session)
+    _as_stored_before_adr_0114(db_session)
     before = {key: float(m.value) for key, m in _figures(db_session).items()}
 
     assert backfill_voiced_span.backfill(apply=False) == 1

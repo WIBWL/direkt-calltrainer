@@ -1,4 +1,4 @@
-# ADR 0108: The VAD's Padding Is Not Speech
+# ADR 0114: The VAD's Padding Is Not Speech
 
 ## Status
 

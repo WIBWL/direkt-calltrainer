@@ -1,8 +1,8 @@
-# ADR 0109: A Call's Figures Are Placed Against the User's Own Usual Range
+# ADR 0115: A Call's Figures Are Placed Against the User's Own Usual Range
 
 ## Status
 
-**Accepted**, with the project lead: the usual range as the reference (not the mean, not the previous call), five earlier trainings as the floor, quantities only in the wording, the range stated as the half of the calls it holds, and the wrap-up model kept out. Not built yet. One point is left open on purpose and does not block it: the loudness, which stays out of the comparison until one of the two ways below has been tried. Amends ADR 0065 on its scope: that ADR governs the progress view, and this one brings a reference *across* Sessions into the single-call view for the first time. ADR 0065's list of what stays refused on the progress view is untouched, and so is ADR 0078's seventh condition (no traffic light across Sessions). Depends on ADR 0108 having been backfilled, see "Before this can be built".
+**Accepted**, with the project lead: the usual range as the reference (not the mean, not the previous call), five earlier trainings as the floor, quantities only in the wording, the range stated as the half of the calls it holds, and the wrap-up model kept out. Not built yet. One point is left open on purpose and does not block it: the loudness, which stays out of the comparison until one of the two ways below has been tried. Amends ADR 0065 on its scope: that ADR governs the progress view, and this one brings a reference *across* Sessions into the single-call view for the first time. ADR 0065's list of what stays refused on the progress view is untouched, and so is ADR 0078's seventh condition (no traffic light across Sessions). Depends on ADR 0114 having been backfilled, see "Before this can be built".
 
 ## Context
 
@@ -33,7 +33,7 @@ That step says what a norm would say, *unusual*, without the norm. "For you, thi
 
 **6. Which metrics.** Those `utils/metrics.ts` marks `comparableAcrossCalls` and draws as a line. Not the checklists (opening, closing), whose 0–3 parts make "unusual" meaningless. Not the loudness, see below. Not the call length, which is the Scenario's more than the user's. The two classified metrics keep their scale, and the range stands beside it without replacing it.
 
-**7. Where it is computed.** In the browser, from the same client-side load the dashboard reads (ADR 0106), with the pure functions in `utils/progressStats.ts`. The sentence is decided in one place, like `reportOutline.ts`, so the screen and the PDF cannot say different things. No endpoint and no stored field: it is a reading, derived on every read (ADR 0091), and it changes as the history grows.
+**7. Where it is computed.** In the browser, from the same client-side load the dashboard reads (ADR 0112), with the pure functions in `utils/progressStats.ts`. The sentence is decided in one place, like `reportOutline.ts`, so the screen and the PDF cannot say different things. No endpoint and no stored field: it is a reading, derived on every read (ADR 0091), and it changes as the history grows.
 
 **8. The wrap-up model does not see it** (initially). The generated text stays about this call. Whether the model may say "anders als sonst" is a second decision, and it would need the range passed into the prompt against the prompt's own rule not to judge figures against a reference.
 
@@ -52,7 +52,7 @@ Until one of them is tested, the loudness keeps its within-call reading (ADR 008
 
 ## Before this can be built
 
-- **ADR 0108 backfilled** (`scripts/backfill_voiced_span.py --apply`). Otherwise the range is built from calls measured under the old definition, and a new call is flagged as unusual because the measurement changed rather than the user.
+- **ADR 0114 backfilled** (`scripts/backfill_voiced_span.py --apply`). Otherwise the range is built from calls measured under the old definition, and a new call is flagged as unusual because the measurement changed rather than the user.
 - **A rule for every later change of a derivation**: a change that alters stored values ships its backfill in the same change, or the metric drops out of this comparison until five trainings exist under the new definition. Without that rule this feature turns every measurement fix into a false "ungewöhnlich".
 
 ## Alternatives considered

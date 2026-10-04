@@ -75,7 +75,7 @@ export const FOCUS_BACKING: Record<string, FocusBacking> = {
   },
   // Answered by the wrap-up texts. Named individually, not defaulted, so a new
   // catalogue goal forces a decision here. Articulation stood here and is
-  // retired (ADR 0105): the transcript does not carry what that goal is about.
+  // retired (ADR 0111): the transcript does not carry what that goal is about.
   objection_handling: { kind: "text", metrics: [], note: NO_MEASUREMENT },
   empathy: { kind: "text", metrics: [], note: NO_MEASUREMENT },
 };

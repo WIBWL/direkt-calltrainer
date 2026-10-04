@@ -40,7 +40,7 @@ async def attach_measurements(
     # recording's edges: the VAD pads about 0.8 s in front and a second behind,
     # and placed on those edges every reply started early enough to shorten
     # its reaction time by the whole pad and to read as talking over the
-    # Persona (ADR 0108). The pauses below stay rebased on the recording's
+    # Persona (ADR 0114). The pauses below stay rebased on the recording's
     # start, which is what their offsets are relative to.
     if turn.user_offset_ms is None:
         turn.user_offset_ms = started_ms + measured.voice_start_ms

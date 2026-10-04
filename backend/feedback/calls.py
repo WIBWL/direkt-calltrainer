@@ -155,7 +155,7 @@ class Conversation:  # pylint: disable=too-many-instance-attributes  # a record 
     def user_voiced_ms(self) -> int:
         """How long the user spoke from first sound to last, summed over the
         utterances: phonation plus the pauses inside it, without the padding
-        the VAD records at either end (ADR 0108). Praat labels every stretch
+        the VAD records at either end (ADR 0114). Praat labels every stretch
         between the first sound and the last as one or the other, so the sum
         is that span exactly -- and both terms are stored, so a stored call
         yields the same figure as the live one.

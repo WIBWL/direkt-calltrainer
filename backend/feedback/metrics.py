@@ -95,7 +95,7 @@ def _talk_share(call: Conversation) -> Measurement | None:
     counts for neither side). First sound to last on the user's side, the
     synthesized audio on the Persona's: both with the pauses inside them, and
     neither with the VAD's padding, which alone used to add about 1.8 s to
-    every user utterance (ADR 0108). Phonation would strip the user's pauses
+    every user utterance (ADR 0114). Phonation would strip the user's pauses
     but not the Persona's.
     """
     # The span rests on Praat's split into speech and silence; over a noise
@@ -386,7 +386,7 @@ def _reaction_time(call: Conversation) -> Measurement | None:
     return reaction_time_measurement(call.reactions)
 
 
-# Where a stored reaction time's gaps end, recorded with them. Since ADR 0108
+# Where a stored reaction time's gaps end, recorded with them. Since ADR 0114
 # that is the user's first sound; a row without the key was measured to the
 # start of the recording, 0.8 s of VAD padding early, and is what
 # `scripts/backfill_voiced_span.py` looks for.
@@ -396,7 +396,7 @@ REACTION_MEASURED_TO = "first_sound"
 def reaction_time_measurement(reactions: Sequence[Reaction]) -> Measurement | None:
     """The stored shape of F-53's reaction time. Shared with
     `scripts/backfill_voiced_span.py`, which corrects the gaps of calls stored
-    before ADR 0108 and keeps their `at_ms` on the transcript's offsets."""
+    before ADR 0114 and keeps their `at_ms` on the transcript's offsets."""
     if not reactions:
         return None
     gaps = [reaction.gap_ms for reaction in reactions]
@@ -424,7 +424,7 @@ def _phonation_share(call: Conversation) -> Measurement | None:
     rather than pausing. Not over the whole recording: the VAD's padding is a
     fixed 1.8 s or so per utterance, and in the denominator it made the figure
     a measure of how long the utterances were rather than of how fluently they
-    ran (ADR 0108). A call without a single pause reads 100%.
+    ran (ADR 0114). A call without a single pause reads 100%.
     """
     if not call.user_acoustics_complete or not call.user_phonation_ms or not _silence_found(call):
         return None

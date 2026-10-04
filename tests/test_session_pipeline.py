@@ -165,7 +165,7 @@ async def _done(acoustics: TurnAcoustics) -> "asyncio.Task[TurnAcoustics]":
 
 
 async def test_a_reply_is_placed_at_its_first_sound_not_at_the_recording():
-    """ADR 0108. A 2.8 s recording that arrived at 10 s began at 7.2 s, but its
+    """ADR 0114. A 2.8 s recording that arrived at 10 s began at 7.2 s, but its
     first 0.8 s are the VAD's lead-in and its last second the silence it waited
     through: the user spoke from 8.0 s to 9.0 s. Placed on the recording's
     edges, every reply started 0.8 s early -- a reaction time short by that

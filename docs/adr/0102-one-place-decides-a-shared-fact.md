@@ -40,7 +40,7 @@ A later review that proposes merging one of these back — for instance "the PDF
 
 ## Amendment, 2026-09-24: the progress report gets the same treatment
 
-This ADR extracted `reportOutline.ts` for the feedback report and stopped there. The application writes a second report (ADR 0107), and it was left in exactly the state the first one had been in: `ProgressView.tsx` and `progressPdf.ts` each decided for themselves what a focus goal reads and how a mention is counted.
+This ADR extracted `reportOutline.ts` for the feedback report and stopped there. The application writes a second report (ADR 0113), and it was left in exactly the state the first one had been in: `ProgressView.tsx` and `progressPdf.ts` each decided for themselves what a focus goal reads and how a mention is counted.
 
 It had drifted, in both directions, which is the part worth recording. `progressPdf` carried its own `countMentions`, a line-for-line copy of `goalMentions.mentionsFor` under a docstring saying it counted "the way the screen counts it" — the sentence a second implementation writes about itself. And of the five states a focus goal can be in, the file handled one the screen did not: a goal that *has* a measurement in a selection carrying no value for it. The screen fell through every branch and drew a tile holding a title, a link and nothing between them, which section 6 of the concept rules out by name. The file was right, the screen was wrong, and nothing connected the two well enough for either to notice.
 
