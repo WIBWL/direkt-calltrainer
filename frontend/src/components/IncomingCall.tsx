@@ -188,7 +188,7 @@ export default function IncomingCall({
       </div>
 
       <p className="incoming-hint">
-        Sobald Sie annehmen, meldet sich Ihr Gegenüber — reagieren Sie wie am Telefon.
+        Sobald Sie annehmen, beginnt das Telefonat. Melden Sie sich beim Anrufer mit einer Begrüßung.
       </p>
     </section>
   );
