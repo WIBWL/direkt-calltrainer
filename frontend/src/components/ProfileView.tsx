@@ -8,6 +8,7 @@ import ConsentSettings from "./ConsentSettings";
 import DataOverview from "./DataOverview";
 import FocusSettings from "./FocusSettings";
 import InfoDetails from "./InfoDetails";
+import PrivacyLink from "./PrivacyLink";
 import ProcessingNotice from "./ProcessingNotice";
 import SessionHistory from "./SessionHistory";
 
@@ -125,7 +126,7 @@ export default function ProfileView() {
           </p>
 
           <p>
-            Ausführlich in der <Link to={ROUTES.privacy}>Datenschutzerklärung</Link>.
+            Ausführlich in der <PrivacyLink>Datenschutzerklärung</PrivacyLink>.
           </p>
         </InfoDetails>
       </section>

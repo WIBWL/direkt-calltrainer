@@ -1,60 +1,37 @@
+import { useEffect } from "react";
+
+import { PRIVACY_URL } from "../../routes";
 import LegalPage from "../LegalPage";
-import { Link } from "react-router-dom";
-
-import { ROUTES } from "../../routes";
-
-/** Where the privacy statement lives. The EFRE DiReKT project's own page, which
- *  is the statement of the responsible body for everything under the project. */
-export const PRIVACY_URL = "https://efre-direkt.de/privacy/";
 
 /**
- * The privacy statement, which is no longer here.
+ * `/datenschutz`, which now only forwards.
  *
- * It used to be a full statement of its own, derived from
- * https://efre-direkt.de/privacy/ and adapted to what the Calltrainer actually
- * processes. It is now a referral to that page, so that one document is
- * maintained instead of two that can drift apart.
+ * The statement was a full document of its own here, then a page referring to
+ * the project's own one. Neither is left: every mention in the interface links
+ * `PRIVACY_URL` straight out (`PrivacyLink`), so nothing in the app reaches
+ * this route any more. What the old text said is in the git history, and what
+ * the target page still owes a reader is listed in `docs/deployment.md`.
  *
- * The route stays rather than the footer linking out directly: three places
- * point at it (`AppFooter`, `ConsentDialog`, `ProfileView`), and the consent
- * dialog in particular has to reference a notice that exists. A route that
- * disappeared would break the reference the consent rests on.
- *
- * **What this page deliberately does not do is describe the processing.** That
- * is the point of the change, and it is also its one risk: as of the change,
- * the target page describes a website — a contact form, ticketing, a mailing
- * list — and says nothing about speech leaving the browser for the DiReKT
- * gateway and KugelAudio, about consent-gated storage of transcripts, the
- * six-month retention, the focus goals stored beside the trainings, or the
- * consent log that outlives them. Until that content is on the target page, the
- * application's own processing has no Art. 13 notice anywhere.
- *
- * So: this file is not where a description of the processing belongs any more,
- * and adding one back here would recreate the second document. It belongs on
- * the target page. Whoever restores it there should note that the statement
- * this page replaced said an abandoned call is not stored, which is wrong —
- * `persistence.py` stores it as `aborted` with its full transcript (ADR 0034's
- * amendment), it is only not counted.
+ * The route stays all the same, because a legal URL that has been published
+ * once must not 404: an imprint, a registry or the project site may point at
+ * it. `replace` rather than `assign`, so Back does not bounce the reader
+ * between the two, and the sentence below is what a reader sees if the redirect
+ * is blocked or JavaScript never ran.
  */
 export default function Privacy() {
+  useEffect(() => {
+    window.location.replace(PRIVACY_URL);
+  }, []);
+
   return (
     <LegalPage title="Datenschutzerklärung">
       <div className="legal-body">
         <p>
-          Die Datenschutzerklärung für den Calltrainer ist Teil der Erklärung des Projekts
-          EFRE DiReKT. Sie wird dort gepflegt, damit es nur eine gibt.
+          Die Datenschutzerklärung wird beim Projekt EFRE DiReKT gepflegt. Sie werden
+          dorthin weitergeleitet.
         </p>
         <p>
-          <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">
-            Datenschutzerklärung auf efre-direkt.de öffnen
-          </a>{" "}
-          (öffnet in einem neuen Tab)
-        </p>
-        <p>
-          Was zu Ihren Trainings gespeichert ist, können Sie jederzeit{" "}
-          <Link to={ROUTES.profile}>in Ihrem Profil</Link> einsehen, herunterladen und
-          löschen. Dort ändern Sie auch Ihre Einwilligung zur Speicherung und die
-          automatische Löschung nach sechs Monaten.
+          <a href={PRIVACY_URL}>Datenschutzerklärung auf efre-direkt.de öffnen</a>
         </p>
       </div>
     </LegalPage>

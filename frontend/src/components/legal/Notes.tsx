@@ -1,7 +1,5 @@
-import { Link } from "react-router-dom";
-
-import { ROUTES } from "../../routes";
 import LegalPage from "../LegalPage";
+import PrivacyLink from "../PrivacyLink";
 
 /**
  * What the Calltrainer is and what it is not.
@@ -65,7 +63,7 @@ export default function Notes() {
         </p>
         <p>
           Was mit Ihren eigenen Daten passiert, steht in der{" "}
-          <Link to={ROUTES.privacy}>Datenschutzerklärung</Link>. Löschen können Sie Ihre
+          <PrivacyLink>Datenschutzerklärung</PrivacyLink>. Löschen können Sie Ihre
           Trainings jederzeit im Profil.
         </p>
 

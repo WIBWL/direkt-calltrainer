@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 
-import { ROUTES } from "../routes";
 import InfoDetails from "./InfoDetails";
+import PrivacyLink from "./PrivacyLink";
 import ProcessingNotice from "./ProcessingNotice";
 
 /**
@@ -65,7 +64,7 @@ export default function ConsentDialog({
           <ProcessingNotice compact />
 
           <p>
-            Ausführlich in der <Link to={ROUTES.privacy}>Datenschutzerklärung</Link>.
+            Ausführlich in der <PrivacyLink>Datenschutzerklärung</PrivacyLink>.
           </p>
         </InfoDetails>
 
