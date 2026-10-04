@@ -37,3 +37,17 @@ Every one of these modules is pure or takes its database handle from its caller 
 The cost is one more module to find in four of the five cases. The rule for a later reader is the one this ADR is named for: before working a fact out where it is needed, look for the module that already answers it, and if two places would answer it, that is the seam.
 
 A later review that proposes merging one of these back — for instance "the PDF could read the page's props directly" — is proposing the state this ADR removed, and the three defects above are what it looked like.
+
+## Amendment, 2026-09-24: the progress report gets the same treatment
+
+This ADR extracted `reportOutline.ts` for the feedback report and stopped there. The application writes a second report (ADR 0113), and it was left in exactly the state the first one had been in: `ProgressView.tsx` and `progressPdf.ts` each decided for themselves what a focus goal reads and how a mention is counted.
+
+It had drifted, in both directions, which is the part worth recording. `progressPdf` carried its own `countMentions`, a line-for-line copy of `goalMentions.mentionsFor` under a docstring saying it counted "the way the screen counts it" — the sentence a second implementation writes about itself. And of the five states a focus goal can be in, the file handled one the screen did not: a goal that *has* a measurement in a selection carrying no value for it. The screen fell through every branch and drew a tile holding a title, a link and nothing between them, which section 6 of the concept rules out by name. The file was right, the screen was wrong, and nothing connected the two well enough for either to notice.
+
+`utils/progressOutline.ts` is the counterpart of `reportOutline.ts`: it decides what each picked goal reads — one of five variants, the fifth being that absence — and what recurs, with the catalogue titles resolved. The screen renders it as JSX and the file as paragraphs, and neither decides which readings exist. `metricReading` is exported beside them because the overview that stands in when no goals are picked shows the same thing about a metric chosen a different way, and "the same thing" has to mean the same sentences; rendering its own is what made the "no value in N trainings" line unreachable there.
+
+What deliberately stays per rendering is form, not claim: a tile has a chart and a tally where a paragraph has a sentence (`goalSentence` in `progressPdf.ts`). The test is whether a reader holding the sheet against the screen could find a statement on one and not the other.
+
+`progressOutline.test.ts` pins the claims rather than the shapes — that no goal ever goes unanswered, that only a goal with no measurement at all may say "keine Messung", and that a count's denominator is the one the interface names.
+
+The same review found the pattern's other half missing one module over: which trainings a cross-Session view counts was written out at five call sites and disagreed at three of them. That is `progressStats.completedOnly` now, and ADR 0034's second amendment has the story.

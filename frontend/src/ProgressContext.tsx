@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { useProgressData, type ProgressLoadState } from "./hooks/useProgressData";
 import type { SessionSummary } from "./protocol";
 import { CATEGORY_LABELS, type ScenarioCategory } from "./scenarioLibrary";
-import { latest, selectionSeries, type MetricSeries } from "./utils/progressStats";
+import { latest, readable, selectionSeries, type MetricSeries } from "./utils/progressStats";
 
 /**
  * Which trainings the dashboard reads, counted in trainings, not days
@@ -83,6 +83,11 @@ interface ProgressContextValue {
   /** The trainings both switches selected — what every figure below them is
    *  read over, on the overview and on both detail levels alike. */
   selected: SessionSummary[];
+  /** Those of the selection long enough for their figures to be read
+   *  (`progressStats.readable`). The denominator behind "aus N Trainings", and
+   *  what `series` below is built from. The difference from `selected` is what
+   *  the screen has to account for in words, which is why both travel. */
+  readable: SessionSummary[];
   /** Every series `selected` has, the call length included — derived once
    *  here, so the overview and both detail levels cannot disagree about which
    *  rows exist (`selectionSeries`). */
@@ -134,6 +139,9 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     [sessions, category, count],
   );
 
+  // `selectionSeries` applies the same floor internally, so the two cannot
+  // disagree about which trainings the courses were drawn from.
+  const readableSessions = useMemo(() => readable(selected), [selected]);
   const series = useMemo(() => selectionSeries(selected), [selected]);
 
   const occasionCounts = useMemo(() => {
@@ -182,6 +190,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     () => ({
       sessions,
       selected,
+      readable: readableSessions,
       series,
       state,
       truncated,
@@ -197,6 +206,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     [
       sessions,
       selected,
+      readableSessions,
       series,
       state,
       truncated,

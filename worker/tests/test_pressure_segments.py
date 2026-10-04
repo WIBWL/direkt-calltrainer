@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session as DbSession
 from shared.clients import llm
 from shared.db import models as db_models
 from shared.db.models import Measurement, Session, Turn as TurnRow
+from shared.feedback.segments import SEGMENT_METRIC_KEYS
 from shared.turn import Turn
 from shared.tests.fixtures import METRIC_KEY
 from backend.tests.conftest import persist
@@ -164,13 +165,13 @@ def test_the_marked_exchanges_become_their_own_measurements(
 def test_the_segment_metrics_are_the_ones_that_stay_defined_on_a_part() -> None:
     """Counts shrink with the stretch, reaction time straddles the boundary, intonation needs
     more voiced speech (F-35): pinned so adding a metric here is a decision, not a silent inclusion."""
-    assert set(segments.SEGMENT_METRIC_KEYS) == {
+    assert set(SEGMENT_METRIC_KEYS) == {
         "talk_share", "pace", "pauses", "run_length", "loudness",
     }
-    assert "reaction_time" not in segments.SEGMENT_METRIC_KEYS
-    assert "questions" not in segments.SEGMENT_METRIC_KEYS
-    assert "word_count" not in segments.SEGMENT_METRIC_KEYS
-    assert "intonation" not in segments.SEGMENT_METRIC_KEYS
+    assert "reaction_time" not in SEGMENT_METRIC_KEYS
+    assert "questions" not in SEGMENT_METRIC_KEYS
+    assert "word_count" not in SEGMENT_METRIC_KEYS
+    assert "intonation" not in SEGMENT_METRIC_KEYS
 
 
 def test_the_two_stretches_are_measured_apart(

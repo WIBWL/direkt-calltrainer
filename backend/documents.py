@@ -1,6 +1,6 @@
 """Turn the PDFs a User uploads while authoring a Scenario into a fact list (F-58).
 
-Text-layer PDFs only (no OCR), condensed **together** in one `llm.complete(think=True)`
+Text-layer PDFs only (no OCR), condensed **together** in one `llm.complete`
 call; nothing is stored. Limits: `MAX_UPLOAD_MB` per file (`pdf_text.py`, which reads
 each one in a child process), `MAX_TOTAL_UPLOAD_MB` and `MAX_DOCUMENTS` per request,
 output cut to `MAX_TEXT`. If the LLM fails, the raw text returns, unsummarised."""
@@ -119,10 +119,10 @@ async def summarise_facts(raw_text: str) -> str:
             {"role": "user", "content": raw_text},
         ],
         # No output cap: the fact list is bounded by MAX_TEXT (below and in the
-        # prompt), and thinking mode needs whatever room its trace takes. The
-        # model's own context window is the only ceiling.
+        # prompt), so the model's own context window is the only ceiling. No
+        # thinking: the trace takes minutes on the current model and shares
+        # that window with the document (ADR 0103's amendment).
         max_tokens=None,
-        think=True,
     )
     summary = clean(reply)
     if not summary or "keine verwertbaren fakten" in summary.lower():

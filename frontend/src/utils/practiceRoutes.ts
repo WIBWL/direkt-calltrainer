@@ -23,7 +23,6 @@ export const PRACTICE_CATEGORY: Record<string, ScenarioCategory | null> = {
   // the matter: any call will do.
   pace: null,
   intonation: null,
-  articulation: null,
   conciseness: null,
   talk_share: null,
 };

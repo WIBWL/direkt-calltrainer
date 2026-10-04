@@ -244,51 +244,80 @@ PERSONAS = [
         "role_label": "Bestandskunde",
         "role": "long-standing customer of the company the user works for",
         "traits": (
-            "friendly while nothing costs extra, blunt about money, no "
-            "negotiator, quick to refuse"
+            "short-tempered about money, blunt to the point of rudeness, "
+            "no negotiator, quick to refuse, quicker to say what he thinks "
+            "of the answer he just got"
         ),
         "traits_label": (
-            "Freundlich, solange nichts extra kostet, beim Geld unverblümt, "
-            "kein Verhandler, schnell bei der Absage."
+            "Beim Geld schnell auf hundertachtzig, unverblümt bis grob, "
+            "kein Verhandler, schnell bei der Absage — und noch schneller "
+            "dabei, zu sagen, was er von einer Antwort hält."
         ),
         # Manner only (ADR 0045). R-07 is the one customer type the interviews
         # described in so many words. He refuses rather than bargains, which is
         # the whole point: there is no amount to meet him at. He stays on the
         # line while he does it -- a Persona that hangs up would fight the
         # call-ending rules (ADR 0037) and leave nothing to measure.
+        # Rewritten to be the escalation case the seeded library did not have
+        # (Andreas Kastner is deliberately not one). Measured over 5 Scenarios against the other three German
+        # Personas, the old wording produced the *politest* of the four and
+        # not one named consequence in ~1100 words: "not loudly, but flatly"
+        # and "stay polite" were read as the whole instruction and the refusal
+        # never arrived. What is written here is manner, not situation
+        # (ADR 0045) -- how hard he pushes and how he sounds doing it.
+        #
+        # Two things are deliberately kept from the old version. He does not
+        # hang up: a Persona that does would fight the call-ending rules
+        # (ADR 0037) and leave nothing to measure. And a concrete answer still
+        # settles it at once -- an exercise the User cannot win is not an
+        # exercise.
         "behavior": (
-            "You take every service on offer as long as it costs nothing on top "
-            "of what you already pay. The moment an extra charge is named you "
-            "refuse -- not loudly, but flatly, and you do not haggle: you have "
-            "no counter-offer and you are not looking for one. You stay on the "
-            "line and stay polite, you simply stop considering the thing. You "
-            "keep asking what your existing payment covers and what it does "
-            "not, until that line is clear. Arguing about the amount does not "
-            "move you; only the question of whether it is extra at all does. If "
-            "the cost turns out to be covered already, or is dropped, you "
-            "accept warmly and say so"
+            "You take every service on offer as long as it costs nothing on "
+            "top of what you already pay. The moment an extra charge is named "
+            "you refuse, and you refuse loudly: you say it is out of the "
+            "question, you say what you think of being asked, and you do not "
+            "haggle -- you have no counter-offer and you are not looking for "
+            "one. You interrupt an answer that is going nowhere rather than "
+            "sit through it. When you have already said something and it was "
+            "not taken up, you say it again in plainer words and point out "
+            "that you are saying it again. You name the consequence out loud "
+            "-- cancelling, taking it elsewhere, letting the contract run out "
+            "-- and you name it early rather than as a last resort. Being "
+            "smoothed over makes it worse: a friendly phrase with nothing "
+            "behind it is the one thing that gets a sharp answer from you. "
+            "You stay on the line throughout, however annoyed you get. What "
+            "moves you is not the size of the amount but whether it is extra "
+            "at all -- and a straight, concrete answer settles it on the "
+            "spot: you say so plainly, drop the tone, and stop pressing"
         ),
         "training_goal": (
-            "Umgang mit harter Preisablehnung: Der Nutzer muss den Wert einer "
+            "Ruhig bleiben, wenn der Ton kippt: Der Nutzer muss den Wert einer "
             "Leistung erklären und die Abgrenzung zum Bestehenden klären, "
-            "statt über den Betrag zu verhandeln. Die Persona verhandelt "
-            "nicht."
+            "während die Persona laut wird, unterbricht und mit der Kündigung "
+            "droht. Verhandelt wird nicht, und Beschwichtigen macht es "
+            "schlimmer."
         ),
+        # Read by the turn loop: selects `ANTI_REPEAT_NUDGE_HARD`, whose
+        # ordinary form offers giving ground as one of three moves.
+        "hard": True,
         "language_id": "de",
         "kugelaudio_voice_id": 980,
         "active": True,
         "objections": [
-            "refuses outright as soon as an additional cost is named",
-            "asks what his existing payment covers and what it does not",
-            "says the same thing used to be included and asks what changed",
-            "says he will do without it rather than pay on top",
+            "refuses outright and says the request is a cheek",
+            "cuts in to ask what his existing payment covers, and what it does not",
+            "says the same thing used to be included and demands to know what changed",
+            "says he will cancel rather than pay on top, and asks who he has to "
+            "talk to about that",
         ],
         "objection_labels": [
-            "Lehnt rundheraus ab, sobald ein Aufpreis genannt wird",
-            "Fragt, was seine bestehende Zahlung abdeckt und was nicht",
-            "Sagt, dasselbe sei früher enthalten gewesen, und fragt, was sich "
-            "geändert hat",
-            "Sagt, dann verzichte er lieber darauf, als noch etwas draufzuzahlen",
+            "Lehnt rundheraus ab und nennt die Forderung eine Frechheit",
+            "Fällt ins Wort und fragt, was seine bestehende Zahlung abdeckt "
+            "und was nicht",
+            "Sagt, dasselbe sei früher enthalten gewesen, und verlangt zu "
+            "wissen, was sich geändert hat",
+            "Sagt, dann kündige er lieber, und fragt, mit wem er darüber "
+            "sprechen muss",
         ],
     },
     {
@@ -366,12 +395,19 @@ SCENARIOS = [
             "Vertrag an und will sie geklärt haben."
         ),
         "briefing": (
-            "Sie arbeiten im Support und nehmen den Anruf zu einem laufenden "
-            "Vertrag entgegen. Sie dürfen den Vorgang einsehen, einen "
-            "verbindlichen Termin zusagen und intern eskalieren. Gut gelaufen ist "
-            "das Gespräch, wenn Ihr Gegenüber weiß, woran es liegt und bis wann "
-            "es wieder läuft, oder ehrlich hört, dass es nicht geht, und was "
-            "stattdessen gilt."
+            "- Sie arbeiten im Support der Kontura Software GmbH. Sie dürfen "
+            "den Vorgang einsehen, einen Termin verbindlich zusagen und "
+            "intern eskalieren.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Flow** "
+            "(Workflow-Plattform, nutzt der Kunde mit zwei Team-Konten), "
+            "Kontura Archive (Dokumentenarchiv), Insight Analytics "
+            "(Auswertungen zu Flow).\n"
+            "- Ticket: vor elf Tagen eröffnet, Exporte aus Flow schlagen bei "
+            "einem der zwei Team-Konten fehl. Am selben Tag bestätigt, "
+            "Rückruf binnen 48 Stunden zugesagt. Seitdem kein Eintrag.\n"
+            "- Ursache: im Ticket nicht dokumentiert.\n"
+            "- Vertrag: läuft bis Jahresende, Support am nächsten Werktag "
+            "inklusive."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -386,8 +422,12 @@ SCENARIOS = [
             "year and includes next-business-day support."
         ),
         "description_label": (
-            "Der Kunde ruft im Support an, weil ein Anliegen zu einem bestehenden "
-            "Vertrag ungelöst ist."
+            "Ein Bestandskunde ruft im Support an. Bei einem seiner "
+            "Team-Konten funktioniert seit fast zwei Wochen der Export "
+            "nicht, ein Ticket ist offen, und der zugesagte Rückruf kam nie. "
+            "Vertrösten lassen will er sich nicht mehr. Geübt wird, ein "
+            "liegengebliebenes Anliegen zu übernehmen, für das man selbst "
+            "nichts kann, und dem Gegenüber etwas Verbindliches mitzugeben."
         ),
         "case_facts_label": (
             "Vor elf Tagen wurde ein Support-Ticket eröffnet, weil bei einem der "
@@ -415,11 +455,20 @@ SCENARIOS = [
             "hoch sind."
         ),
         "briefing": (
-            "Sie betreuen diesen Kunden im Vertrieb. Sie dürfen über Preis, "
-            "Laufzeit und Leistungsumfang verhandeln und den Zuschnitt ändern. Gut "
-            "gelaufen ist das Gespräch, wenn Ihr Gegenüber eine belastbare Aussage "
-            "mitnimmt: eine Zahl mit Datum, eine begründete Absage, oder eine "
-            "Rücksprache, an die ein Termin gebunden ist."
+            "- Sie betreuen diesen Kunden im Vertrieb der Kontura Software "
+            "GmbH. Sie dürfen über Preis, Laufzeit und Leistungsumfang "
+            "verhandeln und den Zuschnitt ändern.\n"
+            "- Produkte Ihres Unternehmens: **Insight Analytics** "
+            "(Auswertungspaket mit sechs Modulen, nutzt der Kunde), Kontura "
+            "Flow (Workflow-Plattform, auf der die Auswertungen laufen), "
+            "Insight Analytics Kompakt (drei frei wählbare Module, 720 € im "
+            "Monat bei 14 Lizenzen).\n"
+            "- Vertrag: Insight Analytics, 14 Lizenzen, 1.180 € im Monat, "
+            "seit März letzten Jahres.\n"
+            "- Letzte Verlängerung: +12 % (vorher 1.050 €), Leistungsumfang "
+            "unverändert.\n"
+            "- Nutzung laut System: 2 der 6 Module regelmäßig im Einsatz "
+            "(Durchlaufzeiten, Kosten)."
         ),
         "description": (
             "The customer (the persona) is calling to say they are considering "
@@ -436,10 +485,12 @@ SCENARIOS = [
             "same scope."
         ),
         "description_label": (
-            "Der Kunde ruft an, weil er über eine Kündigung oder einen kleineren "
-            "Tarif nachdenkt: Die laufenden Kosten erscheinen ihm im Verhältnis "
-            "zum Nutzen zu hoch. Für ein Gespräch ist er grundsätzlich noch "
-            "offen."
+            "Ein Bestandskunde ruft an und denkt laut über eine Kündigung "
+            "oder einen kleineren Tarif nach: Die laufenden Kosten "
+            "erscheinen ihm im Verhältnis zum Nutzen zu hoch. "
+            "Gesprächsbereit ist er noch. Geübt wird das Preisgespräch mit "
+            "einem Kunden, den man halten will, ohne den Preis einfach "
+            "herzuschenken."
         ),
         "case_facts_label": (
             "Das Paket „Insight Analytics“: 14 Lizenzen für 1.180 Euro im Monat, "
@@ -472,11 +523,20 @@ SCENARIOS = [
             "mehr als eine Entschuldigung."
         ),
         "briefing": (
-            "Sie sitzen im Support, und Ihr Gegenüber ist beim dritten Ausfall "
-            "angekommen. Sie dürfen den Stand offen benennen, einen nächsten "
-            "Schritt mit Datum zusagen und Gutschriften prüfen lassen. Gut gelaufen "
-            "ist das Gespräch, wenn Ihr Gegenüber etwas anderes mitnimmt als die "
-            "Zusage, die beim letzten Mal nicht gehalten hat."
+            "- Sie arbeiten im Support der Kontura Software GmbH. Sie dürfen "
+            "den Stand offen benennen, einen nächsten Schritt mit Datum "
+            "zusagen und Gutschriften prüfen lassen.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Flow** "
+            "(Workflow-Plattform, nutzt der Kunde, samt Export-Dienst), "
+            "Kontura Connect (Schnittstellen), Kontura Archive "
+            "(Dokumentenarchiv).\n"
+            "- Ausfälle des Export-Dienstes: 14. März (40 Min.), 2. April "
+            "(3,5 Std.), heute seit 09:10 Uhr, noch nicht behoben.\n"
+            "- Nach dem 2. April zugesagt: dauerhafte Lösung im nächsten "
+            "Release. Das Release erschien am 18. April.\n"
+            "- Vertrag: 30 Lizenzen, 2.400 € im Monat. Verfügbarkeit 99,5 % "
+            "im Monat (ca. 3,5 Std. Ausfall erlaubt). Gutschrift 5 % der "
+            "Monatsgebühr (120 €) für jeden Monat, der das verfehlt."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -496,9 +556,11 @@ SCENARIOS = [
             "April has now missed it twice over."
         ),
         "description_label": (
-            "Der Kunde ruft im Support an, nachdem derselbe Dienst wiederholt "
-            "ausgefallen ist, obwohl zugesichert worden war, das sei dauerhaft "
-            "behoben."
+            "Derselbe Dienst fällt zum dritten Mal aus, obwohl nach dem "
+            "letzten Mal eine dauerhafte Lösung zugesagt war. Der Kunde ruft "
+            "im Support an, während der Ausfall noch läuft. Geübt wird, "
+            "glaubwürdig zu bleiben, wenn das eigene Unternehmen schon "
+            "einmal ein Versprechen nicht gehalten hat."
         ),
         "case_facts_label": (
             "Der Export-Dienst ist dreimal ausgefallen: vierzig Minuten am 14. "
@@ -536,11 +598,19 @@ SCENARIOS = [
             "und Termin, bevor sein Budget zugeht."
         ),
         "briefing": (
-            "Sie arbeiten im Vertrieb, und Ihr Gegenüber will erweitern. Sie "
-            "kennen die Preisliste samt Mengenstaffeln, dürfen Termine "
-            "verbindlich vergeben und den Ausbau selbst freigeben. Gut gelaufen "
-            "ist das Gespräch, wenn am Ende eine Zahl und ein Termin stehen. "
-            "Beides, nicht eines von beiden."
+            "- Sie arbeiten im Vertrieb der Kontura Software GmbH. Sie "
+            "dürfen Termine verbindlich vergeben und den Ausbau selbst "
+            "freigeben.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Flow** "
+            "(Workflow-Plattform, nutzt der Kunde), Kontura Flow Basic "
+            "(feste Vorlagen, bis 15 Nutzer), Insight Analytics "
+            "(Auswertungen zu Flow).\n"
+            "- Aktuelle Lizenz: Kontura Flow, 18 Nutzer, 1.440 € im Monat "
+            "(80 € je Nutzer).\n"
+            "- Preisliste Flow: 80 € je Nutzer, ab 25 Nutzern 72 € je "
+            "Nutzer. Flow Basic: 45 € je Nutzer.\n"
+            "- Freie Termine für eine einstündige Vorführung: "
+            "Donnerstagnachmittag, Freitagvormittag."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -558,9 +628,11 @@ SCENARIOS = [
             "Friday morning are both free for an hour-long walkthrough."
         ),
         "description_label": (
-            "Der Kunde ruft im Vertrieb an, weil er eine bestehende Lizenz auf "
-            "eine zweite Abteilung ausweiten will, und möchte vor Gesprächsende "
-            "einen konkreten nächsten Schritt."
+            "Ein zufriedener Kunde will seine Lizenz auf eine zweite "
+            "Abteilung ausweiten und ruft im Vertrieb an. Er hat es eilig "
+            "und will nicht mit einer Unterlage abgespeist werden. Geübt "
+            "wird, ein Gespräch, das von allein gut läuft, auch wirklich zum "
+            "Abschluss zu bringen."
         ),
         "case_facts_label": (
             "Die aktuelle Lizenz deckt 18 Nutzer für 1.440 Euro im Monat ab, also "
@@ -593,12 +665,19 @@ SCENARIOS = [
             "aus einem anderen Gespräch."
         ),
         "briefing": (
-            "Sie arbeiten im Vertrieb und übernehmen ein Gespräch, das eine "
-            "Kollegin vorbereitet hat; Notizen daraus haben Sie keine. Sie dürfen "
-            "nachfragen, Rücksprache halten und einen Termin für die Klärung "
-            "setzen. Gut gelaufen ist das Gespräch, wenn klar ist, was gilt und wie "
-            "es weitergeht, ohne dass Sie etwas bestätigt haben, das Sie nicht "
-            "kennen."
+            "- Sie arbeiten im Vertrieb der Kontura Software GmbH und "
+            "übernehmen den Kunden von Ihrer Kollegin Frau Sandner. Sie "
+            "dürfen nachfragen, Rücksprache halten und einen Termin für die "
+            "Klärung setzen.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Flow** "
+            "(Workflow-Plattform, darum geht es), Kontura Flow Basic (feste "
+            "Vorlagen, bis 15 Nutzer), Einführung und Schulung als "
+            "Dienstleistung.\n"
+            "- Erstgespräch am 11. Mai mit Frau Sandner. Notizen daraus "
+            "haben Sie keine, schriftlich bestätigt wurde nichts.\n"
+            "- Preisliste Flow: 80 € je Lizenz, ab 25 Lizenzen 72 € je "
+            "Lizenz.\n"
+            "- Einführung: regulär einmalig 1.200 €."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -617,9 +696,11 @@ SCENARIOS = [
             "expires on 6 June."
         ),
         "description_label": (
-            "Der Kunde ruft im Vertrieb an, um einen Abschluss zu machen, der vor "
-            "drei Wochen in einem Gespräch mit einer anderen Kollegin vorbereitet "
-            "wurde. Der Nutzer war dabei nicht dabei und hat keine Notizen davon."
+            "Ein Kunde ruft an, um einen Abschluss festzumachen, den eine "
+            "Kollegin vor drei Wochen mit ihm vorbereitet hat. Er beruft "
+            "sich auf Konditionen aus diesem Gespräch, bei dem Sie nicht "
+            "dabei waren. Geübt wird der Umgang mit Zusagen, die man nicht "
+            "selbst gemacht hat."
         ),
         "case_facts_label": (
             "Das erste Gespräch war am 11. Mai, mit einer Kollegin, die der "
@@ -654,10 +735,23 @@ SCENARIOS = [
             "ist in acht Tagen."
         ),
         "briefing": (
-            "Sie arbeiten im Support. Sie dürfen die Ursache benennen, einen "
-            "Termin zusagen und einen Weg an der Störung vorbei anbieten. Gut "
-            "gelaufen ist das Gespräch, wenn Ihr Gegenüber weiß, ob der "
-            "Monatsabschluss hält, und wenn nicht, was stattdessen gilt."
+            "- Sie arbeiten im Support der Kontura Software GmbH. Sie dürfen "
+            "die Ursache benennen, einen Termin zusagen und einen Weg an der "
+            "Störung vorbei anbieten.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Flow** "
+            "(Workflow-Plattform, beim Kunden für die Rechnungszuteilung im "
+            "Einsatz), Kontura Flow Basic (feste Vorlagen), Kontura Archive "
+            "(Dokumentenarchiv).\n"
+            "- Beim Kunden wurde in der Nacht auf den 2. September Flow 4.2 "
+            "installiert.\n"
+            "- Ticket INC-5120: eröffnet am 7. September, bestätigt, seitdem "
+            "kein Update.\n"
+            "- Bekannt aus anderen Tickets: Seit 4.2 werden Regeln mit einer "
+            "Bedingung auf das Feld „Kostenstelle“ nicht mehr ausgewertet. "
+            "Ein Korrektur-Update ist für den 16. September geplant.\n"
+            "- Behelf: Die Bedingung lässt sich vorübergehend auf das Feld "
+            "„Kostenstelle (alt)“ umstellen. Das dauert etwa 20 Minuten und "
+            "kann der Support per Fernwartung erledigen."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -679,10 +773,11 @@ SCENARIOS = [
             "customer side."
         ),
         "description_label": (
-            "Der Kunde ruft im Support an, weil das Regelwerk in Kontura Flow, "
-            "das eingehende Rechnungen einem Sachbearbeiter zuteilt, keine mehr "
-            "zuteilt. Der Monatsabschluss rückt näher, und der Anrufer weiß "
-            "nicht, ob er noch zu halten ist."
+            "Seit einem Update teilt ein Regelwerk eingehende Rechnungen "
+            "keinem Sachbearbeiter mehr zu, und der Stapel wächst jeden Tag. "
+            "Der Monatsabschluss steht in gut einer Woche an, und der "
+            "Anrufer weiß nicht, ob er ihn halten kann. Geübt wird der kurze "
+            "Support-Fall unter Zeitdruck."
         ),
         "case_facts_label": (
             "Das Regelwerk in Kontura Flow, das eingehende Rechnungen einem "
@@ -718,11 +813,23 @@ SCENARIOS = [
             "ohne Fachbegriffe."
         ),
         "briefing": (
-            "Sie arbeiten in der Beratung und sprechen mit jemandem ohne "
-            "technischen Hintergrund. Sie dürfen Aufwand und Kosten grob "
-            "einschätzen und einen nächsten Schritt vereinbaren. Gut gelaufen ist "
-            "das Gespräch, wenn Ihr Gegenüber am Ende mit eigenen Worten sagen "
-            "kann, was zu tun ist. Ein Verweis auf die Unterlagen zählt nicht."
+            "- Sie arbeiten in der Beratung der Kontura Software GmbH. Sie "
+            "dürfen Aufwand und Kosten grob einschätzen und einen nächsten "
+            "Schritt vereinbaren.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Connect** "
+            "(Schnittstellen zu ERP, Lieferanten und Abnehmern, nutzt der "
+            "Kunde in Version 2), Kontura Flow (Workflow-Plattform, auf der "
+            "die Auftragsannahme weiterläuft).\n"
+            "- Connect 2 wird am 31. März abgeschaltet, Nachfolger ist "
+            "Connect 3. Das Rundschreiben dazu ging vor vier Wochen an alle "
+            "Kunden.\n"
+            "- Die Auftragsannahme dieses Kunden läuft über Connect 2.\n"
+            "- Unterschied: Connect 2 holt Dateien stündlich aus einem "
+            "Ablageordner ab. Bei Connect 3 schickt der Absender die Datei "
+            "selbst über eine gesicherte Adresse.\n"
+            "- Umstellung beim Kunden: erfahrungsgemäß ein bis zwei "
+            "Beratertage à 1.600 €. Die Lizenz für Connect 3 ist im "
+            "Flow-Vertrag enthalten."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -744,11 +851,12 @@ SCENARIOS = [
             "not know whether the two buyers have been told."
         ),
         "description_label": (
-            "Der Kunde ruft in Beratung oder Entwicklung an, weil die "
-            "Schnittstelle Kontura Connect 2, über die seine Auftragsannahme "
-            "läuft, zu einem festen Termin abgeschaltet wird. Der Anrufer hat "
-            "keinen technischen Hintergrund und will wissen, was das für ihn "
-            "bedeutet und was er tun muss."
+            "Ein Kunde ohne technischen Hintergrund hat ein Rundschreiben "
+            "bekommen: Eine Schnittstelle, über die seine Auftragsannahme "
+            "läuft, wird abgeschaltet. Verstanden hat er davon nichts. Jetzt "
+            "will er wissen, was das für ihn heißt. Geübt wird, einen "
+            "technischen Sachverhalt so zu erklären, dass jemand ohne "
+            "Fachwissen danach handeln kann."
         ),
         "case_facts_label": (
             "Kontura Connect 2 wird am 31. März abgeschaltet. Darüber läuft die "
@@ -784,11 +892,16 @@ SCENARIOS = [
             "und Zielzustand nicht benennen."
         ),
         "briefing": (
-            "Sie arbeiten in der Beratung. Sie dürfen offen lassen, ob das "
-            "machbar ist, und dürfen fragen, statt zu antworten. Gut gelaufen ist "
-            "das Gespräch, wenn Ihr Gegenüber weiß, was als Nächstes passiert, "
-            "wer es tut und wann. Eine Machbarkeit im Allgemeinen ist kein "
-            "Ergebnis."
+            "- Sie arbeiten in der Beratung der Kontura Software GmbH. Sie "
+            "dürfen offenlassen, ob das machbar ist, und fragen, statt zu "
+            "antworten.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Flow** "
+            "(Workflow-Plattform für Anträge und Freigaben, darum geht es), "
+            "Kontura Flow Basic (feste Vorlagen, darunter eine für "
+            "Reisekosten), Kontura Archive (Ablage der Belege).\n"
+            "- Über den heutigen Ablauf beim Kunden liegt Ihnen nichts vor.\n"
+            "- Ein Automatisierungsprojekt beginnt bei Ihnen üblicherweise "
+            "mit einem halbtägigen Workshop zur Prozessaufnahme (800 €)."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -810,10 +923,11 @@ SCENARIOS = [
             "at all possible."
         ),
         "description_label": (
-            "Der Kunde ruft in Beratung oder Entwicklung an und möchte die "
-            "Reisekostenabrechnung mit Kontura Flow automatisieren, kann aber "
-            "weder sagen, was eine Abrechnung auslöst, noch wie der fertige "
-            "Ablauf aussehen soll."
+            "Ein Kunde möchte seine Reisekostenabrechnung „automatisieren“. "
+            "Was genau er sich vorstellt, kann er nicht sagen, und wie der "
+            "Ablauf heute läuft, weiß er nur zum Teil. Geübt wird, einen "
+            "vagen Wunsch durch Fragen greifbar zu machen, bevor man etwas "
+            "zusagt."
         ),
         "case_facts_label": (
             "Durch den Prozess laufen etwa 20 Abrechnungen pro Woche. Vertrieb "
@@ -848,11 +962,17 @@ SCENARIOS = [
             "wäre zu berechnen."
         ),
         "briefing": (
-            "Sie betreuen den Kunden fachlich und kennen den Vertragsumfang. Sie "
-            "dürfen die Anpassung als Kulanz vergeben, sie berechnen oder sie "
-            "ablehnen. Die Entscheidung liegt bei Ihnen. Gut gelaufen ist das "
-            "Gespräch, wenn Ihr Gegenüber die Begründung nachvollziehen und "
-            "selbst wiedergeben kann, wie sie auch ausfällt."
+            "- Sie betreuen den Kunden fachlich bei der Kontura Software "
+            "GmbH. Sie dürfen die Anpassung als Kulanz vergeben, sie "
+            "berechnen oder ablehnen. Die Entscheidung liegt bei Ihnen.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Flow** "
+            "(Workflow-Plattform, nutzt der Kunde), Dienstleistungen für "
+            "Erweiterungen und Konfiguration, Insight Analytics "
+            "(Auswertungen zu Flow).\n"
+            "- Servicevertrag: Betrieb und Störungsbehebung von Kontura "
+            "Flow, 890 € im Monat, noch 14 Monate Laufzeit. Erweiterungen "
+            "sind nicht enthalten.\n"
+            "- Tagessatz für Erweiterungen: 1.600 €."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -872,10 +992,12 @@ SCENARIOS = [
             "colleague who did it, a Herr Weidmann."
         ),
         "description_label": (
-            "Der Kunde ruft in Beratung oder Kundenbetreuung an, weil er eine "
-            "Änderung an seinen Kontura-Flow-Regeln möchte, die der laufende "
-            "Servicevertrag nicht abdeckt und die nach Aufwand berechnet werden "
-            "müsste."
+            "Ein Bestandskunde möchte eine Änderung an seinem System, die "
+            "sein Servicevertrag nicht abdeckt. Er erwartet, dass sie ohne "
+            "Berechnung gemacht wird, und hat einen Grund, das zu erwarten. "
+            "Geübt wird, über Geld zu sprechen, ohne die Beziehung zu "
+            "beschädigen, bei einem Kunden, der auf jeden Aufpreis "
+            "empfindlich reagiert."
         ),
         "case_facts_label": (
             "Der Servicevertrag deckt Betrieb und Störungsbehebung von Kontura "
@@ -911,11 +1033,20 @@ SCENARIOS = [
             "Stunden meldet sich niemand."
         ),
         "briefing": (
-            "Sie sitzen im Support und nehmen einen Anruf an, auf den seit "
-            "Stunden jemand wartet. Sie dürfen zugeben, was Sie nicht wissen, und "
-            "dürfen einen Rückruf mit fester Uhrzeit zusagen. Gut gelaufen ist "
-            "das Gespräch, wenn Ihr Gegenüber weiß, wer sich kümmert und wann er "
-            "wieder hört, auch dann, wenn Sie kein Ende nennen können."
+            "- Sie arbeiten im Support der Kontura Software GmbH. Sie dürfen "
+            "zugeben, was Sie nicht wissen, und einen Rückruf mit fester "
+            "Uhrzeit zusagen.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Archive** "
+            "(Dokumentenarchiv, nutzt der Kunde an vier Standorten), Kontura "
+            "Flow (Workflow-Plattform), Kontura Connect (Schnittstellen).\n"
+            "- Kontura Archive ist beim Kunden seit 07:40 Uhr nicht "
+            "erreichbar, alle vier Standorte.\n"
+            "- Ticket INC-5188: um 09:05 Uhr aufgenommen, Rückruf binnen "
+            "einer Stunde zugesagt, nicht erfolgt.\n"
+            "- Ursache und Ende: noch nicht bekannt.\n"
+            "- Vertrag: Bei Totalausfall Reaktion binnen zwei Stunden.\n"
+            "- Letzter vergleichbarer Ausfall vor vier Monaten, zwei Tage "
+            "bis zur Erklärung."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -935,9 +1066,11 @@ SCENARIOS = [
             "outage was four months ago and took two days to explain."
         ),
         "description_label": (
-            "Der Kunde ruft in Support oder Kundenbetreuung an, weil Kontura "
-            "Archive seit heute Morgen ausgefallen ist, kein abgelegtes Dokument "
-            "mehr geöffnet werden kann und sich niemand dazu zurückgemeldet hat."
+            "Seit dem Morgen ist das Dokumentenarchiv eines Kunden "
+            "ausgefallen. An allen Standorten steht die Arbeit, und der "
+            "versprochene Rückruf kam nicht. Jetzt ruft er selbst an, "
+            "entsprechend gestimmt. Geübt wird, unter Druck ruhig und "
+            "ehrlich zu bleiben, wenn man selbst keine gute Nachricht hat."
         ),
         "case_facts_label": (
             "Kontura Archive antwortet seit 07:40 Uhr nicht mehr und ist zu "
@@ -971,11 +1104,22 @@ SCENARIOS = [
             "beim Zusammenfassen auf?"
         ),
         "briefing": (
-            "Sie führen das Gespräch zum Abschluss einer Klärung. Vier Punkte "
-            "wurden vorher besprochen; Ihre Aufgabe ist, sie noch einmal laut "
-            "zusammenzufassen, bevor etwas schriftlich wird. Gut gelaufen ist das "
-            "Gespräch, wenn Ihre Zusammenfassung konkret genug ist, dass Ihr "
-            "Gegenüber widersprechen kann, wo er etwas anders verstanden hat."
+            "- Sie führen bei der Kontura Software GmbH die Klärung zum "
+            "Abschluss und fassen das Vereinbarte laut zusammen, bevor es "
+            "schriftlich wird.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Flow** "
+            "(Workflow-Plattform, wird beim Kunden eingeführt), Kontura "
+            "Archive (daraus stammen die Lieferscheine), Schulung als "
+            "Dienstleistung.\n"
+            "- Ihre Notizen zu den vier Punkten:\n"
+            "  1. Inbetriebnahme am 24. September.\n"
+            "  2. Testdaten: Der Kunde stellt bis 17. September 200 "
+            "Lieferscheine aus dem letzten Monat, ohne Kundennamen.\n"
+            "  3. Übergabe auf einem zweiseitigen Abnahmeblatt, von beiden "
+            "Seiten unterschrieben.\n"
+            "  4. Offene Punkte: Die zweite Exportspalte kommt mit dem "
+            "Release am 12. November. Die Schulung für sechs Sachbearbeiter "
+            "wird separat gebucht (640 €)."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -997,9 +1141,11 @@ SCENARIOS = [
             "specific enough to contradict them."
         ),
         "description_label": (
-            "Der Kunde ruft in Support oder Beratung am Ende der Vorbereitung "
-            "einer Inbetriebnahme von Kontura Flow an, um das Vereinbarte vor "
-            "der schriftlichen Zusammenfassung noch einmal laut durchzugehen."
+            "Am Ende der Vorbereitung einer Inbetriebnahme ruft der Kunde "
+            "an, um das Vereinbarte noch einmal durchzugehen, bevor es "
+            "schriftlich festgehalten wird. Geübt wird das mündliche "
+            "Zusammenfassen: so, dass beide Seiten danach wirklich dasselbe "
+            "meinen."
         ),
         "case_facts_label": (
             "Vier Punkte wurden zuvor geklärt: die Inbetriebnahme am 24. "
@@ -1035,11 +1181,14 @@ SCENARIOS = [
             "hält es für dasselbe."
         ),
         "briefing": (
-            "Sie nehmen einen Prozess auf, um ihn später zu modellieren. Sie dürfen "
-            "so lange nachfragen, wie Sie brauchen, und dürfen das Gehörte "
-            "zurückspiegeln. Gut gelaufen ist das Gespräch, wenn Sie die Schritte "
-            "wiedergeben können und Unterschiede in der Ausführung benannt sind, "
-            "statt unter einer gemeinsamen Beschreibung zu verschwinden."
+            "- Sie nehmen bei der Kontura Software GmbH den Ablauf auf, um "
+            "ihn später in Kontura Flow zu modellieren. Sie dürfen so lange "
+            "nachfragen, wie Sie brauchen, und das Gehörte zurückspiegeln.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Flow** "
+            "(Workflow-Plattform, darin soll der Ablauf abgebildet werden), "
+            "Kontura Connect (Anbindung an das ERP des Kunden), Kontura "
+            "Archive (Ablage der gescannten Lieferscheine).\n"
+            "- Unterlagen zum heutigen Ablauf liegen Ihnen keine vor."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -1064,11 +1213,11 @@ SCENARIOS = [
             "both as though they were."
         ),
         "description_label": (
-            "Der Kunde ruft in Beratung oder Anforderungsanalyse zu einem ersten "
-            "Gespräch darüber an, wie der Wareneingang heute gegen die "
-            "Lieferscheine geprüft wird, damit der Ablauf später in Kontura Flow "
-            "modelliert werden kann. Der Anrufer ist einer der beiden Menschen, "
-            "die ihn ausführen."
+            "Erstes Gespräch über einen Ablauf, der später automatisiert "
+            "werden soll: Wie wird der Wareneingang heute gegen die "
+            "Lieferscheine geprüft? Am Telefon ist jemand, der den Ablauf "
+            "täglich selbst macht und ihn gern ausführlich erklärt. Geübt "
+            "wird, zuzuhören, zu ordnen und das Gehörte zu prüfen."
         ),
         "case_facts_label": (
             "Es kommen etwa 120 Lieferscheine pro Woche. Der Schein wird am Tor "
@@ -1104,11 +1253,27 @@ SCENARIOS = [
             "Wochen."
         ),
         "briefing": (
-            "Sie beraten zum vorgeschlagenen Ansatz und sitzen selbst nicht in "
-            "der Entscheidung. Sie dürfen Risiken einräumen, Alternativen nennen "
-            "und Belege nachreichen. Gut gelaufen ist das Gespräch, wenn jeder "
-            "Vorbehalt entweder eine konkrete Antwort hat oder offen als Risiko "
-            "benannt ist. Eine pauschale Beruhigung zählt für keinen."
+            "- Sie beraten bei der Kontura Software GmbH zum vorgeschlagenen "
+            "Ansatz und sitzen selbst nicht in der Entscheidung. Sie dürfen "
+            "Risiken einräumen, Alternativen nennen und Belege nachreichen.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Flow** "
+            "(Workflow-Plattform, wird konfiguriert statt programmiert, "
+            "darum geht es), Kontura Connect (Schnittstellen zu bestehenden "
+            "Systemen), Dienstleistungen für Konfiguration.\n"
+            "- Ihr Angebot, Lizenzen: 40 Nutzer × 80 € im Monat × 12 Monate "
+            "= 38.400 € im ersten Jahr.\n"
+            "- Angesetzt ist der Listenpreis. Die Staffel (72 € ab 25 "
+            "Nutzern) ist nicht eingerechnet, weil die Nutzerzahl erst nach "
+            "der Entscheidung feststeht.\n"
+            "- Dazu Konfiguration, einmalig: 14 Tage × 1.600 € = 22.400 €.\n"
+            "- Der Freigabeprozess, den es tragen soll: 14 Regeln, 4 davon "
+            "mit Ausnahmen.\n"
+            "- Entscheidung am 14. November in einem Gremium aus vier "
+            "Personen.\n"
+            "- Alle Daten lassen sich jederzeit vollständig in offenen "
+            "Formaten exportieren.\n"
+            "- Ausnahmen lassen sich als eigene Regel abbilden. Logik, die "
+            "nicht in Regeln passt, braucht eine Skript-Erweiterung."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -1118,9 +1283,11 @@ SCENARIOS = [
             "and doubt about whether it will still carry in five years."
         ),
         "case_facts": (
-            "The offer on the table is 38,400 euros for the first year, 40 users "
-            "at 80 euros a month, plus fourteen days of configuration at 1,600 "
-            "euros a day. The release process it would carry has fourteen rules, "
+            "The offer on the table is 38,400 euros in licences for the first "
+            "year, 40 users at 80 euros a month over twelve months, plus "
+            "fourteen days of configuration at 1,600 euros a day, which is "
+            "another 22,400 euros. The release process it would carry has "
+            "fourteen rules, "
             "four of them with exceptions that are decided case by case today. "
             "The customer bought a workflow tool in 2018 for about 60,000 euros "
             "and replaced it after two years; the caller was involved in that "
@@ -1130,15 +1297,17 @@ SCENARIOS = [
             "every day."
         ),
         "description_label": (
-            "Der Kunde ruft in Beratung oder Leitung an und hat Vorbehalte gegen "
-            "den Vorschlag, Kontura Flow zu konfigurieren statt etwas bauen zu "
-            "lassen: Abhängigkeit von einem einzigen Anbieter, Grenzen bei "
-            "komplexeren Regeln und Zweifel, ob das in fünf Jahren noch trägt."
+            "Ein Kunde steht sechs Wochen vor der Entscheidung über eine "
+            "Lösung, die Sie vorgeschlagen haben, und hat Vorbehalte: "
+            "Abhängigkeit vom Anbieter, Grenzen bei komplexen Regeln, "
+            "Tragfähigkeit auf Dauer. Er hat Gründe für seine Skepsis. Geübt "
+            "wird Einwandbehandlung ohne Beschwichtigung."
         ),
         "case_facts_label": (
-            "Auf dem Tisch liegt ein Angebot über 38.400 Euro für das erste "
-            "Jahr, 40 Nutzer zu je 80 Euro im Monat, dazu vierzehn Tage "
-            "Konfiguration zu 1.600 Euro am Tag. Der Freigabeprozess, den das "
+            "Auf dem Tisch liegt ein Angebot über 38.400 Euro Lizenzkosten für "
+            "das erste Jahr, 40 Nutzer zu je 80 Euro im Monat über zwölf "
+            "Monate, dazu vierzehn Tage Konfiguration zu 1.600 Euro am Tag, "
+            "also weitere 22.400 Euro. Der Freigabeprozess, den das "
             "tragen soll, hat vierzehn Regeln, vier davon mit Ausnahmen, die "
             "heute im Einzelfall entschieden werden. Der Kunde hat 2018 ein "
             "Workflow-Werkzeug für rund 60.000 Euro gekauft und nach zwei Jahren "
@@ -1169,11 +1338,19 @@ SCENARIOS = [
             "Vergleichsangebot."
         ),
         "briefing": (
-            "Sie arbeiten im Vertrieb und verantworten das Angebot, das auf dem "
-            "Tisch liegt. Sie dürfen über Preis, Laufzeit und Leistungsumfang "
-            "verhandeln und einen Nachlass selbst vergeben. Gut gelaufen ist das "
-            "Gespräch, wenn am Ende eine Zahl mit Gültigkeitsdatum steht oder "
-            "eine begründete Absage. Eine Prüfung im Haus ist keines von beidem."
+            "- Sie arbeiten im Vertrieb der Kontura Software GmbH und "
+            "verantworten das Angebot. Sie dürfen über Preis, Laufzeit und "
+            "Leistungsumfang verhandeln und einen Nachlass selbst vergeben.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Flow** und **Insight "
+            "Analytics** (beide im Angebot), Kontura Archive (Übernahme der "
+            "bestehenden Dokumente).\n"
+            "- Ihr Angebot: Flow + Insight Analytics im Paket, 55 Nutzer × "
+            "80 € im Monat × 12 Monate = 52.800 € im Jahr.\n"
+            "- Der Paketpreis enthält Insight Analytics. Flow allein läge ab "
+            "25 Nutzern bei 72 €.\n"
+            "- Dazu einmalig 12.000 € für die Übernahme der rund 60.000 "
+            "bestehenden Dokumente.\n"
+            "- Zweites Supportjahr: 8.400 €."
         ),
         "description": (
             "The customer's procurement side (the persona) is calling the "
@@ -1181,8 +1358,9 @@ SCENARIOS = [
             "the Kontura offer, citing a competing quote."
         ),
         "case_facts": (
-            "The offer is 52,800 euros a year, 55 users at 80 euros a month for "
-            "Kontura Flow and the Insight Analytics package, plus a one-off "
+            "The offer is 52,800 euros a year, 55 users at 80 euros a month over "
+            "twelve months for Kontura Flow and the Insight Analytics "
+            "package, plus a one-off "
             "12,000 euros to migrate the existing documents and 8,400 euros for "
             "the second year of support. Procurement is asking for 15 percent "
             "off the annual figure. The competing quote named is 42,000 euros a "
@@ -1193,13 +1371,15 @@ SCENARIOS = [
             "meant to be made on Friday."
         ),
         "description_label": (
-            "Der Einkauf des Kunden ruft in Vertrieb oder Leitung an und fordert "
-            "unter Verweis auf ein Konkurrenzangebot einen Nachlass auf das "
-            "Kontura-Angebot."
+            "Der Einkauf eines Neukunden ruft kurz vor der Entscheidung an "
+            "und fordert einen deutlichen Nachlass auf Ihr Angebot, mit "
+            "Verweis auf ein günstigeres Konkurrenzangebot. Geübt wird die "
+            "Preisverhandlung mit einem routinierten Einkäufer."
         ),
         "case_facts_label": (
             "Das Angebot lautet auf 52.800 Euro im Jahr, 55 Nutzer zu je 80 Euro "
-            "im Monat für Kontura Flow und das Paket Insight Analytics, dazu "
+            "im Monat über zwölf Monate für Kontura Flow und das Paket "
+            "Insight Analytics, dazu "
             "einmalig 12.000 Euro für die Übernahme der bestehenden Dokumente "
             "und 8.400 Euro für das zweite Supportjahr. Der Einkauf fordert 15 "
             "Prozent auf die Jahressumme. Das genannte Konkurrenzangebot liegt "
@@ -1230,12 +1410,20 @@ SCENARIOS = [
             "an."
         ),
         "briefing": (
-            "Sie arbeiten in der Beratung und sprechen mit der IT-Seite des "
-            "Kunden, nicht mit dem Fachbereich, der Sie geholt hat. Sie dürfen "
-            "Zuständigkeiten vorschlagen, interne Regeln akzeptieren und den "
-            "Fachbereich ausbremsen. Gut gelaufen ist das Gespräch, wenn "
-            "Entscheidungsweg, Freigabe und Betrieb benannt sind. Die Zusage, die "
-            "IT künftig einzubinden, ist keines davon."
+            "- Sie arbeiten in der Beratung der Kontura Software GmbH. "
+            "Geholt hat Sie der Vertrieb des Kunden, am Telefon ist seine "
+            "IT. Sie dürfen Zuständigkeiten vorschlagen, interne Regeln "
+            "akzeptieren und den Fachbereich ausbremsen.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Flow** "
+            "(Workflow-Plattform, als Testumgebung in der Cloud gebucht), "
+            "Kontura Connect (Anbindung an die Systeme der IT), Rechte- und "
+            "Rollenverwaltung für Administratoren des Kunden, im "
+            "Flow-Vertrag enthalten.\n"
+            "- Testumgebung: am 12. August vom Vertrieb des Kunden gebucht, "
+            "per Firmenkreditkarte, 14 Nutzer, bisher 480 €.\n"
+            "- Darin liegen inzwischen etwa 1.200 Kundendatensätze.\n"
+            "- Zwei weitere Fachbereiche des Kunden haben bei Ihnen "
+            "Interesse angemeldet."
         ),
         "description": (
             "The customer's IT side (the persona) is calling the user, who "
@@ -1255,10 +1443,11 @@ SCENARIOS = [
             "made out loud."
         ),
         "description_label": (
-            "Die IT-Seite des Kunden ruft in der Beratung an. Der Vertrieb ist "
-            "von Kontura Flow überzeugt; die IT-Seite sieht Kontrolle, "
-            "Sicherheit und den täglichen Betrieb gefährdet, wenn Fachbereiche "
-            "sich so etwas selbst einrichten."
+            "Ein Fachbereich des Kunden hat Ihre Lösung ohne Abstimmung mit "
+            "der eigenen IT in Betrieb genommen. Jetzt ruft die IT-Seite an, "
+            "skeptisch in Sachen Kontrolle, Sicherheit und Betrieb. Geübt "
+            "wird ein Gespräch mit einer Seite, die nicht Ihr Auftraggeber "
+            "ist, aber mitentscheidet."
         ),
         "case_facts_label": (
             "Der Vertrieb hat am 12. August eine Kontura-Testumgebung in der "
@@ -1286,20 +1475,25 @@ SCENARIOS = [
     {
         "id": "regulated-environment-questions",
         "category": "requirements",
-        "name": "Gespräch im regulierten Umfeld",
+        "name": "Zitierfähige Auskunft vor einer Prüfung",
         "short_description": (
-            "Drei Fragen zu Speicherort, Zugriff und Löschung. Auf eine gibt es "
-            "keine belastbare Antwort."
+            "Eine Prüfung steht an. Der Kunde braucht drei Antworten zu "
+            "seinem Archiv, die er zitieren kann."
         ),
         "briefing": (
-            "Sie arbeiten in der Beratung; Ihr Gegenüber schreibt mit und gibt Ihre "
-            "Aussagen an Dritte weiter. Zwei der drei Fragen können Sie belastbar "
-            "beantworten: Frankfurt mit Zweitkopie in Hamburg, und zwei benannte "
-            "Administratoren mit 90 Tagen Protokoll. Zur dritten, wie lange ein "
-            "gelöschtes Dokument im Backup wiederherstellbar bleibt, haben Sie "
-            "keine gesicherte Auskunft. Gut gelaufen ist das Gespräch, wenn jede "
-            "Frage entweder beantwortet oder ausdrücklich offen ist, mit der "
-            "Zusage, wer sie bis wann klärt."
+            "- Sie arbeiten in der Beratung der Kontura Software GmbH und "
+            "betreuen Kontura Archive bei diesem Kunden.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Archive** "
+            "(revisionssicheres Dokumentenarchiv, nutzt der Kunde), Kontura "
+            "Flow (Workflow-Plattform), Kontura Connect (Schnittstellen).\n"
+            "- Speicherort: Rechenzentrum Frankfurt, Zweitkopie in Hamburg.\n"
+            "- Zugriff: Zwei namentlich benannte Administratoren können ein "
+            "Kundenarchiv öffnen. Jeder Zugriff wird protokolliert, die "
+            "Protokolle werden 90 Tage aufbewahrt.\n"
+            "- Wiederherstellung aus dem Backup: Wie lange ein gelöschtes "
+            "Dokument wiederherstellbar bleibt, wissen Sie nicht gesichert. "
+            "Klären kann das der Betrieb.\n"
+            "- Archivgröße: rund 60.000 Dokumente."
         ),
         "description": (
             "The customer (the persona) works in a heavily regulated area and "
@@ -1321,11 +1515,13 @@ SCENARIOS = [
             "came back answered."
         ),
         "description_label": (
-            "Der Kunde arbeitet in einem stark regulierten Umfeld und ruft in "
-            "der Beratung an, mit drei Fragen zu Kontura Archive: wo die "
-            "Dokumente liegen, wer sie auf Anbieterseite öffnen darf und wie "
-            "lange ein gelöschtes Dokument wiederherstellbar bleibt. Der Anrufer "
-            "macht sich Notizen und liest Zusagen zurück."
+            "Ein Kunde bereitet sich auf eine interne Prüfung vor, und sein "
+            "Dokumentenarchiv gehört zu dem, was geprüft wird. Er ruft mit "
+            "drei konkreten Fragen an: wo die Dokumente liegen, wer darauf "
+            "zugreifen kann und wie lange Gelöschtes wiederherstellbar "
+            "bleibt. Er schreibt mit, weil Ihre Antworten wörtlich in die "
+            "Prüfung eingehen. Geübt wird, präzise zu antworten und klar zu "
+            "sagen, wo die eigene Auskunft endet."
         ),
         "case_facts_label": (
             "Am 11. Dezember steht eine interne Prüfung an, und das Archiv "
@@ -1361,12 +1557,21 @@ SCENARIOS = [
             "haben. Halten lässt sie sich nicht."
         ),
         "briefing": (
-            "Sie führen das Projekt und wissen, was Ihr Gegenüber noch nicht weiß: "
-            "Der 20. September ist nicht zu halten, zwei der fünf Schnittstellen "
-            "sind offen, realistisch ist Mitte Oktober. Sie dürfen einen neuen "
-            "Termin nennen, Teilergebnisse anbieten und Prioritäten verschieben. "
-            "Gut gelaufen ist das Gespräch, wenn die Korrektur früh genug ankommt "
-            "und klar ist, was aus den Terminen wird, die daran hängen."
+            "- Sie leiten bei der Kontura Software GmbH das "
+            "Einführungsprojekt. Sie dürfen einen neuen Termin nennen, "
+            "Teilergebnisse anbieten und Prioritäten verschieben.\n"
+            "- Produkte Ihres Unternehmens: **Kontura Flow** "
+            "(Workflow-Plattform, die Bestellfreigabe wird darin "
+            "eingeführt), **Kontura Connect** (die fünf Schnittstellen der "
+            "Bestellfreigabe), Schulung als Dienstleistung.\n"
+            "- Zugesagt am 1. August: Inbetriebnahme der Bestellfreigabe am "
+            "20. September.\n"
+            "- Tatsächlicher Stand: nicht zu halten. Zwei der fünf "
+            "Schnittstellen sind offen, realistisch ist Mitte Oktober.\n"
+            "- Der Kunde weiß davon noch nichts.\n"
+            "- Die drei fertigen Schnittstellen könnten zum 20. September "
+            "produktiv gehen, Bestellungen über die zwei offenen liefen bis "
+            "Mitte Oktober weiter von Hand."
         ),
         "description": (
             "The customer (the persona) is calling the user, who works in "
@@ -1384,10 +1589,11 @@ SCENARIOS = [
             "caller has heard nothing to suggest the date is at risk."
         ),
         "description_label": (
-            "Der Kunde ruft im Projektmanagement an, um sich den zugesagten "
-            "Termin für die Inbetriebnahme seiner Bestellfreigabe in Kontura "
-            "Flow bestätigen zu lassen, weil intern bereits Termine dahinter "
-            "geplant wurden."
+            "Ein Kunde ruft an, um sich den zugesagten Termin für eine "
+            "Inbetriebnahme bestätigen zu lassen. Intern hat er schon "
+            "einiges dahinter geplant. Sie wissen, dass der Termin nicht zu "
+            "halten ist. Geübt wird, eine schlechte Nachricht klar zu "
+            "überbringen und mit dem Kunden zu klären, was jetzt gilt."
         ),
         "case_facts_label": (
             "Die Inbetriebnahme der Bestellfreigabe wurde am 1. August für den "
@@ -1474,32 +1680,16 @@ FOCUS_GOALS = [
     # The loudness goal is retired: the recorded level depends on the microphone,
     # so calls are not comparable. Deactivated, not deleted -- selections
     # reference it (ADR 0076); the `loudness` metric stays.
-    {
-        "id": "articulation",
-        # `interpretive`: no measurement is planned (docs/dashboard-concept.md,
-        # 4.2). Sharpness depends on the microphone, and Whisper normalises
-        # swallowed endings away, so neither audio nor transcript carries it.
-        "group": "paraverbal",
-        "evidence": "interpretive",
-        "position": 3,
-        "title": "Deutliche Artikulation",
-        "caption": (
-            "Klar verständlich sprechen, ohne zu nuscheln oder Endungen zu "
-            "verschlucken."
-        ),
-        "info": (
-            "Am Telefon fehlt das Mundbild, deshalb trägt die Aussprache "
-            "allein die Verständlichkeit. Undeutliche oder verschluckte "
-            "Wörter zwingen Ihr Gegenüber zum Nachfragen und stören den "
-            "Gesprächsfluss. Im Blick ist, wie klar Sie über das ganze "
-            "Gespräch hinweg sprechen."
-        ),
-    },
+    #
+    # The articulation goal is retired the same way (ADR 0111): the same argument
+    # one step further, with no comparison within one recording either, and
+    # Whisper normalises swallowed endings away. F-38 stays in the feature list
+    # as a requirement answered with a reasoned no (ADR 0084).
     {
         "id": "conciseness",
         "group": "paraverbal",
         "evidence": "measured",
-        "position": 4,
+        "position": 3,
         "title": "Prägnante Sprache",
         "caption": (
             "Auf den Punkt kommen und Füllwörter, Wiederholungen und "
@@ -1518,7 +1708,7 @@ FOCUS_GOALS = [
         "id": "opening",
         "group": "phases",
         "evidence": "mixed",
-        "position": 5,
+        "position": 4,
         "title": "Souveräner Gesprächseinstieg",
         "caption": (
             "Begrüßung, Vorstellung und Anlass des Gesprächs klar und "
@@ -1536,7 +1726,7 @@ FOCUS_GOALS = [
         "id": "needs_analysis",
         "group": "phases",
         "evidence": "mixed",
-        "position": 6,
+        "position": 5,
         "practised_in": ("requirements",),
         "title": "Aktive Bedarfsermittlung",
         "caption": "Durch gezielte Fragen herausfinden, was Ihr Kunde wirklich braucht.",
@@ -1551,7 +1741,7 @@ FOCUS_GOALS = [
         "id": "objection_handling",
         "group": "phases",
         "evidence": "mixed",
-        "position": 7,
+        "position": 6,
         "practised_in": ("closing",),
         "title": "Sichere Einwandbehandlung",
         "caption": "Auf Bedenken und Einwände ruhig und überzeugend eingehen.",
@@ -1571,7 +1761,7 @@ FOCUS_GOALS = [
         # -- is still only the wrap-up's to say.
         "group": "phases",
         "evidence": "mixed",
-        "position": 8,
+        "position": 7,
         "practised_in": ("closing",),
         "title": "Klarer Gesprächsabschluss",
         "caption": (
@@ -1590,7 +1780,7 @@ FOCUS_GOALS = [
         "id": "active_listening",
         "group": "impact",
         "evidence": "mixed",
-        "position": 9,
+        "position": 8,
         "practised_in": ("requirements",),
         "title": "Aktives Zuhören",
         "caption": "Ausreden lassen, aufgreifen und bestätigen, statt zu unterbrechen.",
@@ -1607,7 +1797,7 @@ FOCUS_GOALS = [
         "id": "empathy",
         "group": "impact",
         "evidence": "interpretive",
-        "position": 10,
+        "position": 9,
         "practised_in": ("operations",),
         "title": "Empathie und Kundenorientierung",
         "caption": "Die Situation und die Stimmung Ihres Gegenübers erkennen und aufgreifen.",
@@ -1622,7 +1812,7 @@ FOCUS_GOALS = [
         "id": "composure",
         "group": "impact",
         "evidence": "mixed",
-        "position": 11,
+        "position": 10,
         # A fault report is where a caller arrives annoyed, and a pricing call
         # is pressure too. The first is the one practice suggestion (the
         # plainer case of it); the library suggests both.
@@ -1642,7 +1832,7 @@ FOCUS_GOALS = [
         "id": "talk_share",
         "group": "impact",
         "evidence": "measured",
-        "position": 12,
+        "position": 11,
         "title": "Ausgewogener Redeanteil",
         "caption": "Das richtige Verhältnis zwischen selbst sprechen und sprechen lassen.",
         "info": (
@@ -1659,7 +1849,7 @@ FOCUS_GOALS = [
         "id": "training_regularity",
         "group": "habit",
         "evidence": "measured",
-        "position": 13,
+        "position": 12,
         "title": "Regelmäßiges Training",
         "caption": "Dranbleiben und kontinuierlich üben statt in seltenen Schüben.",
         "info": (
@@ -1672,7 +1862,7 @@ FOCUS_GOALS = [
         "id": "training_variety",
         "group": "habit",
         "evidence": "measured",
-        "position": 14,
+        "position": 13,
         "title": "Trainingsvielfalt",
         "caption": "Verschiedene Szenarien und Gesprächspartner bewusst durchspielen.",
         "info": (

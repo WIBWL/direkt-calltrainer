@@ -51,6 +51,10 @@ class Persona:  # pylint: disable=too-many-instance-attributes
     # same order, same length. Built in one pass in `library._to_persona`, so
     # an objection and its label cannot fall out of step.
     objection_labels: tuple[str, ...] = ()
+    # Read by the turn loop, not by the display: picks which anti-repeat nudge
+    # a Turn gets, because the ordinary one offers "give ground" as a move and
+    # a `hard` Persona is one that does not.
+    hard: bool = False
     # Display: the path this Persona's portrait is served from. Defaulted
     # rather than required, because it is display-only -- a Persona without a
     # picture plays exactly the same, and the UI shows its initials instead.

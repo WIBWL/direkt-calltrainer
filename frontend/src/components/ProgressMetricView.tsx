@@ -54,9 +54,13 @@ export default function ProgressMetricView() {
         {back}
         <h1>Kennzahl</h1>
         <div className="card">
+          {/* Which trainings were looked at, here as well: without it the sentence
+              blamed the absence on the metric ("noch nie gemessen") where the reason
+              is usually the selection. The focus tiles made the same mistake. */}
           <p>
-            Zu dieser Kennzahl liegen keine Werte vor. Möglicherweise wurde sie in Ihren
-            Trainings noch nie gemessen.
+            Über {periodPhrase} liegt zu dieser Kennzahl kein Wert vor. Mit einer weiteren
+            Auswahl auf der Fortschrittsseite steht hier unter Umständen mehr; sonst wurde sie
+            in Ihren Trainings noch nicht gemessen.
           </p>
         </div>
       </AppLayout>

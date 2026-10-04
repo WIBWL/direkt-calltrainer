@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted, **amended twice on 2026-09-09** — see the two amendments at the end.
+Accepted, **amended twice on 2026-09-09** and **once on 2026-10-04** — see the
+amendments at the end.
 Two clauses of the Decision below no longer hold: the follow-up is no longer
 written without being asked for, and it no longer invents a new situation in
 the same subject area but carries the played case forward. Everything else
@@ -333,3 +334,26 @@ a skill into an unfamiliar case. If the pilot shows people getting good at one
 case and no further, that is the symptom, and the fix is a second kind of
 follow-up rather than a change to this one — the material is the only
 difference between them.
+
+## Amendment 3 (2026-10-04): the trainee's "Worum es geht" is written too
+
+A follow-up's `description` is the caller's briefing (S1), addressed to the
+caller: "Sie rufen an, weil der zugesagte Rückruf ausblieb." The info panel and
+the setup screen show `description_label or description` as "Worum es geht" —
+and a follow-up had no label, so the trainee read the caller's text as their own
+and took the call to be theirs to make. It is not: the Persona rings and the
+User picks up (ADR 0110); only a reverse (ADR 0070) has the User call.
+
+**What changes.** The draft gains a seventh key, `situation`, stored as
+`description_label` — the column a built-in already uses for its German
+trainee-facing twin. Rule C3 asks for it in a built-in's shape: the caller from
+the last call rings again and why, then one sentence starting "Geübt wird". It
+is required like `description`; a draft without it is retried once and then a
+503, because the fallback is exactly the misreading this amendment removes. The
+card's start note now says that the caller rings the User, not the other way
+round.
+
+**What does not change.** The caller never reads `situation` (it is not in the
+prompt fields `prompting.py` reads); the `briefing` stays the Wissensstand after
+the microphone check. Follow-ups stored before this amendment keep showing their
+`description` — no backfill, since writing a label needs the model.

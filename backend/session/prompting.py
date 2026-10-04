@@ -15,8 +15,10 @@ from backend.scenarios import Scenario
 def opening_instruction(pack: LanguagePack, reverse: bool = False) -> str:
     """Asks the Persona for the line that opens the call. Openers come from the
     pack, since a single English example was copied verbatim into every call.
-    In a reverse (ADR 0070) it only answers the phone: a callee who guesses the
-    reason has answered the exercise before it started."""
+    Ordinarily the User has just picked up (ADR 0110) and this asks for the
+    caller's first words in reply to their answering line. In a reverse
+    (ADR 0070) it only answers the phone: a callee who guesses the reason has
+    answered the exercise before it started."""
     if reverse:
         return (
             "The phone is ringing and you are picking it up. Say only what "
@@ -35,11 +37,14 @@ def opening_instruction(pack: LanguagePack, reverse: bool = False) -> str:
             "stage directions. Reply with only that line."
         )
     return (
-        "The call is starting now: you are the one calling, and you speak "
-        "first. Open the conversation yourself with 1-2 short, realistic "
-        "sentences: a greeting, who you are, and — briefly — what you're "
-        "calling about (the question/concern from your role above). Invent "
-        "plausible details as you go.\n"
+        "You rang, and the user has just picked up: their last line is how "
+        "they answered the phone. Now open the conversation with 1-2 short, "
+        "realistic sentences: return the greeting, say who you are, and — "
+        "briefly — what you're calling about (the question/concern from your "
+        "role above). You have not greeted anyone or given your name yet, so "
+        "the rule against doing that again does not apply to this reply. Do "
+        "not repeat their answering line back, and do not treat it as a "
+        "question you have to answer. Invent plausible details as you go.\n"
         "Name the reason in a clause, not in a summary: what you want, in one "
         "breath. The background — what was agreed before, what has happened "
         "since, the figures and the dates — is yours to give when you are "

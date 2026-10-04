@@ -32,6 +32,13 @@ export const ROUTES = {
   notes: "/hinweise",
 } as const;
 
+/** The privacy statement, which is not in this application: the EFRE DiReKT
+ *  project's own page, the statement of the responsible body for everything
+ *  under the project. Every mention in the interface points straight at it
+ *  (`PrivacyLink`); `ROUTES.privacy` only forwards, for links published before
+ *  that was true. */
+export const PRIVACY_URL = "https://efre-direkt.de/privacy/";
+
 /**
  * Handed via location state when a follow-up (F-60) or reverse (F-61) is started
  * from a past training. Not a query parameter, which would survive a reload and

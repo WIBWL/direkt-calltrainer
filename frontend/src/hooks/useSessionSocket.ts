@@ -41,8 +41,9 @@ interface UseSessionSocketOptions {
 
 /**
  * Owns the per-Session WebSocket (ADR 0033's wire protocol). Connects as soon
- * as a Session is committed to (ADR 0042), so the opening line generates in
- * the background while the user is still on the microphone check.
+ * as a Session is committed to (ADR 0042), so a reverse's answering line
+ * generates in the background while the user reads their briefing; an
+ * ordinary call has nothing to prepare, the user speaks first (ADR 0110).
  */
 export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionSocketOptions) {
   const [callState, setCallState] = useState<CallState>("thinking");
@@ -222,6 +223,12 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     if (!send({ type: "session.activate" })) pendingActivateRef.current = true;
   }, [send]);
 
+  /** The user started speaking while the Persona was silent (ADR 0110). Lost
+   * on a closed socket, which is harmless: it only postpones a "Hallo?". */
+  const sendSpeaking = useCallback(() => {
+    send({ type: "user.speaking" });
+  }, [send]);
+
   const endSession = useCallback(() => {
     if (send({ type: "session.end" })) return;
     // The handshake never finished, so the server will never send
@@ -237,5 +244,5 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     onEnded("user", [], null);
   }, [send, onEnded]);
 
-  return { callState, error, sendTurnAudio, sendInterrupt, sendActivate, endSession };
+  return { callState, error, sendTurnAudio, sendInterrupt, sendActivate, sendSpeaking, endSession };
 }

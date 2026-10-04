@@ -86,6 +86,12 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN --mount=type=cache,id=npm,target=/root/.npm \
     npm ci
 COPY frontend/ ./
+# Before the build and a step of its own, so a failure names itself. `npm run
+# build` runs eslint and tsc but never vitest, which is the suite behind what the
+# dashboard claims out loud ("Ihr üblicher Bereich 118 bis 141") — pure functions
+# whose every failure renders perfectly, so nothing else catches them. Two
+# seconds, and no settings: vitest reads the same vite.config.ts as the build.
+RUN npm test
 RUN npm run build
 
 

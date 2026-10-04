@@ -431,21 +431,24 @@ function Pauses({ detail }: { detail: Record<string, unknown> }) {
 }
 
 function Phonation({ detail }: { detail: Record<string, unknown> }) {
-  const speech = number(detail.speech_ms);
+  // `voiced_ms`, not the `speech_ms` a row stored before ADR 0114 carries: that
+  // was the recordings' length, padding and all, and drawing it under this
+  // text would mislabel the padding as pauses.
+  const voiced = number(detail.voiced_ms);
   const phonation = number(detail.phonation_ms);
-  if (speech === null || phonation === null || speech <= 0) return null;
+  if (voiced === null || phonation === null || voiced <= 0) return null;
 
-  const share = (phonation * 100) / speech;
+  const share = (phonation * 100) / voiced;
 
   return (
     <Block title="Woraus der Anteil entsteht">
       <ul className="evidence-bars">
         <Bar label="gesprochen" ms={phonation} share={share} />
-        <Bar label="Stille darin" ms={speech - phonation} share={100 - share} />
+        <Bar label="Pausen darin" ms={voiced - phonation} share={100 - share} />
       </ul>
       <p className="muted">
-        Beides zusammen ist die Länge Ihrer Aufnahmen. Der kurze Vorlauf und Nachlauf, den
-        jede Aufnahme mitschneidet, zählt zur Stille.
+        Beides zusammen ist die Zeit von Ihrem ersten bis zu Ihrem letzten Laut in jedem
+        Beitrag. Die Stille, die jede Aufnahme davor und danach mitschneidet, zählt nicht mit.
       </p>
     </Block>
   );

@@ -23,6 +23,7 @@ function card(id: string, overrides: Partial<ScenarioCard> = {}): ScenarioCard {
     name: id,
     short_description: "",
     briefing: "",
+    description: "",
     category: "operations",
     origin: "builtin",
     shared: false,

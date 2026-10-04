@@ -1,8 +1,6 @@
-import { Link } from "react-router-dom";
-
-import { ROUTES } from "../routes";
 import AppFooter from "./AppFooter";
 import BrandName from "./BrandName";
+import PrivacyLink from "./PrivacyLink";
 
 interface LoginViewProps {
   errorMessage?: string | undefined;
@@ -125,7 +123,7 @@ export default function LoginView({
 
           <p className="login-privacy-note">
             Mit der Anmeldung bestätigen Sie, dass Sie die{" "}
-            <Link to={ROUTES.privacy}>Datenschutzhinweise</Link> gelesen haben.
+            <PrivacyLink>Datenschutzhinweise</PrivacyLink> gelesen haben.
           </p>
         </section>
       </main>

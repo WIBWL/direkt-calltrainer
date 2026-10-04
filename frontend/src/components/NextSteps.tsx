@@ -176,7 +176,7 @@ export function FollowUp({
         name={card.name}
         teaser={card.short_description}
         onStart={() => onStart(card.id, personaId)}
-        note="„Starten“ ruft denselben Gesprächspartner wie in diesem Training an – ohne Mikrofoncheck. Das Gespräch beginnt, sobald Sie den Anruf annehmen."
+        note="Nach „Starten“ ruft Sie derselbe Gesprächspartner wie in diesem Training an – ohne Mikrofoncheck. Sie nehmen ab und melden sich zuerst."
       />
     </NextStepCard>
   );

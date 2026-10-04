@@ -148,7 +148,8 @@ def _seed_personas(db: DbSession) -> int:
              # False only while something the Persona needs (a voice id) is missing.
              "avatar_url": p.get("avatar_url"),
              "active": p.get("active", True), "language_code": p["language_id"],
-             "kugelaudio_voice_id": p["kugelaudio_voice_id"]})
+             "kugelaudio_voice_id": p["kugelaudio_voice_id"],
+             "hard": p.get("hard", False)})
         created += was_created
         _seed_objections(db, row, p["objections"], p["objection_labels"])
     return created

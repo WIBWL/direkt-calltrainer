@@ -87,8 +87,21 @@ Locally, `keycloak/direkt-realm.json` sets all of this up; in the realm at `keyc
 
 ### Legal
 
-- The **privacy statement has not yet been reviewed by the data protection officer.** That blocks going live with real users. If the text changes afterwards, raise `CURRENT_VERSION` in `backend/consent.py` so every earlier consent is asked again.
-- The privacy statement names Hetzner and KugelAudio as processors. Check that the path from the Hetzner server to the university gateway (audio and transcripts) is covered there.
+- **The privacy statement is no longer in this application.** `/datenschutz` refers to <https://efre-direkt.de/privacy/> (`PRIVACY_URL` in `frontend/src/components/legal/Privacy.tsx`), so that one document is maintained instead of two.
+- **Blocking: that page must describe what the Calltrainer does before real users reach it.** As of the change it describes a website — contact form, pretix, a mailing list — and none of the following, all of which the statement it replaced carried and which the application actually does:
+  - the Keycloak login and which claims the app receives,
+  - the recording leaving the browser for the DiReKT gateway (speech recognition and reply generation) and the reply text going to KugelAudio UG, Hannover, for the speech output, both under Art. 28 agreements, KugelAudio's sub-processors being Verda AI (Finland) and Hetzner (Germany),
+  - that the recording itself is never stored,
+  - consent-gated storage of transcript, metrics and wrap-up, under the account's technical id rather than the name,
+  - the derived exercises (Folgeszenario, Rollentausch) and what deletion does to each,
+  - six-month retention and the switch that suspends it,
+  - the focus goals and the retention preference, stored beside the trainings and not deleted with them,
+  - the consent log, which outlives a deletion on purpose,
+  - the rights exercisable in the profile, the server and operating logs, the four items in browser storage, the absence of analytics, and the two limits (backups at the hoster, DiReKT account separate from the trainings).
+- Do **not** answer that by writing the text back into `Privacy.tsx`. That recreates the second document this change removed.
+- One correction to carry over rather than copy: the old statement said an abandoned call is not stored. It is — `persistence.py` stores it as `aborted` with its full transcript (ADR 0034's amendment); it is only not counted.
+- The statement has still **not been reviewed by the data protection officer**, which blocks going live with real users and did before this change too. When the text on the target page changes, raise `CURRENT_VERSION` in `backend/consent.py` so every earlier consent is asked again.
+- Check that the path from the Hetzner server to the university gateway (audio and transcripts) is covered on the target page.
 - Review the imprint and the accessibility statement (`frontend/src/components/legal/`) for the domain and the operation.
 
 ## Starting

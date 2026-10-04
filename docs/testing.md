@@ -110,7 +110,7 @@ source of that content, and which imports without a database.
 | Verdicts on one reply against the replies before it: repeats, oscillation, restatement, re-greeting, a still-pressing ending, and whether a finished reply ends the call and needs a goodbye | ADR 0037, ADR 0038 | `test_reply_checks.py` |
 | Which nudge a reply gets, in order of precedence, the reverse's reminder and the settlement check | ADR 0035, ADR 0037, ADR 0038, ADR 0070, ADR 0073 | `test_turn_nudge.py` |
 | Async wrap-up job status (queued → running → done/failed), and every path that can strand it | F-09, F-10, ADR 0019, ADR 0032, ADR 0034, ADR 0050 | `test_feedback_job_status.py` |
-| Wrap-up prompt & phase block (F-42), and the thinking-mode call it is asked with | F-09, F-42, F-43, ADR 0004, ADR 0011, ADR 0043, ADR 0049, ADR 0051, ADR 0056 | `test_wrapup_prompt.py` |
+| Wrap-up prompt & phase block (F-42), and the capped, non-thinking call it is asked with | F-09, F-42, F-43, ADR 0004, ADR 0011, ADR 0043, ADR 0049, ADR 0051, ADR 0056, ADR 0103 | `test_wrapup_prompt.py` |
 | Documented gaps (current-state guards) | F-56 | `test_documented_gaps.py` |
 | The seed sweep reaches only rows the seed created: a retired built-in is deactivated, an authored Scenario is not, with or without a `key` | ADR 0041, ADR 0057, ADR 0058 | `test_seed.py` |
 | What a stored Measurement says beyond its figure: the keys resolve, a scale sits beside its explanation, and no step is carried by colour alone | F-35, F-51, F-53, ADR 0051, ADR 0063, ADR 0078 | `test_metric_readings.py` |

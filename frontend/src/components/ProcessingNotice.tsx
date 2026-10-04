@@ -1,7 +1,8 @@
 /**
  * Where the data goes (F-49): the *place* of processing, the part a user cannot guess — speech leaves the
  * machine. One component shared by the consent dialog and the profile, because a claim about where personal
- * data travels must not exist in two copies. The short version; the full statement is `ROUTES.privacy`.
+ * data travels must not exist in two copies. The short version; the full statement is the project's own page
+ * (`PrivacyLink`), which is where every mention in the interface now points.
  */
 export default function ProcessingNotice({ compact = false }: { compact?: boolean }) {
   return (

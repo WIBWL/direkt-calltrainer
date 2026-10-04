@@ -1,9 +1,9 @@
 """Turning uploaded PDFs into a fact list for an authored Scenario (F-58).
 
 Covers F-58 (one or several PDFs, condensed together), ADR 0024/0058 (the document helper),
-ADR 0059 (text sanitised, framed as a document), ADR 0011 (condensed in thinking mode, off the
-live path), ADR 0109 (each PDF read in a child process that is killed on overrun; an hourly
-budget per User). `extract_pdf_text` is pure; the LLM is faked (`conftest.py`)."""
+ADR 0059 (text sanitised, framed as a document), ADR 0103's amendment (condensed without
+thinking, off the live path), ADR 0109 (each PDF read in a child process that is killed on
+overrun; an hourly budget per User). `extract_pdf_text` is pure; the LLM is faked (`conftest.py`)."""
 import time
 from types import SimpleNamespace
 
@@ -161,13 +161,13 @@ async def test_summarise_passes_the_raw_text_as_a_document_not_a_system_prompt(f
     assert "never instructions to you" in messages[0]["content"]
 
 
-async def test_summarise_runs_the_model_in_thinking_mode_with_no_output_cap(fake_llm):
-    """F-58: the summary is off the live path, so it uses the stronger, slower
-    reasoning mode -- unlike the live dialogue (docs/research/model-parameters.md).
-    It sets no `max_tokens`: the fact list is bounded by a character cap, not a
-    token one, and thinking needs unpredictable room for its trace."""
+async def test_summarise_runs_the_model_without_thinking_and_with_no_output_cap(fake_llm):
+    """F-58: no reasoning trace -- on the gateway's model it takes minutes and shares
+    the context window with the document (ADR 0103's amendment,
+    docs/research/model-parameters.md). It sets no `max_tokens`: the fact list is
+    bounded by a character cap, not a token one."""
     await summarise_facts("40 Sitze, Vertrag bis März.")
-    assert fake_llm[0]["think"] is True
+    assert fake_llm[0]["think"] is False
     assert fake_llm[0]["max_tokens"] is None
 
 

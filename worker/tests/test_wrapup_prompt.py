@@ -243,10 +243,11 @@ def test_the_language_name_is_what_the_model_is_told_to_write_in() -> None:
     assert "Every value you write is in English" in system
 
 
-async def test_the_wrapup_is_asked_in_thinking_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    """ADR 0011/0043: German prose from an English brief on a 4B model needs thinking mode.
+async def test_the_wrapup_is_asked_without_thinking(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ADR 0103's amendment: the trace outran the token cap on the gateway's model, so
+    every wrap-up came back empty and the fallback was stored with no points at all.
 
-    Asserted on the call; what the trace does to the German cannot be tested.
+    Asserted on the call; that the answer then fits the cap was measured, not tested.
     """
     calls: list[dict] = []
     # Tells "left at llm.complete's default" apart from "explicitly None",
@@ -262,9 +263,9 @@ async def test_the_wrapup_is_asked_in_thinking_mode(monkeypatch: pytest.MonkeyPa
     await _ask("Transcript, timestamped from the start of the call:", "German")
 
     assert len(calls) == 1, "one attempt is enough when the answer validates"
-    assert calls[0]["think"] is True
+    assert calls[0]["think"] is False
     # The wrap-up keeps the cap; only the PDF summary (F-58) drops it, having a
-    # character cap instead. Uncapped, a trace could run to the job timeout.
+    # character cap instead. Uncapped, a repetition loop could run to the job timeout.
     assert calls[0]["max_tokens"] is unset
     assert "Transcript" in calls[0]["messages"][1]["content"]
 
