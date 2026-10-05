@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 
-import { ROUTES } from "../routes";
+import { ACCESSIBILITY_URL, IMPRINT_URL, ROUTES } from "../routes";
 import PrivacyLink from "./PrivacyLink";
+import ProjectPageLink from "./ProjectPageLink";
 
 // The shared footer keeps legal information consistent across all training screens.
 export default function AppFooter() {
@@ -17,14 +18,13 @@ export default function AppFooter() {
         </div>
 
         <nav className="app-footer-links" aria-label="Rechtliche Informationen">
-          {/* Router links, not <a href>: a plain href reloads the whole app,
-              which on the way out of a finished wrap-up would discard it. */}
-          <Link to={ROUTES.imprint}>Impressum</Link>
-          {/* The exception, and it leaves the app on purpose: the statement is
-              the project's own page (`PrivacyLink`). A new tab for the reason
-              above — a finished wrap-up must survive the trip. */}
+          {/* The three legal statements are the project's own pages and leave
+              the app on purpose, in a new tab (`ProjectPageLink`). */}
+          <ProjectPageLink href={IMPRINT_URL}>Impressum</ProjectPageLink>
           <PrivacyLink>Datenschutz</PrivacyLink>
-          <Link to={ROUTES.accessibility}>Barrierefreiheit</Link>
+          <ProjectPageLink href={ACCESSIBILITY_URL}>Barrierefreiheit</ProjectPageLink>
+          {/* A router link, not <a href>: a plain href reloads the whole app,
+              which on the way out of a finished wrap-up would discard it. */}
           <Link to={ROUTES.notes}>Wichtige Hinweise</Link>
         </nav>
       </div>

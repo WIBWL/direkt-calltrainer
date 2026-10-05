@@ -23,8 +23,9 @@ export const ROUTES = {
    *  and a reader should be able to link to them and use Back. */
   sessionMetric: "/trainings/:sessionId/kennzahl/:metricKey",
 
-  // The legal pages the footer links. Their paths are the ones the footer
-  // already used, so old links and bookmarks keep working.
+  // The legal pages the footer once linked. Their paths are kept, so old links
+  // and bookmarks keep working; all three only forward to the project's own
+  // pages below.
   imprint: "/impressum",
   privacy: "/datenschutz",
   accessibility: "/barrierefreiheit",
@@ -32,12 +33,15 @@ export const ROUTES = {
   notes: "/hinweise",
 } as const;
 
-/** The privacy statement, which is not in this application: the EFRE DiReKT
- *  project's own page, the statement of the responsible body for everything
- *  under the project. Every mention in the interface points straight at it
- *  (`PrivacyLink`); `ROUTES.privacy` only forwards, for links published before
- *  that was true. */
+/** The imprint, privacy statement and accessibility statement, none of which is
+ *  in this application: the EFRE DiReKT project's own pages, the statements of
+ *  the responsible body for everything under the project. Every mention in the
+ *  interface points straight at them (`ProjectPageLink`); `ROUTES.imprint`,
+ *  `ROUTES.privacy` and `ROUTES.accessibility` only forward, for links
+ *  published before that was true. */
+export const IMPRINT_URL = "https://efre-direkt.de/imprint/";
 export const PRIVACY_URL = "https://efre-direkt.de/privacy/";
+export const ACCESSIBILITY_URL = "https://efre-direkt.de/accessibility/";
 
 /**
  * Handed via location state when a follow-up (F-60) or reverse (F-61) is started

@@ -7680,7 +7680,7 @@ a.recurring-item:focus-visible {
   margin-top: 0;
 }
 
-/* --- Legal pages (imprint, privacy, accessibility) ----------------------- */
+/* --- Legal pages (the AI notes, and the referrals to the project's own) -- */
 /* Long documents rather than screens, so they get reading measure, generous
    line height and headings that structure rather than decorate. */
 
@@ -7745,23 +7745,10 @@ a.recurring-item:focus-visible {
   border-radius: 4px;
 }
 
-/* Bare URLs, listed rather than linked, exactly as the source page has them. */
-.legal-links {
-  list-style: none;
-  padding-left: 0;
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-}
-
-.legal-links li {
-  margin-bottom: 0.25rem;
-  overflow-wrap: anywhere;
-}
-
-/* `.legal-uppercase` (the Art. 21 notice in capitals) and `.legal-date` (the
-   revision date) stood here. Both were named only by the privacy statement,
-   which is now a referral to the project's own page and carries neither. */
+/* `.legal-uppercase` (the Art. 21 notice in capitals), `.legal-date` (the
+   revision date) and `.legal-links` (the imprint's bare URLs) stood here. They
+   were named only by the privacy statement and the imprint, which are now
+   referrals to the project's own pages and carry none of them. */
 
 .legal-body p.legal-lead {
   font-size: 1.05rem;

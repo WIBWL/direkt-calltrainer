@@ -8,10 +8,8 @@ import { AuthGate } from "./AuthGate";
 import { ConsentProvider } from "./ConsentContext";
 import { FocusProvider } from "./FocusContext";
 import { ProgressProvider } from "./ProgressContext";
-import Accessibility from "./components/legal/Accessibility";
-import Imprint from "./components/legal/Imprint";
 import Notes from "./components/legal/Notes";
-import Privacy from "./components/legal/Privacy";
+import ProjectPageRedirect from "./components/legal/ProjectPageRedirect";
 import PastSessionView from "./components/PastSessionView";
 import { ScreenTransitionProvider } from "./components/ScreenTransition";
 import ProfileView from "./components/ProfileView";
@@ -20,7 +18,7 @@ import ProgressMetricView from "./components/ProgressMetricView";
 import ProgressView from "./components/ProgressView";
 import SessionMetricView from "./components/SessionMetricView";
 import { consumeReturnTo, rememberReturnTo, userManager } from "./auth";
-import { ROUTES } from "./routes";
+import { ACCESSIBILITY_URL, IMPRINT_URL, PRIVACY_URL, ROUTES } from "./routes";
 import "./index.css";
 
 const onSigninCallback = (user: User | undefined) => {
@@ -74,10 +72,22 @@ createRoot(document.getElementById("root")!).render(
             started it (see ScreenTransition.tsx). */}
         <ScreenTransitionProvider>
           <Routes>
-            {/* Public legal pages */}
-            <Route path={ROUTES.imprint} element={<Imprint />} />
-            <Route path={ROUTES.privacy} element={<Privacy />} />
-            <Route path={ROUTES.accessibility} element={<Accessibility />} />
+            {/* Public legal pages. The first three are the project's own and
+                only forward there (ProjectPageRedirect). */}
+            <Route
+              path={ROUTES.imprint}
+              element={<ProjectPageRedirect title="Impressum" url={IMPRINT_URL} />}
+            />
+            <Route
+              path={ROUTES.privacy}
+              element={<ProjectPageRedirect title="Datenschutzerklärung" url={PRIVACY_URL} />}
+            />
+            <Route
+              path={ROUTES.accessibility}
+              element={
+                <ProjectPageRedirect title="Erklärung zur Barrierefreiheit" url={ACCESSIBILITY_URL} />
+              }
+            />
             <Route path={ROUTES.notes} element={<Notes />} />
 
             {/* Everything below requires authentication. */}

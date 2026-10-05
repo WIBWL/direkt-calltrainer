@@ -4,7 +4,7 @@
 
 Accepted, **amended on 2026-09-19**: the reverse's card turn, one of the examples below, no longer exists (see the amendment at the end).
 
-The accessibility statement (`/barrierefreiheit`) names EN 301 549, which corresponds in substance to WCAG 2.1 level AA, and states partial conformance. The Calltrainer itself has not been through the BITV self-assessment that statement describes.
+The accessibility statement (the project's own page, which `/barrierefreiheit` forwards to) names EN 301 549, which corresponds in substance to WCAG 2.1 level AA, and states partial conformance. The Calltrainer itself has not been through the BITV self-assessment that statement describes.
 
 ## Context
 

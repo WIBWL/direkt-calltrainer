@@ -87,7 +87,7 @@ Locally, `keycloak/direkt-realm.json` sets all of this up; in the realm at `keyc
 
 ### Legal
 
-- **The privacy statement is no longer in this application.** `/datenschutz` refers to <https://efre-direkt.de/privacy/> (`PRIVACY_URL` in `frontend/src/components/legal/Privacy.tsx`), so that one document is maintained instead of two.
+- **Imprint, privacy statement and accessibility statement are no longer in this application.** The footer and every other mention link <https://efre-direkt.de/imprint/>, <https://efre-direkt.de/privacy/> and <https://efre-direkt.de/accessibility/> (`IMPRINT_URL`, `PRIVACY_URL`, `ACCESSIBILITY_URL` in `frontend/src/routes.ts`), so that one document each is maintained instead of two. `/impressum`, `/datenschutz` and `/barrierefreiheit` only forward there (`frontend/src/components/legal/ProjectPageRedirect.tsx`).
 - **Blocking: that page must describe what the Calltrainer does before real users reach it.** As of the change it describes a website — contact form, pretix, a mailing list — and none of the following, all of which the statement it replaced carried and which the application actually does:
   - the Keycloak login and which claims the app receives,
   - the recording leaving the browser for the DiReKT gateway (speech recognition and reply generation) and the reply text going to KugelAudio UG, Hannover, for the speech output, both under Art. 28 agreements, KugelAudio's sub-processors being Verda AI (Finland) and Hetzner (Germany),
@@ -98,11 +98,12 @@ Locally, `keycloak/direkt-realm.json` sets all of this up; in the realm at `keyc
   - the focus goals and the retention preference, stored beside the trainings and not deleted with them,
   - the consent log, which outlives a deletion on purpose,
   - the rights exercisable in the profile, the server and operating logs, the four items in browser storage, the absence of analytics, and the two limits (backups at the hoster, DiReKT account separate from the trainings).
-- Do **not** answer that by writing the text back into `Privacy.tsx`. That recreates the second document this change removed.
+- Do **not** answer that by writing the text back into the app. That recreates the second document this change removed.
 - One correction to carry over rather than copy: the old statement said an abandoned call is not stored. It is — `persistence.py` stores it as `aborted` with its full transcript (ADR 0034's amendment); it is only not counted.
 - The statement has still **not been reviewed by the data protection officer**, which blocks going live with real users and did before this change too. When the text on the target page changes, raise `CURRENT_VERSION` in `backend/consent.py` so every earlier consent is asked again.
 - Check that the path from the Hetzner server to the university gateway (audio and transcripts) is covered on the target page.
-- Review the imprint and the accessibility statement (`frontend/src/components/legal/`) for the domain and the operation.
+- **The accessibility statement on the target page does not cover the Calltrainer.** Its scope names efre-direkt.de and excludes the university's other web offerings; the copy this app carried until the change named the Calltrainer as well, and that was its one deviation from the original. Have the scope sentence on the project page extended to the Calltrainer. Its listed barriers (event registration, newsletter) are the website's, and this application has never been through the BITV self-assessment the statement describes.
+- Check that the imprint on the target page fits the domain and the operation.
 
 ## Starting
 
