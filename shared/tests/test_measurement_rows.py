@@ -43,21 +43,6 @@ def test_a_key_the_seed_does_not_know_is_dropped_and_said_so(caplog):
     assert "no_such_metric" in caplog.text
 
 
-def test_a_backfilled_row_says_where_it_came_from_without_touching_the_figure():
-    original = {"runs": 27}
-    row = _only(rows.measurements(IDS, [Measurement("pace", 1.25, original)], backfilled=True))
-
-    assert row.detail_json == {"runs": 27, "backfilled": True}
-    assert original == {"runs": 27}, "the caller's detail was mutated"
-    assert str(row.value) == "1.2500"
-
-
-def test_an_ordinary_row_carries_no_backfilled_key():
-    row = _only(rows.measurements(IDS, [Measurement("pace", 1.0, {"runs": 3})]))
-
-    assert "backfilled" not in row.detail_json
-
-
 def test_a_segment_row_names_its_stretch_and_its_session():
     """The wrap-up's segment pass adds rows by `session_id` rather than through
     the relationship, because it has just deleted the ones it replaces."""

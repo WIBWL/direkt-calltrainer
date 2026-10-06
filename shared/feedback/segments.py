@@ -3,9 +3,7 @@
 call, folded and measured by the unchanged `metrics.py`. Nothing here compares
 the two figures -- a meaningful difference is the norm ADR 0051 refuses.
 
-Measuring only, nothing is written: the wrap-up stores the result
-(`worker/segments.py`), and `backend/scripts/backfill_voiced_span.py` measures
-stored calls again with it.
+Measuring only; `worker/segments.py` stores the result.
 """
 
 from __future__ import annotations

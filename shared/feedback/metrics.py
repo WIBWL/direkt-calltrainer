@@ -276,9 +276,6 @@ def _reaction_time(call: Conversation) -> Measurement | None:
     return reaction_time_measurement(call.reactions)
 
 
-REACTION_MEASURED_TO = "first_sound"
-
-
 def reaction_time_measurement(reactions: Sequence[Reaction]) -> Measurement | None:
     if not reactions:
         return None
@@ -293,7 +290,6 @@ def reaction_time_measurement(reactions: Sequence[Reaction]) -> Measurement | No
                 {"at_ms": reaction.at_ms, "duration_ms": reaction.gap_ms}
                 for reaction in reactions
             ],
-            "measured_to": REACTION_MEASURED_TO,
         },
     )
 

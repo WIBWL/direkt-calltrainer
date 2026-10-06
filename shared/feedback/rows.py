@@ -1,8 +1,5 @@
-"""Turning measured figures into `measurement` rows: the one place for the live
-path, the segment pass and the backfill scripts. An unseeded key is dropped
-(not raised, which would lose the whole Session's figures) but logged, since a
-silently vanishing figure is the failure this application is worst at seeing.
-"""
+"""Measured figures into `measurement` rows. An unseeded key is logged and
+dropped, not raised, which would lose every figure of the Session."""
 
 from __future__ import annotations
 
@@ -33,12 +30,8 @@ def measurements(
     *,
     segment: str = db_models.SEGMENT_CALL,
     session_id: int | None = None,
-    backfilled: bool = False,
 ) -> list[db_models.Measurement]:
-    """Unattached rows for `values`, in order, skipping keys the seed lacks; each
-    caller attaches them its own way. `backfilled` marks a row as reconstructed
-    rather than measured when the call ended.
-    """
+    """Unattached rows for `values`, in order, skipping keys the seed lacks."""
     rows = []
     for value in values:
         metric_type_id = ids.get(value.key)
@@ -47,11 +40,10 @@ def measurements(
                 "No seeded metric_type for %r; its figure is not stored", value.key
             )
             continue
-        detail = value.detail or {}
         rows.append(db_models.Measurement(
             metric_type_id=metric_type_id,
             value=Decimal(f"{value.value:.{VALUE_SCALE}f}"),
-            detail_json=(detail | {"backfilled": True}) if backfilled else value.detail,
+            detail_json=value.detail,
             segment=segment,
             **({"session_id": session_id} if session_id is not None else {}),
         ))

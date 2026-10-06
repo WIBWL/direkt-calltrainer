@@ -101,15 +101,6 @@ def test_reaction_time_is_measured_from_when_the_persona_stopped() -> None:
     assert [r.gap_ms for r in conversation(_measured_call()).reactions] == [500]
 
 
-def test_reaction_time_records_what_its_gaps_end_at() -> None:
-    """ADR 0114. The marker `scripts/backfill_voiced_span.py` reads to leave a
-    call alone whose gaps already end at the first sound; without it a second
-    run would shift them by the padding again."""
-    detail = {m.key: m.detail for m in measure(conversation(_measured_call()))}
-
-    assert detail["reaction_time"]["measured_to"] == "first_sound"
-
-
 # --- A Turn that could not be measured (ADR 0048) --------------------------
 
 

@@ -314,9 +314,7 @@ def test_the_heard_part_is_still_what_the_segment_lasts() -> None:
 
 
 def test_a_turn_that_knows_only_one_end_reads_it_as_both() -> None:
-    """Sessions recorded before the distinction, and every ordinary Turn, carry
-    no separate dispatched end. Falling back to the one end is what keeps
-    `backend/scripts/backfill_interruptions.py` reading old calls as it always did."""
+    """An ordinary Turn carries no separate dispatched end."""
     segment = Segment("persona", 0, 10_000, interrupted=True)
 
     assert segment.dispatched_end_ms == segment.end_ms == 10_000

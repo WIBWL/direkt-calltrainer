@@ -37,10 +37,6 @@ BACKCHANNEL_MAX_MS = 1000
 GREEN_MAX_COUNT = 0
 YELLOW_MAX_COUNT = 2
 
-# The metric a Finding of this kind points at, and the `finding.category` it
-# carries. Named here rather than spelled out at each site: the writer
-# (persistence.py), the backfill script and anything reading them later have to
-# agree on the string, and a typo would simply match nothing.
 COUNT_KEY = "interruptions"
 FINDING_CATEGORY = "hard_interruption"
 
@@ -194,11 +190,7 @@ class Report:
         return max(end for _, end in self.spans) - min(start for start, _ in self.spans)
 
     def detail(self) -> dict:
-        """Everything stored with the measurement besides its value, for the live
-        path and the backfill alike. The light is deliberately **not** stored: a
-        reading is derived on every read (ADR 0091), by `readings.py` from
-        `hard_offsets_ms`, so a recalibration reaches old Sessions.
-        """
+        """The stored detail. Never the light: it is derived on read (ADR 0091)."""
         return {
             "persona_turns": self.persona_turns,
             "call_ms": self.call_ms,
@@ -266,9 +258,7 @@ def _overlapped(user: Segment, persona: list[Segment]) -> Segment | None:
 
 
 def finding_description(event: Event) -> str:
-    """The Finding's text for one hard interruption. One place for both writers
-    (`session.persistence` and `backend/scripts/backfill_interruptions.py`).
-    """
+    """The Finding's text for one hard interruption."""
     return (
         f"Sie haben zu sprechen begonnen, während Ihr Gegenüber noch "
         f"{round(event.remaining_ms / 1000, 1)} Sekunden zu sagen hatte."
