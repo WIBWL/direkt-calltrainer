@@ -1,10 +1,6 @@
 # Feature-Katalog
 
-## Zweck und Abgrenzung
-
-Dieser Katalog enthält ausschließlich **funktionale Anforderungen**, also das, was das System tut. Qualitätsziele, Randbedingungen und Nicht-Ziele sind bewusst nicht enthalten. Sie werden an anderer Stelle geführt.
-
-Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
+Funktionale Anforderungen. Code und Tests zitieren die IDs. *Herkunft*:
 
 | Wert | Bedeutung |
 |---|---|
@@ -15,99 +11,90 @@ Die Spalte *Herkunft* gibt an, worauf ein Feature zurückgeht:
 
 ## Gesprächssimulation und KI-Gegenpart
 
-| ID | Feature | Kurzbeschreibung | ISO 25010 | Prio | Herkunft |
-|---|---|---|---|---|---|
-| F-01 | Live-Gesprächssimulation mit KI | Das System agiert im Telefonie-Kontext als Gesprächspartner und reagiert auf Inhalt und Gesprächsführung des Nutzers, einschließlich spontaner Einwände. | Funktionale Vollständigkeit | MUST | R-05, R-06, R-12 |
-| F-03 | Szenario-Typen | Das System deckt mehrere Gesprächskontexte ab: kurze Support-Fälle, längere beratende Projektgespräche sowie Angebots- und Preisgespräche. | Funktionale Vollständigkeit | MUST | R-03, R-09, R-10 |
-| F-04 | Kundenpersona-Bibliothek | Erweiterbare Auswahl an Gesprächspartnern mit unterschiedlicher Haltung, unter anderem kostenkritische Kunden sowie Geschäftsführer und IT-Leiter mit Fokus auf Strategie und Budget. | Funktionale Vollständigkeit | MUST | R-06, R-07, R-08 |
-| F-23 | Mehrteilige Projektgespräche | Trainingsfälle erstrecken sich über mehrere Sitzungen, wobei sich der Gegenpart an vorangegangene Termine erinnert. | Funktionale Vollständigkeit | COULD | R-11 |
-| F-34 | Usergesteuertes Szenario | Der Nutzer beschreibt die zu trainierende Gesprächssituation per Freitext. | Funktionale Vollständigkeit | COULD | Systementwurf |
-| F-58 | Szenario aus hochgeladenem Dokument | Aus einem hochgeladenen Dokument erzeugt das System ein sitzungsbezogenes Szenario, um Gespräche mit stärkerem Unternehmensbezug zu üben. | Funktionale Vollständigkeit | SHOULD | R-42 |
-| F-60 | Folgeszenario aus dem Feedback | Aus den Verbesserungspunkten eines abgeschlossenen Gesprächs entwirft das System auf Knopfdruck das nächste Gespräch in derselben Sache – derselbe Fall, zeitlich später –, das genau die dort benannten Punkte verlangt. Es wird als eigenes Szenario gespeichert und lässt sich im Editor ändern. | Funktionale Vollständigkeit | SHOULD | R-22, Systementwurf |
-| F-62 | Zufallsszenario | Der Nutzer startet ein Gespräch, ohne zu wissen, worum es geht: das System zieht eines der verfügbaren Szenarien und nennt es erst nach dem Gespräch. Der Anlass erschließt sich wie bei einem eingehenden Anruf erst im Gespräch selbst. | Funktionale Vollständigkeit | COULD | Systementwurf |
-| F-63 | Anruf annehmen statt starten | Vor einem gewöhnlichen Gespräch klingelt das Telefon: der Nutzer sieht, wer anruft, und nimmt den Anruf an, statt einen Startknopf zu drücken. Das entspricht der Rollenverteilung – die KI ruft an, der Nutzer ist die Seite, die abnimmt. | Benutzbarkeit | COULD | Systementwurf |
-| F-59 | Mandantenbezogene Szenario-Bibliothek | Selbst erstellte Szenarien werden über die Sitzung hinaus mandantenbezogen gespeichert, sodass Kollegen ohne erneute Erfassung damit trainieren. | Funktionale Vollständigkeit | COULD | R-58 |
+| ID | Feature | Prio | Herkunft |
+|---|---|---|---|
+| F-01 | Live-Gesprächssimulation mit KI | MUST | R-05, R-06, R-12 |
+| F-03 | Szenario-Typen | MUST | R-03, R-09, R-10 |
+| F-04 | Kundenpersona-Bibliothek | MUST | R-06, R-07, R-08 |
+| F-23 | Mehrteilige Projektgespräche | COULD | R-11 |
+| F-34 | Usergesteuertes Szenario | COULD | Systementwurf |
+| F-58 | Szenario aus hochgeladenem Dokument | SHOULD | R-42 |
+| F-60 | Folgeszenario aus dem Feedback | SHOULD | R-22, Systementwurf |
+| F-62 | Zufallsszenario | COULD | Systementwurf |
+| F-63 | Anruf annehmen statt starten | COULD | Systementwurf |
+| F-59 | Mandantenbezogene Szenario-Bibliothek | COULD | R-58 |
 
 ## Sprach- und Kommunikationsanalyse
 
-| ID   | Feature                                             | Kurzbeschreibung                                                                                 | ISO 25010               | Prio   | Herkunft      |
-| ---- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------- | ------ | ------------- |
-| F-35 | Analyse der Intonation                              | Erfassung der Tonhöhenvariation, wodurch Monotonie und nervös wirkendes Sprechen sichtbar werden. | Funktionale Korrektheit | MUST   | R-14, R-49    |
-| F-36 | Analyse des Sprechtempos                            | Erfassung von Sprechtempo und Tempoverlauf, auch relativ zum Gesprächspartner.                   | Funktionale Korrektheit | MUST   | R-14          |
-| F-37 | Analyse der Lautstärke                              | Erfassung von Lautstärke und Lautstärkeschwankungen als Maß stimmlicher Präsenz.                 | Funktionale Korrektheit | MUST   | R-14          |
-| F-38 | Analyse der Artikulation                            | Erkennung undeutlich gesprochener Passagen, auch als Indikator für Nervosität.                   | Funktionale Korrektheit | MUST   | R-14, R-49    |
-| F-51 | Analyse der Sprechflüssigkeit                       | Erkennung von Stockungen, Füllwörtern und Unterbrechungen im Redefluss.                          | Funktionale Korrektheit | MUST   | R-18          |
-| F-08 | Erkennung überlanger oder überkomplexer Erklärungen | Erkennung zu hoher Informationsdichte und Redundanz sowie daraus entstehender Missverständnisse. | Funktionale Korrektheit | MUST   | R-15, R-16 R-17    |
-| F-40 | Analyse der sprachlichen Konkretheit                | Erkennung des Anteils konkreter gegenüber vager oder stark fachsprachlicher Formulierungen.      | Funktionale Korrektheit | SHOULD | R-16          |
-| F-42 | Phasengerechte Sprache                              | Erkennung der Gesprächsphase und Bewertung der Passung des Sprachtons.                           | Funktionale Korrektheit | COULD | R-13          |
-| F-24 | Analyse der Redeanteile                             | Ermittlung der Sprechzeitverteilung, bewertet relativ zum Gesprächstyp.                          | Funktionale Korrektheit | SHOULD | R-51, Systementwurf |
-| F-41 | Erkennung aktiven Zuhörens                          | Erkennung von Pausen, bestätigenden Signalen und zusammenfassenden Rückgriffen.                  | Funktionale Korrektheit | SHOULD | Systementwurf        |
-| F-39 | Kongruenz von Inhalt und Stimme                     | Abgleich der stimmlichen Umsetzung mit dem verbalen Inhalt.                                      | Funktionale Korrektheit | COULD  | R-19, R-49    |
+| ID | Feature | Prio | Herkunft |
+|---|---|---|---|
+| F-35 | Analyse der Intonation | MUST | R-14, R-49 |
+| F-36 | Analyse des Sprechtempos | MUST | R-14 |
+| F-37 | Analyse der Lautstärke | MUST | R-14 |
+| F-38 | Analyse der Artikulation | MUST | R-14, R-49 |
+| F-51 | Analyse der Sprechflüssigkeit | MUST | R-18 |
+| F-08 | Erkennung überlanger oder überkomplexer Erklärungen | MUST | R-15, R-16 R-17 |
+| F-40 | Analyse der sprachlichen Konkretheit | SHOULD | R-16 |
+| F-42 | Phasengerechte Sprache | COULD | R-13 |
+| F-24 | Analyse der Redeanteile | SHOULD | R-51, Systementwurf |
+| F-41 | Erkennung aktiven Zuhörens | SHOULD | Systementwurf |
+| F-39 | Kongruenz von Inhalt und Stimme | COULD | R-19, R-49 |
 
 ## Feedback und Auswertung
 
-| ID | Feature | Kurzbeschreibung | ISO 25010 | Prio | Herkunft |
-|---|---|---|---|---|---|
-| F-09 | Qualitatives Wrap-up | Zusammenfassende Rückmeldung nach dem Gespräch, mehrdimensional und ohne Reduktion auf einen Zahlenwert. | Funktionale Vollständigkeit | MUST | R-19, R-20, R-31 |
-| F-10 | Konkrete Verbesserungsvorschläge | Unmittelbar anwendbare Hinweise mit Bezug auf konkrete Gesprächsstellen. | Funktionale Vollständigkeit | MUST | R-22, R-23 |
-| F-53 | Auswertungs-Dashboard | Visuelle Darstellung der Auswertung im Stil eines Dashboards, ergänzend zum qualitativen Feedback. Belegte Kennzahlen sind Redeanteil, Fragenanteil, Sprechtempo, Anzahl der Wörter, Reaktionszeit bis zur Antwort und Pausenzeiten; die Menge ist erweiterbar. | Funktionale Vollständigkeit | SHOULD | R-24, R-50, R-51 |
-| F-47 | Verknüpfung von Feedback und Gesprächsstellen | Hinweise sind über Zeitmarken mit Transkript und Aufzeichnung verknüpft. | Funktionale Vollständigkeit | COULD | R-22 |
-| F-14 | Score für das Gespräch | Ergänzender Zahlenwert zur groben Orientierung, kein Ersatz für das Feedback. | Funktionale Vollständigkeit | COULD | R-21 |
-| F-54 | Gesprächszusammenfassung für den Gesprächspartner | Erzeugung einer Zusammenfassung, mit der das gemeinsame Verständnis abgesichert werden kann. | Funktionale Vollständigkeit | COULD | R-31 |
+| ID | Feature | Prio | Herkunft |
+|---|---|---|---|
+| F-09 | Qualitatives Wrap-up | MUST | R-19, R-20, R-31 |
+| F-10 | Konkrete Verbesserungsvorschläge | MUST | R-22, R-23 |
+| F-53 | Auswertungs-Dashboard | SHOULD | R-24, R-50, R-51 |
+| F-47 | Verknüpfung von Feedback und Gesprächsstellen | COULD | R-22 |
+| F-14 | Score für das Gespräch | COULD | R-21 |
+| F-54 | Gesprächszusammenfassung für den Gesprächspartner | COULD | R-31 |
 
 ## Lernprozess und Reflexion
 
-| ID | Feature | Kurzbeschreibung | ISO 25010 | Prio | Herkunft |
-|---|---|---|---|---|---|
-| F-12 | Aufzeichnung des Gesprächs | Aufzeichnung und Transkription zur nachträglichen Reflexion. Das Transkript liegt unmittelbar nach dem Gespräch vollständig in Textform vor und wird während des Gesprächs nicht angezeigt. | Funktionale Vollständigkeit | MUST | R-28, R-52 |
-| F-13 | Aufzeichnung des Fortschritts | Nutzerbezogene Verlaufsdaten über längere Zeiträume, nachvollziehbar dargestellt. Die Ansicht lässt sich am Fuß der Seite als gestaltetes PDF herunterladen, das denselben Inhalt in derselben Reihenfolge trägt und wie die Feedback-Datei im Browser entsteht (F-64). | Funktionale Vollständigkeit | SHOULD | R-27, R-29, R-30 |
-| F-64 | Gesprächsfeedback als PDF | Die Auswertung wird nach dem Gespräch als gestaltetes PDF zum Herunterladen angeboten: Zusammenfassung, Stärken, Verbesserungen, phasengerechte Sprache und Kennzahlen in der Reihenfolge der Seite, das vollständige Transkript mit Zeitmarken und Sprecherkennzeichnung am Ende. Die Datei entsteht im Browser und wird nicht hochgeladen. | Benutzbarkeit | COULD | F-12, Systementwurf |
-| F-48 | Trainingshistorie | Übersicht vergangener Trainings, filterbar nach Szenario-Typ und Zeitraum. | Funktionale Vollständigkeit | COULD | R-29 |
-| F-61 | Rollentausch eines Gesprächs | Ein abgeschlossenes Gespräch lässt sich mit vertauschten Rollen wiederholen: der Nutzer ruft an, die KI nimmt ab und übernimmt die Seite des Nutzers. Während des Gesprächs sieht der Nutzer die Unterlagen, die zuvor die KI hatte, samt einer kurzen Liste, worauf zu achten ist. | Funktionale Vollständigkeit | COULD | R-25, R-28, R-01 |
-| F-62 | Persönliche Fokusziele | Der Nutzer wählt aus einem Katalog bis zu fünf Trainingsziele, die in Training und Auswertung besonders hervorgehoben werden; die übrigen Ziele bleiben unberührt. Die Auswahl wird beim ersten Start erfragt, ist mit „ohne Fokus“ beantwortbar und im Profil jederzeit änderbar. | Funktionale Vollständigkeit | SHOULD | R-30, Systementwurf |
-| F-63 | Analyse des Gesprächseinstiegs | Prüfung, ob der erste eigene Redebeitrag Begrüßung, eigenen Namen und Anliegen enthält, sowie dessen Tempo gegenüber dem restlichen Gespräch. | Funktionale Korrektheit | SHOULD | F-62 |
-| F-64 | Vorschlag für das nächste Gespräch | Nach einem Gespräch werden bis zu zwei bestehende Szenarien zum direkten Start angeboten: dasselbe Szenario in der anderen Sprache und ein weiteres aus der Bibliothek, begründet aus Profil, Fokuszielen und Historie. | Funktionale Vollständigkeit | COULD | F-62 |
-| F-65 | Analyse des Gesprächsabschlusses | Prüfung, ob die letzten beiden eigenen Redebeiträge das Ergebnis zusammenfassen, einen konkreten nächsten Schritt festhalten und sich verabschieden. | Funktionale Korrektheit | SHOULD | F-62 |
+| ID | Feature | Prio | Herkunft |
+|---|---|---|---|
+| F-12 | Aufzeichnung des Gesprächs | MUST | R-28, R-52 |
+| F-13 | Aufzeichnung des Fortschritts | SHOULD | R-27, R-29, R-30 |
+| F-64 | Gesprächsfeedback als PDF | COULD | F-12, Systementwurf |
+| F-48 | Trainingshistorie | COULD | R-29 |
+| F-61 | Rollentausch eines Gesprächs | COULD | R-25, R-28, R-01 |
+| F-62 | Persönliche Fokusziele | SHOULD | R-30, Systementwurf |
+| F-63 | Analyse des Gesprächseinstiegs | SHOULD | F-62 |
+| F-64 | Vorschlag für das nächste Gespräch | COULD | F-62 |
+| F-65 | Analyse des Gesprächsabschlusses | SHOULD | F-62 |
 
 ## Bedienoberfläche
 
-| ID | Feature | Kurzbeschreibung | ISO 25010 | Prio | Herkunft |
-|---|---|---|---|---|---|
-| F-43 | Setup-Übersicht | Startbildschirm mit sichtbaren Pflichteinstellungen, Zusatzoptionen eingeklappt. | Interaktionsfähigkeit | MUST | R-34 |
-| F-46 | Live-Call-Interface | Bedienoberfläche während des Gesprächs mit Mikrofonstatus, Dauer und Beenden-Funktion. | Interaktionsfähigkeit | MUST | Q-02, Systementwurf |
-| F-44 | Persona-Kartenansicht | Auswahl der Persona über Karten mit Kurzsteckbrief. | Interaktionsfähigkeit | SHOULD | Q-02 |
-| F-45 | Wissensbasis-Upload-Oberfläche | Oberfläche zum Hochladen und Verwalten eigener Dokumente. | Interaktionsfähigkeit | SHOULD | R-42 |
-| F-56 | Sprachumschaltung der Oberfläche | Die Oberfläche steht in Deutsch und Englisch bereit und lässt sich jederzeit umschalten, unabhängig von der Sprache der Trainings-Session. | Interaktionsfähigkeit | SHOULD | R-53 |
-| F-57 | Kontexthilfen in der Oberfläche | Tooltips und Kurzhinweise erläutern Bereiche und Eingabefelder dort, wo die Beschriftung allein nicht ausreicht. | Interaktionsfähigkeit | COULD | R-55 |
+| ID | Feature | Prio | Herkunft |
+|---|---|---|---|
+| F-43 | Setup-Übersicht | MUST | R-34 |
+| F-46 | Live-Call-Interface | MUST | Q-02, Systementwurf |
+| F-44 | Persona-Kartenansicht | SHOULD | Q-02 |
+| F-45 | Wissensbasis-Upload-Oberfläche | SHOULD | R-42 |
+| F-56 | Sprachumschaltung der Oberfläche | SHOULD | R-53 |
+| F-57 | Kontexthilfen in der Oberfläche | COULD | R-55 |
 
 ## Konto und Zugriff
 
-| ID | Feature | Kurzbeschreibung | ISO 25010 | Prio | Herkunft |
-|---|---|---|---|---|---|
-| F-31 | Accountsystem | Nutzerbezogene Datenhaltung für Aufzeichnungen, Feedback und Trainingsverlauf. | Sicherheit | MUST | C-04 |
-| F-50 | Login und Authentifizierung | Anmeldung über Benutzername und Passwort, der Zugriff auf nutzerbezogene Daten ist erst danach möglich. | Sicherheit | MUST | C-04 |
-| F-49 | Datenschutzhinweis beim Start | Hinweis zu Art, Zweck und Ort der Datenverarbeitung vor der ersten Aufzeichnung. | Sicherheit | MUST | C-04 |
+| ID | Feature | Prio | Herkunft |
+|---|---|---|---|
+| F-31 | Accountsystem | MUST | C-04 |
+| F-50 | Login und Authentifizierung | MUST | C-04 |
+| F-49 | Datenschutzhinweis beim Start | MUST | C-04 |
 
 ## Integration und Wissensanbindung
 
-| ID | Feature | Kurzbeschreibung | ISO 25010 | Prio | Herkunft |
-|---|---|---|---|---|---|
-| F-26 | Kundenspezifische Wissensbasis | Nutzer stellen eigene Dokumente bereit, die den fachlichen Rahmen prägen. Ein solches Dokument kann auch ein individuelles Szenario tragen. | Funktionale Vollständigkeit | SHOULD | R-42 |
-| F-29 | Anbindung an die Telefonsoftware Starface | Integration mit dem im Unternehmen genutzten Telefoniesystem. | Kompatibilität | COULD | R-38 |
-| F-55 | Auswertung realer Kundengespräche | Mitlaufen und Auswerten echter Telefonate statt ausschließlich simulierter Gespräche. | Funktionale Vollständigkeit | COULD | R-44 |
+| ID | Feature | Prio | Herkunft |
+|---|---|---|---|
+| F-26 | Kundenspezifische Wissensbasis | SHOULD | R-42 |
+| F-29 | Anbindung an die Telefonsoftware Starface | COULD | R-38 |
+| F-55 | Auswertung realer Kundengespräche | COULD | R-44 |
 
 ## Multimodale Erweiterung
 
-| ID | Feature | Kurzbeschreibung | ISO 25010 | Prio | Herkunft |
-|---|---|---|---|---|---|
-| F-32 | Videobasierte Verarbeitung | Verarbeitung von Videosignalen zur Abbildung von Konferenzkanälen. | Funktionale Vollständigkeit | COULD | R-39 |
-| F-33 | Analyse der visuellen nonverbalen Kommunikation | Auswertung von Mimik und Gestik auf Basis des Videosignals. | Funktionale Korrektheit | COULD | Systementwurf |
-
-## Verteilung
-
-| Prio | Anzahl |
-|---|---|
-| MUST | 17 |
-| SHOULD | 11 |
-| COULD | 18 |
-| **Gesamt** | **46** |
+| ID | Feature | Prio | Herkunft |
+|---|---|---|---|
+| F-32 | Videobasierte Verarbeitung | COULD | R-39 |
+| F-33 | Analyse der visuellen nonverbalen Kommunikation | COULD | Systementwurf |
