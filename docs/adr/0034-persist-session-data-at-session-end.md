@@ -1,67 +1,15 @@
-# ADR 0034: Session Data Is Persisted in the MVP, Written Once at Session End
-
-## Status
-
-Accepted (supersedes ADR 0023)
+# ADR 0034: Session Data Is Written Once, at Session End
 
 ## Context
 
-ADR 0023 decided that no Session data would be persisted for the MVP: audio, transcripts, and Feedback were to live only in the memory of the running processes and be discarded once a Session ended, with consent-gated storage deferred until after the MVP. That decision was taken before the persistence layer existed.
-
-Since then it does exist. ADR 0010 established an in-repo PostgreSQL instance, and ADRs 0025 through 0032 designed and built a complete normalized schema for Sessions, Turns, measurements, findings, and Feedback, with Alembic migrations and seeded reference data. None of it is reachable from the application: no code path in `backend/app.py` or `backend/api/session_ws.py` opens a database session, because ADR 0023 forbids precisely that. The result is a schema that has never had a row inserted by the product, and therefore has never been validated against how the Session pipeline actually produces data.
-
-Several forces now pull against ADR 0023. F-12 (Aufzeichnung des Gesprächs) is a MUST feature and asks for the transcript to be available for later reflection, which an in-memory-only Session cannot offer beyond the browser tab that produced it. F-13 and F-48 need data spanning several Sessions and are impossible by construction. The async Feedback worker of ADR 0018/0019 has nowhere to write its result, and ADR 0032's `AnalysisJob` table describes job outcomes for jobs whose Session does not exist in the database.
-
-At the same time, the live Session path constrains *how* data may be written. ADR 0033 made that path a streaming, real-time audio pipeline, and `backend/db/session.py` provides a synchronous SQLAlchemy engine. A blocking database call inside the turn loop would stall the event loop that is concurrently streaming synthesized audio, which is audible to the user and affects every Session sharing the worker process (Q-03). The Session orchestrator, however, already retains the complete Session in memory for the duration of the call, so nothing about the pipeline requires writing incrementally.
-
-The MVP is operated with the project team and the two pilot companies, and has no user accounts: ADR 0009's Keycloak integration is not built and ADR 0031 leaves `subject_id` a pseudonym with no referential integrity behind it.
+A blocking database call in the turn loop would stall the event loop that streams audio. The orchestrator already holds the whole call in memory.
 
 ## Decision
 
-We will persist Session data in the MVP, and we will write it exactly once, at the end of a Session, in a single transaction.
-
-Persisted are Session metadata, the Turn transcripts, and — once the async worker of ADR 0018 exists — the measurements, findings, and Feedback belonging to that Session. Session audio is not persisted yet: the schema (ADR 0026) has no column for a recording, so a Session's audio exists only for as long as the Session is running.
-
-The write happens after the Session has ended, at the point where the completed transcript is assembled for the client, and never during the live turn loop. Because the ORM session is synchronous and the surrounding path is asynchronous, the write is dispatched off the event loop rather than awaited inline. A Session that ends because the client disconnected is not persisted; only Sessions that reach a regular end — the user ending the call, the Persona ending it, or a pipeline failure per ADR 0016 — produce a row.
-
-`subject_id` remains the pseudonymous placeholder of ADR 0031. This ADR does not revive ADR 0009 as a precondition and does not introduce an account concept.
-
-What this ADR keeps from ADR 0023 is its commitment for the state *after* authentication exists: consent remains the sole basis on which a Session is tied to an identified User, and Users retain full self-service control over deleting their own data. For the MVP, where no account and therefore no in-system consent exists, F-49's data-protection notice before the first recording is a precondition for use rather than an optional feature, and the pilot group is informed out of band about what is stored.
+- A Session is stored once, after the call, in one transaction, off the event loop, and only with consent (ADR 0066).
+- A call that ends by disconnect is stored as `aborted`, and every other call as `completed`. Anything that counts trainings counts only `completed`, through one function. Anything that lists them shows both.
+- Separately, a call shorter than 60 s is left out of the progress series, whatever its status, because its figures describe almost nothing. The screen and the report say how many were set aside.
 
 ## Consequences
 
-The persistence schema stops being unexercised code. Its first real writer will surface the mismatches that a schema built ahead of its caller inevitably contains — among them `turn.start_offset_ms` and `turn.duration_ms`, which are `NOT NULL` although neither the orchestrator nor the WebSocket protocol carries timing data today, and the divergence between the in-memory Turn (one exchange, comprising both speakers) and the persisted Turn (one utterance of one speaker). These are now blocking work items rather than latent surprises.
-
-Writing once at the end keeps the real-time path entirely free of database dependencies. The live loop cannot fail because of the database, and a database outage degrades to "the Session ran but was not recorded" instead of breaking the call itself. The cost is symmetrical and deliberate: a user who closes the tab mid-call leaves no record at all, and the loss is unbounded within that one Session rather than limited to its last turn. For training data this is an acceptable trade; it would not be for anything the user is told was saved during the call, so the UI must not promise otherwise.
-
-Because no audio is persisted, any analysis that needs the waveform — the paraverbal measurements of F-35 through F-38 and F-51, which ADR 0026 models as `Measurement` and `Finding` rows against a Turn — cannot be recomputed after the fact. Either that analysis runs while the Session's audio is still in memory, or the audio must be handed to the async worker as part of its job payload. This is a genuinely open design question that ADR 0018's worker will have to answer, and it did not previously have to be asked, since nothing was stored at all.
-
-The MVP now has a retained-data DSGVO surface where ADR 0023 deliberately had none. A retention period and a working deletion path become open obligations rather than deferred ones, and they are not satisfied today. The mechanism now exists — the foreign keys cascade in the database, so a Session and its whole subtree can be removed by a single statement, and a test covers both that path and the ORM one — but nothing yet decides how long a Session is kept or offers a User the button to delete it. Risk RI-02 grows accordingly rather than shrinking.
-
-Finally, storing Sessions does not by itself make per-user history possible. With `subject_id` unenforced and no identity behind it (ADR 0031), F-13 and F-48 remain out of reach until ADR 0009's authentication lands; what this decision buys for them is that the data will already be there when it does.
-
-## Amendment, 2026-09-12: a call nobody ended is stored as aborted
-
-The rule above says a Session that ends because the client disconnected is not persisted. A review of the live path found that it was persisted, and worse, as **completed**: `_receive_json` caught `WebSocketDisconnect` and answered `None`, which the receive loop reads as the user pressing *Gespräch beenden*. A closed tab produced the same row as a finished training, so it counted in the history and in the progress view's activity calendar, which is explicitly a count of trainings somebody carried through.
-
-Restoring the original rule was one of two ways out. We take the other: the disconnect now travels up as an exception to the one place that knows how a call ended, and the Session is stored with `session.status = 'aborted'`.
-
-The reason is that the original rule charges the wrong party. The training did happen — the Turns are in memory, the measurements are attached, the transcript is complete up to the moment the connection went — and discarding it treats a network blip, a closed laptop or a browser update as if the user had never trained. The status vocabulary already carries the distinction the calendar needs: `completed` against `aborted`, with every cross-Session view counting the former. Storing the call and marking it for what it was says more than throwing it away, and it says it in the schema rather than in a comment.
-
-What does not change: the write still happens once, after the call, off the event loop, and it still cannot affect the live path. What the user loses on a disconnect is the `session.ended` message and with it the transcript in the browser — the connection it would travel on is gone — but the Session itself is readable from the history afterwards, which it was not before.
-
-`session.status` is therefore the only place this distinction lives. Anything that counts trainings reads `completed`; anything that lists them shows both.
-
-## Amendment, 2026-09-24: the rule above was half-kept, and a figure needs a second one
-
-"Every cross-Session view counting the former" was a clause, and a clause is not an implementation. An audit of the progress view found it honoured in two places and broken in three. The calendar counted finished trainings; the three figures above it, the Scenario × Persona grid beside it and every metric series below it counted every stored row. So a card read "17 Trainings" next to a calendar showing fourteen marks under a line saying only completed ones are counted, and the downloadable report reproduced the split onto a sheet where nobody can ask which figure is right. One of the breaks was pinned by a test, which argued — correctly, and on other grounds — that a cell saying 2 must not open onto three rows.
-
-The rule is now one function, `progressStats.completedOnly`, and the five readers go through it rather than each spelling out the same filter, which is how four of them came to disagree (ADR 0102).
-
-**The second rule is new and is not about the status at all.** Whether a call's *figures* may join a series is a different question from whether it counts as a training, and this ADR never asked it. An abandoned call is stored with its full measurements — `_write_analysis` runs whatever the status — so a call hung up after twenty seconds contributed a talk share and a speaking pace measured over two sentences, as an equal point in a band describing every other call.
-
-Filtering those out by status would have been the obvious move and is the wrong one. `aborted` also means a dropped connection or a closed laptop, so a call that ran nine minutes and died at the end of them is a complete measurement, and discarding it would throw away good data to catch a different problem. The problem is the short call, and a short call is short whether it ended tidily or not.
-
-So: `progressStats.readable` keeps the calls of at least `MIN_CALL_MS` (60 s) for the series, applied once inside `selectionSeries` so no caller can forget it. The figure is **set, not measured**, like `MIN_SESSIONS_FOR_SERIES`, and it is a floor on describability rather than a judgement of the call — which keeps it clear of ADR 0051, since nothing here compares a value to a threshold. A call whose length cannot be worked out is kept: the rule is "drop what is known to be too short", not "drop what cannot be checked".
-
-The two rules stay two, and both are said out loud. A training left out of the courses is still counted in the record, still in the calendar and still in the history; the screen says how many were set aside, beside the switch where the selection is stated, and the report says it on its first page. A course drawn over fewer calls than the line above it names is otherwise a quiet subtraction, and on paper it is one nobody can question.
+The live call cannot fail because of the database; an outage means "ran but not recorded". A closed tab still leaves a readable record.

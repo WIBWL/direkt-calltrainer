@@ -1,17 +1,13 @@
 # ADR 0013: Minimal Required Setup, Advanced Options Separate
 
-## Status
-
-Accepted
-
 ## Context
 
-Stakeholder interviews identified an overloaded UI as a central adoption blocker. Before starting a Session, the user could be asked to configure everything up front (Scenario, Persona, and any advanced options) in a single flat form, or be asked only the minimum and given advanced options elsewhere.
+Interviews named an overloaded UI as a central adoption blocker.
 
 ## Decision
 
-We will keep the required setup before starting a Session to a minimum, clearly visible set of choices. Additional and special options are offered separately, less prominently, not mixed into the required flow.
+The required setup before a call is a minimal, clearly visible set of choices. Advanced options are offered separately and less prominently.
 
 ## Consequences
 
-Lowers the barrier to starting a first Session and matches the stated usability quality goal. Advanced or power-user options are less discoverable as a result, and the UI needs an explicit place to put them (not yet designed).
+Starting a first call is easy. Advanced options are less discoverable.

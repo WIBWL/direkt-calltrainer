@@ -1,22 +1,17 @@
 # ADR 0105: Logs Go to Stdout Only, JSON in the Images
 
-## Status
-
-Accepted (supersedes ADR 0055; amends ADR 0039)
-
 ## Context
 
-ADR 0039 and 0055 had each process write colored lines to the console and a plain copy to a log file (`logs/calltrainer.log`, `logs/worker.log`), opened fresh per run. In the deployment that file ends up inside a container with no volume, where nobody reads it, while the host's log shipper (Alloy, in `direkt-infrastructure`) collects what the containers write to stdout — which arrived wrapped in ANSI color codes. The dataplatform writes stdout only: pretty in development, JSON in production.
+A log file inside a container with no volume is read by nobody. The host's log shipper collects stdout.
 
 ## Decision
 
-One handler, on stdout. `LOG_FORMAT` picks its shape and is required like every other setting (ADR 0106):
-
-* `json` — one object per line with `time`, `level`, `logger`, `session`, `message` and, for an error, `exception` (the traceback inside the one line). The images set it (`ENV LOG_FORMAT=json` in the `Dockerfile`).
-* `pretty` — ADR 0039's colored lines, the Session id in brackets. `.env.example` sets it.
-
-There is no log file, so there is no `logs/` directory and nothing to rotate.
+- One handler, on stdout, configured once at startup. It replaces any handlers already installed (gunicorn adds its own).
+- `LOG_FORMAT` is `json` in the images (one object per line, with `session` and any `exception` inline) or `pretty` locally (coloured, with the Session id in brackets).
+- The Session id comes from a `contextvar` that follows the connection's tasks.
+- There is no log file.
+- No spoken content is logged, at any level (ADR 0066).
 
 ## Consequences
 
-The Session id is a field of its own in the JSON, so one call's lines are selected by a query rather than by `grep "[session <id>]"`. What was in the file is now in `docker compose logs`/Grafana in deployment and in the terminal in development; a developer who wants it kept redirects the process's output. The rule that no spoken content is logged (`test_transcript_logging.py`) is unchanged.
+One call's lines are selected by a query on `session`. Anyone who wants a local log redirects the output.

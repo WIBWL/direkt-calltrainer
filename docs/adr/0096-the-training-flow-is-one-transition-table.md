@@ -1,43 +1,18 @@
 # ADR 0096: The Training Flow Is One Transition Table
 
-## Status
-
-Accepted, **amended on 2026-09-19**: the reverse's card turn is gone, so a cut is now none or a fade (see the amendment at the end).
-
 ## Context
 
-A training runs under one route, `/`, as a sequence of screens: setup, microphone check, the case or the reverse's briefing, the die, the ringing phone, the call, the wait for the wrap-up, and the wrap-up. They are screens and not routes on purpose. Leaving the page tears the WebSocket down, and an abandoned Session is never persisted (ADR 0034), which is also why the header's links are locked on the screens that hold one.
-
-Which screen follows another depends on several facts at once: whether the committed Scenario is a reverse (ADR 0070), whether a random Scenario was drawn (F-62), whether the committed case has anything to read and whether it has arrived yet, whether the user asked for reduced motion, whether the microphone check is skipped because the call is started straight from a finished training (F-60, F-61), and whether the call that just ended was stored (ADR 0066).
-
-Those transitions used to be fourteen `setScreen` calls spread through `App.tsx`, five of them producing the ringing phone and one written inline in the markup. The flow could only be read by finding every call site, and two had drifted apart: the microphone check's button label took the briefing from the library card while the router took it from the committed case, so a Scenario with facts but no card briefing promised a call and delivered a page of text.
+A training is a sequence of screens under one route, because leaving the page tears down the socket. Screen changes were scattered across fourteen `setScreen` calls, and two had drifted apart.
 
 ## Decision
 
-**Every change of screen goes through `nextScreen(context, event)`**, and `App`'s `advance` is its only caller. It returns the destination and the cut that covers the change — none, a fade, or the reverse's card turn (`ScreenTransition.tsx` performs it).
-
-**The function is pure.** No React, no network, no environment. What a transition depends on is passed in as a `FlowContext`, including `prefersReducedMotion()`, which the caller asks at the moment of the transition. That is what makes the table testable by describing a situation, without a WebSocket, an AudioContext or the 15 MB VAD model.
-
-**The switch over events is exhaustive.** A new event does not compile until somebody decides where it leads and what covers it.
-
-**The table decides where, never what else happens.** Activating playback, sending `session.activate` and unmuting the microphone stay in `App`, performed on `callAccepted` — the only event that reaches the call.
-
-**No path leads straight into a conversation.** Every way in ends on a screen the user leaves by pressing something: the ringing phone before an ordinary call (F-63), the briefing before a reverse. A case that is still in flight routes to the briefing screen, because skipping a case that turns out to hold something cannot be undone, whereas `caseArrivedEmpty` moves on by itself from one that turns out to hold nothing.
-
-**Questions about the flow ask the table.** `briefingFollows` is answered by calling `nextScreen` with `micConfirmed` and looking at the destination, so the microphone check's label cannot disagree with where its button leads.
+- Every screen change goes through the pure function `nextScreen(context, event)`, and `advance` is its only caller. It returns the destination and the cut (`none` or `fade`).
+- Everything a transition depends on is passed in `FlowContext`, including reduced motion, so the table is testable without sockets or audio.
+- The switch over events is exhaustive.
+- The table decides only where; side effects (activating playback, `session.activate`, unmuting) happen in `App` on `callAccepted`, the only event that reaches the call.
+- No path leads straight into a conversation: the ringing phone precedes an ordinary call, the briefing precedes a reverse.
+- Questions about the flow ask the table, so labels cannot disagree with where buttons lead.
 
 ## Consequences
 
-`App` refreshes the context in a ref on every render and reads it only from event handlers, so `advance` keeps one identity for the life of the component; the waiting screen's two-minute limit hangs off a callback built on it and would restart on a new identity.
-
-A new screen touches three places: the `Screen` type, the table, and the render branch in `App`. A new fact the flow routes on touches `FlowContext` and every test that builds one.
-
-The table does not guarantee the side effects of a transition. That playback is activated when the call begins is ensured by there being a single handler for `callAccepted`, not by the table.
-
-## Amendment (2026-09-19): the reverse's card turn is removed
-
-The Decision above names three cuts: none, a fade, or the reverse's card turn. The card turn has been removed, both the animation and the card itself (`ReverseCard.tsx` and its image), at the user's request. `Cut` is now `"none" | "fade"`, and `ScreenTransition.tsx` performs only the fade.
-
-A reverse still reaches its briefing on the way out of the microphone check. The table now returns `{ screen: "brief", cut: "none" }` for it, and the two other ways in, from the wrap-up and from a past training, start the reverse directly instead of behind a cover. Nothing else about the table changes: the reverse still goes to `brief` and not to the ringing phone, because the User is the one calling.
-
-The Decision is left as written because it records what was built at the time. The card turn's reason, that a turning card says "the roles swap" in a way a button label cannot, is withdrawn along with the card. The briefing screen that follows now carries that message on its own.
+`advance` keeps one identity because the context lives in a ref. A new screen touches the type, the table and the render branch.

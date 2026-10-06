@@ -1,17 +1,13 @@
-# ADR 0014: Speech-Behavior Feedback Surfaces Only in the Post-Call Wrap-Up
-
-## Status
-
-Accepted
+# ADR 0014: Speech-Behaviour Feedback Surfaces Only in the Post-Call Wrap-Up
 
 ## Context
 
-While the user speaks, the system continuously analyzes intonation, pace, volume, and articulation. This could be surfaced live, interrupting or annotating the conversation as issues are detected, or collected silently and presented only after the call ends.
+Findings could be shown live during the call or collected and shown afterwards.
 
 ## Decision
 
-We will collect speech-behavior findings silently during the Session, without interrupting or annotating the live conversation. All findings are surfaced together in the Feedback wrap-up after the call ends.
+Nothing is surfaced during the call. All findings appear in the wrap-up after it ends.
 
 ## Consequences
 
-The simulated conversation stays uninterrupted and realistic, matching how a real phone call feels. The tradeoff is that the user gets no in-the-moment correction — every observation waits until the wrap-up, which places more weight on that summary's quality (see ADR 0004) to make the delay feel worthwhile.
+The call stays uninterrupted and realistic. There is no in-the-moment correction, which puts more weight on the wrap-up.

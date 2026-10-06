@@ -1,52 +1,15 @@
 # ADR 0094: The Frontend Is Checked by a Strict Compiler, a Narrow Test Suite and the Hook Rules
 
-## Status
-
-Accepted. All three parts are in place; the third — ESLint restricted to the React hook rules — was built on 2026-09-21 (see *Built* below).
-
 ## Context
 
-There is no CI workflow in the repository and no Node toolchain on the development machine. The frontend is verified when the image is built: `docker build --target frontend-build` runs `npm ci && npm run build`, and `build` is `tsc && vite build`. Whatever that step does not catch reaches the browser.
-
-**The compiler runs at maximum strictness** (`frontend/tsconfig.json`): `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnusedLocals`, `noUnusedParameters`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `verbatimModuleSyntax`. The test specs are type-checked with everything else, since a fixture had once drifted out of shape while they were excluded. CLAUDE.md described them as excluded for a while after that; it has been corrected, and `tsconfig.json` is the current state.
-
-**The test suite is deliberately narrow** (Vitest, jsdom, hand-written Web Audio and WebSocket fakes in `src/test/setup.ts`):
-
-- `useStreamedAudioPlayback`, `useSessionSocket` and `useBargeIn` — the barge-in races that the compiler cannot see and a click-through cannot reproduce (ADR 0035).
-- `trainingFlow.test.ts` — the pure transition table of the training flow (ADR 0096).
-- `stylesheet.test.ts` — a static check that no rule outlives its markup (ADR 0092).
-
-No component is rendered to check what it shows.
-
-**What neither catches is a hook's dependency list.** Five `eslint-disable-next-line react-hooks/exhaustive-deps` comments are in the source (`App.tsx` three times, `useSessionSocket.ts`, `MicCheck.tsx`), although ESLint is not installed: they record an intent, and nothing enforces the rule they switch off. `beginSession` in `App.tsx` declares no dependencies and closes over `advance`, which works only because `advance` happens to keep one identity. `useBargeIn.ts` documents the same hazard from the other side: a single dependency added to the wrong callback would freeze barge-in against a dead socket, with no type error and no failing test. A stale closure is the one class of defect in this frontend that is both likely and silent.
+There is no CI. The frontend is verified when the image builds. A stale hook dependency list is the one defect class here that is both likely and silent.
 
 ## Decision
 
-**1. The compiler is the broad check.** The strict flags stay, and none is relaxed to make a change compile.
-
-**2. Tests are written where the compiler and a manual run cannot see:** timing and races, pure decision tables, static invariants of the source. Rendering is not tested. The screens change with nearly every feature, and a snapshot suite would pin wording and markup rather than behaviour.
-
-**3. ESLint runs with `eslint-plugin-react-hooks` and nothing else** — `rules-of-hooks` and `exhaustive-deps` — as part of `npm run build`, so that the image build fails on a violation. No style or formatting rules: formatting is not what breaks here, and a large rule set would bury the two rules that matter under warnings nobody reads. The existing disable comments become checked exceptions, each keeping its reason, and dependency lists that are merely incomplete are completed.
-
-### Rejected
-
-**No linter, and the disable comments deleted.** It keeps the toolchain smaller, but it leaves unchecked the one defect class the code already documents as dangerous.
-
-**Component tests with Testing Library.** Considered for the post-call screen, which has the most branches. Its branches depend on server data and on the flow state, and a test there would mostly assert copy; the decisions behind the branches already live in pure functions (`trainingFlow.ts`, `utils/metrics.ts`, `utils/progressStats.ts`) where they can be tested without rendering.
+1. **`tsc` at maximum strictness** is the broad check, specs included. No flag is relaxed to make a change compile.
+2. **Tests only where the compiler and a manual run cannot see:** audio races, pure decision tables, the sentences a screen claims about a person, and static invariants of the source. No component rendering.
+3. **ESLint with only `rules-of-hooks` and `exhaustive-deps`**, as errors, with `reportUnusedDisableDirectives`. It is the first step of `npm run build`. A remaining disable comment is a checked exception carrying its reason.
 
 ## Consequences
 
-The build gains a lint step and a development dependency. Effects that are deliberately keyed on an object's identity — the committed Session in `App.tsx` and `useSessionSocket.ts` — keep a disable comment, now as a checked exception rather than a note.
-
-A regression in what a screen shows is still caught only by looking at it. The accessibility of the markup is not checked automatically either (see ADR 0097).
-
-Because there is no CI, all of this runs only when somebody builds the image. The deploy builds the same image, so nothing reaches a server unchecked, but a broken commit can sit on a branch until then.
-
-## Built
-
-`frontend/eslint.config.js` enables `rules-of-hooks` and `exhaustive-deps` as errors and nothing else, parsing TypeScript through `@typescript-eslint/parser` only so it can read the source, not to add its rules. `reportUnusedDisableDirectives` is an error too, so a disable comment that stops suppressing anything fails the build instead of lingering. `npm run build` is now `eslint src && tsc && vite build`, and `npm run lint` runs the step alone.
-
-The first run found six violations. Four were incomplete dependency lists that happened to work: `beginSession` and the call's accept handler closed over callbacks that keep one identity by construction, and the listening effect read `vad` through a property path the rule could not follow — each now names what it reads. One was a hook name on a function that is not a hook (`useAppFonts` in the PDF builder, now `registerAppFonts`). And **one was a live defect**: `ProgressPractice` keyed its library fetch on the suggestion object, which is rebuilt on every render, although the comment beside it explained exactly why it must be keyed on whether there is one — every response re-ran the effect and fetched the library again. The code now says what the comment did.
-
-The four disable comments that remain are the deliberate exceptions this decision anticipated — effects keyed on identity or run once on mount — each carrying its reason.
-
+The image build fails on a hook violation. A regression in what a screen shows is caught only by looking at it, and accessibility is not checked automatically.

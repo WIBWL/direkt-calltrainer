@@ -1,51 +1,17 @@
 # ADR 0065: Progress Is Shown Without Being Judged
 
-## Status
-
-Accepted, deliberately not amended by ADR 0078, amended once below to permit two descriptions of one metric side by side. Extends ADR 0004 and ADR 0051 to the multi-Session view; constrains ADR 0064's data. ADR 0078 permits a traffic light on the single-call view and names "it stays on the single call" as one of its seven conditions, precisely so that this ADR is not read as having been loosened along with the other two. No colour on the progress view, none carried across Sessions, none aggregated over a user.
-
 ## Context
 
-ADR 0064 makes a user's Sessions readable as a series, which is what F-13 (Aufzeichnung des Fortschritts) asks for. The obvious next step is a view that plots the metrics over time — and the obvious way to draw that view is the one this project has twice decided against.
-
-ADR 0004 rejected reducing performance to a score, on the pilot stakeholder's explicit request. ADR 0051 went further for the per-Session statistics: no metric carries a target range, because none is validated for this population, and "an invented threshold is a score in disguise". The wrap-up prompt enforces it in writing (`generator.py`: no score, grade, rating, percentage or star, and no judging a figure against a norm).
-
-A progress view puts that under quiet pressure in a way a single Session never did. A line going up asserts a direction whether or not anyone chose to assert one. A green band asserts a target. Even an arrow and the word "besser" asserts that more questions, or a higher talk share, or a faster speaking pace, is an improvement — and nobody has established that for this population. The risk is not that someone argues for a score; it is that the score arrives as a styling decision, made by whoever draws the chart, without the discussion ADR 0004 had.
+A progress chart asserts a direction just by how it is drawn: a rising line, a green band, an arrow. Nobody has established what "better" means for these figures in this population (ADR 0004/0051).
 
 ## Decision
 
-The progress view shows the user their own values over time and does not evaluate them.
+The progress view shows the User's own values over time and does not evaluate them.
 
-Permitted, and the substance of F-13: the course of each metric across Sessions, plotted plainly; the descriptive history of F-48 (when, which Scenario, which Persona, how long, completed or aborted); and activity figures such as how many trainings were done in a period. Activity needs no norm — it counts what the user did, not how well.
-
-Not permitted without a further, explicit decision: target ranges or bands; arrows, deltas or labels asserting improvement or decline; ranking against other users; and any aggregate score over Sessions. `metric_type` has no target column and gains none — the absence is the mechanism, not an oversight, exactly as in ADR 0051.
-
-Consistent with this, ADR 0064's endpoint returns raw measured values and no interpretation, and `feedback.score` stays unwritten. ADR 0004 does permit a numeric score as a supplementary addition that never replaces the qualitative feedback, so the column remains; this ADR declines to introduce one *across* Sessions, where it would be a ranking of a person over time rather than a note about one call.
-
-The peak-end weighting stays what ADR 0004 made it: text weight in the wrap-up, never a number, and it does not extend across Sessions.
+- **Permitted:** each metric's course, the descriptive history, and activity counts.
+- **Not permitted:** target ranges or bands, arrows, deltas, words asserting improvement or decline, ranking against others, an aggregate score, or any colour that carries a value (ADR 0095). The traffic light of ADR 0078 stays on the single call.
+- **Two halves side by side** (earlier and recent trainings, each as median ± spread) are allowed only on a metric's own page. Nothing is computed between them, columns are labelled by *when* and never *how*, the halves are equal and each above the series threshold, and both are drawn identically. The text says that Scenario and Persona differ between halves.
 
 ## Consequences
 
-The progress view can be built now, from data that already exists, without inventing a single threshold — which is why this is a constraint rather than a blocker. What the user gets is honest: their own behaviour made visible over time, with the interpretation left to them and to the qualitative feedback that ADR 0003 and ADR 0004 made the product's actual output.
-
-The cost is that the view is less immediately gratifying than a dashboard with a big green number, and "Fortschritt" in the UI has to mean *development made visible* rather than *measured improvement*. That gap should be named in the interface rather than papered over, or users will supply the missing judgement themselves and assume up is good.
-
-This decision is falsifiable and expected to be revisited: if the pilot produces enough Sessions to establish what a distribution of these values actually looks like for this population, then a norm would rest on measurement rather than on invention, and a target range would become a defensible thing to draw. Until that data exists, an evaluative progress view would be asserting knowledge nobody has. Whoever revisits this should replace this ADR rather than amend a chart.
-
-## Amendment: two descriptions of the same metric may stand side by side
-
-The decision above leaves the view unable to answer the one question a user brings to it — "has anything changed?" — and that turned out to be the wrong kind of silence. The sparkline holds the answer and hands the reader sixteen small curves to hold in their head; nothing on the screen is wrong, and nothing on it is legible as development either. The gap this ADR's own consequences ask to be *named in the interface* was instead being left for the reader to fill, which is the failure mode it was written to prevent.
-
-What is now permitted is narrow, and it is not new. **The same description, computed twice over two stretches of the user's own history, displayed side by side** — the earlier half of the selected trainings and the recent half, each as its own median widened by its own spread, in the user's own unit. This is the construction ADR 0081 already permits for the two stretches of a single call, applied to two stretches of a history, and it rests on the same argument: two figures beside each other are a description; the number *between* them would be the norm nobody has.
-
-Five conditions, all of which the pressure/rest comparison already meets:
-
-1. **Nothing is computed between the two.** No difference, no ratio, no percentage, no index. The absence is the mechanism — `progressStats.halves` returns two bands and a count, and a test asserts it returns nothing else.
-2. **No word for a direction.** Not "besser", not "stabiler", not "zugenommen", and not in a tooltip. The columns are labelled by *when*, never by *how*.
-3. **Equal halves, both above the series threshold.** Otherwise the two rest on different amounts of evidence and the narrower one is noise wearing the same typography.
-4. **Both columns drawn identically**, side by side rather than stacked, with nothing between them. An arrow, a separator or a vertical order would assert the direction condition 2 forbids.
-5. **On the metric's own page, never on the overview.** A reader who has opened one metric has asked about it; sixteen pairs on the overview would be sixteen invitations to read a trend, which is how a comparison becomes a score with nobody deciding to build one.
-
-Everything else stays refused, and the list is unchanged: target ranges and bands, arrows, deltas, labels asserting improvement or decline, ranking against other users, any aggregate score over Sessions, and any colour on this view (ADR 0095). `metric_type` still has no target column.
-
-The honest weakness is condition 3's companion problem, and the interface says so rather than hiding it: the trainings in the two halves are not repeated measures. Scenario and Persona change between them and move these figures more than a change in behaviour would. That is why the same change adds the occasion filter — read over one kind of call, the two halves are at least comparable in that one respect — and why the block's own text names the limitation instead of leaving it to this document.
+The view can be built from existing data without inventing a threshold. "Fortschritt" means development made visible, not measured improvement, and the interface must say so. If pilot data ever establishes real distributions, this ADR is replaced, not amended.

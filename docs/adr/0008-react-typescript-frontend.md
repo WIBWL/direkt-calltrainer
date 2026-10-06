@@ -1,17 +1,13 @@
 # ADR 0008: Frontend Built with React and TypeScript
 
-## Status
-
-Accepted (amended by ADR 0104: the build is served by its own frontend container, not by FastAPI)
-
 ## Context
 
-The frontend needs to manage growing interactive state — login, live conversation UI, Feedback display — well beyond what the current audio-upload spike required. A plain static HTML/JS page was used for that spike but does not reflect the intended architecture.
+The frontend manages substantial interactive state: login, the live call, the wrap-up and progress views.
 
 ## Decision
 
-We will build the frontend as a React + TypeScript single-page application, built with Vite. The FastAPI backend serves the production build as static files, keeping the existing single-container deployment model.
+The frontend is a React + TypeScript SPA built with Vite, served by its own container (ADR 0108).
 
 ## Consequences
 
-Provides component structure, type safety, and a standard toolchain suited to future growth (Keycloak login flow, live conversation UI). Requires a Node.js build step and its own dependency ecosystem, and during local development the Vite dev server and the FastAPI backend run as two separate processes/origins, requiring CORS configuration.
+It has component structure, type safety and a standard toolchain, at the cost of a Node build step and a second dependency ecosystem.

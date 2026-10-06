@@ -1,39 +1,18 @@
 # ADR 0009: Authentication via Keycloak (OIDC Authorization Code Flow + PKCE)
 
-## Status
-
-Accepted — implemented (see *Implementation*, added after the fact)
-
 ## Context
 
-Users need to be authenticated before performing Sessions, and their identity needs to travel with requests to the external Data Platform. Keycloak is the project's designated identity provider.
+Users must be authenticated, and Keycloak is the project's identity provider.
 
 ## Decision
 
-We will authenticate users via the OIDC Authorization Code Flow with PKCE, with Keycloak as the identity provider. The frontend performs the login redirect directly against Keycloak, not proxied through the backend, and receives a JWT that the backend later forwards when calling the Data Platform.
+- The SPA logs in with the OIDC authorization code flow and PKCE, as the public client `calltrainer-frontend` in the `direkt` realm, directly against Keycloak.
+- The backend verifies the RS256 access token against the realm's JWKS and checks `iss` and the audience `calltrainer-backend`.
+- A token failure is a 401. A JWKS or infrastructure failure is a 5xx, so an outage is not masked as a login problem.
+- A browser cannot set headers on a WebSocket, so the token rides in the `session.start` handshake message. An invalid token closes the socket with 1008.
+- The issuer is the single setting `OIDC_ISSUER`, read by the backend and served to the SPA. The client id and audience are constants.
+- Access needs a client role (ADR 0109).
 
 ## Consequences
 
-This is the standard, secure flow for a public SPA client — no client secret to protect, and safe against authorization code interception. It requires the frontend to hold and refresh a JWT, and the backend to validate and forward it correctly.
-
-## Implementation
-
-Built for this stack (FastAPI) and its WebSocket data path.
-
-**Realm and client.** Realm `direkt`, reused from the data platform (one realm, many services — switching between dev and prod changes only the host in `OIDC_ISSUER`). A new public client `calltrainer-frontend` (`publicClient`, PKCE S256, standard flow) performs the login. A pinned audience mapper adds `calltrainer` to the access token; the backend requires that audience. `keycloak/direkt-realm.json` is the **dev-only** import (users `alice`/`bob`/`carol`, password = username); production needs the client and mapper added by hand.
-
-**Frontend** (`frontend/src/{oidcConfig,auth,api,AuthGate}.ts[x]`). `oidc-client-ts` + `react-oidc-context`. One `UserManager` is the source of truth for the token; `api.ts` and `useSessionSocket.ts` read it live at request time so a silent renew is picked up without a re-render. `AuthGate` wraps the app: splash while the session restores, a login button (`signinRedirect`) otherwise, `<App/>` once authenticated. No router — `react-oidc-context` consumes the `?code=&state=` on mount. OIDC config is build-time Vite env (`VITE_OIDC_ISSUER`), consistent with `VITE_API_URL`. *(Both names are gone: `VITE_API_URL` with the same-origin deployment, and the issuer's VITE_ copy with ADR 0103 — the SPA reads the backend's own `OIDC_ISSUER`/`OIDC_CLIENT_ID` through a widened `envPrefix`, so the value the backend checks `iss` against and the value the SPA authenticates at are one line in `.env`.)*
-
-**Backend** (`backend/auth.py`). `PyJWT[crypto]` verifies the RS256 signature against the realm JWKS (resolved from the OIDC discovery document, or `OIDC_JWKS_URL` when the backend reaches Keycloak under a different host than the browser — the compose case). It checks `iss` and `aud`, and surfaces `sub` plus `resource_access.calltrainer.roles`. A token-level failure is a 401 (the client's problem); a JWKS/infra failure propagates as a 5xx (not the client's problem — masking it as a 401 would hide the outage). `require_user` is a FastAPI dependency on `/api/personas` and `/api/scenarios`; `/health` and the static SPA mount stay open. **No role check** — any valid realm token may use the app (there is no admin surface); `roles` is carried so a check can be added later without reshaping this.
-
-**The WebSocket.** A browser cannot set an `Authorization` header on a `WebSocket`, so the token rides inside the `session.start` handshake message (`backend/api/session_ws.py::_handshake`), which the protocol already sends first. A missing or invalid token closes the socket with 1008 (policy violation). The verified `sub` is threaded into `SessionOrchestrator` so it is on hand when ADR 0034's persist-at-session-end path lands (it becomes `session.subject_id`, ADR 0031).
-
-**Local dev.** `compose.yaml` runs its own Keycloak (`start-dev --import-realm`, host port 18081, `KC_HOSTNAME` fixing the issuer). `KC_HOSTNAME`/`--hostname-strict=false` plus `OIDC_JWKS_URL` resolve the browser-vs-container host mismatch.
-
-**Out of scope, deliberately:** forwarding the JWT onward to the Data Platform (no such call exists yet); F-49's data-protection notice and the consent gate ADR 0034 ties to an identified user.
-
-## Status update (September 2026)
-
-The client is `calltrainer-frontend` and the audience `calltrainer-backend` (both were briefly `direkt-calltrainer`; the audience was `calltrainer` above). The audience names the API, not the client that logs in; there is still one client, whose audience mapper adds it. The decision itself is unchanged.
-
-**"No role check" is superseded by ADR 0109:** a caller needs the client role `calltrainer-user`, and one without it is answered 403 (REST) or refused at the socket's handshake.
+This is the standard secure flow for a public SPA, with no client secret. The SPA must hold and refresh the token. The local realm import (`keycloak/direkt-realm.json`) is the template for the real realm.
