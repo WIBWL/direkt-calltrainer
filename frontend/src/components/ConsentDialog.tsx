@@ -30,8 +30,8 @@ export default function ConsentDialog({
         <h1 id="consent-title">Dürfen wir Ihre Trainings speichern?</h1>
 
         <p>
-          Von abgeschlossenen Trainings speichern wir Gesprächsprotokoll, Kennzahlen und
-          Auswertung, verknüpft mit Ihrem Konto.
+          Von Ihren Trainings, auch abgebrochenen, speichern wir Gesprächsprotokoll, Kennzahlen
+          und Auswertung, verknüpft mit Ihrem Konto.
         </p>
 
         <p className="consent-highlight">

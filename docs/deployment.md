@@ -65,7 +65,7 @@ HTTPS is required, because the browser grants the microphone only in a secure co
 
 ### Legal (blocking)
 
-The project's privacy page (`PRIVACY_URL` in `frontend/src/routes.ts`) does not yet describe the Calltrainer. It must cover:
+The project's privacy page (`PRIVACY_URL` in `frontend/src/routes.ts`) does not yet describe the Calltrainer. Its Calltrainer section must carry the anchor `calltrainer` and cover:
 
 - the login claims
 - audio to the DiReKT gateway and reply text to KugelAudio (Art. 28; sub-processors Verda AI and Hetzner)

@@ -15,7 +15,7 @@ from shared.db.session import session_scope
 logger = logging.getLogger(__name__)
 
 # Bump on any substantive change to the notice: older decisions go stale.
-CURRENT_VERSION = "1"
+CURRENT_VERSION = "2"
 
 PURPOSE = db_models.CONSENT_SESSION_STORAGE
 

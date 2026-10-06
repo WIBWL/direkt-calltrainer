@@ -20,7 +20,7 @@ export const ROUTES = {
 
 /** The EFRE DiReKT project's own pages (`ProjectPageLink`). */
 export const IMPRINT_URL = "https://efre-direkt.de/imprint/";
-export const PRIVACY_URL = "https://efre-direkt.de/privacy/";
+export const PRIVACY_URL = "https://efre-direkt.de/privacy/#calltrainer";
 export const ACCESSIBILITY_URL = "https://efre-direkt.de/accessibility/";
 
 /** Location state, not a query parameter, which would restart the call on reload. Consumed once. */
