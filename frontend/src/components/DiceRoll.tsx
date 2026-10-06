@@ -1,14 +1,8 @@
 import type { CSSProperties } from "react";
 
-/**
- * The die thrown between the mic check and a random Scenario's call (F-62). Theatre:
- * the Scenario was drawn at commit time, since the connection and opening line are
- * prepared during the check (ADR 0042). The face it lands on means nothing.
- */
+/** The die before a random Scenario's call (F-62). Theatre: the Scenario was drawn at commit (ADR 0042). */
 
-/** Each face by the pips it fills, numbered 1-9 across a three-by-three grid.
- * Front comes first, and the throw ends square on it — so the six is the face
- * it settles on, which is the one worth landing. */
+/** Pips by slot, 1-9 across a 3x3 grid. Front first: the throw lands on it. */
 const FACES: number[][] = [
   [1, 3, 4, 6, 7, 9], // front, the one it lands on
   [1, 5, 9], // back
@@ -22,8 +16,7 @@ const SIDES = ["front", "back", "right", "left", "top", "bottom"];
 
 export default function DiceRoll({ durationMs }: { durationMs: number }) {
   return (
-    // The throw's length comes from the caller, which is also what times the
-    // screen: two numbers that must agree, kept as one.
+    // The caller's length also times the screen.
     <div
       className="dice-stage"
       style={{ "--roll-ms": `${durationMs}ms` } as CSSProperties}
@@ -32,9 +25,6 @@ export default function DiceRoll({ durationMs }: { durationMs: number }) {
       <div className="dice">
         {FACES.map((pips, i) => (
           <div key={SIDES[i]} className={`dice-face dice-face-${SIDES[i]}`}>
-            {/* All nine slots always exist: the pips are placed by the grid,
-                so a face is a set of filled positions rather than a layout of
-                its own. */}
             {Array.from({ length: 9 }, (_, slot) => (
               <span
                 key={slot}

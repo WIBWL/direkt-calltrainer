@@ -3,11 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { microphoneErrorMessage } from "../utils/microphoneError";
 import { useAudioLevelMeter } from "./useAudioLevelMeter";
 
-/**
- * Meters the microphone for the mic check, independent of the call's VAD; owns
- * the capture stream, the metering is `useAudioLevelMeter`. `deviceId` null
- * means the browser default; `start()` always reads the current value.
- */
+/** The mic check's meter, independent of the call's VAD. `start()` reads the current `deviceId`. */
 export function useMicrophoneLevel(deviceId: string | null) {
   const [error, setError] = useState<string | null>(null);
 
@@ -17,8 +13,7 @@ export function useMicrophoneLevel(deviceId: string | null) {
   const attemptRef = useRef(0);
 
   const stop = useCallback(() => {
-    // Also retires an attempt still waiting on getUserMedia, so a cancel or an
-    // unmount during the permission prompt closes that stream on arrival.
+    // Also retires an attempt still in the permission prompt.
     attemptRef.current += 1;
     stopMeter();
 
@@ -28,22 +23,13 @@ export function useMicrophoneLevel(deviceId: string | null) {
     audioContextRef.current?.close();
     audioContextRef.current = null;
 
-    // The last device label stays visible after the completed test.
   }, [stopMeter]);
 
-  /** Opens the microphone and starts metering it. Reports whether that worked,
-   * so the caller can show the failure as a state of its own instead of
-   * waiting for a level that is never going to arrive — or `null` when a newer
-   * call to `start()` superseded this one, which is neither: that call's own
-   * answer is the one to act on. */
+  /** Reports success; `null` when a newer `start()` superseded it. */
   const start = useCallback(async (): Promise<boolean | null> => {
     stop(); // a retry must not leave the previous stream open
     setError(null);
-    // A device change can start a second attempt while the first is still
-    // waiting on getUserMedia (the permission prompt, typically). `stop()`
-    // above finds nothing to close then, so the older attempt has to notice
-    // on arrival that it was superseded and close its own stream — otherwise
-    // it lands in no ref and the microphone stays on.
+    // A newer attempt may start during the prompt; this one then closes its own stream.
     const attempt = ++attemptRef.current;
     const superseded = () => attempt !== attemptRef.current;
 
@@ -63,7 +49,6 @@ export function useMicrophoneLevel(deviceId: string | null) {
       if (ctx.state === "suspended") {
         await ctx.resume();
       }
-      // The newer attempt's stop() has already closed this stream and context.
       if (superseded()) return null;
 
       const analyser = ctx.createAnalyser();

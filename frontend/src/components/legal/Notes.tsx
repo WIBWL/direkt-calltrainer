@@ -1,19 +1,7 @@
 import LegalPage from "../LegalPage";
 import PrivacyLink from "../PrivacyLink";
 
-/**
- * What the Calltrainer is and what it is not.
- *
- * The footer has linked this since before there was a page behind it. What
- * belongs here is the thing the interface cannot say often enough without
- * getting in the way: the person on the other end does not exist, the machine
- * makes things up, and the feedback is a training aid rather than an
- * assessment of anyone.
- *
- * Written plainly and kept short. A disclaimer nobody reads protects nobody,
- * and the temptation with this kind of page is to make it long enough to feel
- * thorough.
- */
+/** What the Calltrainer is and is not. Kept short: a disclaimer nobody reads protects nobody. */
 export default function Notes() {
   return (
     <LegalPage title="Wichtige Hinweise">

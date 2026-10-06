@@ -1,16 +1,8 @@
-/**
- * Fakes for Web Audio (useStreamedAudioPlayback) and WebSocket (useSessionSocket),
- * which jsdom lacks. Barge-in races only show when the test controls decode timing
- * and socket delivery, hence the manual controls (resolve decode, deliver frame).
- */
+/** Web Audio and WebSocket fakes jsdom lacks, with manual decode and delivery controls for the barge-in races. */
 
-// What /config.js sets in the browser; config.ts refuses to load without it.
+// config.ts refuses to load without it.
 window.__APP_CONFIG__ = { oidcIssuer: "http://localhost:18081/realms/direkt" };
 
-// --- Web Audio -------------------------------------------------------------
-
-/** A decode call waiting for the test to hand it a buffer, the way the model
- * gateway hands back synthesized audio. */
 interface PendingDecode {
   resolve: (buffer: FakeAudioBuffer) => void;
   reject: (err: unknown) => void;
@@ -106,9 +98,7 @@ export class FakeAudioContext {
   }
 }
 
-/** Resolve decodes as the scheduling chain produces them — each resolved decode
- * lets the chain advance one link and queue the next — and return once the
- * chain has been idle for a few microtask rounds. */
+/** Resolves decodes until the scheduling chain is idle. */
 export async function flushDecodes(duration = 1): Promise<void> {
   let idleRounds = 0;
   while (idleRounds < 5) {
@@ -122,20 +112,16 @@ export async function flushDecodes(duration = 1): Promise<void> {
   }
 }
 
-/** The playback sources that actually got start()ed and weren't stopped or
- * disconnected again — i.e. audio the user would have heard. */
+/** Started and not stopped: what the user would have heard. */
 export function audibleSources(): FakeAudioBufferSourceNode[] {
   return FakeAudioContext.createdSources.filter(
     (s) => s.startedAt !== null && !s.stopped && !s.disconnected,
   );
 }
 
-/** True when the master gain is currently cutting all output (barge-in mute). */
 export function masterMuted(): boolean {
   return FakeAudioContext.gains.some((g) => g.gain.value === 0);
 }
-
-// --- WebSocket -----------------------------------------------------------
 
 type Listener = ((event: any) => void) | null;
 
@@ -172,9 +158,6 @@ export class FakeWebSocket {
     this.onclose?.({ code: 1000, reason: "", wasClean: true });
   }
 
-  // --- test controls ---
-
-  /** The parsed JSON control messages the client has sent. */
   sentJson(): Array<Record<string, unknown>> {
     return this.sent
       .filter((d): d is string => typeof d === "string")
@@ -196,26 +179,20 @@ export class FakeWebSocket {
 }
 
 export function latestSocket(): FakeWebSocket {
-  // Indexed rather than `.at(-1)`, which is ES2022 and would mean widening
-  // `lib` for the production build as well.
+  // Not `.at(-1)`, which would widen `lib` for the build too.
   const socket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
   if (!socket) throw new Error("no FakeWebSocket was constructed");
   return socket;
 }
 
-// --- Wiring + per-test reset --------------------------------------------
-
 import { afterEach, beforeEach, vi } from "vitest";
 
 vi.stubGlobal("AudioContext", FakeAudioContext);
 vi.stubGlobal("WebSocket", FakeWebSocket);
-// The level meter re-arms itself every animation frame; pinned to a no-op so
-// the audio specs stay deterministic and don't leak act() warnings.
+// Deterministic audio specs, no act() warnings.
 vi.stubGlobal("requestAnimationFrame", () => 0);
 vi.stubGlobal("cancelAnimationFrame", () => {});
 
-// The hooks trace every socket message on console.debug; keep it out of the
-// test reporter's output. Real warnings and errors still come through.
 vi.spyOn(console, "debug").mockImplementation(() => {});
 
 beforeEach(() => {

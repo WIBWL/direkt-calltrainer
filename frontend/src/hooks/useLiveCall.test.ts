@@ -5,11 +5,7 @@ import { endIsDue, useLiveCall, type EndedCall } from "./useLiveCall";
 import type { CommittedSession } from "./useSessionSocket";
 import type { TranscriptEntry } from "../protocol";
 
-/**
- * The three rules that bind the connection to its audio. Socket and playback
- * are plain fakes: their own specs cover WebSocket and Web Audio; this tests
- * only what the hook asks of them, and when.
- */
+/** The three rules binding the connection to its audio, against plain fakes. */
 
 type OnEnded = (
   reason: EndedCall["reason"],
@@ -132,8 +128,7 @@ describe("the buffered opening line (ADR 0042)", () => {
   });
 
   it("is revealed together with the server's clock starting", () => {
-    // One without the other either plays a line the server has not timed, or
-    // leaves the server holding a line nobody hears.
+    // Either alone plays an untimed line or leaves one unheard.
     const { result } = render();
     result.current.accept();
 

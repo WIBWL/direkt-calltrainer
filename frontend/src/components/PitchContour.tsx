@@ -1,8 +1,6 @@
-/**
- * The F0 contour (F-35), drawn the phonetics way: semitones relative to the speaker's median; x = the user's
- * speaking time with dashed turn seams; unvoiced gaps bridged dotted, never across a seam; at most one point per
- * pixel (column median); band = the speaker's own 5th-95th percentile, not a target (ADR 0051); one hue.
- */
+/** The F0 contour (F-35): semitones from the speaker's median over their own
+ * speaking time, dashed turn seams, unvoiced gaps bridged dotted. The band is the
+ * speaker's own 5th-95th percentile, not a target (ADR 0051). */
 
 import { formatNumber } from "../utils/metrics";
 
@@ -10,22 +8,15 @@ const WIDTH = 720;
 const HEIGHT = 232;
 const PAD_LEFT = 46;
 const PAD_BOTTOM = 28;
-/** Room above the plot for the turn numbers. */
 const PAD_TOP = 18;
 
-/** Gridlines every three semitones: a minor third, small enough to read a
- *  contour against and large enough not to clutter. */
+/** A minor third. */
 const GRID_STEP_ST = 3;
-/** The axis never shrinks below this, so a monotone call looks monotone
- *  instead of being stretched to fill the box. */
+/** So a monotone call looks monotone rather than stretched. */
 const MIN_HALF_RANGE_ST = 4;
-/** A little air above the highest and below the deepest point, so the extremes
- *  of a call do not sit exactly on the frame and read as clipped. */
 const HEADROOM = 1.06;
-/** One drawn point per unit of plot width; see the note on condensing. */
+/** One drawn point per unit of plot width. */
 const MAX_POINTS = WIDTH - PAD_LEFT;
-/** Below this spacing the turn numbers would sit on top of each other, and the
- *  dashed lines alone have to do the orienting. */
 const MIN_LABEL_GAP = 26;
 
 export default function PitchContour({
@@ -36,24 +27,17 @@ export default function PitchContour({
   bandHighSt,
   breaks = [],
 }: {
-  /** One point per `stepMs`, null where the frame carried no voicing. */
   curveHz: (number | null)[];
-  /** The speaker's own middle, the zero of the vertical axis. */
   medianHz: number;
-  /** The grid the curve is actually on, as the backend thinned it. */
   stepMs: number;
-  /** The 5th and 95th percentile, in semitones from the median. */
   bandLowSt?: number | undefined;
   bandHighSt?: number | undefined;
-  /** Indices into `curveHz` where one user turn ends and the next begins. */
   breaks?: number[] | undefined;
 }) {
   const measured = curveHz.map((hz) => (hz ? 12 * Math.log2(hz / medianHz) : null));
   if (measured.filter((st) => st !== null).length < 2) return null;
 
-  // The duration comes from what was measured, never from what is drawn: the
-  // condensing below changes how many points there are, not how long the user
-  // spoke.
+  // From what was measured; condensing changes the points, not the duration.
   const seconds = (measured.length * stepMs) / 1000;
   const { points, marks } = condense(
     measured,
@@ -80,7 +64,6 @@ export default function PitchContour({
     gridlines.push(st);
   }
 
-  // Numbering the turns only helps while the numbers can be told apart.
   const gaps = marks.map(
     (mark, position) => x(mark) - (position === 0 ? PAD_LEFT : x(marks[position - 1]!)),
   );
@@ -111,9 +94,7 @@ export default function PitchContour({
               width={plotWidth}
               height={Math.max(1, y(bandLowSt) - y(bandHighSt))}
             />
-            {/* Written out rather than mapped: on a perfectly steady voice the
-                two ends are the same value, and a key of that value would be
-                the same key twice. */}
+            {/* Not mapped: on a steady voice both ends share a value, and so a key. */}
             <line
               className="pitch-contour-band-edge"
               x1={PAD_LEFT}
@@ -146,8 +127,6 @@ export default function PitchContour({
           </g>
         ))}
 
-        {/* Behind the curve: a seam is context for the line, not a thing to
-            read on its own. */}
         {marks.map((index, position) => (
           <g key={index}>
             <line
@@ -204,11 +183,8 @@ export default function PitchContour({
   );
 }
 
-/**
- * The curve at no more than `maxPoints`, by each column's median: a mean would be pulled by stray frames, and
- * sampling one frame per column turns a syllable rate into a sawtooth. Unvoiced columns stay empty, so gaps
- * survive, and seams move with their points.
- */
+/** Each column's median: a mean is pulled by stray frames, and sampling turns a
+ * syllable rate into a sawtooth. Unvoiced columns stay empty. */
 function condense(
   points: (number | null)[],
   breaks: number[],
@@ -225,19 +201,14 @@ function condense(
     values.sort((a, b) => a - b);
     out.push(values.length > 0 ? values[Math.floor(values.length / 2)]! : null);
   }
-  // Deduplicated: two seams inside one column would draw two lines a hair
-  // apart, and the caption counts them.
+  // Two seams in one column would draw twice; the caption counts them.
   const marks = [...new Set(breaks.map((index) => Math.round(index / per)))].filter(
     (index) => index > 0 && index < out.length,
   );
   return { points: out, marks };
 }
 
-/**
- * The curve as two sets of runs: what was measured, and what merely connects
- * two measured stretches. Both are needed because the line has to be continuous
- * to be readable and honest to be true.
- */
+/** What was measured, and what merely connects two measured stretches. */
 function trace(
   points: (number | null)[],
   marks: number[],
@@ -250,8 +221,7 @@ function trace(
   let previous: [number, number] | null = null;
 
   const closeRun = () => {
-    // A run of one point draws nothing in SVG, and it is not lost: it stays the
-    // endpoint of the bridges on either side of it.
+    // A single point draws nothing; it stays the end of the bridges beside it.
     if (run.length > 1) lines.push(run);
     run = [];
   };

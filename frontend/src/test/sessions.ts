@@ -5,14 +5,9 @@ import type {
   SessionSummaryMeasurement,
 } from "../protocol";
 
-/**
- * History rows for the dashboard's specs, one builder shared so no spec keeps
- * its own idea of a `SessionSummary`'s shape. Boring defaults (completed, no
- * measurements, no tags), so each fixture reads "the same training, except …".
- */
+/** The one `SessionSummary` builder for the specs, with boring defaults. */
 
-/** Counts up, so two sessions built in a row are never the same row. The id
- *  matters to de-duplication and to the links, never to the arithmetic. */
+/** So two built in a row are never the same row. */
 let next = 0;
 
 export function session(over: Partial<SessionSummary> = {}): SessionSummary {
@@ -35,7 +30,6 @@ export function session(over: Partial<SessionSummary> = {}): SessionSummary {
   };
 }
 
-/** A measured figure as the listing carries it. */
 export function measurement(
   key: string,
   value: number,

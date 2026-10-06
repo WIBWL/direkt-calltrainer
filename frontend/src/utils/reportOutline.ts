@@ -8,31 +8,21 @@ import type {
 } from "../protocol";
 import { ASPECT_LABELS, ASPECT_LEADS, METRIC_ASPECTS, metricAspect, withDerived } from "./metrics";
 
-/** What the feedback report says, before layout (F-64, ADR 0102): decided here so
- * `FeedbackView`/`FeedbackScreen` and `feedbackPdf` only draw it and cannot drift.
- * Pure and derived on every render; without consent (ADR 0066) it is the meta
- * line alone. */
+/** What the feedback report says, for the page and the PDF alike (F-64, ADR 0102). */
 
-/** One wrap-up point, with what it cites already looked up. */
 export interface OutlinePoint {
   text: string;
-  /** Where in the call the cited utterance starts, or null for a point that
-   *  cites none, or one whose Turn is not in the stored transcript. */
+  /** Null if it cites nothing or its Turn is not stored. */
   offsetMs: number | null;
-  /** The display name of the focus goal it was filed under (ADR 0080), or null
-   *  for an untagged point and for a key the catalogue does not know — a goal
-   *  retired since (ADR 0076 deactivates rather than deletes). A slug like
-   *  `active_listening` in its place would be worse than no tag at all. */
+  /** Null untagged or for a retired goal (ADR 0076); a raw slug would be worse. */
   goal: string | null;
 }
 
-/** Which training this was. It describes the *call*, not the wrap-up, so it is
- *  there for a Session whose wrap-up never got written as well. */
+/** Describes the call, so it exists without a wrap-up too. */
 export interface CallMeta {
   scenario: string | null;
   partner: string;
-  /** Which side the User was on, for a reverse only (ADR 0070): the transcript
-   *  reads very differently depending on it. Null for an ordinary call. */
+  /** ADR 0070; null for an ordinary call. */
   reversal: string | null;
 }
 
@@ -43,9 +33,7 @@ export interface WrapUpOutline {
   phaseLanguage: string | null;
 }
 
-/** One of the two halves the metrics are read in (ADR 0082). Both are always
- *  present, an empty one included: the page decides from that whether there
- *  is anything to switch between. */
+/** ADR 0082. Both always present, so the page can tell whether to switch. */
 export interface MetricGroup {
   aspect: MetricAspect;
   label: string;
@@ -55,8 +43,7 @@ export interface MetricGroup {
 
 export interface ReportOutline {
   meta: CallMeta;
-  /** Null without a wrap-up: no consent, or one that failed or is still on its
-   *  way. The report is then the protocol, and says so. */
+  /** Null without a wrap-up: the report is then the protocol. */
   wrapUp: WrapUpOutline | null;
   metricGroups: MetricGroup[];
 }
@@ -67,10 +54,8 @@ export interface ReportInput {
   reverse?: boolean | undefined;
   feedback?: SessionFeedback | null | undefined;
   measurements?: Measurement[] | undefined;
-  /** The stored utterances, which a point's `turn_id` refers to. */
   turns?: SessionTurn[] | undefined;
-  /** The focus-goal catalogue, for naming a point's tag. Empty while it has not
-   *  loaded, and the tags are then simply absent. */
+  /** Empty while loading; the tags are then absent. */
   goals?: FocusGoal[] | undefined;
 }
 

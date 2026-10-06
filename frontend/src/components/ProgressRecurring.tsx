@@ -9,23 +9,16 @@ import InfoDetails from "./InfoDetails";
 import MentionTally from "./MentionTally";
 import SectionHeading from "./SectionHeading";
 
-/**
- * Block D: what the wrap-ups keep coming back to, counted from each point's focus goal. A frequency of
- * statements, not a measurement (ADR 0004, ADR 0065): "genannt", over a named denominator, never a percentage.
- * The practice suggestion (block E) is handed in and drawn as a full-width band under the lists.
- */
+/** Block D: what the wrap-ups keep naming. Statements over a named denominator,
+ * never a percentage (ADR 0004/0065). */
 export default function ProgressRecurring({
   sessions,
   catalogue,
   practice,
 }: {
   sessions: SessionSummary[];
-  /** The focus catalogue, for turning a key into its German title. Served with
-   *  the selection (`GET /api/focus`), so the wording lives in one place. */
   catalogue: FocusGoal[];
-  /** The suggestion card, shown beside the two lists. Only where there is
-   *  something recurring: with nothing named twice it has no ground to stand
-   *  on, and `ProgressPractice` would render nothing anyway. */
+  /** Only where something recurs. */
   practice?: ReactNode;
 }) {
   const { strengths, improvements, total } = mentionSummary(sessions);
@@ -45,9 +38,7 @@ export default function ProgressRecurring({
         </div>
       ) : (
         <>
-          {/* One card each, side by side. The two lists answer different
-              questions and were previously two columns inside one border, where
-              the eye read them as one table with a gap in the middle. */}
+          {/* Two cards: inside one border they read as one table. */}
           <div className="recurring-columns">
             <Column
               heading="Häufig als Stärke genannt"
@@ -65,13 +56,9 @@ export default function ProgressRecurring({
             />
           </div>
 
-          {/* Full width, directly under the lists: it follows from what they say, and as a third column it ran
-              three times their height. */}
           {practice}
 
-          {/* A footnote to the whole section, naming both lists: directly under the suggestion, "gezählt wird"
-              would read as about the suggestion. The written-not-measured sentence stays in view; the rules of
-              the count go behind the "i". */}
+          {/* A footnote to both lists, under the suggestion. */}
           <p className="progress-preview-note recurring-note">
             In den beiden Listen oben ist gezählt, was Ihre Auswertungen geschrieben haben,
             nicht was gemessen wurde.
@@ -95,7 +82,6 @@ export default function ProgressRecurring({
   );
 }
 
-/** Distinguishes nothing analysed from nothing said twice. */
 function emptyText(total: number): string {
   if (total === 0) {
     return (
@@ -122,8 +108,7 @@ function Column({
   total: number;
   empty: string;
 }) {
-  // The selection travels with the link, so the goal's page counts the same
-  // trainings this row does (see ProgressContext.tsx).
+  // The selection travels with the link.
   const { withPeriod } = useProgressContext();
 
   return (
@@ -134,9 +119,7 @@ function Column({
       ) : (
         <ul className="recurring-list">
           {entries.map((entry, index) => {
-            // The catalogue title where there is one. A key whose goal has
-            // since been retired still has points pointing at it, and the raw
-            // key is a poor label but an honest one.
+            // A retired goal shows its key.
             const title = titles.get(entry.goal);
             const body = (
               <>
@@ -155,9 +138,7 @@ function Column({
 
             return (
               <li key={entry.goal}>
-                {/* Each row opens the goal's page, where the sentences behind the count are quoted. Not for a
-                    goal the catalogue no longer knows — that page would be a dead end — and such a row gets
-                    no hover either. */}
+                {/* No link for a goal the catalogue no longer knows. */}
                 {title ? (
                   <Link className="recurring-item" to={withPeriod(progressGoalPath(entry.goal))}>
                     {body}

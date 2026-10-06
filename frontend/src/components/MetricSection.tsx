@@ -20,11 +20,7 @@ import InfoDetails from "./InfoDetails";
 import LoudnessCourse from "./LoudnessCourse";
 import SectionHeading from "./SectionHeading";
 
-/**
- * The call's statistics (F-53), computed during the call (ADR 0047/0048), so a Session
- * with no wrap-up still has them. A reading, never a judgement (ADR 0051), and the note
- * under the grid says so.
- */
+/** The call's statistics (F-53), measured during the call (ADR 0048). A reading, never a judgement (ADR 0051). */
 export default function MetricSection({
   measurements,
   findings = [],
@@ -33,21 +29,15 @@ export default function MetricSection({
   segments = [],
 }: {
   measurements: Measurement[];
-  /** Individual moments noted during the call, e.g. F-51's interruptions.
-   *  Used here only to decide which tiles have a page worth opening. */
+  /** Only decides which tiles open a page. */
   findings?: Finding[];
-  /** The long explanation behind a metric's "i", by metric key. */
   notes?: Record<string, string>;
-  /** The Session these figures belong to, for the per-metric page. Null on a
-   *  call that was never stored, where there is nothing to link to. */
+  /** Null for an unstored call. */
   sessionId?: string | null;
-  /** The same metrics over the demanding stretches and over the rest
-   *  (ADR 0081). Used here only to say that the comparison exists: it is two
-   *  figures per metric, which is a table and belongs on the metric's own
-   *  page. */
+  /** Only to say a comparison exists (ADR 0081); it lives on the metric's page. */
   segments?: SegmentMeasurement[];
 }) {
-  // Opens on the paraverbal half: the one reading the transcript cannot give.
+  // Paraverbal first: the reading the transcript cannot give.
   const [aspect, setAspect] = useState<MetricAspect>("how");
 
   const groups = metricGroups(measurements);
@@ -58,7 +48,6 @@ export default function MetricSection({
     label: group.label,
     count: group.measurements.length,
   }));
-  // Nothing to switch between when one half is empty: show what there is.
   const split = options.every((option) => option.count > 0);
   const current = groups.find((group) => group.aspect === aspect)!;
   const shown = split ? current.measurements : all;
@@ -97,9 +86,7 @@ export default function MetricSection({
         ))}
       </div>
 
-      {/* Names the exception to the sentence above: two metrics carry a word beside their
-          figure. Kept out of `METRIC_DISCLAIMER` because the PDF prints figures without
-          readings. */}
+      {/* Not in `METRIC_DISCLAIMER`: the PDF prints no readings. */}
       <p className="metric-disclaimer">
         {METRIC_DISCLAIMER} Wo „Einschätzung“ steht, haben wir die Schwellen selbst
         gesetzt; welche das sind, steht jeweils dabei.
@@ -107,9 +94,7 @@ export default function MetricSection({
 
       <MetricNotes measured={all} segments={segments} />
 
-      {/* Last, pointing to the same figure across trainings, which this screen cannot
-          answer. Only for a stored Session: without consent there is nothing to compare
-          (ADR 0066). */}
+      {/* Only for a stored Session (ADR 0066). */}
       {sessionId && (
         <p className="metric-progress-link">
           <Link to={ROUTES.progress}>
@@ -121,11 +106,7 @@ export default function MetricSection({
   );
 }
 
-/**
- * What the grid cannot say: that a metric could not be measured and so left no tile
- * (ADR 0085; which one is not named, the frontend would have to guess why), and that a
- * second reading exists where the wrap-up marked demanding stretches (ADR 0081).
- */
+/** That a metric left no tile (ADR 0085), and that a stretch comparison exists (ADR 0081). */
 function MetricNotes({
   measured,
   segments,
@@ -134,12 +115,8 @@ function MetricNotes({
   segments: SegmentMeasurement[];
 }) {
   const shown = new Set(measured.map((m) => m.key));
-  // Counted off the catalogue the frontend already keeps, so a metric added on
-  // the backend does not have to be listed here a second time.
   const missing = METRIC_KEYS.filter((key) => !shown.has(key)).length;
-  // Distinct metrics, not rows: each one that was compared carries two, one
-  // per stretch. The wire never sends the whole call here -- that is what
-  // `measurements` is -- so nothing has to be filtered out first.
+  // Distinct metrics: each compared one carries two rows.
   const compared = new Set(segments.map((entry) => entry.key)).size;
 
   if (missing === 0 && compared === 0) return null;
@@ -177,8 +154,7 @@ function MetricNotes({
   );
 }
 
-/** The one metric whose unit a reader cannot place. Matches
- *  `intonation.RANGE_KEY` on the backend. */
+/** Matches `intonation.RANGE_KEY` on the backend. */
 const INTONATION_KEY = "intonation";
 
 function Metric({
@@ -187,31 +163,22 @@ function Metric({
   detailed,
 }: {
   measurement: Measurement;
-  /** Null on a call that was never stored, where there is no page to open. */
   sessionId: string | null;
-  /** Whether this metric has a page worth opening. */
   detailed: boolean;
 }) {
-  // Loudness is shown as a course, not a figure: its dB span reads like a level without
-  // being one (ADR 0004/0051). The course arrives in the Measurement's detail (ADR 0091),
-  // so the wrap-up's sentence about it cannot disagree with the picture.
+  // Loudness as a course: a dB span reads like a level (ADR 0004/0051).
   const curve = measurement.key === "loudness" ? loudnessCourse(measurement.detail) : null;
   if (measurement.key === "loudness" && !curve) return null;
 
   const context = interruptionContext(measurement);
   const detail = metricSubline(measurement);
-  // The step this call landed on, in words, and its colour (`metricReading`; F-51's
-  // traffic light and F-35's reading). The light colours the figure only, never the
-  // whole tile: its thresholds are unvalidated working values (`interruptions.py`).
-  // For F-35 the tile leads with the classification word, so the colour sits on that;
-  // it must never sit on the semitone figure, a different measurement from the step's.
+  // The light colours the reading only, never the tile (unvalidated thresholds),
+  // and never F-35's semitone figure, a different measurement.
   const { label: reading, readingLight } = metricReading(measurement);
 
   const figure = formatMetricValue(measurement);
 
-  // Intonation's unit is one a reader cannot place, so the reading leads and the
-  // semitone range stands under it (ADR 0077). Never dropped: without it only the part
-  // resting on thresholds would be left (ADR 0004/0051, ADR 0088).
+  // The reading leads, the semitone range stays under it (ADR 0077, 0088).
   const melody = measurement.key === INTONATION_KEY;
   const parts = metricParts(measurement);
 
@@ -252,10 +219,6 @@ function Metric({
     </>
   );
 
-  // One class list for both, so the loudness tile keeps its own width whether
-  // or not it opens. It used to return early and could therefore never be a
-  // link, which left the one tile carrying a drawing as the one tile with no
-  // way to see it larger.
   const className = `metric${curve ? " metric-loudness" : ""}`;
 
   if (!detailed || !sessionId) {
@@ -273,11 +236,7 @@ function Metric({
   );
 }
 
-/**
- * The count set against the call it happened in: context beside the figure, never a
- * rate (a rate put one interruption in a short call on the top step). Backchannels are
- * named as not counting, so an attentive call and an absent one read differently.
- */
+/** Context, never a rate: a rate put one interruption in a short call on the top step. */
 function interruptionContext(measurement: Measurement): string | null {
   if (measurement.key !== "interruptions") return null;
   const detail = measurement.detail ?? {};
@@ -296,10 +255,7 @@ function interruptionContext(measurement: Measurement): string | null {
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
-/** A checklist metric's headline — the opening's (F-63) or the closing's
- *  (ADR 0089): its parts, each marked, in place of a count that reads like a
- *  grade. The screen reader hears "not recognised", never "missing": a bare
- *  name or a recap worded some other way slips past the patterns. */
+/** A checklist's parts, each marked (F-63, ADR 0089). "Not recognised", never "missing". */
 function MetricParts({ parts }: { parts: MetricPart[] }) {
   return (
     <span className="metric-parts">

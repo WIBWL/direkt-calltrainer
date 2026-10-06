@@ -6,11 +6,7 @@ import type { SessionSummary } from "./protocol";
 import { CATEGORY_LABELS, type ScenarioCategory } from "./scenarioLibrary";
 import { latest, readable, selectionSeries, type MetricSeries } from "./utils/progressStats";
 
-/**
- * Which trainings the dashboard reads, counted in trainings, not days
- * (`progressStats.latest`). `prefix` is the selection's half of the sentence
- * pages without the switch say themselves; the occasion supplies the noun.
- */
+/** Counted in trainings, not days. `prefix` begins the selection's sentence. */
 export const PERIODS = [
   { key: "5", label: "Letzte 5", count: 5, prefix: "Ihren letzten 5" },
   { key: "10", label: "Letzte 10", count: 10, prefix: "Ihren letzten 10" },
@@ -19,11 +15,7 @@ export const PERIODS = [
 
 export type PeriodKey = (typeof PERIODS)[number]["key"];
 
-/**
- * Which kind of call the dashboard reads (ADR 0072): narrowed to one occasion, a
- * line is a series rather than scatter (dashboard concept 4.3). `noun` is the dative
- * plural the prefix takes ("Ihren letzten 5 Beratungsgesprächen").
- */
+/** ADR 0072: within one occasion a line is a series, not scatter. `noun` is dative plural. */
 export const OCCASIONS = [
   { key: "all", label: "Alle Anlässe", category: null, noun: "Trainings" },
   {
@@ -59,66 +51,38 @@ export const OCCASIONS = [
 
 export type OccasionKey = (typeof OCCASIONS)[number]["key"];
 
-/**
- * Everything by default (dashboard-concept.md section 10), and the fallback for
- * an unknown URL value such as a hand-typed `?trainings=42`.
- */
+/** Also the fallback for an unknown URL value. */
 const DEFAULT_PERIOD: PeriodKey = "all";
-
-/** Every occasion by default, for the reason the period defaults to everything:
- *  the first look should show all there is. Narrowing is one press away, and
- *  an account whose trainings are all of one kind sees the same page either
- *  way. */
 const DEFAULT_OCCASION: OccasionKey = "all";
 
-/** The selections' names in the URL. German, like every other path segment the
- *  user can see. */
 const PERIOD_PARAM = "trainings";
 const OCCASION_PARAM = "anlass";
 
 interface ProgressContextValue {
-  /** Every stored training, newest first, whatever the switches say. What the
-   *  activity block at the top of the overview counts. */
+  /** Every stored training, whatever the switches say. */
   sessions: SessionSummary[];
-  /** The trainings both switches selected — what every figure below them is
-   *  read over, on the overview and on both detail levels alike. */
   selected: SessionSummary[];
-  /** Those of the selection long enough for their figures to be read
-   *  (`progressStats.readable`). The denominator behind "aus N Trainings", and
-   *  what `series` below is built from. The difference from `selected` is what
-   *  the screen has to account for in words, which is why both travel. */
+  /** The denominator behind "aus N Trainings"; `series` is built from it. */
   readable: SessionSummary[];
-  /** Every series `selected` has, the call length included — derived once
-   *  here, so the overview and both detail levels cannot disagree about which
-   *  rows exist (`selectionSeries`). */
+  /** Derived once, so all three levels agree on which rows exist. */
   series: MetricSeries[];
   state: ProgressLoadState;
-  /** True when the account holds more trainings than the dashboard reads. */
   truncated: boolean;
   total: number;
   period: PeriodKey;
   occasion: OccasionKey;
-  /** The current selection in a sentence ("Ihren letzten 5
-   *  Beratungsgesprächen"). */
   periodPhrase: string;
   setPeriod: (key: PeriodKey) => void;
   setOccasion: (key: OccasionKey) => void;
-  /** How many trainings each occasion would yield under the current period, by
-   *  key. The switch shows them, so nobody presses into an empty page. */
+  /** Shown on the switch, so nobody presses into an empty page. */
   occasionCounts: Record<OccasionKey, number>;
-  /** A dashboard path with the current selection on it. Every link between the
-   *  three levels goes through this, which is what keeps them reading the same
-   *  trainings. */
+  /** Every link between the levels goes through this, keeping the selection. */
   withPeriod: (path: string) => string;
 }
 
 const ProgressContext = createContext<ProgressContextValue | null>(null);
 
-/**
- * The trainings the dashboard reads and which are selected, shared by its three
- * screens (F-13): one load, and the period reaches the detail pages too. The
- * selection lives in the URL, so it survives a reload and a shared link.
- */
+/** Shared by the three dashboard screens (F-13). The selection lives in the URL. */
 export function ProgressProvider({ children }: { children: ReactNode }) {
   const { sessions, state, truncated, total } = useProgressData();
   const [params, setParams] = useSearchParams();
@@ -130,17 +94,12 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
   const occasion = occasionOption.key;
   const category = occasionOption.category;
 
-  // Narrowed first, cut second. The other order would take the last five
-  // trainings and then keep whichever of them were advisory calls, so "Letzte
-  // 5" plus "Beratung" could yield one — a selection whose size depends on
-  // what was played in between, which is not what either switch says.
+  // Narrowed first, cut second, or "Letzte 5" plus "Beratung" could yield one.
   const selected = useMemo(
     () => latest(byOccasion(sessions, category), count),
     [sessions, category, count],
   );
 
-  // `selectionSeries` applies the same floor internally, so the two cannot
-  // disagree about which trainings the courses were drawn from.
   const readableSessions = useMemo(() => readable(selected), [selected]);
   const series = useMemo(() => selectionSeries(selected), [selected]);
 
@@ -155,12 +114,10 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
   const setParam = useCallback(
     (name: string, key: string, fallback: string) => {
       const next = new URLSearchParams(params);
-      // The default stays out of the URL, so the plain path is the one people
-      // copy and the parameter appears only where it says something.
+      // The default stays out of the URL.
       if (key === fallback) next.delete(name);
       else next.set(name, key);
-      // Replaced rather than pushed: Back should leave the dashboard, not undo
-      // three presses of a filter first.
+      // Replaced, so Back leaves the dashboard rather than undoing filters.
       setParams(next, { replace: true });
     },
     [params, setParams],
@@ -225,29 +182,21 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
   return <ProgressContext.Provider value={value}>{children}</ProgressContext.Provider>;
 }
 
-/** The dashboard's data and its selection. Throws outside the provider, which
- *  is a wiring mistake and not a state a screen should try to draw. */
 export function useProgressContext(): ProgressContextValue {
   const value = useContext(ProgressContext);
   if (!value) throw new Error("useProgressContext must be used inside <ProgressProvider>");
   return value;
 }
 
-/** The selection one URL asks for. Returns the option rather than the key, so
- *  the caller cannot look up a key that is not in the table. */
 function readPeriod(raw: string | null): (typeof PERIODS)[number] {
   const named = PERIODS.find((entry) => entry.key === raw);
   if (named) return named;
   const fallback = PERIODS.find((entry) => entry.key === DEFAULT_PERIOD);
-  // Unreachable while DEFAULT_PERIOD is one of the keys above, and the type
-  // system cannot know that from a `find`.
   if (!fallback) throw new Error("no default period in PERIODS");
   return fallback;
 }
 
-/** The same for the occasion. An unknown value falls back to every occasion
- *  rather than to none, for the reason the period does: a selection nobody
- *  offered is answered with the widest one, not with an error screen. */
+/** Unknown values fall back to every occasion. */
 function readOccasion(raw: string | null): (typeof OCCASIONS)[number] {
   const named = OCCASIONS.find((entry) => entry.key === raw);
   if (named) return named;
@@ -256,9 +205,7 @@ function readOccasion(raw: string | null): (typeof OCCASIONS)[number] {
   return fallback;
 }
 
-/** The trainings of one kind of call, or all for null. An uncategorised one
- *  (authored Scenario, reverse) is only ever in "Alle Anlässe" — filing it
- *  under a guessed heading is what this filter exists to avoid. */
+/** Uncategorised trainings only ever count under "Alle Anlässe". */
 function byOccasion(
   sessions: SessionSummary[],
   category: ScenarioCategory | null,

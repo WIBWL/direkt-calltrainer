@@ -1,18 +1,12 @@
-// OIDC configuration. The issuer comes at runtime (config.ts), under the
-// backend's own name, so one image serves every realm. The client id is the
-// same in every realm, so not a setting.
+// The issuer comes at runtime (config.ts); the client id is the same in every realm.
 import { oidcIssuer } from "./config";
 
-/** The realm issuer URL; the OIDC `authority`. Must match the backend's `iss` check. */
+/** Must match the backend's `iss` check. */
 export const oidcAuthority: string = oidcIssuer;
 
-/** The public Keycloak client that performs the login (see keycloak/direkt-realm.json). */
+/** keycloak/direkt-realm.json. */
 export const oidcClientId = "calltrainer-frontend";
 
-/**
- * Where Keycloak sends the user back: always the SPA origin, so the realm needs
- * one redirect URI. Returning to the requested page is the app's job
- * (`onSigninCallback` in main.tsx).
- */
+/** Always the SPA origin, so the realm needs one redirect URI; main.tsx returns to the page. */
 export const oidcRedirectUri: string =
   typeof window === "undefined" ? "" : window.location.origin + "/";

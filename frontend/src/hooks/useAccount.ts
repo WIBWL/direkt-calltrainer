@@ -2,15 +2,10 @@ import { useAuth } from "react-oidc-context";
 
 import { initialsOf } from "../utils/initials";
 
-/**
- * The signed-in user, read from the ID token alone: identity lives in Keycloak
- * and the app keeps no User table (ADR 0031), so none of it is editable here.
- * Every OIDC claim is optional, so each field degrades on its own.
- */
+/** From the ID token alone (ADR 0031); every claim is optional. */
 export interface Account {
-  /** Best available human name; falls back to the username, then to a label. */
   displayName: string;
-  /** One or two letters for the avatar. Never empty. */
+  /** Never empty. */
   initials: string;
   username: string | null;
   email: string | null;
@@ -35,8 +30,7 @@ export function useAccount(): Account {
 
   return {
     displayName,
-    // Initials come from the name, not from the fallback label: initials taken
-    // from a generic signed-in label would look like a person's and be wrong.
+    // Not from a generic fallback label, which would look like a person's.
     initials: (asString(fullName) || username ? initialsOf(displayName) : "") || "?",
     username,
     email: asString(claims?.email),

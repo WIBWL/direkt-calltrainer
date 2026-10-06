@@ -1,31 +1,19 @@
-/**
- * The Scenario library REST surface (backend/api/scenarios.py, ADR 0058).
- * A Scenario's `id` is its extern_id (ADR 0050). Wire names match the schema
- * (ADR 0061), except the card's `name` (column `title`).
- */
+/** Scenario library API (ADR 0058). `id` is the extern_id (ADR 0050); the card's `name` is column `title`. */
 import { apiFetch } from "./api";
 import type { FollowUpCard } from "./protocol";
 
-/** builtin = shipped built-in, own = the caller authored it (ADR 0058),
- * tenant = a colleague shared it with the caller's company (ADR 0060). */
+/** builtin, own (ADR 0058), or shared by a colleague (ADR 0060). */
 export type Origin = "builtin" | "own" | "tenant";
 
 export type Visibility = "private" | "tenant";
 
-/** What kind of call a Scenario is (ADR 0072). The wire carries the English
- * key; the German labels below are display only. */
+/** ADR 0072; the German labels below are display only. */
 export type ScenarioCategory = "operations" | "requirements" | "pricing" | "closing";
 
-/** "" = no category. Only reachable for a Scenario authored before the column
- * existed, or one whose author left the field empty; such a row is listed under
- * the unfiltered row and under no category. */
+/** "" = no category: listed only under the unfiltered row. */
 export type CategoryChoice = ScenarioCategory | "";
 
-/** Display order and labels, in one place: the filter slider and the editor's
- * select both read this, so a further category is one entry here plus one value
- * in the backend's SCENARIO_CATEGORIES. The labels name the occasion of the
- * call rather than a department, because that is what a user picking a training
- * case is choosing between. */
+/** Read by the filter and the editor; a new category also needs the backend's SCENARIO_CATEGORIES. */
 export const CATEGORY_LABELS: Record<ScenarioCategory, string> = {
   operations: "Betrieb & Störung",
   requirements: "Beratung & Anforderung",
@@ -35,29 +23,23 @@ export const CATEGORY_LABELS: Record<ScenarioCategory, string> = {
 
 export const CATEGORIES = Object.keys(CATEGORY_LABELS) as ScenarioCategory[];
 
-/** The conversation a reverse replays (ADR 0070). Null on the card once that
- * Session has been deleted — the reverse outlives it. */
+/** The call a reverse replays (ADR 0070); null once that Session is deleted. */
 export interface OriginSessionRef {
   id: string;
   persona: string;
-  /** ISO 8601, as every timestamp on this wire is. */
   started_at: string;
 }
 
-/** What the User reads while playing a reverse (ADR 0070), generated once and
- * stored. `goal` is the one sentence on what the caller is after; `goals` the
- * concrete points to raise, ask and come away with. */
+/** What the User reads while playing a reverse (ADR 0070). */
 export interface ReverseBrief {
   situation: string;
   facts: string;
-  /** What the caller wants *and* the bar that settles it, in one field since
-   * the two were merged — the same merge the Scenario's own `call_goal` got. */
+  /** What the caller wants and the bar that settles it. */
   goal: string;
   goals: string[];
 }
 
-/** Why a Scenario is suggested (F-62): the kind of call it is, and which of
- *  the User's focus goals its context exercises. */
+/** F-62: the call type and the focus goals it exercises. */
 export interface ScenarioRecommendation {
   call_type: boolean;
   goals: string[];
@@ -67,60 +49,37 @@ export interface ScenarioCard {
   id: string;
   name: string;
   short_description: string;
-  /** The trainee's own briefing (ADR 0054): the role they answer in, the room
-   * they have, and for a built-in the whole "Ihr Wissensstand" as `- ` lines.
-   * Shown after the microphone check and during the call, never sent to the
-   * model. "" for a Scenario whose author left it empty. */
+  /** The trainee's own briefing (ADR 0054), never sent to the model. */
   briefing: string;
-  /** Who calls, why, and what is practised, as German display text. Shown on
-   * the setup screen once the card is picked. */
   description: string;
-  /** null = uncategorised (ADR 0072). */
+  /** null = uncategorised. */
   category: ScenarioCategory | null;
   origin: Origin;
-  /** True once shared with the company — also for the caller's own Scenarios,
-   * which `origin` still reports as "own". */
+  /** Also true for the caller's own, which `origin` still reports as "own". */
   shared: boolean;
-  /** Drafted from one of the caller's Sessions (F-60, ADR 0069). Its own
-   * category in the picker; `origin` stays "own", but it is neither edited nor
-   * shared — it sits exactly at the wrap-up's improvement point, and an edited
-   * one is no longer that exercise. */
+  /** F-60 (ADR 0069): `origin` "own", but neither edited nor shared. */
   follow_up: boolean;
-  /** A reverse of one finished Session (F-61, ADR 0070). Also `origin: "own"`,
-   * and also its own category, and likewise neither edited nor shared: it
-   * copies a case that was actually played. */
+  /** F-61 (ADR 0070): likewise neither edited nor shared. */
   reverse: boolean;
   origin_session: OriginSessionRef | null;
-  /** Set on the few the listing suggests; null for every other card. */
   recommendation: ScenarioRecommendation | null;
 }
 
-/** The pick that is not a Scenario: draw one, and do not say which (F-62).
- * A sentinel id, so the screen keeps exactly one selected value; it cannot
- * collide with a real id, those being UUIDs (ADR 0050). */
+/** Draw one and do not say which (F-62); cannot collide with a UUID. */
 export const RANDOM_SCENARIO_ID = "__random__";
 
-/** Whether a Scenario may be drawn at random. Reverses (ADR 0070) and follow-ups
- * (ADR 0069) are out: neither survives being walked into unprepared. The caller
- * further narrows the pool to what the filter rows show (`scenarioSelection.ts`). */
+/** Reverses and follow-ups do not survive being walked into unprepared. */
 export function isDrawable(scenario: ScenarioCard): boolean {
   return !scenario.reverse && !scenario.follow_up;
 }
 
-/** One of `pool`, drawn uniformly. `isDrawable` is applied again here rather
- * than trusted: the caller's filtering is about what is on screen, this is
- * about what may be walked into blind, and the second is not the first's to
- * get right. */
+/** `isDrawable` again rather than trusting the caller's on-screen filtering. */
 export function drawRandomScenario(pool: ScenarioCard[]): ScenarioCard | null {
   const drawable = pool.filter(isDrawable);
   return drawable[Math.floor(Math.random() * drawable.length)] ?? null;
 }
 
-/**
- * Level 1 of the library filter, in chip order (ADR 0072). "followUp" (ADR 0069)
- * and "reverse" (ADR 0070) are `origin: "own"` on the wire but options of their own,
- * so "own" means hand-authored only. "recommended"/"tenant" are views across the rest.
- */
+/** Level 1 of the filter, in chip order (ADR 0072). "own" means hand-authored only. */
 export const LIBRARY_FILTERS = [
   "recommended",
   "all",
@@ -133,7 +92,6 @@ export const LIBRARY_FILTERS = [
 
 export type LibraryFilter = (typeof LIBRARY_FILTERS)[number];
 
-/** Level 2, the thematic category (ADR 0072). */
 export type CategoryFilter = "all" | ScenarioCategory;
 
 export const CATEGORY_FILTERS: CategoryFilter[] = ["all", ...CATEGORIES];
@@ -143,33 +101,22 @@ export const CATEGORY_FILTER_LABELS: Record<CategoryFilter, string> = {
   ...CATEGORY_LABELS,
 };
 
-/** Whether a card passes the active origin filter. The grid, the counts on the
- * chips and the random Scenario's pool all ask this one function, so an option
- * cannot count one set and show another. */
+/** The grid, the chip counts and the random pool all ask this one function. */
 export function matchesFilter(card: ScenarioCard, filter: LibraryFilter): boolean {
-  // A view over the cards: a suggested Scenario stays under its own origin too.
   if (filter === "recommended") return card.recommendation !== null;
   if (filter === "all") return true;
   if (filter === "standard") return card.origin === "builtin";
   if (filter === "followUp") return card.follow_up;
   if (filter === "reverse") return card.reverse;
-  // The hand-authored option is what is left of `own` once the two kinds the
-  // system wrote itself are taken out.
   if (filter === "own") return card.origin === "own" && !card.follow_up && !card.reverse;
-  // "tenant": anything shared with the company, the author's own shared
-  // Scenarios included.
   return card.shared;
 }
 
-/** Whether a card passes the active category filter. An uncategorised Scenario
- * matches only "all": there is no category it belongs to, and filing it under
- * one nobody chose would be a guess (ADR 0072). */
+/** Uncategorised matches only "all" (ADR 0072). */
 export function matchesCategory(card: ScenarioCard, category: CategoryFilter): boolean {
   return category === "all" || card.category === category;
 }
 
-/** Why a card is suggested, in one line: that it matches the call types the
- *  User picked, and which of their focus goals it practises. */
 export function recommendationReason(
   recommendation: ScenarioRecommendation,
   goalTitle: (key: string) => string,
@@ -182,9 +129,7 @@ export function recommendationReason(
   return parts.join(" · ");
 }
 
-/** The fields a User may author. `name` / `short_description` are the card and
- * `briefing` the trainee's own text (ADR 0054); the rest is prompt input and may
- * be left empty (ADR 0045). */
+/** `briefing` is the trainee's (ADR 0054); the prompt fields may be empty (ADR 0045). */
 export interface ScenarioDraft {
   name: string;
   short_description: string;
@@ -192,55 +137,34 @@ export interface ScenarioDraft {
   description: string;
   case_facts: string;
   call_goal: string;
-  /** A closed vocabulary, not free text. The backend validates it against the
-   * same list the CHECK constraint holds (ADR 0072). "" is a valid choice. */
+  /** Validated against the CHECK constraint's list (ADR 0072). */
   category: CategoryChoice;
 }
 
-/** The draft fields that are text and therefore length-capped. `category` is a
- * choice from a fixed list, so it has no limit to fetch. */
 export type TextField = Exclude<keyof ScenarioDraft, "category">;
 
-/**
- * One Scenario as `GET /api/scenarios/{id}` returns it (ADR 0062): the read
- * view the info panel shows, and — where `editable` is true — the row the
- * editor loads. Not a `ScenarioDraft`: two fields are nullable here.
- */
+/** The read view (ADR 0062), and the editor's row where `editable`. */
 export interface ScenarioDetail {
   id: string;
   name: string;
   short_description: string;
   briefing: string;
   description: string;
-  /** null = withheld because this is a built-in: its `briefing` says what the
-   * trainee's side knows, and the facts are the caller's (ADR 0054's
-   * amendment). */
+  /** null = withheld for a built-in (ADR 0054). */
   case_facts: string | null;
-  /** What the caller wants and the bar that settles it, in one field.
-   * null = withheld because this is a built-in, whose caller's intent is the
-   * answer key (ADR 0062). "" = its author left the field empty. */
+  /** null = withheld for a built-in: the answer key (ADR 0062). */
   call_goal: string | null;
   category: CategoryChoice;
-  /** "public" for a built-in. The editor never sees that value: it opens
-   * only where `editable` is true, and those rows are private or tenant. */
   visibility: Visibility | "public";
-  /** The caller authored this row and may edit it. Decided by the server from
-   * the verified token, never inferred from `origin` here — and false on the
-   * two kinds built from a Session, which their author owns but cannot change
-   * (ADR 0069, ADR 0070). */
+  /** From the verified token; false on reverses and follow-ups (ADR 0069, 0070). */
   editable: boolean;
-  /** ADR 0070. `reverse_brief` is null on everything that is not a reverse;
-   * on one it is the panel shown during the call. */
   reverse: boolean;
-  /** ADR 0069. Beside `reverse` because the panel treats the two alike: these
-   * are the rows whose one action is deleting them. */
   follow_up: boolean;
   origin_session: OriginSessionRef | null;
   reverse_brief: ReverseBrief | null;
 }
 
-/** The editor works on strings; a withheld or absent field is an empty one
- * to it. Only ever called on an `editable` row, where nothing is withheld. */
+/** Only called on an `editable` row, where nothing is withheld. */
 export function toDraft(detail: ScenarioDetail): ScenarioDraft {
   return {
     name: detail.name,
@@ -255,10 +179,7 @@ export function toDraft(detail: ScenarioDetail): ScenarioDraft {
 
 export type FieldLimits = Record<TextField, number>;
 
-/** Max length per authorable field until `getFieldLimits()` answers, and for good
- * if it fails. Must match `backend/authored_text.py` FIELD_LIMITS exactly: a
- * higher cap lets the User type what Save answers with a 422
- * (`tests/test_authored_text.py` pins it). */
+/** Until `getFieldLimits()` answers. Must match `backend/authored_text.py` (pinned by test_authored_text.py). */
 export const FALLBACK_FIELD_LIMITS: FieldLimits = {
   name: 50,
   short_description: 100,
@@ -268,8 +189,6 @@ export const FALLBACK_FIELD_LIMITS: FieldLimits = {
   call_goal: 500,
 };
 
-/** The lengths the API currently enforces, keyed by the same field names as
- * `ScenarioDraft`. Fetched once when the editor opens. */
 export const getFieldLimits = () =>
   apiFetch<FieldLimits>("/api/scenarios/field-limits");
 
@@ -283,24 +202,20 @@ export const EMPTY_DRAFT: ScenarioDraft = {
   category: "",
 };
 
-/** The caller's tenant (ADR 0060), or `{name: null}` for the default tenant.
- * Drives the company filter chip and badge in the Scenario library. */
+/** ADR 0060; `{name: null}` for the default tenant. */
 export const getTenant = () =>
   apiFetch<{ name: string | null }>("/api/tenant");
 
 export const listScenarios = () => apiFetch<ScenarioCard[]>("/api/scenarios");
 
-/** One way to go on after a call (F-64): the same Scenario in the other
- *  language, or another from the library. */
+/** F-64: the same Scenario in the other language, or another from the library. */
 export interface NextCallOffer {
   kind: "language" | "library";
   scenario_id: string;
   scenario_name: string;
   persona_id: string;
   persona_name: string;
-  /** The Persona's language, e.g. "Englisch". */
   language: string;
-  /** Why a library offer was chosen, when the profile chose it. */
   recommendation: ScenarioRecommendation | null;
   unplayed: boolean;
 }
@@ -329,16 +244,13 @@ export const updateScenario = (id: string, draft: ScenarioDraft) =>
 export const deleteScenario = (id: string) =>
   apiFetch<null>(`/api/scenarios/${id}`, { method: "DELETE" });
 
-/** Share the Scenario with the caller's company, or make it private again
- * (R-58). Only the author may. */
+/** R-58; author only. */
 export const setScenarioVisibility = (id: string, visibility: Visibility) =>
   apiFetch<ScenarioDetail>(`/api/scenarios/${id}/visibility`, {
     method: "PUT",
     body: JSON.stringify({ visibility }),
   });
 
-/** What `POST /api/sessions/{id}/reverse` answers: enough to start the reverse
- * immediately, without a second request for the row that was just written. */
 export interface ReverseScenario {
   id: string;
   name: string;
@@ -346,48 +258,29 @@ export interface ReverseScenario {
   reverse_brief: ReverseBrief | null;
 }
 
-/** Create (or find — idempotent) the reverse of a finished Session (F-61,
- * ADR 0070). Slow, so callers show a busy state; 409 = nothing to swap or
- * already a reverse, 503 = model unreachable, both with a `detail`. */
+/** Idempotent (F-61, ADR 0070). 409 = nothing to swap, 503 = model unreachable. */
 export const createReverse = (sessionId: string) =>
   apiFetch<ReverseScenario>(`/api/sessions/${sessionId}/reverse`, { method: "POST" });
 
-/** Draft (or find — idempotent) the follow-up Scenario for a finished Session
- * (F-60, ADR 0069); same shape as `createReverse`. 409 = the wrap-up names
- * nothing to build from, 503 = model unreachable. Slow, so show a busy state. */
+/** Idempotent (F-60, ADR 0069). 409 = nothing to build from, 503 = model unreachable. */
 export const createFollowUp = (sessionId: string) =>
   apiFetch<FollowUpCard>(`/api/sessions/${sessionId}/follow-up`, { method: "POST" });
 
 export interface DocumentText {
-  /** The LLM's fact list, or (when `summarised` is false) the raw text. One
-   * list for the whole upload: several documents are condensed together. */
+  /** The fact list, or the raw text when `summarised` is false. */
   text: string;
-  /** Pages over the whole batch. */
   pages: number;
-  /** What was read, in the order it was sent — the sanitised file names, so
-   * the editor can say how many documents went in. */
   documents: { name: string; pages: number }[];
-  /** True: the LLM condensed the document. False: the LLM was unreachable and
-   * this is the raw extracted text, truncated. */
   summarised: boolean;
 }
 
-/** Upload ceilings, mirrored from `backend/documents.py` so the editor can
- * refuse an oversized drop instead of sending it and waiting. The server
- * enforces the real thing and answers with its own message, so this is a
- * courtesy check — keep it in step, but it need not be exact. Same arrangement
- * as `FALLBACK_FIELD_LIMITS` above. */
+/** A courtesy check mirrored from `backend/documents.py`; the server enforces the real one. */
 export const MAX_DOCUMENT_MB = 5;
 export const MAX_DOCUMENTS_TOTAL_MB = 20;
 
-/** Extract the text-layer PDFs and have the LLM condense them into one fact
- * list, for the facts field (F-58). Several at once, summarised together:
- * the field holds one list, and two documents condensed apart would repeat
- * every fact they share. Multipart: `apiFetch` leaves the content type of a
- * form body to the browser. */
+/** Condenses the PDFs together into one fact list (F-58). */
 export function extractPdfs(files: File[]): Promise<DocumentText> {
   const form = new FormData();
-  // Repeated under one name, which the route reads as `form.getlist("files")`.
   for (const file of files) form.append("files", file);
   return apiFetch<DocumentText>("/api/scenarios/document", { method: "POST", body: form });
 }

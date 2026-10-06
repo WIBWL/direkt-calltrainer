@@ -11,11 +11,8 @@ import {
 } from "../utils/progressStats";
 import TrainingLinks from "./TrainingLinks";
 
-/**
- * When the user trained, one month at a time (F-13). The period switch deliberately does
- * not reach it: the grid carries its own range. Counting implies no norm (ADR 0065), and
- * the printed count makes the shading redundant. A real `<table>` for screen readers.
- */
+/** When the user trained, a month at a time (F-13), outside the period switch.
+ * Counting implies no norm (ADR 0065). A real `<table>`, for screen readers. */
 
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const WEEKDAY_NAMES = [
@@ -29,10 +26,7 @@ export default function ActivityCalendar({ sessions }: { sessions: SessionSummar
     month: today.getMonth(),
   });
   const [active, setActive] = useState<ActivityDay | null>(null);
-  // The day whose trainings are listed under the calendar. Separate from
-  // `active`, which is the hover readout: pointing at a cell and opening one
-  // are two different acts, and letting a hover close an opened list would
-  // make the list impossible to reach with the mouse still on the grid.
+  // Separate from the hover readout, or hovering would close an opened list.
   const [opened, setOpened] = useState<string | null>(null);
 
   const month = useMemo(
@@ -41,18 +35,13 @@ export default function ActivityCalendar({ sessions }: { sessions: SessionSummar
   );
   const earliest = useMemo(() => firstTrainingMonth(sessions), [sessions]);
 
-  // Months counted from year zero, so "is this one before that one" is one
-  // comparison instead of two nested ones.
   const at = shown.year * 12 + shown.month;
   const hasPrevious = earliest !== null && at > earliest.year * 12 + earliest.month;
   const hasNext = at < today.getFullYear() * 12 + today.getMonth();
   const todayKey = dayKey(today);
 
   const step = (by: number) => {
-    // The readout names a day of the month on screen; paging away from it would
-    // otherwise leave that sentence standing over a different month. The same
-    // goes for an opened day's list, which would then sit under a month it does
-    // not belong to.
+    // Readout and list belong to the month being left.
     setActive(null);
     setOpened(null);
     setShown(({ year, month: current }) => {
@@ -107,8 +96,6 @@ export default function ActivityCalendar({ sessions }: { sessions: SessionSummar
         </thead>
         <tbody>
           {month.weeks.map((week, index) => (
-            // The week has no id of its own and no meaning beyond its
-            // position in the month, so its index is its key.
             <tr key={`${month.label}-${index}`}>
               {week.map((day, weekday) => (
                 <td key={day ? day.date : `pad-${weekday}`}>
@@ -133,9 +120,7 @@ export default function ActivityCalendar({ sessions }: { sessions: SessionSummar
       </table>
 
       <figcaption className="calendar-legend">
-        {/* The hovered day replaces the scale rather than sitting beside it: at
-            this width both together wrap onto a second line, and the scale is
-            what the reader has already understood by the time they hover. */}
+        {/* Replaces the scale: both together wrap. */}
         {active ? (
           <span className="calendar-readout">
             {new Date(active.date).toLocaleDateString("de-DE", {
@@ -153,9 +138,7 @@ export default function ActivityCalendar({ sessions }: { sessions: SessionSummar
         )}
       </figcaption>
 
-      {/* Under the whole calendar rather than under the week that was pressed:
-          a row inserted into the grid would push the following weeks down and
-          make the month change shape as it is read. */}
+      {/* Under the calendar, so the month does not change shape. */}
       {opened && (
         <TrainingLinks
           title={`Trainings am ${new Date(opened).toLocaleDateString("de-DE", {
@@ -197,11 +180,7 @@ function Day({
     (isToday ? " calendar-day-today" : "") +
     (isOpen ? " calendar-day-open" : "");
 
-  // The day of the month on an empty day, the count on a day that has
-  // trainings. The number a reader is looking for differs: on an empty day it
-  // is "which day is this", on a full one it is "how many". The full sentence
-  // goes to a screen reader, which cannot see that a 2 in a coloured cell is a
-  // count while a 2 in a plain one is a date.
+  // The date on an empty day, the count on a full one; the sentence for screen readers.
   const content = (
     <>
       <span aria-hidden="true">{day.count > 0 ? day.count : day.dayOfMonth}</span>
@@ -209,10 +188,7 @@ function Day({
     </>
   );
 
-  // A day with nothing on it stays a plain cell. Making every cell a button
-  // would put thirty stops in the tab order to reach the two that open
-  // something, and a control that does nothing when pressed is worse than no
-  // control.
+  // An empty day is no button: thirty tab stops to reach two.
   if (day.count === 0) {
     return (
       <span className={className} onMouseEnter={onEnter} onMouseLeave={onLeave}>
@@ -235,8 +211,6 @@ function Day({
   );
 }
 
-/** One day in words. Counted, never judged: a number of trainings, never a
- * verdict on them. */
 function describe(day: ActivityDay): string {
   if (day.count === 0) return "kein Training";
   return `${day.count} ${day.count === 1 ? "Training" : "Trainings"}`;

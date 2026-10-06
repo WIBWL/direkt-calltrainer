@@ -2,21 +2,12 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-/**
- * Every class in `index.css` is used by something (static: compares strings).
- * Do not split the sheet per component instead: many classes are styled from
- * several sections, and rule order would move into the module graph, unseen.
- */
+/** ADR 0092: every class in `index.css` is used somewhere. Do not split the sheet: rule order would move into the module graph. */
 
-/** Vitest runs with the frontend package as its working directory. Resolving
- *  through `import.meta.url` instead breaks under Vite on Windows, where it
- *  arrives as an `/@fs/` URL with the path still percent-encoded. */
+/** `import.meta.url` breaks under Vite on Windows. */
 const SRC = join(process.cwd(), "src");
 
-/**
- * Classes assembled at runtime (prefix, and where it is completed). Listed
- * explicitly: a clever matcher would quietly readmit unreachable rules.
- */
+/** Classes built at runtime; explicit, since a clever matcher would readmit dead rules. */
 const BUILT_AT_RUNTIME: ReadonlyArray<readonly [RegExp, string]> = [
   [/^card-origin-/, "LibraryPicker.badgeClass — builtin/own/shared/tenant/reverse/follow-up"],
   [/^call-animation-/, "CallView — the three states of the call animation"],
@@ -37,8 +28,7 @@ function sourceFiles(dir: string): string[] {
   return out;
 }
 
-/** The stylesheet with its comments removed, so a class named in prose is not
- *  mistaken for one that is styled. */
+/** Comments removed, so a class named in prose does not count. */
 function stylesheet(): string {
   return readFileSync(join(SRC, "index.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 }
@@ -59,9 +49,7 @@ describe("the stylesheet", () => {
   });
 
   it("has an entry under every runtime-built prefix it claims", () => {
-    // The allowlist is the one way past the check above, so it has to age with
-    // the sheet: a prefix left behind after its rules went would silently widen
-    // the exemption for whatever is written next.
+    // A stale prefix would silently widen the exemption.
     const classes = definedClasses();
     const unused = BUILT_AT_RUNTIME.filter(([re]) => !classes.some((c) => re.test(c)));
     expect(unused.map(([re, why]) => `${re.source} (${why})`)).toEqual([]);

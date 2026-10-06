@@ -20,8 +20,7 @@ import SetupSection from "./SetupSection";
 
 const NOT_SELECTED = "Noch nicht ausgewählt";
 
-/** Summary label for a case not yet drawn (F-62): the choice, plus the category it will be drawn from.
- * With no category the word stands alone. */
+/** F-62: the choice, plus the category it will be drawn from. */
 function randomSelectedLabel(category: CategoryFilter): string {
   return category === "all"
     ? "Zufallsszenario"
@@ -33,9 +32,7 @@ interface SetupViewProps {
   scenarioId: string | null;
   scenarioFilter: LibraryFilter;
   onScenarioFilter: (f: LibraryFilter) => void;
-  /** How many Scenarios each option of a row would show, counted against the
-   * *other* row only. Switching to an empty option is then visible in advance
-   * rather than a surprise. */
+  /** Each counted against the other row, so an empty option shows in advance. */
   scenarioOriginCounts: Record<LibraryFilter, number>;
   scenarioCategory: CategoryFilter;
   onScenarioCategory: (c: CategoryFilter) => void;
@@ -43,16 +40,12 @@ interface SetupViewProps {
   showRecommended: boolean;
   tenantName: string | null;
   onNewScenario: () => void;
-  /** Whether there is anything in the library to draw a random Scenario from
-   * (F-62). */
+  /** F-62. */
   offerRandom: boolean;
-  /** Open a Scenario's read-only info panel; editing starts there
-   * (ADR 0062). */
+  /** Editing starts there (ADR 0062). */
   onShowScenarioInfo: (id: string) => void;
   personas: Persona[];
   personaId: string | null;
-  /** Open the read-only info panel for this Persona. Held in App.tsx
-   * beside the Scenario editor's state, since this component keeps none. */
   onShowPersonaInfo: (id: string) => void;
   selectedScenario: ScenarioCard | null;
   selectedPersona: Persona | null;
@@ -62,10 +55,7 @@ interface SetupViewProps {
   onStart: () => void;
 }
 
-/**
- * Presentational three-step selection screen. Only the final button commits a Session; picking connects
- * nothing (ADR 0042), so all state comes from App.tsx (ADR 0058/0060).
- */
+/** Presentational: only the final button commits a Session (ADR 0042). */
 export default function SetupView({
   scenarioItems,
   scenarioId,
@@ -91,8 +81,7 @@ export default function SetupView({
   onStart,
 }: SetupViewProps) {
   const { consent } = useConsentContext();
-  // The one selection that resolves to no card: it is drawn on the way into
-  // the call, not here (F-62).
+  // Drawn on the way into the call (F-62).
   const randomPicked = scenarioId === RANDOM_SCENARIO_ID;
 
   return (
@@ -164,16 +153,10 @@ export default function SetupView({
           language={selectedPersona?.language ?? NOT_SELECTED}
         />
 
-        {/* What the case is about: which Scenario to pick is itself a
-            decision, and the card's one line says only what the caller wants.
-            The Wissensstand with its figures follows after the microphone
-            check, once the Session is committed to (ADR 0054's amendment). */}
+        {/* The Wissensstand follows after the mic check (ADR 0054). */}
         <ScenarioDescription description={selectedScenario?.description} />
 
-        {/* Said before the call, not after it (ADR 0066). Someone who declined
-            storage should learn that this training will leave no record while
-            they can still change their mind — finding out afterwards, with the
-            transcript already gone, is finding out too late. */}
+        {/* Before the call, while the user can still change their mind (ADR 0066). */}
         {consent && !consent.allows_storage && (
           <p className="setup-storage-note">
             Dieses Training wird <strong>nicht gespeichert</strong>. Sie sehen das
@@ -202,9 +185,7 @@ export default function SetupView({
   );
 }
 
-/** One selectable card (the Persona step; Scenarios use LibraryPicker). The "i" sits outside the card button
- * — buttons cannot nest — in the same `card-wrap` shell, and reading does not select. The text lines are
- * wrapped as the row's second column, beside the portrait. */
+/** The Persona step's card. The "i" sits beside the card button (buttons cannot nest); reading does not select. */
 function ChoiceCard({
   title,
   subtitle,
@@ -219,7 +200,6 @@ function ChoiceCard({
   title: string;
   subtitle: string;
   language: string;
-  /** Which flag goes on the language line, beside the word it illustrates. */
   languageCode: string;
   avatarUrl: string | null;
   isSelected: boolean;
@@ -244,8 +224,7 @@ function ChoiceCard({
         <span className="persona-card-body">
           <span className="persona-name">{title}</span>
           <span className="card-subtitle">{subtitle}</span>
-          {/* The flag goes ahead of the language word, not beside the name, so every card's flag sits at the
-              same x. */}
+          {/* Before the language word, so every flag sits at the same x. */}
           <span className="card-meta">
             <LanguageFlag code={languageCode} />
             {language}

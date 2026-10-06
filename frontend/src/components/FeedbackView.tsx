@@ -8,8 +8,7 @@ import { retryFeedback } from "../sessions";
 import FeedbackReport from "./FeedbackReport";
 import type { FollowUpActions } from "./NextSteps";
 
-/** Everything that is not a finished wrap-up is a one-line notice. There is
- * no entry for "ready": the hook reports it only once feedback is present. */
+/** No "ready": the hook reports it only once feedback is present. */
 const NOTICE: Record<string, string> = {
   loading: "Das Feedback wird erstellt. Einen Moment bitte.",
   missing: "Für dieses Gespräch wurde kein Feedback gespeichert.",
@@ -17,11 +16,7 @@ const NOTICE: Record<string, string> = {
     "Das Feedback konnte nicht erstellt werden. Das Gesprächsprotokoll unten ist davon nicht betroffen.",
 };
 
-/**
- * The post-call wrap-up (F-09/F-10/F-53): the model's narrative and the statistics it
- * was written from, the figures as evidence, never a score (ADR 0004/0049/0051). The
- * Session is polled once in `App` and handed in, so the PDF reads the same `detail`.
- */
+/** The post-call wrap-up (F-09/F-10/F-53): narrative and figures, never a score (ADR 0004/0049/0051). */
 export default function FeedbackView({
   detail,
   state,
@@ -31,25 +26,17 @@ export default function FeedbackView({
   onReverse,
   next,
 }: {
-  /** The polled Session. Null while it has not arrived, and for a call that
-   * was never stored. */
+  /** Null while arriving, and for an unstored call. */
   detail: SessionDetail | null;
   state: FeedbackState;
-  /** The Session to ask again about, where a failed wrap-up can be retried.
-   *  Null on a call that was never stored — there is nothing to generate. */
+  /** Null for an unstored call. */
   sessionId?: string | null;
-  /** Poll again, once the retry has been accepted. Omitted on a screen that
-   *  does not poll (the history reads once), where the retry is not offered. */
+  /** Omitted where nothing polls (the history), and the retry with it. */
   onRetry?: () => void;
-  /** Omitted where there is nowhere to act on the follow-up (F-60). */
   followUp?: FollowUpActions;
-  /** Create and start the reverse of this Session (F-61, ADR 0070). Like
-   * `followUp.onStart` it belongs to whoever owns the screen: the post-call
-   * screen begins the call itself, the history hands the pairing to the
-   * training flow. Omitted where there is nowhere to go with it. */
+  /** F-61 (ADR 0070); belongs to whoever owns the screen. */
   onReverse?: (reverse: ReverseScenario) => void;
-  /** What to play next (F-64). Shown without a wrap-up too: it needs no
-   *  stored Session, so a call that was not kept still gets it. */
+  /** F-64. Needs no stored Session. */
   next?: ReactNode;
 }) {
   if (!detail?.feedback) {
@@ -57,10 +44,7 @@ export default function FeedbackView({
       <>
         <div className="card">
           <p className="muted">{NOTICE[state]}</p>
-          {/* The one state that was a dead end. The work is still possible —
-              a wrap-up is written from the stored Transcript and Measurements,
-              never from audio (ADR 0048/0049) — and until now the only way to
-              ask for it again ran inside the container. */}
+          {/* Written from stored data, never audio (ADR 0049), so it can be asked again. */}
           {state === "failed" && sessionId && onRetry && (
             <RetryFeedback sessionId={sessionId} onQueued={onRetry} />
           )}
@@ -74,11 +58,7 @@ export default function FeedbackView({
   );
 }
 
-/**
- * Ask for the wrap-up once more. On a refusal it shows the server's sentence, since the
- * reasons (a job still running, nothing to summarise) are invisible here. On success
- * polling resumes at once.
- */
+/** Shows the server's refusal sentence; on success polling resumes. */
 function RetryFeedback({
   sessionId,
   onQueued,

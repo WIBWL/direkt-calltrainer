@@ -12,17 +12,11 @@ import AppLayout from "./AppLayout";
 import GoalStatements from "./GoalStatements";
 import SegmentComparison from "./SegmentComparison";
 
-/**
- * One focus goal across trainings, the dashboard's second level (docs/dashboard-concept.md, section 7): the goal,
- * how often it was named out of how many, every sentence quoted and linked. A backing metric is linked, not
- * redrawn. No verdict; ADR 0080's wording, since a frequency is easily read as a grade here.
- */
+/** One focus goal across trainings: how often named out of how many, every
+ * sentence quoted. No verdict (ADR 0080). */
 export default function ProgressGoalView() {
   const { goalKey } = useParams<{ goalKey: string }>();
-  // The overview's selection, for the reason ProgressMetricView gives: the
-  // tile and the page behind it count the same trainings or they contradict
-  // each other, and here it is a count of statements, which is the figure most
-  // easily misread (ADR 0080).
+  // The overview's selection, so tile and page count the same trainings.
   const { selected: sessions, series: all, periodPhrase, state, withPeriod } =
     useProgressContext();
   const { focus } = useFocusContext();
@@ -44,9 +38,7 @@ export default function ProgressGoalView() {
     );
   }
 
-  // The catalogue is what turns the key into a goal, so without it there is
-  // nothing to name. Null here is a failed load and not one still running:
-  // `FocusProvider` renders nothing below it until its request has settled.
+  // Null is a failed load: `FocusProvider` waits for its request.
   if (!focus) {
     return (
       <AppLayout pageClassName="app-page-narrow progress-page">
@@ -59,9 +51,7 @@ export default function ProgressGoalView() {
     );
   }
 
-  // An unknown key is a goal that was retired, or a hand-typed URL. Both are
-  // the same answer: the catalogue has nothing under this name, and there is
-  // nothing to show for it.
+  // Retired, or a hand-typed URL.
   if (state === "failed" || !goal || !goalKey) {
     return (
       <AppLayout pageClassName="app-page-narrow progress-page">
@@ -77,8 +67,7 @@ export default function ProgressGoalView() {
   const { strengths, improvements, total } = mentionsFor(sessions, goalKey);
   const statements = statementsFor(sessions, [goalKey]);
   const backing = backingOf(goalKey);
-  // Only a series that actually has points: linking to an empty metric page
-  // promises a chart that is not there.
+  // Only series with points: an empty metric page promises a missing chart.
   const measured = all.filter((series) =>
     backing.metrics.includes(series.key),
   );
@@ -88,14 +77,10 @@ export default function ProgressGoalView() {
       {back}
       <h1>{goal.title}</h1>
       <p className="page-lead">{goal.caption}</p>
-      {/* No switch of its own, so it says what it reads -- see the same line on
-          a metric's page. */}
       <p className="muted">Gelesen über {periodPhrase}.</p>
 
       <div className="card">
-        {/* Habit goals are never tagged -- the wrap-up is refused them in the
-            prompt and again when the tags are stored (ADR 0080) -- so a count
-            of zero would be an artefact and not an observation. */}
+        {/* Habit goals are never tagged (ADR 0080), so a zero would be an artefact. */}
         {backing.kind !== "activity" &&
           (total === 0 ? (
             <p>
@@ -123,10 +108,7 @@ export default function ProgressGoalView() {
           </p>
         )}
 
-        {/* An activity goal is answered by the figures at the top of the
-            overview and by nothing on this page. Saying "keine Messung" here
-            would be wrong in the other direction: those goals are measured,
-            just not per call. */}
+        {/* Measured, just not per call: "keine Messung" would be wrong. */}
         {backing.kind === "activity" && (
           <p className="muted">
             Dieses Ziel betrifft Ihr Training selbst, nicht ein einzelnes Gespräch. Wie
@@ -150,10 +132,7 @@ export default function ProgressGoalView() {
   );
 }
 
-/**
- * The "composure under pressure" comparison, one block per training, newest first (ADR 0081). Never aggregated:
- * each call's pressure was a different thing, and an average would be the single number this goal must not have.
- */
+/** One block per training (ADR 0081), never aggregated: an average is the number this goal must not have. */
 function PressureSection({ sessions }: { sessions: SessionSummary[] }) {
   const trainings = segmentTrainings(sessions);
 

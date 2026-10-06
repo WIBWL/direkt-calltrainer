@@ -7,11 +7,7 @@ import {
   type LoudnessCurve,
 } from "./loudness";
 
-/**
- * The drawing arithmetic of F-37's loudness course (the reading is the server's,
- * ADR 0091). A bridge one point too long draws a line across a silence,
- * asserting a level nobody spoke at, and looks perfectly ordinary.
- */
+/** F-37's drawing arithmetic: a bridge too long draws a line across a silence. */
 
 describe("loudnessRuns", () => {
   it("returns one run for an unbroken curve", () => {
@@ -96,8 +92,7 @@ describe("describeLoudness", () => {
   it("never reads as a judgement, only as a location", () => {
     const text = describeLoudness(curve([{ direction: "louder", peakIndex: 1 }]));
 
-    // ADR 0004/0051: the course carries no target, so the sentence under it
-    // may say where the line went and not whether that was good.
+    // ADR 0004/0051.
     expect(text).not.toMatch(/zu laut|zu leise|besser|schlecht|gut/i);
   });
 });

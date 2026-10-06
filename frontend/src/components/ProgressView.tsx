@@ -36,17 +36,10 @@ import SectionHeading from "./SectionHeading";
 import Sparkline from "./Sparkline";
 import VarietyGrid from "./VarietyGrid";
 
-/**
- * Progress dashboard (F-13, docs/dashboard-concept.md): activity over every training, then the period switch
- * (placed where its reach begins; kept in the URL, `ProgressContext`), then goals, recurring themes and metrics
- * over the selection. Nothing evaluated (ADR 0065, ADR 0051); no comparison with colleagues (ADR 0060 would allow).
- */
+/** Progress dashboard (F-13): activity over everything, then the period switch,
+ * then goals, recurring themes and metrics over the selection. Nothing evaluated (ADR 0065). */
 export default function ProgressView() {
-  // The trainings and the selection both come from the provider, which the two
-  // detail levels read as well — that is what keeps a tile and the page behind
-  // it talking about the same set (see ProgressContext.tsx). `withPeriod` is
-  // not taken here: the links that need it sit in the tiles and in the metric
-  // table, which read it from the same context.
+  // From the provider, so a tile and the page behind it read the same set.
   const {
     sessions,
     selected: inPeriod,
@@ -64,14 +57,10 @@ export default function ProgressView() {
   const { focus } = useFocusContext();
   const { consent } = useConsentContext();
   const overview = series.filter((s) => showsInOverview(s.key));
-  // Over everything stored, like the calendar they stand beside: the three
-  // figures sit above the switch now, so they cannot follow it. Completed
-  // trainings only, which is `activity`'s own rule since it and the calendar
-  // stopped disagreeing (ADR 0034's amendment).
+  // Over everything stored, like the calendar beside it.
   const counts = activity(sessions);
   const goals = pickedGoals(focus?.goals ?? [], focus?.selected ?? []);
-  // What each goal reads, decided once for this screen and the downloaded
-  // report alike (`utils/progressOutline.ts`, ADR 0102).
+  // Decided once for this screen and the report (ADR 0102).
   const outline = focusOutline({
     goals,
     series,
@@ -79,9 +68,7 @@ export default function ProgressView() {
     readable,
     shows: showsInOverview,
   });
-  // Trainings in the selection too short for their figures to be read
-  // (`MIN_CALL_MS`). Still counted above and still in the calendar; only the
-  // courses leave them out, and doing that silently would overstate them.
+  // Left out of the courses only; said, or they would be overstated.
   const tooShort = inPeriod.length - readable.length;
 
   if (state === "loading") {
@@ -102,9 +89,7 @@ export default function ProgressView() {
     );
   }
 
-  // Nothing stored and nothing being stored: the dashboard cannot fill up on
-  // its own, and reporting an empty history would send the user off to train
-  // when the reason is a setting.
+  // The reason is a setting, not a lack of training.
   if (sessions.length === 0 && consent && !consent.allows_storage) {
     return (
       <Frame>
@@ -139,8 +124,6 @@ export default function ProgressView() {
         </p>
       )}
 
-      {/* First, above the switch: activity over every stored training. It needs no norm (ADR 0065) and is
-          what a returning User checks first. */}
       <section className="progress-section progress-training-section" aria-labelledby="activity-title">
         <SectionHeading id="activity-title" title="Ihr Training" />
 
@@ -184,11 +167,7 @@ export default function ProgressView() {
         </div>
       </section>
 
-      {/* The switch sits where its reach begins. Everything above it counts
-          every stored training; everything below is read over the selection.
-          It used to sit in the page head beside the counted facts, where it
-          looked as if it governed them and the calendar too, and the calendar
-          then needed a comment explaining why it did not. */}
+      {/* Everything above counts every training; everything below the selection. */}
       <div className="progress-scope">
         <span className="progress-scope-label" id="progress-scope-label">
           Ausgewertet werden
@@ -207,9 +186,7 @@ export default function ProgressView() {
           ))}
         </div>
 
-        {/* Occasion filter, the same control as the period row. A course across different kinds of call is
-            scatter, across one kind a series (concept section 4.3). Options carry their counts; an empty one
-            cannot be pressed. */}
+        {/* A course across kinds of call is scatter; an empty option cannot be pressed. */}
         <div
           className="progress-periods progress-occasions"
           role="group"
@@ -236,9 +213,6 @@ export default function ProgressView() {
         <span className="progress-scope-note">
           {inPeriod.length} {inPeriod.length === 1 ? "Training" : "Trainings"}, für alles
           darunter
-          {/* Said where the selection is stated, because it is part of what
-              the selection amounts to. A course drawn over fewer calls than
-              the line above names would otherwise be a quiet subtraction. */}
           {tooShort > 0 && (
             <>
               {". "}
@@ -252,10 +226,7 @@ export default function ProgressView() {
         </span>
       </div>
 
-      {/* Empty only through the occasion row: counted in trainings, the period
-          alone is never empty while anything is stored. Reachable by a shared
-          link, and by deleting the last training of a kind while the filter is
-          on it. */}
+      {/* Empty only through the occasion row, e.g. from a shared link. */}
       {inPeriod.length === 0 ? (
         <div className="card">
           <p>
@@ -271,10 +242,6 @@ export default function ProgressView() {
             <OverviewSection series={overview} />
           )}
 
-          {/* Second, directly under the goals: what the wrap-ups keep naming,
-              and beside the improvements the one call to practise them in. It
-              is the only block on the page that leads back into training, and
-              it used to be the last one. */}
           <ProgressRecurring
             sessions={inPeriod}
             catalogue={focus?.goals ?? []}
@@ -285,29 +252,18 @@ export default function ProgressView() {
         </>
       )}
 
-      {/* Last on the page, the way the feedback screen puts its download last:
-          what to do once the reading is done, after the reading. It is offered
-          even where the selection is empty, because the record at the top of
-          the sheet counts every stored training and is worth having on its
-          own. */}
       <DownloadReport />
     </Frame>
   );
 }
 
-/**
- * The whole screen as a PDF (F-13; `utils/progressPdf.ts`), counterpart of F-64's feedback file. Built in the
- * browser from the page's own numbers — a server route would be a second path to them (concept section 9).
- * Shares the feedback screen's actions-row classes rather than copying its rules.
- */
+/** The screen as a PDF (F-13), built from the page's own numbers. */
 function DownloadReport() {
   const { sessions, selected, periodPhrase, truncated } = useProgressContext();
   const { focus } = useFocusContext();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  // Nothing to print before the first training, and the empty state above
-  // already says what to do about that.
   if (sessions.length === 0) return null;
 
   const download = async () => {
@@ -347,17 +303,11 @@ function DownloadReport() {
   );
 }
 
-/** The page frame, so every branch above returns the same heading and back link
- *  instead of each repeating them. */
 function Frame({ children }: { children: ReactNode }) {
   return (
     <AppLayout progressActive pageClassName="app-page-wide progress-page">
       <h1>Ihr Fortschritt</h1>
-      {/* What the page is, first, and that nothing on it is a grade, in one
-          sentence -- that half cannot move behind the "i": a reader who is not
-          told that no figure is judged fills the gap in and assumes higher is
-          better (dashboard-concept.md section 2). The reason why belongs
-          behind it. */}
+      {/* That nothing is graded is said up front: an untold reader assumes higher is better. */}
       <p className="page-lead">
         Woran Sie arbeiten, was Ihre Auswertungen wiederholt nennen und wie Sie über Ihre
         Trainings hinweg gesprochen haben. Bewertet wird hier nichts.
@@ -380,10 +330,7 @@ function Frame({ children }: { children: ReactNode }) {
   );
 }
 
-// --- Focus goals (block B) ---------------------------------------------------
-
-/** The picked goals, in catalogue order, resolved against the catalogue. A key
- *  whose goal has since been retired simply drops out. */
+/** Catalogue order; a retired goal drops out. */
 function pickedGoals(catalogue: FocusGoal[], selected: string[]): FocusGoal[] {
   return catalogue.filter((goal) => selected.includes(goal.key));
 }
@@ -392,10 +339,9 @@ function FocusSection({
   outline,
   allSessions,
 }: {
-  /** What each picked goal reads, decided in `utils/progressOutline.ts` and
-   *  only drawn here. The downloaded report renders the same list. */
+  /** Decided in `utils/progressOutline.ts`; the report renders the same list. */
   outline: FocusOutline[];
-  /** Everything stored, whatever the switch says (see `FocusTile`). */
+  /** Everything stored, whatever the switch says. */
   allSessions: SessionSummary[];
 }) {
   return (
@@ -421,22 +367,14 @@ function FocusSection({
   );
 }
 
-/**
- * One focus goal, in one of the five shapes `utils/progressOutline.ts` decided:
- * a metric with its course, a two-stretch comparison, an activity figure,
- * wrap-up mentions, or a measured goal this selection carries no value for. None
- * is ever hidden, or the user would believe the goal is being tracked. Which
- * shape it is is not decided here: this and the report's paragraph are two
- * drawings of one reading, and each working it out for itself is what made them
- * disagree about that fifth state (ADR 0102).
- */
+/** One focus goal in the shape `utils/progressOutline.ts` decided. None is ever
+ * hidden, or the user would believe it tracked (ADR 0102). */
 function FocusTile({
   entry,
   allSessions,
 }: {
   entry: FocusOutline;
-  /** Every stored training, for the regularity goal, which is about the
-   *  calendar and not about the trainings the switch selected. */
+  /** For the regularity goal, which is about the calendar, not the selection. */
   allSessions: SessionSummary[];
 }) {
   const { withPeriod } = useProgressContext();
@@ -452,10 +390,7 @@ function FocusTile({
           {reading.supporting.length > 0 && <SupportingMetrics series={reading.supporting} />}
         </>
       ) : reading.kind === "no-value" ? (
-        // Measured, but nothing in this selection carries it: a metric younger
-        // than these calls, or one their recordings could not yield. It used to
-        // fall through every branch and draw a title, a link and nothing
-        // between them, which section 6 of the concept rules out.
+        // Measured, but nothing in this selection carries it.
         <p className="focus-tile-note">{reading.note}</p>
       ) : reading.kind === "segment" ? (
         <SegmentBody trainings={reading.trainings} />
@@ -469,8 +404,7 @@ function FocusTile({
         <GoalMentionBody reading={reading} />
       )}
 
-      {/* One drill-down per tile: the goal's own page (which links on to a chart where one exists). Activity
-          goals have none — the calendar and variety grid on this screen answer them. */}
+      {/* Activity goals have no page: the calendar and variety grid answer them. */}
       {reading.kind !== "activity" && (
         <Link className="progress-detail-link" to={withPeriod(progressGoalPath(entry.key))}>
 
@@ -481,10 +415,7 @@ function FocusTile({
   );
 }
 
-/**
- * The goal's other metrics, one small line each (`focusMetrics.FOCUS_BACKING`): for rhythm-like goals the
- * combination is the goal. Same terms as the main figure — no band, no value colour.
- */
+/** For rhythm-like goals the combination is the goal. No band, no value colour. */
 function SupportingMetrics({ series }: { series: MetricSeries[] }) {
   return (
     <ul className="focus-supporting">
@@ -508,9 +439,7 @@ function SupportingMetrics({ series }: { series: MetricSeries[] }) {
   );
 }
 
-/** Regular training in words: how many trainings in the last 30 days, and when
- *  the last one was. A count and a date, no verdict on either -- how often is
- *  often enough is exactly the kind of number nobody has established. */
+/** A count and a date, no verdict: nobody has established how often is enough. */
 function regularityText(sessions: SessionSummary[]): string {
   const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const completed = sessions.filter((s) => s.status === "completed");
@@ -520,10 +449,7 @@ function regularityText(sessions: SessionSummary[]): string {
   return last ? `${count}, zuletzt am ${formatDate(last) ?? last}.` : `${count}.`;
 }
 
-/**
- * Tile of a goal answered by a comparison rather than a series (ADR 0081): only a count of trainings. The
- * comparison is a table one level down; any single number here would be the composite ADR 0051 refuses.
- */
+/** Only a count (ADR 0081): any single number here would be the composite ADR 0051 refuses. */
 function SegmentBody({ trainings }: { trainings: number }) {
   const withComparison = trainings;
 
@@ -548,14 +474,8 @@ function SegmentBody({ trainings }: { trainings: number }) {
   );
 }
 
-/**
- * A goal with no figure to show (`utils/focusMetrics.ts`), answered by counting
- * what the wrap-ups said — a count of statements, not a verdict. A measured goal
- * whose selection carries no value reaches this too, and `measured` keeps the
- * closing line honest there: "keine Messung" is the truth only in the first
- * case. No two-mention threshold as in the recurring block: on a tile the user
- * picked, "once so far" is a legitimate answer.
- */
+/** Counting what the wrap-ups said: statements, not a verdict. No two-mention
+ * threshold here: on a picked goal "once so far" is an answer. */
 function GoalMentionBody({
   reading,
 }: {
@@ -567,11 +487,7 @@ function GoalMentionBody({
     return <p className="focus-tile-note">{note}</p>;
   }
 
-  // The sentence first, then the tally. For a goal with no measurement the
-  // sentences are the whole of what exists, and a count on its own asks the
-  // reader to take a number on trust — which is the reading that makes a
-  // frequency look like a measurement. Quoted, never summarised, and labelled
-  // in words rather than by colour, exactly as the goal's own page does it.
+  // The sentences first, quoted: a count alone looks like a measurement.
   return (
     <>
       {latest && (
@@ -614,16 +530,11 @@ function GoalMentionBody({
   );
 }
 
-/** A metric's current state: the last value, its course, and the user's own
- *  usual range in words. Shared by the focus tiles and the overview that stands
- *  in for them, both of which hand in a reading rather than a series, so the
- *  same metric cannot say two different things depending on which block it
- *  stands in (`utils/progressOutline.ts`). */
+/** Shared by the focus tiles and the overview, so a metric cannot say two things. */
 function MetricBody({ reading }: { reading: Extract<FocusReading, { kind: "metric" }> }) {
   const { series, last, band, trainings, missing } = reading;
 
-  // A checklist has no course and no band (see `SeriesShape`): the counts per
-  // training, and how often all parts were there.
+  // A checklist has no course and no band.
   if (series.shape === "parts") {
     const summary = partsSummary(series);
     return (
@@ -657,7 +568,7 @@ function MetricBody({ reading }: { reading: Extract<FocusReading, { kind: "metri
         <span className="progress-metric-figure-label"> zuletzt</span>
       </p>
       <Sparkline series={series} />
-      {/* Trainings without a value, so a course from 6 of 10 does not read as complete (ADR 0085). */}
+      {/* So a course from 6 of 10 does not read as complete (ADR 0085). */}
       <p className="focus-tile-note">
         Ihr üblicher Bereich {band ?? "–"}, aus {trainings} Trainings.
         {missing > 0 &&
@@ -668,19 +579,11 @@ function MetricBody({ reading }: { reading: Extract<FocusReading, { kind: "metri
   );
 }
 
-// --- Replacement when no goals are picked (block B') -------------------------
-
-/** How many series stand in for the focus goals. */
 const OVERVIEW_COUNT = 3;
 
-/**
- * Stands in for the focus goals when none are set: the three metrics that moved most, beside an offer to pick
- * goals. Choosing goals is voluntary (F-62), so no content is withheld until you do.
- */
+/** The three metrics that moved most, when no goals are picked (F-62). */
 function OverviewSection({ series }: { series: MetricSeries[] }) {
-  // `readable` and not the series' own point count: against its own points the
-  // "no value in N trainings" line can never fire, so the same tile said less
-  // here than it did among the focus tiles.
+  // `readable`, not the series' own points, or the "no value" line never fires.
   const { readable, withPeriod } = useProgressContext();
   const withSpread = mostVarying(series, OVERVIEW_COUNT);
 
@@ -720,8 +623,6 @@ function OverviewSection({ series }: { series: MetricSeries[] }) {
     </section>
   );
 }
-
-// --- Nothing stored yet ------------------------------------------------------
 
 function EmptyState({ goals }: { goals: FocusGoal[] }) {
   return (

@@ -26,18 +26,11 @@ import {
   variety,
 } from "./progressStats";
 
-/** The arithmetic behind the progress dashboard (F-13): every failure here renders
- * perfectly, so the cases pin the claims the screen makes out loud ("Ihr üblicher
- * Bereich 118 bis 141", "in 9 von 12 Trainings"). Nothing may grow a target or a
- * direction (ADR 0051/0065); `band` is where one would arrive first. */
-
-// --- Series -----------------------------------------------------------------
+/** F-13, ADR 0051/0065: the dashboard's arithmetic, which renders perfectly when wrong. */
 
 describe("building a series from the history", () => {
   it("turns the newest-first history into points oldest first", () => {
-    // The history arrives newest first (ADR 0064) and a chart reads left to
-    // right in time. Reversed, every course on the dashboard tells its story
-    // backwards while looking entirely healthy.
+    // Newest first in (ADR 0064), oldest first in the chart.
     const series = toSeries([
       session({ started_at: "2026-09-03T10:00:00Z", measurements: [measurement("pace", 3)] }),
       session({ started_at: "2026-09-02T10:00:00Z", measurements: [measurement("pace", 2)] }),
@@ -48,11 +41,8 @@ describe("building a series from the history", () => {
     expect(series[0]?.points.map((p) => p.value)).toEqual([1, 2, 3]);
   });
 
-
   it("leaves out the loudness, which is not comparable between calls", () => {
-    // Its dB span is the recording level, so across calls it measures the
-    // microphone and the distance as much as the speaker (ADR 0076's
-    // amendment). The single call's own page keeps it.
+    // Its dB span measures the microphone across calls (ADR 0076).
     const series = toSeries([
       session({ measurements: [measurement("loudness", 12), measurement("pace", 130)] }),
     ]);
@@ -61,8 +51,7 @@ describe("building a series from the history", () => {
   });
 
   it("gives a checklist metric no band, whatever its values", () => {
-    // A course of 1-3-2-3 over a band reads as a score climbing to full marks,
-    // which is the reading ADR 0086 kept off the single call's tile.
+    // ADR 0086.
     const series = toSeries([
       session({ measurements: [measurement("opening", 3)] }),
       session({ measurements: [measurement("opening", 2)] }),
@@ -91,23 +80,18 @@ describe("building a series from the history", () => {
   });
 });
 
-// --- The usual range --------------------------------------------------------
-
 describe("the user's own usual range", () => {
   it("describes nothing below three values", () => {
     expect(band([10, 20])).toBeNull();
   });
 
   it("is the median widened by the median absolute deviation", () => {
-    // 1, 2, 3, 4, 100: median 3, deviations 2, 1, 0, 1, 97, median of those 1.
-    // The outlier moves the band by nothing, which is the whole reason for a
-    // MAD over a standard deviation.
+    // The outlier moves the band by nothing.
     expect(band([1, 2, 3, 4, 100])).toEqual({ median: 3, low: 2, high: 4 });
   });
 
   it("falls back to the mean deviation where more than half the values are equal", () => {
-    // 5, 5, 5, 9: the MAD is 0 because three of four sit on the median, and a
-    // band of zero width would claim somebody always speaks at exactly 5.
+    // MAD 0, but a zero-width band would claim exactly 5 every time.
     const result = band([5, 5, 5, 9]);
     expect(result?.median).toBe(5);
     expect(result?.high).toBeCloseTo(6, 10);
@@ -115,8 +99,7 @@ describe("the user's own usual range", () => {
   });
 
   it("has no width at all where every value is identical", () => {
-    // Neither deviation separates a constant series, and inventing a width for
-    // it would be the first threshold on this screen.
+    // Inventing a width would be the first threshold.
     expect(band([7, 7, 7])).toEqual({ median: 7, low: 7, high: 7 });
   });
 
@@ -131,8 +114,7 @@ describe("writing the range out", () => {
   });
 
   it("never reaches below zero for a count", () => {
-    // 0, 0, 0, 5, 5: the median is 0 and the spread 2, so the band runs from
-    // -2 on paper. "-2 bis 2 Unterbrechungen" describes nothing anybody did.
+    // Median 0, spread 2: the band would start at -2.
     const series = counted([0, 0, 0, 5, 5]);
     expect(series.band?.low).toBeLessThan(0);
     expect(formatBand(series)).toBe("0 bis 2");
@@ -150,14 +132,11 @@ describe("writing the range out", () => {
       session({ measurements: [measurement("reaction_time", 2.4, { unit: "s" })] }),
     ])[0]!;
 
-    // The dot was simply wrong in German, and the low end carries no unit.
     expect(formatBand(series)).toBe("1,2 bis 2,4 s");
   });
 });
 
 describe("the earlier half and the recent one", () => {
-  /** A pace series whose values arrive oldest first in the chart. The history
-   *  is newest first, so the fixture is written the other way round. */
   const paces = (values: number[]) =>
     toSeries(
       [...values]
@@ -166,8 +145,6 @@ describe("the earlier half and the recent one", () => {
     )[0]!;
 
   it("describes each half on its own terms", () => {
-    // 10, 10, 10 and 20, 20, 20: two medians, two spreads, and nothing
-    // computed between them.
     const split = halves(paces([10, 10, 10, 20, 20, 20]));
 
     expect(split).toEqual({
@@ -178,16 +155,14 @@ describe("the earlier half and the recent one", () => {
   });
 
   it("computes no difference, no ratio and no direction", () => {
-    // The assertion that notices a delta being added. ADR 0065 rules one out by
-    // name, and this is the function where it would arrive.
+    // ADR 0065 rules out a delta.
     const split = halves(paces([10, 10, 10, 20, 20, 20]));
 
     expect(Object.keys(split ?? {}).sort()).toEqual(["each", "early", "late"]);
   });
 
   it("leaves the middle training out of an odd count", () => {
-    // In both halves it would pull them towards each other; in one it would
-    // make the two rest on different numbers of calls.
+    // The odd middle would skew one half or both.
     const split = halves(paces([1, 2, 3, 99, 7, 8, 9]));
 
     expect(split?.each).toBe(3);
@@ -196,8 +171,6 @@ describe("the earlier half and the recent one", () => {
   });
 
   it("says nothing below twice the series threshold", () => {
-    // A usual range over two values describes nothing, and two of those beside
-    // each other describe nothing twice.
     expect(halves(paces([1, 2, 3, 4, 5]))).toBeNull();
     expect(halves(paces([1, 2, 3, 4, 5, 6]))).not.toBeNull();
   });
@@ -216,14 +189,12 @@ describe("a checklist's figures", () => {
     toSeries(counts.map((c) => session({ measurements: [measurement("opening", c)] })))[0]!;
 
   it("reads a value as parts recognised, never as a fraction", () => {
-    // "2 von 3" is what reads as a mark, and "erkannt" keeps it a detection,
-    // which is all it is — a bare name slips past the patterns (F-63).
+    // F-63.
     expect(formatPoint(openings([2]), 2)).toBe("2 Teile erkannt");
     expect(formatPoint(openings([1]), 1)).toBe("1 Teil erkannt");
   });
 
   it("counts the trainings in which every part was there", () => {
-    // Newest first in, so this is 3, 3, 2 — two complete.
     expect(completeParts(openings([2, 3, 3]))).toBe(2);
   });
 
@@ -232,8 +203,6 @@ describe("a checklist's figures", () => {
     expect(completeParts(pace)).toBeNull();
   });
 });
-
-// --- The selection ----------------------------------------------------------
 
 describe("selecting trainings", () => {
   const five = [session(), session(), session(), session(), session()];
@@ -269,9 +238,7 @@ describe("the counted figures", () => {
   });
 
   it("counts finished trainings only, like the calendar beside it", () => {
-    // ADR 0034's amendment: a call nobody ended is kept without being counted.
-    // These three figures counted every stored row, so the card said 3 over a
-    // calendar showing two marks.
+    // ADR 0034: an aborted call is kept, not counted.
     const counts = activity([
       session({ started_at: "2026-09-03T10:00:00Z", scenario: "A", persona: "X" }),
       session({ started_at: "2026-09-02T10:00:00Z", scenario: "B", persona: "Y", status: "aborted" }),
@@ -279,13 +246,10 @@ describe("the counted figures", () => {
     ]);
 
     expect(counts).toMatchObject({ sessions: 2, scenarios: 1, personas: 1 });
-    // The span too: it is the range of what was counted, not of what is stored.
     expect(counts.firstAt).toBe("2026-09-01T10:00:00Z");
     expect(counts.lastAt).toBe("2026-09-03T10:00:00Z");
   });
 });
-
-// --- Which trainings a course may be drawn from -----------------------------
 
 describe("the calls long enough to read figures from", () => {
   const long = (over = {}) =>
@@ -294,15 +258,11 @@ describe("the calls long enough to read figures from", () => {
     session({ started_at: "2026-09-01T10:00:00Z", ended_at: "2026-09-01T10:00:20Z", ...over });
 
   it("drops a call too short to describe", () => {
-    // A talk share or a speaking pace read off twenty seconds is a statistic
-    // about a fragment, and it sat in the band as an equal point.
     expect(readable([long(), short(), long()])).toHaveLength(2);
   });
 
   it("keeps a long call that ended badly, and drops a short one that ended well", () => {
-    // On the length and deliberately not on the status: `aborted` also means a
-    // dropped connection, and a call that ran its course and died at the end of
-    // it is a complete measurement (`MIN_CALL_MS`).
+    // On length, not status: `aborted` also means a dropped connection.
     const kept = readable([long({ status: "aborted" }), short({ status: "completed" })]);
 
     expect(kept).toHaveLength(1);
@@ -310,9 +270,7 @@ describe("the calls long enough to read figures from", () => {
   });
 
   it("keeps a call whose length cannot be worked out", () => {
-    // The rule is "drop what is known to be too short", not "drop what cannot
-    // be checked": discarding a call that may well have been a full one is the
-    // worse of the two mistakes.
+    // Dropping a possibly full call is the worse mistake.
     expect(readable([session({ ended_at: null })])).toHaveLength(1);
   });
 
@@ -326,16 +284,12 @@ describe("the calls long enough to read figures from", () => {
   });
 
   it("counts the finished and the readable separately, because they answer different questions", () => {
-    // A short but finished call is counted in the record at the top and left
-    // out of the courses below. Neither rule is the other one's approximation.
     const sessions = [long(), short(), long({ status: "aborted" })];
 
     expect(completedOnly(sessions)).toHaveLength(2);
     expect(readable(sessions)).toHaveLength(2);
   });
 });
-
-// --- Call length ------------------------------------------------------------
 
 describe("how long a call ran", () => {
   it("is the two timestamps apart", () => {
@@ -347,7 +301,6 @@ describe("how long a call ran", () => {
   });
 
   it("is absent where the Session has no recorded end", () => {
-    // A call cut short by a pipeline failure legitimately may not have one.
     expect(callDurationMs(session({ ended_at: null }))).toBeNull();
   });
 
@@ -375,9 +328,7 @@ describe("how long a call ran", () => {
 });
 
 describe("the series of a selection", () => {
-  // The overview, a metric's page and a goal's page all read this one list, so
-  // a row the overview links to is one the page behind the link can find. The
-  // call length was the row that went missing: only the overview added it.
+  // Every progress screen reads this one list.
   it("carries the call length beside the measured metrics", () => {
     const keys = selectionSeries([
       session({ measurements: [measurement("pace", 130)] }),
@@ -386,17 +337,12 @@ describe("the series of a selection", () => {
   });
 });
 
-// --- The calendar -----------------------------------------------------------
-
 describe("the calendar month", () => {
-  /** A training at midday local time on the given day of September 2026, so the
-   *  fixture cannot slide into a neighbouring day in any timezone the suite
-   *  runs in. */
+  /** Midday, so no timezone shifts the day. */
   const onDay = (day: number, over: Partial<Parameters<typeof session>[0]> = {}) =>
     session({ started_at: new Date(2026, 8, day, 12, 0, 0).toISOString(), ...over });
 
   it("pads to whole weeks with Monday first", () => {
-    // 1 September 2026 is a Tuesday, so one empty cell leads.
     const month = activityMonth([], 2026, 8);
     expect(month.weeks[0]?.[0]).toBeNull();
     expect(month.weeks[0]?.[1]?.dayOfMonth).toBe(1);
@@ -414,8 +360,6 @@ describe("the calendar month", () => {
   });
 
   it("neither counts nor marks an abandoned call", () => {
-    // The calendar answers "when did I train", and a call that broke off is
-    // not an answer to it (ADR 0034's amendment).
     const month = activityMonth([onDay(3, { status: "aborted" })], 2026, 8);
     expect(month.total).toBe(0);
   });
@@ -429,9 +373,7 @@ describe("the calendar month", () => {
   });
 
   it("keys a late-evening training on the day it happened", () => {
-    // Built from the local parts rather than from `toISOString`, which would
-    // push a 23:30 call into the next day for anybody east of UTC — and the
-    // "today" ring is read with the same key, so the two cannot disagree.
+    // Local parts: `toISOString` pushes 23:30 into the next day east of UTC.
     const late = new Date(2026, 8, 3, 23, 30, 0);
     expect(dayKey(late)).toBe("2026-8-3");
   });
@@ -456,9 +398,7 @@ describe("the calendar month", () => {
   });
 
   it("lists exactly the trainings a cell counted", () => {
-    // The list under the calendar and the number in the cell are read off the
-    // same `dayKey`, so they cannot disagree — a cell saying 2 over a list of
-    // three is the defect this pins.
+    // Same `dayKey`, so a cell saying 2 never lists three.
     const sessions = [onDay(3), onDay(3), onDay(4)];
     const counted = activityMonth(sessions, 2026, 8)
       .weeks.flat()
@@ -490,9 +430,6 @@ describe("the trainings behind a variety cell", () => {
   });
 
   it("leave out an abandoned call, exactly as the cell does", () => {
-    // Both go through `completedOnly` (ADR 0034's amendment). They still have to
-    // agree with each other — a cell saying 2 must not open onto three rows —
-    // and now with the calendar beside them as well.
     const sessions = [
       session({ scenario: "A", persona: "X" }),
       session({ scenario: "A", persona: "X", status: "aborted" }),
@@ -503,13 +440,9 @@ describe("the trainings behind a variety cell", () => {
   });
 });
 
-// --- The variety grid -------------------------------------------------------
-
 describe("what was played against whom", () => {
   it("holds only the combinations that occurred", () => {
-    // A grid of everything the library offers with the unplayed cells empty
-    // would turn a description of what somebody did into a list of what they
-    // have not.
+    // Played combinations only.
     const grid = variety([
       session({ scenario: "A", persona: "X" }),
       session({ scenario: "A", persona: "X" }),
@@ -552,9 +485,7 @@ describe("what stands in for the focus goals", () => {
     );
 
   it("orders by spread relative to the middle, so units can be compared", () => {
-    // Pace moves by 40 around 120, a third; talk share by 2 around 50, a
-    // twenty-fifth. In absolute terms pace would win anyway — the reaction
-    // time below is what the relative measure is for.
+    // Relative to the middle, which the reaction time below needs.
     const series = toSeries(
       history({ pace: [100, 140, 120, 125], talk_share: [49, 51, 50, 50], reaction_time: [0.5, 1.5, 1, 1] }),
     );

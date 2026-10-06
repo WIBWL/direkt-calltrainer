@@ -11,18 +11,11 @@ import { FollowUp, Reverse, type FollowUpActions } from "./NextSteps";
 import SectionHeading from "./SectionHeading";
 import { useTranscriptFocus } from "./TranscriptFocus";
 
-/**
- * User utterances needed before the follow-up and reverse offers appear: a call hung up
- * after a sentence has nothing to build from. Counts the User's own rows only. The routes
- * refuse under `MIN_USER_UTTERANCES` (`backend/api/sessions.py`, pinned by `tests/test_reverse.py`).
- */
+/** User rows needed before the follow-up and reverse offers; matches the routes'
+ * `MIN_USER_UTTERANCES` (pinned by backend/tests/test_reverse.py). */
 const MIN_USER_TURNS = 3;
 
-/**
- * The wrap-up itself, given fetched data, without the post-call notices, so the history's
- * page can render it too. Renders nothing without a wrap-up: what to say instead differs
- * per screen. The follow-up/reverse offers (F-60, F-61) are props for the same reason.
- */
+/** The wrap-up alone, so the history's page can render it too. Renders nothing without one. */
 export default function FeedbackReport({
   detail,
   followUp,
@@ -35,8 +28,7 @@ export default function FeedbackReport({
   next?: ReactNode;
 }) {
   const { feedback, measurements, turns } = detail;
-  // The catalogue, for naming the goal a point was tagged with. Null while it
-  // has not loaded or failed to, and the tags are then simply absent.
+  // Null while loading or failed; the tags are then absent.
   const { focus: picked } = useFocusContext();
   if (!feedback) return null;
 
@@ -45,9 +37,7 @@ export default function FeedbackReport({
   const spokenTurns = turns.filter((turn) => turn.speaker === "user").length;
   const longEnough = spokenTurns >= MIN_USER_TURNS;
 
-  // Built here so "is there anything to offer?" is asked once and the row never
-  // appears empty. Only where the wrap-up named improvement points: those are the
-  // follow-up's whole input, and the route refuses without them (ADR 0069).
+  // Only with improvement points, the follow-up's whole input (ADR 0069).
   const followUpOffer =
     followUp && longEnough && improvements.length > 0 ? (
       <FollowUp
@@ -57,18 +47,12 @@ export default function FeedbackReport({
         {...followUp}
       />
     ) : null;
-  // No condition on the points: a reverse copies the case that was played, so
-  // it is available for any call that was actually conducted — except a reverse
-  // itself, which is already the other way round (ADR 0070).
+  // Any conducted call except a reverse itself (ADR 0070).
   const reverseOffer =
     onReverse && longEnough && !detail.reverse ? (
       <Reverse sessionId={detail.session_id} onReverse={onReverse} />
     ) : null;
 
-  // No meta row here any more: which case, which partner and which side the
-  // User was on describe the *call*, not the wrap-up, and a Session whose
-  // wrap-up never got written still has all three. `FeedbackScreen` shows them
-  // under the title of both screens instead.
   return (
     <>
       <section className="feedback-section feedback-summary-section">
@@ -102,10 +86,7 @@ export default function FeedbackReport({
         segments={detail.segments}
       />
 
-      {/* Last: what to do after reading. The two offers sit side by side as alternatives;
-          either may be absent, and the other then takes the full width. The next-call
-          offers (F-64) go under them, or stand alone. `next` is an element even when it
-          renders nothing, so it cannot decide whether the heading appears. */}
+      {/* The two offers side by side, either may be absent; the next-call offers (F-64) under them. */}
       {followUpOffer || reverseOffer ? (
         <section className="feedback-section">
           <SectionHeading title="Nächste Schritte" />
@@ -122,10 +103,7 @@ export default function FeedbackReport({
   );
 }
 
-/**
- * F-42's register block: the model's reading as the finding itself, and behind the "i"
- * what it rests on and cannot tell (ADR 0056: the phase boundaries are the model's guess).
- */
+/** F-42's register block; the phase boundaries are the model's guess (ADR 0056). */
 function PhaseLanguage({ text }: { text: string }) {
   return (
     <section className="feedback-section feedback-phase-card">
@@ -139,9 +117,7 @@ function PhaseLanguage({ text }: { text: string }) {
         </p>
 
         <InfoDetails label="Warum diese Reihenfolge">
-          {/* A list, not prose: each phase asks for a different register for a
-              different reason, and three reasons run together in a paragraph
-              read as one. */}
+          {/* A list: three reasons run together in prose read as one. */}
           <dl className="feedback-phase-phases">
             <dt>Einstieg</dt>
             <dd>
@@ -182,8 +158,7 @@ function PointList({
   points: OutlinePoint[];
   tone: "success" | "danger";
 }) {
-  // Null on a screen with no transcript, and then the moment stays the plain
-  // text it has always been (see TranscriptFocus.tsx).
+  // Null without a transcript (TranscriptFocus.tsx).
   const focus = useTranscriptFocus();
 
   if (points.length === 0) return null;
@@ -201,10 +176,7 @@ function PointList({
             const at = point.offsetMs;
             return (
               <div className="feedback-point-item" key={i}>
-                {/* The moment this was written about, as something to press.
-                  A timestamp alone is checkable only by somebody who still
-                  remembers the call; the line it names sits collapsed a little
-                  further down, and one press opens it there. */}
+                {/* One press opens the transcript at the line. */}
                 {at !== null &&
                   (focus ? (
                     <button
@@ -218,9 +190,7 @@ function PointList({
                   ) : (
                     <span className="feedback-point-time">{formatOffset(at)}</span>
                   ))}
-                {/* The focus goal the wrap-up filed this point under (ADR 0080), as an eyebrow
-                  above the sentence so it reads as a heading. Shown for every tagged
-                  point, not only the User's own five. */}
+                {/* The goal the point was filed under (ADR 0080), as an eyebrow. */}
                 <div className="feedback-point-body">
                   {point.goal && <span className="feedback-point-goal">{point.goal}</span>}
                   <p>{point.text}</p>

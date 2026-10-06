@@ -1,21 +1,16 @@
 import { useEffect, type ReactNode } from "react";
 
-/**
- * The app's modal shell: backdrop, panel, dismissed by Escape or a backdrop press. With a `ConfirmDialog` open
- * (`overlay`), `onDismiss` must close the question first: it handles no Escape itself, since two `window`
- * listeners fire in registration order and the panel's would win (see `ConfirmDialog`).
- */
+/** Backdrop and panel, dismissed by Escape or a backdrop press. With an `overlay`
+ * open, `onDismiss` closes the question first (see `ConfirmDialog`). */
 export default function Modal({
   labelledBy,
   onDismiss,
   overlay,
   children,
 }: {
-  /** The id of the panel's heading, for `aria-labelledby`. */
   labelledBy: string;
   onDismiss: () => void;
-  /** Laid over the panel, inside the backdrop — where `ConfirmDialog` has to
-   *  mount to cover it. */
+  /** Where `ConfirmDialog` mounts. */
   overlay?: ReactNode;
   children: ReactNode;
 }) {
@@ -32,8 +27,7 @@ export default function Modal({
       className="editor-backdrop"
       role="presentation"
       onMouseDown={(e) => {
-        // Only a press that starts on the backdrop itself — not a text
-        // selection dragged out of the panel — counts as "click outside".
+        // Not a text selection dragged out of the panel.
         if (e.target === e.currentTarget) onDismiss();
       }}
     >

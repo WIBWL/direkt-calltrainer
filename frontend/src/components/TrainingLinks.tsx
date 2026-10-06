@@ -4,16 +4,11 @@ import type { SessionSummary } from "../protocol";
 import { sessionPath } from "../routes";
 import { formatDateTime } from "../utils/time";
 
-/**
- * The trainings behind one calendar or variety-grid cell, each a link, so those blocks lead somewhere. Shown in
- * place rather than as a route of its own. Its heading ("Trainings am 14. September") ties the list to the
- * pressed cell and is what a screen reader hears.
- */
+/** The trainings behind one calendar or grid cell, in place. */
 export default function TrainingLinks({
   title,
   sessions,
 }: {
-  /** What these trainings have in common, as a sentence. */
   title: string;
   sessions: SessionSummary[];
 }) {

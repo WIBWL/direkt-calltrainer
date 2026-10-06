@@ -3,16 +3,11 @@ import { describe, expect, it } from "vitest";
 import { session, tag } from "../test/sessions";
 import { MIN_MENTIONS, mentionSummary, mentionsFor, statementsFor } from "./goalMentions";
 
-/** Counting what the wrap-ups said (ADR 0080, block D). Pins what keeps it a
- * frequency, not a score: per training, over trainings that could have said it,
- * from a threshold, in stable order. A wrong denominator fails nowhere; it just
- * tells the user "4 von 6" where the truth is 4 of 9. */
+/** ADR 0080: a frequency, not a score; a wrong denominator fails nowhere. */
 
 describe("the denominator", () => {
   it("counts only the trainings whose wrap-up carried an assignment", () => {
-    // A training with no wrap-up never had an opinion, and one written before
-    // the assignment existed could not record it. Counting either in would
-    // quietly shrink every fraction on the screen.
+    // Untagged trainings could not have named it.
     const summary = mentionSummary([
       session({ feedback_goals: [tag("improvement", "closing")] }),
       session({ feedback_goals: [tag("improvement", "closing")] }),
@@ -37,9 +32,7 @@ describe("the denominator", () => {
 
 describe("counting a mention", () => {
   it("counts a training once however often the wrap-up named the goal", () => {
-    // Two improvements about the closing in one call are one call that
-    // mentioned it. Counting points would let a single wordy wrap-up look like
-    // a pattern.
+    // Per training: one wordy wrap-up is no pattern.
     const summary = mentionSummary([
       session({
         feedback_goals: [
@@ -54,8 +47,6 @@ describe("counting a mention", () => {
   });
 
   it("keeps the two kinds apart in one training", () => {
-    // A goal named as a strength in one call and as an improvement in another
-    // is two different statements, and one call can carry both.
     const tally = mentionsFor(
       [
         session({
@@ -76,8 +67,6 @@ describe("counting a mention", () => {
 
 describe("what counts as recurring", () => {
   it("leaves out a goal named only once", () => {
-    // One point from one training is an observation, not a pattern, and
-    // presenting it as one is the failure this block has to avoid.
     const summary = mentionSummary([session({ feedback_goals: [tag("improvement", "closing")] })]);
     expect(summary.improvements).toEqual([]);
   });
@@ -90,8 +79,6 @@ describe("what counts as recurring", () => {
   });
 
   it("shows at most three per column", () => {
-    // "What keeps coming up" is a different question from "everything that was
-    // ever said".
     const goals = ["a", "b", "c", "d", "e"];
     const sessions = [
       session({ feedback_goals: goals.map((g) => tag("improvement", g)) }),
@@ -102,8 +89,7 @@ describe("what counts as recurring", () => {
   });
 
   it("orders by count and breaks a tie by goal key", () => {
-    // Two goals mentioned three times each must not swap places because a
-    // training was added at the other end of the list.
+    // Ties must not swap when a training is added.
     const sessions = [
       session({ feedback_goals: [tag("improvement", "zebra"), tag("improvement", "alpha")] }),
       session({ feedback_goals: [tag("improvement", "zebra"), tag("improvement", "alpha")] }),

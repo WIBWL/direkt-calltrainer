@@ -12,11 +12,7 @@ interface FocusContextValue {
 
 const FocusContext = createContext<FocusContextValue | null>(null);
 
-/**
- * Holds the training focus app-wide, one fetch, asked once (F-62, ADR 0076).
- * Inside the consent gate so the legally required question comes first. Never
- * blocks on a *failed* load: a focus changes emphasis, not whether the app works.
- */
+/** One fetch, inside the consent gate (F-62, ADR 0076). A failed load never blocks. */
 export function FocusProvider({ children }: { children: ReactNode }) {
   const { focus, state, saving, choose } = useFocus();
 
@@ -35,7 +31,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** The current focus. Null while unknown — a failed load, not "no goals". */
+/** Null while unknown, not "no goals". */
 export function useFocusContext(): FocusContextValue {
   const value = useContext(FocusContext);
   if (value === null) {

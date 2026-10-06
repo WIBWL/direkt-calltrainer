@@ -3,11 +3,8 @@ import { describe, expect, it } from "vitest";
 import { segment, session } from "../test/sessions";
 import { pairFor, segmentTrainings } from "./segmentStats";
 
-/** Pairing a call's demanding stretches with the rest (ADR 0081): two figures, no
- * difference, ratio or direction (ADR 0051). Also pins that loudness is dropped
- * across trainings — one `comparableAcrossCalls` call no type would miss. */
+/** ADR 0081/0051: two figures, no difference, ratio or direction; loudness dropped across trainings. */
 
-/** A training with a pressure/rest pair for each metric named. */
 const withPairs = (
   pairs: Record<string, [pressure: number, rest: number]>,
   over: Parameters<typeof session>[0] = {},
@@ -30,8 +27,7 @@ describe("pairing the two stretches", () => {
   });
 
   it("keeps a row where only one stretch was long enough to measure", () => {
-    // A stretch too short yields no row for that half, and the other still says
-    // something on its own.
+    // The other half still says something on its own.
     const [training] = segmentTrainings([
       session({ segments: [segment("pressure", "pace", 150)] }),
     ]);
@@ -40,9 +36,7 @@ describe("pairing the two stretches", () => {
   });
 
   it("computes no difference, no ratio and no verdict", () => {
-    // The reader draws the comparison. A derived "stability" would be the
-    // refused norm wearing a different name, and this is the assertion that
-    // notices one being added.
+    // A derived "stability" would be the refused norm under another name.
     const [training] = segmentTrainings([withPairs({ pace: [150, 128] })]);
 
     expect(Object.keys(training?.pairs[0] ?? {}).sort()).toEqual([
@@ -57,8 +51,6 @@ describe("pairing the two stretches", () => {
 
 describe("which trainings carry a comparison", () => {
   it("leaves out a call in which nobody pushed back", () => {
-    // Also every call recorded before the per-utterance facts were kept: the
-    // audio is gone (ADR 0048), so those can never gain one.
     expect(segmentTrainings([session({ segments: [] })])).toEqual([]);
   });
 
@@ -92,7 +84,6 @@ describe("the loudness", () => {
   });
 
   it("drops a training whose only comparison is the loudness", () => {
-    // Otherwise the page would show a row with a heading and nothing under it.
     expect(segmentTrainings([withPairs({ loudness: [14, 11] })])).toEqual([]);
   });
 

@@ -1,11 +1,6 @@
-/**
- * The flag on a Persona's language line. SVG, not a flag emoji: Windows has no glyphs and
- * renders "DE" as letters. It stands for the language, not a country (English → US flag).
- * Decorative: the language is always written beside it.
- */
+/** SVG, not an emoji, which Windows renders as letters. It stands for the language. Decorative. */
 
-/** A uniform 3:2 box for every flag. Neither flag's true proportions, but a row
- * of them lines up, which matters more here than either does. */
+/** One 3:2 box, so a row of flags lines up. */
 const BOX = { viewBox: "0 0 60 40", className: "language-flag" } as const;
 
 function GermanFlag() {
@@ -19,9 +14,6 @@ function GermanFlag() {
 }
 
 function UnitedStatesFlag() {
-  // Thirteen stripes and not a legible-at-16px seven: at this size they read as
-  // a striped flag either way, and the wrong number is the kind of detail
-  // someone notices exactly once and never unsees.
   const stripe = 40 / 13;
   return (
     <svg {...BOX} aria-hidden="true">
@@ -30,9 +22,7 @@ function UnitedStatesFlag() {
         <rect key={i} y={i * stripe} width="60" height={stripe} fill="#b22234" />
       ))}
       <rect width="24" height={7 * stripe} fill="#3c3b6e" />
-      {/* The stars as dots: at the size this is shown they are under a pixel
-          across, and a five-pointed star drawn there is a smudge with corners
-          rather than a star. */}
+      {/* Dots: a star under a pixel across is a smudge. */}
       {Array.from({ length: 5 }, (_, row) =>
         Array.from({ length: row % 2 === 0 ? 5 : 4 }, (_, col) => (
           <circle
@@ -49,8 +39,7 @@ function UnitedStatesFlag() {
 }
 
 export default function LanguageFlag({ code }: { code: string }) {
-  // Only the two languages there are Personas for. An unknown code shows no
-  // flag rather than a wrong one — the name beside it still says the language.
+  // An unknown code shows no flag rather than a wrong one.
   if (code === "de") return <GermanFlag />;
   if (code === "en") return <UnitedStatesFlag />;
   return null;

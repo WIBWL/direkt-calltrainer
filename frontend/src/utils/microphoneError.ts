@@ -1,7 +1,4 @@
-/** Converts browser microphone errors into stable German messages (browser text
- * differs per browser and language), for the mic check and the call alike.
- * `fallback` is for non-microphone failures, e.g. the VAD model failing to load,
- * which must not be reported as a device problem. */
+/** Stable German messages; `fallback` for non-microphone failures such as the VAD model. */
 export function microphoneErrorMessage(
   error: unknown,
   fallback = "Das Mikrofon konnte nicht geöffnet werden.",

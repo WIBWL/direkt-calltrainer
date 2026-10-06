@@ -3,20 +3,12 @@ import { useEffect, useState } from "react";
 import type { SessionSummary } from "../protocol";
 import { MAX_PAGE_SIZE, listSessions } from "../sessions";
 
-/**
- * How many pages the dashboard reads before it stops and sets `truncated`.
- * The counted figures describe the whole account, so reading one page made
- * them wrong; 1000 trainings is far past what six-month retention (ADR 0067) holds.
- */
+/** Far past what six-month retention holds (ADR 0067); beyond it `truncated` is set. */
 const MAX_PAGES = 10;
 
 export type ProgressLoadState = "loading" | "ready" | "failed";
 
-/**
- * The stored trainings the dashboard is drawn from (F-13), read from
- * `GET /api/sessions` rather than an aggregate route that could drift from it.
- * Called only by `ProgressProvider`, so the three dashboard screens share one load.
- */
+/** The dashboard's trainings (F-13), from the history route, loaded once by `ProgressProvider`. */
 export function useProgressData() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -32,23 +24,18 @@ export function useProgressData() {
         let reported = 0;
         let page = 0;
 
-        // Pages are read one after another rather than at once: the later ones
-        // exist only on an account nobody has, and a burst of ten requests to
-        // find that out would cost every ordinary account a slower first paint.
+        // One after another: later pages exist only on extreme accounts.
         for (; page < MAX_PAGES; page += 1) {
           const answer = await listSessions(MAX_PAGE_SIZE, page * MAX_PAGE_SIZE);
           if (cancelled) return;
           reported = answer.total;
-          // De-duplicated by id, because a Session written between two requests
-          // shifts every later row by one under offset pagination (ADR 0064)
-          // and would otherwise arrive twice.
+          // De-duplicated: a Session written mid-read shifts the offsets (ADR 0064).
           for (const session of answer.sessions) {
             if (seen.has(session.session_id)) continue;
             seen.add(session.session_id);
             loaded.push(session);
           }
-          // An empty or short page is the end of the history. Asking `total`
-          // alone would loop forever if a row were deleted mid-read.
+          // A short page ends it; `total` alone could loop after a deletion.
           if (answer.sessions.length < MAX_PAGE_SIZE || loaded.length >= reported) break;
         }
 
@@ -70,7 +57,6 @@ export function useProgressData() {
   return {
     sessions,
     state,
-    /** True when the account holds more trainings than the cap above reads. */
     truncated: !complete,
     total,
   };

@@ -4,9 +4,7 @@ interface NoAccessViewProps {
   onLogout: () => void;
 }
 
-/** What a logged-in User without the `calltrainer-user` role sees instead of
- * the app (ADR 0109). Logging out is the one thing to offer: another account
- * may have the role, and this one gets it only from an administrator. */
+/** Without the `calltrainer-user` role (ADR 0109); logging out is the one offer. */
 export default function NoAccessView({ onLogout }: NoAccessViewProps) {
   return (
     <div className="auth-status-page" role="alert">

@@ -1,10 +1,6 @@
 import { formatRange, halves, type MetricSeries } from "../utils/progressStats";
 
-/**
- * Earlier and recent trainings side by side, each a median widened by its own spread.
- * Nothing is computed between them — no delta, arrow or direction (ADR 0065/0051; ADR
- * 0081's two-stretch construction). Only on a metric's own page, never the overview.
- */
+/** Earlier and recent trainings side by side, nothing computed between them (ADR 0051/0065). */
 export default function EarlyAndLate({ series }: { series: MetricSeries }) {
   const split = halves(series);
   if (!split) return null;
@@ -26,11 +22,7 @@ export default function EarlyAndLate({ series }: { series: MetricSeries }) {
           </div>
         </div>
 
-        {/* The sentence is the feature. Two ranges beside each other are read
-            as a before and an after unless something says otherwise, and what
-            is missing is not modesty but a basis: nobody has established what a
-            good value is here, so nobody can say which of the two is the
-            better one. */}
+        {/* The sentence is the feature: two ranges read as before and after unless told otherwise. */}
         <p className="muted">
           Zwei Beschreibungen Ihrer eigenen Werte, jede aus {split.each} Trainings. Welcher
           Unterschied zwischen ihnen etwas bedeutet, steht hier nicht, denn dafür gibt es

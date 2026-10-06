@@ -4,11 +4,7 @@ import InfoDetails from "./InfoDetails";
 import PrivacyLink from "./PrivacyLink";
 import ProcessingNotice from "./ProcessingNotice";
 
-/**
- * The storage decision, asked once, answerable either way (ADR 0066). Declining leaves
- * the trainer fully usable, which keeps the consent freely given; hence both buttons
- * carry equal weight, and the notice stays short enough to be read.
- */
+/** Asked once (ADR 0066). Declining leaves the trainer fully usable, so both buttons carry equal weight. */
 export default function ConsentDialog({
   onDecide,
   saving,
@@ -18,9 +14,7 @@ export default function ConsentDialog({
 }) {
   const [failed, setFailed] = useState(false);
 
-  // Awaited, not fired and forgotten: a rejected promise from a synchronous
-  // try/catch would go unhandled and the dialog would sit there looking as if
-  // the click had worked.
+  // Awaited, or a rejection goes unhandled and the click seems to have worked.
   const decide = async (granted: boolean) => {
     setFailed(false);
     try {
@@ -31,8 +25,6 @@ export default function ConsentDialog({
   };
 
   return (
-    // aria-modal + role=dialog: the rest of the page is inert behind it, and a
-    // screen reader should say so rather than reading the app underneath.
     <div className="consent-backdrop" role="dialog" aria-modal="true" aria-labelledby="consent-title">
       <div className="consent-dialog">
         <h1 id="consent-title">Dürfen wir Ihre Trainings speichern?</h1>

@@ -8,8 +8,7 @@ import {
 } from "../utils/loudness";
 
 interface LoudnessCourseProps {
-  /** The course as the server read it (`loudnessCourse`): the smoothed line,
-   * the band from the call's own samples, and the stretches that left it. */
+  /** As the server read it (`loudnessCourse`). */
   curve: LoudnessCurve;
 }
 
@@ -17,14 +16,10 @@ const WIDTH = 640;
 const PLOT_TOP = 16;
 const PLOT_H = 70;
 const HEIGHT = PLOT_TOP + PLOT_H;
-/** Keeps a marker's caption inside the plot instead of off its edge. */
 const LABEL_MARGIN = 70;
 
-/**
- * The loudness curve (F-37, ADR 0029/0047), with no figure: the dB span reads like a level
- * without being one (ADR 0004/0051). The x axis is the user's own speaking time, not the
- * call clock. Everything drawn is computed server-side (ADR 0091), matching the wrap-up.
- */
+/** The loudness curve (F-37) without a figure, which would read like a level
+ * (ADR 0004/0051). x is the user's own speaking time; computed server-side (ADR 0091). */
 export default function LoudnessCourse({ curve }: LoudnessCourseProps) {
   const x = (index: number) => (index / (curve.points - 1)) * WIDTH;
   const y = (value: number) => PLOT_TOP + PLOT_H - ((value - curve.floor) / curve.span) * PLOT_H;
@@ -37,8 +32,7 @@ export default function LoudnessCourse({ curve }: LoudnessCourseProps) {
         role="img"
         aria-label={describeLoudness(curve)}
       >
-        {/* Clamped: on an even call the band is wider than the curve's own
-            range, and the SVG does not clip its overflow. */}
+        {/* Clamped: the SVG does not clip its overflow. */}
         <rect
           className="loudness-course-band"
           x={0}
@@ -85,9 +79,7 @@ export default function LoudnessCourse({ curve }: LoudnessCourseProps) {
   );
 }
 
-/** One departure, at its largest point. The caption sits above a louder stretch
- * and below a quieter one so it never crosses its own line, and turns in at the
- * edges rather than running off the plot. */
+/** The caption sits on the side away from its own line and turns in at the edges. */
 function Marker({
   stretch,
   curve,

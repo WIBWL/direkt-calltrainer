@@ -3,7 +3,6 @@ import { useLayoutEffect, useRef, useState } from "react";
 export interface FilterOption<T extends string> {
   value: T;
   label: string;
-  /** How many Scenarios this option would show. */
   count: number;
 }
 
@@ -14,11 +13,7 @@ interface FilterSliderProps<T extends string> {
   label: string;
 }
 
-/**
- * One row of the Scenario library filter, used for both levels so they cannot drift in
- * size. A `radiogroup`, not `input type="range"`: the options are nominal, and a range
- * would imply an order and announce a number. Arrow keys still move the selection.
- */
+/** One filter row. A `radiogroup`, not a range: the options are nominal. */
 export default function FilterSlider<T extends string>({
   options,
   value,
@@ -27,8 +22,7 @@ export default function FilterSlider<T extends string>({
 }: FilterSliderProps<T>) {
   const trackRef = useRef<HTMLDivElement>(null);
   const optionRefs = useRef(new Map<T, HTMLButtonElement>());
-  // Pixel geometry of the active option, measured rather than computed: the
-  // labels have different widths, so equal-width thumbs would sit off-centre.
+  // Measured: the labels differ in width.
   const [thumb, setThumb] = useState<{ left: number; width: number } | null>(null);
 
   useLayoutEffect(() => {
@@ -42,15 +36,13 @@ export default function FilterSlider<T extends string>({
       });
     };
     measure();
-    // The labels reflow on resize and when the font finally loads, and the
-    // thumb is positioned in pixels, so it has to be re-measured then.
+    // Re-measured on reflow and font load.
     const observer = new ResizeObserver(measure);
     if (trackRef.current) observer.observe(trackRef.current);
     return () => observer.disconnect();
   }, [value, options]);
 
-  // Wraps at both ends, so the row can be cycled without reaching for the other
-  // arrow key. `value` is always one of the options, so the index is never -1.
+  // Wraps at both ends.
   const move = (delta: number) => {
     const index = options.findIndex((o) => o.value === value);
     const wrapped = (index + delta + options.length) % options.length;
@@ -62,7 +54,6 @@ export default function FilterSlider<T extends string>({
 
   return (
     <div className="filter-slider" role="radiogroup" aria-label={label} ref={trackRef}>
-      {/* Decorative: the selection it marks is announced by aria-checked. */}
       <span
         className={"filter-slider-thumb" + (thumb ? "" : " is-unmeasured")}
         style={thumb ? { transform: `translateX(${thumb.left}px)`, width: thumb.width } : undefined}
@@ -74,7 +65,7 @@ export default function FilterSlider<T extends string>({
           type="button"
           role="radio"
           aria-checked={value === option.value}
-          // Roving tabindex: the row is one tab stop, arrows move inside it.
+          // Roving tabindex.
           tabIndex={value === option.value ? 0 : -1}
           ref={(el) => {
             if (el) optionRefs.current.set(option.value, el);

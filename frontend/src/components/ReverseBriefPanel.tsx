@@ -2,19 +2,14 @@ import { useState } from "react";
 
 import type { ReverseBrief } from "../scenarioLibrary";
 
-/**
- * The User's briefing and goals while playing a reverse (F-61, ADR 0070): the deliberate exception to ADR 0033,
- * fixed before the call. Beside the state animation, so ticking never scrolls it away. Goals tick locally and are
- * stored nowhere; the counter says how many, never how well (ADR 0004).
- */
+/** The briefing and goals while playing a reverse (F-61, ADR 0070). Goals tick
+ * locally and are stored nowhere; the counter says how many, never how well (ADR 0004). */
 export default function ReverseBriefPanel({
   brief,
   variant,
 }: {
   brief: ReverseBrief;
-  /** "prepare" on its own briefing screen, where there is room to read it
-   * before the call; "call" beside the state animation, where it is a
-   * reference. */
+  /** "prepare" on its own screen; "call" beside the animation. */
   variant: "prepare" | "call";
 }) {
   const [ticked, setTicked] = useState<Set<number>>(new Set());
@@ -56,8 +51,7 @@ export default function ReverseBriefPanel({
             </span>
           </div>
 
-          {/* Width, not a colour or a grade: it says how much of the list has
-              been worked through and nothing about how the call is going. */}
+          {/* Progress through the list, nothing about the call. */}
           <div
             className="reverse-brief-progress"
             role="progressbar"
@@ -71,9 +65,7 @@ export default function ReverseBriefPanel({
 
           <ul className="reverse-brief-watch-list">
             {goals.map((goal, index) => (
-              // The index is the key because the list is fixed for the life of
-              // the panel: it comes from the stored briefing and nothing
-              // reorders, inserts or removes an entry.
+              // The list is fixed for the panel's life.
               <li key={index}>
                 <label className={ticked.has(index) ? "is-ticked" : undefined}>
                   <input
@@ -97,8 +89,7 @@ export default function ReverseBriefPanel({
   );
 }
 
-/** One labelled paragraph, left out entirely when the model had nothing to put
- * in it — an empty heading reads as a missing fact rather than an absent one. */
+/** Left out when empty: an empty heading reads as a missing fact. */
 function Field({ label, text }: { label: string; text: string }) {
   if (!text.trim()) return null;
   return (

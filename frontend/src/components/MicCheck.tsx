@@ -6,30 +6,22 @@ import { useMicrophoneLevel } from "../hooks/useMicrophoneLevel";
 const HEARD_THRESHOLD = 0.02;
 const REQUIRED_HEARD_DURATION_MS = 450;
 
-/** The test's states as one value, so impossible boolean pairs cannot arise. "failed" is its own state
- * because a microphone that never opened has no level to wait for — the running panel would wait forever. */
+/** One value, so impossible pairs cannot arise; "failed" has no level to wait for. */
 type TestPhase = "idle" | "starting" | "running" | "failed" | "passed";
 
 interface MicCheckProps {
-  /** null = browser default. */
   deviceId: string | null;
   devices: MicDevice[];
   onDeviceChange: (deviceId: string | null) => void;
-  /** Labels are empty until permission is granted once — call after a
-   * successful test to pick up the real names. */
+  /** Labels are empty until permission is granted once. */
   onDevicesRefresh: () => void;
   onConfirmed: () => void;
   onCancel: () => void;
-  /** Whether the check leads to a briefing screen rather than into the call
-   * (ADR 0070's reverse, and any Scenario with a briefing or facts to read).
-   * The button has to name the step it actually takes: a start-the-call label
-   * on a button that opens a page of text is a promise the next screen breaks.
-   */
+  /** The button names the step it actually takes. */
   briefingFollows: boolean;
 }
 
-/** Pre-call microphone test: lets the user pick an input device and confirm
- * that recording works before a session starts. */
+/** Pick a device and confirm recording works before the call. */
 export default function MicCheck({
   deviceId,
   devices,
@@ -45,7 +37,6 @@ export default function MicCheck({
   const heardDurationRef = useRef(0);
   const lastLevelTimestampRef = useRef<number | null>(null);
 
-  // Scale the small RMS input range to a percentage for visual and accessible feedback.
   const meterPercentage = Math.min(Math.round(level * 400), 100);
 
   useEffect(() => {
@@ -83,8 +74,7 @@ export default function MicCheck({
     }
   };
 
-  // Picking a different device while the meter is live must not keep the old
-  // stream open — restart against the new one instead of silently ignoring it.
+  // A device change restarts a running test.
   useEffect(() => {
     if (phase === "starting" || phase === "running") void startTest();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a deviceId change (not every re-render) should restart the running test
@@ -101,11 +91,7 @@ export default function MicCheck({
         </p>
       </section>
 
-      {/* No SetupSection here: this screen has one box and no numbered steps to
-          count off, and the page heading above already names it. */}
       <section className="setup-section">
-        {/* The visible label makes the device selector easier to identify while the
-            selected option continues to name the active microphone. */}
         <label className="mic-device-label" htmlFor="mic-device-select">
           Mikrofon auswählen
         </label>

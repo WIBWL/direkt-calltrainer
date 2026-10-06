@@ -2,11 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { FOCUS_BACKING, backingOf, goalsForMetric } from "./focusMetrics";
 
-/**
- * What a focus tile is allowed to claim (F-62, F-13). A goal in the wrong bucket
- * renders fine but may claim a measurement that does not exist, which
- * ADR 0004/0051 rule out.
- */
+/** F-62, F-13, ADR 0004/0051: what a focus tile may claim. */
 
 describe("backingOf", () => {
   it("gives an unknown goal the honest fallback rather than an empty chart", () => {
@@ -14,8 +10,7 @@ describe("backingOf", () => {
 
     expect(backing.kind).toBe("text");
     expect(backing.metrics).toEqual([]);
-    // The tile has to say *why* there is no chart; an empty note would render
-    // as a blank box under a heading.
+    // An empty note would render as a blank box.
     expect(backing.note).toMatch(/noch keine Messung/);
   });
 
@@ -27,15 +22,12 @@ describe("backingOf", () => {
   });
 
   it("keeps Souveränität a comparison and never a series", () => {
-    // ADR 0081: a line through it would be the difference over time, which is
-    // the one number this goal must not have.
+    // ADR 0081.
     expect(backingOf("composure").kind).toBe("segment");
   });
 
   it("knows nothing of the retired Artikulation and says so honestly", () => {
-    // ADR 0111 retired the goal. A key the catalogue no longer names has to
-    // reach the fallback, not a leftover entry: a tile drawn from a stale row
-    // would go on offering a goal the application withdrew.
+    // ADR 0111: a retired key reaches the fallback.
     const retired = backingOf("articulation");
 
     expect(FOCUS_BACKING.articulation).toBeUndefined();
@@ -64,14 +56,11 @@ describe("the catalogue's shape", () => {
     }
   });
 
-  it("holds the split the dashboard concept states: 8 measured, 1 segment, 2 activity, 2 text", () => {
+  it("holds the split: 8 measured, 1 segment, 2 activity, 2 text", () => {
     const kinds = Object.values(FOCUS_BACKING).map((backing) => backing.kind);
     const count = (kind: string) => kinds.filter((k) => k === kind).length;
 
-    // docs/dashboard-concept.md section 4.2. Pinned as a count because the
-    // honest answer differs per goal, and a goal quietly moving between
-    // buckets is what changes what the screen claims. Thirteen since ADR 0111
-    // retired the Artikulation, which was one of the text goals.
+    // Pinned as counts: a goal moving between buckets changes what the screen claims.
     expect(count("metric")).toBe(8);
     expect(count("segment")).toBe(1);
     expect(count("activity")).toBe(2);
@@ -87,14 +76,12 @@ describe("goalsForMetric", () => {
   });
 
   it("counts only the primary metric, so a supporting figure collects nothing", () => {
-    // reaction_time and pauses sit behind active_listening, but a sentence
-    // about listening does not belong under every figure it was read from.
+    // Supporting figures collect nothing.
     expect(goalsForMetric("reaction_time")).toEqual([]);
     expect(goalsForMetric("pauses")).toEqual([]);
   });
 
   it("lets one metric stand behind several goals when it leads both", () => {
-    // talk_share leads its own goal; needs_analysis leads with questions.
     expect(goalsForMetric("talk_share")).toEqual(["talk_share"]);
     expect(goalsForMetric("questions")).toEqual(["needs_analysis"]);
   });
@@ -105,10 +92,7 @@ describe("goalsForMetric", () => {
   });
 
   it("keeps the segment goal off its four supporting figures but not off its first", () => {
-    // composure names five metrics and `pace` is the first of them, so the
-    // Sprechtempo page carries statements about Souveränität as well as about
-    // Sprechtempo. That follows from the primary-only rule rather than working
-    // around it: the four figures behind the comparison collect nothing.
+    // pace is composure's primary metric too.
     expect(goalsForMetric("pace")).toEqual(["pace", "composure"]);
     expect(goalsForMetric("loudness")).toEqual([]);
     expect(goalsForMetric("run_length")).toEqual([]);

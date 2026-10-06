@@ -28,23 +28,17 @@ import Modal from "./Modal";
 import ShareToggle from "./ShareToggle";
 
 interface ScenarioEditorProps {
-  /** null = author a new Scenario; an id = edit that one. */
   scenarioId: string | null;
-  /** The caller's company name, or null for the `default` tenant. Sharing is
-   * offered only when it is set — "share" means "with my colleagues", which a
-   * user with no company does not have (ADR 0060). */
+  /** Sharing needs a company (ADR 0060). */
   tenantName: string | null;
   onClose: () => void;
-  /** Called after a successful save or delete. `savedId` is the id to select
-   * next (the new/edited Scenario), or null after a delete. Closes the editor. */
+  /** `savedId` is the row to select next, or null after a delete. */
   onSaved: (savedId: string | null) => void;
-  /** Reload the library list without closing the editor — after the "share"
-   * toggle, which applies immediately. */
+  /** After the share toggle, which applies at once. */
   onRefresh: () => void;
 }
 
-/** The placeholder is the field's guidance in one short line, greyed out while
- * the field is empty — so there is no separate always-visible hint. */
+/** The placeholder is the field's only guidance. */
 const FIELDS: {
   key: TextField;
   label: string;
@@ -59,8 +53,6 @@ const FIELDS: {
     placeholder: "Ein Satz für die Auswahlkarte",
     required: true,
   },
-  // Situation first, then the briefing: the case exists before the trainee's
-  // side of it does, and the two are read that way round in the info panel too.
   {
     key: "description",
     label: "Situation",
@@ -74,9 +66,7 @@ const FIELDS: {
     placeholder: "Ihre Rolle, Ihr Spielraum, was ein gutes Ergebnis ist.",
     multiline: true,
   },
-  // Goal and bar in one field: a goal without the mark that settles it is half
-  // a case, and the caller weighs both the same way — silently, against what
-  // has actually been said.
+  // Goal and bar in one field: a goal without its bar is half a case.
   {
     key: "call_goal",
     label: "Ziel des Anrufs (optional)",
@@ -91,18 +81,15 @@ const FIELDS: {
   },
 ];
 
-/** Seconds as m:ss, for the document-upload progress counter. */
 const formatElapsed = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 const MB = 1024 * 1024;
 
-/** A dropped file carries no type often enough that the extension has to count
- * too — the file picker filters by `accept`, a drag does not. */
+/** A drag does not filter by `accept`, and often carries no type. */
 const isPdf = (file: File) =>
   file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 
-/** Create / edit / delete a user-authored Scenario (ADR 0058). Rendered as a
- * modal over the setup screen. */
+/** Create, edit or delete an authored Scenario (ADR 0058). */
 export default function ScenarioEditor({
   scenarioId,
   tenantName,
@@ -120,27 +107,19 @@ export default function ScenarioEditor({
   const [pdfElapsed, setPdfElapsed] = useState(0);
   const [pdfNote, setPdfNote] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  // The facts field's own id: its label sits outside it now, above the row it
-  // shares with the drop zone, so the two are tied by htmlFor rather than by
-  // nesting — a <label> around both would hand a click on the zone to the
-  // textarea.
+  // Tied by htmlFor: a <label> around the zone would hand its clicks to the textarea.
   const factsId = useId();
   const [error, setError] = useState<string | null>(null);
   const [confirmingClose, setConfirmingClose] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  // What the draft looked like when the editor opened (empty for a new
-  // Scenario, the loaded row for an edit) — so a click outside only prompts
-  // when there is really something to lose.
+  // So a click outside only prompts when there is something to lose.
   const pristine = useRef<ScenarioDraft>(EMPTY_DRAFT);
   const isDirty = (Object.keys(draft) as (keyof ScenarioDraft)[]).some(
     (key) => draft[key] !== pristine.current[key],
   );
 
-  // Escape or a click on the backdrop. An open question over the panel is
-  // closed first; otherwise the panel closes — blocked mid-save, and once a
-  // field has been touched only after confirming through the in-panel dialog
-  // (a native window.confirm would break out of the app's look).
+  // Escape or backdrop: blocked mid-save, and confirmed in-panel once touched.
   const dismiss = () => {
     if (confirmingClose) {
       setConfirmingClose(false);
@@ -152,9 +131,7 @@ export default function ScenarioEditor({
     }
   };
 
-  // A file dropped anywhere but the zone below would otherwise be *opened* by
-  // the browser, which navigates away from the editor and takes the unsaved
-  // draft with it. While this panel is up, a missed drop does nothing instead.
+  // A missed drop would make the browser open the file and lose the draft.
   useEffect(() => {
     const swallow = (e: DragEvent) => e.preventDefault();
     window.addEventListener("dragover", swallow);
@@ -167,9 +144,7 @@ export default function ScenarioEditor({
 
   useEffect(() => {
     let cancelled = false;
-    // Cap the inputs from the same limits the API validates against, rather
-    // than a bundled copy that drifts (ADR 0063). On failure the fallback
-    // stands and the server still rejects an over-long field.
+    // The API's own limits (ADR 0063); on failure the fallback stands.
     getFieldLimits()
       .then((l) => !cancelled && setLimits(l))
       .catch(() => undefined);
@@ -188,7 +163,6 @@ export default function ScenarioEditor({
         const draft = toDraft(detail);
         setDraft(draft);
         pristine.current = draft;
-        // Never "public" here: the editor only opens on an editable row.
         setVisibility(detail.visibility === "public" ? "private" : detail.visibility);
       })
       .catch((e: unknown) =>
@@ -215,8 +189,7 @@ export default function ScenarioEditor({
       const saved = isNew
         ? await createScenario(draft)
         : await updateScenario(scenarioId as string, draft);
-      // A new Scenario is created private; if the user ticked "share" in the
-      // form, apply that now that it has an id.
+      // Created private; apply "share" once it has an id.
       if (isNew && visibility === "tenant") {
         await setScenarioVisibility(saved.id, "tenant");
       }
@@ -250,10 +223,7 @@ export default function ScenarioEditor({
       setError("Bitte PDF-Dateien auswählen oder ablegen.");
       return;
     }
-    // Checked here as well as on the server so an oversized drop is refused at
-    // once rather than after the upload. The server's answer is authoritative;
-    // these messages deliberately read the same, and name the file only when
-    // there is more than one, exactly as the server does.
+    // Refused at once; the server's answer is authoritative and worded the same.
     const named = (file: File, message: string) =>
       files.length > 1 ? `${file.name}: ${message}` : message;
     const tooBig = files.find((file) => file.size > MAX_DOCUMENT_MB * MB);
@@ -269,8 +239,7 @@ export default function ScenarioEditor({
     setPdfBusy(true);
     setPdfNote(null);
     setError(null);
-    // No real ETA is possible (thinking-mode length varies), so just count up
-    // so the user can see it is still working, not frozen.
+    // No ETA is possible, so count up.
     setPdfElapsed(0);
     const started = Date.now();
     const ticker = window.setInterval(
@@ -386,10 +355,7 @@ export default function ScenarioEditor({
                         {counter}
                       </label>
 
-                      {/* Typing them and dropping the documents in fill the
-                          same field, so they sit side by side at the same
-                          size with an "oder" between — not one under the
-                          other, which would read as a second step. */}
+                      {/* Side by side with an "oder": two ways to fill one field, not two steps. */}
                       <div className="facts-split">
                         <textarea
                           id={factsId}
@@ -403,9 +369,7 @@ export default function ScenarioEditor({
 
                         <span className="facts-split-or">oder</span>
 
-                        {/* A <label>, so a click anywhere in the zone opens
-                            the picker and the hidden input stays the
-                            keyboard's way in. */}
+                        {/* A <label>, so a click opens the picker; the input stays the keyboard's way in. */}
                         <label
                           className={cx(
                             "pdf-dropzone",
@@ -417,8 +381,7 @@ export default function ScenarioEditor({
                             if (!pdfBusy) setDragging(true);
                           }}
                           onDragLeave={(e) => {
-                            // Only when the pointer really left the zone —
-                            // crossing a child fires this too.
+                            // Crossing a child fires this too.
                             if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
                               setDragging(false);
                             }
@@ -518,8 +481,7 @@ export default function ScenarioEditor({
                           }))
                         }
                       >
-                        {/* "Ohne Kategorie" is a valid answer, so the field needs no `canSave` check: better
-                            uncategorised than filed wrongly (ADR 0072). */}
+                        {/* Better uncategorised than filed wrongly (ADR 0072). */}
                         <option value="">Ohne Kategorie</option>
                         {CATEGORIES.map((c) => (
                           <option key={c} value={c}>

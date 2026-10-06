@@ -9,11 +9,7 @@ import { callDurationMs } from "../utils/progressStats";
 import { formatClock, formatDateTime } from "../utils/time";
 import { useSessionDeletion } from "./DeleteSessionPrompt";
 
-/**
- * The user's past trainings (F-48), one row each, listing without rating (ADR 0065). A row shows what tells
- * calls apart: when, which scenario, with whom. The newest few are shown, more on demand (`useSessionHistory`).
- * Deletion is offered per row; the confirmation carries the weight, since it is final (ADR 0066).
- */
+/** Past trainings (F-48), listed without rating (ADR 0065). Deletion per row is final (ADR 0066). */
 export default function SessionHistory() {
   const { sessions, total, state, hasMore, loadingMore, showMore, removeSession } =
     useSessionHistory();
@@ -76,10 +72,7 @@ function SessionRow({
 
   const when = formatDateTime(session.started_at) ?? session.started_at;
 
-  // Focus follows the control that just took the place of the one pressed:
-  // the bin is hidden once the check and the cross are in, and a focused
-  // element that turns invisible drops the keyboard to the top of the page.
-  // The cross rather than the check, so that a second Enter cannot delete.
+  // Focus moves to the cross, not the check, so a second Enter cannot delete.
   useEffect(() => {
     if (confirming) cancelRef.current?.focus();
     else if (wasConfirming.current) binRef.current?.focus();
@@ -100,14 +93,10 @@ function SessionRow({
           <span className="session-row-persona">
             {session.persona}
             {session.reverse && (
-              // Which side of the phone the User was on (ADR 0070). Two rows on
-              // the same Scenario are otherwise indistinguishable, and they were
-              // opposite exercises.
+              // ADR 0070: otherwise two rows on one Scenario look alike.
               <span className="chip chip-neutral">Rollentausch</span>
             )}
             {session.status === "aborted" && (
-              // Worth saying, because it explains a short call or a missing
-              // wrap-up — but stated, not warned about.
               <span className="chip chip-neutral">abgebrochen</span>
             )}
             <span className={`chip ${feedback.tone}`}>{feedback.label}</span>
@@ -119,9 +108,7 @@ function SessionRow({
         <span className="session-row-chevron" aria-hidden="true" />
       </Link>
 
-      {/* Outside the Link, not inside it: a button nested in an anchor is
-          invalid markup and clicking it would navigate as well as delete. */}
-      {/* The bin slides out and a check and a cross take its place. All three stay mounted, hidden by
+      {/* Outside the Link: no button inside an anchor. All three stay mounted, hidden by
           `visibility`, so the bin can animate and hidden controls leave the tab order. */}
       <div
         className={cx("session-row-actions", confirming && "is-confirming")}
@@ -135,8 +122,7 @@ function SessionRow({
           ref={binRef}
           type="button"
           className="session-row-delete"
-          // The label names the training, because a screen reader meets a
-          // column of otherwise identical delete buttons.
+          // A screen reader meets a column of otherwise identical buttons.
           aria-label={`Training „${session.scenario}“ vom ${when} löschen`}
           title="Training löschen"
           onClick={() => setConfirming(true)}
@@ -149,8 +135,7 @@ function SessionRow({
           className="session-row-yes"
           aria-label={`Endgültig löschen: Gesprächsprotokoll, Kennzahlen und Auswertung werden entfernt`}
           title="Endgültig löschen"
-          // Never `disabled` while the request runs: a disabled button drops
-          // the focus it is holding.
+          // Never `disabled`: that drops the focus.
           aria-busy={deletion.deleting}
           onClick={() => !deletion.deleting && void deletion.remove()}
         >
@@ -178,7 +163,6 @@ function SessionRow({
   );
 }
 
-/** Bin, drawn rather than typed: no icon font, no external asset. */
 function TrashIcon() {
   return (
     <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false">
@@ -223,10 +207,7 @@ function CrossIcon() {
   );
 }
 
-/**
- * What the row promises. Three states: a just-ended Session really has a wrap-up on its way (ADR 0019), while
- * a failed job will never produce one.
- */
+/** A just-ended Session has a wrap-up on its way (ADR 0019); a failed job never will. */
 function feedbackChip(session: SessionSummary): { label: string; tone: string } {
   if (session.has_feedback) {
     return { label: "Feedback erstellt", tone: "chip-success" };
@@ -237,7 +218,6 @@ function feedbackChip(session: SessionSummary): { label: string; tone: string } 
   return { label: "kein Feedback verfügbar", tone: "chip-absent" };
 }
 
-/** How long the call ran, as mm:ss, or null where it has no recorded end. */
 function callDuration(session: SessionSummary): string | null {
   const ms = callDurationMs(session);
   return ms === null ? null : formatClock(ms / 1000);

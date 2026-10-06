@@ -3,9 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { FocusGoal, Measurement, SessionFeedback, SessionTurn } from "../protocol";
 import { callMeta, metricGroups, reportOutline } from "./reportOutline";
 
-/** The feedback report's outline, shared by page and PDF (F-64): a point's moment,
- * its focus goal, which side of the call the User was on, and which half a metric
- * is read in. */
+/** F-64: the report outline shared by page and PDF. */
 
 function turn(turn_id: number, start_offset_ms: number): SessionTurn {
   return {

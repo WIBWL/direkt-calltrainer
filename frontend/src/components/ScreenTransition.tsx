@@ -11,27 +11,17 @@ import {
 
 import { prefersReducedMotion } from "../utils/motion";
 
-/**
- * The film cut between two screens. Mounted above the router (`main.tsx`) because the trigger may be what
- * disappears: an overlay in a page that navigates away would unmount mid-animation.
- */
+/** The cut between screens, above the router: the trigger may be what disappears. */
 
-/** How long each phase runs. Long enough to read as a cut, short enough not to
- * be a wait. */
 const TIMING = { cover: 300, reveal: 320 } as const;
 
 interface ScreenTransitionApi {
-  /**
-   * Dim the screen and run `cut` at the moment it is covered. Everything the
-   * cut does — a state change, a navigation — is invisible while it happens,
-   * which is the whole point of the cover.
-   */
+  /** Runs `cut` while the screen is covered. */
   playFade: (cut: () => void) => void;
 }
 
 const ScreenTransitionContext = createContext<ScreenTransitionApi>({
-  // No provider (a test rendering one screen on its own, say) means no
-  // animation, never a missing screen change.
+  // Without a provider: no animation, never a missing change.
   playFade: (cut) => cut(),
 });
 
@@ -42,16 +32,12 @@ export function useScreenTransition(): ScreenTransitionApi {
 export function ScreenTransitionProvider({ children }: { children: ReactNode }) {
   const [run, setRun] = useState<{ cut: () => void; seq: number } | null>(null);
   const [phase, setPhase] = useState<"cover" | "reveal">("cover");
-  // Read in the play function, which has to stay referentially stable: it
-  // sits in the dependency lists of the callbacks that start a call.
+  // The play function must stay stable for the callbacks that start a call.
   const running = useRef(false);
   const seq = useRef(0);
 
   const playFade = useCallback((cut: () => void) => {
-    // Reduced motion and a second press while one is already playing take the
-    // same way out: do the cut, skip the film. A dropped cut would leave the
-    // press without an effect, which is the one outcome worse than no
-    // animation.
+    // Do the cut, skip the film; a dropped cut is worse than no animation.
     if (running.current || prefersReducedMotion()) {
       cut();
       return;
@@ -82,20 +68,15 @@ export function ScreenTransitionProvider({ children }: { children: ReactNode }) 
       {children}
       {run && (
         <div
-          // Keyed on the run so a repeat play restarts the animations rather
-          // than continuing the previous element's.
           key={run.seq}
           className={`screen-transition screen-transition-${phase}`}
-          // The durations live here and not in the stylesheet so the timers
-          // above and the animations cannot drift apart.
+          // Here, so the timers and animations cannot drift apart.
           style={
             {
               "--cover-ms": `${TIMING.cover}ms`,
               "--reveal-ms": `${TIMING.reveal}ms`,
             } as CSSProperties
           }
-          // Purely visual, and the screen behind it is already announced by
-          // its own headings.
           aria-hidden="true"
         >
           <div className="screen-transition-scrim" />

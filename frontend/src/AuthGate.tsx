@@ -10,25 +10,16 @@ import NoAccessView from "./components/NoAccessView";
 import { oidcClientId } from "./oidcConfig";
 import { holdsRequiredRole } from "./utils/access";
 
-/**
- * Renders `children` only for an authenticated user holding the
- * `calltrainer-user` role (ADR 0109); a splash while the session is restored or
- * a redirect is in flight, the login screen without a session, and a "not
- * admitted" screen without the role. `isLoading` is checked first so the login
- * prompt does not flash on every page load.
- */
+/** Children only for a logged-in user with the role (ADR 0109). `isLoading`
+ * first, so the login prompt does not flash on every load. */
 export function AuthGate({ children }: { children: ReactNode }) {
   const auth = useAuth();
 
-  // The router's location, not window.location: inside a Router the two agree,
-  // but reading it here is what makes the dependency explicit.
   const location = useLocation();
 
   const showsLogin = !auth.isLoading && !auth.activeNavigator && !auth.isAuthenticated;
 
-  // Warm up the discovery document while the login screen is read, so the
-  // button press does not wait ~200 ms on Keycloak. A failure is ignored:
-  // `signinRedirect` fetches it again and surfaces the error there.
+  // Warms the discovery document; `signinRedirect` surfaces any error itself.
   useEffect(() => {
     if (showsLogin) void userManager.metadataService.getMetadata().catch(() => undefined);
   }, [showsLogin]);

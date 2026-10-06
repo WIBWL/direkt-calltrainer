@@ -5,14 +5,10 @@ import { formatNumber } from "../utils/metrics";
 import InfoDetails from "./InfoDetails";
 import PitchContour from "./PitchContour";
 
-/**
- * What a speaker's pitch contour says about their delivery (F-35): the contour, a lead
- * sentence, then five figure tiles with an "i" each. Only liveliness carries a class and
- * light (Hincks 2005; ADR 0077/0078); endings and development need no norm.
- */
+/** The pitch contour's reading (F-35). Only liveliness carries a class and light
+ * (ADR 0077/0078); endings and development need no norm. */
 
-/** Below this a change between the first and last third is wobble, not a
- *  development worth a sentence. Three semitones is a minor third. */
+/** Below a minor third, a change between thirds is wobble. */
 const NOTABLE_CHANGE_ST = 3;
 
 interface Endings {
@@ -26,22 +22,14 @@ export default function IntonationReading({
   toneFit = null,
 }: {
   measurement: Measurement;
-  /**
-   * Whether the tone suited the occasion, from the wrap-up (`feedback.tone_fit`), shown
-   * here because it answers what these figures cannot. Null for an older or unfinished
-   * wrap-up, in which case the block is left out.
-   */
+  /** From the wrap-up (ADR 0079); null leaves the block out. */
   toneFit?: string | null;
 }) {
   const detail = measurement.detail ?? {};
   const curve = detail.curve_hz as (number | null)[] | undefined;
   const median = detail.median_hz as number | undefined;
   const stepMs = (detail.curve_step_ms as number | undefined) ?? 100;
-  // `null` and not just `undefined` throughout: these are Optional on the
-  // Python side, so a figure the contour did not support arrives as JSON null
-  // rather than as a missing key. `!== undefined` lets a null through, and
-  // `(null * 100).toFixed(0)` is the string "0", so the screen would report a
-  // measurement that was never taken.
+  // `null` too: Optional fields arrive as JSON null, and `(null * 100).toFixed(0)` is "0".
   const movement = detail.movement_st_per_s as number | null | undefined;
   const endings = detail.endings as Endings | undefined;
   const first = detail.range_first_st as number | null | undefined;
@@ -49,7 +37,7 @@ export default function IntonationReading({
   const breaks = detail.turn_breaks as number[] | undefined;
   const bandLow = detail.band_low_st as number | undefined;
   const bandHigh = detail.band_high_st as number | undefined;
-  // Null with too little voiced speech; then there is no step and no colour.
+  // Null with too little voiced speech: no step, no colour.
   const pvq = detail.pvq as number | null | undefined;
   const pvqWindows = (detail.pvq_windows as number | null | undefined) ?? 0;
   const label = detail.liveliness_label as string | undefined;
@@ -228,10 +216,7 @@ export default function IntonationReading({
   );
 }
 
-/**
- * One figure as a tile, shaped as `.metric` so it reads like the wrap-up's tiles; it adds
- * an "i", since here there is no further page to go to.
- */
+/** Shaped as `.metric`, plus an "i", since there is no further page. */
 function Tile({
   name,
   value,
@@ -244,8 +229,7 @@ function Tile({
   value: string;
   subline?: string;
   light?: TrafficLight | undefined;
-  /** The accessible name of the icon. Hidden from the eye, because the same
-   *  label on every tile of a grid is noise. */
+  /** Hidden from the eye: the same label on every tile is noise. */
   info: string;
   children: ReactNode;
 }) {
@@ -261,10 +245,6 @@ function Tile({
   );
 }
 
-/**
- * The one sentence this screen is built around: the coloured classification in words and
- * what it sounds like on the other end of the line.
- */
 function lead(
   pvq: number | null | undefined,
   label: string | undefined,
@@ -292,10 +272,7 @@ function lead(
   );
 }
 
-/** What each step sounds like to the person on the other end, in one sentence.
- *  Keyed by the German label, which the backend serves beside the threshold it
- *  came from, so a relabelling shows up here as a missing sentence rather than
- *  as a wrong one. */
+/** Keyed by the backend's label, so a relabelling shows as a missing sentence, not a wrong one. */
 const SOUNDS_LIKE: Record<string, string> = {
   monoton:
     "Ihre Stimme blieb fast auf einer Höhe. Am Telefon fällt das stärker auf als im Raum, " +
@@ -315,10 +292,7 @@ function endingsSubline({ falling, rising, level }: Endings): string {
   return `${falling} fallend, ${rising} steigend, ${level} gleichbleibend`;
 }
 
-/**
- * What the endings say, in one sentence, or nothing. It stops at the observation: only
- * the speaker can settle whether it landed as meant.
- */
+/** Stops at the observation: only the speaker knows whether it landed as meant. */
 function endingsNote(endings: Endings | undefined): string | null {
   if (!endings) return null;
   const { falling, rising, level } = endings;
@@ -349,8 +323,7 @@ function developmentSubline(first: number, last: number): string {
     : `weiter um ${formatNumber(change, 1)} Halbtöne`;
 }
 
-/** A comparison of the speaker with themselves, which is the only comparison
- *  available here without a norm. Silent when nothing moved. */
+/** The speaker against themselves, the only comparison without a norm. */
 function developmentNote(
   first: number | null | undefined,
   last: number | null | undefined,

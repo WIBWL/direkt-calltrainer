@@ -1,8 +1,4 @@
-/**
- * Up to two initials ("Anna Maria Berger" → "AB") for every avatar in the app.
- * Taken per grapheme, not code unit, so a non-BMP first character stays whole.
- * Empty for an empty name; the fallback is the caller's.
- */
+/** Up to two initials, per grapheme; empty for an empty name. */
 export function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   const first = parts[0];

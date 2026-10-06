@@ -5,10 +5,7 @@ import type { DataOverviewPayload, RetentionState } from "../protocol";
 import { formatDate } from "../utils/time";
 import RetentionSettings from "./RetentionSettings";
 
-/**
- * How much is stored about the caller, and a copy to take away (ADR 0066). Counts
- * rather than content, so the *extent* of what is held is visible at a glance.
- */
+/** Counts, not content, and a copy to take away (ADR 0066). */
 export default function DataOverview() {
   const [data, setData] = useState<DataOverviewPayload | null>(null);
   const [failed, setFailed] = useState(false);
@@ -86,11 +83,7 @@ export default function DataOverview() {
   );
 }
 
-/**
- * Fetch the export and hand it to the browser as a file. Not a plain link: an
- * `<a href>` sends no bearer token. The blob download also keeps a page of transcripts
- * out of a browser tab the next person could page back to.
- */
+/** A blob download: an `<a href>` sends no bearer token. */
 async function download(
   setDownloading: (value: boolean) => void,
   setFailed: (value: boolean) => void,
@@ -112,15 +105,12 @@ async function download(
     console.debug("[export] failed", e);
     setFailed(true);
   } finally {
-    // Revoked either way: an object URL holds the whole document in memory
-    // until it is released, and this one is a copy of everything the user ever
-    // said.
+    // It holds a copy of everything the user said.
     if (url) URL.revokeObjectURL(url);
     setDownloading(false);
   }
 }
 
-/** The server's suggested filename, if it sent one. */
 function filenameFrom(response: Response): string | null {
   const disposition = response.headers.get("content-disposition");
   const match = disposition?.match(/filename="([^"]+)"/);

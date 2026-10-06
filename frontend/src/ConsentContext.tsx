@@ -12,11 +12,7 @@ interface ConsentContextValue {
 
 const ConsentContext = createContext<ConsentContextValue | null>(null);
 
-/**
- * Holds the storage decision app-wide, one fetch, and asks when missing (ADR 0066).
- * Never blocks on a *failed* load: the backend fails closed by itself, so a
- * network blip must not lock out a user who decided long ago.
- */
+/** One fetch, app-wide (ADR 0066). A failed load never blocks: the backend fails closed by itself. */
 export function ConsentProvider({ children }: { children: ReactNode }) {
   const { consent, state, saving, decide } = useConsent();
 
@@ -35,12 +31,10 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** The current decision. Null while unknown — a failed load, not a "no". */
+/** Null while unknown: a failed load, not a "no". */
 export function useConsentContext(): ConsentContextValue {
   const value = useContext(ConsentContext);
   if (value === null) {
-    // A component rendered outside the provider would otherwise read "no
-    // consent" from a default and quietly tell the user the wrong thing.
     throw new Error("useConsentContext must be used inside <ConsentProvider>");
   }
   return value;

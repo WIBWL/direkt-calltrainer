@@ -5,11 +5,7 @@ import type { FocusChoice, FocusState } from "../protocol";
 
 export type FocusLoadState = "loading" | "ready" | "failed";
 
-/**
- * The signed-in user's training focus and its catalogue (F-62, ADR 0076), held
- * once near the root so dialog and profile agree. A failed load is not
- * "undecided": re-asking would overwrite an answer given months ago.
- */
+/** Held once near the root (F-62, ADR 0076). A failed load is not "undecided", or it would re-ask. */
 export function useFocus() {
   const [focus, setFocus] = useState<FocusState | null>(null);
   const [state, setState] = useState<FocusLoadState>("loading");
@@ -35,7 +31,7 @@ export function useFocus() {
     };
   }, []);
 
-  /** Replace the selection. No goals is "no focus" — a real answer. */
+  /** No goals is "no focus", a real answer. */
   const choose = useCallback(async (choice: FocusChoice): Promise<FocusState> => {
     setSaving(true);
     try {

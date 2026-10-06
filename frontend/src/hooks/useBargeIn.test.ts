@@ -8,11 +8,7 @@ import {
 } from "./useBargeIn";
 import type { CallState } from "../protocol";
 
-/**
- * The wire between playback and socket, which neither hook's own spec covers:
- * the heard position `interrupt()` returns must reach the server, or the
- * transcript silently keeps unheard words (ADR 0035). Plain fakes suffice.
- */
+/** ADR 0035: the heard position `interrupt()` returns must reach the server. */
 
 function fakes(callState: CallState, isPlaying: boolean, playedMs = 1234) {
   const socket: BargeInSocket = {
@@ -35,8 +31,7 @@ const render = (socket: BargeInSocket, playback: BargeInPlayback) =>
 
 describe("what the call screen shows", () => {
   it("holds at speaking while the last chunk plays out", () => {
-    // The server says the Turn is over the moment it has the transcript; the
-    // audio it already sent is still playing locally.
+    // The Turn is over on the server while its audio still plays locally.
     const { socket, playback } = fakes("listening", true);
     expect(render(socket, playback).result.current.displayState).toBe("speaking");
   });
@@ -54,9 +49,7 @@ describe("what the call screen shows", () => {
 
 describe("barging in", () => {
   it("forwards the played position to the server (ADR 0035)", () => {
-    // The assertion that matters: the number `interrupt()` returns is the
-    // number the server is told. Dropping it keeps unheard words in the
-    // transcript, and nothing else in the suite would notice.
+    // Dropping it keeps unheard words in the transcript, unnoticed elsewhere.
     const { socket, playback } = fakes("speaking", true, 1234);
     render(socket, playback).result.current.bargeIn();
 
@@ -65,8 +58,7 @@ describe("barging in", () => {
   });
 
   it("does nothing during the user's own turn", () => {
-    // The other failure direction: an interrupt reported here would trim a
-    // reply that had already finished.
+    // Would trim a reply that had already finished.
     const { socket, playback } = fakes("listening", false);
     render(socket, playback).result.current.bargeIn();
 
@@ -75,8 +67,7 @@ describe("barging in", () => {
   });
 
   it("reports speech into silence, so no 'Hallo?' is asked over it", () => {
-    // ADR 0110: the user's audio arrives only once they finish; the start is
-    // all the server has to go on.
+    // ADR 0110.
     const { socket, playback } = fakes("listening", false);
     render(socket, playback).result.current.bargeIn();
 
@@ -91,8 +82,7 @@ describe("barging in", () => {
   });
 
   it("still fires while the tail of a reply plays out", () => {
-    // The server already said "listening", but the Persona is audibly still
-    // talking — the user talking over it is a real barge-in.
+    // The Persona is audibly still talking.
     const { socket, playback } = fakes("listening", true, 900);
     render(socket, playback).result.current.bargeIn();
 
@@ -107,8 +97,7 @@ describe("ending the call", () => {
 
     expect(socket.sendInterrupt).toHaveBeenCalledWith(500);
     expect(socket.endSession).toHaveBeenCalledTimes(1);
-    // Order matters: ending first would close the socket before the position
-    // could be sent.
+    // Ending first would close the socket before the position is sent.
     const interruptOrder = (socket.sendInterrupt as ReturnType<typeof vi.fn>).mock
       .invocationCallOrder[0] as number;
     const endOrder = (socket.endSession as ReturnType<typeof vi.fn>).mock
@@ -139,9 +128,7 @@ describe("the callbacks VAD holds for the whole call", () => {
   });
 
   it("act on the current socket, not the one they were created with", () => {
-    // What the latest-value ref buys: the callbacks used to capture
-    // sendInterrupt and interrupt from the first render, and were correct only
-    // because four separate dependency arrays happened to be empty.
+    // The latest-value ref: callbacks used to capture the first render.
     const first = fakes("speaking", true, 100);
     const view = render(first.socket, first.playback);
     const frozen = view.result.current.bargeIn;
@@ -155,8 +142,7 @@ describe("the callbacks VAD holds for the whole call", () => {
   });
 
   it("see the current state, so a stale one cannot suppress a barge-in", () => {
-    // The subtle failure this guards: a callback holding the first render's
-    // "listening" would return early and never report an interrupt again.
+    // A first-render "listening" would never report an interrupt again.
     const first = fakes("listening", false);
     const view = render(first.socket, first.playback);
     const frozen = view.result.current.bargeIn;

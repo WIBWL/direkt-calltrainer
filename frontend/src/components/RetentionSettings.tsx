@@ -4,11 +4,8 @@ import { apiFetch } from "../api";
 import type { RetentionState } from "../protocol";
 import { formatDate } from "../utils/time";
 
-/**
- * The six-month automatic deletion and the switch that suspends it (ADR 0067). Leads with the date, not the
- * control. Switching off is not confirmed: it destroys nothing, and confirming the harmless direction would
- * make the harmful ones look routine.
- */
+/** The six-month deletion and its off switch (ADR 0067). Switching off is not
+ * confirmed: confirming the harmless direction makes the harmful ones look routine. */
 export default function RetentionSettings({
   retention,
   onChange,
@@ -16,8 +13,6 @@ export default function RetentionSettings({
 }: {
   retention: RetentionState;
   onChange: (next: RetentionState) => void;
-  /** Rendered beside the toggle: the export button shares its row, because the
-   *  two are the same kind of thing — what happens to the stored data. */
   children?: ReactNode;
 }) {
   const [saving, setSaving] = useState(false);

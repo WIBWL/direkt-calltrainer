@@ -5,44 +5,31 @@ import { useBargeIn } from "./useBargeIn";
 import { useSessionSocket, type CommittedSession } from "./useSessionSocket";
 import { useStreamedAudioPlayback } from "./useStreamedAudioPlayback";
 
-/** The live call and the three rules binding connection to playback: the opening-line
- * reset keys on the same `committed` as the socket; `accept` is the only way to run
- * `activate()` and always sends `sendActivate()`; a Persona-ended call waits for its
- * goodbye to play out (`endIsDue`). The ended call is handed to `onCallOver`. */
+/** The live call. The opening-line reset keys on the socket's `committed`;
+ * `accept` is the only way to `activate()`; a Persona-ended call waits for its
+ * goodbye to play out (`endIsDue`). */
 
-/** A call the server has said is over, with what it left behind. */
 export interface EndedCall {
   reason: "user" | "error" | "completed";
   turns: TranscriptEntry[];
-  /** Names the persisted Session; null where nothing was stored. */
+  /** Null where nothing was stored. */
   sessionId: string | null;
 }
 
-/**
- * Whether an ended call may be torn down now. `session.ended` can arrive while
- * the closing line still plays, so a natural or failed ending waits for the
- * audio; a User's hang-up stops at once.
- */
+/** `session.ended` can arrive while the goodbye plays; only a hang-up stops at once. */
 export function endIsDue(end: EndedCall, isPlaying: boolean): boolean {
   return end.reason === "user" || !isPlaying;
 }
 
 export interface LiveCall {
-  /** What the call screen shows (see `useBargeIn`). */
   displayState: CallState;
-  /** The Persona's output level, for the animation. */
   audioLevel: number;
   error: string | null;
-  /** The User started talking over the Persona. One identity for the life of
-   * the component, which `useMicrophoneVAD` depends on. */
+  /** One identity for the component's life; `useMicrophoneVAD` depends on it. */
   bargeIn: () => void;
   endCall: () => void;
   sendTurnAudio: (audio: Blob, mimeType: string) => void;
-  /**
-   * The User picked up (or, in a reverse, is through to the Persona): reveal
-   * whatever opening audio is buffered — only a reverse has any (ADR 0110) —
-   * and start the Session clock on the server, as one act (ADR 0042).
-   */
+  /** Reveals buffered opening audio (a reverse's only, ADR 0110) and starts the server clock, as one act (ADR 0042). */
   accept: () => void;
 }
 
@@ -66,18 +53,13 @@ export function useLiveCall(
     onEnded: handleEnded,
   });
 
-  // Buffered opening audio belongs to exactly one connection (ADR 0042). The
-  // socket above is replaced whenever `committed` changes, so whatever the
-  // previous one buffered is audio from a Session that will never be
-  // conducted — drop it, and go back to holding. Keyed on the same value the
-  // socket keys on, which is the whole point of the two living here.
+  // Buffered audio belongs to one connection (ADR 0042): keyed like the socket.
   useEffect(() => {
     playback.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- playback is stable-shaped; this must mirror the connection key exactly
   }, [committed]);
 
-  // Read through a ref, as `useBargeIn` does: the caller's callback closes
-  // over its own render, and the effect below must not re-run when it changes.
+  // A ref, as in `useBargeIn`: the effect must not re-run on a new callback.
   const latest = useRef({ onCallOver, playback, socket });
   latest.current = { onCallOver, playback, socket };
 

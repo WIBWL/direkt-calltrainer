@@ -35,55 +35,33 @@ import {
 } from "./progressStats";
 import { formatDate } from "./time";
 
-/** The progress screen as a PDF (F-13), in the page's order over the selected
- * trainings. Never a report card: no target, good/bad colour, arrow, difference or
- * aggregate (ADR 0004/0051/0065), and it says so twice, since paper reads as an
- * assessment. Built in the browser from the page's numbers (concept, section 9). */
+/** The progress screen as a PDF (F-13). Never a report card: no target, colour,
+ * arrow, difference or aggregate (ADR 0004/0051/0065), and it says so. */
 
-/** One course beside a metric's figures, in millimetres. Small on purpose: it
- *  is the shape of the row, and the figures beside it are the reading. */
 const COURSE = { width: 42, height: 8 };
-/** One row of the metric list. Fixed, so a page break never lands between a
- *  name and the course belonging to it. */
+/** Fixed, so a page break never separates a name from its course. */
 const ROW_HEIGHT = 11;
-/** Where the columns of that list sit, measured from the left margin, and how
- *  much room the count at the right-hand end takes. The band text is fitted
- *  into what is left: "128 bis 138 WPM" beside a right-aligned "9 von 9" ran
- *  into it at the first long unit. */
+/** Column offsets from the left margin; the band text is fitted into what is left. */
 const COLUMN = { value: 56, course: 86, band: 136 };
 const COUNT_WIDTH = 17;
-/** At most this many months under the training record. Twelve is already more
- *  than the six-month retention can fill (ADR 0067); the cap is there so an
- *  account that somehow holds more does not print a page of them. */
+/** More than six-month retention can fill (ADR 0067). */
 const MAX_MONTHS = 12;
-/** At most this many rows of the variety list. The grid on screen collapses
- *  after five and offers the rest behind a button; paper has no button, so it
- *  prints the ones that carry the training and says how many it left out. */
+/** Paper has no "show more" button; the rest is counted. */
 const MAX_PAIRINGS = 12;
 
 export interface ProgressPdfOptions {
-  /** Every stored training, newest first — what the record at the top counts,
-   *  exactly as on screen, where the period switch deliberately does not reach
-   *  that block. */
+  /** Every stored training: the record ignores the period switch, as on screen. */
   sessions: SessionSummary[];
-  /** The trainings the switches select: what every figure below the record is
-   *  read over. */
+  /** What every figure below the record is read over. */
   selected: SessionSummary[];
-  /** That selection in words ("Ihren letzten 5 Beratungsgesprächen"), from the
-   *  same place the pages without a switch take it (`ProgressContext`). */
   phrase: string;
-  /** The focus catalogue, for turning a key into its German title. */
   catalogue: FocusGoal[];
-  /** The goals the user picked, by key. */
   picked: string[];
-  /** Whether the account holds more trainings than the dashboard read. */
   truncated?: boolean;
   date?: Date;
 }
 
-/** The document and its file name, without saving it, so the layout can be
- *  rendered outside a browser. No caller in the repository on purpose, like
- *  `buildFeedbackPdf`: an unused-export sweep will flag it wrongly. */
+/** Without saving, like `buildFeedbackPdf`; no caller in the repo on purpose. */
 export async function buildProgressPdf({
   sessions,
   selected,
@@ -96,12 +74,8 @@ export async function buildProgressPdf({
   const sheet = await openSheet("Ihr Fortschritt");
 
   const counts = activity(sessions);
-  // The same list the screen reads (`selectionSeries`), so the file cannot
-  // show a row the page does not, or miss one it does.
+  // The screen's own list, so the file cannot differ from the page.
   const series = selectionSeries(selected).filter((s) => showsInOverview(s.key));
-  // Those of the selection the courses were drawn from: a call too short to
-  // describe carries no figures (`readable`, `MIN_CALL_MS`). Both counts are
-  // stated below rather than one silently swapped for the other.
   const long = readable(selected);
 
   sheet.facts([
@@ -116,9 +90,7 @@ export async function buildProgressPdf({
   ]);
   sheet.y += 3;
 
-  // The sentence that has to be read before any figure on the sheet, and the
-  // reason it has to: a printed page of numbers about a person is taken for an
-  // assessment of them unless it says it is not.
+  // Before any figure: printed numbers about a person read as an assessment.
   sheet.paragraph(
     "Diese Übersicht beschreibt Ihre eigenen Trainings. Bewertet wird nichts: Für keine " +
       "dieser Größen gibt es einen belegten Richtwert, an dem sie für Ihre Gespräche zu " +
@@ -134,9 +106,7 @@ export async function buildProgressPdf({
     );
     sheet.y += 4;
   }
-  // The sentence the screen puts beside its switch, and it matters more here: a
-  // reader cannot ask a sheet why a course rests on fewer calls than the line
-  // above it names.
+  // A sheet cannot be asked why a course rests on fewer calls.
   if (selected.length > long.length) {
     const short = selected.length - long.length;
     sheet.paragraph(
@@ -151,9 +121,7 @@ export async function buildProgressPdf({
   sheet.y += 4;
 
   record(sheet, sessions, counts);
-  // What each goal reads and what recurs are both decided in
-  // `progressOutline`, which the screen renders as JSX and this file as
-  // paragraphs. Neither decides which readings exist (ADR 0102).
+  // Decided in `progressOutline`, like the screen (ADR 0102).
   focus(
     sheet,
     focusOutline({
@@ -175,11 +143,7 @@ export async function downloadProgressPdf(options: ProgressPdfOptions): Promise<
   doc.save(filename);
 }
 
-/**
- * What was trained, over every stored training. The calendar becomes a list of
- * trainings per month (twelve grids would be pages of squares); the variety
- * table travels as pairings with counts.
- */
+/** The calendar as trainings per month; the variety table as pairings with counts. */
 function record(
   sheet: Sheet,
   sessions: SessionSummary[],
@@ -244,10 +208,7 @@ function record(
   }
 }
 
-/** The picked focus goals, each with whatever honestly answers it — the four
- *  shapes the tiles take (`utils/focusMetrics.ts`), written out as lines. A
- *  goal with no measurement says so rather than being left off: a sheet that
- *  quietly dropped it would let the reader believe it is being tracked. */
+/** A goal without a measurement says so, rather than seeming tracked. */
 function focus(sheet: Sheet, outline: FocusOutline[]) {
   if (outline.length === 0) return;
 
@@ -262,10 +223,7 @@ function focus(sheet: Sheet, outline: FocusOutline[]) {
   sheet.y += 4;
 }
 
-/** One focus goal's reading as a sentence. Which of the five states it is was
- *  decided in `progressOutline`, for the screen and this file at once (ADR
- *  0102); what is left is the wording a paragraph needs where a tile has a chart
- *  and a tally — the part that may legitimately differ. */
+/** The state is decided in `progressOutline` (ADR 0102); only the wording is this file's. */
 function goalSentence(reading: FocusReading): string {
   switch (reading.kind) {
     case "metric": {
@@ -287,9 +245,7 @@ function goalSentence(reading: FocusReading): string {
       return "Was dieses Ziel beantwortet, steht oben unter „Ihr Training“.";
     case "mentions": {
       const { improvements, strengths, total, note, measured } = reading;
-      // Only the halves that happened. "in 0 als Stärke" reads as a score of
-      // zero, which is the one thing a count of statements must not become
-      // (ADR 0080).
+      // Only the halves that happened: "in 0 als Stärke" reads as a score (ADR 0080).
       const named = [
         ...(improvements > 0 ? [`in ${improvements} als Verbesserung`] : []),
         ...(strengths > 0 ? [`in ${strengths} als Stärke`] : []),
@@ -301,10 +257,7 @@ function goalSentence(reading: FocusReading): string {
   }
 }
 
-/** What the wrap-ups keep naming. A frequency of statements over a named
- *  denominator, never a measurement and never a percentage — ADR 0080's
- *  wording kept word for word, because this is the block most easily misread as
- *  a grade and a sheet of paper cannot be asked a follow-up question. */
+/** Statements over a named denominator, never a percentage (ADR 0080). */
 function recurring(sheet: Sheet, summary: RecurringOutline) {
   if (summary.total === 0) return;
   if (summary.strengths.length === 0 && summary.improvements.length === 0) return;
@@ -330,9 +283,7 @@ function recurring(sheet: Sheet, summary: RecurringOutline) {
       sheet.doc.setFont("app", "normal");
       sheet.doc.setFontSize(9);
       sheet.doc.setTextColor(...NAVY);
-      // The catalogue title where there is one, the raw key otherwise: a goal
-      // retired since still has points pointing at it (ADR 0076), and a slug is
-      // a poor label but an honest one.
+      // A retired goal (ADR 0076) shows its key.
       sheet.doc.text(drawable(entry.title ?? entry.goal), MARGIN.left, sheet.y);
       sheet.doc.setTextColor(...MUTED);
       sheet.doc.text(
@@ -348,10 +299,6 @@ function recurring(sheet: Sheet, summary: RecurringOutline) {
   sheet.y += 4;
 }
 
-/**
- * Every metric over the selection, one row each, grouped as on screen, with
- * the course drawn beside the figures: the shape is half the reading.
- */
 function metrics(sheet: Sheet, series: MetricSeries[], trainings: number) {
   if (series.length === 0) return;
 
@@ -383,9 +330,7 @@ function metrics(sheet: Sheet, series: MetricSeries[], trainings: number) {
         top,
       );
 
-      // A checklist has no range or course (see `SeriesShape`): its sentence
-      // gets the course column too, since the range column alone squeezed it
-      // to six point and into the count.
+      // A checklist's sentence takes the course column too.
       if (row.shape === "parts") {
         fitted(sheet, partsSummary(row) ?? "–", MARGIN.left + COLUMN.course, top);
       } else {
@@ -423,10 +368,7 @@ function metrics(sheet: Sheet, series: MetricSeries[], trainings: number) {
   );
 }
 
-/** One cell of the band column, set one step smaller where it would otherwise
- *  run into the count at the right-hand end. Shrinking rather than clipping:
- *  "In 5 von 9 Trainings alle 3 Teile erkannt" is a sentence, and half of one
- *  says something different from the whole. */
+/** Shrunk rather than clipped: half a sentence says something else. */
 function fitted(sheet: Sheet, text: string, left: number, top: number) {
   const { doc } = sheet;
   const room = PAGE.width - MARGIN.right - COUNT_WIDTH - left;
@@ -439,10 +381,7 @@ function fitted(sheet: Sheet, text: string, left: number, top: number) {
   doc.text(drawable(text), left, top);
 }
 
-/** One metric's course, drawn the way `Sparkline.tsx` draws it: the user's own
- *  usual range behind it and the line over it, one ink colour, no mark for a
- *  direction. Colour here is the family's identity on screen and never a
- *  reading of a value, so on paper one colour loses nothing. */
+/** As `Sparkline.tsx` draws it: one ink colour, no direction mark. */
 function course(sheet: Sheet, series: MetricSeries, left: number, top: number) {
   const { doc } = sheet;
   const values = series.points.map((point) => point.value);
@@ -456,7 +395,6 @@ function course(sheet: Sheet, series: MetricSeries, left: number, top: number) {
     top + COURSE.height - ((value - lowest) / range) * COURSE.height;
 
   if (series.band) {
-    // Clamped: on an even series the band is wider than the values' own range.
     const bandTop = Math.max(top, py(series.band.high));
     const bandBottom = Math.min(top + COURSE.height, py(series.band.low));
     doc.setFillColor(...RULE);
@@ -469,15 +407,12 @@ function course(sheet: Sheet, series: MetricSeries, left: number, top: number) {
     doc.line(px(i - 1), py(values[i - 1]!), px(i), py(values[i]!));
   }
 
-  // The most recent value, which is the figure printed to the left of the
-  // course, so the mark and the number agree.
+  // The latest value, matching the figure printed beside it.
   doc.setFillColor(...BLUE);
   doc.circle(px(values.length - 1), py(values[values.length - 1]!), 0.7, "F");
 }
 
-/** The trainings per calendar month, newest month first. Completed only, the
- *  way the calendar counts them: an abandoned call is not an answer to "when
- *  did I train" (ADR 0034's amendment). */
+/** Completed only, as the calendar counts them. */
 function byMonth(sessions: SessionSummary[]): [string, number][] {
   const counts = new Map<string, { label: string; count: number; at: number }>();
   for (const session of completedOnly(sessions)) {

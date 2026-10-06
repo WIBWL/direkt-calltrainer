@@ -4,29 +4,19 @@ import type { SessionSummary } from "../protocol";
 import { trainingsWith, type Variety } from "../utils/progressStats";
 import TrainingLinks from "./TrainingLinks";
 
-/** How many Scenarios the grid shows before the show-more button. Five: enough to
- *  say where the training has gone, few enough that the card stays about as
- *  tall as the month calendar beside it. */
+/** About as tall as the calendar beside it. */
 const COLLAPSED_ROWS = 5;
 
-/**
- * Which Scenario was played against which Persona (F-13, training variety). A real table, so it is its own
- * accessible form. Played combinations only — empty cells would read as homework. Most played first
- * (`progressStats.variety`), cut after `COLLAPSED_ROWS` with a show-more button.
- */
+/** Scenario against Persona (F-13), played combinations only; a real table. */
 export default function VarietyGrid({
   variety,
   sessions,
 }: {
   variety: Variety;
-  /** The trainings the grid was counted from, so a cell can list the ones
-   *  behind it. */
   sessions: SessionSummary[];
 }) {
   const [expanded, setExpanded] = useState(false);
-  // The pairing whose trainings are listed under the grid, or null. A pair and
-  // not an index: the rows re-sort when a training is added, and an index would
-  // then open a different cell than the one that was pressed.
+  // A pair, not an index: the rows re-sort.
   const [opened, setOpened] = useState<{ scenario: string; persona: string } | null>(null);
   if (variety.cells.length === 0) return null;
 
@@ -42,8 +32,6 @@ export default function VarietyGrid({
         <table className="variety-grid">
           <thead>
             <tr>
-              {/* Empty by design: the row headers below are the Scenarios, and a
-                  caption over them would repeat the section heading. */}
               <th scope="col" />
               {variety.personas.map((persona) => (
                 <th scope="col" key={persona}>
@@ -63,15 +51,11 @@ export default function VarietyGrid({
                   return (
                     <td key={persona}>
                       {count > 0 ? (
-                        // A played cell opens the trainings behind it. An empty
-                        // one stays a plain cell: there is nothing to open, and
-                        // a grid where every cell is a control puts most of the
-                        // tab order on combinations nobody played.
+                        // Only played cells are controls.
                         <button
                           type="button"
                           className={`variety-cell is-played${isOpen ? " is-open" : ""}`}
-                          // The fill only repeats the number it sits behind; it
-                          // is never the sole carrier of the value.
+                          // Never the sole carrier of the value.
                           style={{ opacity: 0.35 + (count / peak) * 0.65 }}
                           aria-expanded={isOpen}
                           aria-label={
@@ -110,19 +94,13 @@ export default function VarietyGrid({
         />
       )}
 
-      {/* Only where something is actually cut off, and it says how much: a
-          button that reveals one row is not worth a guess about what it
-          opens. */}
       {hidden > 0 && (
         <button
           type="button"
           className="session-more"
           aria-expanded={expanded}
           onClick={() => {
-            // Collapsing can take the opened cell off the screen, and its list
-            // would then stand under a grid that no longer shows what it
-            // belongs to. `ActivityCalendar` clears the same state when it
-            // pages to another month, for the same reason.
+            // Its list would stand under a grid that no longer shows it.
             setOpened(null);
             setExpanded((open) => !open);
           }}

@@ -1,11 +1,6 @@
 import type { ReactNode } from "react";
 
-/**
- * The trainee's own side of the case (ADR 0054), shown as "Ihr Wissensstand" — the only text addressed to
- * whoever picks up, not to the model. Rendered after the microphone check and again with the call, where one
- * reaches back for a number mid-sentence, hence a built-in's `- ` list (`StructuredText`). Renders nothing for
- * a Scenario without one.
- */
+/** "Ihr Wissensstand": the trainee's own side of the case (ADR 0054), never sent to the model. */
 export default function ScenarioBriefing({ briefing }: { briefing: string | undefined }) {
   if (!briefing?.trim()) return null;
 
@@ -17,11 +12,7 @@ export default function ScenarioBriefing({ briefing }: { briefing: string | unde
   );
 }
 
-/**
- * What the setup screen shows once a card is picked: who calls, why, in what
- * situation and what is practised. No figures — those are the Wissensstand's,
- * read once the Session is committed to.
- */
+/** The setup screen's view of a picked card; no figures, which are the Wissensstand's. */
 export function ScenarioDescription({ description }: { description: string | undefined }) {
   if (!description?.trim()) return null;
 
@@ -33,14 +24,8 @@ export function ScenarioDescription({ description }: { description: string | und
   );
 }
 
-/**
- * Plain text with the little structure the seeded briefings use, and nothing
- * more: a line starting `- ` is a bullet, an indented `1. ` line under one is a
- * numbered sub-item, `**x**` is bold. Anything else is a paragraph, so a
- * briefing an author or the follow-up generator wrote as prose reads exactly as
- * it always did. Rendered as elements, never as HTML — authored text reaches
- * this component too.
- */
+/** `- ` bullets, indented `1. ` sub-items and `**bold**`; anything else is a
+ * paragraph. Elements, never HTML: authored text reaches this too. */
 export function StructuredText({ text }: { text: string }) {
   const blocks: ReactNode[] = [];
   let bullets: { text: string; sub: string[] }[] = [];
@@ -87,7 +72,7 @@ export function StructuredText({ text }: { text: string }) {
   return <>{blocks}</>;
 }
 
-/** `**bold**` inside one line; an unpaired marker is left as it is. */
+/** An unpaired marker is left as it is. */
 function inline(line: string): ReactNode[] {
   return line
     .split(/(\*\*[^*]+\*\*)/)

@@ -26,8 +26,7 @@ describe("useStreamedAudioPlayback barge-in", () => {
     const { result } = renderHook(() => useStreamedAudioPlayback());
     act(() => result.current.activate());
 
-    // Three chunks the server streamed ahead of playback arrive over the
-    // socket; the first is mid-decode, the other two are queued behind it.
+    // Three chunks streamed ahead: one decoding, two queued.
     await act(async () => {
       result.current.enqueue(chunk());
       result.current.enqueue(chunk());
@@ -35,13 +34,12 @@ describe("useStreamedAudioPlayback barge-in", () => {
     });
     expect(FakeAudioContext.pendingDecodes).toHaveLength(1);
 
-    // The user talks over the persona before any of those chunks played.
+    // Barge-in before any played.
     act(() => {
       result.current.interrupt();
     });
 
-    // Their decodes now resolve (the audio came back from the gateway) — none
-    // of them may reach the speakers: the user already cut the reply off.
+    // None of the late decodes may reach the speakers.
     await act(async () => {
       await flushDecodes();
     });
@@ -53,23 +51,20 @@ describe("useStreamedAudioPlayback barge-in", () => {
     const { result } = renderHook(() => useStreamedAudioPlayback());
     act(() => result.current.activate());
 
-    // The server streamed a long reply ahead of playback: five chunks that are
-    // fully decoded and scheduled back-to-back into the future.
+    // Five chunks decoded and scheduled into the future.
     await act(async () => {
       for (let i = 0; i < 5; i++) result.current.enqueue(chunk());
     });
     await act(async () => {
       await flushDecodes();
     });
-    // Only the first is playing; the rest sit scheduled ahead.
     expect(audibleSources().length).toBeGreaterThan(0);
 
     act(() => {
       result.current.interrupt();
     });
 
-    // Nothing may still be routed to the speakers, and the master gain is cut
-    // as a backstop for engines that ignore stop() on a pending source.
+    // The master gain is a backstop for engines that ignore stop().
     expect(audibleSources()).toHaveLength(0);
     expect(masterMuted()).toBe(true);
   });
@@ -109,7 +104,6 @@ describe("useStreamedAudioPlayback barge-in", () => {
       await flushDecodes();
     });
 
-    // The reply to the barge-in arrives.
     await act(async () => {
       result.current.enqueue(chunk());
       result.current.enqueue(chunk());

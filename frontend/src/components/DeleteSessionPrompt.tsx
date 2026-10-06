@@ -2,26 +2,18 @@ import { useState } from "react";
 
 import { deleteSession } from "../sessions";
 
-/**
- * Deleting one stored training (ADR 0066): the request and its two states. A hook beside
- * the prompt because both callers open and close the question themselves, and the
- * history's bin button must know whether a deletion is in flight before it closes.
- */
+/** Deleting one stored training (ADR 0066). The history's bin needs to know whether one is in flight. */
 export function useSessionDeletion(sessionId: string | undefined, onDeleted: () => void) {
   const [deleting, setDeleting] = useState(false);
   const [failed, setFailed] = useState(false);
 
   const remove = async () => {
-    // Unreachable without one on either screen, but the page's route param is
-    // optional, and without this guard the request would go to
-    // `/api/sessions/undefined`.
+    // The route param is optional.
     if (!sessionId) return;
     setDeleting(true);
     setFailed(false);
     try {
       await deleteSession(sessionId);
-      // Both callers leave the training behind here — the row disappears, the
-      // page navigates away — so there is no state to reset afterwards.
       onDeleted();
     } catch (e) {
       console.debug("[delete session] failed", e);
@@ -33,10 +25,7 @@ export function useSessionDeletion(sessionId: string | undefined, onDeleted: () 
   return { deleting, failed, remove };
 }
 
-/**
- * The question on a training's own page. It says what goes with the training, since the
- * deletion is final. The history asks with a check and a cross instead (`SessionHistory`).
- */
+/** Says what goes with the training, since deletion is final. */
 export default function DeleteSessionPrompt({
   deleting,
   failed,

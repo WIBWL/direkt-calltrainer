@@ -2,11 +2,7 @@ import type { ReactNode } from "react";
 
 import AppLayout from "./AppLayout";
 
-/**
- * The last screen before a call: a briefing, the button on, and the way out (F-61,
- * F-63). Shared by the reverse's briefing and the ordinary case. The way out sits where
- * the mic check's does, since for a reverse this replaces it; leaving drops the Session.
- */
+/** The last screen before a call (F-61, F-63); its way out drops the Session. */
 export default function BriefScreen({
   onContinue,
   onLeave,
@@ -14,7 +10,6 @@ export default function BriefScreen({
 }: {
   onContinue: () => void;
   onLeave: () => void;
-  /** The briefing itself, or what stands in while it is on its way. */
   children: ReactNode;
 }) {
   return (

@@ -8,82 +8,53 @@ import {
   type SeriesShape,
 } from "./metrics";
 
-/** The training history as the dashboard's series (F-13, docs/dashboard-concept.md):
- * pure functions that group server-measured figures (ADR 0051) and describe their
- * spread. Must never grow a target, threshold, trend line or direction (ADR 0065)
- * — this module is where one would sneak in. */
+/** The history as the dashboard's series (F-13). Never a target, threshold,
+ * trend line or direction (ADR 0065): this module is where one would sneak in. */
 
-/** Below this a series is noise: two points make a line, and a line asserts a
- *  direction. The dashboard shows single values instead and says so. */
+/** Two points make a line, and a line asserts a direction. */
 export const MIN_SESSIONS_FOR_SERIES = 3;
 
-/** The trainings a cross-Session view may count: the ones carried to the end
- *  (ADR 0034's amendment). One function rather than the same filter at five
- *  call sites, which is how four of them came to disagree (ADR 0102) — the card
- *  read "17 Trainings" over a calendar showing fourteen marks, and the PDF
- *  reproduced the split onto paper where nobody can ask which is right. */
+/** Completed trainings only (ADR 0034). One function, or the call sites disagree (ADR 0102). */
 export function completedOnly(sessions: SessionSummary[]): SessionSummary[] {
   return sessions.filter((session) => session.status === "completed");
 }
 
-/** How long a call must have run for its figures to join a series. **Set, not
- *  measured**, like `MIN_SESSIONS_FOR_SERIES`, and a floor on describability
- *  rather than a judgement: under a minute a talk share is a statistic about a
- *  fragment, and it otherwise sits in the band as an equal point. On the length
- *  and deliberately not on the status — `aborted` also means a dropped
- *  connection, so a nine-minute call that died at the end is a complete
- *  measurement. It does not catch a long call in which the user barely spoke;
- *  that would need a figure which is itself one of the ones being filtered. */
+/** Set, not measured: under a minute a talk share describes a fragment. On length,
+ *  not status, since `aborted` also means a dropped connection. */
 export const MIN_CALL_MS = 60_000;
 
-/** The trainings whose figures may be read as a series. Separate from
- *  `completedOnly` on purpose: "when did somebody train" is answered by a
- *  finished call, "is there enough call to describe" by a long enough one. One
- *  left out here is still counted above and still in the calendar, and the
- *  screen says how many. */
+/** Separate from `completedOnly`: a short call still counts as training, but its figures are not a series. */
 export function readable(sessions: SessionSummary[]): SessionSummary[] {
   return sessions.filter((session) => {
     const ms = callDurationMs(session);
-    // Unknown length is kept: drop only what is known to be too short.
     return ms === null || ms >= MIN_CALL_MS;
   });
 }
 
-/** How many multiples of the spread the usual-range band covers. The same
- *  construction backend/feedback/metrics.py uses for the loudness course, and
- *  self-referential for the same reason (ADR 0051). */
+/** Spreads covered by the usual-range band (ADR 0051). */
 const BAND_DEVIATION = 1;
 
 export interface SeriesPoint {
   sessionId: string;
-  /** ISO 8601, the Session's start. */
   at: string;
   value: number;
   scenario: string;
   persona: string;
 }
 
-/** How a series is drawn; decided by `utils/metrics`, which knows which
- * metrics are checklists. */
 export type { SeriesShape };
 
 export interface MetricSeries {
   key: string;
-  /** The German display name, straight from `metric_type.name`. */
   name: string;
   unit: string | null;
-  /** Which half of the metrics this one belongs to, from the schema's own
-   *  column. It decides the group the row sits in and the hue the chart is
-   *  drawn in (`utils/metricGroups`) — identity, never a value. */
+  /** Decides the row's group and hue (`utils/metricGroups`): identity, never a value. */
   aspect: MetricAspect | null;
   shape: SeriesShape;
-  /** How the figure was derived from the stored one, where it was, as a
-   *  sentence for the reader. Null for a value shown exactly as measured. */
+  /** How the figure was derived, as a sentence; null when shown as measured. */
   derivation: string | null;
-  /** Oldest first, so the chart reads left to right in time. */
   points: SeriesPoint[];
-  /** The user's own usual range, or null with too few points to describe one
-   *  and always null for a `parts` series. */
+  /** Null with too few points, and always for a `parts` series. */
   band: Band | null;
 }
 
@@ -93,10 +64,7 @@ export interface Band {
   median: number;
 }
 
-/**
- * One series per metric, oldest point first: the history arrives newest first
- * (ADR 0064), so it is reversed once, here, rather than in each component.
- */
+/** Reversed once here: the history arrives newest first (ADR 0064). */
 export function toSeries(sessions: SessionSummary[]): MetricSeries[] {
   const byKey = new Map<string, MetricSeries>();
 
@@ -109,9 +77,6 @@ export function toSeries(sessions: SessionSummary[]): MetricSeries[] {
         name: measurement.name,
         unit: measurement.unit,
         aspect: measurement.aspect,
-        // From the same catalogue the single call's tile reads, so a
-        // checklist cannot be a checklist on one screen and a climbing
-        // line on the other.
         shape: seriesShape(measurement.key),
         derivation: null,
         points: [],
@@ -134,9 +99,7 @@ export function toSeries(sessions: SessionSummary[]): MetricSeries[] {
   return [...byKey.values()];
 }
 
-/** The series that moved most, widest first, standing in for focus goals when none
- * are picked. Band width relative to its middle, so units compare; it picks what to
- * show, not what is better (ADR 0065). Only series with a band count. */
+/** The widest-banded series, when no focus goals are picked. Picks what to show, not what is better (ADR 0065). */
 export function mostVarying(series: MetricSeries[], count: number): MetricSeries[] {
   return series
     .filter((s) => s.points.length >= MIN_SESSIONS_FOR_SERIES && s.band !== null)
@@ -150,10 +113,7 @@ function relativeSpread(range: Band): number {
   return (range.high - range.low) / (Math.abs(range.median) || 1);
 }
 
-/**
- * One value of a series as the reader should see it. A checklist reads as parts
- * "erkannt", never "2 von 3", which reads as a grade (F-63).
- */
+/** A checklist reads as parts "erkannt", never "2 von 3", which reads as a grade (F-63). */
 export function formatPoint(series: MetricSeries, value: number): string {
   if (series.shape === "parts") {
     const count = Math.round(value);
@@ -162,17 +122,12 @@ export function formatPoint(series: MetricSeries, value: number): string {
   return formatValue(series.key, value, series.unit);
 }
 
-/**
- * The user's usual range in words, or null. For a count both ends are whole and
- * clamped at zero ("-0,5 bis 1,5 Unterbrechungen" describes nothing anybody did).
- */
+/** For a count both ends are whole and clamped at zero. */
 export function formatBand(series: MetricSeries): string | null {
   return series.band ? formatRange(series, series.band) : null;
 }
 
-/** The same, for a band that is not the series' own — the two halves below.
- *  One rule, so an earlier range and the overall one cannot round or punctuate
- *  differently on the same screen. */
+/** One rule for every range on a screen. */
 export function formatRange(series: MetricSeries, range: Band): string {
   if (isCount(series.unit)) {
     const low = Math.max(0, Math.round(range.low));
@@ -185,19 +140,14 @@ export function formatRange(series: MetricSeries, range: Band): string {
   );
 }
 
-/** In how many trainings every part of a checklist was recognised. A count of
- *  trainings over a named denominator, the same kind of statement as the
- *  recurring block's count over a named denominator, never a share or a
- *  direction. */
+/** A count over a named denominator, never a share or direction. */
 export function completeParts(series: MetricSeries): number | null {
   const total = partsTotal(series.key);
   if (total === null) return null;
   return series.points.filter((p) => Math.round(p.value) >= total).length;
 }
 
-/** A checklist's sentence: in how many trainings every part was recognised. Null
- * where the catalogue gives no part count. Here, not in `PartsStrip.tsx`, because
- * three screens and the progress PDF say it. */
+/** Null where the catalogue gives no part count. */
 export function partsSummary(series: MetricSeries): string | null {
   const total = partsTotal(series.key);
   const complete = completeParts(series);
@@ -205,15 +155,12 @@ export function partsSummary(series: MetricSeries): string | null {
   return `In ${complete} von ${series.points.length} Trainings alle ${total} Teile erkannt`;
 }
 
-/** The user's usual range: median ± MAD, so one unusual call does not stretch it.
- * Null below the series threshold. A description, not a target: nothing may colour
- * a value by whether it falls inside (ADR 0065). */
+/** Median ± MAD, so one unusual call does not stretch it. A description, not a target (ADR 0065). */
 export function band(values: number[]): Band | null {
   if (values.length < MIN_SESSIONS_FOR_SERIES) return null;
   const middle = median(values);
   const spread = median(values.map((v) => Math.abs(v - middle)));
-  // A zero MAD means more than half the values are identical; the mean absolute
-  // deviation still separates them, and only a constant series has neither.
+  // A zero MAD falls back to the mean absolute deviation.
   const width =
     spread || values.reduce((sum, v) => sum + Math.abs(v - middle), 0) / values.length;
   return {
@@ -223,19 +170,15 @@ export function band(values: number[]): Band | null {
   };
 }
 
-/** The user's earlier trainings and their recent ones, each described on its
- *  own terms. */
 export interface Halves {
   early: Band;
   late: Band;
-  /** How many trainings each half holds. Always equal — see `halves`. */
+  /** Always equal; see `halves`. */
   each: number;
 }
 
-/** The band over the older and the newer half of the selection (concept, section
- * 8's amendment; ADR 0081's construction). Two bands only: never a difference,
- * ratio or direction (ADR 0051/0065). Equal halves; an odd middle is in neither.
- * Null below twice the series threshold. */
+/** The band over the older and newer half (ADR 0081's construction): never a
+ * difference, ratio or direction (ADR 0051/0065). An odd middle is in neither. */
 export function halves(series: MetricSeries): Halves | null {
   if (series.shape !== "line") return null;
   const each = Math.floor(series.points.length / 2);
@@ -260,14 +203,11 @@ export interface Activity {
   sessions: number;
   scenarios: number;
   personas: number;
-  /** ISO 8601 of the oldest and newest training in the set, or null when empty. */
   firstAt: string | null;
   lastAt: string | null;
 }
 
-/** What the user did, counted. Activity needs no norm to be shown, which is
- *  what ADR 0065 names as explicitly permitted. Completed trainings only, like
- *  the calendar these figures stand beside (`completedOnly`). */
+/** Activity needs no norm (ADR 0065). Completed trainings only. */
 export function activity(sessions: SessionSummary[]): Activity {
   const finished = completedOnly(sessions);
   const dates = finished.map((s) => s.started_at).sort();
@@ -280,16 +220,12 @@ export function activity(sessions: SessionSummary[]): Activity {
   };
 }
 
-/** The most recent `count` trainings, or all for `null` (at most six months, ADR
- * 0067). Counted in trainings, not days, because a day window is empty for anyone
- * training in bursts. The history is newest first (ADR 0064), so this is a slice. */
+/** Counted in trainings, not days: a day window is empty for anyone training in bursts. */
 export function latest(sessions: SessionSummary[], count: number | null): SessionSummary[] {
   return count === null ? sessions : sessions.slice(0, count);
 }
 
-/** How long the call ran in ms, from its two timestamps, or null where it has no
- * recorded end (a Session cut short by a pipeline failure). Not a Measurement:
- * it describes what happened, like the activity figures. */
+/** Null without a recorded end. Not a Measurement. */
 export function callDurationMs(session: SessionSummary): number | null {
   if (!session.ended_at) return null;
   const started = new Date(session.started_at).getTime();
@@ -298,22 +234,15 @@ export function callDurationMs(session: SessionSummary): number | null {
   return ended - started;
 }
 
-/** Every series of a selection: the measured metrics plus the call length. The one
- * list all progress screens read (via `ProgressContext`), so every row the overview
- * links to exists on the page behind the link. */
+/** The measured metrics plus the call length; the one list every progress screen reads. */
 export function selectionSeries(sessions: SessionSummary[]): MetricSeries[] {
-  // The length floor is applied once, here, so both kinds of series see the
-  // same set and no caller can forget it. A call too short to describe used to
-  // sit in every band as an equal point (`readable`, `MIN_CALL_MS`).
+  // The length floor, applied once for both kinds of series.
   const long = readable(sessions);
   const duration = durationSeries(long);
   return [...toSeries(long), ...(duration ? [duration] : [])];
 }
 
-/** The call lengths as a series, in minutes, so they can be drawn like any
- *  metric. Its key is in `utils/metrics`' catalogue like every other, marked
- *  `derived` there because it has no `metric_type` row behind it: without an
- *  entry it inherited every display fact from the unknown-key fallback. */
+/** The call lengths in minutes; `derived` in `utils/metrics`, with no `metric_type` row. */
 export function durationSeries(sessions: SessionSummary[]): MetricSeries | null {
   const points: SeriesPoint[] = [];
   for (const session of [...sessions].reverse()) {
@@ -332,9 +261,6 @@ export function durationSeries(sessions: SessionSummary[]): MetricSeries | null 
     key: "duration",
     name: "Gesprächsdauer",
     unit: "min",
-    // `what`, like the docstring above argues: it describes what happened
-    // rather than how somebody spoke. Written here rather than read off the
-    // wire because this one is the exception that has no `metric_type` row.
     aspect: "what",
     shape: "line",
     derivation: "Aus Beginn und Ende des Gesprächs gerechnet, nicht aus der Aufnahme.",
@@ -343,35 +269,23 @@ export function durationSeries(sessions: SessionSummary[]): MetricSeries | null 
   };
 }
 
-/** One day of the calendar, whether or not anything happened on it. */
 export interface ActivityDay {
-  /** Local midnight of the day, ISO 8601. */
   date: string;
-  /** Day of the month, which is what the cell prints when nothing happened. */
   dayOfMonth: number;
-  /** Completed trainings on that day. An abandoned call is not counted and not
-   *  marked either: the calendar answers "when did I train", and a call that
-   *  broke off is not an answer to it. */
+  /** Completed only: the calendar answers "when did I train". */
   count: number;
 }
 
-/** One month of the calendar, its days padded to whole weeks. */
 export interface ActivityMonth {
-  /** "September 2026", for the heading. */
   label: string;
   year: number;
-  /** 0-11, as `Date` counts them. */
   month: number;
-  /** Whole weeks, Monday first. `null` pads the first and last week, so a
-   *  month always renders as a rectangle and the weekday columns line up. */
+  /** Monday first; `null` pads the first and last week. */
   weeks: (ActivityDay | null)[][];
-  /** Trainings in this month, for the heading's own count. */
   total: number;
 }
 
-/** The step a day's cell is shaded at. Three, not seven: at the volume one
- *  person trains at, a day holds one, two or a handful of calls, and a ramp
- *  with more steps than the data has values encodes nothing. */
+/** Three steps: one person's volume has no more values than that. */
 export type ActivityStep = 0 | 1 | 2 | 3;
 
 export function activityStep(count: number): ActivityStep {
@@ -381,10 +295,7 @@ export function activityStep(count: number): ActivityStep {
   return 3;
 }
 
-/** One calendar month, Monday-first, with each day's trainings; the month is the
- * caller's. A calendar shows the shape of a week, which bars do not. The period
- * switch deliberately does not reach it: the grid carries its own range. Counting
- * needs no norm, so it carries no caveat (ADR 0065). */
+/** One month, Monday first. The period switch does not reach it. */
 export function activityMonth(
   sessions: SessionSummary[],
   year: number,
@@ -392,7 +303,6 @@ export function activityMonth(
 ): ActivityMonth {
   const counts = trainingDays(sessions);
   const lastDay = new Date(year, month + 1, 0).getDate();
-  // Monday first, because a German week starts there.
   const lead = (new Date(year, month, 1).getDay() + 6) % 7;
 
   const cells: (ActivityDay | null)[] = Array(lead).fill(null);
@@ -420,8 +330,7 @@ export function activityMonth(
   };
 }
 
-/** How many completed trainings fell on each day. Abandoned calls are left out
- *  entirely, here and not in the component, so no view can count them back in. */
+/** Abandoned calls are left out here, so no view can count them back in. */
 function trainingDays(sessions: SessionSummary[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const session of completedOnly(sessions)) {
@@ -431,9 +340,7 @@ function trainingDays(sessions: SessionSummary[]): Map<string, number> {
   return counts;
 }
 
-/** The month the oldest training falls in, which is as far back as paging makes
- *  sense: earlier months are empty by definition (ADR 0067 caps them at six
- *  anyway). Null with nothing stored. */
+/** As far back as paging makes sense. Null with nothing stored. */
 export function firstTrainingMonth(
   sessions: SessionSummary[],
 ): { year: number; month: number } | null {
@@ -448,17 +355,12 @@ export function firstTrainingMonth(
   return { year: date.getFullYear(), month: date.getMonth() };
 }
 
-/** A day as a key, in local time. Built from the parts rather than from
- *  `toISOString`, which would shift a late-evening training into the next day
- *  for anybody east of UTC. The calendar marks today with the same key, so
- *  "is this cell today" cannot answer differently than the shading. */
+/** Local time: `toISOString` would shift a late-evening training into the next day east of UTC. */
 export function dayKey(date: Date): string {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
-/** The trainings behind one calendar cell, newest first. Completed only and keyed
- * by the same `dayKey` as the shading, so the list always matches the number the
- * cell prints. */
+/** Keyed by the same `dayKey` as the shading, so the list matches the cell. */
 export function trainingsOn(sessions: SessionSummary[], date: Date): SessionSummary[] {
   const key = dayKey(date);
   return completedOnly(sessions).filter(
@@ -466,9 +368,7 @@ export function trainingsOn(sessions: SessionSummary[], date: Date): SessionSumm
   );
 }
 
-/** The trainings behind one cell of the variety grid, newest first. Through the
- *  same `completedOnly` the cell was counted with, so a cell saying 2 can never
- *  open onto three rows. */
+/** Through the same `completedOnly`, so a cell saying 2 never opens onto three rows. */
 export function trainingsWith(
   sessions: SessionSummary[],
   scenario: string,
@@ -491,15 +391,9 @@ export interface Variety {
   cells: VarietyCell[];
 }
 
-/**
- * Which Scenario was played against which Persona, and how often. Played
- * combinations only: empty cells would read as a to-do list.
- */
+/** Played combinations only: empty cells would read as a to-do list. */
 export function variety(sessions: SessionSummary[]): Variety {
   const counts = new Map<string, VarietyCell>();
-  // Completed only, like everything else in this block (`completedOnly`). The
-  // grid and `trainingsWith` below used to agree with each other and with
-  // nothing else on the screen.
   for (const session of completedOnly(sessions)) {
     const id = `${session.scenario}\0${session.persona}`;
     const cell = counts.get(id) ?? { scenario: session.scenario, persona: session.persona, count: 0 };
@@ -514,10 +408,7 @@ export function variety(sessions: SessionSummary[]): Variety {
   };
 }
 
-/**
- * The distinct names along one side of the grid, most played first (the grid is
- * cut after a few rows, `VarietyGrid`), alphabetical on a tie for a stable order.
- */
+/** Most played first, alphabetical on a tie. */
 function byFrequency(cells: VarietyCell[], name: (cell: VarietyCell) => string): string[] {
   const totals = new Map<string, number>();
   for (const cell of cells) totals.set(name(cell), (totals.get(name(cell)) ?? 0) + cell.count);

@@ -1,10 +1,9 @@
 import { currentAccessToken, userManager } from "./auth";
 import { apiUrl } from "./config";
 
-/** A non-2xx reply from the backend. */
 export class ApiError extends Error {
   readonly status: number;
-  /** The backend's `detail` string, when it sent one — safe to show the user. */
+  /** Safe to show the user. */
   readonly detail?: string;
 
   constructor(status: number, detail?: string) {
@@ -14,14 +13,10 @@ export class ApiError extends Error {
   }
 }
 
-// Set once we have started a re-login redirect, so a burst of parallel requests
-// (the setup screen fires several on mount) does not each kick one off.
+// So parallel requests do not each start a redirect.
 let reauthStarted = false;
 
-/** The stored session looks valid locally but the server rejected the token —
- * a stale signing key after the Keycloak realm was re-imported, a revoked
- * session, a wiped realm. Drop the local user and send the browser back through
- * login; on return the original page is restored. */
+/** A locally valid session the server rejected (e.g. after a realm re-import): log in again. */
 async function reauthenticate(): Promise<void> {
   if (reauthStarted) return;
   reauthStarted = true;
@@ -35,11 +30,8 @@ async function reauthenticate(): Promise<void> {
   });
 }
 
-/**
- * The one place a request is authorised; raw response (`apiFetch` for JSON).
- * The token is read from the live OIDC session at call time (auth.ts). A 401
- * triggers a re-login redirect; any other non-2xx throws an `ApiError`.
- */
+/** The one place a request is authorised, with the live token (auth.ts). 401
+ * re-logs in; any other non-2xx throws `ApiError`. */
 export async function authorizedFetch(path: string, init?: RequestInit): Promise<Response> {
   const token = await currentAccessToken();
   if (!token) {
@@ -49,8 +41,7 @@ export async function authorizedFetch(path: string, init?: RequestInit): Promise
   const response = await fetch(apiUrl + path, {
     ...init,
     headers: {
-      // Only a string body is JSON here: a FormData body has to set its own
-      // multipart content type, boundary included.
+      // FormData sets its own multipart content type.
       ...(typeof init?.body === "string" ? { "Content-Type": "application/json" } : {}),
       Authorization: `Bearer ${token}`,
       ...init?.headers,
@@ -67,7 +58,6 @@ export async function authorizedFetch(path: string, init?: RequestInit): Promise
   return response;
 }
 
-/** Authenticated JSON request (see `authorizedFetch`). */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await authorizedFetch(path, init);
   return (response.status === 204 ? null : await response.json()) as T;

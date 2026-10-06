@@ -2,33 +2,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAudioLevelMeter } from "./useAudioLevelMeter";
 
-/** Speech RMS is small; this scales it into a range the call wave can show. */
 const METER_GAIN = 5;
 
-/** One scheduled chunk, with what it takes to tell how much of it was heard. */
 interface ScheduledChunk {
   startAt: number;
   duration: number;
 }
 
-/**
- * Plays incoming TTS chunks (each a complete WAV) gapless as they arrive (ADR 0033).
- * Starts held: chunks before `activate()` are buffered (the opening line is generated
- * during the mic check). `audioLevel` is the output amplitude, for the call wave.
- */
+/** Plays TTS chunks gapless as they arrive (ADR 0033). Starts held: chunks
+ * before `activate()` are buffered. */
 export function useStreamedAudioPlayback() {
   const [isPlaying, setIsPlaying] = useState(false);
   const { level: audioLevel, start: startMeter, stop: stopMeter } = useAudioLevelMeter(METER_GAIN);
 
-  // Created on demand, and together: every chunk is routed through the
-  // analyser on its way to the speakers, which leaves the audio unchanged
-  // while exposing its waveform to the meter.
   const audioRef = useRef<{
     ctx: AudioContext;
     analyser: AnalyserNode;
-    // Master gain so a barge-in cuts all output at once: `stop()` does not
-    // reliably cancel a source scheduled in the future (Firefox throws), which
-    // left the rest of an interrupted reply playing (see stopActiveSources).
+    // Mutes all output at once on a barge-in: `stop()` on a future source is unreliable.
     gain: GainNode;
   } | null>(null);
   const nextStartTimeRef = useRef(0);
@@ -36,20 +26,13 @@ export function useStreamedAudioPlayback() {
   const scheduleChainRef = useRef<Promise<void>>(Promise.resolve());
   const heldRef = useRef(true);
   const heldChunksRef = useRef<ArrayBuffer[]>([]);
-  // Tracked so reset()/interrupt() can silence whatever's still playing —
-  // without this, audio already scheduled (e.g. the Persona's closing line, or
-  // sentences streamed ahead of a barge-in) would keep playing out through the
-  // speakers. Each source carries its own scheduled start and length so a
-  // barge-in can tell how much of the current chunk was actually heard.
+  // So reset()/interrupt() can silence what is still scheduled, and tell how
+  // much of the current chunk was heard.
   const activeSourcesRef = useRef<Map<AudioBufferSourceNode, ScheduledChunk>>(new Map());
-  // Bumped by every stopActiveSources(). A decode that resolves under an older
-  // epoch belongs to a cut-off reply and must not be scheduled: reassigning
-  // scheduleChainRef does not unhook .then() callbacks already chained behind
-  // an in-flight decode, which would otherwise play the interrupted reply.
+  // A decode resolving under an older epoch belongs to a cut-off reply:
+  // already-chained .then() callbacks are not unhooked.
   const epochRef = useRef(0);
-  // Milliseconds of the *current* persona reply that have actually played.
-  // Reset when a fresh reply's first chunk arrives (below) and read by
-  // interrupt() so the server only commits what the user heard (ADR 0035).
+  // Of the current reply; read by interrupt() (ADR 0035).
   const playedMsRef = useRef(0);
 
   const getAudio = useCallback(() => {
@@ -59,7 +42,6 @@ export function useStreamedAudioPlayback() {
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.75;
       const gain = ctx.createGain();
-      // source(s) -> analyser -> gain -> speakers
       analyser.connect(gain);
       gain.connect(ctx.destination);
       audioRef.current = { ctx, analyser, gain };
@@ -68,9 +50,6 @@ export function useStreamedAudioPlayback() {
     return audioRef.current;
   }, []);
 
-  /** Cut / restore all output at the master gain. Used around a barge-in so
-   * nothing the server streamed ahead keeps playing even if its source node
-   * ignores stop(). */
   const setMasterMuted = useCallback((muted: boolean) => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -91,20 +70,15 @@ export function useStreamedAudioPlayback() {
   const scheduleChunk = useCallback(
     (data: ArrayBuffer) => {
       const epoch = epochRef.current;
-      // Nothing pending or playing means this is the first chunk of a new
-      // persona reply — start its played-time tally from zero. (A long enough
-      // mid-reply TTS stall could also land here; the tally then under-counts,
-      // which only makes the server commit *less* on a barge-in — the safe way
-      // to be wrong.)
+      // A new reply: start the tally from zero. A long TTS stall can land here
+      // too; the under-count only makes the server commit less.
       if (pendingCountRef.current === 0 && activeSourcesRef.current.size === 0) {
         playedMsRef.current = 0;
       }
       pendingCountRef.current += 1;
       setIsPlaying(true);
-      // Chained so chunks are decoded+scheduled in arrival order even though
-      // decodeAudioData is async and could otherwise resolve out of order.
+      // Chained, so decoding keeps arrival order.
       scheduleChainRef.current = scheduleChainRef.current.then(async () => {
-        // Interrupted or reset while this chunk sat in the chain — drop it.
         if (epoch !== epochRef.current) return;
         const { ctx, analyser } = getAudio();
         try {
@@ -114,7 +88,6 @@ export function useStreamedAudioPlayback() {
           source.buffer = audioBuffer;
           source.connect(analyser);
           startMeter(analyser);
-          // This chunk belongs to the live reply — lift the barge-in mute.
           setMasterMuted(false);
 
           const startAt = Math.max(ctx.currentTime, nextStartTimeRef.current);
@@ -122,7 +95,6 @@ export function useStreamedAudioPlayback() {
           nextStartTimeRef.current = startAt + audioBuffer.duration;
           activeSourcesRef.current.set(source, { startAt, duration: audioBuffer.duration });
           source.onended = () => {
-            // Played to its end: the whole chunk counts as heard.
             activeSourcesRef.current.delete(source);
             playedMsRef.current += audioBuffer.duration * 1000;
             finishPending();
@@ -158,18 +130,13 @@ export function useStreamedAudioPlayback() {
 
   const stopActiveSources = useCallback(() => {
     epochRef.current += 1; // in-flight decodes from before this point are stale
-    // Master mute first: whatever the per-source stop()s below do or don't do,
-    // nothing reaches the speakers from this instant.
     setMasterMuted(true);
     const now = audioRef.current?.ctx.currentTime ?? 0;
     for (const [source, { startAt, duration }] of activeSourcesRef.current) {
       source.onended = null; // avoid a double pendingCount decrement below
-      // Count only the part of this chunk that had actually played by now;
-      // a chunk still scheduled in the future (startAt > now) contributes 0.
+      // Only the part that has played; a future chunk counts 0.
       playedMsRef.current += Math.min(duration, Math.max(0, now - startAt)) * 1000;
-      // disconnect() is the reliable one — stop() on a not-yet-started source
-      // throws on Firefox and is ignored by some engines, which is what let a
-      // streamed-ahead reply keep playing after a barge-in.
+      // disconnect() is the reliable one: stop() on an unstarted source throws on Firefox.
       try {
         source.disconnect();
       } catch {
@@ -196,10 +163,7 @@ export function useStreamedAudioPlayback() {
     heldChunksRef.current = [];
   }, [stopActiveSources]);
 
-  /** Like reset(), but for a mid-call barge-in: stays live (not held) so
-   * the next Turn's chunks play immediately instead of buffering forever.
-   * Returns how many ms of the interrupted reply actually played, for the
-   * server to bound what it commits to history (ADR 0035). */
+  /** Like reset(), but stays live for the next Turn. Returns the ms played (ADR 0035). */
   const interrupt = useCallback((): number => {
     stopActiveSources();
     heldChunksRef.current = [];
@@ -208,8 +172,6 @@ export function useStreamedAudioPlayback() {
     return played;
   }, [stopActiveSources]);
 
-  // The meter stops itself on unmount; the context it was reading has to be
-  // closed here or it outlives the call.
   useEffect(() => () => void audioRef.current?.ctx.close(), []);
 
   return { enqueue, activate, reset, interrupt, isPlaying, audioLevel };

@@ -43,43 +43,28 @@ import {
 } from "./scenarioLibrary";
 import { prefersReducedMotion } from "./utils/motion";
 
-
-/** How long the die is on screen before the call begins (F-62). Long enough to
- * read as a throw and land, short enough not to become a wait — the Session is
- * already connected behind it, so this is the only thing it costs. */
+/** How long the die shows (F-62); the Session is already connecting behind it. */
 const ROLL_MS = 2000;
 
 /** null = closed; { id: null } = new; { id } = editing that row. */
 type EditorState = { id: string | null } | null;
 
-/**
- * Owns the training flow: which screen is showing, what has been selected, and
- * the live Session behind it. Everything visible is delegated to a screen
- * component — what stays here is the state those screens share.
- */
+/** The training flow's shared state; every screen is its own component. */
 export default function App() {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [personaId, setPersonaId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [editingScenario, setEditingScenario] = useState<EditorState>(null);
-  // The Persona whose read-only info panel is open, or null. Held here for
-  // the same reason the editor's state is: SetupView is presentational.
   const [infoPersonaId, setInfoPersonaId] = useState<string | null>(null);
-  // The Scenario whose read-only info panel is open, or null. Editing starts
-  // from inside it (ADR 0062), so this opens first and the editor second.
+  // Editing starts from the info panel (ADR 0062).
   const [infoScenarioId, setInfoScenarioId] = useState<string | null>(null);
-  // The caller's company (ADR 0060); null = default tenant, no company chip.
+  // ADR 0060; null = default tenant.
   const [tenantName, setTenantName] = useState<string | null>(null);
-  // Tracks intentional muting separately from entering or leaving the call screen.
   const [isMicrophoneMuted, setIsMicrophoneMuted] = useState(false);
-  // The input device picked in the mic-check screen; null = browser default.
-  // Carries over into the call the same way isMicrophoneMuted does.
+  // null = browser default.
   const [micDeviceId, setMicDeviceId] = useState<string | null>(null);
   const { devices: micDevices, refresh: refreshMicDevices } = useMicrophoneDevices();
-  // The fade that covers a change of screen, played over whichever screen starts it.
   const { playFade } = useScreenTransition();
-  // The training run: the committed Session, its case or briefing, what was
-  // said once it ended and what survives a reload (see useTrainingRun.ts).
   const run = useTrainingRun();
   const {
     restored,
@@ -95,10 +80,8 @@ export default function App() {
     restart: restartRun,
   } = run;
   const [screen, setScreen] = useState<Screen>(restored ? "transcript" : "setup");
-  // The wrap-up, polled once for the waiting screen, the post-call screen and
-  // the downloadable report (F-64), so the file carries exactly what the page
-  // shows. Polled only while one of those screens is up. Null while on its way
-  // and for a call never stored — the file is then the protocol alone.
+  // Polled once for the waiting screen, the post-call screen and the report
+  // (F-64), so the file carries what the page shows.
   const {
     detail: endedSessionDetail,
     state: feedbackState,
@@ -112,8 +95,7 @@ export default function App() {
     screen === "transcript",
   );
 
-  // The library, its two filter rows and which case is picked. A restored
-  // wrap-up owns the screen, so nothing is preselected behind it.
+  // A restored wrap-up owns the screen, so nothing is preselected behind it.
   const library = useScenarioLibrary(!restored);
   const {
     scenarioId,
@@ -127,16 +109,11 @@ export default function App() {
 
   const selectedPersona = personas.find((persona) => persona.id === personaId) ?? null;
 
-  // A reload restores the post-call screen without a selection to look the
-  // name up in, so the stored one stands in.
+  // After a reload there is no selection, so the stored names stand in.
   const personaName = selectedPersona?.name ?? restored?.personaName ?? "Persona";
-  // The played case, resolved the same way and for the same screen. A
-  // random Scenario needs nothing special: `beginSession` sets `scenarioId` to
-  // the drawn row, so the selection already *is* the case that was played.
   const scenarioName = selectedScenario?.name ?? restored?.scenarioName ?? null;
 
-  // Loaded apart from the library, so either one failing leaves the other
-  // usable and names itself in the error line.
+  // Apart from the library, so either can fail alone.
   useEffect(() => {
     listPersonas()
       .then((data) => {
@@ -152,20 +129,15 @@ export default function App() {
       .catch(() => setTenantName(null)); // no company filter if this fails
   }, [restored]);
 
-  // A selected microphone that gets unplugged (mid-test or mid-call) falls
-  // back to the browser default rather than failing every getUserMedia call
-  // with a stale exact deviceId from then on.
+  // An unplugged microphone falls back to the default instead of a stale deviceId.
   useEffect(() => {
     if (micDeviceId !== null && !micDevices.some((d) => d.deviceId === micDeviceId)) {
       setMicDeviceId(null);
     }
   }, [micDevices, micDeviceId]);
 
-
-  // Render state the flow routes on, refreshed every render and read only from
-  // handlers, so `advance` keeps one identity: `handleAnalysed` feeds the
-  // waiting screen's patience timer, and a new identity would restart it.
-  // What only one handler knows travels on its event (see `FlowEvent`).
+  // Read only from handlers, so `advance` keeps one identity: the waiting
+  // screen's patience timer would restart on a new one.
   const flowRef = useRef<Omit<FlowContext, "reducedMotion">>({
     reverse: false,
     drawn: false,
@@ -176,18 +148,12 @@ export default function App() {
     drawn: secretScenario !== null,
     committedCase,
   };
-  // The whole context at the moment of a press. Reduced motion is asked here
-  // rather than per render: it is a media query, and only the throw needs it.
   const flowContext = (): FlowContext => ({
     ...flowRef.current,
     reducedMotion: prefersReducedMotion(),
   });
 
-  /**
-   * The only way the screen changes; every destination comes from
-   * `trainingFlow.nextScreen`. Facts only a handler knows (skipped mic check,
-   * whether the call was stored) ride on the event, so omitting one fails to compile.
-   */
+  /** The only way the screen changes (`trainingFlow.nextScreen`). */
   const advance = useCallback(
     (event: FlowEvent) => {
       const context: FlowContext = {
@@ -201,25 +167,15 @@ export default function App() {
     [playFade],
   );
 
-
-  // What happens once a call is over and its goodbye has been heard: the run
-  // keeps the transcript and remembers the finished Session across a reload,
-  // and the flow moves on. When that moment is due is `useLiveCall`'s to
-  // decide (see `endIsDue`).
   const handleCallOver = (ended: EndedCall) => {
-    // The names are kept because a reload restores the post-call screen
-    // without a selection to look them up in; the Persona's id so a reverse
-    // started from there after a reload still knows who answers (ADR 0070).
+    // Kept for a reload; the Persona's id so a reverse still knows who answers (ADR 0070).
     run.finish(ended, { personaName, scenarioName, personaId });
-    // Straight to the wrap-up's own waiting screen where one is being written,
-    // and straight past it where none is: no stored Session, no wrap-up, and a
-    // wait for something that is not coming (ADR 0066).
+    // No stored Session, no wrap-up to wait for (ADR 0066).
     advance({ type: "callEnded", stored: ended.sessionId !== null });
   };
 
-  // The Session (WebSocket + playback + VAD) lives at App level, not in a
-  // screen: it connects on commit and buffers the opening line during the mic
-  // check, so the Persona speaks the moment the call screen appears (ADR 0042).
+  // At App level: it connects on commit and buffers a reverse's opening during
+  // the mic check (ADR 0042).
   const call = useLiveCall(committed, handleCallOver);
   const { accept } = call;
 
@@ -230,12 +186,11 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- preload once, on mount
   }, []);
 
-  // Armed for the whole call, not just while it's nominally the user's turn
-  // — see the barge-in handling above.
+  // Armed for the whole call, for barge-in.
   const { startListening, stopListening } = vad;
   useEffect(() => {
     if (screen !== "call" || isMicrophoneMuted) {
-      // Pausing keeps the preloaded VAD instance warm without capturing speech.
+      // Keeps the preloaded VAD warm without capturing speech.
       stopListening();
       return;
     }
@@ -244,11 +199,8 @@ export default function App() {
     return () => stopListening();
   }, [isMicrophoneMuted, screen, startListening, stopListening]);
 
-  // The one way into a call: commit to a pairing and go to the microphone
-  // check. Taken by the setup screen's button and by the follow-up's start
-  // button alike, so the second is the same act as the first and not a shortcut
-  // past it. Committing also forgets the stored finished Session (`commit`),
-  // so the previous wrap-up does not come back on the next reload.
+  // The one way into a call, from setup and from a finished training alike.
+  // `commit` forgets the stored finished Session.
   const beginSession = useCallback(
     (
       nextScenarioId: string,
@@ -259,25 +211,17 @@ export default function App() {
       setScenarioId(nextScenarioId);
       setPersonaId(nextPersonaId);
       commit(nextScenarioId, nextPersonaId, options);
-      // Straight from a finished training (F-60/F-61) the microphone was just
-      // in use, so the check is skipped. The case is not: a reverse gets its
-      // briefing, everything else the case screen, then the ringing phone
-      // (F-63) — nothing goes straight into a conversation.
+      // After a training the microphone was just in use; the case screen is never skipped.
       advance({ type: "sessionCommitted", reverse, skipMicCheck });
       if (skipMicCheck) setIsMicrophoneMuted(false);
     },
-    // All three keep one identity (`advance` by its own empty-context design,
-    // `commit` by its empty list, the other is a state setter), so this does
-    // too -- but it says so now rather than relying on it silently (ADR 0094).
     [advance, setScenarioId, commit],
   );
 
   const handleStartSession = useCallback(() => {
     if (personaId === null || scenarioId === null) return;
 
-    // The random Scenario (F-62) is drawn here and nowhere earlier: selecting
-    // the tile is not yet a case, and a draw made on selection would be a
-    // different one each time the User changed their mind about the Persona.
+    // Drawn here, not on selection, or each change of Persona would redraw (F-62).
     if (scenarioId === RANDOM_SCENARIO_ID) {
       const drawn = drawRandomScenario(drawPool);
       if (drawn === null) return; // nothing to draw from; the tile is not offered
@@ -285,25 +229,17 @@ export default function App() {
       return;
     }
 
-    // A reverse picked from the library keeps the microphone check and reaches
-    // its briefing on the way *out* of it — see `handleMicConfirmed`. Coming
-    // from a finished call there is no check to pass, so that path goes to the
-    // briefing straight away.
     beginSession(scenarioId, personaId, { reverse: selectedScenario?.reverse ?? false });
   }, [personaId, scenarioId, drawPool, selectedScenario, beginSession]);
 
-  // Post-call screen into the reverse (F-61, ADR 0070): same Persona, new
-  // Scenario, via `beginSession` onto the briefing screen. The card's second
-  // button — the first only wrote it. The library is reloaded and the filter
-  // follows the row so it is not hidden behind the active chip.
+  // F-61 (ADR 0070): same Persona, new Scenario, onto the briefing screen.
   const handleReverse = useCallback(
     (reverse: ReverseScenario) => {
       const persona = personaId ?? restored?.personaId ?? null;
       if (persona === null) return;
       setScenarioFilters({ origin: "reverse", category: "all" });
       void reloadScenarios();
-      // The briefing is seeded from the answer that just came back, so its
-      // screen has something to show immediately rather than one request later.
+      // Seeded from the answer, so the briefing shows at once.
       beginSession(reverse.id, persona, {
         reverse: true,
         skipMicCheck: true,
@@ -314,86 +250,63 @@ export default function App() {
   );
 
   const handleConfirmed = useCallback(() => {
-    // Switch to live playback and start the Session timeline. In a reverse
-    // this reveals the Persona's buffered answering line (ADR 0042); in an
-    // ordinary call there is none, the User answers first (ADR 0110).
+    // In a reverse this reveals the buffered answering line (ADR 0042, 0110).
     setIsMicrophoneMuted(false);
     accept();
     advance({ type: "callAccepted" });
   }, [accept, advance]);
 
-  // The mic check's button; `trainingFlow` decides where it leads. Its label
-  // asks the same function via `briefingFollows`, so the two cannot disagree.
+  // The label asks `briefingFollows` too, so the two cannot disagree.
   const handleMicConfirmed = useCallback(() => {
     advance({ type: "micConfirmed" });
   }, [advance]);
 
-  // The same question asked once more, for the way in that cannot answer it at
-  // the door: a follow-up commits and lands on this screen before its case has
-  // been fetched. An empty panel with a button under it stops the User for no
-  // reason, so the screen moves on by itself the moment the answer is in.
+  // A follow-up lands here before its case is fetched; move on once it is.
   useEffect(() => {
     if (screen !== "case-brief" || committedCase === null) return;
     if (committedCase.briefing || committedCase.facts) return;
     advance({ type: "caseArrivedEmpty" });
   }, [screen, committedCase, advance]);
 
-  // The throw ends where every ordinary call now begins: at the ringing phone,
-  // through the same fade an ordinary call gets. Nothing can cancel it, so the
-  // timer is the whole of the screen's logic.
   useEffect(() => {
     if (screen !== "rolling") return undefined;
     const timer = window.setTimeout(() => advance({ type: "rollFinished" }), ROLL_MS);
     return () => window.clearTimeout(timer);
   }, [screen, advance]);
 
-  // Abandoning the microphone check drops the Session that was committed to
-  // — the opening line generated for it is already spent, but there is no
-  // point holding the connection (and the server-side Session) open for it.
   const handleCancelMicCheck = useCallback(() => {
     cancelRun();
     advance({ type: "micCheckCancelled" });
   }, [advance, cancelRun]);
 
-  // The effect above owns VAD pause/resume; the button only changes UI state.
   const handleToggleMicrophone = useCallback(() => {
     setIsMicrophoneMuted((muted) => !muted);
   }, []);
 
-  // The wrap-up has settled, or the User would rather not wait for it. Stable,
-  // because the waiting screen hangs its own patience limit off it.
+  // Stable: the waiting screen's patience limit hangs off it.
   const handleAnalysed = useCallback(() => {
     advance({ type: "analysed" });
   }, [advance]);
 
-  // Clears the stored finished Session too, so the wrap-up does not come
-  // back when the next Session ends (ADR 0042 handles the reconnect side).
+  // Clears the stored finished Session, or the wrap-up comes back.
   const handleRestart = useCallback(() => {
     restartRun();
     advance({ type: "restarted" });
   }, [advance, restartRun]);
 
-  // Starts a follow-up (F-60) or reverse (F-61) against the training's Persona.
-  // The library predates the new row, hence the reload — and why `reverse` is
-  // passed in rather than looked up: a wrong guess would start the call
-  // without the briefing the User needs.
+  // F-60/F-61. `reverse` is passed in: a wrong guess would skip the briefing.
   const handleStartFollowUp = useCallback(
     (followUpId: string, followUpPersonaId: string, reverse = false) => {
       void reloadScenarios();
-      // Skips the microphone check: this call is begun from a training that
-      // has just been read, not from the selection screen. What it does not
-      // skip is the case — the wrap-up gives way to the briefing screen, and
-      // the call is started from there.
+      // Skips the mic check, not the case.
       playFade(() => beginSession(followUpId, followUpPersonaId, { reverse, skipMicCheck: true }));
     },
     [reloadScenarios, beginSession, playFade],
   );
 
-  // The same, started from a past training instead (F-60/F-61). That screen is
-  // a route of its own, so it hands the pairing over in the router's location
-  // state; this consumes it and clears it immediately, so neither a reload nor
-  // the Back button starts a second call. The ref guards against React's
-  // double-invoked effects, which would otherwise commit twice.
+  // The same from a past training, handed over in router state and cleared at
+  // once so neither reload nor Back starts a second call. The ref guards
+  // against React's double-invoked effects.
   const location = useLocation();
   const navigate = useNavigate();
   const handedOver = useRef(false);
@@ -408,32 +321,25 @@ export default function App() {
 
   const handleScenarioSaved = (savedId: string | null) => {
     setEditingScenario(null);
-    // Selects the saved row, so it is already picked for the next Session.
     void reloadScenarios(savedId);
   };
 
-  // The card the info panel was opened from. Looked up rather than stored so
-  // a reload of the Persona list cannot leave a stale name in the heading;
-  // if the Persona is gone the panel closes with the list.
+  // Looked up, so a reloaded list cannot leave a stale name.
   const infoPersona = personas.find((p) => p.id === infoPersonaId) ?? null;
   const infoScenario = library.scenarios.find((s) => s.id === infoScenarioId) ?? null;
 
-  // Reading hands over to writing: the panel closes as the editor opens, so
-  // Cancel in the editor returns to the library rather than to the panel.
+  // Cancel in the editor returns to the library, not the panel.
   const handleEditFromInfo = (id: string) => {
     setInfoScenarioId(null);
     setEditingScenario({ id });
   };
 
-  // The panel closes first: it is reading a row that is about to be gone, and
-  // the request behind it would otherwise finish against a 404.
+  // Closed first, or its request finishes against a 404.
   const handleDeleteFromInfo = (id: string) => {
     setInfoScenarioId(null);
     handleRemoveScenario(id);
   };
 
-  // Rendered over the setup screen and the post-call screen alike: the
-  // follow-up (F-60) can be edited from either.
   const scenarioEditor = editingScenario && (
     <ScenarioEditor
       scenarioId={editingScenario.id}
@@ -444,14 +350,10 @@ export default function App() {
     />
   );
 
-  // Shown on the briefing screen and during the call only. The slot is claimed
-  // as soon as the Scenario is known to be a reverse, before its briefing
-  // arrives: the call screen lays out around it, and a late panel would move the call.
+  // The slot is claimed before the briefing arrives, or a late panel moves the call.
   const briefPanel = (variant: "prepare" | "call") => {
     if (!committed?.reverse) {
-      // An ordinary call keeps its facts in view too (same ADR 0033 exception:
-      // fixed before the call). Null for a random Scenario. Read from the
-      // committed case, never the selected card, which differs for a follow-up.
+      // Read from the committed case, never the selected card (they differ for a follow-up).
       return (
         <CaseBriefPanel
           briefing={committedCase?.briefing}
@@ -476,11 +378,7 @@ export default function App() {
     return <ReverseBriefPanel brief={reverseBrief} variant={variant} />;
   };
 
-  // The reverse's own pre-call screen: the briefing and nothing else, then the
-  // button that begins the call. The Session is already committed behind it and
-  // the opening line is generating (ADR 0042), exactly as it does while the
-  // microphone check is on screen — this screen replaces that one, it does not
-  // come after it.
+  // A reverse's pre-call screen; it replaces the mic check (ADR 0042).
   if (screen === "brief") {
     return (
       <BriefScreen onContinue={handleConfirmed} onLeave={handleCancelMicCheck}>
@@ -489,17 +387,10 @@ export default function App() {
     );
   }
 
-  // The ordinary call's own pre-call screen: the briefing and the facts, then
-  // the button that rings the phone. The same `BriefScreen` as the reverse's,
-  // because it is the same moment in the flow.
   if (screen === "case-brief") {
     return (
       <BriefScreen onContinue={() => advance({ type: "caseRead" })} onLeave={handleCancelMicCheck}>
         {committedCase === null ? (
-          // The reverse's briefing screen says the same thing in the same
-          // place while its own text is in flight. Reached with the case
-          // already fetched from the microphone check, and without it from a
-          // wrap-up, where the commit and the request are the same moment.
           <section className="scenario-briefing">
             <h3 className="scenario-briefing-title">Ihre Ausgangslage</h3>
             <p className="scenario-briefing-body">Wird geladen …</p>
@@ -531,8 +422,7 @@ export default function App() {
   }
 
   if (screen === "mic-check") {
-    // Same function the press goes through, so the label cannot promise a call
-    // and deliver a page of text. May flip once while the case is in flight.
+    // The same function the press goes through; may flip once the case arrives.
     const nextIsBriefing = briefingFollows(flowContext());
     return (
       <AppLayout step="prepare" navigationLocked pageClassName="mic-check-page">
@@ -556,9 +446,6 @@ export default function App() {
           personaName={personaName}
           personaAvatarUrl={selectedPersona?.avatar_url ?? null}
           onAccept={handleConfirmed}
-          // The same door out as the microphone check's and the briefing's:
-          // declining drops the committed Session rather than holding its
-          // connection open for a call nobody is going to take.
           onDecline={handleCancelMicCheck}
         />
       </AppLayout>
@@ -566,9 +453,7 @@ export default function App() {
   }
 
   if (screen === "call") {
-    // Asked of the data, not the element: `CaseBriefPanel` renders nothing
-    // without a Wissensstand or facts. A reverse's briefing sits beside the
-    // call; an ordinary case goes below it, so the live call keeps visual priority.
+    // A reverse's briefing sits beside the call, an ordinary case below it.
     const briefPlacement: BriefPlacement | null = committed?.reverse
       ? "beside"
       : committedCase?.briefing.trim() || committedCase?.facts.trim()
@@ -578,14 +463,11 @@ export default function App() {
       <AppLayout
         step="call"
         navigationLocked
-        // Wider only while a briefing is beside the call: facts below it keep
-        // the standard call width.
         pageClassName={briefPlacement === "beside" ? "call-page call-page-wide" : "call-page"}
       >
         <CallView
           personaName={personaName}
-          // In a reverse the Persona is on the company's side, not the role it
-          // carries (ADR 0070) — the same reason the prompt drops that field.
+          // A reverse's Persona is on the company's side (ADR 0070).
           personaRole={
             committed?.reverse
               ? "Nimmt Ihren Anruf entgegen"
@@ -622,9 +504,7 @@ export default function App() {
 
   if (screen === "transcript") {
     return (
-      // The brand in the header leaves for the same place the preparation button
-      // at the foot does, and has to do the same thing to get there: these two
-      // screens are a state under the training route, not a route of their own.
+      // These screens are state under the training route, so the brand behaves like the button.
       <AppLayout
         step="feedback"
         onHome={handleRestart}
@@ -648,8 +528,6 @@ export default function App() {
               onRetry={restartFeedbackPoll}
               followUp={{
                 onStart: handleStartFollowUp,
-                // The new row is not in this screen's library copy yet, and
-                // the setup screen reads its names off that.
                 onCreated: () => void reloadScenarios(),
               }}
               onReverse={handleReverse}

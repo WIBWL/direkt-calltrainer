@@ -10,35 +10,24 @@ import FeedbackScreen, { transcriptFromTurns } from "./FeedbackScreen";
 import FeedbackReport from "./FeedbackReport";
 import MetricSection from "./MetricSection";
 
-/**
- * One past training from the history (F-48), rendered by `FeedbackScreen` like the post-call screen with other
- * buttons. Read once, never polled: the stored state is final (ADR 0019). A foreign Session is a 404 like a
- * missing one (ADR 0031/0050). Offers the follow-up (F-60) and reverse (F-61), both written on request.
- */
+/** One past training (F-48). Read once, never polled: the stored state is final (ADR 0019). */
 export default function PastSessionView() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { detail, state, reload } = useStoredSession(sessionId ?? null);
   const navigate = useNavigate();
   const [confirming, setConfirming] = useState(false);
-  // Back to the history rather than to the now-empty page this was. Replacing
-  // the entry means Back does not return to a training that no longer exists.
+  // Replaced, so Back does not return to a deleted training.
   const deletion = useSessionDeletion(sessionId, () =>
     navigate(ROUTES.profile, { replace: true }),
   );
 
-  // Starting the follow-up belongs to the training flow, which is another
-  // route — so hand it the pairing and go (see TrainingStart). The Persona is
-  // the one this training was played with, not a fresh choice.
+  // Handed to the training route (TrainingStart), with this training's Persona.
   const startFollowUp = (scenarioId: string, personaId: string) => {
     const start: TrainingStart = { scenarioId, personaId };
     navigate(ROUTES.training, { state: { start } });
   };
 
-  // The reverse (F-61) leaves by the same door, and is offered here and not
-  // only after the call for the reason ADR 0070 gives for storing it at all:
-  // standing on the other side of a conversation is worth doing about a
-  // training you have gone back to read, not just about the one that has just
-  // ended. The Persona is again the one this training was played with.
+  // The reverse (F-61, ADR 0070) leaves the same way.
   const startReverse = (reverse: ReverseScenario) => {
     if (!detail) return;
     const start: TrainingStart = {
@@ -49,9 +38,7 @@ export default function PastSessionView() {
     navigate(ROUTES.training, { state: { start } });
   };
 
-  // A link, not a button, so middle-click and "open in new tab" keep working; only styled as a button.
-  // Used twice: above the report (so a reader need not scroll back) and in the actions row at the foot.
-  // The short screens (not found, failed, loading) have only the upper one.
+  // A link styled as a button, so new-tab still works; shown above the report and in the actions row.
   const backLink = (
     <Link to={ROUTES.profile} className="back-to-start-button">
       Zurück zum Profil
@@ -113,8 +100,7 @@ export default function PastSessionView() {
           detail.feedback ? (
             <FeedbackReport
               detail={detail}
-              // Re-read after one is written, so the card survives a reload of
-              // this page as the row the detail route now carries.
+              // Re-read, so the card survives a reload.
               followUp={{ onStart: startFollowUp, onCreated: reload }}
               onReverse={startReverse}
             />
@@ -126,10 +112,7 @@ export default function PastSessionView() {
                   gekommen. Das Gesprächsprotokoll und die Zahlen unten sind vollständig.
                 </p>
               </div>
-              {/* The figures are measured during the call and stored with the
-                  Session (ADR 0047/0048), so they survive a wrap-up that never
-                  got written. Withholding them would hide data that is right
-                  there. */}
+              {/* Measured during the call (ADR 0048), so shown without a wrap-up too. */}
               <MetricSection
                 measurements={detail.measurements}
                 findings={detail.findings}
@@ -141,9 +124,7 @@ export default function PastSessionView() {
           )
         }
       >
-        {/* At the bottom, after everything it would destroy. Putting it beside
-            the heading would make it the first thing in reach on a screen the
-            user opened in order to read. */}
+        {/* At the bottom, after everything it would destroy. */}
         <section className="session-delete">
           {confirming ? (
             <DeleteSessionPrompt

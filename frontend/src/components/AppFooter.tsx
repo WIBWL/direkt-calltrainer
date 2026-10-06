@@ -4,7 +4,6 @@ import { ACCESSIBILITY_URL, IMPRINT_URL, ROUTES } from "../routes";
 import PrivacyLink from "./PrivacyLink";
 import ProjectPageLink from "./ProjectPageLink";
 
-// The shared footer keeps legal information consistent across all training screens.
 export default function AppFooter() {
   return (
     <footer className="app-footer">
@@ -18,13 +17,11 @@ export default function AppFooter() {
         </div>
 
         <nav className="app-footer-links" aria-label="Rechtliche Informationen">
-          {/* The three legal statements are the project's own pages and leave
-              the app on purpose, in a new tab (`ProjectPageLink`). */}
+          {/* The project's own pages, in a new tab. */}
           <ProjectPageLink href={IMPRINT_URL}>Impressum</ProjectPageLink>
           <PrivacyLink>Datenschutz</PrivacyLink>
           <ProjectPageLink href={ACCESSIBILITY_URL}>Barrierefreiheit</ProjectPageLink>
-          {/* A router link, not <a href>: a plain href reloads the whole app,
-              which on the way out of a finished wrap-up would discard it. */}
+          {/* A router link: a reload would discard a finished wrap-up. */}
           <Link to={ROUTES.notes}>Wichtige Hinweise</Link>
         </nav>
       </div>

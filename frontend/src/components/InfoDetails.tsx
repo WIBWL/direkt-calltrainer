@@ -1,10 +1,6 @@
 import type { ReactNode } from "react";
 
-/**
- * An "i" that folds a long explanation away, keeping the deciding sentence visible.
- * A native `<details>`: keyboard/screen-reader operable, opens on find, prints expanded.
- * The summary carries the accessible name; `iconOnly` hides it from the eye only.
- */
+/** An "i" folding a long explanation away. A native `<details>`; `iconOnly` hides the name from the eye only. */
 export default function InfoDetails({
   label = "Mehr dazu",
   iconOnly = false,

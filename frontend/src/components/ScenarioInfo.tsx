@@ -7,36 +7,24 @@ import Modal from "./Modal";
 import { StructuredText } from "./ScenarioBriefing";
 
 interface ScenarioInfoProps {
-  /** The Scenario to describe — its `extern_id` (ADR 0050). */
   scenarioId: string;
-  /** Shown as the heading until the fetch lands, so the panel never opens
-   * nameless: the card the user just clicked already knows the name. */
+  /** The heading until the fetch lands. */
   scenarioName: string;
   onClose: () => void;
-  /** Switch to the editor on this Scenario. Offered only when the server says
-   * the caller may edit it (ADR 0062). */
+  /** Only where the server allows (ADR 0062). */
   onEdit: (id: string) => void;
-  /** Delete this Scenario. Offered on the two kinds built from a Session —
-   * a reverse (ADR 0070) and a follow-up (ADR 0069) — which are the rows that
-   * cannot reach the editor, where every hand-authored row is deleted. */
+  /** For reverses and follow-ups (ADR 0069, 0070), which cannot reach the editor. */
   onDelete: (id: string) => void;
 }
 
-/** Text rows in the editor's order; empty or withheld fields are left out. `call_goal` is never shown: it is
- * the answer key to the exercise (ADR 0043/0045), for built-in and authored Scenarios alike. A built-in shows
- * its description alone (ADR 0054's amendment): its Wissensstand is read after the microphone check and its
- * facts are the caller's (`case_facts` null). */
+/** Never `call_goal`, the answer key (ADR 0043/0045). A built-in shows its description alone (ADR 0054). */
 const SECTIONS: { key: keyof ScenarioDetail; label: string; authoredOnly?: boolean }[] = [
   { key: "description", label: "Worum es geht" },
   { key: "briefing", label: "Ihr Wissensstand", authoredOnly: true },
   { key: "case_facts", label: "Fakten des Falls" },
 ];
 
-/**
- * Read-only Scenario view from the card's "i" (ADR 0062): the editor's `Modal` and field order, edit button only
- * where the server set `editable`. Shows only what the trainee may know going in. Reverses (ADR 0070) and
- * follow-ups (ADR 0069) are not editable, so their delete control lives here.
- */
+/** Read-only view from the card's "i" (ADR 0062): what the trainee may know going in. */
 export default function ScenarioInfo({
   scenarioId,
   scenarioName,
@@ -48,7 +36,6 @@ export default function ScenarioInfo({
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  // The question first, the panel behind it second (see `Modal`).
   const dismiss = () => {
     if (confirmingDelete) setConfirmingDelete(false);
     else onClose();
@@ -78,8 +65,7 @@ export default function ScenarioInfo({
       labelledBy="scenario-info-title"
       onDismiss={dismiss}
       overlay={
-        // A whole phrase per kind: the two take different articles. Confirmed because the row can only be
-        // recreated from its training, with a model call, if that training is still stored.
+        // Confirmed: the row can only be recreated from its training, with a model call.
         confirmingDelete &&
         detail && (
           <ConfirmDialog
@@ -111,15 +97,12 @@ export default function ScenarioInfo({
 
       {!detail && !error && <p>Wird geladen …</p>}
 
-      {/* No category line: it is a filter, and the filter row on the selection
-          screen is where it belongs. Here it said only which chip this card
-          sits under, which the reader had just used to find it. */}
+      {/* No category line: that is the filter row's business. */}
       {detail && (
         <div className="persona-info-sections">
           {SECTIONS.map((section) => {
             const value = detail[section.key];
             if (typeof value !== "string" || value.length === 0) return null;
-            // A built-in is the row whose facts came back withheld.
             if (section.authoredOnly && detail.case_facts === null) return null;
             return (
               <section className="persona-info-section" key={section.key}>

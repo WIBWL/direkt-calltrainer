@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { fillerHits, questionsIn } from "./transcriptEvidence";
 
-/** What a metric's page quotes as evidence (ADR 0098). Must reproduce the backend's
- * counting rule; the failure is silent (four quotes under a figure of five), so
- * the arithmetic is pinned here. */
+/** ADR 0098: the quotes must match the backend's count, and the failure is silent. */
 
 describe("questionsIn", () => {
   it("quotes the question alone, not the sentence before it", () => {
@@ -19,7 +17,6 @@ describe("questionsIn", () => {
   });
 
   it("keeps a question mark inside a sentence, which a sentence split would drop", () => {
-    // The backend counts the character, so this has to count it too.
     const text = "Sie fragen: wann kommt der Techniker? und ich verstehe das.";
     expect(questionsIn(text)).toHaveLength(1);
     expect(questionsIn(text)[0]).toBe(
@@ -33,10 +30,7 @@ describe("questionsIn", () => {
   });
 
   it("still quotes a stray question mark, because the metric counted it", () => {
-    // Ugly on the page and deliberate all the same: the backend counts the
-    // character, so dropping this would put four quotes under a figure of
-    // five. The module's contract is that the two agree, and a prettier quote
-    // list is not worth breaking it for.
+    // Ugly, but the backend counts the character: four quotes under a five would be worse.
     expect(questionsIn("Ja. ?")).toEqual(["?"]);
   });
 });
@@ -57,7 +51,6 @@ describe("fillerHits", () => {
   });
 
   it("quotes the word as it was said, not as it was counted", () => {
-    // The detail lists the word lower-cased; the sentence keeps its capital.
     const hits = fillerHits([turn("Eigentlich schon.")], ["eigentlich"]);
 
     expect(hits[0]?.word).toBe("Eigentlich");
@@ -81,7 +74,6 @@ describe("fillerHits", () => {
     );
 
     expect(hits).toHaveLength(1);
-    // The earliest of the words in the sentence, whichever order they arrived in.
     expect(hits[0]?.word).toBe("Also");
   });
 

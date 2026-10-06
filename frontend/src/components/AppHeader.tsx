@@ -9,27 +9,15 @@ import BrandName from "./BrandName";
 
 export type TrainingStep = "prepare" | "call" | "feedback";
 
-// `| undefined` is spelled out on each optional prop because the project builds
-// with `exactOptionalPropertyTypes`: under it, "may be omitted" and "may be
-// passed as undefined" are different types, and AppLayout forwards these
-// straight through, which is the second of the two.
+// `| undefined` because of `exactOptionalPropertyTypes`: AppLayout forwards these.
 interface AppHeaderProps {
-  /** Omitted outside the training flow — the profile screen is not a step. */
   activeStep?: TrainingStep | undefined;
-  /**
-   * Suppresses every link in the header while a call is live: leaving the page tears
-   * down the WebSocket and an abandoned Session is stored as `aborted` (ADR 0034).
-   */
+  /** While a call is live: leaving tears down the socket and stores `aborted` (ADR 0034). */
   navigationLocked?: boolean | undefined;
-  /** Marks the account chip and its Profil entry as the current page. */
   accountActive?: boolean | undefined;
-  /** Marks the account chip and its Fortschritt entry as the current page (F-13). */
+  /** F-13. */
   progressActive?: boolean | undefined;
-  /**
-   * Resets the training flow when the brand is clicked. From a screen that is a state
-   * rather than a route, the brand's link points at the path already shown, so the
-   * router renders nothing new and the click would do nothing.
-   */
+  /** From a screen that is a state, not a route, the link alone would do nothing. */
   onHome?: (() => void) | undefined;
 }
 
@@ -76,9 +64,7 @@ export default function AppHeader({
             className="app-brand-link"
             aria-label="Zum Training"
             onClick={onHome}
-            // The reset is the whole of the navigation where `onHome` is set,
-            // and the route does not change: pushing the path a second time
-            // would leave a history entry that goes nowhere.
+            // Replace: the route does not change, so a push would add a dead entry.
             replace={Boolean(onHome)}
           >
             {brand}
@@ -112,18 +98,12 @@ export default function AppHeader({
             })}
           </ol>
         ) : (
-          // Holds the brand left and the account right when there are no steps
-          // between them.
           <span className="app-header-spacer" />
         )}
 
         {auth.isAuthenticated &&
           (navigationLocked ? (
-            // Hidden, not greyed out: during the microphone check and the call
-            // the chip has nothing to offer, and a dimmed control still invites
-            // the click it is refusing. It carries the full content anyway so
-            // that it reserves the same width the real chip has -- otherwise
-            // the progress steps shift sideways on entering the call.
+            // Hidden, not greyed, but sized like the real chip so the steps do not shift.
             <span className="account-chip is-locked" aria-hidden="true">
               <span className="account-avatar">{account.initials}</span>
               <span className="account-chip-name">{account.displayName}</span>
@@ -151,11 +131,7 @@ interface AccountMenuProps {
   onSignOut: () => void;
 }
 
-/**
- * The account chip and the short list it opens: Profil, Fortschritt, Abmelden.
- * A disclosure, not an ARIA `menu`: the entries are plain links reached with Tab,
- * and `role="menu"` would promise arrow-key handling this list does not have.
- */
+/** A disclosure, not an ARIA `menu`: there is no arrow-key handling. */
 function AccountMenu({
   initials,
   displayName,
@@ -179,8 +155,7 @@ function AccountMenu({
       setOpen(false);
       buttonRef.current?.focus();
     };
-    // Tabbing past the last entry leaves the list open behind the focus
-    // otherwise, covering whatever the focus has moved on to.
+    // Tabbing past the last entry closes the list.
     const onFocusOut = (event: FocusEvent) => {
       if (!rootRef.current?.contains(event.relatedTarget as Node | null)) setOpen(false);
     };
@@ -210,7 +185,6 @@ function AccountMenu({
         )}
         aria-expanded={open}
         aria-controls={listId}
-        // The name is hidden on a narrow screen, and the avatar is decorative.
         aria-label={`Kontomenü für ${displayName}`}
         onClick={() => setOpen((value) => !value)}
       >

@@ -18,17 +18,11 @@ import GoalStatements from "./GoalStatements";
 import PartsStrip from "./PartsStrip";
 import Sparkline from "./Sparkline";
 
-/**
- * One metric across trainings, the dashboard's second level (docs/dashboard-concept.md, section 7). The table is
- * the chart's other half, not a fallback: the Scenario and Persona behind a value make it readable, and it is the
- * accessible form. Rows link to `PastSessionView`; below, the wrap-ups' statements on the backed goals are quoted.
- */
+/** One metric across trainings. The table is the chart's accessible half; rows
+ * link to the training, and the backed goals' statements follow. */
 export default function ProgressMetricView() {
   const { metricKey } = useParams<{ metricKey: string }>();
-  // The trainings the switch on the overview selected, not everything stored:
-  // this page and the tile that links here have to describe the same set, or
-  // the tile's "aus 5 Trainings" and the chart below disagree about what they
-  // are about (dashboard-concept.md section 7, ProgressContext.tsx).
+  // The overview's selection, so the tile and this page describe the same set.
   const { selected: sessions, series: all, periodPhrase, state, withPeriod } =
     useProgressContext();
   const series = all.find((s) => s.key === metricKey);
@@ -54,9 +48,7 @@ export default function ProgressMetricView() {
         {back}
         <h1>Kennzahl</h1>
         <div className="card">
-          {/* Which trainings were looked at, here as well: without it the sentence
-              blamed the absence on the metric ("noch nie gemessen") where the reason
-              is usually the selection. The focus tiles made the same mistake. */}
+          {/* The usual reason is the selection, not the metric. */}
           <p>
             Über {periodPhrase} liegt zu dieser Kennzahl kein Wert vor. Mit einer weiteren
             Auswahl auf der Fortschrittsseite steht hier unter Umständen mehr; sonst wurde sie
@@ -67,12 +59,8 @@ export default function ProgressMetricView() {
     );
   }
 
-  // Newest first in the table, oldest first in the chart: a chart reads left to
-  // right in time, a list is read from the most recent entry down.
+  // Newest first in the table, oldest first in the chart.
   const rows = [...series.points].reverse();
-  // What the wrap-ups wrote about the goals this metric stands behind. The
-  // sessions arrive newest first, so the quotations are already in the order
-  // the table is in.
   const statements = statementsFor(sessions, goalsForMetric(series.key));
 
   return (
@@ -81,9 +69,7 @@ export default function ProgressMetricView() {
       <h1>{series.name}</h1>
       <p className="page-lead">
         {series.points.length} {series.points.length === 1 ? "Training" : "Trainings"}
-        {/* A checklist's unit is a bare denominator, which reads as nothing in
-            this sentence; its strip below says what the numbers count. */}
-        {/* Nor for a count, whose unit is the bare word "count". */}
+        {/* Not for a checklist's bare denominator or the word "count". */}
         {series.unit && series.shape === "line" && !isCount(series.unit) && (
           <>, gemessen in {series.unit}</>
         )}
@@ -91,15 +77,11 @@ export default function ProgressMetricView() {
         Zielwert, denn für diese Nutzergruppe gibt es keinen belegten Richtwert.
         {series.derivation && <> {series.derivation}</>}
       </p>
-      {/* Which trainings this page is drawn over. It carries no switch of its
-          own -- the selection is made on the overview and travels in the URL --
-          so it has to say in words what it is reading, or a page over the last
-          five trainings looks like a page over all of them. */}
+      {/* No switch here, so it says what it reads. */}
       <p className="muted">Gelesen über {periodPhrase}.</p>
 
       {series.shape === "parts" ? (
-        // No line and no band for a checklist (see `SeriesShape`): the count per
-        // training, and how often every part was there.
+        // A checklist has no line or band.
         <div className="card">
           <PartsStrip series={series} />
           <p className="muted">
@@ -127,9 +109,6 @@ export default function ProgressMetricView() {
         </div>
       )}
 
-      {/* Under the chart and above the table: it is a reading of the same
-          curve, and the table is the individual points the two of them
-          summarise. */}
       <EarlyAndLate series={series} />
 
       <h2>Einzelne Trainings</h2>

@@ -22,20 +22,15 @@ import { ACCESSIBILITY_URL, IMPRINT_URL, PRIVACY_URL, ROUTES } from "./routes";
 import "./index.css";
 
 const onSigninCallback = (user: User | undefined) => {
-  // Keycloak always returns to "/". Stripping `?code=&state=` (needed for silent
-  // renew) goes through the History API so the callback stays out of the back
-  // stack. Returning to the requested page must NOT happen here: `replaceState`
-  // fires no event, so the router would keep the old screen under the new URL.
-  // <ReturnToRequestedPage /> below navigates through the router instead.
+  // Keycloak returns to "/". The callback params are stripped via the History
+  // API; returning to the requested page must go through the router
+  // (<ReturnToRequestedPage />), since `replaceState` fires no event.
   const returnTo = (user?.state as { returnTo?: string } | undefined)?.returnTo;
   if (returnTo) rememberReturnTo(returnTo);
   window.history.replaceState({}, document.title, ROUTES.training);
 };
 
-/**
- * Sends the user to the page they originally asked for, once. Fires only after
- * a login redirect, the only writer of the stored path.
- */
+/** Once, after a login redirect. */
 function ReturnToRequestedPage() {
   const navigate = useNavigate();
 
@@ -47,11 +42,7 @@ function ReturnToRequestedPage() {
   return null;
 }
 
-/**
- * Routes reachable only once the two first-run questions are answered: storage
- * consent (ADR 0066), then focus (ADR 0076). Nested so they come one after the
- * other, the one with a legal basis first.
- */
+/** Consent first (ADR 0066), then focus (ADR 0076). */
 function ConsentGate() {
   return (
     <ConsentProvider>
@@ -68,12 +59,10 @@ createRoot(document.getElementById("root")!).render(
       <AuthProvider userManager={userManager} onSigninCallback={onSigninCallback}>
         <ReturnToRequestedPage />
 
-        {/* Above the routes on purpose: a transition outlives the screen that
-            started it (see ScreenTransition.tsx). */}
+        {/* Above the routes: a transition outlives the screen that started it. */}
         <ScreenTransitionProvider>
           <Routes>
-            {/* Public legal pages. The first three are the project's own and
-                only forward there (ProjectPageRedirect). */}
+            {/* The first three only forward to the project's pages. */}
             <Route
               path={ROUTES.imprint}
               element={<ProjectPageRedirect title="Impressum" url={IMPRINT_URL} />}
@@ -90,7 +79,6 @@ createRoot(document.getElementById("root")!).render(
             />
             <Route path={ROUTES.notes} element={<Notes />} />
 
-            {/* Everything below requires authentication. */}
             <Route
               element={
                 <AuthGate>
@@ -101,10 +89,7 @@ createRoot(document.getElementById("root")!).render(
               <Route element={<ConsentGate />}>
                 <Route path={ROUTES.training} element={<App />} />
                 <Route path={ROUTES.profile} element={<ProfileView />} />
-                {/* One history load and selection for the three dashboard
-                    screens (ProgressContext.tsx), mounted here so the training
-                    flow does not pay for the request, and kept mounted across
-                    the three so moving between them refetches nothing. */}
+                {/* One load for the three dashboard screens, kept mounted across them. */}
                 <Route
                   element={
                     <ProgressProvider>

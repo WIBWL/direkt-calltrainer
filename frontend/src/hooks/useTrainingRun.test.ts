@@ -5,10 +5,7 @@ import type { ReverseBrief } from "../scenarioLibrary";
 import { loadFinishedSession, saveFinishedSession } from "../utils/finishedSession";
 import { useTrainingRun } from "./useTrainingRun";
 
-/**
- * The training run's rules. Only the detail route is faked: under test is which
- * Session asks it what, and what survives a commit, an end and a reload.
- */
+/** What survives a commit, an end and a reload; only the detail route is faked. */
 
 const fake = vi.hoisted(() => ({ getScenario: vi.fn() }));
 vi.mock("../scenarioLibrary", () => ({ getScenario: fake.getScenario }));

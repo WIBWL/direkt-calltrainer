@@ -1,11 +1,6 @@
 import ScenarioBriefing, { StructuredText } from "./ScenarioBriefing";
 
-/**
- * The trainee's Wissensstand (`briefing`, ADR 0054) and, for an authored Scenario, the case facts;
- * a built-in serves no facts (ADR 0054's amendment), and `call_goal`, the answer key, stays withheld
- * everywhere. "prepare" and "call" carry the same text, the latter below the live call (ADR 0070's
- * exception to ADR 0033). Not for a random Scenario (F-62).
- */
+/** The Wissensstand (ADR 0054) and, for an authored Scenario, the case facts; `call_goal` stays withheld. Not for a random Scenario (F-62). */
 export default function CaseBriefPanel({
   briefing,
   caseFacts,
@@ -23,8 +18,6 @@ export default function CaseBriefPanel({
 
   return (
     <div className={variant === "call" ? "case-brief-call" : undefined}>
-      {/* The same component in both places, so the Wissensstand reads
-          identically before and during the call. */}
       <ScenarioBriefing briefing={briefing} />
 
       {facts && (

@@ -3,22 +3,13 @@ import { useCallback, useEffect, useState } from "react";
 import type { SessionDetail } from "../protocol";
 import { readStoredSession } from "../sessions";
 
-/** "missing" is what `sessions.getSession` reports as null — no such Session,
- *  or not the caller's (ADR 0031/0050), which are deliberately the same
- *  answer. */
+/** "missing": absent or not the caller's, the same answer (ADR 0031/0050). */
 export type StoredSessionState = "loading" | "ready" | "missing" | "failed";
 
-/**
- * One stored Session, read once. Unlike `useSessionFeedback` it never polls
- * (ADR 0019): nothing is in flight days later, so a missing wrap-up is `ready`,
- * not an error. `reload` re-reads past the cache in `sessions.ts`, after a
- * follow-up was created (F-60).
- */
+/** Read once, never polled (ADR 0019): a missing wrap-up is `ready`, not an error. `reload` bypasses the cache. */
 export function useStoredSession(sessionId: string | null) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [state, setState] = useState<StoredSessionState>("loading");
-  // Bumped by `reload`; the effect keys on it, so there is one fetch path and
-  // not a second copy of it.
   const [nonce, setNonce] = useState(0);
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 

@@ -7,11 +7,8 @@ import { loudnessCourse } from "../utils/loudness";
 import { formatOffset } from "../utils/time";
 import LoudnessCourse from "./LoudnessCourse";
 
-/**
- * What a figure was read off, on the metric's own page (ADR 0098). Nothing is recomputed: blocks read the stored
- * `detail` (ADR 0029) or quote the transcript, since a second client-side arithmetic would eventually disagree.
- * Missing detail is said, not derived. Nothing judges (ADR 0004/0051). Intonation and interruptions have own blocks.
- */
+/** What a figure was read off (ADR 0098). Nothing is recomputed: blocks read the
+ * stored `detail` or quote the transcript; missing detail is said, not derived. */
 export default function MetricEvidence({
   measurement,
   turns,
@@ -56,7 +53,6 @@ export default function MetricEvidence({
   }
 }
 
-/** A block with the heading every other section on this page carries. */
 function Block({ title, children }: { title: string; children: ReactNode }) {
   return (
     <>
@@ -66,7 +62,6 @@ function Block({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** One quoted stretch of the call, with the moment it was said. */
 function Quote({ at, children }: { at?: number; children: ReactNode }) {
   return (
     <blockquote className="evidence-quote">
@@ -76,8 +71,6 @@ function Quote({ at, children }: { at?: number; children: ReactNode }) {
   );
 }
 
-/** A figure with its name under it, for the two or three numbers a detail
- *  holds beside the measurement itself. */
 function Facts({ items }: { items: { label: string; value: string }[] }) {
   return (
     <ul className="evidence-facts">
@@ -99,12 +92,7 @@ function number(value: unknown): number | null {
   return typeof value === "number" ? value : null;
 }
 
-// --- The blocks --------------------------------------------------------------
-
-/**
- * Both sides' speaking time. The Persona's bar carries no comment: it is a synthesized voice at a fixed rate,
- * so a remark about it would be about a setting (ADR 0051).
- */
+/** The Persona's bar carries no comment: its rate is a setting (ADR 0051). */
 function TalkShare({ detail }: { detail: Record<string, unknown> }) {
   const user = number(detail.user_ms);
   const persona = number(detail.persona_ms);
@@ -140,10 +128,7 @@ function Bar({ label, ms, share }: { label: string; ms: number; share: number })
   );
 }
 
-/**
- * Every question that was counted, quoted. Cut at the question marks, not at sentence boundaries, so the list
- * holds exactly as many entries as the figure says.
- */
+/** Cut at question marks, so the list holds as many entries as the figure says. */
 function Questions({
   detail,
   turns,
@@ -210,10 +195,7 @@ function WordCount({ detail }: { detail: Record<string, unknown> }) {
   );
 }
 
-/**
- * The filler words (from the stored detail) and the sentences they fell in (from the transcript). The marked
- * word is the same string that was counted, so the count can be checked against the call.
- */
+/** The marked word is the counted string, so the count can be checked. */
 function Fillers({
   detail,
   turns,
@@ -302,7 +284,6 @@ function Repetitions({ detail }: { detail: Record<string, unknown> }) {
   );
 }
 
-/** The user's first turn, with the parts that were looked for beside it. */
 function Opening({
   measurement,
   detail,
@@ -330,7 +311,6 @@ function Opening({
   );
 }
 
-/** The last turns the closing was read in, and the parts that were looked for. */
 function Closing({
   measurement,
   detail,
@@ -340,8 +320,7 @@ function Closing({
   detail: Record<string, unknown>;
   turns: SessionTurn[];
 }) {
-  // How many turns were read travels in the detail, so this quotes exactly the
-  // window that was checked rather than a number written twice (ADR 0063).
+  // The window size travels in the detail (ADR 0063).
   const window = number(detail.turns_read) ?? 2;
   const read = turns.slice(-window);
 
@@ -357,10 +336,7 @@ function Closing({
   );
 }
 
-/**
- * A checklist's parts, in words. "Nicht erkannt", never "fehlt": parts are found by their usual phrasing, and a
- * greeting worded differently slips past (ADR 0086).
- */
+/** "Nicht erkannt", never "fehlt": differently worded parts slip past (ADR 0086). */
 function PartList({ measurement }: { measurement: Measurement }) {
   const parts = metricParts(measurement);
   if (!parts) return null;
@@ -377,10 +353,7 @@ function PartList({ measurement }: { measurement: Measurement }) {
   );
 }
 
-/**
- * Every pause that went into the average, in order, on the user's own speaking time: the stored offsets count
- * the user's turns concatenated, so nothing in the strip stands for the Persona talking.
- */
+/** On the user's own speaking time: the stored offsets concatenate the user's turns. */
 function Pauses({ detail }: { detail: Record<string, unknown> }) {
   const events = Array.isArray(detail.pause_events)
     ? (detail.pause_events as { start_ms: number; duration_ms: number }[])
@@ -480,11 +453,8 @@ function RunLength({ detail }: { detail: Record<string, unknown> }) {
   );
 }
 
-/**
- * Every silence that went into the average, and the exchange the longest one stood in — the question waiting
- * through a pause usually explains it. Takes every Turn, not only the user's: the Persona's line before the
- * silence is matched on the offset the gap was measured from, so the two cannot disagree.
- */
+/** Every silence, and the exchange the longest stood in. The Persona's line is
+ * matched on the offset the gap was measured from. */
 function ReactionTime({
   detail,
   turns,
@@ -499,8 +469,7 @@ function ReactionTime({
     : [];
   if (longest === null && count === null) return null;
 
-  // The longest by measurement, not by a second comparison of our own: the
-  // stored figure decides, and the entry is the one that carries it.
+  // The stored figure decides which is longest.
   const peak = gaps.reduce<{ at_ms: number; duration_ms: number } | null>(
     (best, gap) => (best === null || gap.duration_ms > best.duration_ms ? gap : best),
     null,
@@ -554,7 +523,6 @@ function ReactionTime({
   );
 }
 
-/** Words over speaking time, as the division it is. */
 function Pace({ detail }: { detail: Record<string, unknown> }) {
   const words = number(detail.words);
   const phonation = number(detail.phonation_ms);
@@ -577,10 +545,7 @@ function Pace({ detail }: { detail: Record<string, unknown> }) {
   );
 }
 
-/**
- * The held sounds, quoted by the utterance they fell in, not pinned to a word: the recogniser removes exactly
- * these sounds from the transcript, so the sentence is as precise as the stored facts allow.
- */
+/** Quoted by utterance, not word: the recogniser removes these sounds from the transcript. */
 function Hesitations({
   detail,
   turns,
@@ -595,8 +560,6 @@ function Hesitations({
 
   if (total === null) return null;
 
-  // One row per utterance that held any, newest last, so the quotes read in
-  // the order of the call.
   const byTurn = new Map<number, number>();
   for (const hold of holds) byTurn.set(hold.turn, (byTurn.get(hold.turn) ?? 0) + 1);
 
@@ -636,9 +599,7 @@ function Hesitations({
 }
 
 function Loudness({ detail }: { detail: Record<string, unknown> }) {
-  // The course arrives read: band, smoothing and stretches are derived by the
-  // server on every read (ADR 0091), from the same function that writes the
-  // wrap-up's sentence about it. This block only draws it.
+  // Derived by the server on every read (ADR 0091); only drawn here.
   const curve = loudnessCourse(detail);
   if (!curve) return null;
 

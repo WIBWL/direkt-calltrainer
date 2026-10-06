@@ -1,8 +1,4 @@
-/**
- * One pip per analysed training, filled where the theme came up: a count, not a proportion or a level (ADR 0065,
- * ADR 0080). Above `MAX_PIPS` it becomes a single track. `aria-hidden`, the figure always stands beside it in
- * words. Shared by the recurring block and unmeasured goals' tiles, where a big "3 von 8" read as a mark.
- */
+/** One pip per analysed training, filled where the theme came up: a count, not a level (ADR 0065/0080). `aria-hidden`. */
 const MAX_PIPS = 12;
 
 export default function MentionTally({ count, total }: { count: number; total: number }) {

@@ -2,13 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { REQUIRED_ROLE, holdsRequiredRole } from "./access";
 
-/** The SPA's reading of the role gate (ADR 0109). A wrong answer either locks
- * an admitted User out of the app or shows an outsider a screen whose every
- * request then fails — so both directions are pinned. */
+/** ADR 0109: both directions pinned. */
 
 const CLIENT = "calltrainer-frontend";
 
-/** An unsigned JWT with `payload`; nothing here checks the signature. */
 function token(payload: object): string {
   const encode = (value: object) =>
     btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(value))))

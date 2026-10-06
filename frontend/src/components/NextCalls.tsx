@@ -1,10 +1,7 @@
 import { useFocusContext } from "../FocusContext";
 import { recommendationReason, type NextCallOffer } from "../scenarioLibrary";
 
-/**
- * What to play next (F-64): existing Scenarios, one press to start. Nothing is written first, so starting
- * begins the call at once, skipping the microphone check. Each offer names its reason.
- */
+/** What to play next (F-64): existing Scenarios, started at once without the mic check. */
 export default function NextCalls({
   offers,
   onStart,

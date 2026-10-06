@@ -6,11 +6,7 @@ import type { ConsentState } from "../protocol";
 
 export type ConsentLoadState = "loading" | "ready" | "failed";
 
-/**
- * The signed-in user's storage consent (ADR 0066), held once near the root so
- * the dialog, setup notice and profile cannot disagree. A failed load is not
- * "no consent": the backend decides and fails closed on its own (`consent.py`).
- */
+/** Held once near the root (ADR 0066). A failed load is not "no consent": the backend fails closed. */
 export function useConsent() {
   const [consent, setConsent] = useState<ConsentState | null>(null);
   const [state, setState] = useState<ConsentLoadState>("loading");
@@ -36,7 +32,7 @@ export function useConsent() {
     };
   }, []);
 
-  /** Record a decision. Returns how many stored trainings a withdrawal removed. */
+  /** Returns how many trainings a withdrawal removed. */
   const decide = useCallback(async (granted: boolean): Promise<number> => {
     setSaving(true);
     try {

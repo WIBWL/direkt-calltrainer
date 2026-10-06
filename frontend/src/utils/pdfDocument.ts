@@ -4,17 +4,13 @@ import hankenRegular from "../assets/fonts/HankenGrotesk-Regular.ttf";
 import hankenSemiBold from "../assets/fonts/HankenGrotesk-SemiBold.ttf";
 import schibstedBold from "../assets/fonts/SchibstedGrotesk-Bold.ttf";
 
-/** The chrome shared by `feedbackPdf.ts` (F-64) and `progressPdf.ts` (F-13):
- * geometry, palette from `index.css`, fonts, banner, headings, paragraphs and page
- * breaks, so a style change reaches both. Built in the browser because an
- * unconsented run is never stored (ADR 0066) and the download is its only copy. */
+/** The chrome shared by `feedbackPdf.ts` (F-64) and `progressPdf.ts` (F-13), palette from `index.css`. */
 
-/** A4 in millimetres, which is also the unit a document is built in. */
+/** A4, in millimetres. */
 export const PAGE = { width: 210, height: 297 };
 export const MARGIN = { left: 18, right: 18, top: 18, bottom: 20 };
 export const CONTENT_WIDTH = PAGE.width - MARGIN.left - MARGIN.right;
 
-/** The band at the top of the first page. */
 const BANNER_HEIGHT = 36;
 export const LINE_HEIGHT = 4.8;
 
@@ -22,59 +18,38 @@ export const NAVY: [number, number, number] = [3, 37, 62];
 export const BLUE: [number, number, number] = [50, 95, 127];
 export const MUTED: [number, number, number] = [91, 107, 120];
 export const RULE: [number, number, number] = [215, 226, 235];
-/** Not exported, unlike its neighbours: white is only ever drawn by the
- * banner in this module, and nothing outside it has asked for a paper
- * colour. */
 const WHITE: [number, number, number] = [255, 255, 255];
 export const INK: [number, number, number] = [30, 40, 50];
-/** The two tones the feedback page gives its point lists (`is-success` /
- * `is-danger` in index.css). Taken from there rather than invented, so a
- * printed list is the one the reader saw. */
+/** `is-success` / `is-danger` in index.css. */
 export const SUCCESS: [number, number, number] = [34, 96, 72];
 export const CAUTION: [number, number, number] = [154, 77, 20];
-/** `--color-brand-accent`. The one place it is allowed here: the "ai" of the
- * wordmark, exactly as on screen (see `BrandName.tsx`). */
+/** `--color-brand-accent`, for the wordmark's "ai" only. */
 const ACCENT: [number, number, number] = [255, 106, 0];
 
-/** The logo is a file in `public/` rather than a bundled asset, so it is
- * fetched by the same path the header's <img> uses. */
 const LOGO_URL = "/logo.png";
-/** The white tile the logo sits on inside the navy banner. Its strokes are
- * navy and blue, so it needs a light ground to be visible at all — the same
- * answer the favicon gives. */
+/** The logo needs a light ground inside the navy banner. */
 const LOGO_TILE = 18;
 const LOGO_PAD = 2;
 
-/**
- * Letter spacing of small uppercase lines in mm, matching `.feedback-section-eyebrow`
- * and `.metric-name` on screen; solid caps read as an abbreviation.
- */
+/** In mm, matching `.feedback-section-eyebrow` and `.metric-name`. */
 export const TRACKING = 0.2;
 
-/** What `heading` puts on the page, eyebrow to rule — the room a section
- * needs before anything of its own is drawn. */
+/** Eyebrow to rule. */
 export const HEADING_HEIGHT = 15;
 
-/** Exactly what the subsetted fonts carry. Anything else is dropped rather
- * than drawn: a missing glyph is an invisible gap, and a gap in a transcript is
- * worse than a visible replacement. */
+/** What the subsetted fonts carry; a missing glyph would be an invisible gap. */
 const SUPPORTED =
   /[ -~ -ÿĀ-ſ‐-―‘-„†-•…‹›€]/;
 
-/** Speech transcribed from German or English stays inside the subset, so this
- * is a guard and not a transformation — it only fires on something unexpected,
- * an emoji or a script the fonts do not cover. */
+/** A guard for emoji or uncovered scripts. */
 export function drawable(text: string): string {
   let out = "";
   for (const ch of text) out += SUPPORTED.test(ch) ? ch : "?";
   return out;
 }
 
-/** jsPDF wants a font and an image as base64, and the browser has no direct
- * route from an ArrayBuffer to one. Chunked because `String.fromCharCode` takes
- * its bytes as arguments, and a whole font at once overruns the argument limit.
- * The status is checked because a miss under the SPA is still a response with a
- * body, which would otherwise be base64ed into the document as a font. */
+/** Chunked, or `String.fromCharCode` overruns the argument limit. The status is
+ * checked: the SPA answers a miss with a page that would be embedded as a font. */
 async function loadBase64(url: string): Promise<string> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${url}: ${response.status}`);
@@ -86,10 +61,7 @@ async function loadBase64(url: string): Promise<string> {
   return btoa(binary);
 }
 
-/** The logo as a data URL, or null if it cannot be had. A report is worth
- * having without it, so a missing file costs the tile and nothing else — the
- * fonts, which decide how every line of it is set, are deliberately not
- * treated this leniently. */
+/** Null if missing: the report is worth having without it, unlike without the fonts. */
 async function loadLogo(): Promise<string | null> {
   try {
     return `data:image/png;base64,${await loadBase64(LOGO_URL)}`;
@@ -99,9 +71,7 @@ async function loadLogo(): Promise<string | null> {
   }
 }
 
-/** The app's faces under the two names a document then asks for: "app" in
- * normal and bold, and "display" for the titles. Both OFL and therefore
- * embeddable, subsetted to Latin plus the marks German uses. */
+/** "app" (normal, bold) and "display"; both OFL, subsetted to Latin plus German marks. */
 async function registerAppFonts(doc: jsPDF) {
   const faces: [string, string, string, string][] = [
     [hankenRegular, "HankenGrotesk-Regular.ttf", "app", "normal"],
@@ -115,9 +85,7 @@ async function registerAppFonts(doc: jsPDF) {
   });
 }
 
-/** The date in a file name: the reader's own day, in the order a downloads
- * list sorts by. Built from the local parts rather than from `toISOString`,
- * which would move a late-evening call to the next day. */
+/** Local parts: `toISOString` would move a late-evening call to the next day. */
 export function stamp(date: Date): string {
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}_${pad(date.getMonth() + 1)}_${pad(date.getDate())}`;
@@ -131,34 +99,21 @@ export interface ParagraphOptions {
   lineHeight?: number;
 }
 
-/**
- * A document being written, top to bottom. `y` is the one cursor; everything
- * that draws advances it. An accessor so helpers and caller share one number
- * instead of passing it back and forth as return values.
- */
+/** A document written top to bottom; `y` is the one cursor. */
 export interface Sheet {
   doc: jsPDF;
-  /** The vertical cursor, in millimetres from the top of the page. */
   y: number;
-  /** The last line a page may hold before it has to break. */
   readonly bottom: number;
-  /** Start a fresh page, with the running head and the footer on it. */
   nextPage(): void;
-  /** Break before drawing something that has to stay in one piece. */
+  /** Breaks first if `height` does not fit. */
   keep(height: number): void;
-  /** Body text, wrapped and broken across pages. */
   paragraph(text: string, options?: ParagraphOptions): void;
-  /** A section's heading, the shape `SectionHeading` gives it on screen: the
-   *  eyebrow above, the title under it, and a rule closing the row off. */
+  /** Eyebrow, title and rule, as `SectionHeading` on screen. */
   heading(eyebrow: string, name: string): void;
-  /** The label-and-value rows under the banner: what this document is about,
-   *  before anything is said about it. */
   facts(rows: [string, string][]): void;
 }
 
-/**
- * A new document with the banner on it. `title` also heads every later page.
- */
+/** `title` heads every later page too. */
 export async function openSheet(title: string): Promise<Sheet> {
   const { jsPDF: JsPDF } = await import("jspdf");
   const doc = new JsPDF({ unit: "mm", format: "a4" });
@@ -175,10 +130,7 @@ export async function openSheet(title: string): Promise<Sheet> {
     doc.text(`Seite ${page}`, PAGE.width - MARGIN.right, PAGE.height - 10, { align: "right" });
   };
 
-  /** The wordmark, set the way the app sets it: the display face, and the "ai"
-   * in the brand accent (`BrandName.tsx`). Three runs rather than one string,
-   * because only the middle one changes colour. It used to be a line of flat
-   * uppercase body text, which read as a label rather than as the mark it is. */
+  /** Three runs, because only the "ai" changes colour (`BrandName.tsx`). */
   const wordmark = (x: number, baseline: number) => {
     doc.setFont("display", "bold");
     doc.setFontSize(11);
@@ -195,16 +147,13 @@ export async function openSheet(title: string): Promise<Sheet> {
     }
   };
 
-  /** The first page carries the banner; every later one a rule, so a report
-   * keeps running rather than restarting. */
+  /** Banner on the first page, a rule on every later one. */
   const startPage = (first: boolean) => {
     if (first) {
       doc.setFillColor(...NAVY);
       doc.rect(0, 0, PAGE.width, BANNER_HEIGHT, "F");
 
-      // The logo centred in the band, the title block set beside it. Without
-      // the logo that block simply takes the margin back, so a failed fetch
-      // leaves a banner that still looks deliberate.
+      // Without the logo the title block takes the margin back.
       const tileTop = (BANNER_HEIGHT - LOGO_TILE) / 2;
       let textLeft = MARGIN.left;
       if (logo) {
@@ -275,8 +224,7 @@ export async function openSheet(title: string): Promise<Sheet> {
       const lines: string[] = doc.splitTextToSize(drawable(text), CONTENT_WIDTH - indent);
       for (const line of lines) {
         if (y > bottom) nextPage();
-        // Re-set after a page break, which leaves the running head's face
-        // current.
+        // Re-set after a page break.
         doc.setFont("app", style);
         doc.setFontSize(size);
         doc.setTextColor(...colour);
@@ -285,12 +233,7 @@ export async function openSheet(title: string): Promise<Sheet> {
       }
     },
     heading(eyebrow: string, name: string) {
-      // The heading plus two lines of whatever follows: a title alone at the
-      // foot of a page announces nothing.
       sheet.keep(24);
-      // Blue and tracked out, as `.feedback-section-eyebrow` is on screen —
-      // not muted grey. The eyebrow is the section's label, and a grey one
-      // reads as a footnote to the title under it.
       doc.setFont("app", "bold");
       doc.setFontSize(7.5);
       doc.setTextColor(...BLUE);

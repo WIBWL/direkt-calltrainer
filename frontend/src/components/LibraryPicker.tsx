@@ -14,7 +14,7 @@ import {
 import { formatDayMonth } from "../utils/time";
 import FilterSlider, { type FilterOption } from "./FilterSlider";
 
-/** Static labels; the "tenant" option is labelled with the company name. */
+/** "tenant" is labelled with the company name. */
 const ORIGIN_LABELS: Record<Exclude<LibraryFilter, "tenant">, string> = {
   recommended: "Empfehlungen",
   all: "Alle",
@@ -24,12 +24,10 @@ const ORIGIN_LABELS: Record<Exclude<LibraryFilter, "tenant">, string> = {
   reverse: "Rollentausch",
 };
 
-/** How many tiles the collapsed grid shows: two full rows of three. The rest open from a
- * button under the grid, not a tile, so it is never mistaken for a case to pick. */
+/** Two rows of three; the rest open from a button, never mistaken for a case. */
 const COLLAPSED_TILES = 6;
 
-/** Dates the call a reverse replays and names its Persona, so two reverses of
- * the same Scenario are told apart. */
+/** Tells two reverses of one Scenario apart. */
 function reverseSubtitle(card: ScenarioCard): string {
   if (!card.origin_session) return "Ursprungsgespräch gelöscht";
   const { started_at, persona } = card.origin_session;
@@ -40,33 +38,24 @@ interface LibraryPickerProps {
   items: ScenarioCard[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  /** Level 1: origin. */
   filter: LibraryFilter;
   onFilter: (f: LibraryFilter) => void;
   originCounts: Record<LibraryFilter, number>;
-  /** Level 2: thematic category. */
   category: CategoryFilter;
   onCategory: (c: CategoryFilter) => void;
   categoryCounts: Record<CategoryFilter, number>;
-  /** Whether anything is suggested; without a basis there is no such option. */
   showRecommended: boolean;
-  /** The caller's company name (ADR 0060); null = default tenant, no company
-   * option or badge. */
+  /** ADR 0060; null = no company option. */
   tenantName: string | null;
   newLabel: string;
   onNew: () => void;
-  /** Open the read-only info panel. Editing is reached from inside it
-   * (ADR 0062), so the card carries no separate edit affordance. */
+  /** Editing is reached from the info panel (ADR 0062). */
   onInfo: (id: string) => void;
-  /** Offer the random Scenario tile (F-62). Decided by the caller, not here:
-   * the tile draws only from the drawable rows among what these filters show
-   * (`isDrawable`), and the caller is where that pool is built. */
+  /** F-62; the caller builds the drawable pool. */
   offerRandom?: boolean;
 }
 
-/** The card's origin, also the suffix of its `card-origin-` class (tile and badge colour);
- * not the level-2 category. The two system-written kinds come first: both are
- * `origin: "own"`, and that is the distinction the badge makes. */
+/** Also the `card-origin-` class suffix. The system-written kinds come first: both are `origin: "own"`. */
 function badgeClass(card: ScenarioCard): string {
   if (card.reverse) return "reverse";
   if (card.follow_up) return "follow-up";
@@ -82,11 +71,7 @@ function badgeLabel(card: ScenarioCard, tenantName: string | null): string {
   return "Standard";
 }
 
-/**
- * The Scenario selection grid: two independent filter rows (origin, then kind of call), a
- * "new" button, and badged cards with an "i" for the info panel (ADR 0058/0060/0062/0069).
- * What each option matches lives in `scenarioLibrary.ts` (`matchesFilter`, `matchesCategory`).
- */
+/** Two independent filter rows, a "new" button and badged cards (ADR 0058/0060/0062/0069). */
 export default function LibraryPicker({
   items,
   selectedId,
@@ -104,14 +89,11 @@ export default function LibraryPicker({
   onInfo,
   offerRandom = false,
 }: LibraryPickerProps) {
-  // The grid opens on `COLLAPSED_TILES`; the rest is behind the button under
-  // it. Collapsed again whenever the filters change, because which rows come
-  // first has changed with them.
+  // Collapsed again when the filters change.
   const [expanded, setExpanded] = useState(false);
   useEffect(() => setExpanded(false), [filter, category]);
 
-  // The random tile is a case to pick like the others, so it takes one of the
-  // six places rather than adding a seventh.
+  // The random tile takes one of the six places.
   const cards = offerRandom ? COLLAPSED_TILES - 1 : COLLAPSED_TILES;
   const hidden = items.length - cards;
   const shown = expanded ? items : items.slice(0, cards);
@@ -121,17 +103,13 @@ export default function LibraryPicker({
   const goalTitle = (key: string) => focus?.goals.find((g) => g.key === key)?.title ?? key;
 
   const originOptions = LIBRARY_FILTERS.flatMap<FilterOption<LibraryFilter>>((f) => {
-    // The suggestions lead the row, and only when there are any (F-62): a chip
-    // that filters down to nothing is a promise the screen cannot keep.
+    // Only when there are suggestions: an empty chip is a broken promise (F-62).
     if (f === "recommended") {
       return showRecommended
         ? [{ value: f, label: ORIGIN_LABELS.recommended, count: originCounts.recommended }]
         : [];
     }
-    // The company's chip is the other one that can be absent — it is offered
-    // only to a caller who has colleagues to share with (ADR 0060), and it is
-    // labelled with the company's own name rather than a static word.
-    // `flatMap` so it drops out of the middle of the row without leaving a gap.
+    // Only for a caller with colleagues (ADR 0060), named after the company.
     if (f === "tenant") {
       return tenantName ? [{ value: f, label: tenantName, count: originCounts.tenant }] : [];
     }
@@ -179,19 +157,12 @@ export default function LibraryPicker({
       </div>
 
       {items.length === 0 && !offerRandom && (
-        // Only when the grid is genuinely bare. The pool is drawn from this
-        // same filtered set, so an empty `items` already implies no tile — the
-        // second condition is there because this line claiming an empty library
-        // above a visible card is exactly what got it removed once before, and
-        // that must not come back through a changed caller.
+        // Only when the grid is genuinely bare, random tile included.
         <p className="library-empty">Zu dieser Auswahl gibt es kein Szenario.</p>
       )}
 
       <div className="persona-grid scenario-grid">
-        {/* First, and in a fixed place: it is the one tile whose position must
-            not move as the filters do, because nothing on screen leads to it.
-            It is also the only card that says what it is *for* rather than what
-            it is about — there is nothing to say about a case not yet drawn. */}
+        {/* First and fixed: nothing on screen leads to it. */}
         {offerRandom && (
           <div className="card-wrap">
             <button
@@ -239,12 +210,9 @@ export default function LibraryPicker({
                   {recommendationReason(card.recommendation, goalTitle)}
                 </span>
               )}
-              {/* Unclassed: its colours come from the card's own origin class,
-                  so the badge and the tile it sits on cannot disagree. */}
+              {/* Coloured by the card's origin class. */}
               <span className="card-badge">{badgeLabel(card, tenantName)}</span>
             </button>
-            {/* Every Scenario is readable (ADR 0062), so the "i" is on every
-                card. */}
             <button
               type="button"
               className="card-info"
@@ -258,11 +226,7 @@ export default function LibraryPicker({
         ))}
       </div>
 
-      {/* Under the grid, not in it: it opens the rest of the library rather
-          than being part of it. It looks like the training history's control
-          but does less — everything is already here, so this only unfolds it,
-          where that one fetches the next page. Hence "Alle" and not
-          "Weitere": one press and the grid is complete. */}
+      {/* "Alle", not "Weitere": everything is loaded, this only unfolds it. */}
       {hidden > 0 && (
         <button
           type="button"

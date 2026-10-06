@@ -16,11 +16,8 @@ import PartsStrip from "./PartsStrip";
 import SectionHeading from "./SectionHeading";
 import Sparkline from "./Sparkline";
 
-/**
- * Every metric over time, one row each (block C of the dashboard): a sparkline table fits all sixteen on one
- * screen at comparable size, and is the better accessible form. The two families are row groups headed in
- * their hue; colour is identity, never a value (`utils/metricGroups`).
- */
+/** Block C: every metric over time, one sparkline row each, grouped by family.
+ * Colour is identity, never a value (`utils/metricGroups`). */
 export default function ProgressMetricTable({ series }: { series: MetricSeries[] }) {
   if (series.length === 0) {
     return (
@@ -39,9 +36,7 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
     );
   }
 
-  // Delivery first, as the post-call screen opens on it: the reading the
-  // transcript cannot give. Within a group the order is the backend's own
-  // inventory order, which is the order the series arrive in.
+  // Delivery first, as on the post-call screen; inventory order within.
   const groups: MetricGroup[] = ["speech", "content"];
 
   return (
@@ -52,8 +47,7 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
       />
 
       <div className="card metric-table-card">
-        {/* Scrolls inside itself on a narrow screen rather than pushing the
-            page sideways: five columns do not reflow into anything readable. */}
+        {/* Scrolls inside itself: five columns do not reflow. */}
         <div className="metric-table-scroll">
           <table className="metric-table">
             <thead>
@@ -97,9 +91,7 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
         </div>
       </div>
 
-      {/* The one sentence that must be read with the usual-range column stays
-          in view, since that heading alone could pass for a target. The rest is
-          how the table was made. */}
+      {/* In view, since "usual range" alone could pass for a target. */}
       <p className="muted progress-note">
         Der übliche Bereich ist aus Ihren eigenen Trainings gerechnet und ist kein Ziel.
       </p>
@@ -137,14 +129,10 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
   );
 }
 
-/**
- * One metric. The name is the link — the row's one real control for keyboard and screen reader; the rest of
- * the row also takes a click as a mouse convenience.
- */
+/** The name is the row's real control; the rest takes a click as a mouse convenience. */
 function MetricRow({ series }: { series: MetricSeries }) {
   const navigate = useNavigate();
-  // The selection travels with the link, so the page behind it is drawn over
-  // the same trainings this row was (see ProgressContext.tsx).
+  // The selection travels with the link.
   const { withPeriod } = useProgressContext();
   const path = withPeriod(progressMetricPath(series.key));
   const last = series.points[series.points.length - 1];
@@ -154,7 +142,6 @@ function MetricRow({ series }: { series: MetricSeries }) {
     <tr
       className="metric-table-row"
       onClick={(event) => {
-        // The link handles its own click; everything else in the row forwards.
         if ((event.target as HTMLElement).closest("a")) return;
         navigate(path);
       }}
@@ -186,9 +173,7 @@ function MetricRow({ series }: { series: MetricSeries }) {
   );
 }
 
-/** The fourth column: the user's own usual range, or for a checklist how often
- *  it was complete. A dash where neither can be said yet, rather than a range
- *  over two values that describes nothing. */
+/** A dash rather than a range over two values. */
 function bandText(series: MetricSeries): string {
   if (series.shape === "parts") return partsSummary(series) ?? "–";
   return formatBand(series) ?? "–";

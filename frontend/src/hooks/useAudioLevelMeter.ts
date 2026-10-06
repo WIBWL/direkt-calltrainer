@@ -1,17 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-/** What is being metered, plus a scratch buffer sized for it. The two are made
- * together so a new analyser can never be read through the previous one's
- * buffer, and the buffer is reused so the frame loop allocates nothing.
- * The sample type is inferred rather than written out: which `Uint8Array` the
- * DOM's `getByteTimeDomainData` accepts differs between TypeScript versions. */
+/** Made together, so a new analyser is never read through the old buffer; reused, so frames allocate nothing. */
 function meterSource(analyser: AnalyserNode) {
   return { analyser, samples: new Uint8Array(analyser.fftSize) };
 }
 
 type MeterSource = ReturnType<typeof meterSource>;
 
-/** RMS amplitude (0..1) of the analyser's current time-domain window. */
 function readRms({ analyser, samples }: MeterSource): number {
   analyser.getByteTimeDomainData(samples);
 
@@ -24,17 +19,12 @@ function readRms({ analyser, samples }: MeterSource): number {
   return Math.sqrt(sumSquares / samples.length);
 }
 
-/**
- * Samples an AnalyserNode once per animation frame and exposes its amplitude
- * as a normalized 0..1 `level`. Used for the mic check and persona playback;
- * `gain` scales the raw RMS (speech RMS is small) before it is clamped.
- */
+/** The analyser's amplitude per animation frame, as 0..1; `gain` scales the small speech RMS. */
 export function useAudioLevelMeter(gain = 1) {
   const [level, setLevel] = useState(0);
   const frameRef = useRef<number | null>(null);
   const sourceRef = useRef<MeterSource | null>(null);
 
-  /** Ends the loop and drops the level back to silence. */
   const stop = useCallback(() => {
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
     frameRef.current = null;
@@ -42,9 +32,7 @@ export function useAudioLevelMeter(gain = 1) {
     setLevel(0);
   }, []);
 
-  /** Arms the meter on `analyser`. Safe to call per audio chunk: a loop that
-   * is already running is not stacked, it is re-pointed — so handing over a
-   * *different* analyser meters that one, rather than being ignored. */
+  /** Safe per audio chunk: a running loop is re-pointed, not stacked. */
   const start = useCallback(
     (analyser: AnalyserNode) => {
       if (sourceRef.current?.analyser !== analyser) {
@@ -64,7 +52,7 @@ export function useAudioLevelMeter(gain = 1) {
     [gain],
   );
 
-  // The loop outlives the component otherwise — it re-arms itself every frame.
+  // The loop re-arms itself every frame.
   useEffect(() => stop, [stop]);
 
   return { level, start, stop };

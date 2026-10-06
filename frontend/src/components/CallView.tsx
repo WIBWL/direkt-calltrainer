@@ -7,15 +7,13 @@ import CallAnimation from "./CallAnimation";
 import ConfirmDialog from "./ConfirmDialog";
 import PersonaAvatar from "./PersonaAvatar";
 
-/** A reverse's briefing stays beside the call, since the trainee works from
- * it throughout; an ordinary call's facts follow below it. */
+/** A reverse's briefing beside the call (worked from throughout), an ordinary call's facts below. */
 export type BriefPlacement = "beside" | "below";
 
 interface CallViewProps {
   personaName: string;
   personaRole: string;
-  /** The Persona's portrait. Null after a reload, where the selection is gone
-   * and only the stored name is left — the initials stand in then. */
+  /** Null after a reload; the initials stand in. */
   personaAvatarUrl: string | null;
   isMicrophoneMuted: boolean;
   callState: CallState;
@@ -23,18 +21,11 @@ interface CallViewProps {
   error: string | null;
   onToggleMicrophone: () => void;
   onEndCall: () => void;
-  /** Supporting information shown during the call — a reverse's briefing
-   * (ADR 0070) or an ordinary call's facts — with where it goes, or null.
-   * Passed in rather than fetched here so this screen stays presentational;
-   * one prop so the panel and its position cannot disagree. */
+  /** A reverse's briefing (ADR 0070) or an ordinary call's facts; one prop, so panel and position agree. */
   brief?: { content: ReactNode; placement: BriefPlacement } | null;
 }
 
-/**
- * Presentational: the live-call screen (F-46 — mic status, call duration, end-call
- * button). It names no Scenario. The Session is owned at the App level so it can be
- * pre-warmed; the timer therefore counts from mount, a few seconds late at most.
- */
+/** The live-call screen (F-46). It names no Scenario. The timer counts from mount. */
 export default function CallView({
   personaName,
   personaRole,
@@ -48,15 +39,9 @@ export default function CallView({
   brief = null,
 }: CallViewProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  // The end-call button asks first. A call cannot be resumed once it is over —
-  // the socket is torn down and the Session is written — and the button sits a
-  // few pixels from the mute toggle, which is pressed mid-conversation. So the
-  // one control that cannot be undone is the one that asks.
+  // Asks first: the call cannot be resumed, and the button sits by the mute toggle.
   const [confirmingEnd, setConfirmingEnd] = useState(false);
 
-  // Escape goes back to the call, the way it closes every other dialog in the
-  // app. Nothing else on this screen listens for it, so there is no ordering
-  // to keep here (see the note in ConfirmDialog).
   useEffect(() => {
     if (!confirmingEnd) return undefined;
     const onKey = (e: KeyboardEvent) => {
@@ -78,14 +63,7 @@ export default function CallView({
 
   return (
     <>
-      {/* No heading above the panel and no Scenario name anywhere: a page
-          title over a phone call is a caption, and the person on the line is
-          in the panel itself. It also means a random Scenario's case cannot
-          leak here by construction rather than by a condition (F-62). */}
-
-      {/* Ordinary case facts follow the conversation so the live call keeps visual
-          priority. A reverse briefing remains beside it because the trainee works
-          from that information throughout the conversation (ADR 0070). */}
+      {/* No Scenario name anywhere, so a random Scenario cannot leak (F-62). */}
       <div
         className={cx(
           "call-layout",
@@ -101,8 +79,6 @@ export default function CallView({
             />
 
             <div className="call-persona-details">
-              {/* The page's heading: this screen is about the person on the
-                  line. */}
               <h1 id="call-persona-name">{personaName}</h1>
               <p>{personaRole}</p>
             </div>
@@ -129,7 +105,6 @@ export default function CallView({
             </p>
           )}
 
-          {/* The toggle state reflects whether local VAD microphone capture is paused. */}
           <div className="call-controls">
             <button
               className={cx("mute-call-button", isMicrophoneMuted && "is-muted")}
@@ -137,7 +112,6 @@ export default function CallView({
               aria-pressed={isMicrophoneMuted}
               onClick={onToggleMicrophone}
             >
-              {/* Decorative because the adjacent text already names the control. */}
               <svg
                 className="mute-call-icon"
                 viewBox="0 0 24 24"
@@ -161,8 +135,7 @@ export default function CallView({
                   strokeLinejoin="round"
                 />
 
-                {/* The slash appears only while muted, so the icon mirrors the button state
-                    without relying on colour alone. */}
+                {/* The slash, so the icon does not rely on colour. */}
                 {isMicrophoneMuted && (
                   <path
                     className="mute-call-icon-slash"
@@ -195,8 +168,6 @@ export default function CallView({
         {brief?.content}
       </div>
 
-      {/* Its own scrim rather than the panel's: the question is about the call
-          as a whole, and the call is the whole screen. */}
       {confirmingEnd && (
         <div className="call-confirm-scrim">
           <ConfirmDialog
@@ -204,13 +175,9 @@ export default function CallView({
             body="Das Gespräch wird beendet und ausgewertet."
             cancelLabel="Gespräch fortsetzen"
             confirmLabel="Gespräch beenden"
-            // Red for the end: a call cannot be resumed once the socket is
-            // torn down. Carrying on stays plain — it is where the User was.
             destructive
             onCancel={() => setConfirmingEnd(false)}
-            // Closed before the call is ended rather than left to unmount with
-            // the screen: if the socket never answers, a dialog that only goes
-            // away with the next screen would never go away.
+            // Closed first: a socket that never answers would keep it open forever.
             onConfirm={() => {
               setConfirmingEnd(false);
               onEndCall();

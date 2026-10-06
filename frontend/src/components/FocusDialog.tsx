@@ -5,11 +5,7 @@ import AppHeader from "./AppHeader";
 import FocusGoalPicker, { toggleGoal } from "./FocusGoalPicker";
 import FocusProfilePicker from "./FocusProfilePicker";
 
-/**
- * The training focus, asked once at first start (F-62, ADR 0076). Picking nothing is
- * offered as plainly as picking something, and a focus *adds* emphasis rather than
- * switching the rest off. The action bar stays put while the list scrolls.
- */
+/** Asked once (F-62, ADR 0076); picking nothing is offered as plainly as picking something. */
 export default function FocusDialog({
   focus,
   onChoose,
@@ -26,9 +22,7 @@ export default function FocusDialog({
   });
   const [failed, setFailed] = useState(false);
 
-  // Awaited rather than fired and forgotten: a rejected promise would go
-  // unhandled and the screen would sit there looking as if the click worked.
-  // Role and call types go with either button: "no focus" is about the goals.
+  // Awaited, so a rejection is not lost. Role and call types go with either button.
   const submit = async (goals: string[]) => {
     setFailed(false);
     try {
@@ -80,9 +74,7 @@ export default function FocusDialog({
         </section>
       </main>
 
-      {/* Kept outside the content card so the tally and both answers remain
-          available while the catalogue scrolls without covering the card's
-          lower edge or exposing the page background beneath it. */}
+      {/* Outside the card, so the answers stay in reach while the list scrolls. */}
       <div className="focus-actions-bar">
         <div className="focus-actions-inner">
           <div className="focus-actions-copy">

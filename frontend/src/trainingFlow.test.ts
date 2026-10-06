@@ -2,13 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { briefingFollows, nextScreen, type FlowContext, type FlowEvent } from "./trainingFlow";
 
-/**
- * The training flow's transition table. `tsc` sees that a transition returns
- * *a* screen, not the right one. No React, no harness: everything the flow
- * routes on is passed in.
- */
+/** The training flow's transition table: `tsc` sees *a* screen, not the right one. */
 
-/** An ordinary call: not a reverse, not drawn, a case with something in it. */
 const BASE: FlowContext = {
   reverse: false,
   drawn: false,
@@ -18,7 +13,6 @@ const BASE: FlowContext = {
 
 const ctx = (over: Partial<FlowContext> = {}): FlowContext => ({ ...BASE, ...over });
 
-/** An ordinary commit from the setup screen: not a reverse, check not skipped. */
 const commit = (over: { reverse?: boolean; skipMicCheck?: boolean } = {}): FlowEvent => ({
   type: "sessionCommitted",
   reverse: false,
@@ -49,8 +43,7 @@ describe("committing to a pairing", () => {
   });
 
   it("reads the commit's facts off the event, not off a context still behind it", () => {
-    // The press that commits is the one that sets the committed Session, so
-    // render state says "not a reverse" at that moment. The event decides.
+    // At the press render state still says "not a reverse"; the event decides.
     expect(nextScreen(ctx({ reverse: false }), commit({ skipMicCheck: true, reverse: true })).screen)
       .toBe("brief");
   });
@@ -99,9 +92,7 @@ describe("confirming the microphone check", () => {
   });
 
   it("stops at the case while it is still being fetched", () => {
-    // Null is not "nothing": skipping a case that turns out to hold something
-    // cannot be undone, so the safe answer is to stop. `caseArrivedEmpty`
-    // moves on a moment later if it turns out to be empty.
+    // Null may still hold something; skipping it cannot be undone.
     expect(nextScreen(ctx({ committedCase: null }), MIC_CONFIRMED).screen)
       .toBe("case-brief");
   });
@@ -113,11 +104,7 @@ describe("confirming the microphone check", () => {
 });
 
 describe("the button's label", () => {
-  /**
-   * The defect this module was extracted to remove: label and router read
-   * different sources, so the label promised a call and delivered a page of
-   * text (see `MicCheck`). Both now ask this function.
-   */
+  /** Label and router once read different sources (see `MicCheck`). */
   it("agrees with where the press actually leads, for every context", () => {
     const cases: FlowContext[] = [
       ctx(),
@@ -137,7 +124,6 @@ describe("the button's label", () => {
   });
 
   it("promises a briefing for facts without a card briefing", () => {
-    // The regression itself: this combination used to read "start the call".
     const factsOnly = ctx({ committedCase: { briefing: null, facts: "Vertrag läuft aus." } });
     expect(briefingFollows(factsOnly)).toBe(true);
   });
@@ -155,9 +141,7 @@ describe("the way out of a call", () => {
 
 describe("reaching the call", () => {
   it("is only possible by accepting it", () => {
-    // The three things App does on the way in -- unmute, activate playback,
-    // send session.activate -- hang off this one event. Nothing else may
-    // return "call", or they could be bypassed.
+    // App's entry steps hang off this one event, so nothing else may return "call".
     const events: FlowEvent[] = [
       commit(),
       commit({ skipMicCheck: true }),

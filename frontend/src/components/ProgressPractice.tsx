@@ -10,11 +10,9 @@ import { PRACTICE_CATEGORY, PRACTICE_REASON } from "../utils/practiceRoutes";
 import { formatDayMonth } from "../utils/time";
 import InfoDetails from "./InfoDetails";
 
-/**
- * Block E: one thing to practise next, always naming its ground, else it is an instruction (ADR 0004, ADR 0065).
- * Routes (concept 5.E): the follow-up (F-60) from the training that last named it, else a Scenario of the goal's
- * kind (`PRACTICE_CATEGORY`, unplayed first), else any unplayed one. Persona held constant from that training.
- */
+/** Block E: one thing to practise next, always naming its ground (ADR 0004/0065).
+ * The follow-up (F-60) of the training that last named it, else a Scenario of the
+ * goal's kind, else any unplayed one; the Persona from that training. */
 export default function ProgressPractice({
   sessions,
   catalogue,
@@ -28,22 +26,17 @@ export default function ProgressPractice({
   const { improvements } = mentionSummary(sessions);
   const target = improvements[0] ?? null;
   const source = target ? lastNaming(sessions, target.goal) : null;
-  // The detail of that one training, for its follow-up and its Persona. Called
-  // unconditionally with null when there is no candidate, which the hook takes.
+  // Null without a candidate, which the hook takes.
   const { detail } = useStoredSession(source?.session_id ?? null);
 
-  // Keyed on whether there is a target rather than on the target object, which
-  // `mentionSummary` rebuilds on every render: as a dependency it would re-run
-  // this after every response and fetch the library in a loop. Which goal it is
-  // does not change what is fetched.
+  // A boolean: `mentionSummary` rebuilds the target every render, which would loop the fetch.
   const hasTarget = target !== null;
   useEffect(() => {
     if (!hasTarget) return;
     let cancelled = false;
     listScenarios()
       .then((cards) => !cancelled && setLibrary(cards))
-      // A failed library leaves route 1 working and the others silent, which is
-      // better than an error box on a block that is an offer to begin with.
+      // An offer fails silently rather than with an error box.
       .catch(() => !cancelled && setLibrary([]));
     return () => {
       cancelled = true;
@@ -54,8 +47,7 @@ export default function ProgressPractice({
 
   const goal = catalogue.find((entry) => entry.key === target.goal);
   const category = target.goal in PRACTICE_CATEGORY ? PRACTICE_CATEGORY[target.goal] : undefined;
-  // Absent from the editorial table: somebody added a goal and did not decide
-  // what it is practised in. Silence is the honest answer, not a random call.
+  // A goal nobody mapped to a call type: silence, not a random call.
   if (category === undefined) return null;
 
   const since = wordSince(sessions, target.goal, source);
@@ -67,16 +59,13 @@ export default function ProgressPractice({
 
   if (!suggestion || !personaId) return null;
 
-  // A band under the recurring block's two lists rather than a section of its
-  // own (see `ProgressRecurring`), headed the way those lists are.
   return (
     <section className="card" aria-labelledby="practice-title">
       <h3 className="recurring-heading" id="practice-title">
         Als Nächstes üben
       </h3>
 
-      {/* Ground, then offer, then button, in one column: a suggestion whose ground the reader has not seen
-          is an instruction. */}
+      {/* Ground before offer: an unexplained suggestion is an instruction. */}
       <div className="progress-practice-band">
         <p className="progress-practice-why">
           <span className="progress-practice-chip">Vorschlag</span>
@@ -87,8 +76,7 @@ export default function ProgressPractice({
         </p>
 
         {since && (
-          // Looks back (Zimmerman's cycle): the wrap-ups raised this, and afterwards a wrap-up said this.
-          // Causation is never claimed — that would be the measurement ADR 0080 refuses.
+          // Never claims causation (ADR 0080).
           <p className="progress-practice-since">
             <span className="progress-practice-chip">Seither</span>
             In Ihrem Training am {formatDayMonth(since.at) ?? since.at} („{since.scenario}“)
@@ -109,16 +97,10 @@ export default function ProgressPractice({
 
           <button
             type="button"
-            // `consent-button` is the app's primary button, misnamed after the
-            // screen it first stood on. The `button-primary` that used to be
-            // here is styled nowhere, so this rendered as a bare browser
-            // button.
+            // `consent-button` is the app's primary button, misnamed.
             className="consent-button consent-button-primary progress-practice-start"
             onClick={() => {
-              // The same door the history uses to start a follow-up: the two
-              // screens are separate routes, so the pairing travels as location
-              // state and the training screen consumes it once (see
-              // `TrainingStart`).
+              // Handed over as location state (`TrainingStart`).
               const start: TrainingStart = { scenarioId: suggestion.id, personaId };
               navigate(ROUTES.training, { state: { start } });
             }}
@@ -128,11 +110,7 @@ export default function ProgressPractice({
         </div>
       </div>
 
-      {/* The line calling this a suggestion and not an instruction stays in
-          view: it is what keeps the button above from reading as an order. How
-          the suggestion was put together is background and sits behind the "i",
-          on the same line — two trailing rows each with their own weight made
-          the foot of the block heavier than the offer in it. */}
+      {/* "A suggestion, not an instruction" stays in view; the method sits behind the "i". */}
       <div className="progress-practice-foot">
         <p className="progress-practice-note">
           Ein Vorschlag, keine Vorgabe. Über die Startseite können Sie jederzeit etwas anderes
@@ -156,8 +134,7 @@ export default function ProgressPractice({
   );
 }
 
-/** The most recent training whose wrap-up named this goal as an improvement.
- *  The listing is newest first, so the first match is the latest. */
+/** The listing is newest first, so the first match is the latest. */
 function lastNaming(sessions: SessionSummary[], goal: string): SessionSummary | null {
   return (
     sessions.find((session) =>
@@ -166,11 +143,7 @@ function lastNaming(sessions: SessionSummary[], goal: string): SessionSummary | 
   );
 }
 
-/**
- * What a wrap-up has said about this goal since the suggestion's training, or null. Derived, never stored (a
- * stored press would be per-device or training data, ADR 0066). `source` is the newest training naming the goal,
- * so a newest statement from a later training is the case worth showing.
- */
+/** Derived, never stored: a stored press would be training data (ADR 0066). */
 function wordSince(
   sessions: SessionSummary[],
   goal: string,
@@ -181,10 +154,7 @@ function wordSince(
   return newest;
 }
 
-/**
- * A Scenario of the right kind, unplayed first (else the least recently played). Matched on the title, the one
- * thing both the history row and the library card carry; a duplicate title only costs a worse suggestion.
- */
+/** Unplayed first, else least recently. Matched on title, which both row and card carry. */
 function pickScenario(
   library: ScenarioCard[] | null,
   sessions: SessionSummary[],
@@ -193,8 +163,7 @@ function pickScenario(
   if (!library || library.length === 0) return null;
 
   const played = new Set(sessions.map((session) => session.scenario));
-  // Reverses are excluded: one replays a specific call and cannot be handed out
-  // as general practice (ADR 0070).
+  // A reverse replays one specific call (ADR 0070).
   const usable = library.filter((card) => !card.reverse);
   const ofKind = category ? usable.filter((card) => card.category === category) : usable;
   const pool = ofKind.length > 0 ? ofKind : usable;

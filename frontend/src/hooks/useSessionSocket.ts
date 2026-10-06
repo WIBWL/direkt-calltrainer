@@ -4,27 +4,18 @@ import { currentAccessToken } from "../auth";
 import { apiUrl } from "../config";
 import type { CallState, ClientMessage, ServerMessage, TranscriptEntry } from "../protocol";
 
-// On the backend's origin (config.ts), or the SPA's own when that is empty
-// (Vite proxies /ws in development). A browser sends no CORS preflight for a
-// WebSocket; the token rides in the first message, so a foreign page has no
-// credentials to borrow (ADR 0107).
+// The backend's origin, or the SPA's own when empty (Vite proxies /ws). The
+// token rides in the first message, so a foreign page has none to borrow (ADR 0107).
 const WS_URL =
   typeof window === "undefined"
     ? "/ws/session"
     : new URL("/ws/session", apiUrl || window.location.origin).href.replace(/^http/, "ws");
 
-/** The Session the user has committed to, as far as the connection is
- * concerned. A fresh object stands for a fresh Session: the connection is
- * keyed on this object's *identity*, not on its contents, so committing to
- * the same Persona/Scenario pairing twice still reconnects rather than
- * reusing the finished Session's socket. Don't memoize it. */
+/** Keyed on identity: committing to the same pairing twice still reconnects. Don't memoize it. */
 export interface CommittedSession {
   personaId: string;
   scenarioId: string;
-  /** Whether the committed Scenario is a reverse (ADR 0070). Client-side only:
-   * it decides whether the briefing panel is fetched and shown, and is never
-   * sent — the server reads the casting off the Scenario row, which is the one
-   * place it cannot be wrong. */
+  /** ADR 0070. Client-side only; the server reads the casting off the Scenario. */
   reverse: boolean;
 }
 
@@ -34,31 +25,22 @@ interface UseSessionSocketOptions {
   onEnded: (
     reason: "user" | "error" | "completed",
     transcript: TranscriptEntry[],
-    /** Names the persisted Session, for fetching its Feedback afterwards. */
     sessionId: string | null,
   ) => void;
 }
 
-/**
- * Owns the per-Session WebSocket (ADR 0033's wire protocol). Connects as soon
- * as a Session is committed to (ADR 0042), so a reverse's answering line
- * generates in the background while the user reads their briefing; an
- * ordinary call has nothing to prepare, the user speaks first (ADR 0110).
- */
+/** The per-Session WebSocket (ADR 0033). Connects on commit (ADR 0042), so a
+ * reverse's answering line generates while the user reads the briefing. */
 export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionSocketOptions) {
   const [callState, setCallState] = useState<CallState>("thinking");
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const turnSeqRef = useRef(0);
   const sessionIdRef = useRef<string | null>(null);
-  // After a barge-in, sentences of the cut-off reply are still in transit and
-  // must not be played (audio side of ADR 0035). Closed on sendInterrupt,
-  // reopened on the next `state: "speaking"`, which the wire order puts after
-  // every stale chunk.
+  // After a barge-in, chunks of the cut-off reply are still in transit (ADR 0035).
+  // Reopened on the next `state: "speaking"`, which follows every stale chunk.
   const acceptingAudioRef = useRef(true);
-  // `sendActivate` called before the socket opened (usual for F-60/F-61, which
-  // skip the mic check). Sent from `onopen`: dropping it would leave the server
-  // holding the opening line forever, with nothing on screen to say so.
+  // `sendActivate` before the socket opened (F-60/F-61 skip the mic check).
   const pendingActivateRef = useRef(false);
 
   useEffect(() => {
@@ -74,9 +56,8 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     ws.binaryType = "arraybuffer";
     wsRef.current = ws;
 
-    // An effect re-run (e.g. StrictMode) can replace this socket before it
-    // opens; its onerror/onclose then fire late. Without this guard the stale
-    // socket would show a permanent, false "connection lost".
+    // A StrictMode re-run can replace this socket before it opens; its late
+    // onerror/onclose must not show a false "connection lost".
     const isCurrent = () => wsRef.current === ws;
 
     ws.onopen = async () => {
@@ -97,8 +78,7 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
         token,
       };
       ws.send(JSON.stringify(start));
-      // Order matters: activate marks t=0 and must follow the handshake it
-      // belongs to, on the same socket.
+      // activate must follow the handshake, on the same socket.
       if (pendingActivateRef.current) {
         pendingActivateRef.current = false;
         console.debug("[WS] -> deferred session.activate");
@@ -109,8 +89,6 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     ws.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
       if (!isCurrent()) return;
       if (typeof event.data !== "string") {
-        // Dropped between a barge-in and the next reply: audio the server
-        // streamed ahead of the reply the user just cut off (see above).
         if (acceptingAudioRef.current) onAudioChunk(event.data);
         return;
       }
@@ -118,7 +96,6 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
       console.debug("[WS] <-", message);
       switch (message.type) {
         case "state":
-          // The next reply is starting: audio is wanted again.
           if (message.value === "speaking") acceptingAudioRef.current = true;
           setCallState(message.value);
           break;
@@ -156,15 +133,12 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reconnecting on every callback identity change would tear down the call
   }, [session]);
 
-  /** The socket, but only while it can actually carry a message. */
   const openSocket = useCallback(() => {
     const ws = wsRef.current;
     return ws && ws.readyState === WebSocket.OPEN ? ws : null;
   }, []);
 
-  /** Sends one JSON control message. Reports whether it went out rather than
-   * calling that a loss: a caller with a fallback for a closed socket
-   * (endSession) takes it, so only the caller knows what a `false` means. */
+  /** Reports whether it went out; only the caller knows what `false` means. */
   const send = useCallback(
     (message: ClientMessage): boolean => {
       const ws = openSocket();
@@ -179,8 +153,7 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     [openSocket],
   );
 
-  /** One recorded Turn: the meta message and the audio it describes, in that
-   * order and on the same socket (ADR 0033). */
+  /** Meta message, then audio, on the same socket (ADR 0033). */
   const sendTurnAudio = useCallback(
     (blob: Blob, mimeType: string) => {
       const ws = openSocket();
@@ -201,14 +174,10 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     [openSocket],
   );
 
-  /** Tells the server to stop the in-flight Turn (a user barge-in) and
-   * optimistically flips local state to "listening" right away. `playedMs` is
-   * how much of the persona's reply actually played before the cut-in, so the
-   * server commits only what was heard to the history (ADR 0035). */
+  /** Barge-in: flips local state to "listening" at once. `playedMs` bounds what
+   * the server keeps in the history (ADR 0035). */
   const sendInterrupt = useCallback(
     (playedMs: number) => {
-      // Stop forwarding the reply's audio right away: what is still in transit
-      // is the part of it the user just talked over.
       acceptingAudioRef.current = false;
       const sent = send({ type: "turn.interrupt", played_ms: Math.max(0, Math.round(playedMs)) });
       if (sent) setCallState("listening");
@@ -216,31 +185,24 @@ export function useSessionSocket({ session, onAudioChunk, onEnded }: UseSessionS
     [send],
   );
 
-  /** Marks t=0 on the Session's timeline: the opening line starts playing now.
-   * Held back rather than lost when the socket is not open yet (see
-   * `pendingActivateRef`); no other message can arrive that early. */
+  /** t=0 on the timeline; held until the socket opens. */
   const sendActivate = useCallback(() => {
     if (!send({ type: "session.activate" })) pendingActivateRef.current = true;
   }, [send]);
 
-  /** The user started speaking while the Persona was silent (ADR 0110). Lost
-   * on a closed socket, which is harmless: it only postpones a "Hallo?". */
+  /** ADR 0110. Lost on a closed socket, which only postpones a "Hallo?". */
   const sendSpeaking = useCallback(() => {
     send({ type: "user.speaking" });
   }, [send]);
 
   const endSession = useCallback(() => {
     if (send({ type: "session.end" })) return;
-    // The handshake never finished, so the server will never send
-    // session.ended — end locally instead, so the end-call button always
-    // works: in the brief window before the connection is established, and
-    // after the server refused the call and closed the socket (ADR 0109).
+    // No handshake, so no session.ended will come: end locally, before the
+    // connection is up or after a refusal (ADR 0109).
     if (sessionIdRef.current !== null) return;
     const ws = wsRef.current;
     console.debug("[WS] ending a call that never started");
     if (ws?.readyState === WebSocket.CONNECTING) ws.close();
-    // No handshake means no Session was ever created, let alone persisted,
-    // so there is no id and no Feedback to wait for.
     onEnded("user", [], null);
   }, [send, onEnded]);
 

@@ -10,8 +10,7 @@ vi.mock("../auth", () => ({
 
 const SESSION: CommittedSession = { personaId: "p1", scenarioId: "s1", reverse: false };
 
-/** Render the hook and take the socket through open + handshake + the server
- * announcing it has started speaking, so a binary frame next is "live" audio. */
+/** Through open, handshake and "speaking", so the next binary frame is live audio. */
 async function renderSpeakingSession() {
   const onAudioChunk = vi.fn();
   const onEnded = vi.fn();
@@ -50,7 +49,6 @@ describe("useSessionSocket audio gating on barge-in", () => {
     });
     expect(onAudioChunk).toHaveBeenCalledTimes(1);
 
-    // The user talks over the persona.
     act(() => {
       result.current.sendInterrupt(1200);
     });
@@ -60,8 +58,7 @@ describe("useSessionSocket audio gating on barge-in", () => {
         .some((m) => m.type === "turn.interrupt"),
     ).toBe(true);
 
-    // Everything the server streamed ahead keeps arriving — none of it is
-    // still wanted, the user cut the reply off.
+    // Streamed ahead; the user cut the reply off.
     act(() => {
       latestSocket().serverBinary();
       latestSocket().serverBinary();
@@ -69,8 +66,7 @@ describe("useSessionSocket audio gating on barge-in", () => {
     });
     expect(onAudioChunk).toHaveBeenCalledTimes(1);
 
-    // The reply to the barge-in begins: server goes thinking -> speaking, then
-    // sends its audio. That audio plays.
+    // The reply to the barge-in plays.
     act(() => {
       latestSocket().serverJson({ type: "state", value: "thinking" });
       latestSocket().serverJson({ type: "state", value: "speaking" });
@@ -81,9 +77,7 @@ describe("useSessionSocket audio gating on barge-in", () => {
 });
 
 describe("useSessionSocket after the server refuses the call", () => {
-  // ADR 0109: a caller over the open-call cap (or without the role) is told
-  // why in an `error` frame and the socket is closed before any Session
-  // exists. The end-call button must still leave the call screen.
+  // ADR 0109: refused before any Session exists; the end-call button must still leave.
   async function renderRefusedSession() {
     const onEnded = vi.fn();
     const view = renderHook(() =>
@@ -117,8 +111,7 @@ describe("useSessionSocket after the server refuses the call", () => {
   });
 
   it("does not end locally a call that had started and then lost its socket", async () => {
-    // That one has a Session on the server, stored as aborted; inventing an
-    // ending here would send the screen to a wrap-up of a call that has none.
+    // That one is stored as aborted; inventing an ending would show a wrap-up that does not exist.
     const { result, onEnded } = await renderSpeakingSession();
     act(() => {
       latestSocket().close();

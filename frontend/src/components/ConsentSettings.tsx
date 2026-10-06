@@ -2,11 +2,7 @@ import { useState } from "react";
 
 import { useConsentContext } from "../ConsentContext";
 
-/**
- * The storage decision on the profile page (ADR 0066). Withdrawal is confirmed in a step
- * that says what it destroys: consent is the only basis for keeping the data, so it
- * deletes the stored trainings. Granting again takes nothing away and is not confirmed.
- */
+/** Withdrawal deletes the stored trainings (ADR 0066), so it is confirmed; granting is not. */
 export default function ConsentSettings() {
   const { consent, saving, decide } = useConsentContext();
   const [confirming, setConfirming] = useState(false);
@@ -40,9 +36,7 @@ export default function ConsentSettings() {
         </span>
       </p>
 
-      {/* One line each: what is stored, and where it goes, is said once in the
-          "Ihre Daten" card below. Repeating it here would be a second copy to
-          keep in step with the privacy statement. */}
+      {/* What is stored is said once, in the "Ihre Daten" card. */}
       {consent.allows_storage ? (
         <p>Abgeschlossene Trainings werden gespeichert.</p>
       ) : (
@@ -69,11 +63,7 @@ export default function ConsentSettings() {
       {consent.allows_storage ? (
         confirming ? (
           <div className="consent-confirm">
-            {/* A Reverse is named separately (ADR 0070): it is a Scenario
-                rather than a training, yet a withdrawal takes it too, since its
-                brief is written from the User's own wrap-up. Deleting a single
-                training leaves it standing — an asymmetry nothing else on the
-                screen would reveal. */}
+            {/* Reverses are named: a withdrawal takes them too, a single deletion does not (ADR 0070). */}
             <p>
               <strong>Widerrufen und alle gespeicherten Trainings löschen?</strong> Ihre bisherigen
               Gesprächsprotokolle, Kennzahlen und Rückmeldungen werden dabei entfernt, ebenso Ihre

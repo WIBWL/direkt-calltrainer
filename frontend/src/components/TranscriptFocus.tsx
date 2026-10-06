@@ -1,14 +1,9 @@
 import { createContext, useContext, type ReactNode } from "react";
 
-/**
- * Lets a wrap-up point's timestamp (`feedback_point.turn_id`) open the transcript at that line; a context because
- * `FeedbackScreen` owns the transcript and takes the report finished. **Null = no transcript on this screen**
- * (e.g. the downloadable report): the timestamp stays plain text rather than a button that does nothing.
- */
+/** Lets a point's timestamp open the transcript at its line. Null = no transcript
+ * on this screen: the timestamp stays plain text. */
 export interface TranscriptFocus {
-  /** Open the transcript and bring the line spoken at this offset into view. */
   reveal: (offsetMs: number) => void;
-  /** The line currently pointed at, so it can be marked while it is read. */
   focused: number | null;
 }
 
@@ -24,7 +19,6 @@ export function TranscriptFocusProvider({
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 
-/** The transcript on this screen, or null where there is none. */
 export function useTranscriptFocus(): TranscriptFocus | null {
   return useContext(Context);
 }

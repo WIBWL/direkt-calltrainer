@@ -11,11 +11,7 @@ import {
   visibleScenarios,
 } from "./scenarioSelection";
 
-/**
- * What the selection screen shows, and what stays picked. Every rule serves one
- * promise: the summary names a case that is on screen. None fails loudly — a
- * wrong one renders a fine screen pointing at an invisible card.
- */
+/** ADR 0072: the summary names a case that is on screen; a wrong rule renders fine. */
 
 function card(id: string, overrides: Partial<ScenarioCard> = {}): ScenarioCard {
   return {
@@ -148,8 +144,7 @@ describe("the selection after a filter change", () => {
   });
 
   it("comes back to the tile once the User filters their way back", () => {
-    // Clearing rather than falling back used to leave the summary empty even
-    // after the library was full of cases again.
+    // Clearing left the summary empty.
     expect(keptSelection(null, visible, true)).toBe(RANDOM_SCENARIO_ID);
   });
 });

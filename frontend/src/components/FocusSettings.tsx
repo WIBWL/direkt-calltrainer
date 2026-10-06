@@ -5,11 +5,7 @@ import { CATEGORY_LABELS, type ScenarioCategory } from "../scenarioLibrary";
 import FocusGoalPicker, { toggleGoal } from "./FocusGoalPicker";
 import FocusProfilePicker from "./FocusProfilePicker";
 
-/**
- * The training focus on the profile page (F-62, ADR 0076). Read-only until the user asks
- * to edit, so a stray click cannot change what the training emphasises. Editing has an
- * explicit Save and Cancel, unconfirmed since nothing here destroys anything.
- */
+/** The training focus on the profile (F-62, ADR 0076), read-only until the user asks to edit. */
 export default function FocusSettings() {
   const { focus, saving, choose } = useFocusContext();
   const [editing, setEditing] = useState(false);
@@ -29,9 +25,7 @@ export default function FocusSettings() {
   }
 
   const byKey = new Map(focus.goals.map((goal) => [goal.key, goal]));
-  // A goal that has since been retired from the catalogue keeps its slot in the
-  // stored selection but has no card to show; listing the key alone would say
-  // nothing, so it is left out rather than rendered as a blank chip.
+  // A retired goal has no card and is left out.
   const picked = focus.selected.map((key) => byKey.get(key)).filter((g) => g !== undefined);
 
   const start = () => {

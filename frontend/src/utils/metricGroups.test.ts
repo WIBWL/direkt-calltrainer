@@ -4,11 +4,7 @@ import type { ScenarioCategory } from "../scenarioLibrary";
 import { GROUPS, colorOf, groupOf } from "./metricGroups";
 import { PRACTICE_CATEGORY, PRACTICE_REASON } from "./practiceRoutes";
 
-/**
- * Colour as identity on the progress view, and the practice suggestion's table.
- * A hue must never read as a verdict (ADR 0065/0078), and a goal absent from
- * the practice table yields no suggestion rather than a default one.
- */
+/** ADR 0065/0078: colour as identity, never a verdict; the practice suggestion's table. */
 
 describe("groupOf", () => {
   it("reads the family off the aspect the schema already stores", () => {
@@ -30,14 +26,12 @@ describe("groupOf", () => {
 
 describe("colorOf", () => {
   it("hands back the stylesheet's own custom property, not a literal colour", () => {
-    // The palette has one home (index.css); repeating a hex here would give it two.
     expect(colorOf("how")).toBe("var(--series-speech)");
     expect(colorOf("what")).toBe("var(--series-content)");
   });
 
   it("takes no value, so a number can never move a hue", () => {
-    // The structural half of ADR 0065: this is what separates identity colour
-    // from a traffic light. `colorOf` accepts an aspect and nothing else.
+    // `colorOf` takes an aspect and nothing else: no value can move a colour.
     expect(colorOf.length).toBe(1);
   });
 
@@ -47,7 +41,7 @@ describe("colorOf", () => {
     expect(declared).toHaveLength(3);
     expect(new Set(declared).size).toBe(3);
     for (const color of declared) {
-      // ADR 0078 already spent those three on the single-call traffic light.
+      // Reserved for ADR 0078's traffic light.
       expect(color).not.toMatch(/red|amber|green|--light-/);
     }
   });
@@ -67,8 +61,6 @@ describe("PRACTICE_CATEGORY", () => {
   });
 
   it("binds the paraverbal goals to no kind of call", () => {
-    // Speaking rate or intonation can be worked on in any conversation, so the
-    // suggestion widens their practice instead of narrowing it.
     for (const goal of ["pace", "intonation", "conciseness", "talk_share"]) {
       expect(PRACTICE_CATEGORY[goal], goal).toBeNull();
     }
@@ -80,9 +72,7 @@ describe("PRACTICE_CATEGORY", () => {
   });
 
   it("leaves a goal it has not been told about absent, not defaulted", () => {
-    // Absent means no suggestion at all, so adding a catalogue goal forces the
-    // decision instead of quietly inheriting "any scenario". `undefined` and
-    // `null` therefore have to stay distinguishable.
+    // Absent (no suggestion) must stay distinct from `null` (any Scenario).
     expect("training_regularity" in PRACTICE_CATEGORY).toBe(false);
     expect(PRACTICE_CATEGORY["training_regularity"]).toBeUndefined();
     expect(PRACTICE_CATEGORY["opening"]).toBeNull();
@@ -94,7 +84,6 @@ describe("PRACTICE_CATEGORY", () => {
     );
 
     for (const category of routed) {
-      // A suggestion without a ground is an instruction.
       expect(PRACTICE_REASON[category], category).toBeTruthy();
     }
   });

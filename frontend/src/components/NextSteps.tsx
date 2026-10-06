@@ -5,20 +5,14 @@ import type { FollowUpCard } from "../protocol";
 import { createFollowUp, createReverse, type ReverseScenario } from "../scenarioLibrary";
 import { cx } from "../utils/cx";
 
-/** What a screen can do with the follow-up Scenario (F-60), passed in by its owner. No
- * edit: the write routes refuse a follow-up (ADR 0069); deletion is in the info panel.
- * `onStart` gets the Persona too, since the follow-up keeps the training's partner.
- * `onCreated` fires once one was written, so the screen's library copy can reload. */
+/** No edit: the write routes refuse a follow-up (ADR 0069). `onStart` gets the
+ * Persona too; `onCreated` lets the screen reload its library copy. */
 export interface FollowUpActions {
   onStart: (scenarioId: string, personaId: string) => void;
   onCreated?: (() => void) | undefined;
 }
 
-/**
- * One press that writes a Scenario out of this Session — follow-up or reverse (ADR 0069,
- * ADR 0070). The backend's `detail` is shown as is, `fallback` where there is none. `run`
- * resolves to what was written, or null on failure.
- */
+/** One press that writes a follow-up or reverse (ADR 0069, 0070). `run` resolves to the row, or null. */
 function useCreate<T>(create: () => Promise<T>, fallback: string) {
   const [created, setCreated] = useState<T | null>(null);
   const [busy, setBusy] = useState(false);
@@ -42,8 +36,6 @@ function useCreate<T>(create: () => Promise<T>, fallback: string) {
   return { created, busy, error, run };
 }
 
-/** The frame both offers share, before and after their Scenario is written:
- *  title, one lead paragraph, and whatever the offer is right now. */
 function NextStepCard({
   title,
   lead,
@@ -64,8 +56,6 @@ function NextStepCard({
   );
 }
 
-/** The first press: the button that writes the Scenario, and what to say while
- *  that runs or after it failed. */
 function CreateButton({
   label,
   busyLabel,
@@ -92,10 +82,7 @@ function CreateButton({
   );
 }
 
-/** The second press: the written Scenario, named, and the button that starts
- *  it. The button sits in its own row wrapper — that is where the space above
- *  it comes from, so both offers are spaced alike without the number being
- *  written twice. */
+/** The button's row wrapper carries the spacing for both offers. */
 function StartCreated({
   name,
   teaser,
@@ -121,10 +108,7 @@ function StartCreated({
   );
 }
 
-/** The next call in the same matter, built from the points above (F-60). Asked for by
- * the User (ADR 0069's amendment); the same card renders the offer and the written row.
- * Starting skips the mic check and uses this training's Persona; another partner means
- * starting it from the setup screen. */
+/** F-60, asked for by the User (ADR 0069). Starts with this training's Persona and no mic check. */
 export function FollowUp({
   scenario,
   personaId,
@@ -140,9 +124,7 @@ export function FollowUp({
     () => createFollowUp(sessionId),
     "Das Folgeszenario konnte nicht erstellt werden.",
   );
-  // What the create route just wrote, so the card appears without waiting for
-  // a refetch. `scenario` wins: on a reload it is the same row, and on the
-  // history's page it is the only source.
+  // `scenario` wins: on the history's page it is the only source.
   const card = scenario ?? create.created;
 
   if (!card) {
@@ -182,10 +164,7 @@ export function FollowUp({
   );
 }
 
-/** The Reverse offer (F-61, ADR 0070): the same call from the other side. Two presses,
- * like the follow-up: the first writes the Scenario (a model call, most of a minute), the
- * second begins the call, so the start button is never the one pressed before there was
- * anything to start. The Scenario is stored either way. */
+/** F-61 (ADR 0070). Two presses: writing takes most of a minute, so start is never pressed early. */
 export function Reverse({
   sessionId,
   onReverse,

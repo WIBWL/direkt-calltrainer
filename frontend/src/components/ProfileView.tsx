@@ -12,14 +12,10 @@ import PrivacyLink from "./PrivacyLink";
 import ProcessingNotice from "./ProcessingNotice";
 import SessionHistory from "./SessionHistory";
 
-/** Where a DiReKT account is deleted — the identity provider's owner, not this app. */
+/** The identity provider's owner deletes DiReKT accounts, not this app. */
 const DIREKT_CONTACT = "wiwi-direkt@uni-wuerzburg.de";
 
-/**
- * The account screen (F-31), privacy notice (F-49) and deletion paths, with its own AppLayout. Read-only: identity
- * lives in Keycloak, no User table (ADR 0031). The `sub`, realm URL and token expiry are deliberately not shown.
- * The privacy statement is linked, not paraphrased.
- */
+/** Account (F-31), privacy notice (F-49) and deletion paths. Read-only: identity lives in Keycloak (ADR 0031). */
 export default function ProfileView() {
   const account = useAccount();
   const auth = useAuth();
@@ -71,9 +67,6 @@ export default function ProfileView() {
         <ConsentSettings />
       </section>
 
-      {/* Above the history, below the storage decision: it is a setting about
-          future trainings, which is what the card above it is too, and it says
-          nothing about the trainings already listed further down. */}
       <section className="card">
         <h2>Ihre Fokusziele</h2>
         <FocusSettings />
@@ -81,11 +74,6 @@ export default function ProfileView() {
 
       <section className="card">
         <h2>Ihre Trainings</h2>
-        {/* The history lists the trainings one at a time; the progress screen
-            is the same set read across. The link belongs here rather than only
-            in the account chip: somebody who has come to look at what they
-            trained is one sentence away from the page that answers it, and the
-            concept has said so since the first draft. */}
         <p className="card-lead">
           Einzeln aufgeführt. Über alle Trainings hinweg steht das auf{" "}
           <Link to={ROUTES.progress}>Ihrer Fortschrittsseite</Link>.
@@ -170,8 +158,7 @@ export default function ProfileView() {
   );
 }
 
-/** One label/value row. Renders nothing when the claim is absent, so a sparse
- *  account shows a shorter list rather than a column of dashes. */
+/** Nothing for an absent claim. */
 function Fact({
   label,
   value,

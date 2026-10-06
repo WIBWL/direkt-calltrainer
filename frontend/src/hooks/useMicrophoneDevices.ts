@@ -2,24 +2,16 @@ import { useCallback, useEffect, useState } from "react";
 
 export interface MicDevice {
   deviceId: string;
-  /** Empty until microphone permission has been granted at least once
-   * (browser privacy behavior) — callers show a generic placeholder for those. */
+  /** Empty until permission was granted once. */
   label: string;
 }
 
-/** Chrome/Edge append the USB vendor:product id to some device labels (e.g.
- * "Mikrofon (0d8c:0014)") — the raw hardware id means nothing to someone
- * picking a device by name, so it is dropped, leaving what Windows itself
- * calls the device. */
+/** Drops Chrome's "(0d8c:0014)" vendor:product suffix. */
 function stripHardwareId(label: string): string {
   return label.replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, "");
 }
 
-/**
- * The list of available microphones, kept in sync with plug/unplug events.
- * `enumerateDevices()` lists every device (with ids) even before permission is
- * granted; only the labels are withheld until then.
- */
+/** Kept in sync with plug/unplug events; labels are withheld until permission. */
 export function useMicrophoneDevices() {
   const [devices, setDevices] = useState<MicDevice[]>([]);
 

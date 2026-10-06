@@ -1,11 +1,7 @@
 import type { FocusRole } from "../protocol";
 import { CATEGORIES, CATEGORY_LABELS, type ScenarioCategory } from "../scenarioLibrary";
 
-/**
- * The User's role and kinds of call (F-62), from which Scenario suggestions are made.
- * Shared by the first-run screen and the profile. A role prefills its usual call types,
- * which stay freely adjustable.
- */
+/** Role and call types (F-62), for suggestions. A role prefills its usual call types. */
 export default function FocusProfilePicker({
   roles,
   role,
@@ -24,7 +20,6 @@ export default function FocusProfilePicker({
       role,
       categories: categories.includes(category)
         ? categories.filter((c) => c !== category)
-        // Vocabulary order, so the chips and the stored set read the same.
         : CATEGORIES.filter((c) => c === category || categories.includes(c)),
     });
 

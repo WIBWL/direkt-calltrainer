@@ -3,15 +3,11 @@ import { useState, type CSSProperties } from "react";
 import { RINGTONE_CYCLE_MS, useRingtone } from "../hooks/useRingtone";
 import PersonaAvatar from "./PersonaAvatar";
 
-/**
- * The phone ringing before an ordinary call (F-63): the Persona rang (`_casting`), so the
- * user accepts, which sends `session.activate` (ADR 0042), and speaks first: the Persona's first line
- * is the reply to their answer (ADR 0110). Not for a reverse (ADR 0070).
- * The ringtone is stoppable (WCAG 1.4.2) and remembered; the switch's target is 24px (2.5.8).
- */
+/** The phone ringing before an ordinary call (F-63): accepting sends
+ * `session.activate` (ADR 0042) and the user speaks first (ADR 0110). The
+ * ringtone is stoppable (WCAG 1.4.2) and remembered. */
 
-/** Where the ringtone preference lives. Per browser, per person, and of no
- * interest to the server. */
+/** Per browser; of no interest to the server. */
 const MUTED_KEY = "calltrainer.ringtoneMuted";
 
 function loadMuted(): boolean {
@@ -30,9 +26,6 @@ function saveMuted(muted: boolean) {
   }
 }
 
-/** The handset, as an arc with two thickened ends. Drawn rather than taken
- * from an icon set: it is two shapes, and this way nothing has to be vendored
- * for one glyph. */
 function Handset({ declining = false }: { declining?: boolean }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className="incoming-handset">
@@ -58,12 +51,10 @@ export default function IncomingCall({
   onDecline,
 }: {
   personaName: string;
-  /** `persona.avatar_url`; null falls back to the initials, as everywhere. */
   personaAvatarUrl: string | null;
   onAccept: () => void;
   onDecline: () => void;
 }) {
-  // Lazy initializer: read once on mount, not on every render.
   const [muted, setMuted] = useState(loadMuted);
   useRingtone(!muted);
 
@@ -78,14 +69,11 @@ export default function IncomingCall({
 
   return (
     <section className="incoming" aria-labelledby="incoming-title">
-      {/* The shake and the rings run on the ringtone's own cycle, from the one
-          place that number lives — and they run whether or not it is audible:
-          a muted phone still buzzes. */}
+      {/* On the ringtone's cycle, audible or not: a muted phone still buzzes. */}
       <div
         className="incoming-stage"
         style={{ "--ring-cycle": `${RINGTONE_CYCLE_MS}ms` } as CSSProperties}
       >
-        {/* Behind the phone and purely visual: the sound it would be making. */}
         <div className="incoming-rings" aria-hidden="true">
           <span />
           <span />
@@ -93,9 +81,6 @@ export default function IncomingCall({
         </div>
 
         <div className="incoming-phone">
-          {/* The device's own hardware: the keys down its sides and the black
-              pill in the display. Drawn because a phone without them reads as
-              a blue rectangle with a name in it, which is what this was. */}
           <span
             className={`incoming-key incoming-key-silent${muted ? " is-silenced" : ""}`}
             aria-hidden="true"
@@ -107,11 +92,7 @@ export default function IncomingCall({
           <div className="incoming-screen">
             <div className="incoming-island" aria-hidden="true" />
 
-            {/* The portrait and the name, which is what a phone shows: not a
-                caption saying that someone is calling. Who they *are* comes out
-                in the call, which is the exercise. Zoomed to head and
-                shoulders like the selection card's, because at 72px the whole
-                half-body shot leaves a face too small to recognise. */}
+            {/* Zoomed to head and shoulders: at 72px the half-body shot is too small. */}
             <PersonaAvatar
               name={personaName}
               src={personaAvatarUrl}
@@ -139,8 +120,6 @@ export default function IncomingCall({
                   type="button"
                   className="incoming-button incoming-accept"
                   onClick={onAccept}
-                  // The visible label is under the button; the accessible name
-                  // has to say what accepting starts.
                   aria-label="Anruf annehmen und Gespräch beginnen"
                 >
                   <Handset />
@@ -151,10 +130,8 @@ export default function IncomingCall({
           </div>
         </div>
 
-        {/* The silent switch's control; label and arrow are part of the target. A sibling
-            of the phone, not a child, because the phone shakes and a bobbing label is
-            unreadable. The name is on the button too (WCAG 2.5.3): the label is hidden
-            on narrow screens, and a hidden <span> leaves the accessibility tree. */}
+        {/* A sibling of the phone, which shakes. The name is on the button too
+            (WCAG 2.5.3): the label is hidden on narrow screens. */}
         <button
           type="button"
           className="incoming-mute-switch"

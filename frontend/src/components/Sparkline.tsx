@@ -5,11 +5,8 @@ import type { MetricSeries } from "../utils/progressStats";
 import { formatPoint } from "../utils/progressStats";
 import { formatDate } from "../utils/time";
 
-/**
- * One metric over the trainings in the period (F-13): the user's values over their own usual range. No target,
- * good/bad colour, arrow or trend line (ADR 0065); colour is the family, never the value (`utils/metricGroups`).
- * Inline SVG like LoudnessCourse. The accessible name carries the numbers; hover only adds to it.
- */
+/** One metric over the period (F-13) against the user's own usual range. No target,
+ * colour judgement, arrow or trend line (ADR 0065). The accessible name carries the numbers. */
 export default function Sparkline({
   series,
   width = 240,
@@ -21,8 +18,7 @@ export default function Sparkline({
   width?: number;
   height?: number;
   showDots?: boolean;
-  /** Off inside a link, where a nested interactive layer would fight the
-   *  link's own hit area for the pointer. */
+  /** Off inside a link, whose hit area it would fight. */
   interactive?: boolean;
 }) {
   const [active, setActive] = useState<number | null>(null);
@@ -31,8 +27,7 @@ export default function Sparkline({
 
   const lowest = Math.min(...values, series.band?.low ?? Infinity);
   const highest = Math.max(...values, series.band?.high ?? -Infinity);
-  // A flat series would divide by zero; giving it a nominal span puts the line
-  // in the middle of the box instead, which is what a flat series looks like.
+  // A flat series sits in the middle.
   const span = highest - lowest || Math.abs(highest) || 1;
   const pad = 6;
   const plot = height - pad * 2;
@@ -43,12 +38,9 @@ export default function Sparkline({
   const y = (value: number) => pad + plot - ((value - lowest) / span) * plot;
 
   const line = series.points.map((p, i) => `${x(i)},${y(p.value)}`).join(" ");
-  // The fill is closed along the bottom of the box rather than at the lowest
-  // value: an area that starts at the minimum would make the smallest reading
-  // look like nothing at all.
+  // Closed at the bottom, or the smallest reading looks like nothing.
   const area = `${line} ${x(values.length - 1)},${height} 0,${height}`;
-  // With no pointer the most recent value is the one marked: it is the reading
-  // the tile prints beside the chart, so the mark and the number agree.
+  // The latest by default, matching the printed figure.
   const shown = active ?? values.length - 1;
   const point = series.points[shown];
 
@@ -76,11 +68,7 @@ export default function Sparkline({
           {values.length > 1 && <polygon className="sparkline-area" points={area} />}
           {values.length > 1 && <polyline className="sparkline-line" points={line} />}
 
-          {/* The hit areas sit last so they take the pointer, and they are wider
-              than the marks they stand for -- a 2px dot is not a target. One per
-              point rather than a crosshair over the whole box, because the x
-              axis here is a sequence of trainings and not a continuum: there is
-              no value between two of them to read off. */}
+          {/* Last, so they take the pointer; one per training, since there is nothing between two. */}
           {interactive &&
             series.points.map((p, index) => (
               <rect
@@ -96,9 +84,7 @@ export default function Sparkline({
             ))}
         </svg>
 
-        {/* The dots are HTML laid over the SVG, not circles in it: the SVG is stretched to the card's width
-            (`preserveAspectRatio="none"`), which would stretch a circle into an oval on a wide window. Placed
-            by percentage, sized in pixels, so they stay round at any width. */}
+        {/* HTML over the stretched SVG, so the dots stay round. */}
         {showDots && (
           <div className="sparkline-dots" aria-hidden="true" style={{ color }}>
             {series.points.map((p, index) => {
@@ -120,9 +106,7 @@ export default function Sparkline({
         )}
       </div>
 
-      {/* A line under the chart rather than a tooltip: it cannot cover marks and needs no positioning. Kept
-          when empty so tiles do not shift on hover. `aria-hidden`: the accessible name and the detail table
-          already carry every value. */}
+      {/* A line, not a tooltip; kept when empty so tiles do not shift. */}
       {interactive && (
         <p className="sparkline-readout" aria-hidden="true">
           {active !== null && point && (
@@ -139,8 +123,6 @@ export default function Sparkline({
   );
 }
 
-/** The chart in words: how many trainings, the range they covered, and the
- *  most recent value. Stated, never judged. */
 function describe(series: MetricSeries): string {
   const values = series.points.map((p) => p.value);
   const last = values[values.length - 1] ?? 0;

@@ -2,19 +2,12 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 import type { FeedbackState } from "../hooks/useSessionFeedback";
 
-/** The bars of the waveform being read, as a share of the scene's height.
- * Uneven on purpose: an even row is a loading indicator, an uneven one is a
- * recording of somebody talking. */
+/** Uneven: an even row is a loading indicator, an uneven one somebody talking. */
 const BARS = [26, 52, 74, 44, 96, 62, 34, 70, 40, 58, 28];
 
-/** How long one line stands before the next takes over. Long enough to read
- * twice, short enough that the screen never looks stuck. */
 const CAPTION_MS = 3400;
 
-/**
- * What the wait is actually spent on, roughly in order. Light in tone, but every line
- * is true of what the worker is doing, which keeps it from reading as filler.
- */
+/** Every line is true of what the worker is doing. */
 const CAPTIONS = [
   "Das Gespräch wird abgetippt …",
   "Ihre Sprechpausen werden vermessen …",
@@ -24,34 +17,21 @@ const CAPTIONS = [
   "Die Zusammenfassung wird geschrieben …",
 ];
 
-/**
- * How long this screen waits before handing over regardless. `useSessionFeedback` polls
- * for ten minutes, too long for a screen holding nothing else; the poll carries on behind
- * the post-call screen, where the wrap-up appears when it lands.
- */
+/** The poll carries on behind the post-call screen. */
 const WAIT_LIMIT_MS = 120_000;
 
-/**
- * The wait between hanging up and the wrap-up the worker writes (F-09/F-10, ADR 0049).
- * Under `prefers-reduced-motion` the scene stands still rather than being skipped. Never
- * shown for an unstored Session (ADR 0066): App.tsx enters it only with a `sessionId`.
- */
+/** The wait for the worker's wrap-up (ADR 0049). Never for an unstored Session (ADR 0066). */
 export default function FeedbackWaiting({
   state,
   onDone,
 }: {
-  /** Where the wrap-up's poll stands. `App` runs it once for this screen and
-   * the post-call screen together. */
   state: FeedbackState;
-  /** Move on to the post-call screen — because the wrap-up has settled, one
-   * way or the other, or because the User would rather read the transcript. */
+  /** The wrap-up settled, or the User would rather read the transcript. */
   onDone: () => void;
 }) {
   const [caption, setCaption] = useState(0);
 
-  // "loading" is the only state that is still waiting for something: a wrap-up
-  // that failed or was never stored has settled too, and the post-call screen
-  // says which of the two it was.
+  // Only "loading" still waits; failed or unstored has settled.
   useEffect(() => {
     if (state !== "loading") onDone();
   }, [state, onDone]);
@@ -84,8 +64,6 @@ export default function FeedbackWaiting({
           ))}
         </div>
 
-        {/* Passes over the waveform and back, which is what turns a row of
-            bouncing bars into something being *read*. */}
         <div className="feedback-wait-lens">
           <svg viewBox="0 0 52 52" width="52" height="52" focusable="false">
             <circle
@@ -109,9 +87,7 @@ export default function FeedbackWaiting({
         </div>
       </div>
 
-      {/* The rotating line is decoration and is kept away from assistive
-          technology, which would otherwise be read a new sentence every three
-          seconds. The one below it is the whole message, said once. */}
+      {/* Hidden from assistive technology, which would read a new sentence every three seconds. */}
       <p className="feedback-wait-caption" key={caption} aria-hidden="true">
         {CAPTIONS[caption]}
       </p>
@@ -121,9 +97,7 @@ export default function FeedbackWaiting({
         automatisch weiter.
       </p>
 
-      {/* Never a locked screen: the transcript is the one thing a training is
-          guaranteed to leave behind, and for a call that was not stored it is
-          the only copy there is (F-64). */}
+      {/* Never locked: for an unstored call the transcript is the only copy (F-64). */}
       <button type="button" className="feedback-wait-skip" onClick={onDone}>
         Ohne Feedback weiter zum Protokoll
       </button>
