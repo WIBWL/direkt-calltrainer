@@ -1,77 +1,82 @@
 # EFRE-DiReKT Calltrainer
 
-AI-powered phone conversation trainer with real-time speech analysis and behavioral feedback.
+An AI phone conversation trainer with speech analysis and behavioural feedback, built within [EFRE-DiReKT](https://efre-direkt.de/) at the University of Würzburg. Users practise calls against an AI Persona in a Scenario, then get qualitative feedback and measured statistics.
 
-![Status](https://img.shields.io/badge/status-active--development-yellow)
+The frontend is React + TypeScript. Behind it are two Python processes, the FastAPI backend and the wrap-up worker, in one uv workspace of three packages (`shared/`, `backend/`, `worker/`), built as three images from one `Dockerfile`. STT and the LLM run on the DiReKT gateway, which needs the VPN. TTS runs on KugelAudio.
 
-## About
+## Setup
 
-Calltrainer is a use case built within [EFRE-DiReKT](https://efre-direkt.de/), an applied-AI research project at the University of Würzburg's Chair for Business Administration and Business Informatics, funded by the Bavarian Ministry of Science through the EU's European Regional Development Fund. Users practice phone calls against an AI counterpart (a Persona, picked from an extensible library) in a configurable Scenario, then get qualitative feedback on how they communicated, e.g. clarity, tone, structure.
-
-## Architecture
-
-A React + TypeScript frontend and two Python processes — the FastAPI backend (the API and the live call) and the wrap-up worker — built as three images from one `Dockerfile`. The Python side is one uv workspace of three packages: `shared/`, `backend/`, `worker/` (ADR 0108). Speech-to-text and dialogue generation run through the EFRE-DiReKT gateway — an OpenAI-compatible endpoint, named with one model per step in `.env`. Text-to-speech runs on KugelAudio. One backend per leg, no fallbacks and no switches between them (ADR 0103). No local models are needed.
-
-> **Note:** The EFRE-DiReKT gateway is only reachable from its own network - connect via VPN before running the app.
-
-## Running it locally
-
-The apps run on your machine; Docker runs only Postgres, Redis and Keycloak. You need [uv](https://docs.astral.sh/uv/), Node 22 and Docker.
+You need [uv](https://docs.astral.sh/uv/), Node 22 and Docker. Use Python **3.12**: on 3.14, SQLAlchemy 2.0.36 fails with a `TypeError` that looks like a broken model.
 
 ```sh
-uv sync                                       # Python 3.12 and every package, plus the dev tools
+uv sync
 (cd frontend && npm install)
-cp .env.example .env                          # then fill in DIREKT_API_KEY and KUGELAUDIO_API_KEY
+cp .env.example .env                          # fill in DIREKT_API_KEY and KUGELAUDIO_API_KEY
 docker compose -f dev-compose.yaml up -d      # Postgres :15433, Redis :16379, Keycloak :18081
 ```
 
-Then, each in its own shell with `source .env` first:
+Every variable in `.env.example` is required; any can instead be given as `NAME_FILE=/path`. Run `source .env` in every shell that starts a process. The `export`s matter.
+
+## Run
 
 ```sh
-uv run uvicorn backend.app:app --reload       # the backend, :8000
-uv run python -m worker                       # the wrap-up worker
-cd frontend && npm run dev                    # the SPA on http://localhost:5173
+uv run uvicorn backend.app:app --reload       # backend :8000; migrates and seeds on startup
+uv run python -m worker                       # wrap-up worker
+cd frontend && npm run dev                    # SPA :5173, everything except the call
+cd frontend && npm run build:watch            # with `npm run preview` in a second shell: SPA :8391
 ```
 
-The live call needs the production build — voice detection does not load under `npm run dev` — so for anything touching the call run `npm run build:watch` and `npm run preview` instead, and open `http://localhost:8391`. Both Vite servers forward `/api`, `/ws` and `/health` to the backend.
+The call's voice detection (Silero VAD, onnxruntime-web) does not load under `npm run dev`, so use the production build for anything involving the call. Both Vite servers proxy `/api`, `/ws` and `/health` to `:8000`. Restart Vite after changing `.env`. The worker needs `OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES` on macOS (already set in `.env.example`) and does not run on Windows. If the worker is down, calls still work and wrap-ups queue.
 
-## Login (Keycloak)
+## Login
 
-`dev-compose.yaml` brings its own Keycloak on `http://localhost:18081` and imports `keycloak/direkt-realm.json` — the `calltrainer-frontend` client and three fixed users:
+The dev Keycloak at `http://localhost:18081` imports `keycloak/direkt-realm.json`. The password equals the username. Admin console: `admin`/`admin`.
 
-| user | password | company (Organization) |
+| user | role `calltrainer-user` | Organization |
 |---|---|---|
-| `alice` | `alice` | Company A |
-| `bob` | `bob` | Company A |
-| `carol` | `carol` | Company B |
+| `alice`, `bob` | yes | `company-a` |
+| `carol` | yes | `company-b` |
+| `dave` | no | none (sees "nicht freigeschaltet") |
 
-Opening the app redirects to Keycloak; log in as any of them. There is nothing to configure and no roles — a valid token is all the app checks (ADR 0009).
-
-**To change the realm, edit the JSON and drop Keycloak's volume** — import is skipped for a realm that already exists:
+To change the realm, edit the JSON and drop the volume:
 
 ```sh
 docker compose -f dev-compose.yaml rm -sf keycloak && docker volume rm direkt-calltrainer-keycloak-data
-docker compose -f dev-compose.yaml up -d
 ```
 
-The Keycloak admin console is at <http://localhost:18081> with `admin` / `admin`. Production uses the shared `direkt` realm at `keycloak.efre-direkt.de`, administered by hand (the import file is dev-only).
-
-## Tests
+## Test and lint
 
 ```sh
-source .env && uv run pytest                  # needs dev-compose.yaml's Postgres, or the database tests skip
+source .env && uv run pytest                  # DB tests need dev-compose's Postgres; check the skip count
 uv run flake8 && uv run pylint backend/ shared/ worker/
 (cd frontend && npm run lint && npm test)
 ```
 
-## Images and deployment
-
-`scripts/build-and-push.sh` builds the three images for `registry.internal.efre-direkt.de` from a commit with a pushed `v*` tag. The deployment itself is in `direkt-infrastructure` (`public/calltrainer/compose.yml`), which updates to a new `latest` on its own; see `docs/deployment.md`.
-
-## Documentation
-
-The full architecture documentation - arc42 and every Architecture Decision Record (ADR) - is served via [MkDocs](https://www.mkdocs.org):
+## Schema changes
 
 ```sh
-uv run mkdocs serve -a localhost:8001
+uv run alembic -c shared/db/alembic.ini revision --autogenerate -m "..."
 ```
+
+Read every generated migration before applying it. Autogenerate adds `NOT NULL` columns without backfilling them, turns renames into a drop plus a create, and misses `CHECK` constraints.
+
+## Scripts
+
+Run them as `uv run python -m backend.scripts.<name>` locally, or `docker compose exec calltrainer-backend python -m backend.scripts.<name>` on the server.
+
+- `check_backends`: one real request each to STT, LLM and TTS
+- `requeue_feedback [--apply]`: re-queue stored Sessions without a wrap-up
+- `apply_retention [--apply]`: list or delete Sessions past six months
+- `inspect_pressure_segments`: check how wrap-ups marked demanding stretches
+- `stress_db`: load-test the schema on a throwaway database
+- `seed_reference_data`: migrate and seed by hand
+- `generate_erd`: draw the ER diagram (needs Graphviz)
+- `play_scenarios`, `scenario_probes`, `try_voice`: prompt and voice experiments
+
+## Release
+
+Push a `v*` tag, then run `scripts/build-and-push.sh [frontend backend worker]` (needs bash 4). The deployment lives in `direkt-infrastructure`; see [docs/deployment.md](docs/deployment.md).
+
+## Docs
+
+`uv run mkdocs serve -a localhost:8001` serves arc42 and the ADRs.
