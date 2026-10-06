@@ -32,7 +32,7 @@ Each of these has broken something before, or would break it silently.
 - **KugelAudio's pooled socket:** never leave `stream_async` short of its `final` frame; one request at a time (ADR 0044). There is no TTS fallback.
 - **English schema and wire, German only in user-facing content** (ADR 0057). `status` means the Session's outcome on the listing and the job status on the detail route.
 - **The caller opens the transaction**; domain functions take the session and never commit. `session_scope()` is synchronous, so call it via `asyncio.to_thread` from async code (ADR 0099).
-- **The turn loop imports nothing from the analysis except `acoustics`, and never the ORM** (ADR 0090). `test_module_dependencies.py` pins this and the package boundaries. `orchestrator.py` sits just under pylint's 1000-line limit.
+- **The turn loop imports nothing from the analysis except `acoustics`, and never the ORM** (ADR 0090). `test_module_dependencies.py` pins this and the package boundaries.
 - **The wrap-up is queued by name** (`JOB_FUNCTION` in `shared/feedback/queue.py`). Moving the generator fails every job silently; `test_job_name.py` pins it.
 - **Every setting is required and read through `shared/env.py`**; never use `os.environ` directly (ADR 0106). Test fixtures claim `POSTGRES_URL`/`REDIS_URL` with unusable values.
 - **Frontend live call:** `useBargeIn` reads the socket and playback through a ref, because the VAD wires its callbacks once. Dropping `interrupt()`'s return value corrupts the transcript. Only `callAccepted` reaches the call screen.

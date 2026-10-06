@@ -16,4 +16,4 @@ Users know what they want to practise, but the application treated everyone the 
 
 ## Consequences
 
-The first-run screen is the longest in the app. Catalogue text is seed data, so a caption edit needs a restart. The role and goals are not yet in the data export.
+The first-run screen is the longest in the app. Catalogue text is seed data, so a caption edit needs a restart. The data export includes the goals, role and call types.
