@@ -35,8 +35,7 @@ export function session(over: Partial<SessionSummary> = {}): SessionSummary {
   };
 }
 
-/** A measured figure as the listing carries it. `active` defaults to true:
- *  a retired metric type is the exception and the specs that care say so. */
+/** A measured figure as the listing carries it. */
 export function measurement(
   key: string,
   value: number,
@@ -48,7 +47,6 @@ export function measurement(
     unit: null,
     aspect: "how",
     value,
-    active: true,
     ...over,
   };
 }

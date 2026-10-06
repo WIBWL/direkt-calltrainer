@@ -86,8 +86,7 @@ export default function ProgressRecurring({
             <p>
               Aufgenommen wird ein Thema ab {MIN_MENTIONS} Nennungen, denn ein einzelner Punkt
               aus einem einzelnen Gespräch ist eine Beobachtung und kein Muster. Trainings ohne
-              Auswertung, und Auswertungen von vor der Einführung dieser Zuordnung, zählen nicht
-              mit.
+              Auswertung zählen nicht mit.
             </p>
           </InfoDetails>
         </>
@@ -96,16 +95,12 @@ export default function ProgressRecurring({
   );
 }
 
-/**
- * The empty-block text. Distinguishes nothing analysed from nothing said twice; wrap-ups predating the goal
- * tags are indistinguishable in the data, so they are folded into the first sentence rather than claimed.
- */
+/** Distinguishes nothing analysed from nothing said twice. */
 function emptyText(total: number): string {
   if (total === 0) {
     return (
       "Hier steht später, was Ihre Auswertungen wiederholt nennen. Bisher liegt dafür keine " +
-      "ausgewertete Aufzeichnung vor. Auswertungen, die vor der Einführung dieser Zuordnung " +
-      "geschrieben wurden, zählen nicht mit, weil ihnen die Zuordnung fehlt."
+      "ausgewertete Aufzeichnung vor."
     );
   }
   return (

@@ -121,10 +121,8 @@ export default function ProgressMetricTable({ series }: { series: MetricSeries[]
         </p>
         <p>
           Die Spalte „Trainings“ sagt, aus wie vielen Gesprächen eine Zeile besteht. Diese
-          Zahl kann kleiner sein als die Zahl Ihrer Trainings, und dafür gibt es zwei Gründe.
-          Entweder ist die Kennzahl neuer als das Gespräch: Die Aufnahme wird nach jedem
-          Training gelöscht, deshalb lässt sich nichts nachmessen. Oder die Aufnahme hatte so
-          viel Hintergrundgeräusch, dass sich Sprechen und Stille nicht trennen ließen. Dann
+          Zahl kann kleiner sein als die Zahl Ihrer Trainings, wenn eine Aufnahme so viel
+          Hintergrundgeräusch hatte, dass sich Sprechen und Stille nicht trennen ließen. Dann
           fehlen Sprechtempo, Sprechpausen, Redefluss, Sprechlänge und Lautstärke für dieses
           eine Gespräch, weil ein Wert daraus mehr über den Raum sagen würde als über Sie.
         </p>

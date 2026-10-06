@@ -57,10 +57,6 @@ def summary(session: db_models.Session) -> dict:
                 # of the mapping.
                 "aspect": m.metric_type.aspect,
                 "value": float(m.value),
-                # A renamed metric's old rows point at the retired row with the
-                # same display name; without this the progress view (F-13)
-                # draws it twice. The detail route deliberately does not filter.
-                "active": m.metric_type.active,
             }
             # Whole-call rows only. `toSeries` builds one series per metric key
             # and would splice the pressure figure of one training into the

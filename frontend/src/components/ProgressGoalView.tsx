@@ -168,11 +168,6 @@ function PressureSection({ sessions }: { sessions: SessionSummary[] }) {
             Ihr Gegenüber muss widersprochen, nachgehakt oder etwas verlangt haben, und
             beide Teile müssen lang genug sein, um gemessen zu werden.
           </p>
-          <p className="muted">
-            Für Trainings von vor dieser Auswertung gibt es den Vergleich nicht und wird es
-            ihn nicht geben: Die Aufnahme wird nach dem Gespräch gelöscht, und was damals
-            nicht mitgemessen wurde, lässt sich nicht nachholen.
-          </p>
         </div>
       </>
     );

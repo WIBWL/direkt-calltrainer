@@ -44,9 +44,7 @@ export const MIN_CALL_MS = 60_000;
 export function readable(sessions: SessionSummary[]): SessionSummary[] {
   return sessions.filter((session) => {
     const ms = callDurationMs(session);
-    // Kept where the length cannot be worked out: the rule is "drop what is
-    // known to be too short", not "drop what cannot be checked", and such a row
-    // predates `ended_at`.
+    // Unknown length is kept: drop only what is known to be too short.
     return ms === null || ms >= MIN_CALL_MS;
   });
 }
@@ -104,10 +102,6 @@ export function toSeries(sessions: SessionSummary[]): MetricSeries[] {
 
   for (const session of [...sessions].reverse()) {
     for (const measurement of session.measurements) {
-      // Retired metric types are left out: a renamed metric's old row shares the
-      // display name and would draw a duplicate chart, and merging is wrong
-      // since the definitions changed with ADR 0051.
-      if (!measurement.active) continue;
       if (!comparableAcrossCalls(measurement.key)) continue;
 
       const series = byKey.get(measurement.key) ?? {

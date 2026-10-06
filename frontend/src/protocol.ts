@@ -383,11 +383,6 @@ export interface SessionSummaryMeasurement {
    *  delivery/content switch the metric appears on, and nothing else. */
   aspect: MetricAspect;
   value: number;
-  /**
-   * False for a metric measured under a since-renamed key. The progress view
-   * drops those, or one renamed metric appears as two identical charts.
-   */
-  active: boolean;
 }
 
 /** One row of the training history. */

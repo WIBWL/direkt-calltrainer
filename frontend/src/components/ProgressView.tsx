@@ -657,8 +657,7 @@ function MetricBody({ reading }: { reading: Extract<FocusReading, { kind: "metri
         <span className="progress-metric-figure-label"> zuletzt</span>
       </p>
       <Sparkline series={series} />
-      {/* Readable trainings with no value for this metric, so a course from 6 of 10 does not read as complete.
-          The cause is not claimed: recorded before the metric existed (ADR 0048) or too noisy (ADR 0085). */}
+      {/* Trainings without a value, so a course from 6 of 10 does not read as complete (ADR 0085). */}
       <p className="focus-tile-note">
         Ihr üblicher Bereich {band ?? "–"}, aus {trainings} Trainings.
         {missing > 0 &&

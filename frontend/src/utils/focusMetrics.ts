@@ -21,25 +21,10 @@ const NO_MEASUREMENT =
   "Zu diesem Ziel gibt es noch keine Messung. Was dazu gesagt werden kann, " +
   "steht in den Auswertungen Ihrer einzelnen Gespräche.";
 
-/**
- * What a tile says for a goal that *is* measured, where none of the selected
- * trainings carries a value for it.
- *
- * The case was missing, and a tile holding a title, a link and nothing between
- * them is exactly the empty state section 6 of the concept rules out. It
- * arrives as soon as a metric is younger than the stored calls (the closing,
- * ADR 0089, for as long as `backfill_closing.py` has not run) or where the
- * metric could not be taken in any call of the selection, because speech and
- * silence could not be told apart (ADR 0085).
- *
- * Both reasons are named and neither is claimed: which one it was is not
- * something the interface knows, and the metric table further down the same
- * page explains its "Trainings" column with the same two sentences.
- */
+/** A measured goal with no value in any selected training (ADR 0085). */
 export const NO_VALUE_YET =
   "Zu diesem Ziel wird gemessen, aber in den ausgewählten Trainings liegt dazu " +
-  "kein Wert vor. Entweder ist die Kennzahl neuer als diese Gespräche, oder sie " +
-  "ließ sich darin nicht messen.";
+  "kein Wert vor, weil sie sich darin nicht messen ließ.";
 
 export const FOCUS_BACKING: Record<string, FocusBacking> = {
   // speaking pace, pauses and how long a stretch of speech runs between

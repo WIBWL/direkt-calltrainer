@@ -48,21 +48,6 @@ describe("building a series from the history", () => {
     expect(series[0]?.points.map((p) => p.value)).toEqual([1, 2, 3]);
   });
 
-  it("leaves out a measurement whose metric type has been retired", () => {
-    // A Session measured before ADR 0057's rename points at the old row, which
-    // carries the same display name as its replacement. Kept, the dashboard
-    // would draw two charts called "Redeanteil" side by side.
-    const series = toSeries([
-      session({
-        measurements: [
-          measurement("talk_share", 40),
-          measurement("redeanteil", 40, { active: false }),
-        ],
-      }),
-    ]);
-
-    expect(series.map((s) => s.key)).toEqual(["talk_share"]);
-  });
 
   it("leaves out the loudness, which is not comparable between calls", () => {
     // Its dB span is the recording level, so across calls it measures the

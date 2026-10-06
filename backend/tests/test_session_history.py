@@ -236,7 +236,7 @@ async def test_the_loudness_curve_stays_out_of_the_listing(
     body = (await api_client.get("/api/sessions")).json()
 
     measurement = body["sessions"][0]["measurements"][0]
-    assert set(measurement) == {"key", "name", "unit", "value", "active", "aspect"}
+    assert set(measurement) == {"key", "name", "unit", "value", "aspect"}
     assert "detail" not in measurement
 
 

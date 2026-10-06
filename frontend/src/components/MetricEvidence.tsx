@@ -431,9 +431,6 @@ function Pauses({ detail }: { detail: Record<string, unknown> }) {
 }
 
 function Phonation({ detail }: { detail: Record<string, unknown> }) {
-  // `voiced_ms`, not the `speech_ms` a row stored before ADR 0114 carries: that
-  // was the recordings' length, padding and all, and drawing it under this
-  // text would mislabel the padding as pauses.
   const voiced = number(detail.voiced_ms);
   const phonation = number(detail.phonation_ms);
   if (voiced === null || phonation === null || voiced <= 0) return null;

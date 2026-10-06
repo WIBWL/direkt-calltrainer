@@ -46,30 +46,16 @@ export default function IntonationReading({
   const endings = detail.endings as Endings | undefined;
   const first = detail.range_first_st as number | null | undefined;
   const last = detail.range_last_st as number | null | undefined;
-  // Absent for a Session measured before the seams were kept; the plot then
-  // simply draws one continuous stretch of speaking time.
   const breaks = detail.turn_breaks as number[] | undefined;
   const bandLow = detail.band_low_st as number | undefined;
   const bandHigh = detail.band_high_st as number | undefined;
-  // Absent for a Session measured before the reading moved onto this figure
-  // (ADR 0077). The step and the colour are then absent too, and the block says
-  // so rather than reinstating the withdrawn scale from the range.
+  // Null with too little voiced speech; then there is no step and no colour.
   const pvq = detail.pvq as number | null | undefined;
   const pvqWindows = (detail.pvq_windows as number | null | undefined) ?? 0;
   const label = detail.liveliness_label as string | undefined;
   const light = detail.liveliness_light as TrafficLight | undefined;
 
-  // A Session measured before the factors existed carries the range and
-  // nothing else. Its recording is long gone (ADR 0048), so the rest cannot be
-  // reconstructed; the block says so rather than showing empty rows.
-  if (!curve || !median) {
-    return (
-      <p className="muted">
-        Für dieses Training liegt nur der Umfang vor. Der Tonhöhenverlauf wurde damals noch nicht
-        mitgeschrieben, und die Aufnahme ist gelöscht, wie bei jedem Gespräch.
-      </p>
-    );
-  }
+  if (!curve || !median) return null;
 
   const notes = [endingsNote(endings), developmentNote(first, last)].filter(
     (note): note is string => note !== null,
@@ -81,13 +67,8 @@ export default function IntonationReading({
         curveHz={curve}
         medianHz={median}
         stepMs={stepMs}
-        // The measured ends of the range where they exist. The fallback assumes
-        // the band sits symmetrically around the median, which is what this
-        // drawing did before the two ends were measured. Near enough on most
-        // voices, wrong on any voice that reaches further one way than the
-        // other, and kept only so a Session stored in between still draws.
-        bandLowSt={bandLow ?? -measurement.value / 2}
-        bandHighSt={bandHigh ?? measurement.value / 2}
+        bandLowSt={bandLow}
+        bandHighSt={bandHigh}
         breaks={breaks}
       />
 

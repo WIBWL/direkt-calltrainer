@@ -45,8 +45,7 @@ export default function PitchContour({
   /** The 5th and 95th percentile, in semitones from the median. */
   bandLowSt?: number | undefined;
   bandHighSt?: number | undefined;
-  /** Indices into `curveHz` where one of the user's turns ends and the next
-   *  begins. Empty for a Session measured before these were kept. */
+  /** Indices into `curveHz` where one user turn ends and the next begins. */
   breaks?: number[] | undefined;
 }) {
   const measured = curveHz.map((hz) => (hz ? 12 * Math.log2(hz / medianHz) : null));
