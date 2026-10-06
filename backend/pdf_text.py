@@ -1,12 +1,6 @@
-"""Reading the text out of an uploaded PDF (F-58), in a process of its own.
-
-pypdf is a pure-Python parser fed a file the User chose, and a crafted PDF can
-make it loop or inflate a stream far past the upload's size. Run on the
-backend's one event loop, one such file froze every live call (ADR 0109). So
-`read_pdf` hands the bytes to `python -m backend.pdf_text`, which runs under a
-memory ceiling and is killed after `READ_TIMEOUT_S`. Nothing here imports the
-model client, so the child starts in a fraction of a second.
-"""
+"""Reading a PDF's text in a child process (F-58, ADR 0109): a crafted PDF once
+froze every live call on the event loop. The child is memory-capped and killed
+after READ_TIMEOUT_S; this module imports no model client, so it starts fast."""
 from __future__ import annotations
 
 import asyncio
@@ -23,23 +17,15 @@ from backend.authored_text import clean
 
 logger = logging.getLogger(__name__)
 
-# Every upload is read into memory before it is parsed, so this is a memory
-# bound, not a policy one. The number lives once, here, and the German message
-# below is built from it: a literal "5 MB" in a string drifts the first time
-# this changes.
+# A memory bound: uploads are read into memory before parsing.
 MAX_UPLOAD_MB = 5
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 TOO_LARGE = f"Die Datei ist größer als {MAX_UPLOAD_MB} MB."
 
-# A text-layer PDF of 5 MB reads in well under a second; thirty is for a slow
-# machine, not for a document that needs it.
 READ_TIMEOUT_S = 30.0
-# The child's address space. A decompression bomb then ends in a MemoryError in
-# the child rather than in the backend's memory. Linux only: macOS refuses
-# RLIMIT_AS, and development runs without the ceiling.
+# Linux only: macOS refuses RLIMIT_AS.
 CHILD_MEMORY_BYTES = 1024 * 1024 * 1024
-# PDFs read at once across all Users; the rest wait their turn. Each is a
-# process, and the per-User rate limit alone does not bound the sum.
+# Across all Users; each read is a process, which the per-User limit does not bound.
 MAX_READERS = 2
 
 _UNREADABLE = "Die Datei konnte nicht als PDF gelesen werden."
@@ -48,35 +34,25 @@ _TOO_SLOW = (
     "einfacher aufgebaute PDF-Datei verwenden."
 )
 
-# What the child runs, after the interpreter. A module constant so a test can
-# swap in a child that hangs or crashes.
+# Swappable by tests for a child that hangs or crashes.
 _CHILD_ARGS: tuple[str, ...] = ("-m", "backend.pdf_text")
-# The directory `backend` is importable from, whatever the parent's cwd.
 _IMPORT_ROOT = Path(__file__).resolve().parents[1]
 
 _readers = asyncio.Semaphore(MAX_READERS)
 
 
 class DocumentError(ValueError):
-    """The upload is not a usable text-layer PDF. The message is shown to the
-    User as-is, so it is in German."""
+    """Shown to the User as-is, so German."""
 
 
 def labelled(name: str, message: str) -> str:
-    """`message`, saying which file it is about. A lone upload names nothing --
-    the User has exactly one file in mind and the name would be noise -- but one
-    bad file among several has to be identifiable, or the whole batch is."""
+    """A lone upload names nothing; one bad file among several must be named."""
     return f"{name}: {message}" if name else message
 
 
 def extract_pdf_text(data: bytes, name: str = "") -> tuple[str, int]:
-    """The full extracted text of a text-layer PDF plus its page count. Every
-    page is read -- the upload gates are the only bound (`summarise_facts` then
-    hands the whole text to the model). Raises DocumentError for anything that
-    is not a readable text PDF; `name` puts the offending file in the message
-    where a request carried more than one.
-
-    Runs in whatever process calls it; the route reaches it through `read_pdf`."""
+    """Text and page count; every page is read. Runs in the caller's process;
+    the route reaches it through `read_pdf`."""
     if not data:
         raise DocumentError(labelled(name, "Die Datei ist leer."))
     if len(data) > MAX_UPLOAD_BYTES:
@@ -95,7 +71,7 @@ def extract_pdf_text(data: bytes, name: str = "") -> tuple[str, int]:
         try:
             parts.append(page.extract_text() or "")
         except (PdfReadError, KeyError, ValueError):
-            parts.append("")  # a broken page is skipped, not fatal
+            parts.append("")
     text = clean("\n".join(parts))
 
     if not text.strip():
@@ -110,10 +86,7 @@ def extract_pdf_text(data: bytes, name: str = "") -> tuple[str, int]:
 
 
 async def read_pdf(data: bytes, name: str = "") -> tuple[str, int]:
-    """`extract_pdf_text` in a child process that is killed after
-    `READ_TIMEOUT_S`. A child that crashes, runs out of memory or overruns is
-    a DocumentError like any other unreadable file."""
-    # The cheap refusals need no process.
+    """A crash, OOM or overrun is a DocumentError like any unreadable file."""
     if not data:
         raise DocumentError(labelled(name, "Die Datei ist leer."))
     if len(data) > MAX_UPLOAD_BYTES:
@@ -133,8 +106,7 @@ async def read_pdf(data: bytes, name: str = "") -> tuple[str, int]:
             logger.warning("PDF read overran %.0f s; child killed", READ_TIMEOUT_S)
             raise DocumentError(labelled(name, _TOO_SLOW)) from e
         finally:
-            # Also on cancellation: a client that goes away must not leave the
-            # child parsing.
+            # Also on cancellation: a vanished client must not leave the child parsing.
             if child.returncode is None:
                 child.kill()
                 await child.wait()
@@ -149,8 +121,6 @@ async def read_pdf(data: bytes, name: str = "") -> tuple[str, int]:
 
 
 def _limit_memory() -> None:
-    """Cap this process's address space at `CHILD_MEMORY_BYTES`, where the
-    platform allows it."""
     try:
         import resource  # pylint: disable=import-outside-toplevel  # POSIX only
 
@@ -160,8 +130,7 @@ def _limit_memory() -> None:
 
 
 def main() -> None:
-    """The child: PDF bytes on stdin, one JSON object on stdout -- the text and
-    page count, or the German refusal (unnamed; the parent names the file)."""
+    """The child: PDF bytes on stdin, one JSON object on stdout."""
     _limit_memory()
     data = sys.stdin.buffer.read()
     try:

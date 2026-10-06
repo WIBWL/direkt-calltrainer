@@ -1,17 +1,9 @@
-"""Load test for the Postgres schema through the app's own write and read paths
-(persist_session, the wrap-up poll's eager read, the shared pool) -- not pgbench.
-Never touches the database POSTGRES_URL names; creates, migrates and drops a
-throwaway one on the same server.
+"""Load test for the schema through the app's own write and read paths, on a
+throwaway database beside the one POSTGRES_URL names. Exit 0 only if nothing failed.
 
     python -m backend.scripts.stress_db --sessions 300 --writers 16
-    python -m backend.scripts.stress_db --volume 5000 --readers 32 --duration 20
-    python -m backend.scripts.stress_db --sessions 200 --writers 32 --pool-size 20
-
-Exit code is 0 only if no operation failed."""
-# duplicate-code: this script deliberately re-implements the throwaway-database
-# helpers from shared/tests/fixtures.py (not in the image) and copies the wrap-up
-# read from backend/api/sessions.py verbatim -- benchmarking the *exact* query is
-# the point.
+    python -m backend.scripts.stress_db --volume 5000 --readers 32 --duration 20"""
+# duplicate-code: copies the test fixtures (not in the image) and the exact wrap-up read.
 # pylint: disable=duplicate-code
 
 from __future__ import annotations
@@ -43,14 +35,11 @@ from backend import consent, library
 
 logger = logging.getLogger("stress")
 
-# Taken from the environment once, before database_env() points it elsewhere.
+# Read once, before database_env() points it elsewhere.
 _SERVER = os.environ.get("POSTGRES_URL")
 
 
-# --- Environment ----------------------------------------------------------
-
 def server_url() -> URL:
-    """The configured database server: the one POSTGRES_URL names."""
     if not _SERVER:
         sys.exit("POSTGRES_URL is not set -- `source .env` first")
     return build_database_url()
@@ -58,8 +47,7 @@ def server_url() -> URL:
 
 @contextmanager
 def database_env(url: str) -> Iterator[None]:
-    """Points build_database_url() -- and therefore Alembic and the app's
-    engine -- at `url` for the duration of the block."""
+    """Points build_database_url(), and so Alembic and the engine, at `url`."""
     previous = {k: os.environ.pop(k, None) for k in ("POSTGRES_URL", "POSTGRES_PASSWORD")}
     os.environ["POSTGRES_URL"] = url
     try:
@@ -71,11 +59,7 @@ def database_env(url: str) -> Iterator[None]:
 
 @contextmanager
 def throwaway_database(keep: bool) -> Iterator[str]:
-    """Creates a database for this run and drops it afterwards.
-
-    Never the POSTGRES_URL database: a load test writes tens of thousands of rows and
-    would leave the development data unusable.
-    """
+    """Never the POSTGRES_URL database: tens of thousands of rows would ruin it."""
     server = server_url()
     name = f"calltrainer_stress_{uuid.uuid4().hex[:10]}"
     admin = create_engine(server.set(database="postgres"), isolation_level="AUTOCOMMIT")
@@ -95,8 +79,7 @@ def throwaway_database(keep: bool) -> Iterator[str]:
 
 
 def provision(url: str, pool_size: int) -> None:
-    """Migrate to head and seed the reference tables -- the state the app boots
-    into."""
+    """Migrated and seeded, as the app boots."""
     from alembic import command
     from alembic.config import Config
 
@@ -104,8 +87,7 @@ def provision(url: str, pool_size: int) -> None:
     from backend.db.provision import seed
 
     with database_env(url):
-        # Set before the engine is built: get_engine() reads these at call time
-        # and memoises the result, so raising the pool afterwards has no effect.
+        # Before the engine is built: get_engine() memoises.
         db_session.POOL_SIZE = pool_size
         db_session.POOL_MAX_OVERFLOW = pool_size
         db_session.reset_engine()
@@ -116,16 +98,11 @@ def provision(url: str, pool_size: int) -> None:
                 consent.record_decision(db, subject(index), True)
 
 
-# --- Synthetic load -------------------------------------------------------
-
-# The writes are spread over this many synthetic subjects, each of whom has
-# granted consent in `provision` -- without it `persist_session` refuses every
-# write (ADR 0066) and the run would time nothing but refusals.
+# Each granted consent in `provision`, or every write is refused (ADR 0066).
 SUBJECTS = 50
 
 
 def subject(index: int) -> str:
-    """The synthetic subject the `index`-th Session is written under."""
     return f"stress-{index % SUBJECTS:03d}"
 
 
@@ -140,8 +117,7 @@ _SENTENCES = (
 
 
 def synthetic_turns(count: int, rng: random.Random) -> list[Turn]:
-    """A Session of `count` exchanges, shaped like a real one (alternating speech
-    windows, per-Turn paraverbal facts, ADR 0048). Plausible, not real values."""
+    """Plausible, not real values."""
     turns: list[Turn] = []
     clock = 0
     for seq in range(count):
@@ -162,20 +138,15 @@ def synthetic_turns(count: int, rng: random.Random) -> list[Turn]:
             pauses=[Pause(offset_ms=user_start + i * 900,
                           duration_ms=rng.randint(300, 900))
                     for i in range(rng.randint(1, 4))],
-            # One sample per 100ms, a third of them silent -- the same shape
-            # acoustics.py produces.
+            # One sample per 100ms, a third silent, as acoustics.py produces.
             loudness_db=[None if rng.random() < 0.35 else rng.uniform(45.0, 70.0)
                          for _ in range(user_ms // 100)],
         ))
     return turns
 
 
-# --- Measurement ----------------------------------------------------------
-
 @dataclass
 class Samples:
-    """Latencies of one workload, in milliseconds, plus what went wrong."""
-
     name: str
     values: list[float] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
@@ -183,23 +154,19 @@ class Samples:
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def record(self, ms: float) -> None:
-        """One successful operation, at `ms` milliseconds."""
         with self._lock:
             self.values.append(ms)
 
     def fail(self, exc: BaseException) -> None:
-        """One failed operation, kept as text so the run can report it."""
         with self._lock:
             self.errors.append(f"{type(exc).__name__}: {exc}")
 
     def quantile(self, q: float) -> float:
-        """The `q`-quantile latency. Nearest-rank, not interpolated: every
-        value reported is one that was actually measured."""
+        """Nearest-rank: every value reported was actually measured."""
         ordered = sorted(self.values)
         return ordered[min(len(ordered) - 1, int(q * len(ordered)))]
 
     def report(self) -> str:
-        """The workload's line in the summary."""
         if not self.values:
             return f"{self.name}\n  no successful operations ({len(self.errors)} errors)"
         rate = len(self.values) / self.wall_s if self.wall_s else float("nan")
@@ -215,9 +182,7 @@ class Samples:
 
 @contextmanager
 def timed(samples: Samples) -> Iterator[None]:
-    """Times the block, recording either its latency or its exception. Swallows
-    the exception on purpose: one failed operation is a data point, not a reason
-    to stop the run."""
+    """Swallows the exception: one failure is a data point, not a reason to stop."""
     start = time.perf_counter()
     try:
         yield
@@ -227,22 +192,15 @@ def timed(samples: Samples) -> Iterator[None]:
         samples.record((time.perf_counter() - start) * 1000)
 
 
-# --- Workloads ------------------------------------------------------------
-
 def write_load(
     total: int, workers: int, turns_per_session: int, label: str = "WRITE",
 ) -> tuple[Samples, list[uuid.UUID]]:
-    """`total` finished Sessions written concurrently through persist_session --
-    the real transaction, including its Measurement rows and its queued job."""
     from backend.session.persistence import FinishedCall, persist_session
 
     samples = Samples(f"{label}  persist_session  ({workers} threads)")
     written: list[uuid.UUID] = []
     lock = threading.Lock()
 
-    # Read the seeded reference rows straight from the throwaway database (the
-    # hardcoded lists moved into the tables, ADR 0041). `database_env` is active
-    # around every write_load call in main().
     personas = library.list_personas()
     scenarios = library.list_scenarios("stress", 1)
 
@@ -260,9 +218,7 @@ def write_load(
                 started_at=datetime.now(UTC) - timedelta(minutes=3),
                 reason="completed",
             ))
-            # A refusal is not an exception, so without this the run reported
-            # a throughput made of nothing but consent refusals, and read back
-            # Sessions that were never written.
+            # A refusal is not an exception; count it as a failure.
             if stored is None:
                 raise RuntimeError(f"persist_session stored nothing for {subject(index)}")
             with lock:
@@ -276,11 +232,7 @@ def write_load(
 
 
 def read_load(ids: list[uuid.UUID], readers: int, duration_s: float) -> Samples:
-    """The wrap-up read, hammered for `duration_s`.
-
-    This is the query the post-call screen polls, eager loads and all -- the one
-    read that has to stay fast as the tables grow.
-    """
+    """The query the post-call screen polls, eager loads and all."""
     from shared.db import models as db_models
     from shared.db.session import session_scope
 
@@ -319,8 +271,7 @@ def read_load(ids: list[uuid.UUID], readers: int, duration_s: float) -> Samples:
 
 
 def explain_read(extern_id: uuid.UUID) -> str:
-    """EXPLAIN ANALYZE of the lookup, to show whether the unique index on
-    extern_id is used or the planner has fallen back to a sequential scan."""
+    """Whether the unique index on extern_id is used."""
     from shared.db.session import session_scope
 
     with session_scope() as db:
@@ -333,8 +284,6 @@ def explain_read(extern_id: uuid.UUID) -> str:
 
 
 def table_sizes() -> str:
-    """Row counts and on-disk size per table -- the volume the numbers above
-    were measured at."""
     from shared.db.session import session_scope
 
     with session_scope() as db:
@@ -348,10 +297,7 @@ def table_sizes() -> str:
     return "\n".join(f"  {r[0]:<{width}}  {r[1]:>9,} rows  {r[2]:>10}" for r in rows)
 
 
-# --- Entry point ----------------------------------------------------------
-
 def parse_args() -> argparse.Namespace:
-    """The command line."""
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--sessions", type=int, default=200,
@@ -376,10 +322,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    """Provision a throwaway database, run both workloads, print the report."""
     args = parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    # persist_session logs one line per Session; at this volume that is noise.
     logging.getLogger("backend.session.persistence").setLevel(logging.WARNING)
     logging.getLogger("alembic").setLevel(logging.WARNING)
 

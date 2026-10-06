@@ -1,12 +1,8 @@
-"""Auditions KugelAudio voices without a Session: one line per voice id to a .wav,
-fed back through STT -- a voice can return audio of the right length and still be
-unintelligible, which only this round-trip (or listening) catches.
+"""Audition KugelAudio voices: synthesize a line per voice id, then transcribe it
+back, since a voice can return audio of the right length and be unintelligible.
 
-Run from the project root with .env sourced:
-    python -m backend.scripts.try_voice 1071 1018 1656
-    python -m backend.scripts.try_voice --language de 1885
-    python -m backend.scripts.try_voice --text "Guten Tag, hier ist Thomas Brandt." 1885
-    python -m backend.scripts.try_voice --list            # what this account can use
+    python -m backend.scripts.try_voice [--language de] [--text "..."] 1885 1071
+    python -m backend.scripts.try_voice --list
 """
 import argparse
 import asyncio
@@ -25,7 +21,6 @@ SAMPLE_TEXT = {
 
 
 def list_voices() -> None:
-    """Every voice this account can use, with the languages it declares."""
     offset = 0
     while True:
         page = KUGELAUDIO_CLIENT.voices.list(limit=50, offset=offset)
@@ -39,22 +34,18 @@ def list_voices() -> None:
 
 
 async def audition(voice_ids: list[int], text: str, language: str, out_dir: str) -> int:
-    """Synthesize + transcribe each voice. Returns a non-zero count of failures."""
     failures = 0
     for voice_id in voice_ids:
-        # Straight at KugelAudio: the tts.synthesize() wrapper would fall back
-        # to the EFRE voice on failure and hide which backend actually spoke.
+        # Straight at KugelAudio, bypassing the client wrapper.
         try:
             response = await KUGELAUDIO_CLIENT.tts.generate_async(
                 text=text, model_id=KUGELAUDIO_MODEL, voice_id=voice_id, language=language
             )
         except Exception as e:  # noqa: BLE001  # pylint: disable=broad-exception-caught
-            # Surfacing whatever the SDK raises is the point of the audition.
             print(f"  {voice_id}: SYNTHESIS FAILED - {type(e).__name__}: {e}")
             failures += 1
             continue
 
-        # A dev script reusing the client's WAV framing; not worth a public alias.
         wav = tts._pcm16_to_wav(response.audio, response.sample_rate)  # pylint: disable=protected-access
         path = os.path.join(out_dir, f"voice_{voice_id}.wav")
         with open(path, "wb") as f:
@@ -68,7 +59,6 @@ async def audition(voice_ids: list[int], text: str, language: str, out_dir: str)
 
 
 def main() -> int:
-    """Parse the arguments and run either --list or an audition."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("voice_ids", nargs="*", type=int, help="KugelAudio voice ids")
     parser.add_argument("--language", default="en", help="bare code, e.g. en or de (not en-GB)")

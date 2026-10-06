@@ -1,8 +1,5 @@
-"""The briefing a User reads while playing a reverse (F-61, ADR 0070).
-
-Turns the played Scenario's English prompt fields into German prose for the User plus a
-goal checklist. It **translates, never invents**. No statistics (ADR 0051), and it never
-reaches a prompt -- a briefing the Persona could read, it could act on."""
+"""The reverse briefing (F-61, ADR 0070): the played case translated, never
+invented, into German for the User. It never reaches a prompt."""
 from __future__ import annotations
 
 import logging
@@ -14,17 +11,10 @@ from backend.authored_text import clean, fit
 
 logger = logging.getLogger(__name__)
 
-# How much of each field is kept. Not `authored_text.FIELD_LIMITS`: those are
-# what the *authoring* API accepts into a Scenario column, and these are panels
-# on a screen, sized by what stays readable beside a running call. The goals are
-# short on purpose -- a list nobody can hold in their head while talking is
-# decoration, and this one is meant to be glanced at and ticked off mid-call.
+# Screen panels readable beside a running call, not the authoring caps.
 FIELD_LIMITS = {
     "situation": 600,
     "facts": 1500,
-    # The goal and the bar that settles it, in one field since the two were
-    # merged -- the two old caps added together, so a briefing that already
-    # held both is not truncated by it.
     "goal": 800,
 }
 GOAL_LIMIT = 120
@@ -36,8 +26,7 @@ class ReverseError(RuntimeError):
 
 
 class _Brief(BaseModel):
-    """The briefing panel's fields. All defaulted: a missing key costs that
-    panel, not the whole briefing, and a thin brief is still a usable exercise."""
+    """All defaulted: a missing key costs that panel, not the briefing."""
 
     situation: str = ""
     facts: str = ""
@@ -45,20 +34,14 @@ class _Brief(BaseModel):
     goals: list[str] = []
 
     def sanitised(self) -> dict:
-        """Cleaned (ADR 0059) and capped, ready to store and to show. Cleaned
-        though it never reaches a prompt: the rule for the `scenario` table
-        should not depend on which writer filled the row."""
+        """Cleaned though it never reaches a prompt: the `scenario` table's rule
+        should not depend on the writer."""
         brief = {
             field: fit(clean(getattr(self, field)), cap) for field, cap in FIELD_LIMITS.items()
         }
-        # Held at a word boundary like the follow-up's fields: a slice cut the
-        # briefing the User argues from in the middle of a word.
         goals = [fit(clean(g), GOAL_LIMIT) for g in self.goals]
         brief["goals"] = [g for g in goals if g][:MAX_GOALS]
         return brief
-
-
-# --- Prompt ---------------------------------------------------------------
 
 
 def _material(
@@ -67,10 +50,8 @@ def _material(
     call_goal: str,
     improvements: list[str],
 ) -> str:
-    """What the model is given: the three fields to turn around, and — where a
-    wrap-up exists — what the coach asked the User to work on, which decides
-    the order the goals come in. A Session whose wrap-up has not landed simply
-    has no such lines, and the goals are read off the case alone."""
+    """The three fields, plus the coaching points where a wrap-up exists, which
+    decide the order of the goals."""
     lines = [
         "The scenario the trainee has just played, as the simulated caller "
         "received it:",
@@ -89,11 +70,7 @@ def _material(
 
 
 def _messages(material: str) -> list[dict[str, str]]:
-    """The prompt. English per ADR 0043; the briefing itself is German.
-
-    Numbered like the wrap-up's (ADR 0011). Rules a small model breaks here: R1
-    (inventing a case), R2 (addressing the trainee in the role they are leaving),
-    G2 (advice about manner instead of goals that happened or did not)."""
+    """English prompt (ADR 0043); the briefing is German."""
     system = (
         "# Role\n"
         "You prepare a trainee for a phone-call exercise. They have just "
@@ -195,20 +172,14 @@ def _messages(material: str) -> list[dict[str, str]]:
     ]
 
 
-# --- Model call -----------------------------------------------------------
-
-
 async def draft_brief(
     description: str,
     case_facts: str,
     call_goal: str,
     improvements: list[str] | None = None,
 ) -> dict:
-    """One briefing, cleaned and capped, ready to store on the reverse.
-
-    `llm.complete_json` owns the retry (shared with F-60).
-    Propagates OpenAIError; raises ReverseError when nothing parsed -- no fallback,
-    since an unreadable briefing is worse than a button saying try again."""
+    """Propagates OpenAIError; ReverseError when nothing parsed. No fallback: an
+    unreadable briefing is worse than "try again"."""
     messages = _messages(
         _material(description, case_facts, call_goal, improvements or [])
     )

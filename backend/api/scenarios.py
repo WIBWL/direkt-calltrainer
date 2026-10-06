@@ -1,8 +1,5 @@
-"""REST routes for the Scenario library and User-authored Scenarios (ADR 0058).
-Listing and detail (ADR 0062; a built-in withholds `call_goal`, ADR 0043/0045),
-authoring, sharing, and the stateless PDF helper (F-58). Reverses and follow-ups
-(ADR 0069/0070) are written on the Session; here they can only be deleted.
-Sanitising is `library.py`'s (ADR 0059); writes are owner-scoped by `sub`."""
+"""Scenario routes (ADR 0058, 0062): listing, detail, authoring, sharing and the
+PDF helper (F-58). Reverses and follow-ups can only be deleted here."""
 from __future__ import annotations
 
 import logging
@@ -34,8 +31,7 @@ from backend.tenants import ResolvedTenant
 
 logger = logging.getLogger(__name__)
 
-# On the router, so a route added later cannot be reachable unauthenticated
-# by forgetting a parameter; routes that take `user` do so to use it.
+# On the router, so no route can be reachable unauthenticated by omission.
 router = APIRouter(prefix="/api/scenarios", dependencies=[Depends(require_user)])
 
 
@@ -45,38 +41,26 @@ def _limited(field: str, *, required: bool):
         else Field("", max_length=cap)
 
 
-# "" (no category) or one of the three F-03 contexts (ADR 0072). Kept in step
-# with the CHECK constraint by deriving it from the same tuple.
+# Derived from the same tuple as the CHECK constraint.
 _CATEGORY_PATTERN = "^(" + "|".join(SCENARIO_CATEGORIES) + "|)$"
 
 
 class ScenarioInput(BaseModel):
-    """The fields an authoring caller sets. `name` / `short_description` are the
-    card and `briefing` the trainee's own text (ADR 0054); `description` and the
-    three case fields are prompt input (ADR 0045) and may be left empty — an
-    empty case means "improvise"."""
+    """`description` is required; the case fields may be empty ("improvise")."""
 
     name: str = _limited("title", required=True)
     short_description: str = _limited("short_description", required=True)
-    # Display, addressed to the trainee, never to the model (ADR 0054).
-    # Optional: a Scenario without one briefs nobody, which is what every row
-    # authored before this field existed does.
+    # For the trainee, never the model (ADR 0054).
     briefing: str = _limited("briefing", required=False)
-    # The situation is what the model gets as context -- an authored Scenario
-    # without it is not a scenario, so it is required (the built-in seed rows
-    # all carry one; ADR 0045 only allows the *case* fields to be blank).
+    # The situation is required; only the case fields may be blank (ADR 0045).
     description: str = _limited("description", required=True)
     case_facts: str = _limited("case_facts", required=False)
     call_goal: str = _limited("call_goal", required=False)
-    # Display/filter only (ADR 0072), never prompt input -- and a closed
-    # vocabulary rather than the free text it replaces, so the value the
-    # category filter runs on is one the database will accept. "" is the empty
-    # choice the editor offers and reaches the column as NULL.
+    # A closed vocabulary (ADR 0072); "" becomes NULL.
     category: str = Field("", pattern=_CATEGORY_PATTERN)
 
     def to_library(self) -> dict:
-        """1:1 with the schema columns, except the card field `name`, which is
-        the `title` column (ADR 0061), and the empty category, which is NULL."""
+        """`name` is the `title` column; an empty category is NULL."""
         data = self.model_dump()
         data["title"] = data.pop("name")
         data["category"] = data["category"] or None
@@ -84,15 +68,12 @@ class ScenarioInput(BaseModel):
 
 
 class VisibilityInput(BaseModel):
-    # `private` <-> `tenant` only; `public` is a review decision (ADR 0060 phase 3).
+    # `public` needs review (ADR 0060).
     visibility: str = Field(..., pattern="^(private|tenant)$")
 
 
 def _origin(scenario, subject: str) -> str:
-    """Who the Scenario belongs to, from the caller's point of view. `own` wins
-    over `tenant` -- the author still owns and can edit a Scenario they shared;
-    `shared` (below) is the separate "visible to the company" flag the company
-    filter uses."""
+    """`own` wins over `tenant`; `shared` says separately whether it is shared."""
     if scenario.created_by == subject:
         return "own"
     if scenario.visibility == VISIBILITY_TENANT:
@@ -101,9 +82,7 @@ def _origin(scenario, subject: str) -> str:
 
 
 def _origin_session(origin) -> dict | None:
-    """The conversation a reverse replays, for its card (ADR 0070). None for an
-    ordinary Scenario, and for a reverse whose Session has since been deleted —
-    the row outlives it, so the client renders both cases."""
+    """None for an ordinary Scenario, or a reverse whose Session was deleted."""
     if origin is None:
         return None
     return {
@@ -118,115 +97,67 @@ def _card(scenario, subject: str) -> dict:
         "id": scenario.id,
         "name": scenario.name,
         "short_description": scenario.short_description,
-        # On the card rather than only on the detail route: the briefing is
-        # shown before the call from the list the selection screen already
-        # holds (ADR 0054), without a second request. Nothing is withheld
-        # here in any case — this text is written to be read by whoever
-        # plays the Scenario.
+        # On the card, so it shows before the call without a second request.
         "briefing": scenario.briefing,
-        # What the setup screen shows once the card is picked: who calls, why,
-        # and what is practised. The German twin for a built-in, whose own
-        # `description` is English prompt text (ADR 0043); an authored row's
-        # author wrote it in their own language.
+        # The German twin for a built-in, whose `description` is English prompt text.
         "description": scenario.description_label or scenario.description,
-        # Null for an uncategorised Scenario; the category filter then only
-        # shows it under "Alle" (ADR 0072).
         "category": scenario.category,
         "origin": _origin(scenario, subject),
-        # True once shared with the company -- for the author's own Scenarios
-        # too, which `origin` still reports as `own`.
+        # Also for the author's own, which `origin` still reports as `own`.
         "shared": scenario.visibility == VISIBILITY_TENANT,
-        # Drafted from a Session's feedback (ADR 0069). A category of its own in
-        # the library, carried beside `origin` rather than as a value of it: it
-        # is the caller's own Scenario, but like a reverse it is neither
-        # editable nor shareable -- it is the exercise one reading of their
-        # feedback produced, and an edited one is no longer that.
+        # Neither editable nor shareable, like a reverse (ADR 0069).
         "follow_up": scenario.follow_up,
-        # A reverse (ADR 0070) is `origin: "own"` like anything else the caller
-        # owns; this is what separates it out into its own filter, and what
-        # tells the card not to offer an edit it would be refused.
+        # Separates reverses into their own filter and suppresses the edit.
         "reverse": scenario.reverse,
         "origin_session": _origin_session(scenario.origin_session),
-        # Set by the listing for the few it suggests (F-62), with the reason;
-        # a view over the cards, so a suggested one keeps its own origin too.
+        # Set by the listing for suggested cards (F-62).
         "recommendation": None,
     }
 
 
-# The order the selection screen shows the origins in, matching its level-1
-# filter (ADR 0072). Not `scenario.category`, which is the thematic level-2
-# filter. `library.list_scenarios` returns them by creation time and Python's
-# sort is stable, so that order survives inside each group.
+# The level-1 filter order (ADR 0072); the stable sort keeps creation order inside.
 _ORIGIN_ORDER = ("builtin", "own", "follow_up", "reverse", "tenant")
 
 
 def _origin_group(card: dict) -> int:
-    """Which level-1 group a card belongs to. Three of the five are not values
-    of `origin`: a follow-up (ADR 0069) and a reverse (ADR 0070) are both
-    `own` on the wire and are separated out here, exactly as the filter
-    separates them. A row is never both."""
+    """Follow-ups and reverses are `own` on the wire but grouped separately."""
     if card["reverse"]:
         return _ORIGIN_ORDER.index("reverse")
     return _ORIGIN_ORDER.index("follow_up" if card["follow_up"] else card["origin"])
 
 
 def _detail(scenario, subject: str) -> dict:
-    """One Scenario for the editor and the info panel (ADR 0062).
-
-    `editable` is decided from the verified `sub`. A built-in withholds
-    `call_goal` as None (not "") because it is the exercise's answer key, and
-    `case_facts` too, since its `briefing` already states what the trainee's
-    side knows (ADR 0054's amendment); authored rows, reverses included
-    (ADR 0070), withhold nothing."""
-    # No author at all = a shipped built-in. A colleague's shared row has an
-    # author, just not this caller, and is served in full.
+    """`editable` comes from the verified `sub`. A built-in withholds `call_goal`
+    (the answer key) and `case_facts` (its briefing replaces them) as None, not ""
+    (ADR 0054, 0062)."""
     built_in = scenario.created_by is None
     return {
         "id": scenario.id,
         "name": scenario.name,
         "short_description": scenario.short_description,
         "briefing": scenario.briefing,
-        # The display twin where there is one, the field itself otherwise
-        # (ADR 0062). A built-in's prompt text is English (ADR 0043) and the
-        # seed carries a German twin for it; an authored Scenario has no twin
-        # because its author already wrote it in their own language. Same wire
-        # name either way: the client shows one text and never both.
+        # The German twin where there is one.
         "description": scenario.description_label or scenario.description,
-        # A built-in withholds its case facts as well: they are the caller's
-        # side of the case, budget and notes included, and its `briefing`
-        # already carries everything the trainee's own company knows about
-        # this customer (ADR 0054's amendment).
         "case_facts": None if built_in else (scenario.case_facts_label or scenario.case_facts),
         "call_goal": None if built_in else scenario.call_goal,
-        # "" rather than null, so the editor's select has a value to sit on.
+        # "" so the editor's select has a value.
         "category": scenario.category or "",
-        # `public` for a built-in now that this route serves one. The editor
-        # never sees that value: it opens only where `editable` is true.
         "visibility": scenario.visibility,
-        # Authorship, not visibility (ADR 0058). Reverses and follow-ups are
-        # the caller's own but excluded by the write routes (ADR 0069/0070),
-        # so offering the edit would open an editor whose Save answers 404.
+        # The write routes refuse reverses and follow-ups, so no edit is offered.
         "editable": (
             scenario.created_by == subject and
             not scenario.reverse and
             not scenario.follow_up
         ),
         "reverse": scenario.reverse,
-        # Beside `reverse` and for the same reason the panel needs it: these
-        # two are the rows whose only action is deletion.
         "follow_up": scenario.follow_up,
         "origin_session": _origin_session(scenario.origin_session),
-        # The German briefing the User reads during a reverse call; null on
-        # every other row.
         "reverse_brief": scenario.reverse_brief,
     }
 
 
 def _cards(subject: str, tenant_id: int) -> list[dict]:
-    """Every Scenario the caller may select, as cards, grouped by origin and by
-    creation time within one. Both routes below need the same list in the same
-    order -- the listing serves it, `/next` breaks its ties by it -- so it is
-    built in one place rather than written out twice."""
+    """One ordering for the listing and for `/next`, which breaks ties by it."""
     return sorted(
         (_card(s, subject) for s in library.list_scenarios(subject, tenant_id)),
         key=_origin_group,
@@ -234,7 +165,6 @@ def _cards(subject: str, tenant_id: int) -> list[dict]:
 
 
 def _candidate(card: dict) -> recommendations.Candidate:
-    """What the recommendations need to know about a card."""
     return recommendations.Candidate(card["id"], card["category"], card["reverse"])
 
 
@@ -243,8 +173,6 @@ def list_scenarios(
     user: AuthContext = Depends(require_user),
     tenant_id: int = Depends(current_tenant_id),
 ) -> list[dict]:
-    """Every Scenario the caller may select, each badged builtin/own/tenant,
-    grouped by origin and by creation time within one."""
     cards = _cards(user.sub, tenant_id)
     picks = recommendations.for_subject(user.sub, [_candidate(card) for card in cards])
     for card in cards:
@@ -261,11 +189,7 @@ def next_calls(
     user: AuthContext = Depends(require_user),
     tenant_id: int = Depends(current_tenant_id),
 ) -> list[dict]:
-    """What to play after a call on this Scenario with this Persona (F-64).
-
-    Needs no stored Session, so it answers for a call that was not kept too. A
-    Scenario or Persona the caller cannot select is a 404, as everywhere.
-    """
+    """F-64. Needs no stored Session, so it works for an unkept call."""
     cards = _cards(user.sub, tenant_id)
     by_id = {card["id"]: card for card in cards}
     people = {p.id: p for p in library.list_personas()}
@@ -300,18 +224,14 @@ def next_calls(
 
 
 async def _read_documents(uploads: list[UploadFile]) -> list[ExtractedDocument]:
-    """Every upload, read and extracted, in the order they were sent.
-
-    Per-file ceiling on the declared size before reading, total on the bytes
-    actually read after, so a missing Content-Length cannot slip a second
-    oversized file through. One unusable document fails the whole batch."""
+    """One unusable document fails the batch. Declared sizes are checked before
+    reading, the running total after."""
     if not uploads:
         raise DocumentError("Es wurde keine Datei ausgewählt.")
     reject_too_many(len(uploads))
 
     documents: list[ExtractedDocument] = []
-    # Named only when there is more than one: a lone upload needs no label, and
-    # the single-file messages stay the sentences they always were.
+    # A lone upload needs no label in messages.
     named = len(uploads) > 1
     total = 0
     for upload in uploads:
@@ -330,20 +250,11 @@ async def _read_documents(uploads: list[UploadFile]) -> list[ExtractedDocument]:
 async def extract_document(
     request: Request, user: AuthContext = Depends(require_user)
 ) -> dict:
-    """Condense uploaded text-layer PDFs into one fact list for Fakten (F-58).
-
-    All files in one model call, so shared facts are not repeated. Stores
-    nothing. `summarised` is False when the LLM was unreachable and the raw
-    (truncated) text is returned instead. 429 past the caller's hourly budget.
-
-    The form is parsed here rather than declared as a `files` parameter:
-    FastAPI reads a declared body before it resolves any dependency, so the
-    upload would be parsed -- and spooled to disk -- for a caller the login
-    check then turns away (ADR 0109)."""
+    """Condense PDFs into one fact list (F-58); `summarised` is False when the
+    model failed and raw text is returned. The form is parsed here, not declared:
+    FastAPI parses a declared body before checking the login (ADR 0109)."""
     limits.enforce(limits.DOCUMENT_SUMMARIES, user.sub)
-    # Starlette's own file cap (1000) is left alone: past it, it answers a bare
-    # English 400, and `_read_documents` refuses anything over MAX_DOCUMENTS in
-    # German. The bytes are bounded by `body_limit.py` either way.
+    # Starlette's 1000-file cap answers in English; MAX_DOCUMENTS refuses first in German.
     async with request.form() as form:
         files = [f for f in form.getlist("files") if isinstance(f, UploadFile)]
         try:
@@ -361,37 +272,26 @@ async def extract_document(
         summarised = False
     return {
         "text": text,
-        # The whole batch, so the client can say what was read without adding up
-        # a list it would otherwise only need for that.
         "pages": sum(doc.pages for doc in documents),
         "summarised": summarised,
         "documents": [{"name": doc.name, "pages": doc.pages} for doc in documents],
     }
 
 
-# Defined before "/{extern_id}" so the literal path is matched first.
+# Before "/{extern_id}", so the literal path wins.
 @router.get("/field-limits")
 def field_limits() -> dict[str, int]:
-    """The maximum length the API enforces for each authorable Scenario field.
-    The editor caps its inputs from here, so its limits are the same source that
-    validates them rather than a hand-kept mirror that drifts (ADR 0063). Keyed
-    as the client knows the fields, so the `title` column reports as the card
-    field `name` (ADR 0061); that renaming lives in `authored_text.py`."""
+    """Served so the editor validates against the same source (ADR 0063)."""
     return WIRE_FIELD_LIMITS
 
 
-# Defined before "/{extern_id}" so the literal path is matched first.
 @router.get("/{extern_id}")
 def get_scenario(
     extern_id: str,
     user: AuthContext = Depends(require_user),
     tenant_id: int = Depends(current_tenant_id),
 ) -> dict:
-    """One Scenario the caller may select, for the info panel and — where
-    `editable` says so — for the editor (ADR 0062).
-
-    Another User's private row is a 404, indistinguishable from an unknown id
-    (ADR 0031/0050)."""
+    """Another User's private row is a 404, like an unknown id."""
     scenario = library.get_scenario(extern_id, user.sub, tenant_id)
     if scenario is None:
         raise HTTPException(status_code=404, detail="Unknown scenario")
@@ -404,7 +304,6 @@ def create_scenario(
     user: AuthContext = Depends(require_user),
     tenant_id: int = Depends(current_tenant_id),
 ) -> dict:
-    """Author a Scenario. It lands private, owned by the caller (ADR 0058)."""
     scenario = library.create_scenario(body.to_library(), user.sub, tenant_id)
     return _detail(scenario, user.sub)
 
@@ -415,7 +314,6 @@ def update_scenario(
     body: ScenarioInput,
     user: AuthContext = Depends(require_user),
 ) -> dict:
-    """Edit one of the caller's own Scenarios; 404 if it is not theirs."""
     scenario = library.update_scenario(extern_id, body.to_library(), user.sub)
     if scenario is None:
         raise HTTPException(status_code=404, detail="Unknown scenario")
@@ -429,12 +327,8 @@ def set_visibility(
     user: AuthContext = Depends(require_user),
     tenant: ResolvedTenant = Depends(current_tenant),
 ) -> dict:
-    """Share the caller's Scenario with their company, or make it private again
-    (R-58). Only the author may; `public` is not a choice offered here."""
-    # "Share" means "with my colleagues" (ADR 0060) -- a caller in the `default`
-    # tenant has none, so `tenant` visibility would just expose the row to every
-    # other company-less account. The UI hides the toggle for them; this is the
-    # matching server guard.
+    # The default tenant has no colleagues; sharing would expose the row to every
+    # company-less account.
     if body.visibility == "tenant" and tenant.is_default:
         raise HTTPException(
             status_code=409,
@@ -452,7 +346,6 @@ def set_visibility(
 def delete_scenario(
     extern_id: str, user: AuthContext = Depends(require_user)
 ) -> Response:
-    """Retire one of the caller's own Scenarios (soft, ADR 0058)."""
     if not library.deactivate_scenario(extern_id, user.sub):
         raise HTTPException(status_code=404, detail="Unknown scenario")
     return Response(status_code=204)

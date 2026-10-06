@@ -1,8 +1,5 @@
-"""The Persona's system prompt, the opening instruction, and the call-state prompt.
-
-Every sentence was written against a transcript where Qwen3-4B went wrong without
-it (ADR 0037, ADR 0038, ADR 0043, ADR 0045, ADR 0071). Short and sectioned (ADR 0071):
-a 4B model copies phrases out of long rule lists, so the machinery is enforced in code."""
+"""The system prompt, the opening instruction and the call-state prompt. Each
+sentence answers a transcript where the model went wrong without it (ADR 0071)."""
 
 from datetime import date
 
@@ -13,12 +10,8 @@ from backend.scenarios import Scenario
 
 
 def opening_instruction(pack: LanguagePack, reverse: bool = False) -> str:
-    """Asks the Persona for the line that opens the call. Openers come from the
-    pack, since a single English example was copied verbatim into every call.
-    Ordinarily the User has just picked up (ADR 0110) and this asks for the
-    caller's first words in reply to their answering line. In a reverse
-    (ADR 0070) it only answers the phone: a callee who guesses the reason has
-    answered the exercise before it started."""
+    """Ordinarily the User has just picked up (ADR 0110). In a reverse it only
+    answers the phone: a callee who guesses the reason has answered the exercise."""
     if reverse:
         return (
             "The phone is ringing and you are picking it up. Say only what "
@@ -64,11 +57,8 @@ def opening_instruction(pack: LanguagePack, reverse: bool = False) -> str:
 
 
 def _case_block(scenario: Scenario) -> str:
-    """The case the Scenario carries (ADR 0045), or nothing; each field optional.
-    The facts carry an ownership line, else the model asked the user about its own
-    case for eight Turns (ADR 0071); the goal a usage rule, else it was recited as a
-    demand every Turn. A reverse (ADR 0070) relabels them, or the model makes the
-    User's demands at the User."""
+    """The facts carry an ownership line (else the model asked the user about its
+    own case) and the goal a usage rule (else it was recited every Turn)."""
     if scenario.reverse:
         return _reverse_case_block(scenario)
     parts = []
@@ -84,9 +74,6 @@ def _case_block(scenario: Scenario) -> str:
             "What you want from this call, and when you count the matter "
             f"settled: {scenario.call_goal}"
         )
-        # Bare, this was recited as a demand every Turn and never weighed
-        # against what the user had already conceded. It covers the whole
-        # field now that the bar lives in it beside the goal.
         parts.append(
             "That is yours to check silently, never to read out: before each "
             "reply, hold what the user has actually said so far against it, "
@@ -98,9 +85,7 @@ def _case_block(scenario: Scenario) -> str:
 
 
 def _reverse_case_block(scenario: Scenario) -> str:
-    """The same case from the other side of the phone (ADR 0070): the facts become
-    what is on file with the Persona, and the settlement condition becomes the
-    caller's to be met rather than the Persona's to hold."""
+    """The same case from the callee's side (ADR 0070)."""
     parts = []
     if scenario.case_facts:
         parts.append(
@@ -127,8 +112,7 @@ def _reverse_case_block(scenario: Scenario) -> str:
 
 
 def _language_of_the_case(scenario: Scenario, pack: LanguagePack) -> str:
-    """One line where the case is, because that is where the words leak from:
-    the model translated the goal and kept "actually"."""
+    """Beside the case, because that is where English words leaked from."""
     if not scenario.case_facts and not scenario.call_goal:
         return ""
     return (
@@ -138,11 +122,7 @@ def _language_of_the_case(scenario: Scenario, pack: LanguagePack) -> str:
 
 
 def _objections_block(persona: Persona) -> str:
-    """The Persona's typical objections (R-12, ADR 0045), or nothing.
-
-    Framed as a repertoire rather than an agenda: the same model that copied a
-    single opening example into every call will work a list through end to end
-    if it is handed one."""
+    """A repertoire, not an agenda: handed a list, the model works through it."""
     if not persona.objections:
         return ""
     listed = "; ".join(persona.objections)
@@ -155,11 +135,7 @@ def _objections_block(persona: Persona) -> str:
 
 
 def _improvisation_rule(scenario: Scenario) -> str:
-    """How much the Persona may make up.
-
-    With a case (ADR 0045) improvisation is bounded: fill the gaps the facts
-    leave, never overwrite them. Without one the Scenario has nothing to point
-    at, so the original instruction stands."""
+    """With a case, fill its gaps but never overwrite it (ADR 0045)."""
     if scenario.case_facts:
         return (
             "Use the facts of the case as given: quote them when asked, invent "
@@ -179,9 +155,7 @@ def _improvisation_rule(scenario: Scenario) -> str:
 
 
 def _casting(scenario: Scenario, today: date) -> str:
-    """Who rang whom, and what that makes the Persona's job: which end of the line
-    it is on, and whether solutions come from it or the user. Said first since
-    everything after is read in its light; a reverse (ADR 0070) replaces it outright."""
+    """Said first: everything after is read in its light."""
     if scenario.reverse:
         return (
             "You are playing a character in a phone-call training exercise, "
@@ -214,10 +188,7 @@ def _casting(scenario: Scenario, today: date) -> str:
 
 
 def _persona_block(persona: Persona, scenario: Scenario) -> str:
-    """Who the Persona is. Name, traits and behaviour always; role and
-    objections only when the Persona is the caller. A reverse (ADR 0070) drops
-    both because every seeded role and objection is a customer's, which would
-    cast the support-side Persona as both sides of the call."""
+    """A reverse drops role and objections: they are all a customer's."""
     identity = (
         f"Your name: {persona.name} — introduce yourself by that name and "
         "never invent a different one. It is yours and nobody else's: never "
@@ -234,8 +205,6 @@ def _persona_block(persona: Persona, scenario: Scenario) -> str:
 
 
 def _no_restart_rule(scenario: Scenario) -> str:
-    """The tail of the anti-repetition paragraph: you are already past the
-    opening. A reverse loses the last clause, having had no reason to call."""
     if scenario.reverse:
         return (
             "You have already answered this call and said who you are: do not "
@@ -250,9 +219,7 @@ def _no_restart_rule(scenario: Scenario) -> str:
 
 
 def _closing_rules(scenario: Scenario, pack: LanguagePack) -> str:
-    """When the call is over, and how to end it: the half the model must get right
-    itself (enforced in code too, ADR 0037/0038). Reversed, the Persona decides
-    whether the caller is satisfied, and simply does not hang up on a caller."""
+    """Enforced in code too (ADR 0037/0038)."""
     if scenario.reverse:
         return (
             "Before every reply, check first whether the caller now has what "
@@ -297,11 +264,8 @@ def _closing_rules(scenario: Scenario, pack: LanguagePack) -> str:
 def build_system_prompt(
     persona: Persona, scenario: Scenario, pack: LanguagePack, today: date | None = None
 ) -> str:
-    """Builds the LLM system prompt. Instructions are English; only `pack` follows the
-    Persona's language (ADR 0043), and the language rule is repeated beside the case
-    because the 4B model carried its English words over. `today` because a caller knows
-    the date. A reverse (ADR 0070) swaps four pieces here rather than a second prompt;
-    guard tests assert the ordinary prompt keeps its casting."""
+    """English instructions; only `pack` follows the Persona's language (ADR 0043).
+    A reverse swaps pieces here, guarded by tests on the ordinary prompt."""
     today = today or date.today()
     return (
         f"{_casting(scenario, today)}"
@@ -327,22 +291,16 @@ def build_system_prompt(
     )
 
 
-# The call-state notes (ADR 0071): the one summarisation call per exchange
-# that keeps the model's view of the call short. Structured and factual on
-# purpose -- a 4B model extracts three labelled lines reliably where it loses
-# the thread in ten Turns of transcript.
+# Three labelled lines, which a small model extracts reliably (ADR 0071).
 STATE_MAX_TOKENS = 160
 
 
 def build_state_prompt(
     previous_notes: str, user_text: str, persona_text: str, persona: Persona, scenario: Scenario
 ) -> list[dict[str, str]]:
-    """The messages for one refresh of the notes the Persona keeps (ADR 0071).
-    Turned around for a reverse (ADR 0070): the notes are most of what the model
-    sees of the call, so naming the wrong side as caller undoes the system prompt."""
+    """A reverse turns it around: naming the wrong side as caller undoes the prompt."""
     if scenario.reverse:
         return _reverse_state_prompt(previous_notes, user_text, persona_text, persona, scenario)
-    # One line, since the bar the caller judges by now sits in the goal.
     settled = ""
     goal = (
         "What the caller wants, and when they count the matter settled: "
@@ -381,10 +339,7 @@ def build_state_prompt(
 def _reverse_state_prompt(
     previous_notes: str, user_text: str, persona_text: str, persona: Persona, scenario: Scenario
 ) -> list[dict[str, str]]:
-    """The same notes kept by the person who answered the phone (ADR 0070). The
-    exchange keeps the transcript's labels ("User", "Agent") so the machine is
-    never called "Caller"."""
-    # One line, since the bar the caller judges by now sits in the goal.
+    """Keeps the transcript's labels, so the machine is never called "Caller"."""
     settled = ""
     goal = (
         "What the caller wants, and when they count the matter settled: "

@@ -1,7 +1,4 @@
-"""Stores the demanding stretches of a call and the rest, measured separately
-(F-62, ADR 0081), in the wrap-up's transaction. The measuring is
-`shared/feedback/segments.py`.
-"""
+"""Stores the measurements over the demanding stretches (ADR 0081)."""
 
 from __future__ import annotations
 
@@ -17,17 +14,11 @@ logger = logging.getLogger(__name__)
 
 
 def store(db: DbSession, session_id: int, pressure_turns: list[int] | None) -> None:
-    """Mark the pressing utterances, measure both stretches and store them
-    (ADR 0081), in the wrap-up's transaction but behind its own failure boundary.
-
-    The boundary must be a **savepoint**, not just an `except`: after a failed
-    SQL statement Postgres aborts the transaction, and the swallowed error would
-    take the wrap-up and its commit with it. Idempotent for
-    `backend/scripts/requeue_feedback.py`; whole-call rows are never touched.
-    """
+    """In the wrap-up's transaction, behind a savepoint: after a failed statement
+    Postgres aborts the whole transaction, so a bare `except` would lose the
+    wrap-up too. Idempotent; whole-call rows are never touched."""
     if pressure_turns is None:
-        # Nobody judged this call: leave `turn.pressed` NULL. False would claim
-        # "judged, nobody pushed", which the model never said.
+        # Unjudged stays NULL; False would claim "judged, nobody pushed".
         logger.info("Session %d: no pressure judgement in the wrap-up; leaving the rows unmarked", session_id)
         return
     try:
@@ -38,7 +29,6 @@ def store(db: DbSession, session_id: int, pressure_turns: list[int] | None) -> N
 
 
 def _write(db: DbSession, session_id: int, pressure_turns: list[int]) -> None:
-    """The body of `store`, inside its savepoint. See there."""
     session = db.get(db_models.Session, session_id)
     if session is None:
         return
@@ -48,9 +38,7 @@ def _write(db: DbSession, session_id: int, pressure_turns: list[int]) -> None:
         row.turn_id for row in session.turns
         if row.turn_id in wanted and row.speaker == db_models.SPEAKER_PERSONA
     }
-    # Measure before anything is written: if measuring throws after the delete
-    # and the flags, those still commit with the wrap-up, and a re-queue would
-    # leave a Session with no segment rows and unmeasured `pressed` marks.
+    # Measure before writing anything, or a failure leaves marks without rows.
     measured = measure_segments(session, pressed_ids)
 
     for row in session.turns:

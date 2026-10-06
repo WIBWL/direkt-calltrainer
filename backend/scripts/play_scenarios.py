@@ -1,14 +1,9 @@
-"""Play every seeded Scenario against every Persona and write the transcripts.
+"""Plays every seeded Scenario against every Persona and writes the transcripts to
+logs/scenario-runs/<timestamp>/. Only the LLM is real; STT returns the scripted
+probe (see scenario_probes.py), TTS silence. Exit 2: bad probes or empty
+selection; 1: a run failed.
 
-An inspection tool, not a test. Only the LLM leg is real; STT returns the scripted probe
-(`backend/scripts/scenario_probes.py` -- read its docstring first), TTS silence, acoustics nothing.
-
-    docker compose exec backend python -m backend.scripts.play_scenarios
-    docker compose exec backend python -m backend.scripts.play_scenarios --only closing-recap-mismatch
-    docker compose exec backend python -m backend.scripts.play_scenarios --persona andreas-kastner-ceo
-
-Writes per-pairing Markdown plus summary.md to logs/scenario-runs/<timestamp>/. Exit 2: bad
-probes or empty selection; 1: a run failed; else 0 (red flags never change it)."""
+    python -m backend.scripts.play_scenarios [--only <scenario>] [--persona <persona>]"""
 from __future__ import annotations
 
 import argparse
@@ -43,18 +38,13 @@ from backend.scripts.scenario_probes import (
 
 logger = logging.getLogger("play_scenarios")
 
-# The literal the orchestrator ends a call on. Matched against the *raw* model
-# output, which is why the recorder below keeps it: `_strip_end_marker` removes
-# it before TTS, so `turn.persona_text` no longer carries it.
+# Matched against the raw model output: it is stripped before TTS.
 END_MARKER_RE = re.compile(r"\[\s*call[_\s]?end\s*\]", re.IGNORECASE)
 
-# Rough speech rate for the stubbed TTS, so persona_end_ms advances by something
-# plausible instead of a constant. Only the report's timings depend on it.
+# Rough speech rate for the stubbed TTS; only the report's timings depend on it.
 _MS_PER_CHAR = 66
 
-# Function words any whole call in that language is certain to contain several
-# of -- a crude check for a Persona answering in the wrong language. Counted over
-# the whole call: a single reply can easily contain none of them.
+# A crude wrong-language check, counted over the whole call.
 _LANGUAGE_MARKERS = {
     "de": re.compile(
         r"\b(ich|nicht|und|das|der|ist|sind|sie|wir|uns|noch|haben|ein|eine|einen|"
@@ -68,39 +58,30 @@ _LANGUAGE_MARKERS = {
     ),
 }
 
-# Below this many distinct marker words across the whole call, with enough text
-# to judge by, the reply language is doubtful.
 _MIN_LANGUAGE_MARKERS = 3
 _MIN_TEXT_TO_JUDGE = 200
 
-# extern_id -> seed slug, filled by `_load_slugs`. The probe sets and the output
-# filenames are keyed by the slug; the value objects carry only the extern_id.
+# extern_id -> seed slug, filled by `_load_slugs`.
 _SCENARIO_SLUGS: dict[str, str] = {}
 _PERSONA_SLUGS: dict[str, str] = {}
 
 
 @dataclass
 class TurnRecord:
-    """One user probe and the reply it drew."""
-
     slot: int
     user_text: str
     reply: str
-    # The model emitted [CALL_END] itself: it considers its own matter settled.
+    # The model emitted [CALL_END] itself.
     model_ended: bool = False
-    # `signals_closing` matched the probe, so `force_end_call` was set and the
-    # call would have ended even if the model said nothing of the kind.
+    # `signals_closing` matched the probe and forced the end.
     forced: bool = False
-    # What the orchestrator concluded, which folds in the two above plus the
-    # repetition guards.
+    # The orchestrator's conclusion, repetition guards included.
     ended: bool = False
     failure: str | None = None
 
 
 @dataclass
 class RunRecord:
-    """One Persona x Scenario pairing."""
-
     persona: Persona
     scenario: Scenario
     system_prompt: str
@@ -111,63 +92,50 @@ class RunRecord:
 
     @property
     def label(self) -> str:
-        """How this pairing is named in the console output."""
         return f"{self.scenario.name} / {self.persona.name}"
 
     @property
     def replies(self) -> list[str]:
-        """Everything the Persona said, opening first."""
         return [self.opening, *(t.reply for t in self.turns)]
 
 
 class _Pipeline:
-    """The stubs, and the tap on the LLM. STT hands back the due probe, TTS silence;
-    the LLM is only wrapped, to keep the raw stream -- `[CALL_END]` is stripped
-    before the Turn, and who ended the call is the point of the report."""
+    """STT hands back the due probe, TTS silence; the LLM is wrapped to keep the
+    raw stream, since who ended the call is the point of the report."""
 
     def __init__(self) -> None:
         self.next_user_text = ""
         self.raw_reply = ""
-        # Captured before `_stubbed` rebinds the name, or the wrapper below
-        # would call itself.
+        # Captured before `_stubbed` rebinds the name.
         self._real_stream_reply = llm.stream_reply
 
     async def transcribe(self, *_args, **_kwargs) -> str:
-        """Whatever probe is due, in place of recognising synthesised speech."""
         return self.next_user_text
 
     async def stream_reply(self, messages):
-        """The real call, with the raw text kept for the [CALL_END] check."""
         self.raw_reply = ""
         async for chunk in self._real_stream_reply(messages):
             self.raw_reply += chunk
             yield chunk
 
     async def synthesize_stream(self, text, *_args, **_kwargs):
-        """Silence, sized from the text so the timeline stays plausible."""
         yield b"\0" * max(1, len(text))
 
     async def synthesize(self, text, *_args, **_kwargs) -> bytes:
-        """Silence for the fallback closing line."""
         return b"\0" * max(1, len(text))
 
     @staticmethod
     def duration_ms(audio: bytes) -> int:
-        """How long that silence would have taken to say."""
         return len(audio) * _MS_PER_CHAR
 
     @staticmethod
     def analyze(_audio: bytes):
-        """Always "not measurable"."""
-        # A path the orchestrator already handles: the Turn simply carries no
-        # measurements and the call continues (`_attach_measurements`).
         raise AcousticsError("harness: no real audio to measure")
 
 
 @contextmanager
 def _stubbed(pipeline: _Pipeline):
-    """Swap the pipeline's edges for the duration of a run. `analyze` is patched on
-    the orchestrator module, which imported the name directly."""
+    """`analyze` is patched on the orchestrator, which imported the name directly."""
     saved = {
         (stt, "transcribe"): stt.transcribe,
         (tts, "synthesize_stream"): tts.synthesize_stream,
@@ -181,7 +149,6 @@ def _stubbed(pipeline: _Pipeline):
     tts.synthesize = pipeline.synthesize
     tts.duration_ms = pipeline.duration_ms
     orch.analyze = pipeline.analyze
-    # Wrapped, not replaced: the real call still happens, the raw text is kept.
     llm.stream_reply = pipeline.stream_reply
     try:
         yield
@@ -191,7 +158,7 @@ def _stubbed(pipeline: _Pipeline):
 
 
 async def _drain(events) -> tuple[bool, str | None]:
-    """Consume one turn's events; returns (ends_call, failure code)."""
+    """Returns (ends_call, failure code)."""
     ended, failure = False, None
     async for event in events:
         if isinstance(event, TurnCompleted):
@@ -202,7 +169,6 @@ async def _drain(events) -> tuple[bool, str | None]:
 
 
 async def play(persona: Persona, scenario: Scenario) -> RunRecord:
-    """One pairing, six probes, or fewer if the call ends early."""
     pack = get_pack(persona.language_id)
     probes, used_fallback = probes_for(scenario_key_of(scenario), persona.language_id)
     session = orch.SessionOrchestrator(persona, scenario)
@@ -215,7 +181,6 @@ async def play(persona: Persona, scenario: Scenario) -> RunRecord:
 
     pipeline = _Pipeline()
     with _stubbed(pipeline):
-        # Wrapping rather than replacing: the real call still happens.
         saved_stream = orch.llm.stream_reply
         orch.llm.stream_reply = pipeline.stream_reply
         try:
@@ -250,24 +215,17 @@ async def play(persona: Persona, scenario: Scenario) -> RunRecord:
 
 
 def scenario_key_of(scenario: Scenario) -> str | None:
-    """The seed slug a probe set is keyed by, looked up by `extern_id` (ADR 0050) --
-    matching titles would silently fall back after a rename. Authored Scenarios
-    have no slug and get the fallback probe."""
+    """By `extern_id`, not title; authored Scenarios get the fallback probe."""
     return _SCENARIO_SLUGS.get(scenario.id)
 
 
 def _numbers(text: str) -> set[str]:
-    """Digit groups worth looking for in a reply, separators removed.
-
-    Two digits or more only: "three people" and "eight steps" are spelled out in
-    these cases anyway, and a lone digit matches far too easily.
-    """
+    """Two digits or more: a lone digit matches far too easily."""
     return {re.sub(r"[.,\s]", "", n) for n in re.findall(r"\d[\d.,]*\d", text)}
 
 
 def _flow_flags(run: RunRecord) -> list[str]:
-    """How the call ran: where it ended and why. `ended` without `model_ended` or
-    `forced` means only the repetition guards (ADR 0038) could have closed it."""
+    """`ended` without `model_ended` or `forced` means the repetition guards closed it."""
     found: list[str] = []
     by_slot = {t.slot: t for t in run.turns}
     if any(t.ended for t in run.turns[:2]):
@@ -283,7 +241,6 @@ def _flow_flags(run: RunRecord) -> list[str]:
 
 
 def _content_flags(run: RunRecord) -> list[str]:
-    """What was said: the case facts, the language, and the probe used."""
     found: list[str] = []
     spoken = " ".join(run.replies)
 
@@ -303,17 +260,14 @@ def _content_flags(run: RunRecord) -> list[str]:
 
 
 def flags_for(run: RunRecord) -> list[str]:
-    """The mechanical red flags. None of them judges quality. Closing on
-    `success_condition` is uniform across the library, so `_systemic_markdown` reports it."""
+    """Mechanical red flags; none judges quality."""
     if run.failure:
         return [f"RUN FAILED ({run.failure})"]
     return _flow_flags(run) + _content_flags(run)
 
 
 def closing_slot(run: RunRecord) -> int | None:
-    """The probe after which the model closed the call itself, or None.
-
-    Not a flag: it is uniform across the library, so `_systemic_markdown` counts it once."""
+    """The probe after which the model closed the call itself, or None."""
     for turn in run.turns:
         if turn.model_ended:
             return turn.slot
@@ -378,8 +332,7 @@ def _summary_markdown(results: list[tuple[RunRecord, list[str]]], started: datet
 
 
 def _systemic_markdown(results: list[tuple[RunRecord, list[str]]]) -> str:
-    """Observations that hold across the library rather than per Scenario, stated
-    once so they do not bury the per-row findings that do discriminate."""
+    """Observations uniform across the library, stated once."""
     total = len(results)
     if not total:
         return ""
@@ -407,18 +360,13 @@ def _systemic_markdown(results: list[tuple[RunRecord, list[str]]]) -> str:
 
 
 def _load_library() -> tuple[list[Persona], list[Scenario]]:
-    """The seeded built-ins, read the way the app reads them (ADR 0041): a subject
-    owning nothing and a matching-no-tenant id see only `public` rows (ADR 0058/0060).
-    Also fills the slug maps, since the value objects carry `extern_id`, not `key`."""
+    """The built-ins as the app reads them: a subject owning nothing sees only `public` rows."""
     scenarios = [s for s in library.list_scenarios("__harness__", -1) if s.created_by is None]
     _load_slugs()
     return library.list_personas(), scenarios
 
 
 def _load_slugs() -> None:
-    """extern_id -> seed slug, for both tables, straight from the database."""
-    # Imported here rather than at module scope: only this function needs the
-    # ORM, and the script is importable without a database for its own checks.
     # pylint: disable=import-outside-toplevel
     from sqlalchemy import select
 
@@ -486,11 +434,7 @@ async def _main() -> int:
 
 
 async def _play_all(personas, scenarios, out: Path) -> list[tuple[RunRecord, list[str]]]:
-    """Every pairing in turn, one file each, progress and flags to the console.
-
-    Sequential on purpose: the gateway serves one model, and a run that hammers
-    it in parallel would measure queueing rather than the dialogue.
-    """
+    """Sequential: in parallel the run would measure the gateway's queueing."""
     results: list[tuple[RunRecord, list[str]]] = []
     total = len(personas) * len(scenarios)
     pairings = ((s, p) for s in scenarios for p in personas)
@@ -507,7 +451,6 @@ async def _play_all(personas, scenarios, out: Path) -> list[tuple[RunRecord, lis
 
 
 def _persona_key(persona: Persona) -> str:
-    """The seed slug, or a filename-safe stand-in for a row that has none."""
     return _PERSONA_SLUGS.get(persona.id) or persona.name.lower().replace(" ", "-")
 
 

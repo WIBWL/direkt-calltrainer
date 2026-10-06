@@ -1,8 +1,4 @@
-"""Delete Sessions past the retention period by hand (ADR 0067); idempotent, no Redis needed.
-
-    python -m backend.scripts.apply_retention            # show what is over the line
-    python -m backend.scripts.apply_retention --apply    # delete it
-"""
+"""Report, or with --apply delete, Sessions past the retention period (ADR 0067)."""
 
 from __future__ import annotations
 
@@ -19,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> int:
-    """Report, and with --apply delete, every Session past the period."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--apply", action="store_true",
@@ -40,17 +35,11 @@ def main() -> int:
             .order_by(db_models.Session.started_at)
             .all()
         )
-        # Read inside the same transaction as the rows, so the report cannot
-        # describe a preference that changed between the two queries.
         rows = [
             (str(s.extern_id), s.started_at, retention.auto_delete_enabled(db, s.subject_id))
             for s in expired
         ]
-        # The reverse Scenarios that go with them (ADR 0070 as amended). Read
-        # here for the same reason `deletion.reverses_of` reads them before the
-        # delete: `origin_session_id` is `ON DELETE SET NULL`, so afterwards
-        # nothing ties the two together. Counted for the report only -- the
-        # sweep below does its own reading and its own deciding.
+        # Read now: afterwards SET NULL unties them. For the report only.
         due_sessions = [s for s in expired if retention.auto_delete_enabled(db, s.subject_id)]
         reverses = len(deletion.reverses_of(db, due_sessions))
 
@@ -64,11 +53,7 @@ def main() -> int:
 
     due = sum(1 for _, _, swept in rows if swept)
     if reverses:
-        # Named rather than left to the Session count: a dry run that does not
-        # say everything --apply does is not a dry run. Some of these may
-        # survive this pass -- `delete_unreferenced_reverses` leaves any row a
-        # Session that has not expired is still played on -- so this is the
-        # upper bound, which is the honest direction for a warning.
+        # An upper bound: reverses still played by unexpired Sessions survive.
         logger.info("  plus up to %d reverse scenario(s) built from those calls.", reverses)
     if not args.apply:
         logger.info("Dry run: %d of %d session(s) would be deleted. Re-run with --apply.",

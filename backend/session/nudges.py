@@ -1,15 +1,10 @@
-"""The transient per-Turn instructions `SessionOrchestrator` slips in front of
-the model, and the one mark it leaves in the history.
-
-A nudge is used for exactly one completion and never stored (ADR 0035, ADR 0037,
-ADR 0038): the system prompt is too far up-context for a 4B model. `for_turn` picks one."""
+"""Per-Turn instructions, each used for one completion and never stored: the
+system prompt is too far up-context for a small model (ADR 0035, 0037, 0038)."""
 
 import re
 from dataclasses import dataclass
 
-# Frames the caller's notes in the model's view of the call (ADR 0071). They
-# sit right after the system prompt, ahead of the last few exchanges, and are
-# marked as established fact so the model does not re-ask what they record.
+# Marked as established fact, so the model does not re-ask what the notes record (ADR 0071).
 STATE_NOTES_FRAME = (
     "Where the call stands so far (your own notes -- these are established "
     "facts, do not ask about them again):\n"
@@ -22,10 +17,9 @@ CLOSING_NUDGE = (
 )
 
 
-# Carried on every turn past the opening (ADR 0038): presence_penalty and the
-# system prompt's standing rule are too weak; quoting the previous reply right
-# before the answer measurably works. The last lines stop the persona adopting
-# the user's proposal as its own, the cheapest way to "say something new".
+# Every turn past the opening (ADR 0038): quoting the previous reply right before
+# the answer measurably works. The last lines stop the Persona adopting the
+# user's offer as its own.
 ANTI_REPEAT_NUDGE = (
     'Your previous reply in this call was:\n"{previous}"\n'
     "Say something genuinely different now: react to what the user just said, "
@@ -38,12 +32,8 @@ ANTI_REPEAT_NUDGE = (
     "were your own idea."
 )
 
-# The form for a Persona seeded `hard`. Measured over the seeded library
-# (`scripts/play_scenarios.py`), the German Personas were indistinguishable in
-# tone, and Marcel Kropp -- seeded to refuse flatly -- came out the most polite:
-# the standing nudge above sits nearest the reply and offers "give ground" as a
-# move, which outweighs a character set far up in the system prompt. Only that
-# clause goes; giving ground is not forbidden, just no longer offered.
+# For a `hard` Persona: measured, the ordinary nudge's "give ground" outweighed a
+# character set far up the prompt. That clause is dropped, not forbidden.
 ANTI_REPEAT_NUDGE_HARD = (
     'Your previous reply in this call was:\n"{previous}"\n'
     "Say something genuinely different now: react to what the user just said, "
@@ -57,9 +47,7 @@ ANTI_REPEAT_NUDGE_HARD = (
     "were your own idea."
 )
 
-# The reverse form (ADR 0070): the ordinary one's last lines forbid putting an
-# offer forward, which reversed is the persona's job and would contradict the
-# casting from the position nearest the reply. Only the demand for something new stays.
+# Reverse (ADR 0070): putting an offer forward is now the Persona's job.
 ANTI_REPEAT_NUDGE_REVERSE = (
     'Your previous reply in this call was:\n"{previous}"\n'
     "Say something genuinely different now: react to what the caller just "
@@ -72,12 +60,8 @@ ANTI_REPEAT_NUDGE_REVERSE = (
     "not hand their own request back to them as a question."
 )
 
-# Appended to the standing nudge so the ending criterion is the last thing in
-# context: with only `ANTI_REPEAT_NUDGE` (whose moves all carry the call on) no
-# pairing ever ended on the Turn its condition was met. Worded as measured
-# (ADR 0073): phrased as an instruction naming [CALL_END], the persona appended the
-# marker to its opening question (32 of 34 pairings hung up by probe 3). So the
-# marker is not named, the open case comes first, and closing needs a quotable answer.
+# Last in context, so the ending criterion is (ADR 0073). Naming [CALL_END] here
+# made the Persona hang up on its opening question, so the marker is not named.
 SETTLEMENT_CHECK = (
     "\nOne question to settle before you send that reply. What ends this call is: "
     "{criterion}. Has the user actually given you that, in words you could quote "
@@ -89,11 +73,8 @@ SETTLEMENT_CHECK = (
     "the call the way your instructions describe."
 )
 
-# The same check for a reverse (ADR 0070), where the criterion is the caller's
-# and the persona is the one who has to meet it. The direction is the whole
-# difference: asked the question above while playing the support side, the
-# model read "has the user given you that" as its own demand and started
-# pressing the caller for the thing the caller had rung about.
+# Reversed, the question is whether the Persona has given it; asked the other way,
+# the model pressed the caller for what the caller rang about.
 SETTLEMENT_CHECK_REVERSE = (
     "\nOne question to settle before you send that reply. What ends this call is: "
     "{criterion}. Have you actually given the caller that, in words they could "
@@ -106,20 +87,14 @@ SETTLEMENT_CHECK_REVERSE = (
     "close the call the way your instructions describe."
 )
 
-# What the check weighs the call against when the Scenario carries no success
-# condition -- a user-authored one (ADR 0024), or one predating ADR 0045. Vaguer
-# by necessity; the position in context is what does the work either way.
+# When the Scenario has no criterion.
 GENERIC_CRITERION = "what you came for has been given"
 GENERIC_CRITERION_REVERSE = "the caller has what they rang about"
 
-# Replies the persona has to have given -- its opening plus two answers --
-# before the settlement check is attached at all. See `settlement_check`
-# below, which is where that decision moved.
+# Opening plus two answers before the check is attached.
 SETTLEMENT_CHECK_AFTER_REPLIES = 3
 
-# Sent when a reply was caught opening with a greeting again and is being
-# regenerated (ADR 0038). The rejected opening is quoted so the retry has
-# something concrete to steer away from.
+# Re-asking a reply that re-greeted (ADR 0038), quoting the rejected opening.
 REGENERATE_NUDGE = (
     'You just started your reply with:\n"{opening}"\n'
     "That restarts the call — you have already greeted the user and said who "
@@ -127,9 +102,7 @@ REGENERATE_NUDGE = (
     "the conversation where it stands and respond to the user's last message."
 )
 
-# Sent when a reply opens with a sentence the Persona already said verbatim and is
-# being regenerated (ADR 0038), e.g. a cut-off line reproduced after barge-ins.
-# Caught on the first chunk, so the call gets a retry instead of the loop guard's goodbye.
+# Re-asking a reply that opened with an already-said sentence (ADR 0038).
 REPEAT_OPENING_NUDGE = (
     'You just started your reply with:\n"{opening}"\n'
     "You have already said exactly that earlier in this call, and the user "
@@ -138,27 +111,21 @@ REPEAT_OPENING_NUDGE = (
     "on what they offered, or ask them about it."
 )
 
-# The user asked to hear the last reply again (ADR 0038). Given half a chance
-# the 4B model reads its previous line back verbatim -- and a wall of text is
-# no clearer the second time -- so the ask is for the same content, reworded
-# shorter.
+# The user asked to hear it again: the same content, shorter, never verbatim.
 CLARIFY_NUDGE = (
     "The user did not catch your previous reply. Say the same thing again, but "
     "reworded: shorter, plainer words, one or two sentences. Do not read your "
     "previous reply back word for word, and do not greet or introduce yourself."
 )
 
-# They have asked more than once now. A third rendering of the same content,
-# however worded, is not helping -- find out what is unclear or move on.
+# Asked again: a third rendering will not help.
 CLARIFY_AGAIN_NUDGE = (
     "The user still did not follow, even after you rephrased. Do not put it a "
     "third time. Ask which part is unclear, or give the single most important "
     "point in one sentence and carry the call forward."
 )
 
-# Sent when a reply was nothing but the user's own line read back and is being
-# regenerated (ADR 0038); stripping the echo left an empty reply that surfaced as
-# an LLM failure. If the retry is empty too, the call ends with the fixed sign-off.
+# Re-asking a reply that was only the user's words read back (ADR 0038).
 ECHO_NUDGE = (
     'You just repeated the user\'s own words back to them:\n"{opening}"\n'
     "That is not an answer. Respond to what they said in your own words: "
@@ -166,10 +133,7 @@ ECHO_NUDGE = (
     "repeat their sentence."
 )
 
-# Sent when a reply after a barge-in was nothing but the cut-off sentence
-# picked back up -- from the top, or its tail continued -- and is being
-# regenerated (ADR 0035). The filters drop such sentences wherever they sit
-# in a reply; this is for the reply that had nothing else in it.
+# Re-asking a reply that only resumed the cut-off sentence (ADR 0035).
 RESUME_NUDGE = (
     'You just picked the sentence the user cut off back up:\n"{opening}"\n'
     "They cut you off there on purpose, and finishing it is not an answer. Do "
@@ -177,17 +141,12 @@ RESUME_NUDGE = (
     "said instead, in your own words."
 )
 
-# Appended to the history entry of a reply the user talked over (ADR 0035): a bare
-# fragment read as a finished line made the model complete it or re-introduce
-# itself. The model can copy it, so `strip_interrupted_mark` removes it from every
-# chunk before synthesis. The Transcript gets its own human-readable marker.
+# Ends a cut-off line in the history (ADR 0035). The model copies it, so it is
+# stripped from every chunk before synthesis.
 INTERRUPTED_MARK = "—"
 
 
 def strip_interrupted_mark(text: str) -> str:
-    """`text` without any copy of the cut-off mark -- inside a chunk it is a
-    pause the model imitated from its own history, and at the end it would be
-    read back into the Transcript as a line cut off that was not."""
     if INTERRUPTED_MARK not in text:
         return text
     return _MARK_RUN_RE.sub(" ", text).strip()
@@ -195,11 +154,8 @@ def strip_interrupted_mark(text: str) -> str:
 
 _MARK_RUN_RE = re.compile(rf"\s*{INTERRUPTED_MARK}+\s*")
 
-# The turn right after that interruption (ADR 0035), replacing the anti-repeat
-# nudge. Unlike the others it goes *before* the user's message and quotes
-# nothing: a 4B model continues from whatever sits last in its context. Ending on
-# the quoted fragment made it finish that sentence; ending on "react to what they
-# just said" made it read the user's line back. The user's message must be last.
+# After a barge-in (ADR 0035). Placed before the user's message and quotes
+# nothing: the model continues from whatever sits last in its context.
 INTERRUPTED_NUDGE = (
     "Your last line above ends with a dash: the user cut you off there, "
     "mid-sentence, and nothing after the dash was said. What follows is what "
@@ -215,21 +171,13 @@ INTERRUPTED_NUDGE = (
 
 @dataclass(frozen=True)
 class TurnNudge:
-    """This reply's nudge, and where it goes."""
-
     content: str
-    # Between the history's last user message and the one before it, rather
-    # than after the whole view: `INTERRUPTED_NUDGE` is placed so the user's
-    # message is what the model sees last (see there).
+    # Placed before the last user message, so that message is what the model sees last.
     before_last: bool = False
 
 
 def settlement_check(replies: int, *, reverse: bool, call_goal: str) -> str:
-    """The reminder that the call may end now, phrased around the Scenario's
-    call goal where it has one (ADR 0073); empty over the opening exchanges,
-    where nine of ten premature hang-ups landed and no condition can yet be met.
-    A reverse asks it from the other end of the line (ADR 0070).
-    """
+    """Empty over the opening exchanges, where most premature hang-ups landed (ADR 0073)."""
     if replies < SETTLEMENT_CHECK_AFTER_REPLIES:
         return ""
     if reverse:
@@ -250,13 +198,9 @@ def for_turn(  # pylint: disable=too-many-arguments  # each is one situation the
     hard: bool,
     call_goal: str,
 ) -> TurnNudge | None:
-    """The one nudge this reply gets, or None, in order of precedence.
-
-    Closing (ADR 0037) > interrupted (ADR 0035; only where the view ends on the
-    user's message) > repeat request, firmer the second time (ADR 0038) > the
-    anti-repeat reminder plus the settlement check, turned around for a reverse (ADR 0070)
-    and without "give ground" for a `hard` Persona -- the casting wins, since a
-    reverse puts the Persona on the side where yielding is the job."""
+    """Closing > interrupted > repeat request (firmer the second time) > the
+    anti-repeat reminder with the settlement check. A reverse's form wins over
+    `hard`."""
     if closing:
         return TurnNudge(CLOSING_NUDGE)
     if interrupted:

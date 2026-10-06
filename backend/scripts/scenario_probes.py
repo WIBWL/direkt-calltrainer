@@ -1,10 +1,6 @@
-"""The scripted trainee for `backend/scripts/play_scenarios.py`: six user turns, the same for
-every Scenario except the fourth, which meets that Scenario's `success_condition`; the
-fifth concedes nothing, so a close there is the persona's own reading of the case.
-
-Trap: `signals_closing` matches `farewell_re`/`postpone_re` on the *user's* text and
-forces the call to end -- a probe tripping it ("get back to you") silently looks like a
-clean short run. `check_probes()` enforces: probes 1-5 must not signal closing, 6 must."""
+"""The scripted trainee for play_scenarios.py: six user turns, the fourth meeting
+that Scenario's `success_condition`. Trap: a probe matching `signals_closing` ends
+the call and looks like a clean short run; `check_probes()` guards it."""
 from __future__ import annotations
 
 from shared.language_packs import LANGUAGE_PACKS, signals_closing
@@ -21,9 +17,7 @@ PROBE_PURPOSE = {
     FAREWELL: "farewell, must end the call",
 }
 
-# The four generic slots, per language. Deliberately role-neutral: depending on
-# the Scenario the user sits in support, consulting, sales or project
-# management, and one wording has to fit all of them.
+# Role-neutral: the user may sit in support, consulting, sales or projects.
 GENERIC: dict[str, dict[int, str]] = {
     "de": {
         ACCEPT: (
@@ -34,12 +28,9 @@ GENERIC: dict[str, dict[int, str]] = {
             "Können Sie mir dazu die konkreten Zahlen und Termine nennen? "
             "Seit wann läuft das, und was genau ist betroffen?"
         ),
-        # No name, no date, no substance. Every success_condition in the library
-        # rules a bare promise to look into it out; cold-call-followup says so
-        # word for word, because that already happened eleven days ago.
+        # A bare promise to look into it, which every success_condition rules out.
         VAGUE: "Verstehe. Das nehme ich so mit und kümmere mich darum.",
-        # Concedes nothing and adds nothing: whoever closes here closed on what
-        # was already on the table in slot 4.
+        # Concedes nothing: a close here rests on slot 4.
         SETTLE: "So ist das bei uns hinterlegt. Passt das für Sie?",
         FAREWELL: "Dann machen wir das so. Vielen Dank für den Anruf, auf Wiederhören.",
     },
@@ -59,9 +50,8 @@ GENERIC: dict[str, dict[int, str]] = {
     },
 }
 
-# Slot 4, per Scenario key. Each line is written to satisfy that Scenario's
-# `success_condition` and to use figures that agree with its `case_facts`, so a
-# persona that checks the numbers cannot reject it on those grounds.
+# Slot 4: each satisfies its Scenario's `success_condition`, with figures that
+# agree with its `case_facts`.
 CONCRETE_ANSWERS: dict[str, dict[str, str]] = {
     "cold-call-followup": {
         "de": (
@@ -308,9 +298,7 @@ CONCRETE_ANSWERS: dict[str, dict[str, str]] = {
     },
 }
 
-# Used when a Scenario has no entry above, so adding one to the seed does not
-# break the harness. Concrete (a name and a date) but not tailored, so the
-# summary marks the run and its "persona never settles" flag is weaker.
+# For a Scenario without an entry above; the summary marks the run.
 FALLBACK_CONCRETE = {
     "de": (
         "Ich sage Ihnen das verbindlich zu: Frau Berger übernimmt das und nennt "
@@ -324,7 +312,6 @@ FALLBACK_CONCRETE = {
 
 
 def probes_for(scenario_key: str | None, language: str) -> tuple[list[str], bool]:
-    """The six user turns for one run, and whether slot 4 is the fallback."""
     generic = GENERIC[language]
     tailored = CONCRETE_ANSWERS.get(scenario_key or "", {}).get(language)
     return (
@@ -341,8 +328,7 @@ def probes_for(scenario_key: str | None, language: str) -> tuple[list[str], bool
 
 
 def check_probes() -> list[str]:
-    """Every way a probe could silently measure the wrong thing. Empty = fine.
-    Run before the first LLM call (see the module docstring's trap)."""
+    """Every way a probe could silently measure the wrong thing. Empty = fine."""
     problems = []
     for language, pack in LANGUAGE_PACKS.items():
         if language not in GENERIC:

@@ -1,8 +1,4 @@
-"""Which Scenarios to suggest first, from what a User said about their work (F-62).
-
-Rule-based; every suggestion carries its reason. Suggesting a Scenario claims
-nothing about how the User does at a goal (ADR 0076).
-"""
+"""Rule-based Scenario suggestions, each with its reason (F-62, ADR 0076, 0087)."""
 
 from __future__ import annotations
 
@@ -13,12 +9,9 @@ from shared.db.seed_data import FOCUS_GOALS
 from shared.db.session import session_scope
 from backend import focus, library
 
-# One row of the grid in front of the "show all" tile.
 MAX_RECOMMENDATIONS = 5
 
-# The call context that exercises a focus goal (`practised_in` in
-# `seed_data.FOCUS_GOALS`). Voice goals and `opening` name none on purpose:
-# every call trains the voice and has an opening, so they cannot steer.
+# Voice goals and `opening` name no context: every call trains them.
 GOAL_CATEGORIES: dict[str, tuple[str, ...]] = {
     goal["id"]: tuple(goal["practised_in"]) for goal in FOCUS_GOALS if goal.get("practised_in")
 }
@@ -26,8 +19,6 @@ GOAL_CATEGORIES: dict[str, tuple[str, ...]] = {
 
 @dataclass(frozen=True)
 class Candidate:
-    """What a Scenario card offers the scoring."""
-
     id: str
     category: str | None
     reverse: bool
@@ -35,8 +26,6 @@ class Candidate:
 
 @dataclass(frozen=True)
 class Recommendation:
-    """Why one Scenario is suggested."""
-
     call_type: bool          # its category is a kind of call the User takes
     goals: tuple[str, ...]   # the picked goals its context exercises
 
@@ -47,11 +36,8 @@ def recommend(
     goals: Iterable[str],
     played: set[str],
 ) -> dict[str, Recommendation]:
-    """The Scenarios to suggest, by id, at most MAX_RECOMMENDATIONS.
-
-    Call type scores 2, each exercised goal 1; ties go to unplayed, then listing
-    order. Reverses and uncategorised Scenarios are never suggested.
-    """
+    """Call type scores 2, each exercised goal 1; ties go to unplayed, then
+    listing order. Never reverses or uncategorised Scenarios."""
     kinds, picked = set(categories), tuple(goals)
     scored = []
     for position, candidate in enumerate(candidates):
@@ -69,18 +55,14 @@ def recommend(
 
 @dataclass(frozen=True)
 class Partner:
-    """A Persona, as the next-call offers need it."""
-
     id: str
     language_id: str
 
 
 @dataclass(frozen=True)
 class NextCall:
-    """One way to go on after a call (F-64), from the library as it stands."""
-
-    kind: str                 # "language": the same Scenario, other language
-    scenario_id: str          # "library": another Scenario, same partner
+    kind: str                 # "language" (other language) or "library" (same partner)
+    scenario_id: str
     persona_id: str
     recommendation: Recommendation | None = None
     unplayed: bool = False
@@ -88,8 +70,6 @@ class NextCall:
 
 @dataclass(frozen=True)
 class Choices:
-    """What the offers after a call are chosen from."""
-
     candidates: list[Candidate]
     partners: list[Partner]
     picks: dict[str, Recommendation]   # the profile's suggestions, best first
@@ -97,10 +77,8 @@ class Choices:
 
 
 def next_calls(played: Candidate, persona: Partner, choices: Choices) -> list[NextCall]:
-    """At most two offers, neither needing a model: the same Scenario in the
-    other language, and another Scenario -- the best suggestion not just played,
-    else an unplayed one from the same category.
-    """
+    """At most two offers, no model: the other language, then the best suggestion
+    not just played, else an unplayed one of the same category."""
     offers: list[NextCall] = []
     # Not for a reverse: its briefing is German prose (ADR 0070).
     other = next(
@@ -120,7 +98,6 @@ def next_calls(played: Candidate, persona: Partner, choices: Choices) -> list[Ne
 def _library_choice(
     played: Candidate, choices: Choices
 ) -> tuple[str, Recommendation | None] | None:
-    """The suggestion to offer next, preferring one not yet played."""
     others = [pick for pick in choices.picks if pick != played.id]
     fresh = [pick for pick in others if pick not in choices.played_ids]
     if fresh or others:
@@ -142,7 +119,6 @@ def next_for_subject(
     candidates: list[Candidate],
     partners: list[Partner],
 ) -> list[NextCall]:
-    """`next_calls` over this subject's own profile and history."""
     played_ids = library.played_scenario_ids(subject)
     return next_calls(played, persona, Choices(
         candidates, partners,
@@ -153,11 +129,7 @@ def next_for_subject(
 def for_subject(
     subject: str, candidates: list[Candidate], played_ids: set[str] | None = None
 ) -> dict[str, Recommendation]:
-    """`recommend` over this subject's own focus selection and training history.
-
-    `played_ids` is for a caller that already read the history: `next_for_subject`
-    needs it twice, and asked the database for it twice until it was passed in.
-    """
+    """`played_ids` lets a caller that already read the history pass it in."""
     with session_scope() as db:
         chosen = focus.selection(db, subject)
     if played_ids is None:

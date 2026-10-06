@@ -1,8 +1,5 @@
-"""Verdicts on one reply against the replies already given in this call.
-
-Each check answers one question and acts on none: what a verdict leads to, and
-in which order, is the orchestrator's, since that order *is* the behaviour
-(ADR 0035, ADR 0037, ADR 0038). `repetition.py` is the text layer below."""
+"""Verdicts on one reply against the call so far. Each answers one question and
+acts on none; the order of consequences is the orchestrator's (ADR 0035, 0037, 0038)."""
 
 from __future__ import annotations
 
@@ -16,16 +13,13 @@ from backend.session.nudges import strip_interrupted_mark
 
 @dataclass(frozen=True)
 class Ending:
-    """Whether a finished reply ends the call, and why."""
-
     ends: bool
-    # Why, each reason on its own: they are logged together.
+    # Logged together.
     marker: bool
     closing: bool
     repeated: bool
     restates: bool
     said_goodbye: bool
-    # A fallback goodbye has to be spoken after the reply.
     needs_fallback: bool
 
 
@@ -38,15 +32,10 @@ def ending(  # pylint: disable=too-many-arguments  # the reasons a call ends, ea
     allow_repetition: bool,
     pack: LanguagePack,
 ) -> Ending:
-    """Whether a finished reply ends the call, and whether a goodbye must follow.
-
-    `marker` is the model's [CALL_END], already past ADR 0037's veto; `closing`
-    backstops it on a Turn the user closed. On a repeat request, repeating the
-    *previous* reply is the answer, but an older one is still a loop (ADR 0038).
-    `said_goodbye` catches the obedient model: it withholds the marker on a reply
-    voicing a reservation, then signs off anyway, which left the call hanging.
-    The fallback goodbye is needed where nobody asked for one (repeat, unprompted
-    marker), never where the reply said its own, and always on a wordless reply."""
+    """Whether a reply ends the call and whether a goodbye must follow (ADR 0102).
+    On a repeat request, repeating the previous reply is the answer but an older
+    one is still a loop. `said_goodbye` catches a model that withheld the marker
+    on a reservation and signed off anyway."""
     spoke = bool(text)
     repeated = spoke and (
         repetition.has_repeated_sentence(text) or
@@ -70,17 +59,13 @@ def ending(  # pylint: disable=too-many-arguments  # the reasons a call ends, ea
 
 
 def repeats_last(text: str, replies: Sequence[str]) -> bool:
-    """True if this reply repeats its predecessor verbatim (modulo case and
-    whitespace) -- the cross-Turn form of `repetition.has_repeated_sentence`."""
     previous = replies[-1] if replies else ""
     return bool(text.strip()) and previous.strip().lower() == text.strip().lower()
 
 
 def repeats_earlier(text: str, replies: Sequence[str], *, exclude_last: bool = False) -> bool:
-    """True if this reply reproduces, verbatim modulo case, one given further back
-    than the previous Turn (an A-B-A-B oscillation `repeats_last` misses). Short
-    replies don't count. `exclude_last` skips the previous reply when the user
-    asked to hear it again."""
+    """A verbatim repeat of an older reply (A-B-A-B). `exclude_last` when the user
+    asked to hear the previous one again."""
     candidate = text.strip().lower()
     if len(candidate) < repetition.MIN_LOOP_REPLY_CHARS:
         return False
@@ -89,17 +74,13 @@ def repeats_earlier(text: str, replies: Sequence[str], *, exclude_last: bool = F
 
 
 def restates_previous(text: str, replies: Sequence[str]) -> bool:
-    """True if most of this reply was already in its predecessor -- the partial
-    form of `repeats_last`."""
     return repetition.restates(text, replies[-1] if replies else "")
 
 
 def reintroduces(first_chunk: str, replies: Sequence[str], pack: LanguagePack, first_name: str) -> bool:
-    """Whether a reply *opens* by greeting or re-introducing mid-call, judged on
-    the first chunk so it can be regenerated rather than the call ended. Narrow:
-    a greeting at the very start plus the persona's first name or the opening's
-    wording; a mirrored late "Guten Tag" costs only a regeneration."""
-    if not replies:  # the opening Turn -- greeting is correct here
+    """A mid-call re-greeting at the start of the first chunk, so it can be
+    regenerated instead of ending the call."""
+    if not replies:
         return False
     opener = first_chunk.strip()
     words = repetition.word_set(opener)
@@ -113,10 +94,8 @@ def reintroduces(first_chunk: str, replies: Sequence[str], pack: LanguagePack, f
 
 
 def repeats_earlier_opening(first_chunk: str, replies: Sequence[str]) -> str | None:
-    """The first sentence of `first_chunk` if the persona already said exactly
-    that earlier in the call, else None. Pre-synthesis form of `repeats_earlier`:
-    a 4B model readily reproduces short cut-off lines, and a spoken repeat can only
-    end the call, so it is regenerated once instead. Short openers don't count."""
+    """The first sentence if already said verbatim, so it is regenerated before
+    synthesis; spoken, it could only end the call."""
     opening = repetition.first_sentence(first_chunk)
     if len(opening) < repetition.MIN_LOOP_REPLY_CHARS:
         return None
@@ -128,16 +107,12 @@ def repeats_earlier_opening(first_chunk: str, replies: Sequence[str]) -> str | N
 
 
 def said_sentences(replies: Sequence[str]) -> set[str]:
-    """Every content sentence the persona has said so far, normalised."""
     return repetition.said_sentences(strip_interrupted_mark(line) for line in replies)
 
 
 def still_pressing(text: str, pack: LanguagePack) -> bool:
-    """Whether a reply ends on a demand or a question rather than a goodbye
-    (ADR 0037). A farewell anywhere in the reply wins outright: half of the
-    legitimate endings measured in docs/research/model-parameters.md finish on
-    a trailing question ("Auf Wiederhören. Darf ich mich melden?"), so the
-    farewell decides, not the last sentence's shape."""
+    """Ends on a demand or question rather than a goodbye (ADR 0037). A farewell
+    anywhere wins: half of legitimate endings trail a question after it."""
     if pack.farewell_re.search(text):
         return False
     last = repetition.last_sentence(text)

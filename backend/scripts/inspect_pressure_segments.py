@@ -1,12 +1,8 @@
-"""Read back how the wrap-up split each call into demanding stretches and the rest
-(F-62, ADR 0081) -- the model's marks are something no test can judge.
+"""How the wrap-up marked demanding stretches (ADR 0081), which no test can judge.
+Everything or nothing marked, call after call, is the warning sign. Read-only.
 
-    python -m backend.scripts.inspect_pressure_segments                 # every stored Session
-    python -m backend.scripts.inspect_pressure_segments --session <id>  # one, with its transcript
-    python -m backend.scripts.inspect_pressure_segments --transcript    # all of them, with transcripts
-
-Look for everything marked (the two stretches are one) or nothing marked call after
-call. Read-only; uses `.env`'s database, no model, no Redis."""
+    python -m backend.scripts.inspect_pressure_segments [--session <id>] [--transcript]
+"""
 
 from __future__ import annotations
 
@@ -22,17 +18,12 @@ from shared.logging_config import configure_logging
 
 logger = logging.getLogger("inspect_pressure_segments")
 
-# How much of an utterance to show in the transcript listing. Long enough to
-# tell an objection from an acknowledgement, short enough that a call fits on a
-# screen.
 _EXCERPT = 90
 
 
 class _Row:
-    """One Session, reduced to what this script reports about it."""
 
-    # pylint: disable=too-many-instance-attributes  # one field per printed column
-
+    # pylint: disable=too-many-instance-attributes  # one field per column
     def __init__(self, session: db_models.Session) -> None:
         turns = sorted(session.turns, key=lambda t: t.seq_index)
         self.extern_id = str(session.extern_id)
@@ -42,14 +33,8 @@ class _Row:
         self.has_feedback = session.feedback is not None
         self.persona_turns = [t for t in turns if t.speaker == db_models.SPEAKER_PERSONA]
         self.pressed = [t for t in self.persona_turns if t.pressed]
-        # NULL on every Persona row means nobody has judged this call: no
-        # wrap-up yet, a failed one, or a call from before ADR 0081. That is a
-        # different state from "judged, and nothing was pressing", and reading
-        # the two as one is how a broken model call would look like a series of
-        # calm conversations.
+        # All NULL = unjudged, which must not read like "nothing pressing".
         self.judged = any(t.pressed is not None for t in self.persona_turns)
-        # Without these there is nothing left to measure, whatever the wrap-up
-        # marks: the audio is discarded when the call ends (ADR 0048).
         self.has_facts = any(
             t.acoustics_json for t in turns if t.speaker == db_models.SPEAKER_USER
         )
@@ -61,18 +46,16 @@ class _Row:
 
     @property
     def rate(self) -> float | None:
-        """Share of the partner's utterances marked as pressing."""
         if not self.persona_turns or not self.judged:
             return None
         return len(self.pressed) / len(self.persona_turns)
 
     @property
     def verdict(self) -> str:
-        """What to make of this row, in one greppable word. Distinct states, so
-        "nobody pushed back" never collapses into "nothing judged it"."""
-        # pylint: disable=too-many-return-statements  # one per state, see above
+        """One greppable word; "nobody pushed back" never collapses into "unjudged"."""
+        # pylint: disable=too-many-return-statements  # one per state
         if not self.has_facts:
-            return "no-facts"       # recorded before ADR 0081; nothing to measure
+            return "no-facts"       # no measured user utterance
         if not self.has_feedback:
             return "no-wrapup"      # the job never finished, so nothing was judged
         if not self.judged:
@@ -112,8 +95,7 @@ def _report(rows: list[_Row]) -> None:
 
 
 def _transcript(row: _Row) -> None:
-    """One call, with the marked lines pointed at. The trainee's answer is shown
-    under the line it answers, since that answer is what the pressing stretch measures."""
+    """The trainee's answer is shown under the line it answers."""
     logger.info("")
     logger.info("%s -- %s mit %s", row.extern_id, row.scenario, row.persona)
     logger.info("Befund: %s", row.verdict)
@@ -144,8 +126,7 @@ def _summary(rows: list[_Row]) -> None:
             "Im Mittel sind %.0f%% der Persona-Beiträge als fordernd markiert (%d Sitzungen).",
             average * 100, len(judged),
         )
-        # A single `%`, not a doubled one: logging only escapes when it is given
-        # arguments to format with, and this line has none.
+        # A single `%`: logging only escapes it when given arguments.
         logger.info(
             "Nahe 0% oder nahe 100% ist das Warnzeichen: Dann vergleicht die Anzeige "
             "zwei Abschnitte, die keine zwei sind."
@@ -153,7 +134,6 @@ def _summary(rows: list[_Row]) -> None:
 
 
 def main() -> None:
-    """Print the table, optionally the transcripts, then the summary."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--session", help="nur diese Sitzung (extern_id)")
     parser.add_argument(
@@ -166,10 +146,7 @@ def main() -> None:
     try:
         rows = _load(args.session)
     except ProgrammingError as e:
-        # Almost always the same thing on a first run: the database is a
-        # migration behind, because the app applies them at startup and has not
-        # been restarted since this feature landed. Worth naming, rather than
-        # handing somebody a stack trace for a one-line answer.
+        # Usually a database a migration behind; the app migrates at startup.
         if "acoustics_json" in str(e) or "segment" in str(e):
             logger.error(
                 "Die Datenbank kennt die Spalten aus ADR 0081 noch nicht. "
@@ -183,8 +160,6 @@ def main() -> None:
         return
 
     _report(rows)
-    # One Session asked for by id is always shown in full: somebody naming an id
-    # is looking at that call, not counting it.
     if args.transcript or args.session:
         for row in rows:
             _transcript(row)

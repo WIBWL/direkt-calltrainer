@@ -1,8 +1,4 @@
-"""Writing a finished Session to the database (ADR 0034), in one transaction after
-the call has ended -- never from the live turn loop, which must not fail on the DB.
-
-Writes the two readings `shared/feedback/calls.py` produces (the utterances on
-their timeline and the folded call) as rows."""
+"""Writes a finished Session in one transaction after the call (ADR 0034)."""
 
 from __future__ import annotations
 
@@ -14,8 +10,6 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session as DbSession
 
-# Imported as a module, not by name: `db.Session`/`db.Turn` keep the schema's
-# entities visibly distinct from the identically named in-memory ones.
 from shared.db import models as db_models
 from shared.db.session import session_scope
 from shared.feedback import interruptions, metrics, rows
@@ -27,10 +21,7 @@ from backend.scenarios import Scenario
 
 logger = logging.getLogger(__name__)
 
-# How a Session ended, in the wire protocol's vocabulary -> in the schema's.
-# "disconnected" is a call nobody ended: stored, because the training happened,
-# but never as completed -- the history and the activity calendar count a
-# finished training, and walking away is not one (ADR 0034's amendment).
+# A disconnect is stored, but never as completed (ADR 0034).
 _STATUS = {
     "user": db_models.STATUS_COMPLETED,
     "completed": db_models.STATUS_COMPLETED,
@@ -41,27 +32,20 @@ _STATUS = {
 
 @dataclass(frozen=True)
 class FinishedCall:
-    """Everything the write needs to know about a call that has ended; named
-    fields because several are same-typed strings a positional swap would pass."""
+    """Named fields: several same-typed strings a positional swap would pass."""
 
     extern_id: uuid.UUID
-    # The Keycloak `sub` from the handshake (ADR 0009): the Session belongs to
-    # the account that placed the call, not to a placeholder (ADR 0031).
     subject_id: str
     persona: Persona
     scenario: Scenario
     turns: Sequence[Turn]
     started_at: datetime
-    # How it ended, in the wire protocol's vocabulary (see `_STATUS`).
     reason: str
 
 
 def persist_session(call: FinishedCall) -> int | None:
-    """Write the Session, its Turns and measurements; the session_id, or None if
-    storage consent was refused. The consent check sits *inside* this transaction
-    under `lock_subject` (ADR 0066): outside it, a concurrent withdrawal could commit
-    in between and strand this Session beyond every deletion path. Synchronous; the
-    caller runs it off the event loop after the call (ADR 0034)."""
+    """The session_id, or None if consent was refused. The consent check runs
+    inside this transaction under `lock_subject` (ADR 0066). Synchronous."""
     extern_id, subject_id, persona, scenario = call.extern_id, call.subject_id, call.persona, call.scenario
     turns = call.turns
     with session_scope() as db:
@@ -88,10 +72,7 @@ def persist_session(call: FinishedCall) -> int | None:
                 transcript=spoken.text,
                 interrupted=spoken.interrupted,
                 unheard_text=spoken.unheard or None,
-                # The raw facts of this utterance, kept because the audio they
-                # were measured from is discarded when the call ends (ADR 0048)
-                # while which stretch of the call was demanding is decided
-                # afterwards, by the wrap-up (ADR 0081). NULL on a Persona row.
+                # Raw facts for the later segment split; the audio is gone (ADR 0081).
                 acoustics_json=spoken.acoustics.as_json() if spoken.acoustics else None,
             )
             for index, spoken in enumerate(utterances(turns))
@@ -99,8 +80,6 @@ def persist_session(call: FinishedCall) -> int | None:
         _write_analysis(
             db, session, conversation(turns, persona.language_id, scenario.reverse)
         )
-        # The wrap-up itself is generated asynchronously (ADR 0018/0019); this
-        # row is what makes its outcome queryable afterwards (ADR 0032).
         session.jobs = [db_models.AnalysisJob(
             kind=db_models.JOB_KIND_FEEDBACK,
             status=db_models.JOB_QUEUED,
@@ -117,10 +96,7 @@ def persist_session(call: FinishedCall) -> int | None:
 def _write_analysis(
     db: DbSession, session: db_models.Session, call: Conversation
 ) -> None:
-    """Attach the Session's Measurement and Finding rows (`feedback/rows.py` owns
-    dropping unknown metrics and rounding). Findings only for hard interruptions:
-    an event at a moment, not a value judged against a threshold, which ADR 0051
-    forbids for lack of a norm."""
+    """Findings only for hard interruptions: events, not values judged against a threshold."""
     ids = rows.metric_ids(db)
     session.measurements = rows.measurements(ids, metrics.measure(call))
     session.findings = [
@@ -135,9 +111,7 @@ def _write_analysis(
 
 
 def _reference(db: DbSession, model: type, extern_id: str):
-    """The Persona / Scenario row a Session points at, by its `extern_id` (the
-    value object's `.id` since ADR 0058). `active` is not checked: a Session may
-    reference a since-retired row."""
+    """`active` is not checked: a Session may reference a retired row."""
     try:
         ref = uuid.UUID(str(extern_id))
     except (ValueError, TypeError) as e:

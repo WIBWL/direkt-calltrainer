@@ -1,32 +1,21 @@
-"""Buffers streamed LLM tokens into TTS-sized chunks (ADR 0033).
-
-Sentence-sized pieces can be synthesised and start playing while the rest of the
-reply is still generating."""
+"""Streamed LLM tokens into TTS-sized chunks (ADR 0033)."""
 
 import re
 from collections.abc import AsyncIterator
 
-# A full stop straight after a digit is not a sentence end: German ordinals and
-# thousands ("6. Juli", "1.400") arrive split there, and flushing would split one
-# sentence across two synthesis calls (an audible gap, "1. 500" in the history,
-# and out of reach of the sentence dedup, ADR 0038). Cost: "Wir zahlen 850." no
-# longer flushes early. `clients/speech_text.py` removes the stop before speaking.
+# A stop after a digit ("6. Juli", "1.400") is no sentence end; flushing there
+# splits one sentence across two synthesis calls. speech_text.py removes it later.
 _SENTENCE_END_RE = re.compile(r"(?<!\d)[.!?]\s*$")
-# A listening test at 40/150, 80/250 and 120/300 chars found 80/250 most
-# natural: smaller chunks were choppier (no prosody continuity into the next),
-# larger ones only added latency before the first was ready.
+# 80/250 sounded most natural in a listening test against 40/150 and 120/300.
 _MIN_CHUNK_CHARS = 80
 _MAX_CHUNK_CHARS = 250
-# The first chunk sets the perceived latency of the whole Turn, so it flushes at
-# the first sentence end past a much lower floor (ADR 0044) — ~200-300 ms sooner
-# to the ear, worth the small prosody hit. The floor still stops a bare "Ja."
-# from firing its own TTS call.
+# The first chunk sets the perceived latency, so it flushes past a lower floor
+# (ADR 0044); still high enough that a bare "Ja." gets no TTS call of its own.
 _FIRST_CHUNK_MIN_CHARS = 25
 
 
 async def sentence_chunks(tokens: AsyncIterator[str]) -> AsyncIterator[str]:
-    """Regroup LLM token deltas into synthesis-sized chunks, emitting each when
-    complete. The trailing partial sentence is always emitted, so no text drops."""
+    """The trailing partial sentence is always emitted."""
     buffer = ""
     is_first = True
     async for token in tokens:

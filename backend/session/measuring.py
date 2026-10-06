@@ -1,8 +1,4 @@
-"""Attaching one utterance's paraverbal measurements to its Turn (ADR 0048).
-
-`analyze` (shared/feedback/acoustics.py) measures the audio on a worker thread
-during the STT round trip; this places the result on the Session's timeline.
-"""
+"""Places one utterance's acoustic measurements on the Session timeline (ADR 0048)."""
 
 import asyncio
 import logging
@@ -16,11 +12,8 @@ logger = logging.getLogger(__name__)
 async def attach_measurements(
     turn: Turn, acoustics: asyncio.Task[TurnAcoustics], ended_ms: int
 ) -> None:
-    """Record the Turn's paraverbal measurements, on the Session's timeline.
-
-    `ended_ms` is where this fragment ends; the measured duration walks back to
-    its start, so each fragment of a reopened Turn is placed by its own arrival.
-    Never fatal: the conversation does not depend on this leg."""
+    """`ended_ms` is where this fragment ends; each fragment of a reopened Turn
+    is placed by its own arrival. Never fatal."""
     try:
         measured = await acoustics
     except AcousticsError as e:
@@ -28,20 +21,13 @@ async def attach_measurements(
         turn.user_acoustics_complete = False
         return
     except Exception:  # pylint: disable=broad-exception-caught
-        # Deliberately catch-all: `analyze` runs Praat in a worker thread and
-        # can surface anything from the C extension. Per the docstring this leg
-        # is never load-bearing, so any failure here is logged and the Turn
-        # just carries no measurements -- it must not break the call.
+        # Praat can surface anything from the C extension; this leg is never load-bearing.
         logger.exception("Paraverbal analysis failed for turn %d", turn.seq)
         turn.user_acoustics_complete = False
         return
     started_ms = max(0, ended_ms - measured.duration_ms)
-    # The utterance begins at its first sound and ends at its last, not at the
-    # recording's edges: the VAD pads about 0.8 s in front and a second behind,
-    # and placed on those edges every reply started early enough to shorten
-    # its reaction time by the whole pad and to read as talking over the
-    # Persona (ADR 0114). The pauses below stay rebased on the recording's
-    # start, which is what their offsets are relative to.
+    # First sound to last, not the padded recording (ADR 0114). Pauses stay
+    # relative to the recording start.
     if turn.user_offset_ms is None:
         turn.user_offset_ms = started_ms + measured.voice_start_ms
     turn.user_end_ms = started_ms + measured.voice_end_ms
@@ -49,6 +35,4 @@ async def attach_measurements(
     turn.user_phonation_ms += measured.phonation_ms
     turn.pauses.extend(Pause(started_ms + p.offset_ms, p.duration_ms) for p in measured.pauses)
     turn.loudness_db.extend(measured.loudness_db)
-    # Same grid, same concatenation: the pitch curve carries no offsets of its
-    # own, so it needs no rebasing (F-35).
     turn.pitch_hz.extend(measured.pitch_hz)

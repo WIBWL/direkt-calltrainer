@@ -1,9 +1,5 @@
-"""Turn the PDFs a User uploads while authoring a Scenario into a fact list (F-58).
-
-Text-layer PDFs only (no OCR), condensed **together** in one `llm.complete`
-call; nothing is stored. Limits: `MAX_UPLOAD_MB` per file (`pdf_text.py`, which reads
-each one in a child process), `MAX_TOTAL_UPLOAD_MB` and `MAX_DOCUMENTS` per request,
-output cut to `MAX_TEXT`. If the LLM fails, the raw text returns, unsummarised."""
+"""Uploaded PDFs condensed together into a fact list (F-58); nothing is stored.
+If the model fails, the raw text is returned."""
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -13,31 +9,17 @@ from shared.clients import llm
 from backend.authored_text import FIELD_LIMITS, clean
 from backend.pdf_text import MAX_UPLOAD_BYTES, TOO_LARGE, DocumentError, labelled
 
-# Every upload is read into memory before it is parsed, so the total is a
-# memory bound like the per-file one in `pdf_text.py` -- and matters as much
-# now that a request may carry several. The German messages below are built
-# from the numbers: a literal "20 MB" in a string drifts the first time this
-# changes.
+# A memory bound: every upload is read into memory before parsing.
 MAX_TOTAL_UPLOAD_MB = 20
 MAX_TOTAL_UPLOAD_BYTES = MAX_TOTAL_UPLOAD_MB * 1024 * 1024
 _BATCH_TOO_LARGE = f"Die Dokumente sind zusammen größer als {MAX_TOTAL_UPLOAD_MB} MB."
-# How many files one request may carry. Each is read in a process of its own,
-# one after the other, so the count bounds the request's time as the sizes
-# bound its memory.
+# Each file is read in its own process, one after another.
 MAX_DOCUMENTS = 10
 _TOO_MANY = f"Es können höchstens {MAX_DOCUMENTS} Dokumente auf einmal gelesen werden."
-# A file name is a label, never content: long enough to tell two documents
-# apart in a message and in the prompt, short enough that it cannot become a
-# paragraph of its own.
 MAX_NAME = 80
-# The summary goes into the `case_facts` field, so it cannot exceed its cap.
-# This is the *only* size limit on the pipeline below the upload gates: neither
-# the page count nor the extracted length is capped -- a document under the
-# ceiling is handed to the model whole, and the summary is truncated to this.
+# The only size limit below the upload gates: the summary must fit `case_facts`.
 MAX_TEXT = FIELD_LIMITS["case_facts"]
 
-# The length rule keeps the model's output near MAX_TEXT so the hard truncation
-# in summarise_facts is rarely what enforces it.
 _SUMMARY_SYSTEM = (
     "You condense a document into a compact fact list for a phone-call training "
     "scenario. From the text the user gives you, extract only concrete, "
@@ -57,50 +39,36 @@ _SUMMARY_SYSTEM = (
 
 
 def document_name(filename: str | None) -> str:
-    """A file name fit to put in a message and in the prompt. It is User-supplied
-    text on its way to a model, so it goes through `clean()` like every other
-    authored field (ADR 0059) and is capped at `MAX_NAME`."""
+    """Sanitised (ADR 0059) and capped: it reaches the model."""
     return clean(filename or "").strip()[:MAX_NAME] or "Dokument"
 
 
 def reject_oversize_upload(size: int | None, name: str = "") -> None:
-    """Raise if the upload's *declared* size is over the per-file limit -- called
-    before `await file.read()` so the route never buffers a huge file. `size` is
-    None when the client sends no Content-Length; `read_pdf` then catches it
-    on the real byte count."""
+    """Checked on the declared size before reading; `read_pdf` checks the real one."""
     if size is not None and size > MAX_UPLOAD_BYTES:
         raise DocumentError(labelled(name, TOO_LARGE))
 
 
 def reject_oversize_batch(total: int) -> None:
-    """Raise once the bytes read so far exceed what one request may carry. Called
-    after each file rather than on a declared total, so a client that sends no
-    Content-Length is still stopped -- and stopped at the file that crosses the
-    line, not after buffering the rest."""
+    """Checked after each file, so a missing Content-Length is still stopped."""
     if total > MAX_TOTAL_UPLOAD_BYTES:
         raise DocumentError(_BATCH_TOO_LARGE)
 
 
 def reject_too_many(count: int) -> None:
-    """Raise if one request carries more than `MAX_DOCUMENTS` files."""
     if count > MAX_DOCUMENTS:
         raise DocumentError(_TOO_MANY)
 
 
 @dataclass(frozen=True)
 class ExtractedDocument:
-    """One uploaded PDF, read. `name` is already through `document_name`."""
-
     name: str
     pages: int
     text: str
 
 
 def merge_document_text(documents: Sequence[ExtractedDocument]) -> str:
-    """The uploaded documents as one text for one model call.
-
-    One document goes bare; several are each introduced by a plain labelled line
-    with the file name -- not a fence, which a document could contain itself."""
+    """Several documents get a labelled line each, not a fence a document could contain."""
     if len(documents) == 1:
         return documents[0].text
     return "\n\n".join(
@@ -109,19 +77,14 @@ def merge_document_text(documents: Sequence[ExtractedDocument]) -> str:
 
 
 async def summarise_facts(raw_text: str) -> str:
-    """The LLM's fact list for `raw_text`, sanitised and truncated to the field
-    cap. Empty string if the model found nothing usable. Propagates OpenAIError
-    so the caller can fall back to the raw text -- which also covers a document
-    too large to fit the model's context (a 400 from the gateway)."""
+    """Empty if nothing usable. Propagates OpenAIError so the caller can fall
+    back to the raw text (also on a context overflow)."""
     reply = await llm.complete(
         [
             {"role": "system", "content": _SUMMARY_SYSTEM},
             {"role": "user", "content": raw_text},
         ],
-        # No output cap: the fact list is bounded by MAX_TEXT (below and in the
-        # prompt), so the model's own context window is the only ceiling. No
-        # thinking: the trace takes minutes on the current model and shares
-        # that window with the document (ADR 0103's amendment).
+        # No cap: MAX_TEXT bounds it. No thinking (ADR 0103).
         max_tokens=None,
     )
     summary = clean(reply)

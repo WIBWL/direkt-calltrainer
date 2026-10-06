@@ -1,13 +1,8 @@
-"""Rewrites a reply into the form a TTS backend should read aloud; the Transcript keeps the digits.
-
-German full stops in "1.400" and "6. Juli" look like sentence ends to `chunking.py`
-(an audible gap) and to the TTS (falling intonation), so they are removed; only
-ordinals become words. Unknown languages pass through untouched."""
+"""The reply as TTS should read it: German stops in "1.400" and "6. Juli" read as
+sentence ends, so they are removed. The transcript keeps the digits."""
 
 import re
 
-# Ordinals only go as high as a day of the month, which is all the full stop
-# after a number ever means here.
 _ORDINAL_STEMS = {
     1: "erste", 2: "zweite", 3: "dritte", 4: "vierte", 5: "fünfte",
     6: "sechste", 7: "siebte", 8: "achte", 9: "neunte", 10: "zehnte",
@@ -24,26 +19,18 @@ _MONTHS = (
     "Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember"
 )
 
-# The words that put a date into the dative or accusative, where the ordinal
-# takes an -n ("am sechsten Juli"). Anything else keeps the plain form ("der
-# sechste Juli"). Getting the ending wrong is a blemish; leaving the full stop
-# in is a break in the middle of a sentence, so this only has to be usually
-# right.
+# Words that put a date in dative/accusative ("am sechsten Juli"). Usually right
+# is enough: a wrong ending is a blemish, a stray stop is a break.
 _INFLECTING = {
     "am", "vom", "zum", "beim", "seit", "bis", "ab", "nach", "vor", "den", "dem", "im", "des",
 }
 
-# "1.400" -> "1400". Three digits after the stop and no fourth: a thousands
-# separator, never a sentence that happens to end in a digit.
+# Exactly three digits after the stop: a thousands separator.
 _THOUSANDS_RE = re.compile(r"(?<=\d)\.(?=\d{3}(?!\d))")
 
-# "6. Juli", with whatever word came before it so the ending can be chosen.
 _ORDINAL_MONTH_RE = re.compile(rf"(\b\w+\s+)?(\d{{1,2}})\.(\s+(?:{_MONTHS})\b)")
 
-# "am 6." with no month behind it -- still an ordinal, still a full stop.
-# `der`/`des` because the model often puts a date in subject position ("Der 14.
-# ist also der Fix?"). `der` is ambiguous (nominative vs dative), so it takes the
-# plain form, the reading that actually turned up.
+# "am 6." without a month. `der` is ambiguous and takes the plain form.
 _ORDINAL_BARE_RE = re.compile(
     r"\b(am|im|vom|zum|beim|seit|bis|ab|den|dem|der|des)(\s+)(\d{1,2})\.(?!\s*\d)",
     re.IGNORECASE,
@@ -51,7 +38,6 @@ _ORDINAL_BARE_RE = re.compile(
 
 
 def _ordinal(day: int, inflected: bool) -> str | None:
-    """The day as a spoken German ordinal, or None if it is not a day."""
     stem = _ORDINAL_STEMS.get(day)
     if stem is None:
         return None
@@ -76,12 +62,10 @@ def _german(text: str) -> str:
     return _ORDINAL_BARE_RE.sub(_ordinal_after_preposition, text)
 
 
-# English writes neither a thousands separator nor an ordinal with a full stop,
-# so there is nothing here to undo.
+# English needs nothing undone.
 _RULES = {"de": _german}
 
 
 def for_speech(text: str, language_id: str) -> str:
-    """The text as the TTS backend should receive it."""
     rule = _RULES.get(language_id)
     return rule(text) if rule else text

@@ -1,8 +1,5 @@
-"""The next call in the same matter, drafted from a Session's Feedback (F-60, ADR 0069).
-
-Asked for via `POST /api/sessions/{id}/follow-up`; drafted here, stored by `library.py`.
-The played case's four prompt fields go into the prompt (ADR 0070's exception to ADR
-0043), statistics stay out (ADR 0051), and the exercise's purpose stays out of the case."""
+"""The follow-up draft (F-60, ADR 0069): the next call in the same matter. The
+played case goes into the prompt; statistics and the exercise's purpose stay out."""
 from __future__ import annotations
 
 import logging
@@ -18,16 +15,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class PlayedCall:
-    """The call a follow-up continues, as the prompt needs it -- one type so this
-    module stays the only place that decides what a draft is built from."""
-
     scenario_name: str
     scenario_teaser: str
     description: str = ""
     case_facts: str = ""
     call_goal: str = ""
-    # The wrap-up's summary: where that call actually ended up, which is what
-    # the next one has to start from.
+    # Where that call ended up, which the next one starts from.
     outcome: str = ""
     improvements: tuple[str, ...] = ()
     phase_language: str | None = None
@@ -37,23 +30,14 @@ class FollowUpError(RuntimeError):
     """The model answered, but never with a scenario worth storing."""
 
 
-# The fields `ScenarioInput` requires of a User (the three case fields may be
-# empty, ADR 0045). A draft missing one of them is not a Scenario, and storing
-# it would put a row in the library that POST /api/scenarios would have refused.
-# Plus the trainee's "Worum es geht": without it the info panel falls back to
-# `description`, the caller's own "Sie rufen an, weil ...", and the trainee
-# reads that the call is theirs to make.
+# What POST /api/scenarios requires, plus the trainee's "Worum es geht", without
+# which the panel shows the caller's "Sie rufen an" as the trainee's own.
 _REQUIRED = ("name", "short_description", "description", "description_label")
 
 
 class _Draft(BaseModel):
-    """The six authorable fields (`backend/api/scenarios.py`'s ScenarioInput),
-    and `situation`: the trainee's "Worum es geht", stored as the
-    `description_label` a built-in carries for the same panel.
-
-    All defaulted, so a missing optional key costs only that field. `_REQUIRED`
-    is checked after cleaning, since a field can clean to nothing.
-    """
+    """The authorable fields plus `situation` (stored as `description_label`).
+    `_REQUIRED` is checked after cleaning, since a field can clean to nothing."""
 
     name: str = ""
     short_description: str = ""
@@ -64,9 +48,7 @@ class _Draft(BaseModel):
     call_goal: str = ""
 
     def sanitised(self) -> dict[str, str]:
-        """Cleaned and capped to what the authoring API enforces (ADR 0059/0063),
-        so the editor shows exactly the text that would be stored. `situation`
-        is capped like the `description` it stands in for on the screen."""
+        """Capped exactly as the authoring API would store it."""
         draft = {
             field: fit(clean(getattr(self, field)), cap)
             for field, cap in WIRE_FIELD_LIMITS.items()
@@ -75,19 +57,14 @@ class _Draft(BaseModel):
         return draft
 
 
-# --- Prompt ---------------------------------------------------------------
-
-
 def _material(call: PlayedCall) -> str:
-    """What the model is given: the case as it was played, and what to train."""
     lines = [
         "The call the trainee has just had:",
         f"    {call.scenario_name} -- {call.scenario_teaser}",
         "",
         "The case that was played, as the caller had it:",
     ]
-    # Each of the four may be empty -- ADR 0045 lets an authored Scenario leave
-    # them so. A missing line is better than a labelled blank the model fills in.
+    # An empty field is left out rather than shown as a blank the model fills.
     lines += [
         f"    {label}: {text}"
         for label, text in (
@@ -111,11 +88,7 @@ def _material(call: PlayedCall) -> str:
 
 
 def _messages(material: str) -> list[dict[str, str]]:
-    """The prompt. English per ADR 0043; the draft itself is German.
-
-    Numbered because a small model (ADR 0011) loses mid-paragraph rules; the ones
-    it breaks otherwise are S1, S2 and S5.
-    """
+    """English prompt (ADR 0043), numbered because a small model loses rules mid-paragraph."""
     limits = {**WIRE_FIELD_LIMITS, "situation": FIELD_LIMITS["description"]}
     caps = ", ".join(f"{field} {cap}" for field, cap in limits.items())
     system = (
@@ -252,22 +225,14 @@ def _messages(material: str) -> list[dict[str, str]]:
     ]
 
 
-# --- Model call -----------------------------------------------------------
-
-
 async def draft_follow_up(call: PlayedCall) -> dict[str, str]:
-    """One draft, cleaned and capped, ready to store.
-
-    Propagates OpenAIError; raises FollowUpError when nothing usable came back.
-    Both become a 503. Own retry loop rather than `llm.complete_json`: it also
-    re-asks when required fields came back *empty*, not only on a parse failure."""
+    """Propagates OpenAIError; FollowUpError when nothing usable came back. Its
+    own retry loop, because it also re-asks on empty required fields."""
     messages = _messages(_material(call))
-    for attempt in range(2):  # initial attempt + one retry
+    for attempt in range(2):
         raw = await llm.complete(
             messages,
-            # No cap: the fields are bounded by their own limits. No thinking
-            # either -- the User is waiting on the button, and the trace made
-            # that 160 s where the draft alone takes 10 (ADR 0103's amendment).
+            # No cap: the fields bound themselves. No thinking (ADR 0103).
             max_tokens=None,
         )
         try:

@@ -1,11 +1,5 @@
-"""Re-queue wrap-ups for Sessions that never got one (e.g. worker down, Redis lost the job).
-
-    docker compose exec backend python -m backend.scripts.requeue_feedback           # dry run
-    docker compose exec backend python -m backend.scripts.requeue_feedback --apply   # queue them
-
-Run **inside the backend container**: Redis is not published to the host. Written from the
-stored Transcript and Measurements (ADR 0049), so old Sessions work. Safe to run twice;
-eligibility is `jobs.retry_blocked`, shared with `POST /api/sessions/{id}/feedback`."""
+"""Re-queue wrap-ups for stored Sessions without one; --apply to queue. Run
+inside the backend container (Redis is not published)."""
 
 from __future__ import annotations
 
@@ -19,24 +13,17 @@ from shared.logging_config import configure_logging
 
 logger = logging.getLogger(__name__)
 
-# Eligibility lives in `shared/feedback/jobs.py`, shared with the User's retry
-# route, so the two cannot drift (a copy here once re-queued a running job).
-
 
 def _candidates(db) -> list[tuple[int, str, int]]:
-    """(session_id, extern_id, turn count) for every Session worth retrying.
-    Sessions with no Turns are skipped -- there is nothing to write about."""
     found = []
     for session in db.query(db_models.Session).order_by(db_models.Session.session_id).all():
-        # No job row at all qualifies too: api/sessions.py reads that as
-        # "failed", so the Session is in the same dead end.
+        # No job row qualifies too: the API reads it as failed.
         if jobs.retry_blocked(session) is None:
             found.append((session.session_id, str(session.extern_id), len(session.turns)))
     return found
 
 
 def main() -> int:
-    """List, and with --apply re-queue, the Sessions still missing a wrap-up."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--apply", action="store_true",
@@ -60,8 +47,7 @@ def main() -> int:
         logger.info("Dry run. Re-run with --apply to queue these.")
         return 0
 
-    # Imported here, not at module scope: reporting must not require Redis.
-    # `jobs` is imported up top -- it is the state machine and knows nothing of it.
+    # Imported here: reporting must not require Redis.
     from shared.feedback import queue  # pylint: disable=import-outside-toplevel
 
     queued = 0
@@ -72,8 +58,7 @@ def main() -> int:
             # One unreachable moment must not skip the rest of the backlog.
             logger.exception("Could not queue session %s; leaving its row as it is", extern_id)
             continue
-        # Only after the enqueue succeeded: a row saying `queued` with nothing
-        # behind it is the exact state this script exists to repair.
+        # Only after a successful enqueue, or the row lies.
         with session_scope() as db:
             jobs.mark(db, session_id, db_models.JOB_QUEUED)
         queued += 1

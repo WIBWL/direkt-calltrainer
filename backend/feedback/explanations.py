@@ -1,8 +1,5 @@
-"""The text behind each metric's "i", one per active metric (ADR 0098), served by
-`readings.py` and never copied into the frontend. Texts explaining a *scale* stay
-beside their thresholds (ADR 0078). Each says what is counted, how, what it is
-worth and where it stops being trustworthy: no figure has a target (ADR 0004/0051).
-"""
+"""The text behind each metric's "i" (ADR 0098): what is counted, how, what it is
+worth, and where it stops being trustworthy. Scale texts sit beside their thresholds."""
 
 TALK_SHARE = (
     "Ihr Anteil an der Zeit, in der überhaupt gesprochen wurde. Gerechnet wird "
@@ -169,9 +166,6 @@ LOUDNESS = (
     "Sie leiser geworden sind."
 )
 
-# Moved here from `metrics.py`, where it sat beside its derivation, when twelve
-# more of these were written: a text explaining one figure belongs with the
-# other twelve rather than alone in the module that computes it.
 RUN_LENGTH = (
     "Gemessen wird, wie lange Sie am Stück sprechen, bevor Sie absetzen. Ihre "
     "reine Sprechzeit geteilt durch die Anzahl Ihrer Sprechabschnitte. Als "

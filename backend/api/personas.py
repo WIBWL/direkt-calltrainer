@@ -1,8 +1,4 @@
-"""REST routes for the Persona library (ADR 0041), read-only (ADR 0058).
-
-Both routes serve display fields only, the German twins on the info panel;
-the English prompt fields stay on the server (ADR 0043).
-"""
+"""Persona routes, read-only, display fields only (ADR 0043, 0058)."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -15,21 +11,14 @@ router = APIRouter(prefix="/api/personas", dependencies=[Depends(require_user)])
 
 @router.get("")
 def list_personas() -> list[dict]:
-    """Cards for every selectable Persona.
-
-    `id` is the `extern_id` (ADR 0050), sent back in `session.start`.
-    `avatar_url` is a path into the frontend's static files, or null (the card
-    then shows initials)."""
+    """`avatar_url` is null when there is no portrait (initials then)."""
     return [
         {
             "id": p.id,
             "name": p.name,
             "role": p.role_label,
             "language": p.language_name,
-            # The code as well as the name: the card puts a flag beside the
-            # Persona, and picking one off a display string ("Deutsch") would
-            # break the first time that string is reworded. Not a prompt field,
-            # so ADR 0043 has nothing to say about it.
+            # The code too: the flag must not be keyed on a display string.
             "language_code": p.language_id,
             "avatar_url": p.avatar_url,
         }
@@ -39,11 +28,7 @@ def list_personas() -> list[dict]:
 
 @router.get("/{extern_id}")
 def get_persona(extern_id: str) -> dict:
-    """Everything the info panel shows about one Persona, in German.
-
-    An unknown or inactive id is a 404. `objections` carries the display
-    labels, not the English moves the prompt gets; a missing label is dropped
-    rather than shown as an empty bullet."""
+    """The info panel's German fields; empty objection labels are dropped."""
     persona = library.get_persona(extern_id)
     if persona is None:
         raise HTTPException(status_code=404, detail="Persona not found")

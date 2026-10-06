@@ -1,8 +1,5 @@
-"""REST routes for finished Sessions: history, one Session with its wrap-up
-(polled, ADR 0019), and the follow-up/reverse built from one (ADR 0069/0070/0100).
-Addressed by `extern_id` (ADR 0050); someone else's answers 404, never 403,
-which would confirm the id exists (ADR 0031). Wire shapes are `served.py`'s.
-"""
+"""Stored-Session routes: history, detail with the polled wrap-up, retry, and the
+follow-up/reverse (ADR 0100). A foreign id answers 404, never 403 (ADR 0050)."""
 
 from __future__ import annotations
 
@@ -31,9 +28,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/sessions", dependencies=[Depends(require_user)])
 
-# Page size for the history. The default is what one screen of history shows;
-# the cap is what keeps a single request from loading a heavy user's whole
-# past, since the trend view asks for as much as it is allowed.
+# The cap stops one request loading a heavy user's whole past.
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
 
@@ -44,11 +39,7 @@ def list_sessions(
     limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
     offset: int = Query(0, ge=0),
 ) -> dict:
-    """The caller's own finished Sessions, newest first (F-13/F-48).
-
-    Ownership is the query itself (ADR 0031; indexed, migration 18f5098dfb1b).
-    Carries the Measurements without `detail_json`, and no wrap-up text
-    (ADR 0064). `status` is `session.status`; the wrap-up's is `feedback_status`."""
+    """Ownership is the query itself (ADR 0064)."""
     with session_scope() as db:
         query = (
             db.query(db_models.Session)
@@ -58,23 +49,17 @@ def list_sessions(
                 .selectinload(db_models.Measurement.metric_type),
                 selectinload(db_models.Session.persona),
                 selectinload(db_models.Session.scenario),
-                # Batched down to the focus goal, which `_feedback_goals` walks:
-                # without it a page costs a query per wrap-up and per tagged point.
+                # Down to the focus goal, or a page costs a query per tagged point.
                 selectinload(db_models.Session.feedback)
                 .selectinload(db_models.Feedback.points)
                 .selectinload(db_models.FeedbackPoint.focus_goal),
                 selectinload(db_models.Session.jobs),
             )
         )
-        # Before the slice, and on the filtered query: the client needs to know
-        # whether more pages exist, which the page itself cannot say.
+        # Before the slice: the client needs to know whether more pages exist.
         total = query.order_by(None).count()
         sessions = (
-            # session_id breaks a tie on the timestamp. Two Sessions can share
-            # a started_at -- it comes from the client's `session.activate` --
-            # and an order Postgres is free to choose would put them in a
-            # different sequence on each read, which paginates badly: a row can
-            # appear on two pages or on none.
+            # session_id breaks ties on started_at, or rows appear on two pages or none.
             query.order_by(
                 db_models.Session.started_at.desc(),
                 db_models.Session.session_id.desc(),
@@ -93,7 +78,6 @@ def list_sessions(
 
 @router.get("/{extern_id}")
 def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user)) -> dict:
-    """One finished Session: Transcript, measurements, Feedback."""
     with session_scope() as db:
         session = owned_session(
             db, caller.sub, extern_id,
@@ -101,8 +85,6 @@ def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user
             selectinload(db_models.Session.jobs),
             selectinload(db_models.Session.findings),
         )
-        # Absent and not-yours are deliberately the same answer: anything
-        # else would confirm that an id exists (ADR 0050).
         if session is None:
             raise HTTPException(status_code=404, detail="Unknown session")
         return served.detail(session, follow_up=_follow_up(db, session.session_id))
@@ -112,22 +94,15 @@ def get_session(extern_id: uuid.UUID, caller: AuthContext = Depends(require_user
 def delete_one_session(
     extern_id: uuid.UUID, caller: AuthContext = Depends(require_user)
 ) -> Response:
-    """Delete one of the caller's own stored trainings (ADR 0066).
-
-    204 on success; 404 for an absent *or* foreign id, as the read route
-    (ADR 0050). A second DELETE is therefore a 404 too, on purpose.
-    """
+    """A second DELETE is a 404 too, on purpose."""
     with session_scope() as db:
         if not deletion.delete_session(db, caller.sub, extern_id):
             raise HTTPException(status_code=404, detail="Unknown session")
-    # Returned explicitly rather than annotated `-> None`: FastAPI derives a
-    # response model from the annotation, and a 204 may not carry a body.
+    # Explicit: FastAPI would derive a body model from an annotation, and 204 has none.
     return Response(status_code=204)
 
 
-# What each refusal of the retry route below says, by the reason `jobs` gives.
-# Here rather than in `jobs.py`: that module decides *whether*, this one speaks
-# to the User, and the sentences are part of the interface.
+# The sentences per refusal; `jobs` decides whether, this module speaks to the User.
 _RETRY_REFUSALS = {
     jobs.BLOCKED_DONE: "Für dieses Gespräch liegt bereits eine Auswertung vor.",
     jobs.BLOCKED_EMPTY: (
@@ -143,11 +118,8 @@ _RETRY_REFUSALS = {
 def retry_feedback(
     extern_id: uuid.UUID, caller: AuthContext = Depends(require_user)
 ) -> dict:
-    """Ask for this Session's wrap-up to be written again (ADR 0049).
-    Possible because it is written from stored data, never audio (ADR 0048).
-    202 accepted; 404 absent or foreign (ADR 0031/0050); 409 per
-    `jobs.retry_blocked`; 503 if the queue is unreachable, leaving the job row
-    untouched so the screen keeps showing the failure rather than a spinner."""
+    """Written from stored data, never audio (ADR 0049). 503 leaves the job row
+    untouched, so the screen keeps showing the failure rather than a spinner."""
     with session_scope() as db:
         session = owned_session(db, caller.sub, extern_id, *FOR_RETRY)
         if session is None:
@@ -158,7 +130,7 @@ def retry_feedback(
             raise HTTPException(status_code=409, detail=_RETRY_REFUSALS[blocked])
 
         session_pk = session.session_id
-        # Imported here so the rest of the REST layer does not need Redis.
+        # Imported here, so the REST layer does not need Redis.
         from shared.feedback import queue  # pylint: disable=import-outside-toplevel
 
         try:
@@ -173,25 +145,18 @@ def retry_feedback(
                 ),
             ) from e
 
-        # Only after the queue took it: a row moved to `queued` with no job
-        # behind it is the exact state `requeue_feedback.py` exists to repair.
+        # Only after the queue took it, or the row lies.
         jobs.mark(db, session_pk, db_models.JOB_QUEUED)
 
     return {"status": db_models.JOB_QUEUED}
 
 
-# How often the User must have spoken before a call can be reversed or carried
-# forward. The screen hides both offers under `MIN_USER_TURNS` in
-# FeedbackReport.tsx (pinned to this by backend/tests/test_reverse.py); this enforces it.
+# Pinned to the client's `MIN_USER_TURNS` by test_reverse.py; this enforces it.
 MIN_USER_UTTERANCES = 3
 
 
 def _user_utterances(db: DbSession, session_pk: int) -> int:
-    """How often the User spoke in this Session. Stored Turns are one row per
-    speaker, so the Persona's greeting is not counted -- the same count the
-    screen makes. A COUNT rather than loading the Transcript for its length --
-    `.count()` rather than `func.count()`, which pylint cannot see through (the
-    same choice as `api/account.py`)."""
+    """One row per speaker, so the Persona's lines are not counted."""
     return (
         db.query(db_models.Turn)
         .filter(
@@ -203,7 +168,6 @@ def _user_utterances(db: DbSession, session_pk: int) -> int:
 
 
 def _too_short(what: str) -> HTTPException:
-    """The refusal both routes give a call below `MIN_USER_UTTERANCES`."""
     return HTTPException(
         status_code=409,
         detail=f"In diesem Gespräch wurde zu wenig gesprochen, um daraus {what} zu bauen.",
@@ -216,13 +180,9 @@ async def create_reverse(
     caller: AuthContext = Depends(require_user),
     tenant_id: int = Depends(current_tenant_id),
 ) -> dict:
-    """The reverse of this Session: the same call with the roles swapped (F-61).
-    Idempotent: the existing reverse is looked up before any model call. A
-    reverse of a reverse is refused. No consent guard needed: without consent
-    there is no stored Session to read (ADR 0066). Database work goes to a
-    thread, since this route is async for the model call."""
+    """F-61. Idempotent; a reverse of a reverse is refused. No consent guard:
+    without consent there is no stored Session (ADR 0066)."""
     material = await asyncio.to_thread(_reverse_material, extern_id, caller.sub)
-    # Absent and not-yours stay the same answer as in `get_session` (ADR 0050).
     if material is None:
         raise HTTPException(status_code=404, detail="Unknown session")
     if material.already_reverse:
@@ -236,7 +196,7 @@ async def create_reverse(
     existing = await asyncio.to_thread(library.restore_reverse, material.session_pk)
     if existing is not None:
         return _reverse_response(existing)
-    limits.enforce(limits.SCENARIO_DRAFTS, caller.sub)  # only a drafted one counts (ADR 0109)
+    limits.enforce(limits.SCENARIO_DRAFTS, caller.sub)  # only a drafted one counts
 
     try:
         brief = await draft_brief(
@@ -246,7 +206,6 @@ async def create_reverse(
             material.improvements,
         )
     except (OpenAIError, ReverseError) as e:
-        # A dead gateway and an unparseable reply are the same thing from here.
         logger.warning("Reverse briefing failed for session %s: %s", extern_id, e)
         raise HTTPException(
             status_code=503,
@@ -260,15 +219,12 @@ async def create_reverse(
         library.create_reverse, material.session_pk, caller.sub, tenant_id, brief
     )
     if scenario is None:
-        # The Session went away between the two reads — a deletion in another
-        # tab. Nothing was written; the same 404 the first read would have given.
+        # Deleted meanwhile in another tab; nothing was written.
         raise HTTPException(status_code=404, detail="Unknown session")
     return _reverse_response(scenario)
 
 
 def _reverse_response(scenario) -> dict:
-    """What the client needs to start the reverse straight away: the id to
-    commit a Session with, and the briefing to show while it runs."""
     return {
         "id": scenario.id,
         "name": scenario.name,
@@ -279,11 +235,7 @@ def _reverse_response(scenario) -> dict:
 
 @dataclass(frozen=True)
 class _ReverseMaterial:
-    """What a reverse is built from, read out before the database handle is
-    gone. The played Scenario's prompt fields are in here on purpose: the
-    briefing is a translation of exactly those, which is the exception ADR 0070
-    takes to ADR 0043 and the reason it is only ever taken for a case the User
-    has already heard played out."""
+    """Includes the played prompt fields, the exception ADR 0070 takes to ADR 0043."""
 
     session_pk: int
     already_reverse: bool
@@ -295,7 +247,6 @@ class _ReverseMaterial:
 
 
 def _reverse_material(extern_id: uuid.UUID, subject: str) -> _ReverseMaterial | None:
-    """This Session's material, or None if it is not the caller's."""
     with session_scope() as db:
         session = owned_session(db, subject, extern_id, *WITH_WRAPUP)
         if session is None:
@@ -309,9 +260,7 @@ def _reverse_material(extern_id: uuid.UUID, subject: str) -> _ReverseMaterial | 
             description=scenario.description,
             case_facts=scenario.case_facts,
             call_goal=scenario.call_goal,
-            # Absent when the wrap-up has not landed, which is allowed here:
-            # the briefing is built from the case, and the coaching points only
-            # decide which goal the checklist names first.
+            # May be empty: the coaching points only order the goals.
             improvements=[
                 point.text
                 for point in (feedback.points if feedback else [])
@@ -326,13 +275,9 @@ async def create_follow_up(
     caller: AuthContext = Depends(require_user),
     tenant_id: int = Depends(current_tenant_id),
 ) -> dict:
-    """The next exercise, drafted from this Session's wrap-up (F-60, ADR 0069).
-
-    Same shape as the reverse route. 409 when the wrap-up names no improvement
-    points: without them there is nothing to practise. Database work goes to a
-    thread, since this route is async for the model call."""
+    """F-60, shaped like the reverse route. 409 when the wrap-up names no
+    improvement points."""
     material = await asyncio.to_thread(_follow_up_material, extern_id, caller.sub)
-    # Absent and not-yours stay the same answer as in `get_session` (ADR 0050).
     if material is None:
         raise HTTPException(status_code=404, detail="Unknown session")
     if material.user_utterances < MIN_USER_UTTERANCES:
@@ -349,12 +294,11 @@ async def create_follow_up(
     existing = await asyncio.to_thread(library.restore_follow_up, material.session_pk)
     if existing is not None:
         return _follow_up_response(existing)
-    limits.enforce(limits.SCENARIO_DRAFTS, caller.sub)  # only a drafted one counts (ADR 0109)
+    limits.enforce(limits.SCENARIO_DRAFTS, caller.sub)  # only a drafted one counts
 
     try:
         draft = await draft_follow_up(material.call)
     except (OpenAIError, FollowUpError) as e:
-        # A dead gateway and an unusable draft are the same thing from here.
         logger.warning("Follow-up draft failed for session %s: %s", extern_id, e)
         raise HTTPException(
             status_code=503,
@@ -364,23 +308,19 @@ async def create_follow_up(
             ),
         ) from e
 
-    # The draft is keyed as the client knows the fields (ADR 0061); the library
-    # writes columns, where the card's `name` is `title`.
+    # Wire names to columns: the card's `name` is `title`.
     draft["title"] = draft.pop("name")
     scenario = await asyncio.to_thread(
         library.create_follow_up, draft, caller.sub, tenant_id, material.session_pk
     )
     if scenario is None:
-        # The Session went away between the two reads — a deletion in another
-        # tab. The same 404 the first read would have given.
+        # Deleted meanwhile in another tab.
         raise HTTPException(status_code=404, detail="Unknown session")
     return _follow_up_response(scenario)
 
 
 def _follow_up_response(scenario) -> dict:
-    """The card, in the shape `_follow_up` below already hands the client on the
-    detail route — so the screen renders what it came back with and what a
-    later reload brings identically."""
+    """The same shape `_follow_up` serves on the detail route."""
     return {
         "id": scenario.id,
         "name": scenario.name,
@@ -390,9 +330,7 @@ def _follow_up_response(scenario) -> dict:
 
 @dataclass(frozen=True)
 class _FollowUpMaterial:
-    """What a follow-up is drafted from, read before the database handle is gone.
-    Includes the played case's prompt fields (ADR 0070's exception to ADR 0043);
-    excludes the statistics, which have no target range (ADR 0051)."""
+    """Statistics stay out (ADR 0051)."""
 
     session_pk: int
     user_utterances: int
@@ -400,8 +338,7 @@ class _FollowUpMaterial:
 
 
 def _follow_up_material(extern_id: uuid.UUID, subject: str) -> _FollowUpMaterial | None:
-    """This Session's material, or None if it is not the caller's. A missing
-    wrap-up yields no improvements, which the route refuses like an empty one."""
+    """A missing wrap-up yields no improvements, refused like an empty one."""
     with session_scope() as db:
         session = owned_session(db, subject, extern_id, *WITH_WRAPUP)
         if session is None:
@@ -417,8 +354,6 @@ def _follow_up_material(extern_id: uuid.UUID, subject: str) -> _FollowUpMaterial
                 description=scenario.description,
                 case_facts=scenario.case_facts,
                 call_goal=scenario.call_goal,
-                # Where the call ended up, in the wrap-up's own words. The next
-                # call starts from that, and no other field says it.
                 outcome=feedback.summary if feedback else "",
                 improvements=tuple(
                     point.text
@@ -431,11 +366,7 @@ def _follow_up_material(extern_id: uuid.UUID, subject: str) -> _FollowUpMaterial
 
 
 def _follow_up(db: DbSession, session_id: int) -> dict | None:
-    """The card of the active Scenario drafted from this Session (ADR 0069), or None.
-
-    A query rather than a relationship: a second mapped edge between `scenario`
-    and `session` would have to be disambiguated everywhere.
-    """
+    """A query rather than a second mapped relationship between the two tables."""
     scenario = (
         db.query(db_models.Scenario)
         .filter_by(derived_from_session_id=session_id, active=True)

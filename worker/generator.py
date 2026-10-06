@@ -1,8 +1,5 @@
-"""Generating the post-call wrap-up in the async worker (ADR 0049, 0018/0019).
-The model interprets measured statistics, never produces or grades figures
-(ADR 0051). One call writes all six fields, incl. phase_language (ADR 0056),
-tone_fit (ADR 0079) and pressure_turns (ADR 0081, read by `segments.py`).
-"""
+"""The post-call wrap-up (ADR 0049). The model interprets the measured figures,
+never produces or grades them (ADR 0051)."""
 
 from __future__ import annotations
 
@@ -26,9 +23,7 @@ logger = logging.getLogger(__name__)
 
 _LANGUAGE_NAMES_EN = {"de": "German", "en": "English"}
 
-# The two wrap-ups written here rather than by the model, which answered them
-# in the prompt's English (ADR 0011). Keyed by the prompt's language name;
-# unknown languages fall back to German, the pilot's language.
+# Written here: the model answered these in the prompt's English (ADR 0011).
 _NOTHING_SAID = {
     "German": "In diesem Training wurde nicht gesprochen. Es gibt daher nichts auszuwerten.",
     "English": "Nothing was said in this training, so there is nothing to review.",
@@ -47,54 +42,38 @@ def _in_language(texts: dict[str, str], language: str) -> str:
 class _Point(BaseModel):
     text: str
     turn_id: int | None = None
-    # Which of F-62's focus goals the point is about (ADR 0080). An unknown
-    # key is dropped at storage (`_goal_ids`), not rejected here: the
-    # observation is worth more than its tag.
+    # A focus-goal key (ADR 0080); an unknown one is dropped at storage.
     goal: str = ""
 
 
 class _Wrapup(BaseModel):
-    """Strengths and improvements as two lists, not one list with a label, so
-    they cannot compete for one budget (the model would spend it on improvements
-    plus a token strength).
-    """
+    """Two lists, so strengths and improvements do not compete for one budget."""
 
     summary: str
-    # F-42. Defaulted rather than required: it is the newest thing the prompt
-    # asks for and the one a small model is likeliest to drop, and losing a
-    # whole wrap-up over a missing paragraph would be the wrong trade.
+    # Defaulted: a small model drops it, and losing the wrap-up for it is worse.
     phase_language: str = ""
-    # Whether the register suited the occasion. Defaulted on the same grounds.
+    # Defaulted, as above.
     tone_fit: str = ""
-    # The partner's utterances where the trainee was under pressure (ADR 0081).
-    # Ids, never shown; they decide the segment measurements' stretches.
-    # `None` = nobody judged (key missing, or fallback); `[]` = judged, nothing
-    # pressing. Keep the two apart -- `turn.pressed` stores NULL vs False, and
-    # collapsing them broke `backend/scripts/inspect_pressure_segments.py` once.
+    # Partner Turn ids under pressure (ADR 0081). None = unjudged, [] = nothing
+    # pressing; `turn.pressed` stores the two apart.
     pressure_turns: list[int] | None = None
     strengths: list[_Point] = []
     improvements: list[_Point] = []
 
     @property
     def points(self) -> list[tuple[str, _Point]]:
-        """Every point as (kind, point), strengths first -- the display order."""
         return [(db_models.POINT_STRENGTH, p) for p in self.strengths] + [
             (db_models.POINT_IMPROVEMENT, p) for p in self.improvements
         ]
 
 
 def generate_feedback(session_id: int) -> None:
-    """Job entry point: build and store one Session's Feedback.
-
-    Synchronous, because RQ jobs are; the LLM client underneath is async, so
-    the event loop lives only for the duration of this call.
-    """
+    """RQ jobs are synchronous; the event loop lives for this call only."""
     asyncio.run(_generate(session_id))
 
 
 async def _generate(session_id: int) -> None:
-    # The whole job sits inside one failure boundary: the post-call screen
-    # polls on this job's status, so anything that raises has to close the row.
+    # Anything that raises must close the job row the screen polls.
     session_exists = False
     try:
         with session_scope() as db:
@@ -105,13 +84,10 @@ async def _generate(session_id: int) -> None:
             jobs.mark(db, session_id, db_models.JOB_RUNNING)
             dossier, valid_turns = _dossier(session)
             language = _LANGUAGE_NAMES_EN.get(session.language_code, session.language_code)
-            # Read inside the transaction, like everything else here: the model
-            # call below runs with no database handle open (ADR 0070).
+            # The model call below runs with no database handle open.
             reverse = session.scenario.reverse
 
-        # A call with nothing in it is answered here: O5 asks the model for
-        # this sentence, but it is the one case where there is nothing to
-        # write and no reason to spend a model call finding that out.
+        # Nothing said: no model call needed.
         wrapup = (
             _Wrapup(summary=_in_language(_NOTHING_SAID, language))
             if not valid_turns
@@ -125,33 +101,24 @@ async def _generate(session_id: int) -> None:
         logger.info("Feedback stored for session %d (%d points)", session_id, len(wrapup.points))
     except Exception as e:
         logger.exception("Feedback generation failed for session %d", session_id)
-        # `jobs.mark` creates the row where it finds none, so a Session that
-        # does not exist must not reach it.
+        # `jobs.mark` creates a missing row, so only for a Session that exists.
         if session_exists:
             try:
                 with session_scope() as db:
                     jobs.mark(db, session_id, db_models.JOB_FAILED, str(e))
             except Exception:  # pylint: disable=broad-exception-caught
-                # Re-raising here would lose the original error; the client
-                # falls back to its own timeout instead.
+                # Re-raising would lose the original error.
                 logger.exception("Could not mark feedback job failed for session %d", session_id)
         raise
 
 
-# --- Prompt ---------------------------------------------------------------
-
-
 def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
-    """The Session as the model sees it, plus the Turn ids it is allowed to cite.
-    Statistics (no target ranges, ADR 0051; loudness described, not quoted) and
-    the timestamped transcript. In a reverse the partner is labelled `Agent`,
-    since the prompt's rules on who is judged key on that label (ADR 0070).
-    """
+    """The Session as the model sees it, plus the Turn ids it may cite. No target
+    ranges (ADR 0051); loudness described, not quoted."""
     reverse = session.scenario.reverse
     lines = _occasion(session.scenario)
     lines.append("Measured statistics for this call (established fact):")
-    # Whole-call rows only: the segment rows (ADR 0081) from a previous run
-    # would otherwise show the same metric three times with three values.
+    # Whole-call rows only, or each metric appears three times.
     lines += [
         f"    {m.metric_type.name}: {float(m.value):.1f} {m.metric_type.unit or ''}".rstrip()
         for m in stored.whole_call(session)
@@ -183,11 +150,8 @@ def _dossier(session: db_models.Session) -> tuple[str, set[int]]:
 
 
 def _occasion(scenario: db_models.Scenario) -> list[str]:
-    """What kind of call this was, for tone_fit (ADR 0079), from the Scenario's
-    English prompt fields. The success criterion is withheld -- a result, not an
-    occasion -- and since migration `3ce81b27af40` it sits inside `call_goal`,
-    so it is cut off there (`_goal_without_criterion`), never the whole goal.
-    """
+    """What kind of call this was, for tone_fit (ADR 0079). The success criterion
+    is a result, not an occasion, so it is cut off `call_goal`."""
     lines = [
         "The occasion of this call (established fact, not something to assess):",
         f"    Situation: {scenario.description}",
@@ -199,27 +163,18 @@ def _occasion(scenario: db_models.Scenario) -> list[str]:
     return lines
 
 
-# Where the merged `call_goal` stops being the goal and starts being the
-# criterion. A seed convention rather than a schema one: all 17 seeded goals end
-# on this sentence, and `worker/tests/test_wrapup_prompt.py` checks that against the
-# real seed, so the split cannot quietly stop working when one is reworded.
+# Every seeded goal ends on this sentence; test_wrapup_prompt.py checks the seed.
 _SETTLEMENT_MARKER = "The matter is settled when"
 
 
 def _goal_without_criterion(scenario: db_models.Scenario) -> str:
-    """The call goal without the sentence saying when it counts as met. An
-    authored goal has none and goes in whole; a goal that is only the criterion
-    yields "" and its line is left out.
-    """
+    """The goal without its success criterion; "" if it was only the criterion."""
     head, marker, _ = (scenario.call_goal or "").partition(_SETTLEMENT_MARKER)
     return (head if marker else scenario.call_goal or "").strip()
 
 
 def _loudness_course(session: db_models.Session) -> str | None:
-    """F-37's loudness as a sentence, or None if the call has no curve. A sentence
-    from the chart's own function, not the dB span, which the model would quote as
-    a level. Whole-call row only: segment rows carry a `curve_db` of their own.
-    """
+    """F-37's loudness as a sentence, not a dB span the model would quote as a level."""
     for measurement in stored.whole_call(session):
         if measurement.metric_type.key != metrics.LOUDNESS_KEY:
             continue
@@ -230,16 +185,12 @@ def _loudness_course(session: db_models.Session) -> str | None:
 
 
 def _timestamp(offset_ms: int) -> str:
-    """A position on the Session's timeline, as mm:ss."""
     seconds = round(offset_ms / 1000)
     return f"{seconds // 60:02d}:{seconds % 60:02d}"
 
 
 def _phase_rules(reverse: bool) -> str:
-    """What each of F-42's three phases looks like, from the trainee's side. The
-    registers (warm, factual, warm) are the same in a reverse; what each phase is
-    made of differs, e.g. stating the concern instead of receiving it (ADR 0070).
-    """
+    """F-42's three phases from the trainee's side; a reverse differs in content (ADR 0070)."""
     if reverse:
         return (
             "H1. Opening: greeting, giving their own name, and saying what "
@@ -282,17 +233,10 @@ def _phase_rules(reverse: bool) -> str:
 
 @dataclass(frozen=True)
 class _Casting:
-    """Who was on which end of the line (ADR 0070). One record, because the
-    prompt's rules name the simulated side by the transcript's own label, so
-    the two must be the same word.
-    """
+    """Who was on which end (ADR 0070). `partner` must match the transcript's label."""
 
-    # The transcript's label for the simulated side.
     partner: str
-    # The person the trainee spoke to, as a sentence refers to them.
     other: str
-    # What the summary opens on: the concern the call was about, named from
-    # whichever side brought it.
     wanted: str
 
 
@@ -305,10 +249,7 @@ def _casting(reverse: bool) -> _Casting:
 
 
 def _goal_ids(db: DbSession) -> dict[str, int]:
-    """Catalogue key to row id, read from the table the foreign key points into.
-    Deactivated goals are included (the statement stays true, ADR 0076); the
-    habit goals are excluded, since no single call can show them.
-    """
+    """Catalogue key to row id; deactivated goals in, habit goals out (ADR 0076)."""
     return {
         goal.key: goal.focus_goal_id
         for goal in db.query(db_models.FocusGoal)
@@ -316,25 +257,17 @@ def _goal_ids(db: DbSession) -> dict[str, int]:
     }
 
 
-# Goals about the training habit rather than about a call -- the catalogue's
-# `habit` group. Rule A6 tells the model not to assign them; this is the same
-# rule where it cannot be ignored.
+# The `habit` group: no single call can show them.
 _NEVER_ASSIGNED = frozenset(goal["id"] for goal in FOCUS_GOALS if goal["group"] == "habit")
 
 
 def _goal_catalogue() -> str:
-    """The focus goals as the prompt lists them, one key and title per line, from
-    `seed_data.FOCUS_GOALS`. Written out in full so the model copies a key rather
-    than inventing one; the German titles stay untranslated (one wording only).
-    """
+    """Written out so the model copies a key rather than inventing one."""
     return "".join(f"    {goal['id']}: {goal['title']}\n" for goal in FOCUS_GOALS)
 
 
 def _worked_example(reverse: bool) -> str:
-    """The accepted point, shown rather than described. Mirrored for a reverse
-    (ADR 0070): the model follows an example's direction, and the ordinary one
-    is a trainee who *answered* a call.
-    """
+    """Mirrored for a reverse (ADR 0070): the model follows an example's direction."""
     if reverse:
         return (
             "Specific -- write points like this: 'At 02:14 you asked whether "
@@ -354,12 +287,8 @@ def _worked_example(reverse: bool) -> str:
 
 
 def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[str, str]]:
-    """The prompt. English per ADR 0043; the Feedback itself is in `language`.
-    `reverse` (ADR 0070) swaps only the partner label, the person addressed and
-    the phase block. Rules are numbered under headings, with the three most often
-    broken repeated at the end, because a small model (ADR 0011) loses the rest.
-    """
-    # The same labels `_dossier` wrote, from the same record.
+    """English per ADR 0043; the Feedback is in `language`. The most broken rules
+    are repeated at the end, since a small model loses the rest (ADR 0011)."""
     casting = _casting(reverse)
     partner, other = casting.partner, casting.other
     system = (
@@ -608,9 +537,7 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
         "no bullet characters, no line breaks.\n"
         "\n"
         "Shape:\n"
-        # "what the caller wanted" names the trainee in a reverse and the
-        # machine everywhere else, so the one word that flips is spelled out
-        # rather than left to be read either way.
+        # The one word that flips in a reverse, spelled out.
         f'{{"summary": "2-4 sentences: what {casting.wanted}, how the '
         'trainee handled it, and where the call ended up", '
         '"phase_language": "one paragraph on how the register moved through '
@@ -654,15 +581,9 @@ def _messages(dossier: str, language: str, reverse: bool = False) -> list[dict[s
     ]
 
 
-# --- Model call and validation --------------------------------------------
-
-
 async def _ask(dossier: str, language: str, reverse: bool = False) -> _Wrapup:
-    """One attempt plus one retry, then a narrative-only fallback (ADR 0049).
-    Not in thinking mode (ADR 0103's amendment): it was, for Qwen3-4B's German,
-    but on the gateway's current model the trace alone outruns `llm.complete`'s
-    token cap, so both attempts came back empty and every call got the fallback.
-    """
+    """One attempt plus one retry, then a narrative-only fallback (ADR 0049). Not in
+    thinking mode: the trace alone outran the token cap (ADR 0103)."""
     messages = _messages(dossier, language, reverse)
     raw = ""
     for attempt in range(2):  # initial attempt + one retry
@@ -676,11 +597,8 @@ async def _ask(dossier: str, language: str, reverse: bool = False) -> _Wrapup:
 
 
 def _unfenced_text(raw: str, language: str) -> str:
-    """The model's prose, for the fallback (ADR 0049). A reply that still looks
-    like (truncated) JSON is replaced by the fixed sentence: stored raw, it would
-    reach the User as their summary and, having a Feedback row, never be
-    requeued by `backend/scripts/requeue_feedback.py`.
-    """
+    """A reply that still looks like JSON becomes the fixed sentence: stored, it
+    would reach the User and never be requeued."""
     stripped = llm.without_fenced_blocks(raw).strip()
     if not stripped or _looks_like_json(stripped):
         return _in_language(_NO_WRAPUP, language)
@@ -688,23 +606,15 @@ def _unfenced_text(raw: str, language: str) -> str:
 
 
 def _looks_like_json(text: str) -> bool:
-    """Whether this is the model's failed structure rather than its prose.
-    Deliberately crude: a leading brace or bracket, or a schema key in JSON
-    quotes near the start."""
+    """Deliberately crude."""
     if text[:1] in ("{", "["):
         return True
     fields: tuple[str, ...] = tuple(_Wrapup.model_fields)
     return any(f'"{field}"' in text[:200] for field in fields)
 
 
-# --- Storage --------------------------------------------------------------
-
-
-# `_dossier` prefixes every line with `[turn_id=12]` so a point can cite it
-# in the turn_id field (O3); a 4B model (ADR 0011) copies it into the prose
-# too, where P1 asked for the timestamp. N5 forbids it, this takes it back
-# out. Marker shapes only -- cutting "in Turn 12" out of a sentence would
-# leave it ungrammatical, so that form stays N5's job.
+# The model copies `[turn_id=12]` into the prose too (ADR 0011). Marker shapes
+# only: cutting "in Turn 12" would leave the sentence ungrammatical.
 _TURN_MARKER_RE = re.compile(
     r"""
     \s*                                                    # its leading space
@@ -720,21 +630,14 @@ _TURN_MARKER_RE = re.compile(
 def _without_turn_markers(text: str) -> str:
     """One text value with the transcript's id markers taken back out."""
     cleaned = _TURN_MARKER_RE.sub("", text)
-    # It takes its own space with it: close the gap it leaves behind.
     cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
     cleaned = re.sub(r" +([,.;:!?])", r"\1", cleaned)
     return cleaned.strip()
 
 
 def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) -> None:
-    """Replace this Session's Feedback with the generated one. A citation of a
-    foreign Turn is dropped, the point kept; every text passes
-    `_without_turn_markers` here, once, for both screens that read it.
-    """
-    # Through the ORM, not a bulk delete. The database would carry the points
-    # along by itself (feedback_point.feedback_id is ON DELETE CASCADE), but
-    # going through the ORM keeps the identity map in step with what was
-    # deleted, which a bulk delete in the middle of this transaction would not.
+    """Replaces the Session's Feedback. A foreign Turn citation is dropped, the point kept."""
+    # Through the ORM, so the identity map knows what was deleted.
     previous = db.query(db_models.Feedback).filter_by(session_id=session_id).one_or_none()
     if previous is not None:
         db.delete(previous)
@@ -742,9 +645,7 @@ def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) 
     feedback = db_models.Feedback(
         session_id=session_id,
         summary=_without_turn_markers(wrapup.summary),
-        # NULL rather than "" where the model gave us nothing: the frontend
-        # leaves the block out entirely then, which is honest about a call
-        # nobody analysed for its phases. An empty paragraph would not be.
+        # NULL, not "": the frontend then leaves the block out.
         phase_language=_without_turn_markers(wrapup.phase_language) or None,
         tone_fit=_without_turn_markers(wrapup.tone_fit) or None,
         score=None,  # ADR 0004: qualitative only, no score in the MVP
@@ -757,9 +658,7 @@ def _store(db: DbSession, session_id: int, wrapup: _Wrapup, turn_ids: set[int]) 
             kind=kind,
             text=_without_turn_markers(point.text),
             turn_id=point.turn_id if point.turn_id in turn_ids else None,
-            # Unknown keys become NULL rather than raising. The model is asked
-            # for one of the catalogue's keys and will occasionally invent one,
-            # and a wrap-up is worth more than its tags.
+            # An invented key becomes NULL: the wrap-up is worth more than its tags.
             focus_goal_id=goal_ids.get(point.goal),
         )
         for index, (kind, point) in enumerate(wrapup.points)
