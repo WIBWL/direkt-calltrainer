@@ -131,6 +131,7 @@ disable = [
     # missing-class-docstring -- same reasoning, for simple dataclasses
     # (Persona, Scenario, PersonaVoice) whose fields are self-explanatory.
     "C0115",
+    "C0116",  # missing-function-docstring -- names and types say enough
     # too-few-public-methods -- SQLAlchemy models and dataclasses are
     # declarations, not behaviour; every class in shared/db/models.py
     # would otherwise be flagged forever.
