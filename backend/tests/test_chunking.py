@@ -1,8 +1,4 @@
-"""TTS chunking of the streamed LLM output.
-
-Covers ADR 0033: token stream -> sentence/clause-sized chunks so synthesis
-(and playback) can start before the full reply is generated.
-"""
+"""Splitting the token stream into synthesizable chunks (ADR 0033)."""
 
 from backend.session.chunking import (
     _FIRST_CHUNK_MIN_CHARS,
@@ -45,9 +41,7 @@ async def test_does_not_split_a_short_sentence_below_the_minimum():
 
 async def test_first_chunk_flushes_early_at_the_first_sentence(  # ADR 0033: first chunk sets perceived latency
 ):
-    # First sentence is 40 chars — below _MIN_CHUNK_CHARS (80) but above the
-    # first-chunk floor — so it is flushed immediately instead of waiting for
-    # the second sentence.
+    # 40 chars: under _MIN_CHUNK_CHARS but over the first-chunk floor, so flushed at once.
     first = "Guten Tag, hier ist Herr Brandt am Apparat."
     assert _FIRST_CHUNK_MIN_CHARS <= len(first) < _MIN_CHUNK_CHARS
     chunks = await _chunks(first + " ", "Ich habe eine kurze Frage an Sie.")
@@ -75,10 +69,6 @@ async def test_long_unpunctuated_run_is_force_split_at_a_word_boundary():
 
 
 async def test_a_period_after_a_digit_does_not_end_a_sentence():
-    """The tokens arrive split exactly at the thousands separator ("1", ".",
-    "050 Euro"), and flushing there sent "… 1." and "050 Euro …" to TTS as two
-    chunks -- spoken as "eins." / "fünfhundert", stored as "1. 050" -- and put
-    one sentence out of reach of the sentence-level dedup (ADR 0038)."""
     chunks = await _chunks(
         "Wir hatten vor zwei Monaten 1", ".", "050 Euro für 14 Lizenzen",
         ", und jetzt ist der Preis auf 1", ".", "180 Euro gestiegen", ".",

@@ -1,15 +1,4 @@
-"""Two import rules no running system would show a break of, hence this guard.
-
-The three packages: `shared` imports neither `backend` nor `worker`, and those two never
-import each other -- each image carries `shared` and its own package only, so a stray
-import there fails in production, not here. The backend hands the worker a job by name
-(`shared/feedback/queue.py`).
-
-The live call may not depend on the analysis of a finished one (ADR 0033/0034/0049):
-nothing in `backend/session/` or loaded by `orchestrator.py` may import the analysis
-(`shared/feedback/`, `backend/feedback/`), except `acoustics` (measures during the call,
-imports nothing back). The seam is `session/persistence.py` and `session_ws._record`,
-which run after the call ended."""
+"""Package boundaries and the live call's independence from the analysis (ADR 0090, 0108)."""
 import ast
 import pathlib
 import subprocess
@@ -61,7 +50,6 @@ def _probe(module):
 
 @pytest.mark.parametrize("package", sorted(PACKAGES))
 def test_a_package_imports_only_itself_and_shared(package):
-    """The direct imports, read off every source file of the package."""
     wrong = {
         f"{path.relative_to(ROOT)}: {module}"
         for path in _package_modules(package)
@@ -77,7 +65,6 @@ def test_a_package_imports_only_itself_and_shared(package):
     ("worker.generator", "backend"),
 ])
 def test_loading_a_process_does_not_load_the_other(entry_point, never):
-    """The same rule transitively: what each image's process actually loads."""
     loaded = _probe(entry_point)
     assert not {m for m in loaded if m.split(".")[0] == never}, (
         f"{entry_point} loads {never}: {sorted(m for m in loaded if m.split('.')[0] == never)}"
@@ -97,15 +84,11 @@ def _imported_modules(path):
 
 
 def test_the_seam_is_still_there():
-    """If the seam were renamed, the glob above would quietly start calling it
-    live and this file would fail for the wrong reason -- or, worse, a new
-    module named like it would be exempt."""
     assert all((SESSION / name).exists() for name in SEAM)
 
 
 @pytest.mark.parametrize("path", LIVE_MODULES, ids=lambda p: p.name)
 def test_a_live_module_names_no_analysis_module_but_acoustics(path):
-    """The direct imports, read off the source."""
     reached = {m for m in _imported_modules(path) if m.startswith(ANALYSIS)}
     assert reached <= ALLOWED, (
         f"{path.name} imports {sorted(reached - ALLOWED)}; the analysis of a finished call "
@@ -115,7 +98,6 @@ def test_a_live_module_names_no_analysis_module_but_acoustics(path):
 
 @pytest.mark.parametrize("module", LIVE_ENTRY_POINTS)
 def test_loading_the_live_path_does_not_load_the_analysis_package(module):
-    """The same rule transitively, and the one that actually bites."""
     loaded = _probe(module)
     analysis = {m for m in loaded if m.startswith(ANALYSIS) and m not in ANALYSIS}
     assert analysis <= ALLOWED, f"{module} transitively loads {sorted(analysis - ALLOWED)}"

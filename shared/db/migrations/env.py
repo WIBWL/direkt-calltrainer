@@ -10,25 +10,19 @@ from shared.db.session import PROVISION_LOCK_KEY, build_database_url
 config = context.config
 
 try:
-    # The same reading the application does, so migrations can never run against
-    # a different database than the app does.
+    # The app's own URL builder, so migrations hit the app's database.
     DATABASE_URL = build_database_url().render_as_string(hide_password=False)
 except RuntimeError as exc:
     raise SystemExit(
         f"{exc} -- `source .env` first."
     ) from exc
-# Doubled because alembic.ini is read through ConfigParser, where a single "%"
-# starts an interpolation and would reject a password containing one.
+# Doubled: ConfigParser treats "%" as interpolation.
 config.set_main_option("sqlalchemy.url", DATABASE_URL.replace("%", "%%"))
 
-# fileConfig() disables every logger configured before it. That is fine for the
-# alembic CLI, but when the running app migrates itself at startup
-# (backend/db/provision.py) it would silently take out the application's own
-# logging (ADR 0039) for the rest of the process -- so that caller opts out.
+# fileConfig() disables existing loggers; the app's in-process migration opts out.
 if config.config_file_name is not None and config.attributes.get("configure_logging", True):
     fileConfig(config.config_file_name)
 
-# Autogenerate diffs the models against the database (ADR 0027).
 target_metadata = Base.metadata
 
 
@@ -44,37 +38,25 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-# The key lives in shared/db/session.py, because provisioning takes it for the
-# seeding step too (backend/db/provision.py) and both halves have to serialise
-# against each other. Postgres advisory locks are scoped to the database, so a
-# test's throwaway database never blocks the real one.
+# Shared with seeding (backend/db/provision.py); scoped to the database.
 MIGRATION_LOCK_KEY = PROVISION_LOCK_KEY
 
 
 def run_migrations_online() -> None:
-    """Run the migrations against a live database.
-
-    Under an advisory lock, so app instances and backend/scripts/seed_reference_data.py
-    never apply the same revision concurrently; the others wait, then find
-    nothing to do."""
+    """Under an advisory lock, so concurrent boots never apply a revision twice."""
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        # Announced before the wait, not after: pg_advisory_lock blocks without
-        # a deadline, so a process that hangs mid-migration stops every other
-        # one here with no output at all. Waiting is the right behaviour -- an
-        # app that boots on an un-migrated schema loses Sessions quietly, which
-        # is worse than a visible stall -- but the stall should say so.
+        # Announced first: pg_advisory_lock blocks with no deadline or output.
         logging.getLogger("alembic.runtime.migration").info(
             "Waiting for the migration advisory lock"
         )
         connection.execute(text("SELECT pg_advisory_lock(:key)"), {"key": MIGRATION_LOCK_KEY})
-        # Committed straight away: the execute above opened a transaction, and
-        # leaving it open would swallow Alembic's own, rolling the migrations
-        # back at the end. The lock is session-scoped and outlives the commit.
+        # Commit now, or Alembic's transaction is swallowed and rolled back.
+        # The lock is session-scoped and survives the commit.
         connection.commit()
         try:
             context.configure(connection=connection, target_metadata=target_metadata)

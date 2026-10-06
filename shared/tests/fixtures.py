@@ -1,15 +1,7 @@
-"""The fixtures every suite shares, registered by each suite's conftest.py:
-the environment the packages read at import, and the throwaway databases the
-persistence tests run against.
+"""Fixtures every suite shares: the environment, set before any package import, and
+a throwaway database per persistence test (skipped without a server)."""
 
-Most tests fake the pipeline and never touch a database; the persistence tests
-get a throwaway database per test, on the server `POSTGRES_URL` names in the
-environment the suite was started from (`source .env && uv run pytest`), and
-skip without one. The packages read their environment at import time, so it is
-set up below before any import."""
-
-# The env vars below must be set before any package import runs, so those imports
-# deliberately sit after this block.
+# The environment must be set before any package import.
 # pylint: disable=wrong-import-position,missing-function-docstring
 
 import os
@@ -19,16 +11,12 @@ os.environ.setdefault("DIREKT_API_KEY", "test-direkt-key")
 os.environ.setdefault("LLM_MODEL", "test-llm-model")
 os.environ.setdefault("LOG_FORMAT", "pretty")
 
-# The server the persistence tests create their databases on: the developer's
-# own, as sourced from .env. Taken before the guard below replaces it.
+# The developer's own server, taken before the guard below replaces it.
 _SERVER = os.environ.get("POSTGRES_URL")
 _SERVER_PASSWORD = os.environ.get("POSTGRES_PASSWORD")
 
-# Deliberately unusable settings, so a stray session_scope() or enqueue fails
-# loudly instead of writing to the development database or queue. Assigned, not
-# setdefault: the sourced .env has already set the real ones, and setdefault
-# would leave the guard off exactly there. The database fixtures aim the app at
-# a throwaway database per test (`database_env`).
+# Unusable on purpose, so a stray session_scope() or enqueue fails loudly.
+# Assigned, not setdefault: the sourced .env has already set the real ones.
 os.environ["POSTGRES_URL"] = "postgresql://calltrainer-test-no-such-user@127.0.0.1:1/no-such-database"
 os.environ["REDIS_URL"] = "redis://127.0.0.1:1"
 for _name in ("POSTGRES_URL_FILE", "POSTGRES_PASSWORD", "POSTGRES_PASSWORD_FILE", "REDIS_URL_FILE"):
@@ -56,36 +44,25 @@ from shared.db.seed_data import FOCUS_GOALS  # noqa: E402
 from shared.db.session import DRIVER, reset_engine  # noqa: E402
 
 
-# --- Database fixtures ----------------------------------------------------
-# Everything below is for the persistence tests. A test that does not request
-# one of these fixtures never opens a connection to Postgres at all.
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# Bounds the reachability probe so an unreachable server fails in a few seconds
-# instead of hanging on libpq's default.
 _DB_CONNECT_TIMEOUT = 3
 
 
 def _loopback(host: str | None) -> str | None:
-    """`localhost` -> `127.0.0.1` for the test database server.
-
-    On Windows `localhost` resolves to `::1` first, but Docker Desktop forwards IPv4
-    only, so every connect waits out a timeout (Alembic's has none) and the run hangs.
-    """
+    """`localhost` -> `127.0.0.1`: on Windows it resolves to `::1` first, which
+    Docker Desktop does not forward, and Alembic's connect then hangs."""
     return "127.0.0.1" if host in ("localhost", "::1") else host
 
 
 def _render(url: URL) -> str:
-    """URL.__str__ masks the password, which makes the result unusable as a
-    connection string — this keeps it."""
+    # str(URL) masks the password.
     return url.render_as_string(hide_password=False)
 
 
 def _server_url() -> URL:
     """The configured database server, or a skip if none was sourced."""
     if not _SERVER:
-        # `return` only so every path returns an expression: skip() raises.
         return pytest.skip("POSTGRES_URL is not set; `source .env` to run the persistence tests")
     url = make_url(_SERVER).set(drivername=DRIVER)
     if _SERVER_PASSWORD:
@@ -95,11 +72,7 @@ def _server_url() -> URL:
 
 @contextmanager
 def database_env(url: str) -> Iterator[None]:
-    """Points `POSTGRES_URL` at `url` for the block.
-
-    That is how Alembic and `build_database_url()` are aimed at a test's database.
-    Restored afterwards, so the next test is back on the unusable placeholder.
-    """
+    """Aims Alembic and `build_database_url()` at `url` for the block."""
     previous = os.environ["POSTGRES_URL"]
     os.environ["POSTGRES_URL"] = url
     try:
@@ -109,35 +82,26 @@ def database_env(url: str) -> Iterator[None]:
 
 
 def _alembic_config() -> Config:
-    """Alembic settings for a programmatic migration inside the test process.
-
-    `configure_logging=False`: env.py's fileConfig() otherwise disables every existing
-    logger for the rest of the session, breaking later tests that assert on logs.
-    """
+    # Otherwise env.py's fileConfig() disables existing loggers for the session.
     config = Config(str(ALEMBIC_INI))
     config.attributes["configure_logging"] = False
     return config
 
 
 def alembic_upgrade(url: str, revision: str = "head") -> None:
-    """Migrates `url` up to `revision`."""
     with database_env(url):
         command.upgrade(_alembic_config(), revision)
 
 
 def alembic_downgrade(url: str, revision: str) -> None:
-    """Migrates `url` back down to `revision`."""
     with database_env(url):
         command.downgrade(_alembic_config(), revision)
 
 
 @pytest.fixture(scope="session")
 def _reachable_postgres() -> URL:
-    """The configured server, probed once. If it is down, every persistence
-    test skips here in one shot -- without this each fixture re-times-out its
-    own connection, which turned an offline `pytest` into a multi-minute wait.
-    """
-    server = _server_url()  # skips if .env is incomplete
+    """Probed once, so an offline server skips everything in one shot."""
+    server = _server_url()
     probe = create_engine(
         server.set(database="postgres"),
         connect_args={"connect_timeout": _DB_CONNECT_TIMEOUT},
@@ -154,7 +118,6 @@ def _reachable_postgres() -> URL:
 
 @pytest.fixture
 def empty_database(_reachable_postgres: URL) -> Iterator[str]:
-    """A freshly created, entirely empty database. Dropped when the test ends."""
     server = _reachable_postgres
     name = f"calltrainer_test_{uuid.uuid4().hex[:12]}"
     admin = create_engine(server.set(database="postgres"), isolation_level="AUTOCOMMIT")
@@ -166,22 +129,19 @@ def empty_database(_reachable_postgres: URL) -> Iterator[str]:
         yield _render(server.set(database=name))
     finally:
         with admin.connect() as conn:
-            # FORCE terminates leftover connections; without it a session the
-            # test failed to close would block the drop and leak the database.
+            # FORCE: a connection the test left open would block the drop.
             conn.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
         admin.dispose()
 
 
 @pytest.fixture
 def migrated_database(empty_database: str) -> str:
-    """An empty database with all migrations applied."""
     alembic_upgrade(empty_database)
     return empty_database
 
 
 @pytest.fixture
 def db_session(migrated_database: str) -> Iterator[DbSession]:
-    """An ORM session against a migrated, empty database."""
     engine = create_engine(migrated_database)
     session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)()
     try:
@@ -193,11 +153,7 @@ def db_session(migrated_database: str) -> Iterator[DbSession]:
 
 @pytest.fixture
 def app_database(migrated_database: str) -> Iterator[str]:
-    """Points the *application's* engine at this test's throwaway database.
-
-    session.py memoises its engine, so reset_engine() is needed before and after.
-    Required by anything going through session_scope() (every write path, ADR 0034).
-    """
+    """Points the application's memoised engine at this test's database."""
     with database_env(migrated_database):
         reset_engine()
         yield migrated_database
@@ -213,10 +169,6 @@ SESSION_STARTED = datetime(2026, 8, 27, 10, 0, 0, tzinfo=UTC)
 
 @dataclass
 class ReferenceRows:
-    """The reference entities a Session has to point at, as created by
-    `reference_data`. Shared so the Session-related tests describe the same
-    starting world instead of each building their own."""
-
     persona: db_models.Persona
     scenario: db_models.Scenario
     language: db_models.Language
@@ -225,13 +177,9 @@ class ReferenceRows:
 
 @pytest.fixture
 def reference_data(db_session: DbSession) -> ReferenceRows:
-    """Seeds the minimum reference data a Session needs, by hand rather than
-    through the seed script, so these tests do not depend on what personas.py
-    happens to contain."""
+    """Built by hand, independent of the seed content."""
     language = db_models.Language(code="de", name="Deutsch")
-    # The default tenant every caller with no company resolves to (ADR 0060).
     default_tenant = db_models.Tenant(extern_ref="default", name="Ohne Unternehmen")
-    # Built-ins: the Scenario public and authored by nobody (ADR 0058), like a seeded row.
     persona = db_models.Persona(
         key=PERSONA_KEY,
         name="Thomas Brandt",
@@ -257,10 +205,7 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
         key=METRIC_KEY, name="Sprechtempo", unit="Wörter/min", aspect=db_models.ASPECT_HOW,
         feature_id="F-36", active=True,
     )
-    # The focus catalogue, from the same list that seeds it in production. Not
-    # hand-written like the rows above: the wrap-up resolves each point's tag
-    # against these keys (`generator._goal_ids`), so a made-up catalogue here
-    # would let a test pass on a key the real system does not have.
+    # From the real seed: the wrap-up resolves tags against these keys.
     focus_goals = [
         db_models.FocusGoal(
             key=goal["id"], group_key=goal["group"], position=goal["position"],
@@ -279,16 +224,10 @@ def reference_data(db_session: DbSession) -> ReferenceRows:
 
 
 def stub_completions(monkeypatch, reply) -> list[tuple[list[dict[str, str]], bool]]:
-    """Replace `llm.complete` and record what it was asked.
-
-    `reply` is the answer text, or a callable given the messages. Returns one
-    `(messages, think)` pair per call, so a test can check what the model was told.
-    """
+    """Replace `llm.complete`; returns one `(messages, think)` pair per call."""
     calls: list[tuple[list[dict[str, str]], bool]] = []
 
-    # pylint: disable=unused-argument  # the signature has to mirror
-    # `llm.complete`, whose callers pass max_tokens; what it is set to is
-    # not what these tests are about.
+    # pylint: disable=unused-argument  # mirrors llm.complete's signature
     async def complete(messages: list[dict[str, str]], *,
                        max_tokens: int | None = None, think: bool = False) -> str:
         calls.append((messages, think))
@@ -299,6 +238,5 @@ def stub_completions(monkeypatch, reply) -> list[tuple[list[dict[str, str]], boo
 
 
 def asked(calls, index: int = 0) -> str:
-    """Everything the model was told on one call, system prompt and material
-    together -- what a prompt assertion is made against."""
+    """Everything the model was told on one call."""
     return "\n".join(message["content"] for message in calls[index][0])

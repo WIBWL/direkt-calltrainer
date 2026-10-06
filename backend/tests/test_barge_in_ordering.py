@@ -1,13 +1,6 @@
-"""The order in which a barge-in reaches the orchestrator (ADR 0035).
+"""The played position must reach the orchestrator before the turn is finalized (ADR 0035)."""
 
-`note_barge_in()` must land before the turn generator is finalized, or the
-finalizer sees no played position and commits every dispatched chunk, heard or
-not. The two tests are one barge-in, differing in where the forwarding task sat."""
-
-# pylint: disable=duplicate-code
-# Fixture data is repeated per test module on purpose: a test carrying its own
-# Turns shows what it ran against when it fails, and sharing them would let a
-# change made for one test quietly alter another.
+# pylint: disable=duplicate-code  # each module carries its own fixture Turns on purpose
 
 from __future__ import annotations
 
@@ -72,11 +65,6 @@ def _reply(order: list[str], *, park_in_generator: asyncio.Event | None):
 
 
 async def test_barge_in_is_recorded_before_the_turn_is_finalized_mid_generator():
-    """The interrupt arrives while the turn is waiting on the TTS gateway.
-
-    This is the common case -- synthesis is a network round trip, forwarding a
-    chunk to the socket is not -- so it is where a barge-in most often lands.
-    """
     order: list[str] = []
     parked = asyncio.Event()
     ws = _Ws(parked=parked)
@@ -94,9 +82,6 @@ async def test_barge_in_is_recorded_before_the_turn_is_finalized_mid_generator()
 
 
 async def test_barge_in_is_recorded_before_the_turn_is_finalized_mid_send():
-    """The same interrupt, arriving while the turn is parked in the socket send
-    instead. The orchestrator's contract does not change with the suspension
-    point, so this must produce the same order as the test above."""
     order: list[str] = []
     parked = asyncio.Event()
     block_send = asyncio.Event()
@@ -115,9 +100,7 @@ async def test_barge_in_is_recorded_before_the_turn_is_finalized_mid_send():
 
 
 class _RealTurnWs:
-    """A socket for the end-to-end case: counts the chunks the server actually
-    dispatched, parks synthesis once three are out, and only then reports the
-    barge-in -- so the turn is waiting on the TTS gateway when it arrives."""
+    """Parks synthesis once three chunks are out, then reports the barge-in."""
 
     def __init__(self, tts_fake, *, played_ms: int):
         self._tts = tts_fake
@@ -147,11 +130,6 @@ class _RealTurnWs:
 async def test_only_the_heard_sentence_is_committed_when_the_turn_is_cut_mid_synthesis(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """ADR 0035 end to end: only the played sentence enters the history.
-
-    700 ms played plus the 300 ms grace covers exactly the first of three sentences;
-    the other two were never heard and must not shape the next reply.
-    """
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
     s1 = "Der erste Satz meiner Antwort ist inhaltlich vollstaendig und lang genug fuer seinen eigenen Chunk."
     s2 = "Der zweite Satz folgt unmittelbar darauf und ist ebenfalls lang genug fuer einen eigenen Chunk hier."
@@ -205,11 +183,6 @@ class _TailWs:
 async def test_a_barge_in_on_the_tail_trims_the_committed_reply_to_what_was_heard(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """A barge-in after the reply was already committed (the client lags playback).
-
-    History and persona_text are trimmed to the heard part together, never one
-    without the other (ADR 0035); the reply is committed once and the turn stays closed.
-    """
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
     s1 = "Der erste Satz meiner Antwort ist inhaltlich vollstaendig und lang genug fuer seinen eigenen Chunk."
     s2 = "Der zweite Satz folgt unmittelbar darauf und ist ebenfalls lang genug fuer einen eigenen Chunk hier."
@@ -230,10 +203,8 @@ async def test_a_barge_in_on_the_tail_trims_the_committed_reply_to_what_was_hear
 
 
 class _AfterListeningWs:
-    """Interrupts only once the whole turn event stream is out (the last frame
-    is `state: listening`) -- i.e. the turn generator has fully returned, not
-    just committed. The teardown then has nothing to finalize, so the trim has
-    to happen off `note_barge_in` itself."""
+    """Interrupts only after the turn generator has returned, so the trim must
+    come from `note_barge_in` itself."""
 
     def __init__(self):
         self.sent: list = []
@@ -256,11 +227,6 @@ class _AfterListeningWs:
 async def test_a_barge_in_after_the_turn_generator_returned_still_trims(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """The reply finished *and* the generator returned before the interrupt --
-    so `_finalize_interrupted` never runs. `note_barge_in` sees the reply is
-    already revisable and trims it there (ADR 0035). This is the common
-    real-world case: a short reply is fully synthesised and forwarded in a
-    second or two, long before the client finishes playing it."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
     s1 = "Der erste Satz meiner Antwort ist inhaltlich vollstaendig und lang genug fuer seinen eigenen Chunk."
     s2 = "Der zweite Satz folgt unmittelbar darauf und ist ebenfalls lang genug fuer einen eigenen Chunk hier."

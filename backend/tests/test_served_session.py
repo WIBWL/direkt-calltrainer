@@ -1,8 +1,4 @@
-"""A stored Session on the wire (`backend/api/served.py`): history row, detail, export.
-
-Covers ADR 0051 (measurements are whole-call only; segments under their own key, ADR 0081),
-ADR 0064 (listing drops `detail_json` and wrap-up text), ADR 0066 (export carries every owned
-row), ADR 0091 (detail serves the Reading). In-memory ORM rows; HTTP tests run these end to end."""
+"""A stored Session's wire shapes: history row, detail, export (ADR 0051, 0064, 0066, 0081, 0091)."""
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -62,7 +58,6 @@ def test_every_shape_names_a_figure_the_same_way():
 
 
 def test_the_measurement_list_is_the_whole_call_only():
-    """A pressure row in the list would draw the metric twice (ADR 0051)."""
     session = _session()
 
     for shape in (served.summary(session), served.detail(session, follow_up=None)):
@@ -73,8 +68,6 @@ def test_the_measurement_list_is_the_whole_call_only():
 
 
 def test_the_export_carries_every_row_as_stored():
-    """The subject's own copy (ADR 0066): both rows, each saying which stretch
-    it describes, with the detail exactly as it was written."""
     measurements = served.export(_session())["measurements"]
 
     assert [(m["segment"], m["detail"]) for m in measurements] == [
@@ -103,7 +96,6 @@ def test_turns_are_served_in_call_order_whatever_order_they_were_loaded_in():
 
 
 def test_status_means_the_session_on_the_listing_and_the_wrap_up_on_the_detail():
-    """The collision CLAUDE.md warns about, pinned so it cannot quietly change."""
     session = _session()
 
     assert served.summary(session)["status"] == db_models.STATUS_COMPLETED
@@ -112,8 +104,6 @@ def test_status_means_the_session_on_the_listing_and_the_wrap_up_on_the_detail()
 
 
 def test_a_session_whose_job_row_is_missing_reads_as_failed():
-    """Nothing will ever write that wrap-up; a fifth status would only be
-    another way of saying so."""
     session = _session()
     session.jobs = []
 

@@ -1,8 +1,4 @@
-"""Degenerate-repetition guard, re-introduction regeneration, and the guaranteed closing line (ADR 0038).
-
-Pins: repeating any earlier persona message (A-B-A-B) or itself ends the call; a reply mostly
-restating its predecessor behind a fresh opening ends it too (share, not count); a backstopped
-ending appends the language pack's sign-off (ADR 0043); a re-greeting opening is re-asked once."""
+"""Repetition guards, regeneration and the guaranteed closing line (ADR 0038)."""
 
 import pytest
 
@@ -15,10 +11,8 @@ from backend.tests.conftest import audio_chunks, collect, completed, states
 
 FALLBACK_LINE = get_pack("de").fallback_closing_line
 
-# Both fixtures come from real calls. The Persona was reading its whole case
-# out per reply, so no two replies were ever verbatim identical and ADR 0038's
-# check saw nothing -- while the share carried over separates the two cases
-# cleanly: 80% for the restatement, 25% for the reply that moved on.
+# From real calls: no two replies were verbatim equal, but the share carried over
+# separates them (80 % restatement, 25 % moved on).
 FACTS = (
     "Das Paket besteht aus 14 Lizenzen fuer 1180 Euro monatlich. "
     "Die Preisanpassung war um 12 Prozent, ohne Aenderung am Leistungsumfang. "
@@ -62,33 +56,24 @@ _DEADLINE = "Ich erwarte, dass Sie das bis Ende der Woche korrigieren."
 @pytest.mark.parametrize(
     "previous, reply",
     [
-        # One long sentence, carried over. As a *share* that is 100%, but a
-        # share of one is not a share -- it is "has this been said before",
-        # and saying a figure again because the user asked about it is what a
-        # caller does.
+        # A share of one sentence is no share: repeating a figure on request is normal.
         (f"{_FACT} {_AMOUNT} {_DEADLINE}", f"Ganz genau. {_AMOUNT}"),
         (f"{_FACT} {_AMOUNT} {_DEADLINE}", _FACT),
     ],
 )
 def test_a_single_carried_sentence_is_not_a_restatement(previous, reply):
-    """The guard ends the call, so its strictness must not depend on how many
-    sentences the reply happens to have. It used to: one carried sentence out
-    of one condemned a short confirmation, while the same sentence inside a
-    four-sentence reply was fine."""
     assert restates(reply, previous) is False
 
 
 def test_a_reply_that_is_mostly_its_predecessor_still_ends_the_call():
-    """The case the guard exists for is untouched by the above."""
     assert restates(f"{_FACT} {_AMOUNT}", f"{_FACT} {_AMOUNT} {_DEADLINE}") is True
 
 
 async def test_reply_repeating_the_previous_reply_ends_the_call(persona, scenario, fake_pipeline):
     line = "Ich brauche dazu bitte eine konkrete Zahl von Ihnen."
     fake_pipeline.stt.transcripts = ["Ich schaue mal nach.", "Einen Moment noch."]
-    # The second turn repeats the first verbatim -- caught on its opening and
-    # re-asked once; the third copy is that regeneration looping again, which
-    # is spoken and ends the call (2026-09-06 amendment).
+    # The second turn repeats the first and is re-asked; the third is the
+    # regeneration looping, which is spoken and ends the call.
     fake_pipeline.llm.replies = [line, line, line]
 
     orch = SessionOrchestrator(persona, scenario)
@@ -102,8 +87,6 @@ async def test_reply_repeating_the_previous_reply_ends_the_call(persona, scenari
 
 
 async def test_reply_oscillating_back_to_an_earlier_reply_ends_the_call(persona, scenario, fake_pipeline):
-    """A-B-A: turn 3 repeats turn 1 with a different reply in between, which a
-    "same as the last reply" check would miss."""
     a = "Ich brauche dazu bitte eine konkrete Zahl von Ihnen, sonst kommen wir nicht weiter."
     b = "Also gut, dann warte ich noch einen Moment auf Ihre Rueckmeldung dazu."
     fake_pipeline.stt.transcripts = ["Einen Moment.", "Ich schaue nach.", "Gleich habe ich es."]
@@ -123,10 +106,6 @@ async def test_reply_oscillating_back_to_an_earlier_reply_ends_the_call(persona,
 async def test_short_reply_recurring_non_adjacently_is_not_treated_as_a_loop(
     persona, scenario, fake_pipeline
 ):
-    """A brief acknowledgement can legitimately recur a few Turns apart; only a
-    substantial reply coming back counts as the "further back than last" loop.
-    (An exact back-to-back repeat is still degenerate at any length --
-    `_repeats_last_reply` -- so this spaces the two out.)"""
     short = "Ja, genau."
     fake_pipeline.stt.transcripts = ["Stimmt das so?", "Wirklich?", "Ganz sicher?"]
     fake_pipeline.llm.replies = [short, "Da bin ich mir ziemlich sicher, ja.", short]
@@ -140,8 +119,6 @@ async def test_short_reply_recurring_non_adjacently_is_not_treated_as_a_loop(
 
 
 async def test_backstopped_ending_appends_the_fixed_closing_line(persona, scenario, fake_pipeline):
-    """An unprompted [CALL_END] (no farewell from the user) is not trusted to
-    contain a goodbye, so the fixed sign-off is synthesised and appended."""
     fake_pipeline.stt.transcripts = ["Gut, dann machen wir das so."]
     fake_pipeline.llm.replies = ["In Ordnung. [CALL_END]"]
 
@@ -155,8 +132,6 @@ async def test_backstopped_ending_appends_the_fixed_closing_line(persona, scenar
 
 
 async def test_nudged_ending_trusts_the_models_own_goodbye(persona, scenario, fake_pipeline):
-    """When the user said goodbye, the model was explicitly asked for a
-    closing line, so the fixed fallback is NOT appended on top."""
     fake_pipeline.stt.transcripts = ["Auf Wiederhören!"]
     fake_pipeline.llm.replies = ["Danke fuer das Gespraech, auf Wiederhoeren. [CALL_END]"]
 
@@ -170,10 +145,6 @@ async def test_nudged_ending_trusts_the_models_own_goodbye(persona, scenario, fa
 async def test_a_reply_that_mostly_restates_its_predecessor_is_trimmed_to_what_is_new(
     persona, scenario, fake_pipeline
 ):
-    """ADR 0038 (2026-09-06 amendment): four of five sentences carried over
-    are dropped from the chunks before synthesis; the fifth is spoken and the
-    call goes on. Ending on a restatement is now the backstop for the one
-    regeneration attempt only (see the tests further down)."""
     fake_pipeline.stt.transcripts = ["Worum geht es denn?", "Welche Module nutzen Sie?"]
     fake_pipeline.llm.replies = [FACTS, RESTATEMENT]
     carried = set(long_sentences(FACTS))
@@ -195,11 +166,6 @@ async def test_a_reply_that_mostly_restates_its_predecessor_is_trimmed_to_what_i
 async def test_expanding_on_the_opening_without_re_greeting_does_not_end_the_call(
     persona, scenario, fake_pipeline
 ):
-    """The regression a share replaced a sentence count for: asked what he
-    wants, the caller restates his subject and one figure and then says
-    several new things. That is the right answer to the question, not a loop,
-    and -- because he does not greet or name himself again -- not a
-    re-introduction either."""
     fake_pipeline.stt.transcripts = ["Was gibt es denn?", "Und was brauchen Sie von mir?"]
     fake_pipeline.llm.replies = [OPENING, ELABORATION]
 
@@ -214,9 +180,6 @@ async def test_expanding_on_the_opening_without_re_greeting_does_not_end_the_cal
 
 
 async def test_a_reply_that_opens_by_greeting_again_is_regenerated(persona, scenario, fake_pipeline):
-    """ADR 0038: the persona restarting the call from the top -- greeting
-    again, name again -- is caught on the first chunk and the model is
-    re-asked, before any of that greeting is synthesised."""
     regreet = "Guten Tag, hier ist Thomas Brandt. Es geht um unseren Vertrag und die Kosten."
     clean = "Die laufenden Kosten sind zu hoch, wir zahlen jeden Monat deutlich zu viel."
     fake_pipeline.stt.transcripts = ["Guten Tag, wie kann ich helfen?"]
@@ -240,7 +203,6 @@ async def test_a_reply_that_opens_by_greeting_again_is_regenerated(persona, scen
 
 
 async def test_the_regeneration_nudge_quotes_the_rejected_opening(persona, scenario, fake_pipeline):
-    """The retry is given the greeting it must steer away from, verbatim."""
     fake_pipeline.stt.transcripts = ["Guten Tag."]
     fake_pipeline.llm.replies = [
         "Guten Tag, ich bin Thomas Brandt. Es geht um den Vertrag.",   # opening
@@ -260,8 +222,6 @@ async def test_the_regeneration_nudge_quotes_the_rejected_opening(persona, scena
 
 
 async def test_a_normal_turn_carries_a_nudge_quoting_the_previous_reply(persona, scenario, fake_pipeline):
-    """ADR 0038: every turn past the opening reminds the model of its own last
-    reply, so a reworded repeat is discouraged before it is generated."""
     fake_pipeline.stt.transcripts = ["Und wie stellen Sie sich das vor?"]
     fake_pipeline.llm.replies = [
         "Ich moechte eine konkrete Zusage zum Preis, keine allgemeine Auskunft.",  # opening
@@ -300,10 +260,6 @@ def test_asks_to_repeat_recognises_requests_for_a_repeat(text, pack_id, expected
 
 
 async def test_a_repeat_the_user_asked_for_does_not_end_the_call(persona, scenario, fake_pipeline):
-    """ADR 0038: 'wer sind Sie nochmal?' makes repeating the introduction the
-    right answer — the re-introduction guard, the verbatim check and the
-    restatement check all stand down for the immediately previous reply, and
-    the call carries on."""
     intro = "Guten Tag, ich bin Thomas Brandt aus der Geschaeftsleitung. Es geht um den Vertrag."
     fake_pipeline.stt.transcripts = ["Verzeihung, wer sind Sie nochmal? Das habe ich nicht verstanden."]
     fake_pipeline.llm.replies = [intro, intro]  # opening, then the same again on request
@@ -321,8 +277,6 @@ async def test_a_repeat_the_user_asked_for_does_not_end_the_call(persona, scenar
 async def test_a_requested_repeat_swaps_the_anti_repeat_nudge_for_a_clarify_nudge(
     persona, scenario, fake_pipeline
 ):
-    """The standing 'say something different' reminder would fight the user's
-    request; it is replaced by 'say it again, reworded shorter'."""
     fake_pipeline.stt.transcripts = ["Wie war Ihr Name nochmal?"]
     fake_pipeline.llm.replies = ["Mein Name ist Thomas Brandt.", "Thomas Brandt, gerne nochmal."]
 
@@ -336,8 +290,6 @@ async def test_a_requested_repeat_swaps_the_anti_repeat_nudge_for_a_clarify_nudg
 
 
 async def test_asking_again_after_a_rephrase_gets_a_firmer_nudge(persona, scenario, fake_pipeline):
-    """A third rendering of the same content does not help — the persona is
-    told to ask what is unclear or move on."""
     fake_pipeline.stt.transcripts = [
         "Was haben Sie gesagt? Nicht verstanden.",
         "Nochmal bitte, ich hab es wieder nicht mitbekommen.",
@@ -360,8 +312,6 @@ async def test_asking_again_after_a_rephrase_gets_a_firmer_nudge(persona, scenar
 async def test_re_dumping_an_older_reply_ends_the_call_even_when_a_repeat_was_asked(
     persona, scenario, fake_pipeline
 ):
-    """The exemption covers the *immediately previous* reply only: parroting one
-    from further back verbatim is still the loop the guard is for."""
     a = "Ich brauche eine feste Zusage zum Preis, bitte eine konkrete Zahl mit Datum."
     b = "Also gut, dann warte ich noch kurz auf Ihre Rueckmeldung dazu."
     fake_pipeline.stt.transcripts = [
@@ -380,9 +330,6 @@ async def test_re_dumping_an_older_reply_ends_the_call_even_when_a_repeat_was_as
 
 
 async def test_a_reply_of_pure_filler_ends_nothing(persona, scenario, fake_pipeline):
-    """A reply with no sentence long enough to compare has a share of nothing,
-    which must read as "not a restatement" rather than divide by zero. The two
-    replies differ, so ADR 0038's verbatim check stays out of the way."""
     fake_pipeline.stt.transcripts = ["Passt das so?", "Und sonst?"]
     fake_pipeline.llm.replies = ["Ja, genau.", "Aha, verstehe."]
 
@@ -394,8 +341,6 @@ async def test_a_reply_of_pure_filler_ends_nothing(persona, scenario, fake_pipel
 
 
 async def test_a_shared_short_sentence_is_not_a_restatement(persona, scenario, fake_pipeline):
-    """ADR 0038: below the length threshold a shared sentence is filler, not
-    the same content, and must not count against the call."""
     fake_pipeline.stt.transcripts = ["Und wann gilt der?", "Ab naechstem Monat."]
     fake_pipeline.llm.replies = [
         "Ja, genau. Ab wann genau wuerde der neue Preis denn gelten?",
@@ -469,9 +414,6 @@ def test_drop_said_sentences(text, said, expected, dropped):
 async def test_a_block_carried_over_under_a_new_opener_is_dropped_before_it_is_spoken(
     persona, scenario, fake_pipeline
 ):
-    """ADR 0038's named failure: a varied first sentence, the same block
-    underneath. The block is dropped from the chunk, the new sentences are
-    spoken, and the call goes on."""
     block = "Das Ticket wurde vor elf Tagen geoeffnet, und ein Rueckruf war fest zugesagt."
     fake_pipeline.stt.transcripts = ["Ich schaue nach.", "Es tut mir leid, das dauert noch."]
     fake_pipeline.llm.replies = [
@@ -489,9 +431,6 @@ async def test_a_block_carried_over_under_a_new_opener_is_dropped_before_it_is_s
 
 
 async def test_a_reply_that_is_nothing_but_the_users_line_is_re_asked_once(persona, scenario, fake_pipeline):
-    """Seen live: "36 Stunden, das geht nicht früher." came back verbatim as
-    the whole reply. The echo guard's stripping left nothing, so the reply is
-    re-asked with the echo quoted -- and the fresh attempt is what is spoken."""
     line = "36 Stunden, das geht nicht frueher."
     fake_pipeline.stt.transcripts = [line]
     fake_pipeline.llm.replies = [line, "Gut, dann nehme ich die 36 Stunden. Melden Sie sich bitte, sobald es laeuft."]
@@ -510,9 +449,6 @@ async def test_a_reply_that_is_nothing_but_the_users_line_is_re_asked_once(perso
 async def test_an_echo_that_survives_the_re_ask_ends_the_call_with_the_sign_off_not_an_error(
     persona, scenario, fake_pipeline
 ):
-    """The regeneration echoed too. Nothing is left to say, and that is the
-    ADR 0038 ending -- the sign-off and a completed Session -- not the empty-
-    reply error path, which is for a completion that produced no text at all."""
     line = "36 Stunden, das geht nicht frueher."
     fake_pipeline.stt.transcripts = [line]
     fake_pipeline.llm.replies = [line, line]
@@ -526,10 +462,7 @@ async def test_an_echo_that_survives_the_re_ask_ends_the_call_with_the_sign_off_
     assert line not in orch.turns[-1].persona_text
 
 
-# The live case behind the next two tests: after two barge-ins the history
-# held two short cut-off lines, and the model answered an offer by reproducing
-# one of them word for word -- dash included -- which the loop guard could only
-# meet by ending the call.
+# Seen live: after two barge-ins the model reproduced a cut-off line verbatim.
 _LINE_A = "Das ist ein Problem, das wir seit einem Monat haben, und es hat einen Supportversprechen gegeben."
 _LINE_B = "Das Problem ist, dass die Ausfuhren fuer eines der zwei Konten nicht funktionieren, seit elf Tagen."
 
@@ -537,10 +470,6 @@ _LINE_B = "Das Problem ist, dass die Ausfuhren fuer eines der zwei Konten nicht 
 async def test_a_reply_opening_with_a_sentence_already_said_is_regenerated_not_spoken(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """The first chunk repeats a sentence from earlier in the call verbatim ->
-    caught before synthesis, re-asked once with the repeat quoted, and the
-    fresh attempt is what gets spoken. A copied cut-off dash in that attempt is
-    scrubbed too. The call goes on (ADR 0038, ADR 0035)."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 10000)
     fake_pipeline.stt.transcripts = [
         "Was ist denn genau das Problem?",
@@ -576,9 +505,6 @@ async def test_a_reply_opening_with_a_sentence_already_said_is_regenerated_not_s
 async def test_a_regeneration_that_loops_again_still_ends_the_call(
     persona, scenario, fake_pipeline
 ):
-    """One fresh attempt, not an endless retry: if the regenerated reply is a
-    verbatim repeat as well, it is spoken and the standing loop guard ends the
-    call with a goodbye, as before (ADR 0038)."""
     fake_pipeline.stt.transcripts = ["Was ist denn genau das Problem?", "Ich schaue nach.", "Und jetzt?"]
     fake_pipeline.llm.replies = [_LINE_A, _LINE_B, _LINE_A, _LINE_A]
 
@@ -594,15 +520,7 @@ async def test_a_regeneration_that_loops_again_still_ends_the_call(
 async def test_the_opening_checks_survive_a_first_chunk_the_filters_emptied(
     persona, scenario, fake_pipeline
 ):
-    """Opening checks stay armed until a chunk with words in it is seen (ADR 0035/0038).
-
-    A first chunk emptied by `drop_said_sentences` must not disarm them, or the first
-    chunk actually spoken skips the re-greeting, echo and repeated-opening checks.
-    """
-    # `said` is deliberately *not* the opening's first sentence: the guard
-    # compares first sentences, so a chunk repeating one of those is caught by
-    # the guard itself and never reaches `_clean_chunk`. Repeating a later
-    # sentence is what passes the guard and is then dropped by the filter.
+    # Not the opening's first sentence, which the guard itself would catch.
     said = "Die Preisanpassung war um zwoelf Prozent, ohne jede Aenderung am Leistungsumfang."
     regreet = "Guten Tag, hier ist Thomas Brandt von der Firma Beispiel, es geht um die Kosten."
     clean = "Ich brauche dafuer eine belastbare Begruendung, sonst kommen wir hier nicht weiter."

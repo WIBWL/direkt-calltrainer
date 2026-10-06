@@ -1,8 +1,4 @@
-"""A KugelAudio stream left before its `final` frame resets the pooled socket (ADR 0044 amendment).
-
-Frames carry no request id, so an abandoned stream's leftovers become the next request's
-audio: a persistent one-chunk offset. An unfinished stream drops and re-warms the connection,
-and the orchestrator closes an abandoned stream at once."""
+"""An unfinished KugelAudio stream resets the pooled socket (ADR 0044)."""
 
 import asyncio
 
@@ -103,10 +99,6 @@ async def test_a_stream_failing_before_audio_raises_and_drops_the_socket(kugel):
 async def test_the_orchestrator_closes_an_abandoned_stream_before_the_teardown_returns(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """The reset lives in the stream's `finally`, which only runs when the
-    stream is closed. Left to the garbage collector that happens *later*,
-    possibly after the next chunk has already been synthesized on the poisoned
-    socket; the orchestrator therefore closes the stream itself."""
     closed = []
 
     async def recording_stream(text, _voice, _language_id):
@@ -133,11 +125,6 @@ async def test_the_orchestrator_closes_an_abandoned_stream_before_the_teardown_r
 
 
 async def test_the_one_shot_path_drops_the_socket_too(kugel):
-    """The one-shot request shares the pooled connection, so it needs the same reset (ADR 0044).
-
-    Otherwise a failed request's frames wait on the socket and the next call in the
-    process is a chunk out of step.
-    """
     kugel.frames = [_Chunk(b"\x00\x01" * 100)]  # audio, then the stream dies
     kugel.fail = None
 
@@ -155,8 +142,6 @@ async def test_the_one_shot_path_drops_the_socket_too(kugel):
 
 
 async def test_the_one_shot_path_keeps_a_finished_socket(kugel):
-    """The other direction, so the reset cannot simply be made unconditional:
-    a stream read to its `final` frame leaves the connection usable."""
     out = await tts.synthesize("Auf Wiederhoeren.", VOICE, "de")
     await _settle()
 
@@ -165,11 +150,6 @@ async def test_the_one_shot_path_keeps_a_finished_socket(kugel):
 
 
 async def test_two_sessions_cannot_stream_on_the_pooled_socket_at_once(kugel):
-    """One request at a time on the shared connection.
-
-    `websockets` refuses two concurrent `recv()` calls with a ConcurrencyError that
-    nothing on the TTS path catches, failing one call and aborting the other.
-    """
     in_flight = 0
     overlap = 0
 

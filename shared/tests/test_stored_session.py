@@ -1,8 +1,4 @@
-"""Reading a stored Session back as the call it was (ADR 0051, ADR 0081).
-
-`shared/feedback/stored.py` is the one reader for every consumer; this pins its rules,
-including that a slice of a reverse is folded as a reverse. Transient ORM objects, no database.
-"""
+"""Reading a stored Session back (ADR 0081, 0102)."""
 
 # pylint: disable=missing-function-docstring
 
@@ -58,8 +54,6 @@ def test_exchanges_pair_each_rebuilt_turn_with_its_row():
 
 
 def test_a_slice_of_a_reverse_is_folded_as_a_reverse():
-    """The segment pass folded its slices without the casting, so a metric that
-    reads who rang would have measured a reverse the ordinary way round."""
     session = _session(reverse=True)
     part = [turn for turn, _ in stored.exchanges(session)][:2]
     call = stored.conversation_of(session, part)

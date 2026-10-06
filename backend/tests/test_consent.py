@@ -1,13 +1,6 @@
-"""Storage consent and what follows from withdrawing it (F-49, ADR 0066).
+"""Storage consent: checked at write time, fails closed, withdrawal deletes (F-49, ADR 0066)."""
 
-The decisive test is `test_a_session_is_not_stored_without_consent`. Two more
-properties: consent is checked at write time (a withdrawal mid-call counts), and
-the check fails closed."""
-
-# pylint: disable=duplicate-code
-# Fixture data is repeated per test module on purpose: a test carrying its own
-# Turns shows what it ran against when it fails, and sharing them would let a
-# change made for one test quietly alter another.
+# pylint: disable=duplicate-code  # each module carries its own fixture Turns on purpose
 
 import uuid
 from datetime import UTC, datetime
@@ -46,12 +39,7 @@ def _grant(db: DbSession, subject: str = TEST_AUTH.sub, *, version: str | None =
     db.commit()
 
 
-# --- What the client is told -------------------------------------------------
-
-
 async def test_a_new_account_is_asked(api_client: httpx.AsyncClient) -> None:
-    """No decision on record means the interface has to ask before anything
-    this subject does can be stored."""
     body = (await api_client.get("/api/consent")).json()
 
     assert body["status"] is None
@@ -60,8 +48,6 @@ async def test_a_new_account_is_asked(api_client: httpx.AsyncClient) -> None:
 
 
 async def test_granting_is_recorded_and_reported(api_client: httpx.AsyncClient) -> None:
-    """A "yes" comes back as the state that now holds, so the interface does
-    not have to re-fetch to know what it just did."""
     response = await api_client.post("/api/consent", json={"granted": True})
 
     assert response.status_code == 200
@@ -73,8 +59,6 @@ async def test_granting_is_recorded_and_reported(api_client: httpx.AsyncClient) 
 
 
 async def test_a_withdrawal_is_not_asked_again(api_client: httpx.AsyncClient) -> None:
-    """A "no" is a decision, not a gap in one. Re-prompting someone who just
-    declined would turn the dialog into a way of wearing them down."""
     await api_client.post("/api/consent", json={"granted": False})
 
     body = (await api_client.get("/api/consent")).json()
@@ -87,8 +71,6 @@ async def test_a_withdrawal_is_not_asked_again(api_client: httpx.AsyncClient) ->
 async def test_a_stale_version_is_asked_again(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """Agreeing to an older notice is not agreeing to this one, so a changed
-    wording invalidates the decision instead of silently inheriting it."""
     _grant(db_session, version="an-older-wording")
 
     body = (await api_client.get("/api/consent")).json()
@@ -98,14 +80,9 @@ async def test_a_stale_version_is_asked_again(
     assert body["decision_required"] is True
 
 
-# --- The decision log --------------------------------------------------------
-
-
 async def test_decisions_are_appended_not_overwritten(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """Granting, withdrawing and granting again leaves three rows. A record
-    that overwrites itself destroys the evidence it exists to keep."""
     await api_client.post("/api/consent", json={"granted": True})
     await api_client.post("/api/consent", json={"granted": False})
     await api_client.post("/api/consent", json={"granted": True})
@@ -118,21 +95,15 @@ async def test_decisions_are_appended_not_overwritten(
 async def test_repeating_a_decision_writes_nothing(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """Idempotent where it counts: a double-clicked button must not fill the
-    log with identical rows."""
     await api_client.post("/api/consent", json={"granted": True})
     await api_client.post("/api/consent", json={"granted": True})
 
     assert db_session.query(Consent).count() == 1
 
 
-# --- The gate ----------------------------------------------------------------
-
-
 async def test_a_session_is_stored_once_consent_is_given(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """The other side of the gate: with consent, nothing changes."""
     await api_client.post("/api/consent", json={"granted": True})
 
     persist(turns=TURNS)
@@ -143,12 +114,6 @@ async def test_a_session_is_stored_once_consent_is_given(
 async def test_a_session_is_not_stored_without_consent(
     app_database: str, db_session: DbSession  # pylint: disable=unused-argument
 ) -> None:
-    """The one that matters: a subject who never agreed leaves no stored record.
-
-    Driven through `_record`, the path the live call takes (the guard itself sits in
-    `persist_session`, see below). `app_database` is load-bearing: without it the
-    write fails on its own and this test passes whether the guard exists or not.
-    A mutation run caught exactly that."""
     # Imported here so a collection-time import does not pull in the live path.
     from backend.api import session_ws  # pylint: disable=import-outside-toplevel
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
@@ -164,11 +129,6 @@ async def test_a_session_is_not_stored_without_consent(
 def test_the_writer_itself_refuses_without_consent(
     app_database: str, db_session: DbSession  # pylint: disable=unused-argument
 ) -> None:
-    """The guard sits inside the write transaction, not in front of it.
-
-    Asked from outside, a withdrawal could commit between the answer and the INSERT
-    and leave this Session unreachable by any deletion path (ADR 0066). So
-    `persist_session` asks under the withdrawal's advisory lock and returns None."""
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
 
     written = persistence.persist_session(persistence.FinishedCall(
@@ -183,10 +143,6 @@ def test_the_writer_itself_refuses_without_consent(
 async def test_withdrawing_mid_call_still_prevents_the_write(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """Consent is read when the Session is written, not when it starts.
-
-    A call runs for minutes; someone who withdrew while talking must not be stored.
-    """
     from backend.api import session_ws  # pylint: disable=import-outside-toplevel
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
 
@@ -203,11 +159,6 @@ async def test_withdrawing_mid_call_still_prevents_the_write(
 
 
 def test_an_unanswerable_question_fails_closed(monkeypatch) -> None:
-    """An unreachable database must not be read as "go ahead".
-
-    Elsewhere database failures are stepped over; here that would store data on a
-    guess, the one outcome consent exists to prevent.
-    """
     def explode():
         raise RuntimeError("database is gone")
 
@@ -216,14 +167,9 @@ def test_an_unanswerable_question_fails_closed(monkeypatch) -> None:
     assert consent_service.allows_storage("anyone") is False
 
 
-# --- Withdrawal deletes ------------------------------------------------------
-
-
 async def test_withdrawing_deletes_what_was_stored(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """Consent is the only basis this application has for keeping the data, so
-    once it is withdrawn there is nothing left to justify keeping it."""
     await api_client.post("/api/consent", json={"granted": True})
     persist(turns=TURNS)
     assert db_session.query(Session).count() == 1
@@ -238,7 +184,6 @@ async def test_withdrawing_deletes_what_was_stored(
 async def test_withdrawing_leaves_other_subjects_alone(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """The delete is scoped to the caller. Nothing else would be recoverable."""
     await api_client.post("/api/consent", json={"granted": True})
     persist(turns=TURNS)
     persist(turns=TURNS, subject="somebody-else")
@@ -253,9 +198,6 @@ async def test_withdrawing_leaves_other_subjects_alone(
 async def test_withdrawing_removes_the_whole_subtree(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """Turns, measurements and the wrap-up go with the Session — the cascades
-    are what make a deletion complete rather than a Session row disappearing
-    while its transcript stays behind."""
     await api_client.post("/api/consent", json={"granted": True})
     persist(turns=TURNS)
     stored = db_session.query(Session).one()
@@ -275,8 +217,6 @@ async def test_withdrawing_removes_the_whole_subtree(
 async def test_withdrawing_twice_is_not_an_error(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """A retried withdrawal finds nothing to delete and says so, rather than
-    failing for work that already succeeded."""
     await api_client.post("/api/consent", json={"granted": True})
     persist(turns=TURNS)
 
@@ -289,8 +229,6 @@ async def test_withdrawing_twice_is_not_an_error(
 
 
 async def test_consent_requires_a_token(api_client: httpx.AsyncClient) -> None:
-    """Both routes act on the caller's own `sub`; without one there is no
-    request to answer (ADR 0009)."""
     from backend import auth  # pylint: disable=import-outside-toplevel
     from backend.app import app  # pylint: disable=import-outside-toplevel
 
@@ -298,9 +236,6 @@ async def test_consent_requires_a_token(api_client: httpx.AsyncClient) -> None:
 
     assert (await api_client.get("/api/consent")).status_code == 401
     assert (await api_client.post("/api/consent", json={"granted": True})).status_code == 401
-
-
-# --- Helpers -----------------------------------------------------------------
 
 
 def _persona():
@@ -336,11 +271,6 @@ def _started():
 def test_a_withdrawal_under_an_older_version_still_blocks_the_write(
     app_database: str, db_session: DbSession  # pylint: disable=unused-argument
 ) -> None:
-    """A stale *no* is not asked again (ADR 0066's exception), nor becomes a yes.
-
-    `decision_required` ignores the version for a withdrawal; `allows_storage` does
-    not. Both must agree: nothing stored, and the dialog left closed.
-    """
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
 
     db_session.add(

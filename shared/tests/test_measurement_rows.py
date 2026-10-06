@@ -1,8 +1,4 @@
-"""One measured figure becoming one stored row (`shared/feedback/rows.py`).
-
-Covers ADR 0029 (figure and `detail_json`), ADR 0051/0081 (per Session and
-`segment`) and ADR 0057 (English keys, seeded `metric_type` only). Pins the one
-shared builder the four writers use. No database: rows are built, not flushed."""
+"""Measured figures into rows (ADR 0029, 0051, 0081)."""
 import logging
 
 from shared.db import models as db_models
@@ -30,9 +26,6 @@ def test_a_figure_becomes_a_row_at_the_stored_scale():
 
 
 def test_a_key_the_seed_does_not_know_is_dropped_and_said_so(caplog):
-    """It cannot be stored -- the row it would point at does not exist -- but a
-    figure vanishing from every Session with a passing suite is the failure this
-    application is least able to see. It was dropped in silence in four places."""
     with caplog.at_level(logging.WARNING):
         written = rows.measurements(IDS, [
             Measurement("pace", 2.0),
@@ -44,8 +37,6 @@ def test_a_key_the_seed_does_not_know_is_dropped_and_said_so(caplog):
 
 
 def test_a_segment_row_names_its_stretch_and_its_session():
-    """The wrap-up's segment pass adds rows by `session_id` rather than through
-    the relationship, because it has just deleted the ones it replaces."""
     row = _only(rows.measurements(
         IDS, [Measurement("pauses", 4.0)],
         segment=db_models.SEGMENT_PRESSURE, session_id=77,

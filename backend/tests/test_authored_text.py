@@ -1,8 +1,4 @@
-"""Sanitising User-authored Scenario text before it becomes prompt content.
-
-Covers ADR 0059 (control tokens and fence runs stripped, fields length-capped;
-seed content passes `clean()` unchanged), ADR 0024 and ADR 0063 (the frontend's
-fallback field limits are pinned to the backend's). No infrastructure."""
+"""Sanitising authored Scenario text (ADR 0059, 0063)."""
 import re
 from pathlib import Path
 
@@ -24,8 +20,6 @@ from backend.authored_text import FIELD_LIMITS, WIRE_FIELD_LIMITS, clean
     ],
 )
 def test_clean_strips_the_call_end_marker(raw):
-    """The prompt ends a call on a literal [CALL_END] in the model's output; an
-    authored field must not be able to plant one."""
     cleaned = clean(raw)
     assert "[" not in cleaned and "]" not in cleaned
     assert "call_end" not in cleaned.lower().replace(" ", "")
@@ -38,8 +32,6 @@ def test_clean_strips_bracketed_all_caps_tokens_but_keeps_ordinary_brackets():
 
 
 def test_clean_strips_fence_runs():
-    """`<<<` / `>>>` were an earlier prompt delimiter (ADR 0059); a field must
-    not be able to carry a run of them and fake one."""
     assert "<<<" not in clean("text <<< more")
     assert ">>>" not in clean("text >>> more")
 
@@ -61,8 +53,6 @@ def test_clean_leaves_ordinary_authored_prose_untouched():
 
 @pytest.mark.parametrize("entry", SCENARIOS, ids=lambda s: s["id"])
 def test_seed_scenarios_are_unchanged_by_the_sanitiser(entry):
-    """ADR 0059: seed text goes through `clean` too, and it is expected to be a
-    no-op -- a change here would be a silent edit to a shipped prompt."""
     for field in ("name", "short_description", "description",
                   "case_facts", "call_goal"):
         assert clean(entry[field]) == entry[field], field
@@ -78,9 +68,6 @@ def test_seed_personas_are_unchanged_by_the_sanitiser(entry):
 
 @pytest.mark.parametrize("entry", SCENARIOS, ids=lambda e: e["id"])
 def test_seed_content_is_within_the_field_limits(entry):
-    """The caps are tighter than a real Scenario needs, but a seed must still
-    fit them or the authoring endpoint would reject an equivalent row. Scenario
-    fields only -- Personas are curated, not authored (ADR 0058)."""
     # Seed key -> FIELD_LIMITS key. The card `name` is the `title` column.
     limits = {
         "name": FIELD_LIMITS["title"],
@@ -100,11 +87,7 @@ SCENARIO_LIBRARY_TS = (
 
 
 def _fallback_field_limits() -> dict[str, int]:
-    """`FALLBACK_FIELD_LIMITS` as written in the frontend source.
-
-    Read out of the source rather than executed, the way `test_metrics.py`
-    reads the metric catalogue: there is no Node in the pytest run.
-    """
+    """Read from the frontend source as text: there is no Node in the pytest run."""
     text = SCENARIO_LIBRARY_TS.read_text(encoding="utf-8")
     body = text.split("export const FALLBACK_FIELD_LIMITS: FieldLimits = {", 1)[1]
     body = body.split("\n};", 1)[0]
@@ -113,7 +96,4 @@ def _fallback_field_limits() -> dict[str, int]:
 
 
 def test_frontend_fallback_limits_match_the_backend():
-    """The editor caps its inputs with this copy until the limits route answers,
-    and for good when it fails. A cap above the server's lets a User type a field
-    that Save rejects with a 422 -- which is where three of them had drifted."""
     assert _fallback_field_limits() == WIRE_FIELD_LIMITS

@@ -1,13 +1,6 @@
-"""The caller's own Session history: `GET /api/sessions` (F-13, F-48; ADR 0028, 0052).
+"""`GET /api/sessions`: ownership in the query, total order, what is left out (F-13, F-48, ADR 0064)."""
 
-Pins what a happy path hides: filtering by `subject_id` in the query, a total order (a tie on
-`started_at` would put a row on two pages or none), and what the listing leaves out
-(`detail_json`, the wrap-up text -- ADR 0057)."""
-
-# pylint: disable=duplicate-code
-# Fixture data is repeated per test module on purpose: a test carrying its own
-# Turns shows what it ran against when it fails, and sharing them would let a
-# change made for one test quietly alter another.
+# pylint: disable=duplicate-code  # each module carries its own fixture Turns on purpose
 
 import uuid
 from datetime import UTC, datetime
@@ -43,8 +36,6 @@ MEASURED_TURNS = [
 async def test_history_is_empty_before_the_first_call(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """A new account has no history, which is an empty list and not a 404 —
-    the collection exists, it just has nothing in it yet."""
     response = await api_client.get("/api/sessions")
 
     assert response.status_code == 200
@@ -54,11 +45,6 @@ async def test_history_is_empty_before_the_first_call(
 async def test_history_holds_only_the_callers_own_sessions(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """Ownership is the query, not a check applied to its result (ADR 0031).
-
-    Someone else's Session is not filtered out of the response — it is never
-    selected, which is why there is no route that could leak one.
-    """
     mine = persist()
     persist(subject="somebody-else")
     persist(subject="a-third-party")
@@ -72,8 +58,6 @@ async def test_history_holds_only_the_callers_own_sessions(
 async def test_history_returns_the_newest_session_first(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """The history reads as a reverse chronology, so the most recent training
-    is the one the user lands on."""
     june = persist(started_at=JUNE)
     august = persist(started_at=AUGUST)
     july = persist(started_at=JULY)
@@ -88,11 +72,6 @@ async def test_history_returns_the_newest_session_first(
 async def test_sessions_sharing_a_timestamp_still_have_one_order(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """Sessions can share a `started_at`, so the order needs a tiebreak.
-
-    Asserted as the property it protects: paging one row at a time through Sessions
-    sharing an instant yields each exactly once.
-    """
     written = {str(persist(started_at=JULY)) for _ in range(5)}
 
     paged: list[str] = []
@@ -110,8 +89,6 @@ async def test_sessions_sharing_a_timestamp_still_have_one_order(
 async def test_pagination_slices_without_losing_the_total(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """`total` counts the caller's Sessions, not the page — the client cannot
-    tell from a full page whether another one exists."""
     for month in (JUNE, JULY, AUGUST):
         persist(started_at=month)
 
@@ -129,8 +106,6 @@ async def test_pagination_slices_without_losing_the_total(
 
 
 async def test_total_counts_only_the_caller(api_client: httpx.AsyncClient) -> None:
-    """The count runs on the filtered query. A total that included everyone
-    would page through nothing and advertise pages that do not exist."""
     persist()
     persist(subject="somebody-else")
 
@@ -147,8 +122,6 @@ async def test_total_counts_only_the_caller(api_client: httpx.AsyncClient) -> No
 async def test_page_bounds_are_enforced(
     api_client: httpx.AsyncClient, params: dict
 ) -> None:
-    """The cap is what keeps one request from loading a heavy user's whole
-    past; without it the trend view would simply ask for everything."""
     response = await api_client.get("/api/sessions", params=params)
 
     assert response.status_code == 422
@@ -157,9 +130,6 @@ async def test_page_bounds_are_enforced(
 async def test_a_row_carries_what_the_history_list_shows(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """The keys are the schema's own (ADR 0057), and `status` is
-    `session.status` — completed or aborted — not the feedback status the
-    detail route reports under that name."""
     persist(turns=MEASURED_TURNS, started_at=JULY)
 
     body = (await api_client.get("/api/sessions")).json()
@@ -171,19 +141,11 @@ async def test_a_row_carries_what_the_history_list_shows(
         # Which side the User was on (ADR 0070) -- two rows on the same
         # Scenario are otherwise indistinguishable.
         "reverse",
-        # The kind of call (ADR 0072), so the progress view can read a course
-        # over one kind. Without it every chart there mixes a complaint, a
-        # price negotiation and an advisory call into one line, which is the
-        # objection the dashboard concept raises against its own charts.
+        # The kind of call, so the progress view can read a course over one kind.
         "category",
-        # The wrap-up's tagged points: what each was about and how it was
-        # worded. The dashboard counts them across Sessions and shows what was
-        # written (ADR 0064's amendment). The wrap-up as a text -- summary,
-        # phase paragraph, untagged points -- stays on the detail route.
+        # Tagged points with their text (ADR 0064); the wrap-up itself stays on the detail route.
         "feedback_goals",
-        # The same metrics over the demanding stretches of the call and over
-        # the rest (ADR 0081). Beside `measurements` and not inside it: every
-        # reader of that list assumes one entry per metric.
+        # Beside `measurements`, which readers assume holds one entry per metric.
         "segments",
     }
     assert row["persona"] == "Thomas Brandt"
@@ -195,9 +157,6 @@ async def test_a_row_carries_what_the_history_list_shows(
 async def test_an_aborted_session_is_listed_as_aborted(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """A call the pipeline cut short (ADR 0016) still belongs in the history:
-    it happened, and hiding it would make the count disagree with the user's
-    memory of their own training."""
     persist(reason="error")
 
     body = (await api_client.get("/api/sessions")).json()
@@ -209,8 +168,6 @@ async def test_an_aborted_session_is_listed_as_aborted(
 async def test_measurements_travel_with_each_session(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """One point per Session per metric is what a trend over time is made of,
-    and ADR 0051 already guarantees there is exactly one."""
     persist(turns=MEASURED_TURNS, started_at=JUNE)
     persist(turns=MEASURED_TURNS, started_at=JULY)
 
@@ -226,11 +183,6 @@ async def test_measurements_travel_with_each_session(
 async def test_the_loudness_curve_stays_out_of_the_listing(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """The exact key set, so an addition is a decision: `detail_json` (the metric's
-    course) would dwarf a page and belongs on the detail route.
-
-    `active` is deliberate (F-13): it tells a retired metric from its same-named replacement.
-    """
     persist(turns=MEASURED_TURNS)
 
     body = (await api_client.get("/api/sessions")).json()
@@ -243,9 +195,6 @@ async def test_the_loudness_curve_stays_out_of_the_listing(
 async def test_the_listing_says_whether_a_wrap_up_exists_but_not_what_it_says(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """A row carries the wrap-up's availability (what a click promises), never its text,
-    which belongs to the detail route.
-    """
     persist(turns=MEASURED_TURNS)
 
     row = (await api_client.get("/api/sessions")).json()["sessions"][0]
@@ -260,9 +209,6 @@ async def test_the_listing_says_whether_a_wrap_up_exists_but_not_what_it_says(
 async def test_the_wrap_up_state_does_not_overload_status(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """`status` stays the Session's own outcome (ADR 0057). The wrap-up's state
-    travels under its own name, or a reader would have to know which of the two
-    routes it came from to know what it meant."""
     persist(turns=MEASURED_TURNS, reason="error")
     _write_feedback(db_session)
 
@@ -276,8 +222,6 @@ async def test_the_wrap_up_state_does_not_overload_status(
 async def test_a_stored_wrap_up_is_announced_in_the_listing(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """The history's chip is drawn from this: a Session whose wrap-up was
-    written is one the user can open and read."""
     persist(turns=MEASURED_TURNS)
     _write_feedback(db_session)
 
@@ -289,9 +233,6 @@ async def test_a_stored_wrap_up_is_announced_in_the_listing(
 async def test_a_wrap_up_that_never_arrived_is_not_announced_as_pending(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """A job that failed will not produce anything later, and the row has to
-    say so — telling the user it is still being generated is what the detail
-    screen used to do wrongly for days-old Sessions."""
     persist(turns=MEASURED_TURNS)
     job = db_session.query(AnalysisJob).one()
     job.status = "failed"
@@ -306,10 +247,6 @@ async def test_a_wrap_up_that_never_arrived_is_not_announced_as_pending(
 async def test_a_tagged_point_travels_with_its_goal_and_its_text(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """ADR 0064's amendment: the progress view's second level has to say what
-    the wrap-ups wrote about a goal, not only how often. Six focus goals have
-    nothing else behind them, so a count nobody can read behind is a number on
-    trust."""
     persist(turns=MEASURED_TURNS)
     _write_feedback(db_session, points=[("improvement", "closing", "Kein Termin vereinbart.")])
 
@@ -323,9 +260,6 @@ async def test_a_tagged_point_travels_with_its_goal_and_its_text(
 async def test_an_untagged_point_stays_out_of_the_listing(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """A point the model left unassigned cannot be counted, and sending it with
-    a null goal would invite treating "not assigned" as a category. It is the
-    line that keeps this a list of countable tags rather than the wrap-up."""
     persist(turns=MEASURED_TURNS)
     _write_feedback(
         db_session,
@@ -341,9 +275,6 @@ async def test_an_untagged_point_stays_out_of_the_listing(
 async def test_the_wrap_up_itself_still_stays_on_the_detail_route(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """What the amendment widened is the tagged points and nothing else. The
-    summary is the wrap-up as a text, and a page of summaries is exactly the
-    payload the listing exists not to carry."""
     persist(turns=MEASURED_TURNS)
     _write_feedback(db_session, points=[("strength", "pace", "Ruhiges Tempo.")])
 
@@ -356,11 +287,7 @@ async def test_the_wrap_up_itself_still_stays_on_the_detail_route(
 def _write_feedback(
     db: DbSession, points: list[tuple[str, str | None, str]] | None = None
 ) -> None:
-    """Give the stored Session a wrap-up, the way the worker would.
-
-    `points` are (kind, focus-goal key or None, text); keys resolve against the seeded
-    catalogue, so a retired goal cannot pass unnoticed.
-    """
+    """`points` are (kind, focus-goal key or None, text)."""
     session_id = db.query(Session).one().session_id
     feedback = Feedback(
         session_id=session_id,
@@ -377,8 +304,6 @@ def _write_feedback(
 
 
 async def test_the_history_needs_a_token(api_client: httpx.AsyncClient) -> None:
-    """F-31/F-50/ADR 0009: without a caller there is no `sub` to filter by, so
-    an unauthenticated listing has no defensible answer other than 401."""
     persist()
     app.dependency_overrides.pop(auth.require_user, None)  # drop conftest's override
 
@@ -388,9 +313,6 @@ async def test_the_history_needs_a_token(api_client: httpx.AsyncClient) -> None:
 async def test_a_session_from_the_history_opens_on_the_detail_route(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """The id the listing hands out is the one the detail route takes — the
-    `extern_id` (ADR 0050) and not the primary key. Without this the history
-    would list Sessions nobody could open."""
     persist(turns=MEASURED_TURNS, extern_id=uuid.uuid4())
 
     listed = (await api_client.get("/api/sessions")).json()["sessions"][0]

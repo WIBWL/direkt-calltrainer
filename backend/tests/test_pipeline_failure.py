@@ -1,8 +1,4 @@
-"""Pipeline fault tolerance: ADR 0016 (one retry, then graceful end) per leg, per ADR 0033/0044/0103.
-
-STT: one retry, then `stt_failed`. LLM: retried only while nothing was sent, then `llm_failed`.
-TTS: no retry and no fallback, so any chunk failure -> `tts_failed`; a retry would be a second
-request on a pooled socket in unknown state (ADR 0044)."""
+"""One retry per leg, then a clean end; TTS has neither retry nor fallback (ADR 0016, 0033, 0044, 0103)."""
 
 import pytest
 
@@ -74,9 +70,6 @@ async def test_persistent_tts_failure_ends_the_turn_with_tts_failed(orch, fake_p
 
 
 async def test_a_single_tts_failure_ends_the_turn_too(orch, fake_pipeline):
-    """There is nothing behind KugelAudio to absorb a blip (ADR 0103): one
-    failed chunk is a failed Turn, and it says so instead of being spoken in
-    another voice."""
     fake_pipeline.stt.transcripts = ["Sagen Sie etwas."]
     fake_pipeline.llm.replies = ["Kurze Antwort."]
     fake_pipeline.tts.fail_times = 1
@@ -89,6 +82,5 @@ async def test_a_single_tts_failure_ends_the_turn_too(orch, fake_pipeline):
 
 
 def test_wire_error_codes_are_the_three_known_legs():
-    """The Failed event's code vocabulary the client (protocol.ts) expects."""
     codes = Failed.__annotations__["code"]
     assert set(getattr(codes, "__args__", ())) == {"stt_failed", "llm_failed", "tts_failed"}

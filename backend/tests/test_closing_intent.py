@@ -1,8 +1,4 @@
-"""Closing-intent detection (ADR 0037, ADR 0043).
-
-A deterministic regex spots a farewell or a request to postpone and nudges the
-persona to end. The patterns match the user's speech, so they live in the
-language pack; both packs are exercised."""
+"""Closing-intent regexes in both language packs (ADR 0037, 0043)."""
 
 from dataclasses import replace
 
@@ -79,8 +75,6 @@ def test_does_not_fire_on_ordinary_conversation(text):
     ],
 )
 def test_recognises_english_farewells_and_postponements(text):
-    """ADR 0043: an English-speaking Persona needs its own patterns — the
-    German ones would never match what its user actually says."""
     assert _signals_closing(text, ENGLISH) is True
 
 
@@ -109,9 +103,6 @@ def test_english_patterns_do_not_fire_on_ordinary_conversation(text):
     ],
 )
 def test_a_farewell_that_is_only_mentioned_does_not_end_the_call(text):
-    """language_packs.py states the trade: a missed signal costs one extra turn,
-    a false one cuts the conversation off. These all contain a closing phrase
-    while saying the opposite of goodbye, and each one used to end the call."""
     assert _signals_closing(text, GERMAN) is False
 
 
@@ -123,9 +114,6 @@ def test_a_farewell_that_is_only_mentioned_does_not_end_the_call(text):
     ],
 )
 def test_a_negation_in_an_earlier_clause_still_leaves_a_real_goodbye_standing(text):
-    """The veto is scoped to the closing phrase's own clause. A negation on the
-    other side of a comma belongs to a different statement and must not
-    suppress a genuine farewell."""
     assert _signals_closing(text, GERMAN) is True
 
 
@@ -153,8 +141,6 @@ def test_english_mentioned_farewell_does_not_end_the_call():
     ],
 )
 def test_an_objection_is_not_a_request_to_repeat(text):
-    """A false repeat request costs a whole turn: the persona re-delivers its
-    last line instead of answering the objection (ADR 0038)."""
     assert _asks_to_repeat(text, GERMAN) is False
 
 
@@ -167,15 +153,11 @@ def test_genuine_repeat_requests_still_register(text):
 
 
 def test_each_language_uses_its_own_patterns():
-    """ADR 0043: a pack is not a translation of the frame, it is what makes the
-    check work at all — the wrong pack simply does not match."""
     assert _signals_closing("Auf Wiederhören.", ENGLISH) is False
     assert _signals_closing("Goodbye.", GERMAN) is False
 
 
 async def test_farewell_makes_the_persona_end_the_call(persona, scenario, fake_pipeline):
-    """ADR 0037/0038: on a detected farewell the persona is nudged to close,
-    the turn is marked ends_call, and no 'listening' follows."""
     orch = SessionOrchestrator(persona, scenario)
     fake_pipeline.stt.transcripts = ["Das reicht mir so weit, auf Wiederhören."]
     fake_pipeline.llm.replies = ["Sehr gern, ich wünsche Ihnen noch einen guten Tag. [CALL_END]"]
@@ -202,21 +184,12 @@ async def test_closing_nudge_is_added_to_the_llm_messages(persona, scenario, fak
 
 
 def _standing_nudge(orch, replies=3):
-    """The transient system message a turn past the opening carries.
-
-    `replies` is how far into the call it is: the settlement check is withheld
-    until the persona has given `SETTLEMENT_CHECK_AFTER_REPLIES` of them."""
     for i in range(replies):
         orch.history.add_reply(f"Antwort {i}.")
     return orch._messages_for_turn(closing=False)[-1]["content"]
 
 
 def test_standing_nudge_restates_the_settlement_bar(persona, scenario):
-    """The settlement criterion is carried on every turn past the opening.
-
-    Across the whole seeded library no pairing closed on the Turn its condition was
-    met while that permission sat only far up in the system prompt.
-    """
     with_condition = replace(scenario, call_goal="a refund date is named")
     nudge = _standing_nudge(SessionOrchestrator(persona, with_condition))
 
@@ -225,20 +198,12 @@ def test_standing_nudge_restates_the_settlement_bar(persona, scenario):
 
 
 def test_standing_nudge_does_not_spell_out_the_marker(persona, scenario):
-    """The nudge only points at the closing protocol, never spells out [CALL_END].
-
-    Spelled out there, the persona read it as an instruction: 32 of 34 pairings hung
-    up by probe 3."""
     nudge = _standing_nudge(SessionOrchestrator(persona, scenario))
 
     assert "[CALL_END]" not in nudge
 
 
 def test_standing_nudge_puts_the_open_case_first(persona, scenario):
-    """The settlement check and `_ANTI_REPEAT_NUDGE` sit in one message and pull
-    opposite ways. The open case is the branch that has to come first: ending a
-    call mid-conversation is the more expensive failure (ADR 0037), and the
-    first cut of this check proved it by ending 32 of 34 runs by probe 3."""
     nudge = _standing_nudge(SessionOrchestrator(persona, scenario))
 
     assert "press a point you have not pressed yet" in nudge
@@ -247,18 +212,12 @@ def test_standing_nudge_puts_the_open_case_first(persona, scenario):
 
 
 def test_settlement_check_falls_back_without_a_call_goal(persona, scenario):
-    """ADR 0024/0045: an authored Scenario can leave the goal and its bar
-    blank, and the check still has to name something to weigh the call
-    against."""
     nudge = _standing_nudge(SessionOrchestrator(persona, scenario))
 
     assert "what you came for has been given" in nudge
 
 
 def test_settlement_check_is_withheld_over_the_opening_exchanges(persona, scenario):
-    """Nine of ten premature hang-ups in the seeded run landed on the user's
-    very first reply, where the persona has only just said what it wants. The
-    check cannot be answered honestly there, and the model answered it wrong."""
     early = _standing_nudge(
         SessionOrchestrator(persona, replace(scenario, call_goal="a date is named")),
         replies=SETTLEMENT_CHECK_AFTER_REPLIES - 1,
@@ -270,8 +229,6 @@ def test_settlement_check_is_withheld_over_the_opening_exchanges(persona, scenar
 
 
 def test_closing_turn_carries_only_the_closing_nudge(persona, scenario):
-    """The user has already said goodbye: the call is ending either way, and a
-    second, longer instruction beside it only competes with it."""
     orch = SessionOrchestrator(persona, replace(scenario, call_goal="a date is named"))
     orch.history.add_reply("Vorherige Antwort.")
 

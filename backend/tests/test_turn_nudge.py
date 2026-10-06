@@ -1,9 +1,4 @@
-"""Which nudge a reply gets (`backend/session/nudges.py::for_turn`), as a precedence table.
-
-Covers ADR 0037 (goodbye push first), ADR 0035 (cut-off push next, before the user's message),
-ADR 0038 (clarify pushes, then the anti-repeat reminder; a `hard` Persona's variant),
-ADR 0070 (reverse turns it around, and outranks the `hard` variant),
-ADR 0073 (settlement check rides on the reminder alone, after the opening)."""
+"""Nudge precedence per turn (ADR 0035, 0037, 0038, 0070, 0073)."""
 
 from backend.session import nudges
 

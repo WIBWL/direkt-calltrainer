@@ -1,8 +1,4 @@
-"""The Persona and Scenario library: the row mapping (`library.py`, in memory) and the seed content.
-
-Covers: F-01, F-03, F-04, F-44 (portraits), R-07, R-08, R-09, R-10, R-12;
-ADR 0041 (database-backed), ADR 0043 (English prompt fields, per-Persona language),
-ADR 0045 (Scenario carries the case, Persona the objections)."""
+"""The library mapping and seed content (F-01, F-03, F-04, F-44, R-07-R-12, ADR 0041, 0043, 0045)."""
 
 import pathlib
 import re
@@ -17,14 +13,9 @@ from backend.personas import Persona, PersonaVoice
 from backend.scenarios import Scenario
 from backend.tests.conftest import load_seed_module
 
-# _to_persona/_to_scenario are the mapping this module is about.
-# pylint: disable=missing-function-docstring
-# pylint: disable=use-implicit-booleaness-not-comparison
+# pylint: disable=missing-function-docstring,use-implicit-booleaness-not-comparison
 
 SEED = load_seed_module()
-
-
-# --- the mapping: database row -> value object --------------------------
 
 
 _PERSONA_EXTERN_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
@@ -49,8 +40,6 @@ def _persona_row(**overrides):
 
 
 def test_persona_row_maps_onto_the_value_object():
-    """ADR 0041: the German column names stop at `library.py`; callers get a
-    plain dataclass."""
     persona = _to_persona(_persona_row())
     assert isinstance(persona, Persona)
     # ADR 0058: the value object's id is the extern_id (what the client uses),
@@ -63,16 +52,12 @@ def test_persona_row_maps_onto_the_value_object():
 
 
 def test_persona_mapping_keeps_display_and_prompt_fields_apart():
-    """ADR 0043: `role_label` is the card's label, `role` is prompt input.
-    One column each, and they must not be swapped."""
     persona = _to_persona(_persona_row())
     assert persona.role_label == "Geschäftsführer, Fokus auf Strategie & Budget"
     assert persona.role != persona.role_label
 
 
 def test_persona_mapping_carries_language_and_both_voices():
-    """ADR 0041/0043: the language is the Persona's own, and so is its one
-    voice (ADR 0103: KugelAudio, and nothing behind it)."""
     persona = _to_persona(_persona_row())
     assert persona.language_id == "de"
     assert persona.language_name == "Deutsch"
@@ -81,8 +66,6 @@ def test_persona_mapping_carries_language_and_both_voices():
 
 
 def test_scenario_row_maps_onto_the_value_object():
-    """ADR 0043: `short_description` is the teaser shown, `description` the
-    English call context the model reads."""
     extern_id = uuid.UUID("22222222-2222-2222-2222-222222222222")
     scenario = _to_scenario(
         models.Scenario(
@@ -102,9 +85,6 @@ def test_scenario_row_maps_onto_the_value_object():
     assert scenario.description.startswith("The customer")
 
 
-# --- the seeded content -------------------------------------------------
-
-
 def test_seeded_persona_library_is_non_empty_and_well_formed():
     assert SEED.PERSONAS, "F-04: the library ships at least one persona"
     for entry in SEED.PERSONAS:
@@ -121,9 +101,6 @@ def test_seeded_persona_keys_are_unique():
 
 
 def test_seeded_library_covers_the_budget_focused_decision_maker():
-    """F-04 / R-08: a managing director or IT lead with a strategy & budget
-    focus is representable. Asserted in English — ADR 0043 moved the prompt
-    fields off German."""
     joined = " ".join(
         f"{p['role']} {p['traits']} {p['behavior']}".lower() for p in SEED.PERSONAS
     )
@@ -132,7 +109,6 @@ def test_seeded_library_covers_the_budget_focused_decision_maker():
 
 
 def test_seeded_persona_behaviour_encodes_price_pushback():
-    """F-04 / R-07: a cost-critical counterpart that presses on price."""
     joined = " ".join(p["behavior"].lower() for p in SEED.PERSONAS)
     assert "price" in joined
 
@@ -151,8 +127,6 @@ def test_seeded_scenario_keys_are_unique():
 
 
 def test_seeded_scenarios_cover_support_and_pricing_contexts():
-    """F-03 / R-09 / R-10: at least a support-style case and a
-    price/cancellation negotiation are trainable."""
     blob = " ".join(f"{s['name']} {s['description']}".lower() for s in SEED.SCENARIOS)
     assert "support" in blob
     assert "cancel" in blob or "price" in blob
@@ -160,28 +134,17 @@ def test_seeded_scenarios_cover_support_and_pricing_contexts():
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_every_seeded_persona_speaks_a_language_that_has_a_pack(entry):
-    """ADR 0043: a Persona's `language_code` decides the spoken language, and
-    `get_pack` raises for one without a pack — a configuration error that
-    would only surface once a Session starts."""
     assert entry["language_id"] in LANGUAGE_PACKS
 
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_every_offered_persona_has_its_own_voice(entry):
-    """ADR 0041/0103: each Persona has its own KugelAudio voice.
-
-    Only an inactive Persona (still waiting for a voice) may lack the id."""
     if entry.get("active", True):
         assert isinstance(entry["kugelaudio_voice_id"], int)
 
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_a_seeded_persona_without_a_voice_is_not_offered(entry):
-    """The converse, and the one that matters: `library.list_personas` filters
-    on `active`, so an unfinished Persona is invisible — but only as long as
-    nobody flips the flag before choosing the voice. Without the id the default
-    TTS backend has nothing to synthesise with and every Turn falls through to
-    the fallback model."""
     if entry["kugelaudio_voice_id"] is None:
         assert not entry.get("active", True), (
             f"{entry['id']}: on offer without a KugelAudio voice"
@@ -189,19 +152,12 @@ def test_a_seeded_persona_without_a_voice_is_not_offered(entry):
 
 
 def test_seeded_scenarios_carry_no_language_of_their_own():
-    """ADR 0043: Scenarios stay language-neutral, which is what keeps every
-    Persona x Scenario pairing valid (ADR 0001, ADR 0015)."""
     for entry in SEED.SCENARIOS:
         assert "language_id" not in entry
         assert "language" not in entry
 
 
-# --- ADR 0045: the case on the Scenario, the objections on the Persona ---
-
-
 def test_scenario_row_maps_the_case_fields():
-    """ADR 0045: three columns, three fields — the case is addressable, not
-    buried in the prose of `description`."""
     scenario = _to_scenario(
         models.Scenario(
             key="row-case",
@@ -223,8 +179,6 @@ def test_scenario_row_maps_the_case_fields():
 
 
 def test_persona_row_maps_its_objections_in_order():
-    """R-12 / ADR 0026: the objections are ordered rows, and `position` is
-    what orders them — `library.py` has to load and keep that order."""
     row = _persona_row(
         objections=[
             models.PersonaObjection(position=1, text="second objection"),
@@ -236,32 +190,22 @@ def test_persona_row_maps_its_objections_in_order():
 
 
 def test_persona_without_objections_maps_to_an_empty_tuple():
-    """A Persona need not have objections; the prompt then omits the block."""
     # Specifically an empty *tuple* (ADR 0026), not just any falsey value.
     assert _to_persona(_persona_row(objections=[])).objections == ()
 
 
 def test_objections_carry_no_language_of_their_own():
-    """ADR 0043/0045: a Persona has a fixed language, and `persona_einwand` has
-    no language column — which is why objections are authored in English, as
-    moves rather than as quotable lines."""
     assert not hasattr(models.PersonaObjection, "language_code")
     assert not hasattr(models.PersonaObjection, "language")
 
 
 def test_seeded_scenarios_carry_the_case():
-    """ADR 0045: every shipped Scenario states its facts, the caller's goal and
-    the condition under which the matter is settled."""
     for entry in SEED.SCENARIOS:
         assert entry["case_facts"].strip(), f"{entry['id']}: no case facts"
         assert entry["call_goal"].strip(), f"{entry['id']}: no call goal"
 
 
 def test_seeded_scenario_context_does_not_carry_the_trainer_objective():
-    """ADR 0045, the defect that prompted it: `description` used to end with
-    what the *user* is meant to achieve ("keep the customer through price
-    negotiation"), addressed to the Persona — who is the customer. The caller's
-    own goal lives in `call_goal` now, and nothing hands it the trainee's."""
     for entry in SEED.SCENARIOS:
         lowered = entry["description"].lower()
         assert "the goal of the call is" not in lowered, entry["id"]
@@ -269,8 +213,6 @@ def test_seeded_scenario_context_does_not_carry_the_trainer_objective():
 
 
 def test_seeded_personas_carry_objections():
-    """R-12: `persona_einwand` has been empty since ADR 0026 created it. Three
-    to four per Persona is what ADR 0045 asks for."""
     for entry in SEED.PERSONAS:
         objections = entry["objections"]
         assert 3 <= len(objections) <= 4, f"{entry['id']}: {len(objections)} objections"
@@ -279,24 +221,13 @@ def test_seeded_personas_carry_objections():
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_seeded_persona_carries_german_display_text(entry):
-    """F-44: the info panel behind a card shows the Persona in the UI
-    language. `role_label` and `training_goal` were German already; these
-    two are the display twins added beside the English prompt fields."""
     assert entry["traits_label"].strip(), f"{entry['id']}: no traits_label"
-    # Not a language check -- "German" is not mechanically decidable, and the
-    # suite only tests the other direction (the English fields carry no German).
-    # What is checkable is that the display field was actually written rather
-    # than copied off its prompt twin, which is the mistake worth catching.
+    # Checks the display field was written, not copied off its prompt twin.
     assert entry["traits_label"] != entry["traits"], f"{entry['id']}: traits_label is the prompt text"
 
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_every_objection_has_exactly_one_german_label(entry):
-    """The two lists are parallel: `objections[i]` is the English move the
-    prompt gets and `objection_labels[i]` the same move for a person to
-    read. `provision._seed_objections` zips them strictly, so a mismatch
-    here would be a provisioning failure at startup rather than a wrong
-    label -- which is why the lengths are pinned in the seed."""
     labels = entry["objection_labels"]
     assert len(labels) == len(entry["objections"]), entry["id"]
     assert all(label.strip() for label in labels), entry["id"]
@@ -304,10 +235,6 @@ def test_every_objection_has_exactly_one_german_label(entry):
 
 @pytest.mark.parametrize("entry", SEED.SCENARIOS, ids=lambda e: e["id"])
 def test_seeded_scenario_carries_german_display_text(entry):
-    """ADR 0062: the read view behind a card shows the situation and the facts
-    of the case. Those two columns are English prompt text (ADR 0043), so a
-    built-in needs a display twin for each -- without one the panel would show
-    a German user an English case."""
     for field in ("description_label", "case_facts_label"):
         assert entry[field].strip(), f"{entry['id']}: no {field}"
         assert entry[field] != entry[field.removesuffix("_label")], (
@@ -317,9 +244,6 @@ def test_seeded_scenario_carries_german_display_text(entry):
 
 @pytest.mark.parametrize("entry", SEED.SCENARIOS, ids=lambda e: e["id"])
 def test_seeded_scenario_display_text_carries_no_dash(entry):
-    """House style for anything the UI shows: no em or en dash. They were used
-    as a catch-all joiner in the seeded briefings, which reads as an aside in
-    text meant to state a rule."""
     for field in ("name", "short_description", "briefing",
                   "description_label", "case_facts_label"):
         assert not _DISPLAY_DASH.search(entry[field] or ""), (
@@ -328,36 +252,22 @@ def test_seeded_scenario_display_text_carries_no_dash(entry):
 
 
 def test_seeded_persona_behaviour_carries_no_situation():
-    """ADR 0045: `behavior` is manner only. Both Personas used to open it with
-    the same sentence about having a reason for the call — a statement about
-    the Session's setup that the prompt frame already makes."""
     for entry in SEED.PERSONAS:
         lowered = entry["behavior"].lower()
         assert "reason for this call" not in lowered, entry["id"]
         assert "context of the call" not in lowered, entry["id"]
 
 
-# --- ADR 0072: the category the library filter runs on ----------------------
-
-
 def test_every_seeded_scenario_carries_a_valid_category():
-    """ADR 0072: a shipped Scenario that no category filter finds is one nobody
-    selects, and the value has to be one the CHECK constraint accepts."""
     for entry in SEED.SCENARIOS:
         assert entry["category"] in models.SCENARIO_CATEGORIES, entry["id"]
 
 
 def test_the_seeded_library_fills_every_category():
-    """F-03: short support cases, consultative project talks and pricing calls
-    are each trainable, and no filter option is empty on a fresh install. Before
-    the scenario catalogue landed, the consultative context had no Scenario at
-    all."""
     assert {e["category"] for e in SEED.SCENARIOS} == set(models.SCENARIO_CATEGORIES)
 
 
 def test_scenario_row_maps_its_category():
-    """`library._to_scenario` carries the column onto the value object, which is
-    what `/api/scenarios` badges the card from."""
     row = models.Scenario(
         key="row-category", title="t", short_description="s", description="d",
         case_facts="", call_goal="", category="requirements",
@@ -367,13 +277,8 @@ def test_scenario_row_maps_its_category():
     assert _to_scenario(row).category is None
 
 
-# --- ADR 0043: the prompt fields are English --------------------------------
-
-# Two cheap signals that a German sentence slipped into a field the model reads
-# as English. Neither is a language detector: the umlaut check is exact for the
-# text this library actually contains, and the word list holds only forms that
-# cannot also be English ("die", "man", "war", "will", "in", "so" are German
-# words too and are deliberately absent).
+# Cheap signals of German in an English field. The word list holds only forms
+# that cannot also be English.
 _UMLAUTS = re.compile(r"[äöüÄÖÜß]")
 # An em or en dash with space around it: the joiner this seed used to reach
 # for. A hyphen inside a compound ("IT-Seite") is not one and must pass.
@@ -391,9 +296,6 @@ _PROMPT_FIELDS = ("description", "case_facts", "call_goal")
 
 @pytest.mark.parametrize("entry", SEED.SCENARIOS, ids=lambda e: e["id"])
 def test_seeded_scenario_prompt_fields_are_english(entry):
-    """ADR 0043: Scenario prompt fields carry no language, so German here reaches an
-    English Persona unnoticed. Caught a real one ("..., ohne Fachbegriffe" in `call_goal`).
-    """
     for field in _PROMPT_FIELDS:
         text = entry[field]
         assert not _UMLAUTS.search(text), f"{entry['id']}.{field}: umlaut in an English field"
@@ -403,9 +305,6 @@ def test_seeded_scenario_prompt_fields_are_english(entry):
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_seeded_persona_prompt_fields_are_english(entry):
-    """Same for the Persona's prompt fields. `name` and `role_label` are display
-    text; `training_goal` is not read by the model at all (see library.py) and
-    is deliberately German."""
     for field in ("role", "traits", "behavior"):
         text = entry[field]
         assert not _UMLAUTS.search(text), f"{entry['id']}.{field}: umlaut in an English field"
@@ -415,41 +314,29 @@ def test_seeded_persona_prompt_fields_are_english(entry):
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_seeded_persona_objections_are_english(entry):
-    """R-12 / ADR 0045: the objections are English moves, not quoted lines."""
     for text in entry["objections"]:
         assert not _UMLAUTS.search(text), f"{entry['id']}: umlaut in an objection"
         assert _GERMAN_ONLY.search(text) is None, f"{entry['id']}: German in an objection"
 
 
-# --- the seeded portraits (F-44) ----------------------------------------
-#
-# The pairing lives in the table, the file in the frontend, so they can drift
-# silently (the UI falls back to initials). These tests make that a red test.
+# The portrait pairing lives in two places and can drift silently.
 _PORTRAIT_DIR = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "public" / "personas"
 
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_every_seeded_persona_carries_a_portrait_named_after_it(entry):
-    """The file is named after the Persona's name, first-last in lower case
-    and nothing else -- not after its id, which carries the role as well."""
     slug = entry["name"].lower().replace(" ", "-")
     assert entry["avatar_url"] == f"/personas/{slug}.webp"
 
 
 @pytest.mark.parametrize("entry", SEED.PERSONAS, ids=lambda e: e["id"])
 def test_every_seeded_portrait_is_a_file_that_exists(entry):
-    """The other half: the path the row carries has to name a file the app
-    actually serves. `frontend/public/` is copied into `frontend/dist/` by the
-    Vite build, which is the directory the frontend container serves."""
     served = _PORTRAIT_DIR / pathlib.PurePosixPath(entry["avatar_url"]).name
     assert served.is_file(), f"{entry['id']}: no portrait at {entry['avatar_url']}"
 
 
-# --- the seed fits the columns it is written into -----------------------
-#
-# Only the database enforces a length, at provisioning, in one transaction: one
-# over-long value drops every seeded row and /api/scenarios answers 500 (as
-# `persona.traits` once did). Maps seed field -> column, mirroring `provision._seed_*`.
+# One over-long seed value rolls back the whole seed and /api/scenarios 500s.
+# Mirrors `provision._seed_*`.
 _PERSONA_COLUMNS = {
     "id": "key", "name": "name", "role_label": "role_label", "role": "role",
     "traits": "traits", "avatar_url": "avatar_url",

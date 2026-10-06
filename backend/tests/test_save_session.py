@@ -1,8 +1,4 @@
-"""The write path from ADR 0034: a finished Session becomes one row, with its Turns, in one transaction.
-
-Calls `persistence.persist_session` directly: the point is the mapping, not the transport.
-Counts are utterances, not exchanges (ADR 0026; `utterances()` in shared/feedback/calls.py).
-"""
+"""The write path: one Session with its Turns in one transaction (ADR 0034)."""
 import uuid
 
 import pytest
@@ -20,10 +16,6 @@ pytestmark = pytest.mark.usefixtures("app_database", "reference_data")
 
 
 def _default_turns() -> list[Turn]:
-    """Two exchanges: the Persona's opening line, then a full back-and-forth.
-
-    Three utterances in total — the opening Turn has no user half.
-    """
     return [
         Turn(
             seq=1,
@@ -44,7 +36,6 @@ def _default_turns() -> list[Turn]:
 
 
 def test_saves_the_session_and_its_turns(db_session: DbSession) -> None:
-    """The happy path: one Session row, every utterance, timestamps preserved."""
     persist(turns=_default_turns())
 
     session = db_session.query(Session).one()
@@ -55,8 +46,6 @@ def test_saves_the_session_and_its_turns(db_session: DbSession) -> None:
 
 
 def test_assigns_a_public_id_distinct_from_the_primary_key(db_session: DbSession) -> None:
-    """The client never sees session_id — the wire carries extern_id, so a
-    sequential primary key cannot be used to guess at other Sessions."""
     extern_id = persist(turns=_default_turns())
 
     session = db_session.query(Session).one()
@@ -66,8 +55,6 @@ def test_assigns_a_public_id_distinct_from_the_primary_key(db_session: DbSession
 
 
 def test_opening_turn_becomes_a_persona_row_only(db_session: DbSession) -> None:
-    """The Persona speaks first, so the opening exchange has no user utterance
-    — which is one row, not a row with an empty half."""
     persist(turns=_default_turns())
 
     first = db_session.query(TurnRow).order_by(TurnRow.seq_index).first()
@@ -78,8 +65,6 @@ def test_opening_turn_becomes_a_persona_row_only(db_session: DbSession) -> None:
 
 
 def test_each_half_becomes_its_own_row_in_speaking_order(db_session: DbSession) -> None:
-    """Within one exchange the user speaks first, then the Persona answers;
-    seq_index carries that order across the whole Session."""
     persist(turns=_default_turns())
 
     rows = db_session.query(TurnRow).order_by(TurnRow.seq_index).all()
@@ -93,8 +78,6 @@ def test_each_half_becomes_its_own_row_in_speaking_order(db_session: DbSession) 
 
 
 def test_unmeasured_durations_are_stored_as_null(db_session: DbSession) -> None:
-    """An utterance whose end was never measured must not cost us the Turn;
-    NULL says "not measured", which a 0 would not."""
     persist(turns=[Turn(seq=1, user_text="Hallo", persona_text="Guten Tag")])
 
     assert db_session.query(TurnRow).count() == 2
@@ -108,15 +91,12 @@ def test_unmeasured_durations_are_stored_as_null(db_session: DbSession) -> None:
 def test_end_reason_maps_onto_the_status_vocabulary(
     db_session: DbSession, reason: str, expected: str
 ) -> None:
-    """"running" never occurs, because the row is written after the fact."""
     persist(reason=reason, turns=_default_turns())
 
     assert db_session.query(Session).one().status == expected
 
 
 def test_utterances_without_any_text_are_skipped(db_session: DbSession) -> None:
-    """A Turn whose legs all failed carries no transcript; the Session's
-    "aborted" status already records that it went wrong."""
     persist(reason="error", turns=[Turn(seq=1, persona_text="Guten Tag"), Turn(seq=2)])
 
     assert db_session.query(TurnRow).count() == 1
@@ -125,7 +105,6 @@ def test_utterances_without_any_text_are_skipped(db_session: DbSession) -> None:
 def test_unknown_persona_is_refused_rather_than_written_partially(
     db_session: DbSession,
 ) -> None:
-    """A bad key must not leave a Session row behind without its Turns."""
     with pytest.raises(LookupError):
         persist(persona_key="does-not-exist", turns=_default_turns())
 
@@ -134,8 +113,6 @@ def test_unknown_persona_is_refused_rather_than_written_partially(
 
 
 def test_a_deactivated_persona_can_still_receive_a_session(db_session: DbSession) -> None:
-    """A Persona retired while a call was running must not make that call
-    unrecordable — unlike the lookup used when starting one."""
     db_session.query(Persona).update({"active": False})
     db_session.commit()
 

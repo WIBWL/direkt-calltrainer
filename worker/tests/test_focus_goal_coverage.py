@@ -1,8 +1,4 @@
-"""Every focus goal reaches the dashboard, and only the real ones do (F-62, F-13).
-
-Also ADR 0076 (retired goals keep their row) and ADR 0080 (habit goals never tagged).
-A goal missing from `FOCUS_BACKING` silently shows mentions instead of its series;
-this file fails instead. Reads the TypeScript as text: no Node in the pytest run."""
+"""Every focus goal reaches the dashboard, read from the TypeScript as text (F-13, F-62, ADR 0076, 0080)."""
 import re
 from pathlib import Path
 
@@ -19,10 +15,7 @@ KINDS = {"metric", "activity", "text", "segment"}
 
 
 def _focus_backing() -> dict[str, str]:
-    """The goal -> evidence kind table, as written in the source.
-
-    Keys are found by indentation; `kind` is the first field of every entry.
-    """
+    """Read from the frontend source as text; keys are found by indentation."""
     text = FOCUS_METRICS_TS.read_text(encoding="utf-8")
     body = text.split("export const FOCUS_BACKING", 1)[1].split("= {", 1)[1]
     body = body.split("\n};", 1)[0]
@@ -40,9 +33,6 @@ def _seeded_goals() -> set[str]:
 
 
 def test_the_backing_table_parsed() -> None:
-    """The reader above is a regex over a source file, so it can go quietly
-    blind after an edit to that file's shape. Everything below would then pass
-    against an empty table."""
     table = _focus_backing()
 
     assert len(table) >= len(_seeded_goals())
@@ -50,8 +40,6 @@ def test_the_backing_table_parsed() -> None:
 
 
 def test_every_shipped_goal_has_a_tile() -> None:
-    """A goal the User can pick has to show something, and which of the four
-    shapes is a decision, not a default."""
     missing = _seeded_goals() - set(_focus_backing())
 
     assert not missing, (
@@ -61,28 +49,18 @@ def test_every_shipped_goal_has_a_tile() -> None:
 
 
 def test_the_backing_table_names_no_goal_that_is_not_shipped() -> None:
-    """The other direction, which catches a retired goal and a typo alike. A
-    stale entry is harmless on screen and misleading to read: it is the only
-    record anywhere of which metrics a goal was thought to rest on."""
     unknown = set(_focus_backing()) - _seeded_goals()
 
     assert not unknown, f"{sorted(unknown)} is backed but not in the catalogue"
 
 
 def test_the_goals_without_a_call_of_their_own_are_the_habit_goals() -> None:
-    """`activity` on a tile and `_NEVER_ASSIGNED` in the generator mark the same goals.
-
-    They fail in opposite directions: an `activity` goal the wrap-up tags loses those
-    sentences; a habit goal left assignable shows a tally nobody can open.
-    """
     by_activity = {goal for goal, kind in _focus_backing().items() if kind == "activity"}
 
     assert by_activity == set(_NEVER_ASSIGNED)
 
 
 def test_a_goal_backed_by_metrics_names_them() -> None:
-    """`metrics` is empty for every kind but `metric`, and a `metric` entry with
-    an empty list renders a tile with a heading and nothing under it."""
     text = FOCUS_METRICS_TS.read_text(encoding="utf-8")
     body = text.split("export const FOCUS_BACKING", 1)[1].split("= {", 1)[1]
     body = body.split("\n};", 1)[0]

@@ -1,10 +1,5 @@
-"""The migration chain, in both directions (ADR 0027, ADR 0052, ADR 0053).
-
-The whole chain runs, so a later revision cannot break an earlier downgrade.
-Only on an *empty* database: `d7f41c9b3a26` widened `persona.traits`, so rolling
-back past it fails on seeded data, deliberately. A green run is no promise a
-deployed schema can be rolled back. Also pins the naming convention (ADR 0053)
-and that every foreign-key column is indexed (ADR 0052)."""
+"""The migration chain both ways, on an empty database only; naming convention and FK
+indexes (ADR 0027, 0052, 0053)."""
 from sqlalchemy import create_engine, inspect, text
 
 from shared.db.models import Base
@@ -28,7 +23,6 @@ def _columns(url: str, table: str) -> set[str]:
 
 
 def test_upgrade_creates_every_table_the_models_declare(empty_database: str) -> None:
-    """A migration that forgets a table would leave the ORM querying nothing."""
     alembic_upgrade(empty_database)
 
     created = _table_names(empty_database)
@@ -37,7 +31,6 @@ def test_upgrade_creates_every_table_the_models_declare(empty_database: str) -> 
 
 
 def test_downgrade_to_base_removes_the_schema_again(empty_database: str) -> None:
-    """Every downgrade has to undo its upgrade, all the way back to nothing."""
     alembic_upgrade(empty_database)
     alembic_downgrade(empty_database, "base")
 
@@ -46,7 +39,6 @@ def test_downgrade_to_base_removes_the_schema_again(empty_database: str) -> None
 
 
 def test_full_round_trip_restores_the_same_schema(empty_database: str) -> None:
-    """Down and up again must land on exactly the schema we started from."""
     alembic_upgrade(empty_database)
     before = {table: _columns(empty_database, table) for table in _table_names(empty_database)}
 
@@ -58,11 +50,6 @@ def test_full_round_trip_restores_the_same_schema(empty_database: str) -> None:
 
 
 def test_turn_holds_one_utterance_per_row(empty_database: str) -> None:
-    """A stored Turn is one utterance of one speaker, not an exchange (ADR 0026).
-
-    Flattened by `utterances()`, which gives every line its own offset for the
-    timestamped Gesprächsprotokoll.
-    """
     alembic_upgrade(empty_database)
 
     columns = _columns(empty_database, "turn")
@@ -95,9 +82,6 @@ def _constraint_names(url: str) -> list[tuple[str, str, str]]:
 
 
 def test_every_constraint_follows_the_naming_convention(empty_database: str) -> None:
-    """The convention on Base.metadata is what stops autogenerate emitting
-    unnamed constraints, whose downgrade cannot run. A constraint that slipped
-    through with a database-assigned name would silently reintroduce that."""
     alembic_upgrade(empty_database)
 
     expected_prefix = {"p": "pk_", "u": "uq_", "f": "fk_", "c": "ck_"}
@@ -110,9 +94,6 @@ def test_every_constraint_follows_the_naming_convention(empty_database: str) -> 
 
 
 def test_every_foreign_key_column_is_indexed(empty_database: str) -> None:
-    """Postgres indexes the referenced primary key but never the referencing
-    side, so an unindexed foreign key turns every parent delete into a
-    sequential scan of the child table."""
     alembic_upgrade(empty_database)
     engine = create_engine(empty_database)
     try:

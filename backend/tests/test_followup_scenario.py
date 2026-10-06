@@ -1,8 +1,4 @@
-"""The follow-up Scenario written from a Session's Feedback (F-60, F-10).
-
-Covers ADR 0069 (asked for by the User, one per Session), ADR 0043/0070 (played case
-reaches the model), ADR 0051, 0058, 0059, 0066/0067 (retired with its Session) and
-ADR 0103's amendment (no thinking off the live path). Model faked; storage tests need Postgres."""
+"""The follow-up Scenario (F-60, ADR 0069, 0100); mirrors test_reverse.py on purpose."""
 
 import json
 import uuid
@@ -20,9 +16,7 @@ from backend.authored_text import FIELD_LIMITS
 from backend.followups import FollowUpError, PlayedCall, draft_follow_up
 from backend.tests.conftest import DRAFTED_FROM_TURNS, TEST_AUTH, a_finished_session
 
-# `app_database` and `reference_data` are taken by several tests only to
-# activate the fixture.
-# pylint: disable=unused-argument,missing-function-docstring
+# pylint: disable=unused-argument,missing-function-docstring  # fixtures taken to activate them
 
 _CARD_NAME = "Kündigungsabsicht"
 _CARD_TEASER = "Kunde erwägt zu kündigen."
@@ -33,9 +27,7 @@ _IMPROVEMENTS = [
 ]
 _PHASE = "Der Ton bleibt über alle drei Phasen gleich sachlich."
 
-# The case as it was played. Its four prompt fields are material now: a
-# follow-up carries this case forward instead of inventing another one in
-# the same subject area (ADR 0069's second amendment).
+# The played case, carried forward by the follow-up (ADR 0069).
 _DESCRIPTION = "Sie rufen bei Ihrem Anbieter an, weil Sie kündigen wollen."
 _FACTS = "Vertrag seit 2019, monatlich 89 Euro, dritte Störung in sechs Wochen."
 _GOAL = (
@@ -54,9 +46,7 @@ _CALL = PlayedCall(
     phase_language=_PHASE,
 )
 
-# What the stubbed model answers with: the six keys of the authoring wire
-# (ADR 0061, so `name` and not `title`), the trainee's briefing (ADR 0054)
-# among them, and `situation`, the trainee's "Worum es geht".
+# The stubbed model's answer: the authoring wire's keys plus `situation`.
 _SITUATION = (
     "Die Kundin aus dem letzten Gespräch ruft erneut an: Die zugesagte Gutschrift "
     "ist noch immer nicht gebucht. Geübt wird, ein verbindliches Datum zu nennen."
@@ -86,14 +76,9 @@ _DRAFT = {
 }
 
 
-# --- The draft itself (no database) ---------------------------------------
-
-
 async def test_the_prompt_carries_the_case_and_the_improvement_points(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Both halves: the case to carry forward, and what the exercise must
-    demand of the trainee this time."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await draft_follow_up(_CALL)
@@ -105,9 +90,6 @@ async def test_the_prompt_carries_the_case_and_the_improvement_points(
 
 
 async def test_the_played_case_reaches_the_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The four prompt fields of the Scenario that was played, which ADR 0043
-    withholds from the client and ADR 0070 releases here: without them the
-    draft cannot continue this matter, only invent another one beside it."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await draft_follow_up(_CALL)
@@ -119,8 +101,6 @@ async def test_the_played_case_reaches_the_model(monkeypatch: pytest.MonkeyPatch
 async def test_the_wrapups_summary_says_where_the_last_call_ended(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The next call starts from how the last one ended, and no other field
-    carries that."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await draft_follow_up(_CALL)
@@ -131,9 +111,6 @@ async def test_the_wrapups_summary_says_where_the_last_call_ended(
 async def test_the_prompt_asks_for_the_same_matter_rather_than_a_new_one(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The rule the change turns on: a small model (ADR 0011) handed a case
-    will either copy it or leave it, and neither is the exercise. S5 says
-    forward."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await draft_follow_up(_CALL)
@@ -146,11 +123,6 @@ async def test_the_prompt_asks_for_the_same_matter_rather_than_a_new_one(
 async def test_the_prompt_keeps_the_case_out_of_the_description(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The failure this rule was written from: the first follow-up drafted
-    under the new material put the whole case in `description`, which the live
-    prompt hands over as "Context of the call" — so the Persona opened the call
-    by reading it out. `case_facts` is held back one or two at a time
-    (`prompting._improvisation_rule`); a description is not."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await draft_follow_up(_CALL)
@@ -163,8 +135,6 @@ async def test_the_prompt_keeps_the_case_out_of_the_description(
 async def test_an_empty_case_field_is_left_out_rather_than_labelled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """ADR 0045 lets an authored Scenario leave the three case fields empty. A
-    labelled blank invites the model to fill it in."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await draft_follow_up(PlayedCall(_CARD_NAME, _CARD_TEASER, description=_DESCRIPTION))
@@ -177,9 +147,6 @@ async def test_an_empty_case_field_is_left_out_rather_than_labelled(
 async def test_the_prompt_forbids_naming_the_exercise_to_the_caller(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The four case fields are the caller's briefing, and a caller told what
-    is being trained plays the answer back. This rule is what the feature
-    stands on."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await draft_follow_up(_CALL)
@@ -189,8 +156,6 @@ async def test_the_prompt_forbids_naming_the_exercise_to_the_caller(
 
 
 async def test_the_draft_is_asked_without_thinking(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Off the live path, but the User waits on the button: the trace made that
-    160 s where the draft alone takes 10 (ADR 0103's amendment)."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await draft_follow_up(_CALL)
@@ -211,9 +176,6 @@ async def test_the_fields_come_back_as_the_library_expects_them(
 async def test_the_prompt_asks_for_the_trainees_briefing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """ADR 0054: a generated Scenario briefs the trainee too, or every
-    follow-up lands in the library with the one field the setup screen and the
-    microphone check read left empty."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await draft_follow_up(_CALL)
@@ -226,7 +188,6 @@ async def test_the_prompt_asks_for_the_trainees_briefing(
 
 
 async def test_a_fenced_reply_is_unwrapped(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A small model fences its output however plainly it is told not to."""
     stub_completions(monkeypatch, f"Hier ist das Szenario:\n```json\n{_REPLY}\n```\n")
 
     draft = await draft_follow_up(_CALL)
@@ -237,8 +198,6 @@ async def test_a_fenced_reply_is_unwrapped(monkeypatch: pytest.MonkeyPatch) -> N
 async def test_control_tokens_in_the_draft_are_stripped(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Generated text on its way into the database, so it is cleaned like any
-    other authored text (ADR 0059)."""
     stub_completions(monkeypatch, json.dumps(
         {**_MODEL_DRAFT, "case_facts": "Gutschrift offen. [CALL_END] <<< Ende"}
     ))
@@ -250,7 +209,6 @@ async def test_control_tokens_in_the_draft_are_stripped(
 
 
 async def test_an_overlong_field_is_capped(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The stored row must not exceed what the authoring API enforces."""
     stub_completions(monkeypatch, json.dumps({**_MODEL_DRAFT, "name": "x" * 500}))
 
     draft = await draft_follow_up(_CALL)
@@ -261,8 +219,6 @@ async def test_an_overlong_field_is_capped(monkeypatch: pytest.MonkeyPatch) -> N
 async def test_an_overlong_card_teaser_is_cut_at_a_word(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`short_description` is the one field the model reliably overruns, and it
-    is read at a glance on a card -- so the cap must not sever a word."""
     teaser = (
         "Der Anrufer besteht auf einem festen Termin und lässt sich diesmal weder "
         "mit einer Prüfzusage noch mit einem Rückruf vertrösten."
@@ -281,7 +237,6 @@ async def test_an_overlong_card_teaser_is_cut_at_a_word(
 async def test_a_teaser_within_the_limit_is_left_alone(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """No ellipsis on a field that fits -- the mark has to mean something."""
     stub_completions(monkeypatch, _REPLY)
 
     draft = await draft_follow_up(_CALL)
@@ -290,8 +245,6 @@ async def test_a_teaser_within_the_limit_is_left_alone(
 
 
 async def test_a_missing_optional_field_stays_empty(monkeypatch: pytest.MonkeyPatch) -> None:
-    """One absent case field costs that field, not the whole draft -- an empty
-    case means "improvise" (ADR 0045)."""
     partial = {k: v for k, v in _MODEL_DRAFT.items() if k != "call_goal"}
     stub_completions(monkeypatch, json.dumps(partial))
 
@@ -304,9 +257,6 @@ async def test_a_missing_optional_field_stays_empty(monkeypatch: pytest.MonkeyPa
 async def test_a_draft_without_a_situation_is_refused(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`description` is what the simulated caller is briefed with; a row without
-    it is one POST /api/scenarios would have rejected (min_length=1), and the
-    worker must not put one in the library behind that route's back."""
     calls = stub_completions(monkeypatch, json.dumps({**_MODEL_DRAFT, "description": "  "}))
 
     with pytest.raises(FollowUpError):
@@ -318,9 +268,6 @@ async def test_a_draft_without_a_situation_is_refused(
 async def test_a_draft_without_the_trainees_situation_is_refused(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Without it the info panel falls back to `description`, which is the
-    caller's -- "Sie rufen an, weil ..." -- and the trainee reads that the call
-    is theirs to make, when the Persona is the one who rings (ADR 0110)."""
     partial = {k: v for k, v in _MODEL_DRAFT.items() if k != "situation"}
     calls = stub_completions(monkeypatch, json.dumps(partial))
 
@@ -333,8 +280,6 @@ async def test_a_draft_without_the_trainees_situation_is_refused(
 async def test_the_prompt_has_the_caller_ring_the_trainee_in_the_situation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The trainee's "Worum es geht" is the description from the other end of
-    the line, and closes like a built-in's with what is practised."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await draft_follow_up(_CALL)
@@ -348,8 +293,6 @@ async def test_the_prompt_has_the_caller_ring_the_trainee_in_the_situation(
 async def test_an_unparseable_reply_is_retried_once_and_then_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """No partial result is worth keeping, so this raises rather than falling
-    back to a half-written Scenario."""
     calls = stub_completions(monkeypatch, "Ich kann das leider nicht.")
 
     with pytest.raises(FollowUpError):
@@ -358,11 +301,8 @@ async def test_an_unparseable_reply_is_retried_once_and_then_fails(
     assert len(calls) == 2
 
 
-# --- Asking for it (database) ----------------------------------------------
-#
-# `reference_data` is requested per test, not via `pytestmark`: the draft tests
-# above must run without a database. Deliberately the same shape as
-# `backend/tests/test_reverse.py`, so a divergence shows as a difference between the files.
+# `reference_data` per test, so the draft tests above need no database. Same
+# shape as test_reverse.py on purpose.
 
 
 def _store_feedback(
@@ -404,8 +344,6 @@ async def test_the_route_stores_it_as_the_users_own_private_scenario(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Through `library.create_scenario` like anything the User authored
-    (ADR 0058): theirs to edit, share and delete from that moment on."""
     extern_id = a_finished_session()
     _store_feedback(db_session, _IMPROVEMENTS)
     stub_completions(monkeypatch, _REPLY)
@@ -423,9 +361,7 @@ async def test_the_route_stores_it_as_the_users_own_private_scenario(
     assert row.visibility == "private"
     assert row.active is True
     assert row.derived_from_session_id == db_session.query(Session).one().session_id
-    # Stamped with the caller's company, which the worker could never do: it had
-    # no request and so no `organization` claim to resolve one from (ADR 0060). From
-    # here sharing is a `visibility` flip rather than a flip plus a late stamp.
+    # Stamped with the caller's company, so sharing is a plain `visibility` flip.
     assert row.tenant_id is not None
 
 
@@ -433,8 +369,6 @@ async def test_the_answer_is_the_card_the_detail_route_serves(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The screen renders what came back and what a later reload brings with the
-    same code, so the two shapes have to be one shape."""
     extern_id = a_finished_session()
     _store_feedback(db_session, _IMPROVEMENTS)
     stub_completions(monkeypatch, _REPLY)
@@ -451,9 +385,6 @@ async def test_the_info_panel_shows_the_trainees_situation_not_the_callers(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """"Worum es geht" reads `description_label` before `description`, as it
-    does for a built-in -- so the trainee never sees the caller's "Sie rufen
-    an"."""
     extern_id = a_finished_session()
     _store_feedback(db_session, _IMPROVEMENTS)
     stub_completions(monkeypatch, _REPLY)
@@ -468,8 +399,6 @@ async def test_nothing_is_written_without_improvement_points(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The improvement points are the whole input: a wrap-up that names none has
-    nothing to build an exercise from, and the model is not asked."""
     extern_id = a_finished_session()
     _store_feedback(db_session, [])
     calls = stub_completions(monkeypatch, _REPLY)
@@ -485,8 +414,6 @@ async def test_nothing_is_written_for_a_call_too_short_to_build_on(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """One sentence from the User, improvement points or not: the screen offers
-    no follow-up under three utterances, and the route now refuses the same."""
     extern_id = a_finished_session(turns=DRAFTED_FROM_TURNS[:2])
     _store_feedback(db_session, _IMPROVEMENTS)
     calls = stub_completions(monkeypatch, _REPLY)
@@ -502,8 +429,6 @@ async def test_nothing_is_written_without_a_wrapup(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A Session whose wrap-up failed has no points either, and is refused the
-    same way: from here the two are one case, the input is missing."""
     extern_id = a_finished_session()
     calls = stub_completions(monkeypatch, _REPLY)
 
@@ -518,9 +443,6 @@ async def test_an_unreachable_model_is_a_503(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The amendment's point, in one test: the failure that used to be a log
-    line nobody read now reaches the person who pressed the button. The wrap-up
-    is untouched -- it was stored long before this was asked for."""
     extern_id = a_finished_session()
     _store_feedback(db_session, _IMPROVEMENTS)
 
@@ -541,8 +463,6 @@ async def test_an_unusable_draft_is_a_503_too(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A model that answers with nothing storable is a dead model from here:
-    there is no half-written Scenario worth putting in the library."""
     extern_id = a_finished_session()
     _store_feedback(db_session, _IMPROVEMENTS)
     calls = stub_completions(monkeypatch, "Das kann ich leider nicht.")
@@ -558,9 +478,6 @@ async def test_a_second_press_returns_the_same_one_without_asking_the_model(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Idempotent, and cheaply so: the existing row is looked up before any
-    model call, so a double click costs nothing. The UNIQUE on the provenance
-    column is what would make "exactly one" true even if it did not."""
     extern_id = a_finished_session()
     _store_feedback(db_session, _IMPROVEMENTS)
     calls = stub_completions(monkeypatch, _REPLY)
@@ -577,8 +494,6 @@ async def test_past_the_hourly_budget_no_new_one_is_drafted(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """ADR 0109: 429 before the model is asked. The budget is shared with the
-    reverse (`test_reverse.py` holds the same test)."""
     extern_id = a_finished_session()
     _store_feedback(db_session, _IMPROVEMENTS)
     calls = stub_completions(monkeypatch, _REPLY)
@@ -595,7 +510,6 @@ async def test_one_already_drafted_is_returned_past_the_budget(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Only a draft the model writes counts: the stored one costs nothing."""
     extern_id = a_finished_session()
     _store_feedback(db_session, _IMPROVEMENTS)
     stub_completions(monkeypatch, _REPLY)
@@ -612,9 +526,6 @@ async def test_a_removed_follow_up_comes_back(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """One per Session is the rule, so asking again after removing it
-    reactivates that row rather than drafting a second one. Handing back the id
-    of a deactivated Scenario would name something the picker cannot show."""
     extern_id = a_finished_session()
     _store_feedback(db_session, _IMPROVEMENTS)
     stub_completions(monkeypatch, _REPLY)
@@ -631,8 +542,6 @@ async def test_someone_elses_session_is_a_404(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Absent and not-yours are the same answer (ADR 0031/0050): a 403 would
-    confirm the id exists."""
     extern_id = a_finished_session(subject="somebody-else")
     _store_feedback(db_session, _IMPROVEMENTS)
     calls = stub_completions(monkeypatch, _REPLY)
@@ -659,8 +568,6 @@ async def test_the_measured_statistics_are_not_part_of_the_material(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A Scenario correcting a figure would need the target range ADR 0051
-    declined to invent."""
     extern_id = a_finished_session()
     _store_feedback(db_session, _IMPROVEMENTS)
     measurements = db_session.query(Measurement).all()
@@ -678,11 +585,6 @@ async def test_the_played_scenarios_prompt_fields_reach_the_model(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The played case is read off the row and handed over whole (ADR 0069, 2nd amendment).
-
-    Withheld from the client otherwise (ADR 0043); the exception is ADR 0070's: the User
-    has just heard this case, and the draft needs it to carry the matter forward.
-    """
     played = "Die Gutschrift wurde am 3. März zugesagt und nie gebucht."
     scenario = db_session.query(Scenario).one()
     scenario.case_facts = played
@@ -703,8 +605,6 @@ async def test_the_phase_language_note_is_material_too(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """F-42's paragraph says how the register moved through the call, which is
-    the other half of what the next exercise should demand."""
     extern_id = a_finished_session()
     _store_feedback(db_session, _IMPROVEMENTS)
     calls = stub_completions(monkeypatch, _REPLY)
@@ -714,16 +614,11 @@ async def test_the_phase_language_note_is_material_too(
     assert _PHASE in asked(calls)
 
 
-# --- What becomes of it ----------------------------------------------------
-
-
 async def _stored_follow_up(
     client: httpx.AsyncClient, db: DbSession, monkeypatch: pytest.MonkeyPatch,
     **session_kwargs
 ) -> int:
-    """One Session with a follow-up, the state every test below starts from.
-    Returns the Scenario's primary key -- the provenance column, which is the
-    other way to find it, is exactly what these tests watch being cleared."""
+    """Returns the Scenario's key: the provenance column is what these tests watch cleared."""
     extern_id = a_finished_session(**session_kwargs)
     _store_feedback(db, _IMPROVEMENTS)
     stub_completions(monkeypatch, _REPLY)
@@ -735,9 +630,6 @@ async def test_deleting_the_training_deactivates_its_follow_up(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Deactivated, not deleted: a later Session may have been played on it, and
-    `session.scenario_id` is NOT NULL, so that training has to stay readable
-    (ADR 0026/0069). The row survives; the library stops offering it."""
     scenario_id = await _stored_follow_up(api_client, db_session, monkeypatch)
     extern_id = db_session.query(Session).one().extern_id
 
@@ -759,8 +651,6 @@ async def test_withdrawing_consent_deactivates_every_follow_up(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Withdrawal deletes every stored training (ADR 0066), so it takes the
-    Scenarios written from them out of the library too."""
     scenario_id = await _stored_follow_up(api_client, db_session, monkeypatch)
 
     deletion.delete_subject_sessions(db_session, TEST_AUTH.sub)
@@ -774,9 +664,6 @@ async def test_the_retention_sweep_deactivates_the_follow_up_too(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The six-month sweep (ADR 0067) removes Sessions on the same path, so a
-    follow-up cannot outlive the training it was written from by not being
-    deleted by hand."""
     expired = datetime.now(UTC) - retention.RETENTION - timedelta(days=1)
     scenario_id = await _stored_follow_up(
         api_client, db_session, monkeypatch, started_at=expired
@@ -789,16 +676,9 @@ async def test_the_retention_sweep_deactivates_the_follow_up_too(
     assert db_session.get(Scenario, scenario_id).active is False
 
 
-# --- What the client sees --------------------------------------------------
-
-
 async def test_a_session_without_a_follow_up_says_so(
     api_client: httpx.AsyncClient, db_session: DbSession, reference_data
 ) -> None:
-    """Null rather than a missing key -- and since the amendment it means one
-    thing rather than three: nobody has asked for one. Nothing is being written
-    in the background, so the screen offers a button instead of a waiting line.
-    """
     extern_id = a_finished_session()
     _store_feedback(db_session, _IMPROVEMENTS)
 
@@ -814,9 +694,6 @@ async def test_the_library_badges_it_as_its_own_category(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`follow_up` beside `origin`, not a value of it: it is the caller's own
-    Scenario, editable and shareable like one (ADR 0069), but "Individuell"
-    means hand-authored and the setup screen filters them apart."""
     extern_id = a_finished_session()
     _store_feedback(db_session, _IMPROVEMENTS)
     stub_completions(monkeypatch, _REPLY)

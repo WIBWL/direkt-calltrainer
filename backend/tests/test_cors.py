@@ -1,8 +1,4 @@
-"""The SPA on another host may call the API; nothing else may (ADR 0107).
-
-`backend/cors.py` installs the middleware from `CORS_ORIGINS`, and only then:
-unset, as in development, there is no CORS at all.
-"""
+"""CORS for the SPA's host only, and none when unset (ADR 0107)."""
 
 import httpx
 import pytest

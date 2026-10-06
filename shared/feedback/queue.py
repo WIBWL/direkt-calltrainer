@@ -1,7 +1,4 @@
-"""The job queue between the live Session and the Feedback worker (ADR 0019).
-One queue, one job type; the payload is just a Session's primary key, since
-everything else is in Postgres by then -- never a transcript or audio (ADR 0048).
-"""
+"""The wrap-up job queue (ADR 0019). The payload is only a Session key."""
 
 from __future__ import annotations
 
@@ -15,36 +12,26 @@ from shared.feedback.jobs import JOB_TIMEOUT_S
 
 QUEUE_NAME = "feedback"
 
-# The job by name, not by reference: RQ resolves it in the worker, so the app
-# never imports the wrap-up generator (test_module_dependencies pins it).
+# By name, so the backend never imports the worker. Renaming the generator
+# fails every job silently; test_job_name pins it.
 JOB_FUNCTION = "worker.generator.generate_feedback"
 
-# Bounds the job RQ runs, and the window a reader believes a `running` row for
-# (`jobs.is_live`). Defined beside that reading rather than here, so asking the
-# question does not require Redis.
 _RESULT_TTL_S = 3600
 
-# How long the *enqueue* may take, which is a different question entirely: it
-# happens while the user waits for their transcript. See `connection()`.
+# The enqueue happens while the user waits for their transcript.
 CONNECT_TIMEOUT_S = 3
 SOCKET_TIMEOUT_S = 5
 
 
 @lru_cache(maxsize=1)
 def connection() -> Redis:
-    """The worker's process-wide Redis connection, created lazily on first use.
-    Deliberately without a read timeout: the worker idles blocked on it, and a
-    timeout would turn that into an error. The app has its own connection below.
-    """
+    """The worker's connection: no read timeout, since it idles blocked on it."""
     return Redis.from_url(_url())
 
 
 @lru_cache(maxsize=1)
 def _enqueue_connection() -> Redis:
-    """The app's connection, which only pushes a job. Timed out because the user
-    waits on it for their transcript -- possibly the only copy (F-64, ADR 0066)
-    -- and a Redis that stops answering would otherwise hold it for minutes.
-    """
+    """The app's connection, timed out because the user waits on the enqueue."""
     return Redis.from_url(
         _url(),
         socket_connect_timeout=CONNECT_TIMEOUT_S,
@@ -53,8 +40,7 @@ def _enqueue_connection() -> Redis:
 
 
 def _url() -> str:
-    """Read on first use, not at import: the live path imports this module lazily
-    and must not need Redis configured merely to load."""
+    # Read lazily: importing this module must not require REDIS_URL.
     return required("REDIS_URL")
 
 
@@ -64,5 +50,4 @@ def _queue() -> Queue:
 
 
 def enqueue_feedback(session_id: int) -> None:
-    """Hand one finished Session to the worker. Raises if Redis is unreachable."""
     _queue().enqueue(JOB_FUNCTION, session_id, job_timeout=JOB_TIMEOUT_S, result_ttl=_RESULT_TTL_S)

@@ -1,9 +1,6 @@
-"""The backend suite's fixtures: the test doubles for the Persona/Scenario
-library, the faked pipeline, auth, and the real write path for a Session.
-The environment and the databases come from `shared/tests/fixtures.py`."""
+"""Backend fixtures: library doubles, the faked pipeline, auth and the real write path."""
 
-# The env vars below must be set before the packages are imported, so those
-# imports deliberately sit after this block.
+# The environment must be set before the packages are imported.
 # pylint: disable=wrong-import-position,missing-function-docstring
 # pylint: disable=too-few-public-methods,redefined-outer-name
 
@@ -19,9 +16,8 @@ import pytest
 from kugelaudio.exceptions import KugelAudioError
 from openai import OpenAIError
 
-# The environment and the databases every suite shares. pytest registers
-# `pytest_plugins` only after this module has run, so it is also imported first:
-# it sets the environment the imports below read.
+# Imported first as well as registered: pytest registers plugins only after this
+# module ran, and the fixtures set the environment the imports below read.
 pytest.register_assert_rewrite("shared.tests.fixtures")
 from shared.tests.fixtures import PERSONA_KEY, SCENARIO_KEY, SESSION_STARTED  # noqa: E402
 
@@ -33,8 +29,7 @@ os.environ.setdefault("KUGELAUDIO_API_KEY", "test-kugelaudio-key")
 os.environ.setdefault("OIDC_ISSUER", "http://keycloak.test.invalid/realms/direkt")
 
 from shared.clients import llm  # noqa: E402
-# The ORM models keep a namespace: `Persona` and `Scenario` below are the value
-# objects the app passes around, and both names would otherwise collide here.
+# Namespaced: `Persona`/`Scenario` below are the value objects.
 from shared.db import models as db_models  # noqa: E402
 from shared.db.session import session_scope  # noqa: E402
 from shared.turn import Turn  # noqa: E402
@@ -45,11 +40,8 @@ from backend.personas import Persona, PersonaVoice  # noqa: E402
 from backend.scenarios import Scenario  # noqa: E402
 from backend.session.events import AudioChunk, Failed, StateChanged, TurnCompleted  # noqa: E402
 
-# Personas and Scenarios live in the database since ADR 0041, so the suite can
-# no longer import a hardcoded library -- and must not need a database to run.
-# These are test doubles: value objects of the same shape, owned by the suite.
-# Whether the *seeded* content is any good is a separate question, checked in
-# test_persona_scenario_library.py against the seed script.
+# Test doubles of the library, so most tests need no database; the seed is
+# checked in test_persona_scenario_library.py.
 TEST_PERSONAS = [
     Persona(
         id="test-persona-de",
@@ -107,14 +99,12 @@ REPO = Path(__file__).resolve().parents[2]
 
 
 def load_seed_module():
-    """The library's initial content (ADR 0041), from `shared/db/seed_data.py`."""
     from shared.db import seed_data  # pylint: disable=import-outside-toplevel
 
     return seed_data
 
 
-# A fixed caller for tests that don't care about auth (most of them): one the
-# role gate admits (ADR 0109).
+# A caller the role gate admits.
 TEST_AUTH = auth.AuthContext(sub="test-subject", roles=[auth.REQUIRED_ROLE], token="test-token")
 
 
@@ -125,8 +115,7 @@ def auth_ctx():
 
 @pytest.fixture(autouse=True)
 def _fresh_limits(monkeypatch):
-    """The per-User caps count in the process and every test calls as
-    `TEST_AUTH`, so without this the suite would run into its own 429s."""
+    # The caps count in-process and every test calls as TEST_AUTH.
     open_calls, summaries, drafts = limits.fresh()
     monkeypatch.setattr(limits, "OPEN_CALLS", open_calls)
     monkeypatch.setattr(limits, "DOCUMENT_SUMMARIES", summaries)
@@ -135,8 +124,6 @@ def _fresh_limits(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _override_auth():
-    """Every test runs as `TEST_AUTH` unless it clears the override itself
-    (see `test_setup_api.py`'s unauthenticated cases)."""
     app.dependency_overrides[auth.require_user] = lambda: TEST_AUTH
     yield
     app.dependency_overrides.pop(auth.require_user, None)
@@ -154,16 +141,11 @@ def scenario():
 
 @pytest.fixture
 def fake_library(monkeypatch):
-    """Serve the test doubles in place of the database-backed library.
-
-    Patched on the `library` module, where both call sites look the functions up.
-    """
+    """Serve the test doubles; patched on `library`, where both call sites look."""
     by_id = {p.id: p for p in TEST_PERSONAS}
     by_key = {s.id: s for s in TEST_SCENARIOS}
-    # Personas are curated (no scoping); a Scenario read is scoped to the
-    # caller's `sub` + tenant (ADR 0058/0060), which the doubles ignore -- the real
-    # visibility query is tested against a database in test_authored_content.py.
-    # The WS handshake's tenant resolution is stubbed so it needs no database.
+    # The doubles ignore visibility scoping; test_authored_content.py tests the
+    # real query.
     monkeypatch.setattr(library, "list_personas", lambda: list(TEST_PERSONAS))
     monkeypatch.setattr(library, "list_scenarios", lambda subject, tenant_id=1: list(TEST_SCENARIOS))
     monkeypatch.setattr(library, "get_persona", by_id.get)
@@ -173,19 +155,14 @@ def fake_library(monkeypatch):
 
 
 class FakeLLM:
-    """Stand-in for `shared.clients.llm.stream_reply`.
-
-    `.replies` are the successive full replies, each streamed as several token
-    deltas; `.fail_times` raises an OpenAIError on the first N calls.
-    """
+    """`.replies` stream as token deltas; `.fail_times` fails the first N calls."""
 
     def __init__(self, replies=None):
         self.replies = list(replies or ["Alles klar, danke."])
         self.calls = []
         self.fail_times = 0
-        # `complete` is the call-state notes refresh (ADR 0071): one call per
-        # completed exchange. Empty by default, so the notes stay off and the
-        # message list the older tests index into is unchanged.
+        # `complete` is the notes refresh (ADR 0071); empty by default, so the
+        # notes stay off.
         self.states = []
         self.state_calls = []
         self.state_fail_times = 0
@@ -197,9 +174,7 @@ class FakeLLM:
             raise OpenAIError("simulated notes failure")
         return self.states.pop(0) if self.states else ""
 
-    # `**_kwargs` so this keeps the real signature: `retries` is passed by the
-    # boot check (clients/health.py) and a fake that rejected it would fail
-    # where the real function works.
+    # `**_kwargs` keeps the real signature: the boot check passes `retries`.
     def stream_reply(self, messages, **_kwargs):
         self.calls.append(messages)
 
@@ -208,15 +183,13 @@ class FakeLLM:
                 self.fail_times -= 1
                 raise OpenAIError("simulated LLM failure")
             reply = self.replies.pop(0) if self.replies else ""
-            for i, word in enumerate(reply.split(" ")):  # mimic token streaming
+            for i, word in enumerate(reply.split(" ")):
                 yield word if i == 0 else " " + word
 
         return _gen()
 
 
 class FakeSTT:
-    """Stand-in for `backend.clients.stt.transcribe`."""
-
     def __init__(self, transcripts=None):
         self.transcripts = list(transcripts or ["Hallo, worum geht es?"])
         self.calls = []
@@ -231,11 +204,8 @@ class FakeSTT:
 
 
 class FakeTTS:
-    """Stand-in for `backend.clients.tts.synthesize_stream` (+ one-shot `synthesize`).
-
-    One attempt per chunk (ADR 0103): `fail_times` raises `KugelAudioError`. `.hang`
-    (an `asyncio.Event`) parks synthesis; `.chunks_per_call` sets sub-chunks per chunk.
-    """
+    """`fail_times` raises KugelAudioError; `.hang` parks synthesis;
+    `.chunks_per_call` sets sub-chunks per chunk."""
 
     def __init__(self):
         self.calls = []
@@ -265,8 +235,6 @@ class FakeTTS:
 
 @pytest.fixture
 def fake_pipeline(monkeypatch):
-    """Patch STT, LLM and TTS on the modules the orchestrator calls them
-    through. Returns the three fakes so a test can inspect/seed them."""
     llm_fake = FakeLLM()
     stt_fake = FakeSTT()
     tts_fake = FakeTTS()
@@ -278,8 +246,6 @@ def fake_pipeline(monkeypatch):
     monkeypatch.setattr(tts, "synthesize", tts_fake.synthesize)
 
     class Pipeline:
-        """Bundle of the three fakes active for one test."""
-
         llm = llm_fake
         stt = stt_fake
         tts = tts_fake
@@ -288,37 +254,29 @@ def fake_pipeline(monkeypatch):
 
 
 async def collect(turn_events):
-    """Drain an async iterator of TurnEvents into a list."""
     return [event async for event in turn_events]
 
 
 def states(events):
-    """The ordered `StateChanged` values in an event list."""
     return [e.state for e in events if isinstance(e, StateChanged)]
 
 
 def audio_chunks(events):
-    """The `AudioChunk` events in an event list."""
     return [e for e in events if isinstance(e, AudioChunk)]
 
 
 def completed(events):
-    """The first `TurnCompleted` event, or None."""
     return next((e for e in events if isinstance(e, TurnCompleted)), None)
 
 
 def failure(events):
-    """The first `Failed` event, or None."""
     return next((e for e in events if isinstance(e, Failed)), None)
 
 
 @pytest.fixture
 def seeded_database(app_database: str) -> str:
-    """`app_database` with the reference tables seeded, as the application boots.
-
-    Needed by the setup endpoints, which read the persona/scenario tables (ADR 0041).
-    """
-    # Imported here so a collection-time import never needs the environment.
+    """`app_database` seeded as the application boots."""
+    # Imported here so collection never needs the environment.
     from backend.db.provision import seed  # pylint: disable=import-outside-toplevel
 
     with session_scope() as db:
@@ -332,35 +290,22 @@ def persist(  # pylint: disable=too-many-arguments
     reason: str = "user",
     turns: list[Turn] | None = None,
     persona_key: str = PERSONA_KEY,
-    # Named for the same reason `persona_key` is: a test that runs against the
-    # *seeded* reference data rather than against `reference_data`'s two hand-
-    # written rows has to say which rows the Session points at.
     scenario_key: str = SCENARIO_KEY,
     subject: str = TEST_AUTH.sub,
     started_at: datetime = SESSION_STARTED,
 ) -> uuid.UUID:
-    """Write a Session through the real write path; returns its extern_id.
-
-    Needs `app_database`, since persist_session() opens its own session_scope().
-    `started_at` defaults to a fixed instant for reproducibility.
-    """
-    # Imported here, not at module scope: importing the write path pulls in
-    # the feedback stack, which a collection-time import should not need.
+    """Write a Session through the real write path; returns its extern_id."""
+    # Imported here: the write path pulls in the feedback stack.
     from backend import consent  # pylint: disable=import-outside-toplevel
     from backend.session import persistence  # pylint: disable=import-outside-toplevel
 
-    # The write path refuses without it (ADR 0066), and it checks inside its own
-    # transaction, so it cannot be granted from a test's `db_session`. A stored
-    # Session always has a decision behind it in reality; a test that wants the
-    # refusal asks for it explicitly (backend/tests/test_consent.py).
+    # The write path refuses without consent (ADR 0066), checked in its own
+    # transaction; test_consent.py asks for the refusal explicitly.
     with session_scope() as db:
         if not consent.allows_storage(subject, db=db):
             consent.record_decision(db, subject, granted=True)
 
-    # The value object the write path receives carries the row's `extern_id` as
-    # `.id` since ADR 0058, so resolve it from the reference row the fixture
-    # inserted. A `persona_key` the fixture did not write yields a random id,
-    # which exercises the LookupError path.
+    # An unknown `persona_key` yields a random id, exercising the LookupError path.
     with session_scope() as db:
         prow = db.query(db_models.Persona).filter_by(key=persona_key).one_or_none()
         srow = db.query(db_models.Scenario).filter_by(key=scenario_key).one_or_none()
@@ -381,19 +326,13 @@ def persist(  # pylint: disable=too-many-arguments
 
 @pytest.fixture
 async def api_client(app_database: str) -> AsyncIterator[httpx.AsyncClient]:  # pylint: disable=unused-argument
-    """The FastAPI app, wired to this test's throwaway database via `app_database`.
-
-    Uses httpx's ASGI transport, not Starlette's TestClient: the pinned starlette
-    (0.35) passes `app=` to httpx.Client, which httpx 0.28 rejects.
-    """
+    """httpx's ASGI transport: Starlette's TestClient breaks on httpx 0.28."""
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         yield client
 
 
-# One finished exchange with speech durations filled in, so pace (a rate over
-# phonation) is measured. Three user utterances, because the reverse and
-# follow-up routes refuse fewer (`MIN_USER_UTTERANCES`).
+# Three user utterances: the reverse and follow-up routes refuse fewer.
 DRAFTED_FROM_TURNS = [
     Turn(seq=1, persona_text="Brandt hier.", persona_offset_ms=0, persona_end_ms=1500),
     Turn(seq=2, user_text="Guten Tag, was kann ich für Sie tun?",
@@ -417,11 +356,7 @@ DRAFTED_FROM_TURNS = [
 def a_finished_session(
     turns=None, subject: str | None = None, started_at: datetime | None = None
 ) -> uuid.UUID:
-    """One Session written through the real write path, default `DRAFTED_FROM_TURNS`.
-
-    `subject` sets another owner (ownership refusals); `started_at` moves it in time
-    (retention). Omitted rather than passed as None, so `persist` keeps its defaults.
-    """
+    """One Session through the real write path."""
     kwargs: dict = {}
     if subject is not None:
         kwargs["subject"] = subject

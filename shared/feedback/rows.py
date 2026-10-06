@@ -14,13 +14,10 @@ from shared.feedback.metrics import Measurement
 
 logger = logging.getLogger(__name__)
 
-# The scale `measurement.value` is stored at. One place, rather than the same
-# format string in five: a change to the column's precision has one reader.
 VALUE_SCALE = 4
 
 
 def metric_ids(db: DbSession) -> dict[str, int]:
-    """The seeded inventory, keyed by metric key."""
     return {row.key: row.metric_type_id for row in db.query(db_models.MetricType)}
 
 

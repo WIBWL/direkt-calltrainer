@@ -1,8 +1,4 @@
-"""Verdicts on one reply against the call so far (`backend/session/reply_checks.py`).
-
-Covers ADR 0037 (still pressing is no goodbye; a farewell anywhere wins) and ADR 0038 (repeats,
-A-B-A-B, restatements, re-greetings, a first sentence already said). Called directly, so a
-threshold can be read against its own cases; the Turn-level tests live elsewhere."""
+"""Verdicts on one reply against the call so far (ADR 0037, 0038)."""
 from shared.language_packs import get_pack
 from backend.session import reply_checks as checks
 
@@ -26,7 +22,6 @@ def test_an_oscillation_two_replies_back_is_caught_when_it_is_substantial():
 
 
 def test_repeating_the_last_reply_on_request_is_not_a_loop():
-    """The user asked to hear it again: the previous reply is the answer."""
     assert not checks.repeats_earlier(LONG, ["Hallo.", LONG], exclude_last=True)
     assert checks.repeats_earlier(LONG, [LONG, "Hallo."], exclude_last=True)
 
@@ -69,10 +64,8 @@ def test_a_farewell_anywhere_wins_over_a_trailing_question():
     assert not checks.still_pressing("Auf Wiederhören. Darf ich mich melden?", DE)
 
 
-# --- The end-of-reply verdict (ADR 0037, ADR 0038) ---------------------------
-# One verdict for "does this reply end the call" and "must a goodbye be said
-# after it". They were two expressions in the orchestrator that had to agree,
-# and the two recorded ways they failed to are the first two cases below.
+# One verdict for "ends the call" and "needs a goodbye"; the first two cases are
+# the two ways they used to disagree.
 
 def _ending(text, replies=(), *, marker=False, closing=False, allow_repetition=False):
     return checks.ending(
@@ -82,8 +75,6 @@ def _ending(text, replies=(), *, marker=False, closing=False, allow_repetition=F
 
 
 def test_a_closing_turn_with_no_words_still_says_goodbye():
-    """The call used to end in silence: the closing path exempted itself from
-    the fallback on the ground that the reply is the goodbye."""
     verdict = _ending("", closing=True)
     assert verdict.ends and verdict.needs_fallback
 

@@ -1,13 +1,6 @@
-"""Seeing, taking and removing your own data (F-49, ADR 0066).
+"""Overview, export and deletion of one's own data (F-49, ADR 0066)."""
 
-All three routes put the caller's `sub` in the query; each gets a test proving
-it. The export is checked for completeness against what was actually stored,
-since an export that silently omits a table is worse than none."""
-
-# pylint: disable=duplicate-code
-# Fixture data is repeated per test module on purpose: a test carrying its own
-# Turns shows what it ran against when it fails, and sharing them would let a
-# change made for one test quietly alter another.
+# pylint: disable=duplicate-code  # each module carries its own fixture Turns on purpose
 
 import json
 import uuid
@@ -47,12 +40,7 @@ def _add_feedback(db: DbSession) -> None:
     db.commit()
 
 
-# --- Overview ----------------------------------------------------------------
-
-
 async def test_overview_is_empty_for_a_new_account(api_client: httpx.AsyncClient) -> None:
-    """A fresh account holds nothing, and the overview says so with zeroes
-    rather than an error."""
     body = (await api_client.get("/api/me/data")).json()
 
     assert body["sessions"] == 0
@@ -63,8 +51,6 @@ async def test_overview_is_empty_for_a_new_account(api_client: httpx.AsyncClient
 async def test_overview_counts_what_is_stored(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """Counts, not content: the point is to show the extent of what is held at
-    a glance, which a page of transcripts does not do."""
     persist(turns=TURNS)
     _add_feedback(db_session)
 
@@ -79,8 +65,6 @@ async def test_overview_counts_what_is_stored(
 
 
 async def test_overview_ignores_other_subjects(api_client: httpx.AsyncClient) -> None:
-    """Otherwise the figure a user is shown about themselves is really a figure
-    about the deployment."""
     persist(turns=TURNS)
     persist(turns=TURNS, subject="somebody-else")
     persist(turns=TURNS, subject="somebody-else")
@@ -91,17 +75,9 @@ async def test_overview_ignores_other_subjects(api_client: httpx.AsyncClient) ->
     assert body["utterances"] == 3
 
 
-# --- Export ------------------------------------------------------------------
-
-
 async def test_export_carries_everything_that_was_stored(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """Completeness asserted against the database, not against a list of keys.
-
-    A fixed shape would go stale when a column is added, and the export would omit it
-    silently.
-    """
     persist(turns=TURNS)
     _add_feedback(db_session)
 
@@ -122,11 +98,6 @@ async def test_export_carries_everything_that_was_stored(
 async def test_the_export_reaches_past_the_sessions(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """Focus, retention setting and authored Scenarios are in the export too.
-
-    They are personal data but not trainings (Art. 15), so the per-Session
-    completeness test above cannot notice them missing.
-    """
     persist(turns=TURNS)
     await api_client.put("/api/focus", json={"goals": ["pace"], "role": "sales",
                                              "categories": ["pricing"]})
@@ -151,10 +122,6 @@ async def test_the_export_reaches_past_the_sessions(
 async def test_the_export_tells_the_three_segments_of_a_metric_apart(
     api_client: httpx.AsyncClient, db_session: DbSession  # pylint: disable=unused-argument
 ) -> None:
-    """Since ADR 0081 one metric can hold three rows for one call -- the whole
-    call, the demanding stretches and the rest. Without `segment` they arrive as
-    the same key three times with different numbers and nothing to read them by.
-    """
     persist(turns=TURNS)
 
     body = (await api_client.get("/api/me/export")).json()
@@ -165,8 +132,6 @@ async def test_the_export_tells_the_three_segments_of_a_metric_apart(
 
 
 async def test_export_is_a_download_not_a_page(api_client: httpx.AsyncClient) -> None:
-    """A tab full of transcripts is something the next person at the machine
-    can page back to."""
     persist(turns=TURNS)
 
     response = await api_client.get("/api/me/export")
@@ -179,8 +144,6 @@ async def test_export_is_a_download_not_a_page(api_client: httpx.AsyncClient) ->
 async def test_export_holds_no_other_subjects_data(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """The one property that matters most here: an export is a file that leaves
-    the system, so a foreign row in it is a disclosure, not a bug report."""
     persist(turns=TURNS)
     persist(
         turns=[LiveTurn(seq=1, user_text="Streng geheim, fremdes Gespräch.",
@@ -198,21 +161,15 @@ async def test_export_holds_no_other_subjects_data(
 async def test_export_states_the_pseudonym_it_is_filed_under(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """The export is the one place a subject sees the identifier their data
-    sits under, which is ADR 0031's point: it is a pseudonym, not anonymity."""
     body = (await api_client.get("/api/me/export")).json()
 
     assert body["subject_id"]
     assert "consent" in body
 
 
-# --- Deleting one training ---------------------------------------------------
-
-
 async def test_a_training_can_be_deleted_on_its_own(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """One training goes, the rest stay — the point of a selective delete."""
     kept = persist(turns=TURNS)
     doomed = persist(turns=TURNS)
 
@@ -227,8 +184,6 @@ async def test_a_training_can_be_deleted_on_its_own(
 async def test_deleting_a_training_takes_its_subtree(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """A Session row disappearing while its transcript stays behind would be a
-    deletion in name only."""
     extern_id = persist(turns=TURNS)
     _add_feedback(db_session)
 
@@ -243,10 +198,6 @@ async def test_deleting_a_training_takes_its_subtree(
 async def test_another_users_training_cannot_be_deleted(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """404, the same answer an unknown id gets. A distinct response would
-    confirm the id exists, which is what ADR 0050's unguessable id withholds —
-    and confirming it on a *delete* route would be worse than on a read one.
-    """
     extern_id = persist(turns=TURNS, subject="somebody-else")
 
     response = await api_client.delete(f"/api/sessions/{extern_id}")
@@ -259,7 +210,6 @@ async def test_another_users_training_cannot_be_deleted(
 async def test_deleting_an_unknown_training_is_a_clean_404(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """A stale link is expected, not exceptional."""
     response = await api_client.delete(f"/api/sessions/{uuid.uuid4()}")
 
     assert response.status_code == 404
@@ -268,8 +218,6 @@ async def test_deleting_an_unknown_training_is_a_clean_404(
 async def test_deleting_twice_reports_the_second_as_unknown(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """Nothing breaks on the retry, but the route will not claim a training was
-    deleted twice — by then it is indistinguishable from a wrong id."""
     extern_id = persist(turns=TURNS)
 
     assert (await api_client.delete(f"/api/sessions/{extern_id}")).status_code == 204
@@ -283,8 +231,6 @@ async def test_deleting_twice_reports_the_second_as_unknown(
 async def test_every_data_route_needs_a_token(
     api_client: httpx.AsyncClient, method: str, path: str
 ) -> None:
-    """All three act on the caller's own `sub`; without one there is no request
-    to answer (ADR 0009)."""
     from backend import auth  # pylint: disable=import-outside-toplevel
     from backend.app import app  # pylint: disable=import-outside-toplevel
 

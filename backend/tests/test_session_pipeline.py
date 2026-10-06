@@ -1,9 +1,4 @@
-"""The live session loop: STT -> streamed dialogue -> chunked TTS per turn.
-
-Covers F-46 (listening/thinking/speaking), F-01 (persona opens, then turn by turn),
-ADR 0110 (in an ordinary call the user picks up first; a reverse keeps its own opening),
-F-12/F-52/R-52 (transcript only at the end), ADR 0033 (first audio chunk before the reply ends),
-ADR 0047/0048 (per-Turn acoustics inline and on failure; statistics: shared/tests/test_metrics.py)."""
+"""The live loop: STT, streamed dialogue, chunked TTS, inline acoustics (F-01, F-12, F-46, ADR 0033, 0048, 0110)."""
 
 import asyncio
 from dataclasses import replace
@@ -26,7 +21,6 @@ def orch(persona, scenario):
 
 
 async def test_persona_opens_the_call_itself(orch, fake_pipeline):
-    """F-01: the persona speaks first, with no user audio submitted."""
     fake_pipeline.llm.replies = ["Guten Tag, hier ist Thomas Brandt von der Beispiel GmbH."]
     events = await collect(orch.run_opening_turn())
 
@@ -40,7 +34,6 @@ async def test_persona_opens_the_call_itself(orch, fake_pipeline):
 
 
 async def test_turn_runs_stt_then_llm_then_tts_and_reports_state(orch, fake_pipeline):
-    """F-46: a normal turn goes thinking -> speaking -> back to listening."""
     fake_pipeline.stt.transcripts = ["Ich glaube, das Angebot passt so."]
     fake_pipeline.llm.replies = ["Gut. Dann brauche ich noch die genaue Laufzeit von Ihnen."]
 
@@ -54,8 +47,6 @@ async def test_turn_runs_stt_then_llm_then_tts_and_reports_state(orch, fake_pipe
 
 
 async def test_reply_audio_streams_in_multiple_chunks(orch, fake_pipeline):
-    """ADR 0033: a long reply is synthesized and sent as several ordered
-    chunks rather than one blob at the end."""
     fake_pipeline.stt.transcripts = ["Erklaeren Sie mir bitte einmal die Details."]
     long_reply = (
         "Der erste Punkt betrifft die Vertragslaufzeit, die bei zwoelf Monaten liegt. "
@@ -75,8 +66,6 @@ async def test_reply_audio_streams_in_multiple_chunks(orch, fake_pipeline):
 
 
 async def test_thinking_is_emitted_before_any_audio(orch, fake_pipeline):
-    """F-46 / ADR 0033: 'thinking' shows while the first chunk is still being
-    generated; 'speaking' only once real audio is ready."""
     fake_pipeline.stt.transcripts = ["Kurze Frage."]
     fake_pipeline.llm.replies = ["Eine kurze, klare Antwort dazu."]
 
@@ -93,8 +82,6 @@ async def test_thinking_is_emitted_before_any_audio(orch, fake_pipeline):
 
 
 async def test_transcript_is_assembled_across_turns_at_the_end(orch, fake_pipeline):
-    """F-12/R-52: after several turns, orchestrator.turns holds the complete
-    user+persona transcript, ready to be sent once when the session ends."""
     fake_pipeline.llm.replies = [
         "Guten Tag, ich rufe wegen unseres Vertrags an.",
         "Verstehe. Und was genau ist da unklar?",
@@ -129,14 +116,9 @@ async def test_transcript_is_assembled_across_turns_at_the_end(orch, fake_pipeli
 
 
 async def test_a_measured_turn_records_both_its_durations(orch, fake_pipeline, monkeypatch):
-    """ADR 0047/0048. A recording that ran 1.5 s and held 0.9 s of speech puts
-    both figures on the Turn, in their own fields: the recording's length is
-    kept as the fact it is, speaking pace divides by the second."""
     monkeypatch.setattr(
         "backend.session.orchestrator.analyze",
-        # Every field named, including the empty curves: TurnAcoustics carries
-        # no defaults, so a new measurement cannot be added without every
-        # construction of it being revisited.
+        # Every field named: TurnAcoustics has no defaults on purpose.
         lambda _audio: TurnAcoustics(
             duration_ms=1500, phonation_ms=900, voice_start_ms=300, voice_end_ms=1200,
             pauses=(), loudness_db=(), pitch_hz=(),
@@ -166,11 +148,6 @@ async def _done(acoustics: TurnAcoustics) -> "asyncio.Task[TurnAcoustics]":
 
 
 async def test_a_reply_is_placed_at_its_first_sound_not_at_the_recording():
-    """ADR 0114. A 2.8 s recording that arrived at 10 s began at 7.2 s, but its
-    first 0.8 s are the VAD's lead-in and its last second the silence it waited
-    through: the user spoke from 8.0 s to 9.0 s. Placed on the recording's
-    edges, every reply started 0.8 s early -- a reaction time short by that
-    much and a start inside the Persona's line that never happened."""
     turn = Turn(seq=1)
 
     await attach_measurements(turn, await _done(_measured(2_800, 800, 1_800)), ended_ms=10_000)
@@ -182,8 +159,6 @@ async def test_a_reply_is_placed_at_its_first_sound_not_at_the_recording():
 
 
 async def test_a_continued_turn_keeps_its_first_sound_and_takes_the_last():
-    """A Turn reopened after a barge-in (ADR 0035) begins where its first
-    fragment's sound began and ends where its last fragment's sound ended."""
     turn = Turn(seq=1)
 
     await attach_measurements(turn, await _done(_measured(2_800, 800, 1_800)), ended_ms=10_000)
@@ -201,10 +176,6 @@ async def test_a_continued_turn_keeps_its_first_sound_and_takes_the_last():
     ids=["measurement_declined", "unexpected_failure"],
 )
 async def test_an_unmeasurable_turn_says_so(orch, fake_pipeline, monkeypatch, error):
-    """ADR 0048. Both failure paths -- the one `analyze` raises deliberately and
-    the catch-all for whatever Praat's C extension surfaces -- flag the Turn
-    rather than only logging. The call carries on: this leg is never
-    load-bearing."""
     def fail_analyze(_audio):
         raise error
 
@@ -223,7 +194,6 @@ async def test_an_unmeasurable_turn_says_so(orch, fake_pipeline, monkeypatch, er
 
 
 async def test_empty_llm_reply_fails_after_retry(orch, fake_pipeline):
-    """An empty model response must not complete the Turn successfully."""
     fake_pipeline.stt.transcripts = ["Bitte erklären Sie mir das."]
     fake_pipeline.llm.replies = ["", ""]
 
@@ -239,7 +209,6 @@ async def test_empty_llm_reply_fails_after_retry(orch, fake_pipeline):
 
 
 async def test_tts_zero_audio_fails_turn(orch, fake_pipeline):
-    """A TTS stream without audio must not complete the Turn successfully."""
     fake_pipeline.stt.transcripts = ["Bitte erklären Sie mir das."]
     fake_pipeline.llm.replies = ["Natürlich, ich erkläre es Ihnen."]
     fake_pipeline.tts.chunks_per_call = 0
@@ -254,13 +223,7 @@ async def test_tts_zero_audio_fails_turn(orch, fake_pipeline):
     assert not audio_chunks(events)
 
 
-# --- ADR 0110: the user picks up ------------------------------------------
-
-
 async def test_an_ordinary_call_opens_with_the_reply_to_the_users_answering_line(orch, fake_pipeline):
-    """ADR 0110: the Persona rang, so the user answers first and the Persona's
-    first words are the reply to that -- asked for by the opening instruction,
-    placed after the user's line so it is what the model reads last."""
     fake_pipeline.stt.transcripts = ["Beispiel GmbH, Müller am Apparat, guten Tag."]
     fake_pipeline.llm.replies = ["Guten Tag Herr Müller, hier ist Thomas Brandt. Es geht um meinen Vertrag."]
 
@@ -289,8 +252,6 @@ async def test_the_opening_instruction_is_spent_once_the_persona_has_been_heard(
 
 
 async def test_a_reverse_never_gets_the_callers_opening_instruction(persona, scenario, fake_pipeline):
-    """In a reverse the Persona picked up; the caller's opener would cast it
-    as the one ringing (ADR 0070)."""
     orch = SessionOrchestrator(persona, replace(scenario, reverse=True))
     fake_pipeline.stt.transcripts = ["Guten Tag, ich rufe wegen meiner Rechnung an."]
     fake_pipeline.llm.replies = ["Gern, worum geht es denn?"]

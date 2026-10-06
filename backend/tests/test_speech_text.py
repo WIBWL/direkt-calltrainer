@@ -1,8 +1,4 @@
-"""What the TTS backend is handed, as opposed to what the Transcript keeps (ADR 0033/0044).
-
-A full stop after a digit (thousands separator, ordinal) looks like a sentence end and splits
-synthesis mid-sentence; `speech_text.py` removes it at the TTS boundary only. The `der`/`des`
-cases are measured: the only stops left over 734 replies were ordinals after "der"."""
+"""Stops after digits are removed for TTS only (ADR 0033, 0044)."""
 
 import pytest
 
@@ -60,28 +56,20 @@ def test_bare_ordinal_after_a_preposition_becomes_a_word(written, spoken):
     ],
 )
 def test_ordinal_in_subject_position_becomes_a_word(written, spoken):
-    """The gap the 734-reply scan found: `der` is not a preposition, so the
-    stop survived and the date was read as a cardinal ("der vierzehn")."""
     assert for_speech(written, "de") == spoken
 
 
 def test_a_sentence_that_merely_ends_in_a_number_is_left_alone():
-    """The stop after "30" is a sentence end, not a separator or an ordinal —
-    removing it would run two sentences together."""
     text = "Damit sind es 30. Der Rest bleibt offen."
     assert for_speech(text, "de") == text
 
 
 def test_a_day_out_of_range_is_left_as_written():
-    """`_ORDINAL_STEMS` stops at 31; anything else is not a day, so the safe
-    move is to change nothing."""
     text = "Die Ticketnummer ist 45. Bitte notieren."
     assert for_speech(text, "de") == text
 
 
 def test_english_passes_through_untouched():
-    """English writes neither separator with a full stop, so there is nothing
-    to undo — and an unknown language must never be able to fail a synthesis."""
     text = "That is 1,400 euros as of July 6. Nothing else changed."
     assert for_speech(text, "en") == text
     assert for_speech(text, "fr") == text

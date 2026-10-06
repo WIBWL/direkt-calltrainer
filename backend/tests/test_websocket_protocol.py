@@ -1,11 +1,4 @@
-"""The /ws/session wire protocol: handshake and event forwarding.
-
-Covers F-46, ADR 0033 (JSON 'chunk' then binary frame), ADR 0035 ('turn.interrupt'), ADR 0110
-(an ordinary call waits for the user, a reverse is answered by the persona), ADR 0041
-(library faked); a bad handshake or unknown id closes with 1002, a bad token with 1008
-(F-50/ADR 0009); a caller without the role, one over the open-call cap and a silent socket
-close with 1008, a call past its time limit ends, an oversized turn is skipped (ADR 0109).
-Driven through a fake WebSocket, since TestClient breaks on httpx 0.28."""
+"""The /ws/session protocol through a fake WebSocket (F-46, F-50, ADR 0009, 0033, 0035, 0109, 0110)."""
 
 import asyncio
 import json
@@ -22,11 +15,8 @@ from backend.session.events import AudioChunk, Failed, StateChanged, TurnComplet
 from backend.session.orchestrator import SessionOrchestrator
 from backend.tests.conftest import TEST_AUTH, TEST_PERSONAS, TEST_SCENARIOS
 
-# session_ws's ASGI helpers are underscore-prefixed; driving them directly is
-# the point of this module. `unused-argument`: a test takes `fake_library` only
-# to activate the fixture.
 # pylint: disable=missing-function-docstring,missing-class-docstring,protected-access
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument  # driving session_ws's private helpers is the point
 
 
 @pytest.fixture(autouse=True)
@@ -199,9 +189,6 @@ class _FakeOrchestrator:
 
 
 async def test_run_session_routes_a_between_turns_interrupt_to_the_orchestrator():
-    """A barge-in over a reply's tail lands between turns (the server streams
-    ahead and has already finished the turn); _run_session must hand it to the
-    orchestrator to trim, not silently drop it (ADR 0035)."""
     ws = FakeWebSocket([
         {"type": "turn.interrupt", "played_ms": 1500},
         {"type": "session.end"},
@@ -215,11 +202,6 @@ async def test_run_session_routes_a_between_turns_interrupt_to_the_orchestrator(
 
 
 async def test_a_barge_in_over_the_goodbye_ends_the_session_instead_of_reviving_it():
-    """The reply that ends the call is streamed ahead like any other, so the
-    user's interrupt over its tail arrives while (or just after) that Turn is
-    ending the Session. It used to win: the loop carried on and ran a further
-    Turn on a finished call, heard as random text after the goodbye. The
-    orchestrator's `ended` now settles it (ADR 0035)."""
     ws = FakeWebSocket([
         {"type": "turn.audio.meta", "turn_seq": 1, "mime_type": "audio/wav"},
         b"user-audio",
@@ -236,36 +218,23 @@ async def test_a_barge_in_over_the_goodbye_ends_the_session_instead_of_reviving_
 
 
 async def test_a_disconnect_mid_call_is_not_read_as_the_user_ending_it():
-    """A dropped connection reaches `session_ws` as `WebSocketDisconnect`, not None.
-
-    None reads as "the user ended the call"; a walked-away call must be stored as
-    `aborted` (ADR 0034's amendment), not counted as a training.
-    """
     ws = FakeWebSocket([_DISCONNECT])
     with pytest.raises(WebSocketDisconnect):
         await session_ws._receive_json(ws)
 
 
 async def test_a_malformed_control_message_is_still_not_a_disconnect():
-    """The other half of the same call: unparseable input answers None as
-    before, so only a real disconnect travels up as an exception."""
     ws = FakeWebSocket(["{not json at all"])
     assert await session_ws._receive_json(ws) is None
 
 
 def test_a_disconnected_session_is_stored_as_aborted():
-    """The wire word for it maps onto the schema's `aborted`, never
-    `completed` -- the one distinction ADR 0034's amendment rests on."""
     assert persistence._STATUS["disconnected"] == db_models.STATUS_ABORTED
     assert persistence._STATUS["user"] == db_models.STATUS_COMPLETED
 
 
 class FrameWebSocket:
-    """A socket with uvicorn's ASGI message shape (exactly one of "text"/"bytes").
-
-    `FakeWebSocket` only produces well-formed input; this one lets a binary frame
-    arrive where text is expected.
-    """
+    """Lets a binary frame arrive where text is expected."""
 
     def __init__(self, frame):
         self.frame = frame
@@ -291,34 +260,20 @@ class FrameWebSocket:
     ids=["scalar", "array", "string", "unparseable", "binary-frame"],
 )
 async def test_only_a_json_object_counts_as_a_control_message(frame):
-    """Everything else answers None and is skipped.
-
-    A scalar, an array or a binary frame must not raise mid-call, or the training is
-    lost without even an `aborted` row.
-    """
     assert await session_ws._receive_json(FrameWebSocket(frame)) is None
 
 
 async def test_a_text_frame_where_the_audio_blob_belongs_is_not_a_crash():
-    """`turn.audio.meta` promises a binary frame next. A client out of step
-    sends text; the turn is skipped, the Session goes on."""
     assert await session_ws._receive_bytes(FrameWebSocket({"text": "oops"})) is None
 
 
 async def test_a_handshake_that_is_not_json_closes_the_socket(fake_library):  # noqa: ARG001
-    """Reachable before anything is authenticated, so it must not be an
-    unhandled exception either."""
     ws = FrameWebSocket({"bytes": b"\x00"})
     assert await session_ws._handshake(ws) is None
     assert ws.closed[0] == 1002
 
 
 async def test_a_disconnect_during_a_turn_still_tears_the_turn_down():
-    """The teardown (cancel, `aclose`) runs before the disconnect travels on.
-
-    Otherwise the forwarder outlives the handler, mutating `orchestrator.turns` while
-    `_record` reads it (ADR 0034), and the pooled TTS socket is left to the GC (ADR 0044).
-    """
     closed = asyncio.Event()
     forwarded = []
 
@@ -354,11 +309,6 @@ async def test_a_disconnect_during_a_turn_still_tears_the_turn_down():
 
 
 async def test_a_forwarder_that_already_failed_still_closes_the_turn():
-    """The teardown closes the generator however the forwarder ended.
-
-    A send-side RuntimeError must not skip the close (else the loop finalises it and logs
-    `aclose()` errors), yet must still propagate so the Session is stored as aborted.
-    """
     closed = asyncio.Event()
 
     async def events():
@@ -383,9 +333,6 @@ async def test_a_forwarder_that_already_failed_still_closes_the_turn():
     assert closed.is_set(), "the turn generator was closed all the same"
 
 
-# --- Access and caps (ADR 0109) --------------------------------------------
-
-
 class SilentWebSocket(FakeWebSocket):
     """A client that opens the socket and never says anything."""
 
@@ -401,8 +348,6 @@ def _error_codes(ws: FakeWebSocket) -> list[str]:
 
 
 async def test_a_socket_that_never_sends_session_start_is_closed(monkeypatch):
-    """Nobody is known before `session.start`; an open socket that says nothing
-    would otherwise hold its connection for as long as the client likes."""
     monkeypatch.setattr(session_ws, "HANDSHAKE_TIMEOUT_S", 0.05)
     ws = SilentWebSocket()
     assert await session_ws._handshake(ws) is None
@@ -434,8 +379,6 @@ async def test_a_call_over_the_open_call_cap_is_refused(monkeypatch, fake_librar
 
 
 async def test_a_call_gives_its_slot_back_however_it_ends(monkeypatch, fake_library):
-    """Two calls in a row on a cap of one: the first one's slot has to be free
-    again, including when the call died with an exception."""
     monkeypatch.setattr(limits, "OPEN_CALLS", limits.CallSlots(1))
     served = []
 
@@ -451,8 +394,6 @@ async def test_a_call_gives_its_slot_back_however_it_ends(monkeypatch, fake_libr
 
 
 async def test_a_call_past_its_time_limit_ends_between_turns():
-    """Stored and wrapped up like a call that ran its course, and the User is
-    told why it ended."""
     ws = SilentWebSocket()
     orch = _FakeOrchestrator()
     deadline = asyncio.get_running_loop().time() + 0.05
@@ -465,8 +406,6 @@ async def test_a_call_past_its_time_limit_ends_between_turns():
 
 
 async def test_an_oversized_turn_never_reaches_the_pipeline(monkeypatch):
-    """Whisper is only ever sent `MAX_TURN_AUDIO_BYTES`; the client, waiting on
-    a reply, is sent back to listening and the call goes on."""
     monkeypatch.setattr(session_ws, "MAX_TURN_AUDIO_BYTES", 10)
     ws = FakeWebSocket([
         {"type": "turn.audio.meta", "turn_seq": 1, "mime_type": "audio/wav"},
@@ -482,13 +421,7 @@ async def test_an_oversized_turn_never_reaches_the_pipeline(monkeypatch):
     assert {"type": "state", "value": "listening"} in ws.sent
 
 
-# --- ADR 0110: who speaks first ------------------------------------------
-
-
 async def test_an_ordinary_call_waits_for_the_user_to_pick_up(persona, scenario, fake_pipeline):
-    """The Persona rang: nothing is generated before the user has answered, and
-    the client is told it is listening, so its first utterance is a Turn and
-    not a barge-in."""
     ws = FakeWebSocket()
     orch = SessionOrchestrator(persona, scenario)
 
@@ -509,7 +442,6 @@ class _QuietWebSocket(FakeWebSocket):
 
 
 async def test_a_reverse_call_is_answered_by_the_persona(persona, scenario, fake_pipeline):
-    """The user rang, so the Persona picks up and speaks first (ADR 0070)."""
     reverse = replace(scenario, reverse=True)
     fake_pipeline.llm.replies = ["Kundenservice, Brandt, was kann ich für Sie tun?"]
     ws = _QuietWebSocket()

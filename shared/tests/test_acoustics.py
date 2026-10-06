@@ -1,8 +1,4 @@
-"""Paraverbal measurement against synthetic audio (F-35, F-37, F-51, ADR 0047).
-
-The one place real Praat runs in the suite; everything else fakes `analyze()`.
-Synthetic tones make the answer known: 120 Hz stepping to 180 Hz spans ≈ 7.02
-semitones. Whether Praat tracks *speech* well is not this suite's to prove."""
+"""Praat on synthetic tones, the one place real Praat runs (F-35, F-37, F-51, ADR 0047)."""
 import io
 import math
 import wave
@@ -50,8 +46,6 @@ def _voiced(measured) -> list[float]:
 
 
 def test_a_steady_tone_is_measured_at_its_own_frequency() -> None:
-    """The floor under everything else here: if this is off, every figure
-    derived from the curve is off by the same factor."""
     measured = analyze(_wav(_tone(120, 2.0)))
 
     voiced = _voiced(measured)
@@ -60,11 +54,6 @@ def test_a_steady_tone_is_measured_at_its_own_frequency() -> None:
 
 
 def test_the_pitch_curve_is_measured_on_the_fine_grid() -> None:
-    """Ten milliseconds, not the loudness curve's hundred.
-
-    A 100 ms sampler understated a 3 Hz contour by 1.4 semitones and a 4 Hz one by
-    3.6, since intonation moves at the syllable rate. Thinned only for display.
-    """
     measured = analyze(_wav(_tone(150, 2.0)))
 
     assert len(measured.loudness_db) == 20              # 2 s at 100 ms
@@ -73,9 +62,6 @@ def test_the_pitch_curve_is_measured_on_the_fine_grid() -> None:
 
 
 def test_the_fine_grid_recovers_a_contour_the_coarse_one_lost() -> None:
-    """The defect this change was made for, as a number. A contour that swings
-    16 semitones at 3 Hz reads as 14.4 on a 100 ms grid and as 15.8 on the real
-    one -- and the faster the contour, the more the coarse grid loses."""
     swinging = _fm_tone(150, depth_st=8.0, rate_hz=3.0, seconds=6.0)
 
     measured = analyze(_wav(swinging))
@@ -89,8 +75,6 @@ def test_the_fine_grid_recovers_a_contour_the_coarse_one_lost() -> None:
 
 
 def test_silence_is_not_reported_as_a_frequency() -> None:
-    """Praat returns 0.0 for an unvoiced frame. Kept as 0 it would be a
-    measured frequency of nothing and would drag every derived figure down."""
     half = _tone(140, 1.0)
     measured = analyze(_wav(np.concatenate([half, np.zeros(SAMPLE_RATE)])))
 
@@ -99,9 +83,6 @@ def test_silence_is_not_reported_as_a_frequency() -> None:
 
 
 def test_a_step_in_pitch_is_measured_as_the_interval_it_is() -> None:
-    """120 Hz to 180 Hz is a fifth, seven semitones, whoever sings it. The
-    metric reports semitones for exactly this reason: the same interval from a
-    lower or higher voice has to yield the same number (F-35)."""
     stepped = np.concatenate([_tone(120, 1.5), _tone(180, 1.5)])
 
     measured = analyze(_wav(stepped))
@@ -112,9 +93,6 @@ def test_a_step_in_pitch_is_measured_as_the_interval_it_is() -> None:
 
 
 def test_the_same_interval_from_a_higher_voice_yields_the_same_figure() -> None:
-    """The property that makes the unit worth its conversion. In Hertz these
-    two calls would differ by 50%, and the figure would be describing the
-    speaker's voice rather than what they did with it."""
     low = analyze(_wav(np.concatenate([_tone(110, 1.5), _tone(165, 1.5)])))
     high = analyze(_wav(np.concatenate([_tone(220, 1.5), _tone(330, 1.5)])))
 
@@ -126,9 +104,6 @@ def test_the_same_interval_from_a_higher_voice_yields_the_same_figure() -> None:
 
 
 def test_a_flat_tone_has_almost_no_range() -> None:
-    """A monotone delivery must not come out looking varied. No judgement is
-    attached to the number either way (ADR 0051) — this only pins that the
-    measurement follows the signal."""
     measured = analyze(_wav(_tone(130, 3.0)))
 
     call = Conversation(user_text="egal", pitch_hz=measured.pitch_hz)
@@ -142,10 +117,6 @@ def _silence(seconds: float) -> np.ndarray:
 
 
 def test_the_sound_is_found_inside_the_vads_padding() -> None:
-    """ADR 0114. The client's recordings open with about 0.8 s of lead-in and
-    close with the second of silence the VAD waited through; the sound between
-    is what the utterance is placed by. Praat's intensity window blurs an edge
-    by a few tens of milliseconds, hence the tolerance."""
     measured = analyze(_wav(np.concatenate([_silence(0.8), _tone(150, 1.0), _silence(1.0)])))
 
     assert measured.voice_start_ms == pytest.approx(800, abs=60)
@@ -153,9 +124,6 @@ def test_the_sound_is_found_inside_the_vads_padding() -> None:
 
 
 def test_the_span_between_first_and_last_sound_is_speech_plus_pauses() -> None:
-    """What `Conversation.user_voiced_ms` rests on: Praat labels every stretch
-    between the first sound and the last as sounding or as a pause, so their
-    sum is the span, and a stored call can be re-measured from the two."""
     measured = analyze(_wav(np.concatenate(
         [_silence(0.8), _tone(150, 0.8), _silence(0.5), _tone(150, 0.8), _silence(1.0)]
     )))
@@ -168,14 +136,10 @@ def test_the_span_between_first_and_last_sound_is_speech_plus_pauses() -> None:
 
 
 def test_audio_too_short_to_analyse_is_refused_rather_than_guessed() -> None:
-    """`analyze` raising is how a Turn ends up unmeasured, which the live path
-    treats as normal (ADR 0048). Returning a made-up figure would be worse."""
     with pytest.raises(AcousticsError):
         analyze(_wav(_tone(120, 0.1)))
 
 
 def test_a_silent_recording_is_refused() -> None:
-    """Room tone or a muted microphone: there is nothing here to measure, and
-    the metrics must not receive a curve of nothing."""
     with pytest.raises(AcousticsError):
         analyze(_wav(np.zeros(SAMPLE_RATE * 2)))

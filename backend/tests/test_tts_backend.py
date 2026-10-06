@@ -1,8 +1,4 @@
-"""TTS has one backend: KugelAudio, and nothing behind it (ADR 0103, removing ADR 0040's fallback).
-
-A failure surfaces as `KugelAudioError` in both shapes (a clean stream without audio too),
-never as a working call in another voice. Also the PCM16 -> WAV wrapping.
-"""
+"""KugelAudio with no fallback, and the PCM16-to-WAV wrapping (ADR 0103)."""
 
 import io
 import wave
@@ -39,9 +35,7 @@ class _FakeStreamingTTS:
         yield {"final": True}
 
     async def connect_async(self, _model):
-        """The re-warm's call. Present so the background task an unfinished
-        stream schedules finishes rather than leaving an AttributeError nobody
-        retrieves."""
+        """Lets the re-warm task an unfinished stream schedules finish cleanly."""
         self.connects += 1
 
     async def _close_ws_connection(self):
@@ -76,16 +70,12 @@ async def test_the_one_shot_path_returns_kugelaudio_audio(kugelaudio):
 
 
 async def test_a_failing_kugelaudio_is_not_answered_in_another_voice(kugelaudio):
-    """The fallback used to hide this: the call carried on in the gateway's
-    voice and nothing said the hosted one was down."""
     kugelaudio(error=KugelAudioError("kugelaudio down"))
     with pytest.raises(KugelAudioError):
         await tts.synthesize("Hallo.", VOICE, "de")
 
 
 async def test_an_empty_stream_is_a_failure(kugelaudio):
-    """A cleanly finished stream with no audio: nothing to play, so it has to
-    raise rather than return an empty WAV."""
     kugelaudio(chunks=[])
     with pytest.raises(KugelAudioError):
         await tts.synthesize("Hallo.", VOICE, "de")
@@ -100,8 +90,6 @@ async def test_the_streaming_path_yields_a_wav_per_chunk(kugelaudio):
 
 
 async def test_the_streaming_path_raises_after_audio_as_well(kugelaudio):
-    """ADR 0033: a fresh synthesis would diverge from what was already heard,
-    so the Turn ends instead."""
     kugelaudio(chunks=[_Chunk(b"\x01\x02" * 10)], error=KugelAudioError("mid-stream"))
     with pytest.raises(KugelAudioError):
         async for _ in tts.synthesize_stream("Hallo.", VOICE, "de"):
@@ -109,7 +97,6 @@ async def test_the_streaming_path_raises_after_audio_as_well(kugelaudio):
 
 
 async def test_a_transport_failure_arrives_as_a_kugelaudio_error(kugelaudio):
-    """One exception for "the voice failed", so a caller catches one thing."""
     kugelaudio(error=OSError("connection reset"))
     with pytest.raises(KugelAudioError):
         async for _ in tts.synthesize_stream("Hallo.", VOICE, "de"):

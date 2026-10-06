@@ -1,8 +1,4 @@
-"""Whisper's phantom transcripts do not become Turns (ADR 0071; docs/research/model-parameters.md).
-
-On near-silence Whisper invents a phrase ("Vielen Dank.") or an annotation ("*Titelm*"); one
-derailed a live call. Such a transcript gets no reply and no history entry.
-"""
+"""Whisper's phantom transcripts do not become Turns (ADR 0071)."""
 
 import pytest
 
@@ -62,11 +58,6 @@ async def test_a_phantom_transcript_is_no_turn(persona, scenario, fake_pipeline)
 async def test_a_phantom_on_a_reopened_turn_does_not_stretch_the_user_window(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """A phantom after a barge-in leaves the reopened Turn exactly as it was.
-
-    Its end must not be written before the phantom check, or a cough stretches
-    `user_end_ms` and the utterance's span on the F-51 timeline.
-    """
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 100000)
     fake_pipeline.stt.transcripts = ["Erste Haelfte der Frage.", "Vielen Dank."]
     fake_pipeline.llm.replies = ["Es geht um die Exportfunktion, die seit elf Tagen nicht geht."]
@@ -77,10 +68,7 @@ async def test_a_phantom_on_a_reopened_turn_does_not_stretch_the_user_window(
     assert orch._reopen_turn is orch.turns[0]
     end_before = orch.turns[0].user_end_ms
 
-    # The fakes run a Turn in microseconds, so the session clock would not move
-    # far enough between the two for the defect to be visible. This is the dead
-    # time a real cough sits after: the user stopped talking, the persona was
-    # cut off, and seconds passed before the microphone fired again.
+    # The fakes are instant; this is the dead time a real cough sits after.
     monkeypatch.setattr(orch, "_elapsed_ms", lambda: end_before + 9000)
 
     await collect(orch.run_turn(b"b", "turn.webm", "audio/webm"))

@@ -1,8 +1,4 @@
-"""Centralized logging (ADR 0039, ADR 0105).
-
-One handler on stdout, no file: JSON lines for the log shipper, or the colored
-lines for a terminal, with the session id on every line either way.
-"""
+"""stdout logging in JSON or pretty form, with the session id (ADR 0105)."""
 
 import io
 import json
@@ -84,8 +80,6 @@ def test_json_lines_carry_the_session_as_a_field(monkeypatch):
 
 
 def test_json_keeps_the_traceback_inside_the_one_line(monkeypatch):
-    """A multi-line traceback as its own lines would reach the log shipper as
-    that many separate entries, none of them saying which error it belongs to."""
     stream = _configure(monkeypatch, "json")
 
     try:

@@ -1,13 +1,6 @@
-"""The training focus a User picks, and its catalogue (F-62, ADR 0076).
+"""Focus goals: the five-goal limit, "no focus" as an answer, untouched by deletion (F-62, ADR 0076)."""
 
-The sixth goal is refused by the backend, not only greyed out in the client.
-"No focus" and "not asked yet" are distinct, or the first-run dialog misfires.
-A focus is a setting, not training data: deleting trainings leaves it alone."""
-
-# pylint: disable=duplicate-code
-# Fixture data is repeated per test module on purpose: a test carrying its own
-# Turns shows what it ran against when it fails, and sharing them would let a
-# change made for one test quietly alter another.
+# pylint: disable=duplicate-code  # each module carries its own fixture Turns on purpose
 
 import httpx
 import pytest
@@ -29,9 +22,7 @@ from shared.turn import Turn as LiveTurn
 from backend import deletion, focus
 from backend.tests.conftest import TEST_AUTH, persist
 
-# Every test here needs the shipped catalogue in the database: without it there
-# is nothing to select, and a test that passed on an empty catalogue would be
-# asserting nothing.
+# Needs the shipped catalogue; an empty one would make every test vacuous.
 pytestmark = pytest.mark.usefixtures("seeded_database")
 
 TURNS = [
@@ -43,13 +34,7 @@ TURNS = [
 ]
 
 
-# --- The catalogue -----------------------------------------------------------
-
-
 def test_the_catalogue_is_seeded(db_session: DbSession) -> None:
-    """Every entry of seed_data.py reaches the table, keys and positions
-    unique. A duplicate position would make the display order depend on the
-    database's row order, which is not an order at all."""
     rows = db_session.query(FocusGoal).all()
 
     assert len(rows) == len(SEEDED_GOALS)
@@ -58,18 +43,12 @@ def test_the_catalogue_is_seeded(db_session: DbSession) -> None:
 
 
 def test_every_goal_declares_a_group_and_an_evidence_kind(db_session: DbSession) -> None:
-    """Both are closed vocabularies with a CHECK behind them. The group decides
-    the heading a card sits under; `evidence` records how far a goal can be
-    derived from a recording today and stays internal, which is why the payload
-    test below asserts it is *not* on the wire (ADR 0076)."""
     for row in db_session.query(FocusGoal).all():
         assert row.group_key in FOCUS_GROUPS, row.key
         assert row.evidence in FOCUS_EVIDENCE, row.key
 
 
 def test_seeding_twice_changes_nothing(db_session: DbSession) -> None:
-    """The app seeds on every start (provision.py), so a second run must not
-    duplicate the catalogue or reset anybody's selection."""
     # Imported here for the same reason conftest does: no environment at
     # collection time.
     from backend.db.provision import seed  # pylint: disable=import-outside-toplevel
@@ -84,16 +63,12 @@ def test_seeding_twice_changes_nothing(db_session: DbSession) -> None:
 async def test_the_catalogue_is_served_with_the_selection(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """One route, both halves. The dialog needs the catalogue *and* whether the
-    question was answered, and two requests would let it render half a state."""
     body = (await api_client.get("/api/focus")).json()
 
     assert body["max_goals"] == focus.MAX_GOALS
     assert len(body["goals"]) == len(SEEDED_GOALS)
     assert {g["key"] for g in body["groups"]} == set(FOCUS_GROUPS)
-    # Every goal carries the text the card shows and nothing more. `evidence` is
-    # planning information for the analysis work and stays off the wire, so a
-    # user is never asked to weigh up how far a goal is measurable (ADR 0076).
+    # `evidence` stays off the wire (ADR 0076).
     first = body["goals"][0]
     assert set(first) == {"key", "title", "caption", "info", "group"}
 
@@ -101,8 +76,6 @@ async def test_the_catalogue_is_served_with_the_selection(
 async def test_a_retired_goal_is_no_longer_offered(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """Deactivated, not deleted: selections reference the row. It leaves the
-    catalogue the same way a retired Persona leaves the setup screen."""
     db_session.query(FocusGoal).filter_by(key="empathy").update({"active": False})
     db_session.commit()
 
@@ -112,11 +85,7 @@ async def test_a_retired_goal_is_no_longer_offered(
     assert (await api_client.put("/api/focus", json={"goals": ["empathy"]})).status_code == 400
 
 
-# --- Deciding ----------------------------------------------------------------
-
-
 async def test_a_new_account_is_asked(api_client: httpx.AsyncClient) -> None:
-    """No row, no decision — the dialog opens."""
     body = (await api_client.get("/api/focus")).json()
 
     assert body["decided"] is False
@@ -125,8 +94,6 @@ async def test_a_new_account_is_asked(api_client: httpx.AsyncClient) -> None:
 
 
 async def test_a_selection_is_stored_and_read_back(api_client: httpx.AsyncClient) -> None:
-    """The ordinary case. The response of the write is the state that now
-    holds, so the client never has to re-fetch to find out what it saved."""
     written = (await api_client.put(
         "/api/focus", json={"goals": ["pace", "talk_share"]}
     )).json()
@@ -141,9 +108,6 @@ async def test_a_selection_is_stored_and_read_back(api_client: httpx.AsyncClient
 async def test_continuing_without_a_focus_is_a_decision(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """"Ohne Fokus fortfahren" answers the question. Reading it as "not asked
-    yet" would put the dialog in front of the user on every single start, which
-    turns a free choice into something they have to keep fending off."""
     body = (await api_client.put("/api/focus", json={"goals": []})).json()
 
     assert body["decided"] is True
@@ -154,9 +118,6 @@ async def test_continuing_without_a_focus_is_a_decision(
 async def test_the_selection_is_returned_in_catalogue_order(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """Nothing about the selection is ranked, so it comes back in the order the
-    catalogue has rather than in the order the boxes happened to be ticked —
-    which would suggest a priority the user never expressed."""
     body = (await api_client.put(
         "/api/focus", json={"goals": ["closing", "pace", "empathy"]}
     )).json()
@@ -164,15 +125,9 @@ async def test_the_selection_is_returned_in_catalogue_order(
     assert body["selected"] == ["pace", "closing", "empathy"]
 
 
-# --- The limit ---------------------------------------------------------------
-
-
 async def test_the_backend_refuses_a_sixth_goal(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """The limit is the feature, so it lives here and not only in the picker.
-    Nothing is stored — storing the first five would file a focus the user did
-    not pick and give them no way of noticing."""
     six = [g["id"] for g in SEEDED_GOALS[:6]]
 
     response = await api_client.put("/api/focus", json={"goals": six})
@@ -182,8 +137,6 @@ async def test_the_backend_refuses_a_sixth_goal(
 
 
 async def test_the_limit_is_exactly_five(api_client: httpx.AsyncClient) -> None:
-    """The number itself, pinned on the boundary. Five is a decision, and
-    changing it should fail a test rather than slip through as an edit."""
     five = [g["id"] for g in SEEDED_GOALS[:5]]
 
     assert focus.MAX_GOALS == 5
@@ -191,8 +144,6 @@ async def test_the_limit_is_exactly_five(api_client: httpx.AsyncClient) -> None:
 
 
 async def test_a_repeated_goal_costs_one_slot(api_client: httpx.AsyncClient) -> None:
-    """Six entries, five goals: the same goal twice is one goal, not two. The
-    unique constraint would otherwise reject the write outright."""
     six_entries = [g["id"] for g in SEEDED_GOALS[:5]] + [SEEDED_GOALS[0]["id"]]
 
     body = (await api_client.put("/api/focus", json={"goals": six_entries})).json()
@@ -201,8 +152,6 @@ async def test_a_repeated_goal_costs_one_slot(api_client: httpx.AsyncClient) -> 
 
 
 async def test_an_unknown_goal_is_refused(api_client: httpx.AsyncClient) -> None:
-    """A key the catalogue does not offer is a client bug. Dropping it silently
-    would store four of the five goals the user thinks they picked."""
     response = await api_client.put(
         "/api/focus", json={"goals": ["pace", "no-such-goal"]}
     )
@@ -210,14 +159,9 @@ async def test_an_unknown_goal_is_refused(api_client: httpx.AsyncClient) -> None
     assert response.status_code == 400
 
 
-# --- Changing it -------------------------------------------------------------
-
-
 async def test_changing_the_selection_replaces_it(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """The body is the whole selection, so the previous goals go. Rows left
-    behind would be invisible on screen and still count against the limit."""
     await api_client.put("/api/focus", json={"goals": ["pace", "intonation"]})
     body = (await api_client.put("/api/focus", json={"goals": ["empathy"]})).json()
 
@@ -229,8 +173,6 @@ async def test_changing_the_selection_replaces_it(
 async def test_changing_the_selection_keeps_when_it_was_first_decided(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """`decided_at` records that the question was answered, which a later
-    change does not unmake."""
     first = (await api_client.put("/api/focus", json={"goals": ["pace"]})).json()
     second = (await api_client.put("/api/focus", json={"goals": ["closing"]})).json()
 
@@ -238,8 +180,6 @@ async def test_changing_the_selection_keeps_when_it_was_first_decided(
 
 
 def test_a_selection_survives_a_goal_being_retired(db_session: DbSession) -> None:
-    """The row stays readable, which is the whole reason retirement is a flag
-    and not a delete. The interface drops the card; the database keeps the fact."""
     focus.set_selection(db_session, TEST_AUTH.sub, ["pace", "empathy"])
     db_session.commit()
 
@@ -252,9 +192,6 @@ def test_a_selection_survives_a_goal_being_retired(db_session: DbSession) -> Non
 async def test_a_retired_goal_leaves_the_served_selection(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """The row above stays; the payload does not carry it. There is no card for
-    it in the picker, so it would hold one of the five slots invisibly — four
-    ticks on screen and no sixth box to tick."""
     await api_client.put("/api/focus", json={"goals": ["pace", "empathy"]})
     db_session.query(FocusGoal).filter_by(key="empathy").update({"active": False})
     db_session.commit()
@@ -265,14 +202,9 @@ async def test_a_retired_goal_leaves_the_served_selection(
     assert body["decided"] is True
 
 
-# --- Scope and survival ------------------------------------------------------
-
-
 async def test_one_subject_never_sees_another_subjects_focus(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """The `sub` is part of the query, not a check on the result — there is no
-    form of this request that is about somebody else (ADR 0031/0064)."""
     focus.set_selection(db_session, "somebody-else", ["pace", "intonation"])
     db_session.commit()
 
@@ -283,13 +215,7 @@ async def test_one_subject_never_sees_another_subjects_focus(
 
 
 def test_deleting_the_trainings_leaves_the_focus_alone(db_session: DbSession) -> None:
-    """A focus is a setting, not training data: withdrawing consent deletes the
-    Sessions (ADR 0066) and must not quietly reset what the user chose to work
-    on. `retention_preference` is treated the same way."""
-    # This module runs against the *seeded* reference data (`seeded_database`),
-    # not against `reference_data`'s two hand-written rows, so the Session is
-    # pointed at a seeded Persona and Scenario. Adding `reference_data` here
-    # instead would insert the focus catalogue a second time.
+    # Against the seeded data; adding `reference_data` would insert the catalogue twice.
     persona = db_session.query(Persona).filter(Persona.key.isnot(None)).first()
     scenario = db_session.query(Scenario).filter(Scenario.key.isnot(None)).first()
     persist(turns=TURNS, persona_key=persona.key, scenario_key=scenario.key)
@@ -302,13 +228,9 @@ def test_deleting_the_trainings_leaves_the_focus_alone(db_session: DbSession) ->
     assert focus.selection(db_session, TEST_AUTH.sub).keys == ("pace",)
 
 
-# --- Role and call types (F-62) ---------------------------------------------
-
-
 async def test_role_and_call_types_are_stored_and_read_back(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """Beside the goals, in the same request and the same response."""
     await api_client.put("/api/focus", json={
         "goals": ["pace"], "role": "sales", "categories": ["closing", "pricing"],
     })
@@ -320,7 +242,6 @@ async def test_role_and_call_types_are_stored_and_read_back(
 
 
 async def test_leaving_them_out_clears_them(api_client: httpx.AsyncClient) -> None:
-    """A PUT is the whole selection, so omitting them means "none"."""
     await api_client.put("/api/focus", json={"goals": [], "role": "support",
                                              "categories": ["operations"]})
     body = (await api_client.put("/api/focus", json={"goals": []})).json()
@@ -333,14 +254,12 @@ async def test_leaving_them_out_clears_them(api_client: httpx.AsyncClient) -> No
 async def test_an_unknown_role_or_call_type_is_refused(
     api_client: httpx.AsyncClient, choice: dict,
 ) -> None:
-    """A 400, never a silent drop, for the reason given for goals."""
     response = await api_client.put("/api/focus", json={"goals": [], **choice})
 
     assert response.status_code == 400
 
 
 def test_every_role_preselects_known_call_types() -> None:
-    """The catalogue and the CHECK vocabulary are two lists; this keeps them one."""
     assert [role["key"] for role in focus.roles()] == list(TRAINING_ROLES)
     for role in focus.roles():
         assert set(role["categories"]) <= set(SCENARIO_CATEGORIES)

@@ -1,10 +1,5 @@
-"""The same metrics over the demanding stretches of a call and over the rest
-(F-62 "composure under pressure", ADR 0081). A segment is a slice of the same
-call, folded and measured by the unchanged `metrics.py`. Nothing here compares
-the two figures -- a meaningful difference is the norm ADR 0051 refuses.
-
-Measuring only; `worker/segments.py` stores the result.
-"""
+"""The same metrics over the demanding stretches of a call and the rest
+(ADR 0081). Nothing here compares the two figures."""
 
 from __future__ import annotations
 
@@ -12,9 +7,8 @@ from shared.db import models as db_models
 from shared.feedback import metrics, stored
 from shared.turn import Turn
 
-# Only figures that stay defined on a part of a call: not `reaction_time` (its
-# first gap lies in the other segment), not counts (smaller by construction),
-# not `intonation` (a segment falls under its voiced-speech floor, F-35).
+# Only figures defined on part of a call: not `reaction_time` (its first gap lies
+# in the other segment), not counts, not `intonation` (too little voiced speech).
 SEGMENT_METRIC_KEYS = (
     "talk_share",
     "pace",
@@ -23,17 +17,13 @@ SEGMENT_METRIC_KEYS = (
     metrics.LOUDNESS_KEY,
 )
 
-# Under this many user utterances a segment is not measured at all.
 MIN_UTTERANCES = 3
 
 
 def measure_segments(
     session: db_models.Session, pressed_turn_ids: set[int]
 ) -> dict[str, list[metrics.Measurement]]:
-    """The chosen metrics over the pressing stretches and over the remainder,
-    keyed by `SEGMENT_PRESSURE` / `SEGMENT_REST`; an unmeasurable segment is
-    absent. Empty is the normal answer when nobody pushed back.
-    """
+    """Keyed by segment; an unmeasurable segment is absent."""
     if not pressed_turn_ids:
         return {}
 
@@ -57,15 +47,13 @@ def measure_segments(
 def _pressure_marked(
     session: db_models.Session, pressed_turn_ids: set[int]
 ) -> list[tuple[Turn, bool]]:
-    """The call's exchanges, each paired with whether it is pressing. A user
-    utterance takes the pressure of the Persona line it *answers* (off by one
-    here would measure the wrong sentences while looking healthy).
-    """
+    """Each exchange with whether it is pressing. A user utterance takes the
+    pressure of the Persona line it answers; off by one measures the wrong
+    sentences while looking healthy."""
     marked: list[tuple[Turn, bool]] = []
     pressed = False
     for turn, row in stored.exchanges(session):
         if row.speaker == db_models.SPEAKER_PERSONA:
-            # A new exchange starts here, and this line decides its pressure.
             pressed = row.turn_id in pressed_turn_ids
         marked.append((turn, pressed))
     return marked

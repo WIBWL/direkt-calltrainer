@@ -1,22 +1,12 @@
-# pylint: disable=too-many-lines  # a data module: literals, not logic. Splitting it
-# by line count would put the Personas and the Scenarios that exercise them in
-# different files without making either shorter, and provision.py imports the set.
-"""Seed state for the `persona`, `scenario` and `focus_goal` tables (ADR 0041/0076).
+# pylint: disable=too-many-lines  # a data module
+"""Seed content for the reference tables (ADR 0041), upserted at boot by
+`backend/db/provision.py`. Field names match the columns."""
 
-Not a runtime source: the app reads the tables. Written idempotently by
-`backend/db/provision.py`; field names match the columns one to one.
-"""
-
-# --- Personas -----------------------------------------------------------
-# One voice per Persona (ADR 0041/0103; seeded inactive without one). "role_label"
-# is the German card title; "role"/"traits"/"behavior" are English model text
-# (ADR 0043), the role only the position (ADR 0045). A rename needs a new "id".
-# Portrait: frontend/public/personas/<first>-<last>.webp, or initials without one.
+# Personas: German display text, English model text (ADR 0043). A rename needs a
+# new "id". Without a voice a Persona is seeded inactive (ADR 0103).
 LANGUAGE_NAMES = {"de": "Deutsch", "en": "Englisch"}
 
-# Tenants (ADR 0060, R-58). Only the `default` tenant every User with no company
-# resolves to: a company's row is created by `backend/tenants.py` the first time
-# its Keycloak Organization's alias arrives in a token, so no customer is seeded.
+# Only `default`; a company's row is created on first login (ADR 0060).
 TENANTS = [
     {"extern_ref": "default", "name": "Ohne Unternehmen"},
 ]
@@ -37,9 +27,7 @@ PERSONAS = [
             "Budget, ungeduldig bei zu viel technischem Detail, "
             "verhandlungserfahren."
         ),
-        # Manner only (ADR 0045): how hard this Persona pushes and how long it
-        # tolerates a vague answer. What the call is about lives on the
-        # Scenario.
+        # Manner only (ADR 0045).
         "behavior": (
             "You lose patience quickly with technical, evasive or convoluted "
             "answers and say so. Two of them in a row and you cut in to ask "
@@ -54,10 +42,6 @@ PERSONAS = [
             "it immediately and you say so; you do not keep grinding once you "
             "have one"
         ),
-        # Not modelled before this script took over the content: "medium"
-        # because this Persona is demanding but not an escalation case.
-        # Note that `training_goal` does not reach the model: neither the
-        # `Persona` value type nor `library._to_persona` carries it yet.
         "training_goal": (
             "Einwandbehandlung unter Zeitdruck und Verbindlichkeit: Der Nutzer "
             "muss eine Zahl, einen Termin oder einen Namen liefern, statt "
@@ -65,8 +49,7 @@ PERSONAS = [
         ),
         "language_id": "de",
         "kugelaudio_voice_id": 972,
-        # R-12 / ADR 0045: moves, not quotable lines -- the model reuses quoted
-        # examples verbatim, and these have to work in any Scenario.
+        # Moves, not quotable lines: the model reuses quoted examples verbatim.
         "objections": [
             "pushes back that the figure is above what was budgeted for this",
             "says this was promised once before and nothing came of it",
@@ -94,9 +77,7 @@ PERSONAS = [
             "Sehr höflich, zuvorkommend, ruhig und gefasst, nie drängend, "
             "angenehm im Gespräch."
         ),
-        # Manner only (ADR 0045). Same persistence as the other Persona, worn
-        # differently: she never raises her voice and never interrupts, and
-        # that is the whole difference.
+        # Manner only (ADR 0045).
         "behavior": (
             "You never interrupt and never raise your voice, and you give the "
             "other person time to finish even when the answer is going "
@@ -125,11 +106,8 @@ PERSONAS = [
             "verbindlich antworten kann",
         ],
     },
-    # --- From the persona catalogue ---------------------------------------
-    # From docs/scenario-catalogue.md (P-02 / P-06 / P-01 / P-03); P-01 is R-07,
-    # P-02 the technical half of R-08 (Andreas Kastner is the other). `active`
-    # must stay False without a `kugelaudio_voice_id` (ADR 0103), which
-    # backend/tests/test_persona_scenario_library.py enforces.
+    # Catalogue Personas P-02, P-06, P-01, P-03; `active` must stay False without
+    # a voice (test_persona_scenario_library).
     {
         "id": "patrick-lohberg-it-lead",
         "avatar_url": "/personas/patrick-lohberg.webp",
@@ -146,10 +124,7 @@ PERSONAS = [
             "unaufgeregt, sicher im eigenen Fach, verantwortlich für "
             "Sicherheit, Betrieb und Integration."
         ),
-        # Manner only (ADR 0045). The deliberate opposite pole to Andreas
-        # Kastner: the same persistence, but this one wants the long version and
-        # loses patience with the short one. R-08 names a managing director
-        # *and* a technical lead; this is the second half.
+        # Manner only (ADR 0045). P-02: wants the long version.
         "behavior": (
             "You want the long version and you ask for it. A summary is not an "
             "answer to you and you say so. Every answer gets one follow-up: how "
@@ -201,10 +176,7 @@ PERSONAS = [
             "hält Stille aus, am Telefon nur, weil sonst niemand erreichbar "
             "war."
         ),
-        # Manner only (ADR 0045). The counterpart to both existing Personas,
-        # which talk and ask: here the call dies unless the user asks. R-50
-        # argues that the questioning side leads the call; this Persona makes
-        # that experienceable rather than only measurable.
+        # Manner only (ADR 0045). P-06: the call dies unless the user asks (R-50).
         "behavior": (
             "You answer what you were asked and nothing beyond it: one short "
             "sentence, often four or five words, and then you wait. You never "
@@ -253,24 +225,8 @@ PERSONAS = [
             "kein Verhandler, schnell bei der Absage — und noch schneller "
             "dabei, zu sagen, was er von einer Antwort hält."
         ),
-        # Manner only (ADR 0045). R-07 is the one customer type the interviews
-        # described in so many words. He refuses rather than bargains, which is
-        # the whole point: there is no amount to meet him at. He stays on the
-        # line while he does it -- a Persona that hangs up would fight the
-        # call-ending rules (ADR 0037) and leave nothing to measure.
-        # Rewritten to be the escalation case the seeded library did not have
-        # (Andreas Kastner is deliberately not one). Measured over 5 Scenarios against the other three German
-        # Personas, the old wording produced the *politest* of the four and
-        # not one named consequence in ~1100 words: "not loudly, but flatly"
-        # and "stay polite" were read as the whole instruction and the refusal
-        # never arrived. What is written here is manner, not situation
-        # (ADR 0045) -- how hard he pushes and how he sounds doing it.
-        #
-        # Two things are deliberately kept from the old version. He does not
-        # hang up: a Persona that does would fight the call-ending rules
-        # (ADR 0037) and leave nothing to measure. And a concrete answer still
-        # settles it at once -- an exercise the User cannot win is not an
-        # exercise.
+        # Manner only (ADR 0045). P-01, the escalation case (R-07). He never hangs
+        # up (that would fight ADR 0037), and a concrete answer still settles it.
         "behavior": (
             "You take every service on offer as long as it costs nothing on "
             "top of what you already pay. The moment an extra charge is named "
@@ -297,8 +253,6 @@ PERSONAS = [
             "droht. Verhandelt wird nicht, und Beschwichtigen macht es "
             "schlimmer."
         ),
-        # Read by the turn loop: selects `ANTI_REPEAT_NUDGE_HARD`, whose
-        # ordinary form offers giving ground as one of three moves.
         "hard": True,
         "language_id": "de",
         "kugelaudio_voice_id": 980,
@@ -335,10 +289,7 @@ PERSONAS = [
             "Willig, ohne Scham über Nichtwissen, bei Fachjargon schnell "
             "abgehängt, denkt in Bildern, täglich mit der Sache befasst."
         ),
-        # Manner only (ADR 0045). R-16 asks for explaining without jargon; this
-        # is the counterpart that makes it trainable, and the reason F-40 has
-        # something to be measured against. Nothing adversarial about it -- the
-        # difficulty is that a term explained with further terms does not land.
+        # Manner only (ADR 0045). P-03: jargon explained with jargon does not land (R-16).
         "behavior": (
             "You have no technical background and you do not pretend otherwise. "
             "The moment a technical term, an abbreviation or a piece of jargon "
@@ -375,16 +326,10 @@ PERSONAS = [
     },
 ]
 
-# --- Scenarios -----------------------------------------------------------
-# Authoring rules (ADR 0043/0045/0054/0062/0072). Display text is German, prompt
-# text English. The case is concrete and invented, never a real company, and
-# never about the caller (no name, employer, motive: ADR 0001/0015); it brings
-# all its own facts (C-05); figures agree across the library. "call_goal" is the
-# *caller's* aim and bar. "briefing" addresses the trainee (role, room, good
-# outcome -- never what to say, R-43) and must agree with "call_goal".
-# "description_label"/"case_facts_label" are German twins no test can compare:
-# write both in one pass. Every Scenario has a "category". S-06 and S-14 of the
-# catalogue are deliberately not seeded.
+# Scenarios: German display text, English prompt text (ADR 0043/0045). The case
+# is invented and never about the caller (ADR 0001); "call_goal" is the caller's
+# aim and bar; "briefing" must agree with it (ADR 0054). Write the German twins
+# in the same pass. Every Scenario has a "category".
 SCENARIOS = [
     {
         "id": "cold-call-followup",
@@ -509,11 +454,6 @@ SCENARIOS = [
             "back can be a result too."
         ),
     },
-    # --- Complaints and escalation (the User is on the support side) -----
-    # Dense, interlocking figures on purpose (the case density decided for the
-    # library): the availability guarantee, the two April outages and the
-    # service credit only add up to a lever if the numbers actually work out,
-    # and a Persona that presses for specifics will surface it if they do not.
     {
         "id": "escalation-repeated-outage",
         "category": "operations",
@@ -585,10 +525,6 @@ SCENARIOS = [
             "outage."
         ),
     },
-    # --- Appointments and expansion (the User is on the sales side) -------
-    # Deliberately the shortest case in the library: one decision, one date,
-    # a clear point at which the call is done. That makes it the scenario
-    # where an unreliable [CALL_END] shows up soonest.
     {
         "id": "upsell-seat-expansion",
         "category": "closing",
@@ -652,10 +588,6 @@ SCENARIOS = [
             "over is only a result if a date comes with it."
         ),
     },
-    # --- Closing after handover (the User is on the sales side) -----------
-    # An information gap: the Persona remembers a call the user was not on, so
-    # it trains asking over agreeing. The 68 euros sits below the 72-euro tier
-    # in `upsell-seat-expansion` on purpose -- a maybe-promised figure is the hook.
     {
         "id": "closing-after-handover",
         "category": "closing",
@@ -722,10 +654,6 @@ SCENARIOS = [
             "a date comes with it."
         ),
     },
-    # --- From the scenario catalogue: profile A, operations and support ---
-    # S-01. The short end of the duration span C-06/R-03 asks for: one fault,
-    # one deadline, one answer. The close on 18 September is what stops "we are
-    # looking into it" from being an answer.
     {
         "id": "process-halted-before-deadline",
         "category": "operations",
@@ -800,10 +728,7 @@ SCENARIOS = [
             "promise to look into it is not a result on its own."
         ),
     },
-    # S-02. C-05 is met by a case that carries its own facts: the changeover is
-    # the vendor's own end-of-life date, so nothing outside the call has to be
-    # known to play it. Naming a real regulation would have needed exactly the
-    # domain knowledge R-40/R-41 rule out.
+    # S-02.
     {
         "id": "explain-mandatory-change-plainly",
         "category": "requirements",
@@ -880,9 +805,7 @@ SCENARIOS = [
             "not count."
         ),
     },
-    # S-03. The one case the catalogue records as evidenced from both pilot
-    # profiles. The point is that the caller cannot name the trigger or the
-    # finished state, so a general "yes, that is feasible" settles nothing.
+    # S-03.
     {
         "id": "vague-automation-request",
         "category": "requirements",
@@ -950,9 +873,7 @@ SCENARIOS = [
             "not enough."
         ),
     },
-    # S-04. R-07's case: the one customer type quoted verbatim in the pilot
-    # interviews. Consultative, deliberately not a closing call: the money is a
-    # day of work, and the goodwill job two years ago is the whole lever.
+    # S-04.
     {
         "id": "change-outside-contract-scope",
         "category": "pricing",
@@ -1021,9 +942,7 @@ SCENARIOS = [
             "is not one."
         ),
     },
-    # S-05. R-06's emotional case. The five hours of downtime and the silence
-    # since ticket INC-5188 are the facts; how loudly they are carried is the
-    # Persona's business, never the Scenario's (ADR 0001, ADR 0015).
+    # S-05.
     {
         "id": "outage-escalation-no-callback",
         "category": "operations",
@@ -1092,9 +1011,7 @@ SCENARIOS = [
             "with no time on it is what already happened at 09:05."
         ),
     },
-    # S-07. Trains the ground F-54 sits on: the summary at the end of a call.
-    # The test data is the point the caller took away the other way round, and
-    # it surfaces only if the recap is specific enough to contradict them.
+    # S-07.
     {
         "id": "closing-recap-mismatch",
         "category": "operations",
@@ -1169,9 +1086,6 @@ SCENARIOS = [
             "recap general enough for both readings to fit is not a result."
         ),
     },
-    # --- From the scenario catalogue: profile B, advice and onboarding ----
-    # Proposals derived from the pilot's activity profile, not checked with the
-    # customer. S-08: listening and ordering, the mirror of S-02 (too much detail).
     {
         "id": "process-capture-interview",
         "category": "requirements",
@@ -1241,9 +1155,7 @@ SCENARIOS = [
             "loud."
         ),
     },
-    # S-09. R-12's ground on the Scenario side: three reservations that each
-    # need an answer or an honest "that is a risk". Blanket reassurance is the
-    # failure mode the success condition rules out.
+    # S-09.
     {
         "id": "technology-choice-objections",
         "category": "closing",
@@ -1325,10 +1237,7 @@ SCENARIOS = [
             "that it will not be a problem does not count for any of them."
         ),
     },
-    # S-10. R-10, and the sharpest case in the library for the sales/no-sales
-    # question K-01 leaves open: the competing quote covers less, and the
-    # caller does not volunteer that. It comes out only if someone asks what is
-    # actually in it.
+    # S-10.
     {
         "id": "procurement-price-negotiation",
         "category": "pricing",
@@ -1398,9 +1307,7 @@ SCENARIOS = [
             "internally is not a result."
         ),
     },
-    # S-11. R-08's other half, and R-04 read the second way: the IT side is not
-    # against the thing, it was bypassed. Trains asking what the objection
-    # actually is before answering the one that was voiced.
+    # S-11.
     {
         "id": "sceptical-it-governance",
         "category": "requirements",
@@ -1467,11 +1374,7 @@ SCENARIOS = [
             "involved in future, without saying how, is not one."
         ),
     },
-    # S-12. Systementwurf, not evidenced: plausible for the consulting profile
-    # but not recorded in an interview. Which of the three questions has no
-    # solid answer is the *user's* knowledge, so it sits in the briefing, not in
-    # the case -- the caller cannot know what the vendor has on record, and a
-    # model told otherwise plays the call omnisciently. Same split as S-13.
+    # S-12. What only the vendor knows goes in the briefing, never the case.
     {
         "id": "regulated-environment-questions",
         "category": "requirements",
@@ -1543,11 +1446,7 @@ SCENARIOS = [
             "that sounds certain counts as not settled."
         ),
     },
-    # S-13. Systementwurf on R-06's back. The caller rings to confirm the date,
-    # not knowing it has slipped. The case says nothing about it slipping,
-    # because the caller does not know (ADR 0045: these are the caller's facts);
-    # the trainee learns it from the briefing, and gets the replacement date
-    # there too, so there is something to offer instead of a bare apology.
+    # S-13. The slipped date is in the briefing: the caller does not know it.
     {
         "id": "deadline-correction",
         "category": "operations",
@@ -1616,11 +1515,7 @@ SCENARIOS = [
     },
 ]
 
-# --- Focus goals ----------------------------------------------------------
-# The focus-goal catalogue (F-62, ADR 0076): German display text, English "id".
-# "evidence" (measured / mixed / interpretive) is internal planning information,
-# deliberately never served or shown. Texts say what a goal is about, never what
-# the system does with it. "position" orders the catalogue; "group" the heading.
+# Focus goals (ADR 0076): German display text, English "id"; "evidence" is never served.
 FOCUS_GROUP_NAMES = {
     "paraverbal": "Stimme und Sprechweise",
     "phases": "Gesprächsverlauf",
@@ -1628,8 +1523,7 @@ FOCUS_GROUP_NAMES = {
     "habit": "Ihr Training",
 }
 
-# The roles the first-run question offers (F-62), in display order, each with
-# the call types it preselects. Keys match models.TRAINING_ROLES.
+# Each role's preselected call types; keys match models.TRAINING_ROLES.
 TRAINING_ROLE_CATALOGUE = [
     {"key": "sales", "name": "Vertrieb", "categories": ["pricing", "closing", "requirements"]},
     {"key": "service", "name": "Kundenservice", "categories": ["operations", "requirements"]},
@@ -1639,11 +1533,8 @@ TRAINING_ROLE_CATALOGUE = [
     {"key": "other", "name": "Sonstiges", "categories": []},
 ]
 
-# `practised_in`: the call kinds a goal is practised in (ADR 0072), read by
-# `recommendations.py`; the first is the progress view's offer (`practiceRoutes.ts`,
-# pinned by backend/tests/test_recommendations.py). Absent: the goal binds to no kind.
+# `practised_in`: the first entry is the progress view's offer (test_recommendations).
 FOCUS_GOALS = [
-    # --- A. Paraverbal: the measurable core of the voice.
     {
         "id": "pace",
         "group": "paraverbal",
@@ -1677,14 +1568,7 @@ FOCUS_GOALS = [
             "hörbar hervortreten."
         ),
     },
-    # The loudness goal is retired: the recorded level depends on the microphone,
-    # so calls are not comparable. Deactivated, not deleted -- selections
-    # reference it (ADR 0076); the `loudness` metric stays.
-    #
-    # The articulation goal is retired the same way (ADR 0111): the same argument
-    # one step further, with no comparison within one recording either, and
-    # Whisper normalises swallowed endings away. F-38 stays in the feature list
-    # as a requirement answered with a reasoned no (ADR 0084).
+    # Loudness and articulation are retired goals (ADR 0076, ADR 0111).
     {
         "id": "conciseness",
         "group": "paraverbal",
@@ -1703,7 +1587,6 @@ FOCUS_GOALS = [
             "Wiederholungen."
         ),
     },
-    # --- B. Along the course of the call.
     {
         "id": "opening",
         "group": "phases",
@@ -1754,11 +1637,6 @@ FOCUS_GOALS = [
     },
     {
         "id": "closing",
-        # `mixed` since ADR 0089, like the opening: whether the last two turns
-        # sum up, agree a next step and say goodbye is counted from the
-        # transcript (the metric `closing`); whether the close was *clear* --
-        # the right things summed up, a step the other side will actually take
-        # -- is still only the wrap-up's to say.
         "group": "phases",
         "evidence": "mixed",
         "position": 7,
@@ -1775,7 +1653,6 @@ FOCUS_GOALS = [
             "Im Blick ist, ob und wie Sie das Gespräch zu Ende führen."
         ),
     },
-    # --- C. What the call did to the other side.
     {
         "id": "active_listening",
         "group": "impact",
@@ -1813,9 +1690,6 @@ FOCUS_GOALS = [
         "group": "impact",
         "evidence": "mixed",
         "position": 10,
-        # A fault report is where a caller arrives annoyed, and a pricing call
-        # is pressure too. The first is the one practice suggestion (the
-        # plainer case of it); the library suggests both.
         "practised_in": ("operations", "pricing"),
         "title": "Souveränität unter Druck",
         "caption": "Auch bei Gegenwind ruhig, klar und stabil in der Stimme bleiben.",
@@ -1842,9 +1716,6 @@ FOCUS_GOALS = [
             "wird Ihr prozentualer Redeanteil am Gespräch."
         ),
     },
-    # --- D. The training habit, not the performance. Worded so that a goal
-    # about how often you practise cannot be read as a judgement of how well
-    # you did.
     {
         "id": "training_regularity",
         "group": "habit",

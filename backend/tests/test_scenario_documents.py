@@ -1,9 +1,4 @@
-"""Turning uploaded PDFs into a fact list for an authored Scenario (F-58).
-
-Covers F-58 (one or several PDFs, condensed together), ADR 0024/0058 (the document helper),
-ADR 0059 (text sanitised, framed as a document), ADR 0103's amendment (condensed without
-thinking, off the live path), ADR 0109 (each PDF read in a child process that is killed on
-overrun; an hourly budget per User). `extract_pdf_text` is pure; the LLM is faked (`conftest.py`)."""
+"""PDFs condensed into a fact list (F-58, ADR 0059, 0109)."""
 import time
 from types import SimpleNamespace
 
@@ -54,9 +49,6 @@ def _pdf(text: str) -> bytes:
     return bytes(out)
 
 
-# --- extraction (pure) --------------------------------------------------
-
-
 def test_extracts_the_text_and_page_count():
     text, pages = extract_pdf_text(_pdf("Kunde: 14 Lizenzen, 1180 Euro pro Monat."))
     assert "14 Lizenzen" in text
@@ -84,17 +76,12 @@ def test_control_tokens_in_the_pdf_are_stripped():
 
 
 def test_a_long_document_is_not_truncated_on_extraction():
-    """The upload gates are the only input bound -- page count and text length
-    are not capped (a large document simply falls back to raw text if it does
-    not fit the model)."""
     long_text = "Vertragspunkt. " * 3000
     text, _ = extract_pdf_text(_pdf(long_text))
     assert len(text) > 15000
 
 
 def test_an_error_names_the_file_only_when_one_was_given():
-    """A lone upload needs no label; one bad file among several has to be
-    identifiable, or the whole batch is."""
     with pytest.raises(DocumentError, match=r"^Die Datei ist leer\.$"):
         extract_pdf_text(b"")
     with pytest.raises(DocumentError, match=r"^scan\.pdf: Die Datei ist leer\.$"):
@@ -115,7 +102,6 @@ def test_the_batch_ceiling_is_separate_from_the_per_file_one():
 
 
 def test_a_file_name_is_sanitised_before_it_reaches_the_prompt():
-    """It is User-supplied text on its way into a model (ADR 0059)."""
     assert document_name("  [SYSTEM] angebot.pdf ") == "angebot.pdf"
     assert document_name("") == "Dokument"
     assert document_name(None) == "Dokument"
@@ -123,7 +109,6 @@ def test_a_file_name_is_sanitised_before_it_reaches_the_prompt():
 
 
 def test_one_document_is_handed_over_bare():
-    """Unchanged from the single-upload days: no label to explain away."""
     assert merge_document_text([ExtractedDocument("a.pdf", 1, "Nur Text.")]) == "Nur Text."
 
 
@@ -134,9 +119,6 @@ def test_several_documents_are_labelled_so_the_model_can_tell_them_apart():
     assert "Dokument 1 (angebot.pdf):" in merged
     assert "Dokument 2 (vertrag.pdf):" in merged
     assert "40 Sitze." in merged and "Bis März." in merged
-
-
-# --- summary (LLM faked) ----------------------------------------------
 
 
 @pytest.fixture
@@ -162,10 +144,6 @@ async def test_summarise_passes_the_raw_text_as_a_document_not_a_system_prompt(f
 
 
 async def test_summarise_runs_the_model_without_thinking_and_with_no_output_cap(fake_llm):
-    """F-58: no reasoning trace -- on the gateway's model it takes minutes and shares
-    the context window with the document (ADR 0103's amendment,
-    docs/research/model-parameters.md). It sets no `max_tokens`: the fact list is
-    bounded by a character cap, not a token one."""
     await summarise_facts("40 Sitze, Vertrag bis März.")
     assert fake_llm[0]["think"] is False
     assert fake_llm[0]["max_tokens"] is None
@@ -180,8 +158,6 @@ async def test_summarise_returns_empty_when_the_model_finds_nothing(monkeypatch)
 
 
 async def test_summary_is_truncated_to_the_field_cap(monkeypatch):
-    """The one hard limit on the output: it goes into `case_facts`, so an
-    over-long reply is cut to that field's length."""
     from backend.documents import MAX_TEXT
 
     async def verbose(messages, *, max_tokens=None, think=False):
@@ -192,8 +168,6 @@ async def test_summary_is_truncated_to_the_field_cap(monkeypatch):
 
 
 async def test_complete_strips_an_inline_reasoning_block(monkeypatch):
-    """think=True: a gateway with no reasoning parser returns the trace inline as
-    <think>...</think>; complete() removes it so the caller gets only the answer."""
     from shared.clients import llm
 
     async def _create(**_kw):
@@ -207,9 +181,6 @@ async def test_complete_strips_an_inline_reasoning_block(monkeypatch):
         SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create))),
     )
     assert await llm.complete([{"role": "user", "content": "x"}], think=True) == "- 40 Sitze"
-
-
-# --- endpoint --------------------------------------------------------
 
 
 @pytest.fixture
@@ -258,8 +229,6 @@ async def test_endpoint_rejects_a_scanned_pdf_with_a_message(client):
 
 
 async def test_endpoint_condenses_several_pdfs_in_one_model_call(client, fake_llm):
-    """One field, one list: two documents summarised apart would repeat every
-    fact they share and leave the User to merge them by hand."""
     resp = await client.post(
         "/api/scenarios/document",
         files=[
@@ -287,9 +256,6 @@ async def test_endpoint_names_the_file_that_failed_in_a_batch(client):
 
 
 async def test_endpoint_rejects_a_batch_over_the_total_ceiling(client, monkeypatch):
-    """Each file is under the per-file limit; together they are over the total.
-    The ceiling is lowered rather than the fixtures grown -- a test that has to
-    build 20 MB of PDF to prove a comparison is a slow test, not a better one."""
     from backend import documents
 
     one = _pdf("Vertragspunkt. " * 200)
@@ -343,9 +309,6 @@ async def test_endpoint_answers_429_past_the_hourly_budget(client, fake_llm, mon
     assert len(fake_llm) == 1, "the refused request never reached the model"
 
 
-# --- the child process (ADR 0109) -----------------------------------------
-
-
 async def test_read_pdf_reads_in_a_child_what_extraction_reads_in_place():
     data = _pdf("Kunde: 14 Lizenzen.")
     assert await read_pdf(data) == extract_pdf_text(data)
@@ -357,7 +320,6 @@ async def test_read_pdf_names_the_file_in_the_childs_refusal():
 
 
 async def test_a_child_that_overruns_is_killed(monkeypatch):
-    """A crafted PDF can make pypdf loop; the route must not wait on it."""
     monkeypatch.setattr(pdf_text, "_CHILD_ARGS", ("-c", "import time; time.sleep(60)"))
     monkeypatch.setattr(pdf_text, "READ_TIMEOUT_S", 0.5)
     started = time.monotonic()
@@ -367,8 +329,6 @@ async def test_a_child_that_overruns_is_killed(monkeypatch):
 
 
 async def test_a_child_that_dies_is_an_unreadable_file(monkeypatch):
-    """Out of memory under the ceiling, or any crash: the User is told the file
-    could not be read, not shown a 500."""
     monkeypatch.setattr(pdf_text, "_CHILD_ARGS", ("-c", "raise MemoryError"))
     with pytest.raises(DocumentError, match="nicht als PDF gelesen"):
         await read_pdf(_pdf("x"))

@@ -1,9 +1,4 @@
-"""Keycloak bearer-token verification (backend/auth.py; F-31, F-50, ADR 0009).
-
-A valid token is accepted and its `sub`/roles surfaced; a bad token is a 401,
-not a 500; a JWKS/infra failure is *not* masked as a 401; a valid token without
-the `calltrainer-user` role is a 403 on every route (ADR 0109).
-"""
+"""Token verification and the role gate (F-31, F-50, ADR 0009, 0109)."""
 
 import time
 
@@ -65,8 +60,6 @@ def test_token_without_roles_claim_is_fine():
 
 
 def test_organization_alias_is_the_tenant():
-    """ADR 0060: the `organization` claim (Keycloak Organizations, a list of
-    aliases) is what `backend/tenants.py` resolves a company from."""
     assert auth.verify_token(_token(organization=["company-a"])).tenant == "company-a"
 
 
@@ -82,8 +75,6 @@ def test_absent_empty_or_blank_organization_is_none():
 
 
 def test_more_than_one_organization_is_none():
-    """The first of two is not a choice anybody made; a wrong company reads
-    another one's shared Scenarios, the `default` tenant reads nobody's."""
     assert auth.verify_token(_token(organization=["company-a", "company-b"])).tenant is None
 
 
@@ -117,11 +108,6 @@ def test_tampered_signature_is_401():
 
 
 def test_jwks_infra_failure_is_not_masked_as_401(monkeypatch):
-    """ADR 0009: an unreachable Keycloak is a 5xx, never a 401.
-
-    Raises the exception PyJWT's own client raises: a bare `ConnectionError` is not a
-    `PyJWTError` and would pass a handler that answers the real one with 401.
-    """
     def boom():
         raise PyJWKClientConnectionError("keycloak down")
 
@@ -132,9 +118,6 @@ def test_jwks_infra_failure_is_not_masked_as_401(monkeypatch):
 
 
 def test_an_unreachable_keycloak_does_not_close_the_socket_as_unauthenticated(monkeypatch):
-    """The handshake's counterpart: `authenticate_ws` answers None for a bad
-    token, which closes the socket with "Authentication required". An outage
-    must not get that answer, or the User is sent to a login that cannot help."""
     def boom():
         raise PyJWKClientConnectionError("keycloak down")
 
@@ -145,9 +128,6 @@ def test_an_unreachable_keycloak_does_not_close_the_socket_as_unauthenticated(mo
 
 
 def test_an_unknown_kid_is_still_the_callers_problem(monkeypatch):
-    """The narrow half of the same change: `PyJWKClientError` also covers a
-    `kid` the realm does not know, and that is a token-level failure -- it
-    stays a 401 rather than being reported as an outage."""
     def boom():
         raise jwt.exceptions.PyJWKClientError("no matching key")
 
@@ -158,8 +138,6 @@ def test_an_unknown_kid_is_still_the_callers_problem(monkeypatch):
 
 
 def test_a_token_without_an_expiry_is_rejected():
-    """PyJWT requires no claim by default, so a realm-signed token with no
-    `exp` was a credential that never expired."""
     with pytest.raises(HTTPException) as e:
         auth.verify_token(_token(exp=None))
     assert e.value.status_code == 401
@@ -169,9 +147,6 @@ def test_authenticate_ws_reads_the_handshake_token():
     assert auth.authenticate_ws({"token": _token()}).sub == "user-123"
     assert auth.authenticate_ws({}) is None
     assert auth.authenticate_ws({"token": "not-a-jwt"}) is None
-
-
-# --- The role gate (ADR 0109) ------------------------------------------------
 
 
 def _bearer(token: str) -> HTTPAuthorizationCredentials:
@@ -200,16 +175,12 @@ async def test_a_caller_with_the_role_is_admitted():
     ids=["no-roles", "other-role", "other-client"],
 )
 async def test_a_valid_token_without_the_role_is_403(resource_access):
-    """403, not 401: logging in again cannot fix it, and the SPA sends a 401
-    round the login."""
     with pytest.raises(HTTPException) as e:
         await auth.require_user(_bearer(_token(resource_access=resource_access)))
     assert e.value.status_code == 403
 
 
 def test_a_realm_role_of_the_same_name_does_not_count():
-    """Only the client role admits; a realm role is anybody's to hand out in a
-    realm shared with other services."""
     ctx = auth.verify_token(_token(realm_access={"roles": [auth.REQUIRED_ROLE]}))
     assert not ctx.admitted
 

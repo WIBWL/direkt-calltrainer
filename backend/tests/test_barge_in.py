@@ -1,13 +1,6 @@
-"""Barge-in / eager interruption of an in-flight turn (ADR 0035).
+"""Barge-in: only what was heard enters the history (ADR 0035)."""
 
-Tearing down the turn finalizes it at once; with no audio played the same turn
-reopens and the next utterance is appended; only played-through utterances enter
-history; a client sending no playback position commits every dispatched chunk."""
-
-# pylint: disable=duplicate-code
-# Fixture data is repeated per test module on purpose: a test carrying its own
-# Turns shows what it ran against when it fails, and sharing them would let a
-# change made for one test quietly alter another.
+# pylint: disable=duplicate-code  # each module carries its own fixture Turns on purpose
 
 
 import asyncio
@@ -35,8 +28,6 @@ async def _drain_until(gen, predicate):
 
 
 async def test_interrupt_before_any_audio_reopens_the_same_turn(persona, scenario, fake_pipeline):
-    """No audio was sent yet -> the turn stays open and the follow-up
-    utterance is merged onto the same question."""
     fake_pipeline.tts.hang = asyncio.Event()  # park synthesis so no audio is ever produced
 
     fake_pipeline.stt.transcripts = ["Erste Haelfte der Frage.", "Und jetzt der Rest davon."]
@@ -68,8 +59,6 @@ async def test_interrupt_before_any_audio_reopens_the_same_turn(persona, scenari
 async def test_interrupt_without_a_reported_position_commits_every_dispatched_chunk(
     persona, scenario, fake_pipeline
 ):
-    """No played_ms (an older client) -> the server can't tell what was heard,
-    so it falls back to committing everything it dispatched as audio."""
     s1 = (
         "Der erste Teil meiner Antwort ist hier inhaltlich vollstaendig "
         "und auf jeden Fall lang genug, um sauber abgetrennt zu werden."
@@ -90,10 +79,6 @@ async def test_interrupt_without_a_reported_position_commits_every_dispatched_ch
 
 
 async def test_interrupt_commits_only_what_played_through(persona, scenario, fake_pipeline, monkeypatch):
-    """The client reports how many ms of the reply it actually played; only the
-    audio inside that window reaches the history -- every fully-played sentence
-    plus a word-prefix of the one the user cut off -- even though the server had
-    already streamed the whole reply ahead (ADR 0035)."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
     # Each >= 80 chars so the chunker flushes all three as their own chunks.
     s1 = "Der erste Satz meiner Antwort ist inhaltlich vollstaendig und lang genug fuer seinen eigenen Chunk."
@@ -128,11 +113,6 @@ async def test_interrupt_commits_only_what_played_through(persona, scenario, fak
 async def test_interrupt_inside_the_first_sentence_keeps_the_words_that_played(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """A cut inside the very first sentence keeps its word-prefix (ADR 0035).
-
-    That sentence has no checkpoint yet (they are written per finished chunk, while
-    audio streams per sub-chunk, ADR 0044), so it must not be read as "nothing heard"
-    and reopen the Turn. A cut before any audio is the other test's case."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
     reply = "Ein ganzer Satz den der Nutzer fast sofort abschneidet."
     fake_pipeline.stt.transcripts = ["Erste Haelfte."]
@@ -155,9 +135,6 @@ async def test_interrupt_inside_the_first_sentence_keeps_the_words_that_played(
 async def test_a_sentence_heard_almost_to_its_end_keeps_almost_all_of_it(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """Cutting in a moment before a sentence finishes keeps almost all of its
-    words and closes the turn -- the fraction of its audio that played maps
-    onto the fraction of its words kept (ADR 0035)."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 5000)
     s1 = "Der erste Satz meiner Antwort ist inhaltlich vollstaendig und lang genug fuer seinen eigenen Chunk."
     s2 = "Den zweiten Satz hoert der Nutzer gar nicht mehr, weil er kurz vorher schon dazwischenredet."
@@ -194,10 +171,6 @@ async def test_a_sentence_heard_almost_to_its_end_keeps_almost_all_of_it(
 async def test_late_barge_in_trims_a_completed_reply_to_what_was_heard(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """The reply finished and was committed here while the client was still
-    playing its tail; the `turn.interrupt` only reaches the server now, between
-    turns. It must still trim the stored reply -- and the Transcript -- down to
-    the part that was actually played (ADR 0035)."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
     s1 = "Der erste Satz meiner Antwort ist inhaltlich vollstaendig und lang genug fuer seinen eigenen Chunk."
     s2 = "Der zweite Satz folgt unmittelbar darauf und ist ebenfalls lang genug fuer einen eigenen Chunk hier."
@@ -222,9 +195,6 @@ async def test_late_barge_in_trims_a_completed_reply_to_what_was_heard(
 async def test_late_barge_in_with_nothing_heard_reopens_the_turn(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """If the late interrupt reports that essentially none of the reply played,
-    the committed reply is dropped and the turn reopens, so the next utterance
-    continues the same question."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 30000)
     s1 = "Ein einziger, inhaltlich vollstaendiger Satz der lang genug fuer seinen eigenen Chunk ist hier jetzt."
     fake_pipeline.stt.transcripts = ["Erste Haelfte.", "Und der Rest."]
@@ -247,8 +217,6 @@ async def test_late_barge_in_with_nothing_heard_reopens_the_turn(
 async def test_a_barge_in_mid_sentence_trims_the_transcript_to_the_word(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """Cutting in three words into a long sentence leaves roughly those three
-    words in the transcript, not the whole sentence (ADR 0035)."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 10000)
     sentence = (
         "Ich wollte mich eigentlich nur ganz kurz erkundigen ob der vereinbarte "
@@ -273,9 +241,6 @@ async def test_a_barge_in_mid_sentence_trims_the_transcript_to_the_word(
 async def test_a_cut_off_persona_line_is_marked_in_the_transcript(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """A Persona line the user talked over ends with "[unterbrochen]" in the
-    transcript -- but `persona_text` itself, which the metrics read, stays
-    clean, and the LLM history gets only the cut-off dash (ADR 0035)."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 10000)
     sentence = (
         "Ich wollte mich eigentlich nur ganz kurz erkundigen ob der vereinbarte "
@@ -301,10 +266,6 @@ async def test_a_cut_off_persona_line_is_marked_in_the_transcript(
 async def test_the_turn_after_an_interruption_tells_the_model_where_it_was_cut_off(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """Handed a bare fragment as "its previous reply", the model tried to finish
-    the sentence or re-introduced itself. The next Turn therefore carries a
-    nudge naming the interruption and quoting the fragment, in place of the
-    anti-repeat nudge -- and only that one Turn (ADR 0035, ADR 0038)."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 10000)
     opening = (
         "Guten Tag, ich bin Thomas Brandt von der Firma Insight Analytics und "
@@ -343,11 +304,6 @@ async def test_the_turn_after_an_interruption_tells_the_model_where_it_was_cut_o
 async def test_a_reply_that_reads_the_users_line_back_is_cut_to_the_answer(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """Seen live on the Turn after a barge-in: the model opened by reciting the
-    user's question ("Verzeihung, mit wem rede ich da? Ich bin Thomas ...").
-    The echo is dropped before synthesis, so neither the speakers nor the
-    history nor the Transcript get it -- and the re-introduction guard still
-    looks at the first chunk that has words in it."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 10000)
     question = "Verzeihung, mit wem rede ich da?"
     answer = "Ich bin Thomas Brandt, Managing Director bei Insight Analytics, es geht um unseren Vertrag."
@@ -369,20 +325,15 @@ async def test_a_reply_that_reads_the_users_line_back_is_cut_to_the_answer(
     assert not any(line.startswith(question) for line in persona_lines)
 
 
-# --- The cut-off sentence must not come back in any form (ADR 0035) --------
-#
-# Seen live: the next reply restated the sentence the user had talked over.
-# Verbatim repeats are the dedup's; these are the forms it cannot see: restarted
-# from the top, and its tail continued mid-sentence.
+# The forms the verbatim dedup cannot see: the cut-off sentence restarted, or its
+# tail continued.
 
 _FIRST = "Das ist okay, aber ich will den Termin vor dem 8. September."
 _CUT = "Sagen Sie mir, bis wann Sie das dann genau schaffen?"
 
 
 async def _cut_off_reply(orch, fake_pipeline, monkeypatch, reply=f"{_FIRST} {_CUT}", played_ms=14000):
-    """One reply the user talks over: the first sentence heard whole, the
-    second cut five words in (each chunk 10 s; 14 s + grace is 43% of it) --
-    enough of a fragment for `repetition.resumes` to match on."""
+    """First sentence heard whole, the second cut five words in."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 10000)
     fake_pipeline.stt.transcripts.insert(0, "Was ist denn genau das Problem?")
     fake_pipeline.llm.replies.insert(0, reply)
@@ -441,10 +392,6 @@ async def test_a_reply_that_is_nothing_but_the_cut_off_sentence_is_re_asked_once
 async def test_re_delivering_the_cut_off_sentences_after_a_barge_in_is_trimmed_not_ended(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """After a barge-in the model tends to re-deliver the sentences the user
-    already heard before getting to anything new. Those are dropped from the
-    chunk before it is spoken -- the user hears only the new part -- and the
-    call goes on, rather than ADR 0038's restatement backstop ending it."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 1000)
     # Each >= 80 chars so the chunker flushes all three as their own chunks.
     a = "Die Rechnung vom Maerz weist vierzehn Lizenzen aus, wir nutzen aber tatsaechlich nur acht davon."
@@ -452,9 +399,8 @@ async def test_re_delivering_the_cut_off_sentences_after_a_barge_in_is_trimmed_n
     c = "Deshalb moechte ich von Ihnen wissen, ob wir den Vertrag entsprechend anpassen koennen, bitte."
     assert min(len(a), len(b), len(c)) >= 80
     fake_pipeline.stt.transcripts = ["Moment, langsam bitte.", "Okay."]
-    # The resumption opens with a short lead-in, not with a sentence already
-    # said (that would be a repeated opening, regenerated -- ADR 0038), then
-    # re-delivers a and b, then says something new.
+    # A short lead-in (a repeated sentence would be regenerated), then a and b
+    # again, then something new.
     fake_pipeline.llm.replies = [
         f"{a} {b} {c}",
         f"Wie gesagt. {a} {b} Koennen wir das gemeinsam durchgehen, bitte?",
@@ -475,7 +421,6 @@ async def test_re_delivering_the_cut_off_sentences_after_a_barge_in_is_trimmed_n
 
 
 async def test_a_fully_heard_persona_line_is_not_marked(persona, scenario, fake_pipeline):
-    """No barge-in -> no marker."""
     fake_pipeline.stt.transcripts = ["Bitte erklaeren Sie mir das."]
     fake_pipeline.llm.replies = ["Eine ganz normale, vollstaendig gehoerte Antwort."]
 
@@ -511,11 +456,6 @@ async def test_new_or_reopened_turn_bookkeeping(persona, scenario):
 
 
 def test_a_reply_nobody_heard_is_not_counted_as_persona_speech(persona):
-    """A discarded reply is not counted as Persona speaking time (ADR 0035).
-
-    The Persona's window is modelled from dispatched audio, so after a barge-in it
-    overruns what was heard. `persona_speech_ms` divides F-53's Redeanteil, so an
-    unheard reply would count there while the Transcript leaves it out."""
     dropped = Turn(seq=1, user_text="Erste Haelfte der Frage.", persona_text="",
                    persona_offset_ms=1000, persona_end_ms=101000)
 
@@ -528,8 +468,6 @@ def test_a_reply_nobody_heard_is_not_counted_as_persona_speech(persona):
 async def test_a_trimmed_reply_counts_only_the_speech_that_played(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """The same rule where the reply survives as a fragment: the window is cut
-    back to the played position, not left at the end of the dispatched audio."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 100000)
     fake_pipeline.stt.transcripts = ["Erste Haelfte der Frage."]
     fake_pipeline.llm.replies = ["Es geht um die Exportfunktion, die seit elf Tagen nicht geht."]
@@ -546,11 +484,6 @@ async def test_a_trimmed_reply_counts_only_the_speech_that_played(
 async def test_the_trim_leaves_the_dispatched_end_alone(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """Two ends, and the trim touches one of them.
-
-    `persona_end_ms` is heard speech (F-53's Redeanteil); `persona_dispatched_end_ms`
-    is what was sent (F-51's "still had this much to say"). Trimming both would turn
-    F-51's figure into the client's barge-in delay."""
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 100000)
     fake_pipeline.stt.transcripts = ["Erste Haelfte der Frage."]
     fake_pipeline.llm.replies = ["Es geht um die Exportfunktion, die seit elf Tagen nicht geht."]
@@ -569,11 +502,6 @@ async def test_the_trim_leaves_the_dispatched_end_alone(
 async def test_the_cut_off_words_are_kept_beside_the_transcript(
     persona, scenario, fake_pipeline, monkeypatch
 ):
-    """`turn.persona_unheard` holds what had been synthesized but not played.
-
-    Kept outside the Transcript and the model's history (ADR 0035), for the wrap-up's
-    drill-down to show struck through. Written here and read two modules away.
-    """
     monkeypatch.setattr("backend.session.orchestrator.tts.duration_ms", lambda _wav: 100000)
     reply = "Es geht um die Exportfunktion, die seit elf Tagen nicht mehr laeuft."
     fake_pipeline.stt.transcripts = ["Erste Haelfte der Frage."]

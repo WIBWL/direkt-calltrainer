@@ -1,8 +1,4 @@
-"""The five figures read off a pitch contour (F-35).
-
-Constructed 10 ms contours in Hertz; no audio, Praat or database. Each figure must
-measure its own thing: a single range calls a wide-but-slow contour expressive and
-a narrow-but-lively one flat, which is backwards for a listener."""
+"""The pitch figures from constructed contours (F-35, ADR 0077)."""
 from dataclasses import fields
 from pathlib import Path
 
@@ -54,13 +50,7 @@ def _zigzag(centre: float, depth_st: float, period_frames: int, frames: int) -> 
     return tuple(out)
 
 
-# --- Range and movement are different things --------------------------------
-
-
 def test_a_wide_slow_contour_and_a_narrow_lively_one_differ_in_movement() -> None:
-    """The pair this module exists for. Both speakers cover ground; only one of
-    them is doing anything with their voice while they speak, and a range
-    figure alone cannot tell them apart."""
     drifting = profile(_sweep(100, 160, 400), ())
     lively = profile(_zigzag(120, 4.0, 20, 400), ())
 
@@ -74,9 +64,6 @@ def test_a_wide_slow_contour_and_a_narrow_lively_one_differ_in_movement() -> Non
 
 
 def test_a_flat_contour_has_no_range_and_no_movement() -> None:
-    """A monotone delivery, which must not come out looking varied on either
-    factor. No judgement is attached to that (ADR 0051); this pins that the
-    measurement follows the signal."""
     flat = profile(_steady(120, 300), ())
 
     assert flat.range_st == 0.0
@@ -84,8 +71,6 @@ def test_a_flat_contour_has_no_range_and_no_movement() -> None:
 
 
 def test_movement_is_per_second_and_not_per_frame() -> None:
-    """So the figure does not change when the analysis grid does. Two contours
-    of the same shape at different lengths must read the same."""
     short = profile(_zigzag(120, 4.0, 20, 200), ())
     long = profile(_zigzag(120, 4.0, 20, 800), ())
 
@@ -93,17 +78,11 @@ def test_movement_is_per_second_and_not_per_frame() -> None:
 
 
 def test_a_tracker_jump_is_not_counted_as_movement() -> None:
-    """An octave error between neighbouring frames is the tracker changing its
-    mind, not a voice: at 10 ms no speaker moves half an octave. Counted, a
-    handful of them would dominate the figure."""
     clean = list(_steady(120, 300))
     jumpy = clean[:150] + [240.0] + clean[151:]  # one doubled frame
 
     assert profile(tuple(jumpy), ()).movement_st_per_s == 0.0
     assert semitones(240, 120) > MAX_STEP_ST  # the jump really is out of range
-
-
-# --- Terminal contours ------------------------------------------------------
 
 
 def _falling() -> tuple[float, ...]:
@@ -115,8 +94,6 @@ def _rising() -> tuple[float, ...]:
 
 
 def test_a_sentence_that_drops_at_the_end_is_read_as_falling() -> None:
-    """The conventional close of a statement. Not "good": what it is useful for
-    is the mismatch, a speaker who never closes anything."""
     shape = profile(_falling(), (_falling(),))
 
     assert shape.endings.falling == 1
@@ -124,7 +101,6 @@ def test_a_sentence_that_drops_at_the_end_is_read_as_falling() -> None:
 
 
 def test_a_sentence_that_lifts_at_the_end_is_read_as_rising() -> None:
-    """Open, questioning, or seeking agreement. Also not a fault by itself."""
     shape = profile(_rising(), (_rising(),))
 
     assert shape.endings.rising == 1
@@ -132,10 +108,6 @@ def test_a_sentence_that_lifts_at_the_end_is_read_as_rising() -> None:
 
 
 def test_a_small_final_movement_counts_as_level() -> None:
-    """Below the threshold a listener hears wobble, not a direction.
-
-    Tested at half the threshold, so the edge itself is what is exercised.
-    """
     half_of_it = 120 * 2 ** (TERMINAL_FLAT_ST / 2 / 12)
     barely = _steady(120, 60) + _sweep(120, half_of_it, 40)
 
@@ -143,19 +115,12 @@ def test_a_small_final_movement_counts_as_level() -> None:
 
 
 def test_a_movement_over_the_threshold_is_a_direction() -> None:
-    """The other side of the same edge, so the test above cannot be satisfied
-    by a threshold that calls everything level."""
     clearly = _steady(120, 60) + _sweep(120, 120 * 2 ** (2 * TERMINAL_FLAT_ST / 12), 40)
 
     assert profile(clearly, (clearly,)).endings.rising == 1
 
 
 def test_a_short_utterance_is_judged_against_its_own_window() -> None:
-    """The threshold is derived per window, not taken from the constant.
-
-    A short utterance is read over ~70 ms, where the perceptual floor is 4.6 ST, not
-    the 400 ms figure; unchanged, inaudible movements counted as endings.
-    """
     # The call is long enough to be read at all; the *utterance* is the short
     # one, which is what the ending is taken from.
     call = _steady(120, 100)
@@ -173,8 +138,6 @@ def test_a_short_utterance_is_judged_against_its_own_window() -> None:
 
 
 def test_endings_are_counted_per_utterance() -> None:
-    """Three sentences, three readings. The flat contour of the whole call
-    cannot answer this: where one sentence ended is not recoverable from it."""
     shape = profile(_falling() + _rising() + _falling(), (_falling(), _rising(), _falling()))
 
     assert (shape.endings.falling, shape.endings.rising) == (2, 1)
@@ -182,17 +145,10 @@ def test_endings_are_counted_per_utterance() -> None:
 
 
 def test_an_utterance_too_short_to_read_is_skipped_rather_than_guessed() -> None:
-    """A two-frame "slope" is a guess. Skipped, so the counts stay statements
-    about sentences that actually had an ending."""
     assert profile(_steady(120, 300), (_steady(120, 4),)).endings.total == 0
 
 
-# --- Development across the call --------------------------------------------
-
-
 def test_the_first_and_last_third_are_reported_separately() -> None:
-    """A change within one speaker needs no external reference, which is what
-    makes it sayable at all under ADR 0051. Here the voice flattens out."""
     lively_then_flat = _zigzag(120, 6.0, 20, 300) + _steady(120, 300)
 
     shape = profile(lively_then_flat, ())
@@ -202,8 +158,6 @@ def test_the_first_and_last_third_are_reported_separately() -> None:
 
 
 def test_the_thirds_are_thirds_of_speech_and_not_of_the_clock() -> None:
-    """A long silence in the middle must not swallow the second third. Voiced
-    frames are what is divided, so a pause belongs to neither side."""
     talk = _zigzag(120, 6.0, 20, 200)
     silence = tuple([None] * 2_000)
 
@@ -213,13 +167,7 @@ def test_the_thirds_are_thirds_of_speech_and_not_of_the_clock() -> None:
     assert shape.range_first_st == pytest.approx(shape.range_last_st, abs=1.0)
 
 
-# --- What is refused --------------------------------------------------------
-
-
 def test_a_contour_with_too_few_voiced_frames_yields_nothing() -> None:
-    """Whispering, or a Turn Praat found almost no voicing in. Every factor is
-    a shape, and a shape needs points; a figure from five frames would be a
-    number with no measurement behind it."""
     shape = profile(_steady(120, 5), ())
 
     assert shape.range_st is None
@@ -228,8 +176,6 @@ def test_a_contour_with_too_few_voiced_frames_yields_nothing() -> None:
 
 
 def test_unvoiced_frames_never_enter_a_figure() -> None:
-    """They are consonants, breaths and pauses. Counted as zero they would drag
-    every factor towards a value nobody produced."""
     with_gaps = _steady(120, 100) + (None,) * 50 + _steady(120, 100)
 
     shape = profile(with_gaps, ())
@@ -238,12 +184,7 @@ def test_unvoiced_frames_never_enter_a_figure() -> None:
     assert shape.range_st == 0.0
 
 
-# --- The display curve ------------------------------------------------------
-
-
 def test_thinning_keeps_the_shape_and_the_gaps() -> None:
-    """Three minutes at 10 ms is eighteen thousand points and no chart resolves
-    them. What the thinned curve must not do is invent voicing across a pause."""
     contour = _steady(120, 100) + (None,) * 100 + _steady(150, 100)
 
     thinned = thin(contour, 100)
@@ -255,7 +196,6 @@ def test_thinning_keeps_the_shape_and_the_gaps() -> None:
 
 
 def test_thinning_takes_the_median_of_each_window_not_a_sample() -> None:
-    """One stray frame must not become a visible spike in the drawing."""
     contour = list(_steady(120, 100))
     contour[45] = 400.0
 
@@ -263,29 +203,18 @@ def test_thinning_takes_the_median_of_each_window_not_a_sample() -> None:
 
 
 def test_the_grid_constant_matches_the_analysis() -> None:
-    """The step constant matches the analysis's, not the literal 10.
-
-    Movement, voiced milliseconds, Hold durations and `curve_step_ms` all scale with
-    it, so a drift would silently change every one of them.
-    """
     from shared.feedback import acoustics  # pylint: disable=import-outside-toplevel
 
     assert STEP_MS == round(acoustics._PITCH_STEP_S * 1000)  # pylint: disable=protected-access
 
 
 def test_an_ending_is_read_from_voiced_frames_only() -> None:
-    """Utterances end in consonants and breath. Reading the last frames of the
-    recording would read the silence after the sentence."""
     falling_then_silence = _falling() + (None,) * 50
 
     assert profile(falling_then_silence, (falling_then_silence,)).endings.falling == 1
 
 
 def test_the_endings_the_frontend_reads_are_the_ones_measured() -> None:
-    """The endings are `falling/rising/level`, exactly as the frontend words them.
-
-    Pinned against the frontend's own interface: a fourth kind would render as nothing.
-    """
     page = (
         Path(__file__).resolve().parents[2] /
         "frontend" / "src" / "components" / "IntonationReading.tsx"
@@ -296,15 +225,10 @@ def test_the_endings_the_frontend_reads_are_the_ones_measured() -> None:
     assert {field.name for field in fields(Endings)} == read == {"falling", "rising", "level"}
 
 
-# --- The pitch variation quotient -------------------------------------------
-# Hincks (2005)'s measure: SD over mean of F0, in Hertz, per window of speech.
-# The figure the reading rests on, and the only one here with a boundary anybody
-# has published.
+# Hincks (2005)'s PVQ: the only figure here with a published boundary.
 
 
 def test_a_flat_voice_and_a_moving_one_differ_in_the_quotient() -> None:
-    """The measure has to separate the two cases it is used to judge, before
-    any threshold is applied to it."""
     flat = profile(_steady(120, 400), ())
     moving = profile(_zigzag(120, 13.0, 40, 400), ())
 
@@ -313,10 +237,6 @@ def test_a_flat_voice_and_a_moving_one_differ_in_the_quotient() -> None:
 
 
 def test_the_quotient_is_measured_per_window_and_not_over_the_whole_call() -> None:
-    """The quotient is windowed so drift between registers is not read as movement.
-
-    Two steady registers side by side look like a wide spread over the whole contour.
-    """
     per_window = PVQ_WINDOW_MS // STEP_MS
     two_registers = _steady(110, per_window) + _steady(190, per_window)
 
@@ -329,8 +249,6 @@ def test_the_quotient_is_measured_per_window_and_not_over_the_whole_call() -> No
 
 
 def test_a_window_that_is_nearly_all_unvoiced_is_skipped() -> None:
-    """Breath, a trailing whisper, a stretch Praat found nothing in. A quotient
-    off a handful of frames is a number without a measurement behind it."""
     per_window = PVQ_WINDOW_MS // STEP_MS
     good = _zigzag(120, 6.0, 20, per_window)
     mostly_silent = _steady(120, 50) + (None,) * (per_window - 50)
@@ -339,8 +257,6 @@ def test_a_window_that_is_nearly_all_unvoiced_is_skipped() -> None:
 
 
 def test_a_trailing_part_window_is_dropped_rather_than_averaged_in() -> None:
-    """A quotient over three seconds is a different statistic, and averaging it
-    with full windows would quietly weight the end of the call."""
     per_window = PVQ_WINDOW_MS // STEP_MS
 
     shape = profile(_zigzag(120, 6.0, 20, per_window + 400), ())
@@ -349,23 +265,17 @@ def test_a_trailing_part_window_is_dropped_rather_than_averaged_in() -> None:
 
 
 def test_a_call_too_short_for_one_window_is_still_measured() -> None:
-    """Not dropped: the reading has its own floor and will withhold the step.
-    Refusing the figure as well would leave the block with nothing in it."""
     shape = profile(_zigzag(120, 6.0, 20, 400), ())
 
     assert shape.pvq is not None
     assert shape.pvq_windows == 1
 
 
-# --- The three-step reading of the quotient ---------------------------------
-# The one part of this module that judges (ADR 0077). The boundaries are pinned
-# not because they are established for this population but so that changing one
-# is a deliberate act.
+# The boundaries are pinned so that changing one is deliberate, not because they
+# are established for this population (ADR 0077).
 
 
 def test_each_step_of_the_scale_is_reachable() -> None:
-    """A scale with an unreachable step is a scale with fewer steps. Each
-    boundary is taken from just below and just above."""
     assert liveliness(0.0) is Liveliness.MONOTONE
     assert liveliness(PVQ_MONOTONE_MAX - 0.001) is Liveliness.MONOTONE
     assert liveliness(PVQ_MONOTONE_MAX) is Liveliness.LIVELY
@@ -374,19 +284,10 @@ def test_each_step_of_the_scale_is_reachable() -> None:
 
 
 def test_an_unmeasured_quotient_gets_no_step() -> None:
-    """Whispering, a call too short to have a shape, or a Session measured
-    before this figure existed. "monoton" would be a verdict on a measurement
-    that was never taken -- and for the older Sessions it would be the withdrawn
-    five-step reading coming back under a new name."""
     assert liveliness(None) is None
 
 
 def test_a_monotone_contour_reads_as_monotone_and_a_lively_one_as_lively() -> None:
-    """End to end: a barely moving voice and a lively one land on different steps.
-
-    Six semitones peak to peak for the lively case; four would read as monotone
-    (quotient 0.115), so the boundary is not generous.
-    """
     flat = profile(_steady(120, 400), ())
     lively = profile(_zigzag(120, 6.0, 20, 400), ())
 
@@ -395,9 +296,6 @@ def test_a_monotone_contour_reads_as_monotone_and_a_lively_one_as_lively() -> No
 
 
 def test_the_scale_is_built_from_the_thresholds_and_carries_its_colours() -> None:
-    """The legend, the logic and the colour come from the same constants, so a
-    recalibration reaches all three. The light travels beside the threshold it
-    was read from; the frontend maps no step to any colour of its own."""
     steps = liveliness_steps()
 
     assert [s["step"] for s in steps] == [step.value for step in Liveliness]
@@ -409,32 +307,18 @@ def test_the_scale_is_built_from_the_thresholds_and_carries_its_colours() -> Non
 
 
 def test_every_step_has_a_colour_and_a_word() -> None:
-    """Colour is never the only channel (ADR 0077). A step the backend can
-    return with no label would reach the screen as a colour and nothing else,
-    which is the one thing a traffic light on an unvalidated threshold must not
-    become."""
     assert set(LIGHTS) == set(Liveliness)
     assert set(LABELS) == set(Liveliness)
     assert set(LIGHTS.values()) <= {"green", "yellow", "red"}
 
 
 def test_the_top_step_is_not_the_red_one() -> None:
-    """Pins the direction the light claims, because the direction is the whole
-    risk of having one. Monotone is the end F-35 exists to make visible; the
-    top step is where Hincks's liveliest speakers sat, and nothing reviewed
-    calls expressiveness a fault. Its yellow says "worth a look at the
-    contour", never "too much"."""
     assert LIGHTS[Liveliness.MONOTONE] == "red"
     assert LIGHTS[Liveliness.LIVELY] == "green"
     assert LIGHTS[Liveliness.VERY_LIVELY] == "yellow"
 
 
 def test_the_step_is_derived_when_the_session_is_read() -> None:
-    """The step is derived on read, never stored with the Measurement.
-
-    The thresholds are unvalidated, so the scale can be replaced without a migration
-    and without old trainings keeping a withdrawn label.
-    """
     served = served_detail(RANGE_KEY, {"median_hz": 120.0, "pvq": 0.18})
 
     assert served == {
@@ -447,27 +331,16 @@ def test_the_step_is_derived_when_the_session_is_read() -> None:
 
 
 def test_a_session_measured_before_the_quotient_gets_no_step() -> None:
-    """The reading moved onto a figure those Sessions do not carry, and their
-    audio is gone (ADR 0048) so it cannot be measured now. Reading the step off
-    the range instead would reinstate the scale the review withdrew."""
     served = served_detail(RANGE_KEY, {"median_hz": 120.0})
 
     assert served == {"median_hz": 120.0}
 
 
 def test_serving_leaves_a_detail_that_was_never_measured_alone() -> None:
-    """A Session stored before the pitch curve existed carries no detail at
-    all. There is nothing to read a step off, and inventing one would put a
-    word on a training that was never measured."""
     assert served_detail(RANGE_KEY, None) is None
 
 
-# --- Where one utterance ends and the next begins ---------------------------
-
-
 def test_utterance_seams_land_on_the_thinned_curve() -> None:
-    """The curve is speaking time: the Persona's turns are not in it, so a seam
-    is the only thing that says two stretches were not one breath."""
     utterances = (_steady(120, 250), _steady(130, 250), _steady(140, 100))
 
     marks = utterance_breaks(utterances, 100)
@@ -477,35 +350,22 @@ def test_utterance_seams_land_on_the_thinned_curve() -> None:
 
 
 def test_a_call_of_one_utterance_has_no_seams() -> None:
-    """Nothing to mark, and a mark at the end of the last utterance would be a
-    line at the right edge with nothing behind it."""
     assert not utterance_breaks((_steady(120, 300),), 100)
 
 
 def test_two_seams_inside_one_window_are_marked_once() -> None:
-    """A very short utterance puts two seams in the same 100 ms window. One
-    line, not two on top of each other: the second would be invisible and would
-    still be in the count the caption states."""
     barely_spoke = (_steady(120, 105), _steady(130, 4), _steady(140, 300))
 
     assert utterance_breaks(barely_spoke, 100) == [10]
 
 
 def test_the_stated_grid_is_the_one_thinning_produced() -> None:
-    """Thinning works in whole 10 ms frames, so a request for 25 ms yields
-    20 ms. Everything that reads the curve -- the drawing's time axis, the seam
-    indices -- has to use what came out, or the picture claims a duration the
-    curve does not have."""
     assert effective_step_ms(50) == 50
     assert effective_step_ms(25) == 20
     assert len(thin(_steady(120, 100), 25)) == pytest.approx(50, abs=1)
 
 
 def test_the_band_is_measured_at_both_ends_and_not_assumed_symmetric() -> None:
-    """The drawing puts a band behind the contour. Taken as the range halved
-    either side of the median, that band is a guess about the shape of the
-    distribution; a voice that reaches further up than down would be drawn with
-    its band in the wrong place."""
     # Twice as much room above the median as below it.
     lopsided = _steady(120, 200) + _sweep(120, 170, 100) + _sweep(120, 109, 100)
 
@@ -518,10 +378,6 @@ def test_the_band_is_measured_at_both_ends_and_not_assumed_symmetric() -> None:
 
 
 def test_movement_is_not_counted_across_the_seam_between_two_utterances() -> None:
-    """The call's contour is the user's utterances laid end to end with the
-    Persona's turns taken out. The last frame of one and the first frame of the
-    next are neighbours in that array and a minute apart in the call; a step
-    between them is movement the voice never made."""
     # A step just under MAX_STEP_ST, so it is not thrown out as an octave error
     # first and the seam rule is what this actually tests.
     low = _steady(110, 200)
@@ -537,21 +393,12 @@ def test_movement_is_not_counted_across_the_seam_between_two_utterances() -> Non
 
 
 def test_a_step_is_read_only_from_enough_voiced_speech() -> None:
-    """A step off two seconds of humming would be a verdict on nothing. The
-    figure is still reported -- a quotient is a quotient -- but it carries no
-    word. The floor is two to three of Hincks's windows against the nine her
-    reliability figure rests on, so it is a floor and not a sufficiency."""
     assert liveliness(0.18, MIN_VOICED_MS_FOR_READING) is Liveliness.LIVELY
     assert liveliness(0.18, MIN_VOICED_MS_FOR_READING - 1) is None
     assert liveliness(0.18, None) is Liveliness.LIVELY  # not recorded: no reason to withhold
 
 
 def test_the_level_threshold_is_the_glissando_threshold_over_the_window() -> None:
-    """The level threshold is derived, and this pins the derivation (ADR 0077).
-
-    Glissando threshold G = GLISSANDO_ST_S2 / T**2 ST/s over a window of T seconds is
-    GLISSANDO_ST_S2 / T semitones across it; below that no movement is heard.
-    """
     window_s = TERMINAL_WINDOW_MS / 1000
 
     assert TERMINAL_FLAT_ST == pytest.approx(GLISSANDO_ST_S2 / window_s)

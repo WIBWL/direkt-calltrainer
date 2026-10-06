@@ -1,8 +1,4 @@
-"""Deleting a Session takes its whole subtree and leaves reference data alone.
-
-Behind ADR 0034's user deletion. Pinned both ways: `ON DELETE` for raw SQL and
-ORM cascades with `passive_deletes=True`, including FeedbackPoint -> Turn, which
-must unwind in an order that does not trip the foreign key."""
+"""Deleting a Session removes its subtree, via raw SQL and the ORM alike (ADR 0026)."""
 from datetime import UTC, datetime
 
 import pytest
@@ -116,8 +112,6 @@ def _count(db: DbSession, model: type) -> int:
 
 @pytest.mark.usefixtures("session_with_full_subtree")
 def test_subtree_is_set_up_as_expected(db_session: DbSession) -> None:
-    """Guards the fixture itself: without every child row present, the delete
-    tests below would pass for the wrong reason."""
     assert _count(db_session, Turn) == 2
     assert _count(db_session, Measurement) == 1
     assert _count(db_session, Finding) == 1
@@ -129,7 +123,6 @@ def test_subtree_is_set_up_as_expected(db_session: DbSession) -> None:
 def test_deleting_a_session_removes_its_whole_subtree(
     db_session: DbSession, session_with_full_subtree: Session
 ) -> None:
-    """One delete has to clear the Session and everything owned by it."""
     db_session.delete(session_with_full_subtree)
     db_session.commit()
 
@@ -145,8 +138,6 @@ def test_deleting_a_session_removes_its_whole_subtree(
 def test_deleting_a_session_leaves_the_reference_data_alone(
     db_session: DbSession, session_with_full_subtree: Session
 ) -> None:
-    """Personas, Scenarios, Languages and MetricTypes are shared across Sessions;
-    deleting one User's data must not take another's options with it."""
     db_session.delete(session_with_full_subtree)
     db_session.commit()
 
@@ -158,10 +149,6 @@ def test_deleting_a_session_leaves_the_reference_data_alone(
 
 @pytest.mark.usefixtures("session_with_full_subtree")
 def test_raw_sql_delete_also_clears_the_subtree(db_session: DbSession) -> None:
-    """The ORM cascade is not the only path any more: the foreign keys carry
-    ON DELETE, so a plain DELETE — a retention job, a manual fix, a
-    self-service deletion written in SQL — cannot fail on a constraint or leave
-    orphans behind."""
     db_session.execute(text("DELETE FROM session"))
     db_session.commit()
 
@@ -175,11 +162,6 @@ def test_raw_sql_delete_also_clears_the_subtree(db_session: DbSession) -> None:
 
 @pytest.mark.usefixtures("session_with_full_subtree")
 def test_a_metric_type_in_use_cannot_be_deleted(db_session: DbSession) -> None:
-    """A metric type in use is undeletable, like a Persona (ADR 0026).
-
-    No referencing table (`measurement`, `finding`, `feedback_point`) may null the
-    reference instead: reference tables do not cascade, without exception.
-    """
     with pytest.raises(IntegrityError):
         db_session.execute(text("DELETE FROM metric_type"))
         db_session.commit()
@@ -188,8 +170,6 @@ def test_a_metric_type_in_use_cannot_be_deleted(db_session: DbSession) -> None:
 
 @pytest.mark.usefixtures("session_with_full_subtree")
 def test_a_persona_with_sessions_cannot_be_deleted(db_session: DbSession) -> None:
-    """Reference tables deliberately do *not* cascade: removing a Persona must
-    fail loudly rather than silently taking every Session it ever ran with."""
     with pytest.raises(IntegrityError):
         db_session.execute(text("DELETE FROM persona"))
         db_session.commit()

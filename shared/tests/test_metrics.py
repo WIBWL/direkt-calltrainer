@@ -1,8 +1,4 @@
-"""The Session's statistics, derived from a finished call; pure, no database, audio or Praat.
-
-Covers F-24 talk share, F-36 pace, F-53 reaction time / run length / aspect halves (ADR 0082), F-37 loudness,
-F-51 phonation share and fillers (ADR 0083), F-41 questions, F-08 repetitions, F-63 opening (ADR 0086),
-F-65 closing (ADR 0089), ADR 0047/0048 (failed acoustics stay visible), ADR 0051, ADR 0085 (no silence)."""
+"""The metrics derived from a finished call (F-08, F-24, F-36, F-37, F-41, F-51, F-53, F-63, F-65, ADR 0051, 0085)."""
 
 import re
 from pathlib import Path
@@ -44,14 +40,10 @@ def _by_key(turns: list[Turn]) -> dict[str, float]:
 
 
 def test_every_metric_belongs_to_one_half_of_the_grid() -> None:
-    """provision.py seeds `metric_type.aspect` from this inventory: a value
-    outside the vocabulary fails to seed, a missing one is filed under "what"
-    by the screen's fallback rather than showing up as a fault."""
     assert all(metric.aspect in METRIC_ASPECTS for metric in METRICS)
 
 
 def test_both_halves_of_the_grid_are_measured() -> None:
-    """The slider hides itself when one half is empty (MetricSection.tsx)."""
     assert {metric.aspect for metric in METRICS if metric.active} == set(METRIC_ASPECTS)
 
 
@@ -59,27 +51,19 @@ _PAUSE_MS = 500
 
 
 def _call_with_a_pause() -> list[Turn]:
-    """The measured call with one pause inside the utterance: 2 s of speech and
-    0.5 s of pause make a 2.5 s span from first sound to last, inside a 4 s
-    recording -- three figures these tests keep apart."""
+    """2 s speech + 0.5 s pause = 2.5 s span inside a 4 s recording."""
     turns = _measured_call()
     turns[1].pauses = [Pause(offset_ms=2_000, duration_ms=_PAUSE_MS)]
     return turns
 
 
 def test_talk_share_counts_the_user_from_first_sound_to_last() -> None:
-    """F-24, ADR 0114. 2.5 s of user against 2 s of Persona. Not the 4 s
-    recording, whose extra 1.5 s is the VAD's padding and would read as two
-    thirds; not the 2 s of phonation alone, which strips the user's pause but
-    leaves the Persona's in and would read as half."""
     values = _by_key(_call_with_a_pause())
 
     assert values["talk_share"] == 2_500 * 100 / (2_500 + 2_000)
 
 
 def test_talk_share_detail_reports_the_same_unit_it_divided() -> None:
-    """ADR 0029's detail carries the milliseconds the share was computed from,
-    so a reader can check the percentage against them."""
     call = conversation(_call_with_a_pause())
     detail = next(m for m in measure(call) if m.key == "talk_share").detail
 
@@ -87,27 +71,17 @@ def test_talk_share_detail_reports_the_same_unit_it_divided() -> None:
 
 
 def test_pace_divides_by_phonation_not_by_the_recording() -> None:
-    """F-36. Words per minute of talking: the silences inside the utterance and
-    the VAD's padding are not time the user spoke in. Two words in 2 s of
-    phonation is 60 wpm; over the 4 s recording it would read as 30."""
     values = _by_key(_measured_call())
 
     assert values["pace"] == 60.0
 
 
 def test_reaction_time_is_measured_from_when_the_persona_stopped() -> None:
-    """F-53. Reply at 1500 ms, Persona stopped at 1000 ms: half a second, with
-    the gateway's latency outside the window by construction (ADR 0051)."""
     assert [r.gap_ms for r in conversation(_measured_call()).reactions] == [500]
 
 
-# --- A Turn that could not be measured (ADR 0048) --------------------------
-
-
 def _call_with_one_unmeasured_turn() -> list[Turn]:
-    """The same call plus a Turn whose acoustics failed: words (STT succeeded),
-    no milliseconds, and `user_offset_ms` on its fallback -- the *end* of the
-    user's speech, the only point the server knows without a duration."""
+    """Plus a Turn whose acoustics failed: words, no milliseconds."""
     return _measured_call() + [
         Turn(
             seq=3,
@@ -120,27 +94,20 @@ def _call_with_one_unmeasured_turn() -> list[Turn]:
 
 
 def test_redefluss_is_the_share_of_the_span_that_was_speech() -> None:
-    """F-51, ADR 0114. 2 s of speech and 0.5 s of pause is 80%. Over the 4 s
-    recording it would be 50%, and the missing 30 points would be the VAD's
-    padding, the same for a fluent speaker as for a halting one."""
     assert _by_key(_call_with_a_pause())["phonation_share"] == 80.0
 
 
 def test_redefluss_without_a_pause_is_complete() -> None:
-    """Nothing between the first sound and the last but speech."""
     assert _by_key(_measured_call())["phonation_share"] == 100.0
 
 
 def test_redefluss_detail_names_the_span_it_divided_by() -> None:
-    """`voiced_ms`, not the `speech_ms` stored before ADR 0114: the page reads
-    the key to draw the two bars, and the old one held the padded recording."""
     detail = {m.key: m.detail for m in measure(conversation(_call_with_a_pause()))}
 
     assert detail["phonation_share"] == {"voiced_ms": 2_500, "phonation_ms": _PHONATION_MS}
 
 
 def test_redefluss_is_absent_where_the_acoustics_failed() -> None:
-    """ADR 0048: both figures are short by an unknown amount."""
     assert "phonation_share" not in _by_key(_call_with_one_unmeasured_turn())
 
 
@@ -153,8 +120,6 @@ def _questions_asked(text: str, language_id: str | None = "de"):
 
 
 def test_open_and_closed_questions_add_up_to_the_count() -> None:
-    """F-41. Both halves come off the same question marks, so the tile showing
-    the count and the split cannot contradict itself."""
     asked = _questions_asked("Was brauchen Sie? Passt Ihnen Dienstag? Wirklich?")
 
     assert asked.value == 3
@@ -162,20 +127,16 @@ def test_open_and_closed_questions_add_up_to_the_count() -> None:
 
 
 def test_a_question_is_read_from_where_it_begins_not_from_the_sentence_before() -> None:
-    """The transcript runs sentences together; the question is the last clause
-    before the mark."""
     assert _questions_asked("Das ist klar. Wann passt es Ihnen?").detail["open"] == 1
 
 
 def test_the_split_follows_the_language_the_call_ran_in() -> None:
-    """The question words come from the Persona's language pack."""
     asked = _questions_asked("What do you need? Does Tuesday work?", language_id="en")
 
     assert (asked.detail["open"], asked.detail["closed"]) == (1, 1)
 
 
 def test_questions_are_still_counted_without_a_language() -> None:
-    """The count is punctuation and needs no vocabulary."""
     asked = _questions_asked("Was brauchen Sie?", language_id=None)
 
     assert asked.value == 1
@@ -190,7 +151,6 @@ def _fillers_in(text: str, language_id: str | None = "de"):
 
 
 def test_fillers_are_counted_per_word_from_the_transcript() -> None:
-    """F-51. Case-insensitive, and a phrase counts once, as itself."""
     counted = _fillers_in("Eigentlich passt das. Das ist halt so, sag ich mal, eigentlich.")
 
     assert counted.value == 4
@@ -198,17 +158,14 @@ def test_fillers_are_counted_per_word_from_the_transcript() -> None:
 
 
 def test_a_filler_inside_another_word_is_not_one() -> None:
-    """"Haltung" and "enthalten" both contain "halt"."""
     assert _fillers_in("Die Haltung ist enthalten.").value == 0
 
 
 def test_fillers_follow_the_language_of_the_call() -> None:
-    """The list comes from the Persona's language pack."""
     assert _fillers_in("Basically, you know, it works.", language_id="en").value == 2
 
 
 def test_fillers_need_a_vocabulary() -> None:
-    """No pack means no list: absent, rather than a zero that looks measured."""
     assert _fillers_in("Eigentlich schon.", language_id=None) is None
 
 
@@ -219,7 +176,6 @@ def _repetitions_in(text: str):
 
 
 def test_a_repeated_sentence_counts_once_and_is_quoted() -> None:
-    """F-08. Its overlapping four-word matches merge into one passage."""
     said = _repetitions_in(
         "Die Lieferung ist leider unvollständig. Also die Lieferung ist leider unvollständig."
     )
@@ -229,22 +185,14 @@ def test_a_repeated_sentence_counts_once_and_is_quoted() -> None:
 
 
 def test_three_repeated_words_are_no_repetition() -> None:
-    """"Ich habe das" twice is how people talk, not saying something twice."""
     assert _repetitions_in("Ich habe das gesehen. Ich habe das gelesen.").value == 0
 
 
 def test_stammering_does_not_repeat_itself() -> None:
-    """A run of one word would otherwise match its own overlapping copies."""
     assert _repetitions_in("ja ja ja ja ja ja").value == 0
 
 
 def test_a_recording_without_silence_drops_what_rests_on_silence() -> None:
-    """No detectable silence drops what rests on silence (ADR 0085).
-
-    Pauses, phonation share, pace, loudness span and run length would report noise as
-    speech; `run_length` is wrong twice over (phonation and runs). Talk share goes
-    with them since ADR 0114: its user side is the span that same split finds, and
-    over a noise floor that is the whole recording, padding included."""
     turns = _measured_call()
     turns[1].loudness_db = [60.0] * 100
 
@@ -255,7 +203,6 @@ def test_a_recording_without_silence_drops_what_rests_on_silence() -> None:
 
 
 def test_ordinary_silence_keeps_them() -> None:
-    """Stored calls are 37 to 67 % silent; half is well clear of the cut-off."""
     turns = _measured_call()
     turns[1].loudness_db = [60.0, None] * 50
 
@@ -274,7 +221,6 @@ def _opening_of(*said: tuple[str, int], language_id: str | None = "de", reverse=
 
 
 def test_an_opening_with_all_three_parts() -> None:
-    """F-63. The called side: greeting, name, and an offer of help."""
     opening = _opening_of(("Guten Tag, hier ist Schmidt. Was kann ich für Sie tun?", 3000))
 
     assert opening.value == 3
@@ -283,7 +229,6 @@ def test_an_opening_with_all_three_parts() -> None:
 
 
 def test_the_caller_states_the_concern_instead() -> None:
-    """In a reverse the user rang, so the concern is named, not asked for."""
     opening = _opening_of(("Hallo, mein Name ist Beck, ich rufe an wegen der Rechnung.", 3000),
                           reverse=True)
 
@@ -292,7 +237,6 @@ def test_the_caller_states_the_concern_instead() -> None:
 
 
 def test_each_side_is_checked_for_its_own_part() -> None:
-    """Stating a concern is no offer of help, and an offer is no concern."""
     called = _opening_of(("Guten Tag, ich rufe an wegen der Rechnung.", 2000))
     calling = _opening_of(("Guten Tag, was kann ich für Sie tun?", 2000), reverse=True)
 
@@ -301,7 +245,6 @@ def test_each_side_is_checked_for_its_own_part() -> None:
 
 
 def test_a_frame_without_a_name_is_no_introduction() -> None:
-    """"hier ist alles" and "hier ist Ihr Ansprechpartner" name nobody."""
     for said in ("Hier ist alles in Ordnung.", "Hier ist Ihr Ansprechpartner.",
                  "Hier sind Ihre Unterlagen."):
         assert _opening_of((said, 2000)).detail["name"] is False
@@ -317,47 +260,34 @@ def test_a_frame_without_a_name_is_no_introduction() -> None:
     "Hier ist Frau Beck.",
 ])
 def test_the_frames_a_name_is_actually_said_in(said: str) -> None:
-    """F-63. The name is unknown, so the check reads the frame around it -- and
-    a frame nobody uses recognises nobody. These were all real openings that
-    came back "nicht erkannt"; the article one is how a good deal of German
-    introduces a first name."""
     assert _opening_of((said, 2000)).detail["name"] is True
 
 
 def test_a_bare_surname_is_still_not_recognised() -> None:
-    """The limit the widened pattern does not remove, pinned so the next
-    reading of this file does not take it for an oversight: "Beck, guten Tag"
-    is a name to a human and an indistinguishable capitalised word to a regular
-    expression. ADR 0086 is why the tile says "nicht erkannt", never "fehlt"."""
     assert _opening_of(("Beck, guten Tag.", 2000)).detail["name"] is False
 
 
 def test_you_are_speaking_with_introduces_a_name_in_english() -> None:
-    """The English counterpart of "Sie sprechen mit", added with it."""
     assert _opening_of(("Hello, you're speaking with Sarah.", 2000),
                        language_id="en").detail["name"] is True
 
 
 def test_the_opening_follows_the_language_of_the_call() -> None:
-    """The patterns come from the Persona's language pack."""
     opening = _opening_of(("Hello, this is Sarah. How can I help?", 2000), language_id="en")
 
     assert opening.value == 3
 
 
 def test_i_am_introduces_a_name_in_english() -> None:
-    """"I'm Alice" is how most English speakers say it; "I'm fine" names nobody."""
     assert _opening_of(("Hi Samantha, I'm Alice.", 2000), language_id="en").detail["name"]
     assert not _opening_of(("I'm fine, thanks.", 2000), language_id="en").detail["name"]
 
 
 def test_the_opening_needs_a_vocabulary() -> None:
-    """No pack means no patterns: absent, not a zero that looks measured."""
     assert _opening_of(("Guten Tag.", 1000), language_id=None) is None
 
 
 def test_the_opening_tempo_is_read_against_the_rest_of_the_call() -> None:
-    """Ten words in 2 s against twenty in 8 s: twice the user's own rate."""
     opening = _opening_of(
         ("Guten Tag hier ist Schmidt womit kann ich Ihnen helfen", 2000),
         ("eins zwei drei vier fünf sechs sieben acht neun zehn "
@@ -368,7 +298,6 @@ def test_the_opening_tempo_is_read_against_the_rest_of_the_call() -> None:
 
 
 def test_a_call_with_one_turn_has_no_tempo_to_compare() -> None:
-    """Without a rest of the call there is nothing to be faster or slower than."""
     assert _opening_of(("Guten Tag, hier ist Schmidt.", 2000)).detail["pace_ratio"] is None
 
 
@@ -393,9 +322,6 @@ def _parts(measurement) -> tuple[bool, bool, bool]:
 
 
 def test_a_closing_with_all_three_parts() -> None:
-    """ADR 0089. A recap, a concrete next step and a goodbye, spread over the
-    last two turns the way they usually are: the recap and the step, the
-    Persona's answer, then the goodbye."""
     closing = _closing_of(
         "Ich fasse kurz zusammen: Wir tauschen das Gerät. Ich schicke Ihnen bis Freitag "
         "die Bestätigung.",
@@ -408,8 +334,6 @@ def test_a_closing_with_all_three_parts() -> None:
 
 
 def test_the_closing_reads_only_the_last_two_turns() -> None:
-    """A recap three turns before the end is not the closing -- at six to nine
-    turns a call, three would be a third of it."""
     closing = _closing_of(
         "Wir haben also vereinbart, dass Sie das Gerät einschicken.",
         "Ja, genau so.",
@@ -420,8 +344,6 @@ def test_the_closing_reads_only_the_last_two_turns() -> None:
 
 
 def test_a_call_too_short_to_have_a_closing_has_none() -> None:
-    """Under three user turns the window would reach back into the opening:
-    absent, not a zero that looks measured."""
     turns = [Turn(seq=1, persona_text="Guten Tag."),
              Turn(seq=2, user_text="Hallo, auf Wiederhören.", user_speech_ms=1000,
                   user_phonation_ms=1000)]
@@ -429,25 +351,18 @@ def test_a_call_too_short_to_have_a_closing_has_none() -> None:
 
 
 def test_a_vague_promise_is_no_agreement() -> None:
-    """"Ich kümmere mich darum" commits to nothing a caller could hold anyone to
-    -- the phrase the Persona's own prompt calls a vague reassurance."""
     closing = _closing_of("Ich kümmere mich darum.", "Tschüss.")
 
     assert closing.detail["agreement"] is False
 
 
 def test_a_question_about_how_is_no_agreement() -> None:
-    """"Wie machen wir das?" asks for the next step; it does not settle one."""
     closing = _closing_of("Und wie machen wir das jetzt?", "Gut.")
 
     assert closing.detail["agreement"] is False
 
 
 def test_a_deadline_given_as_a_window_is_an_agreement() -> None:
-    """A deadline given as a window ("innerhalb der nächsten halben Stunde") is an agreement.
-
-    Found in stored closings; missing it reports a next step the call did have as absent.
-    """
     for said in (
         "Es sollte innerhalb der nächsten halben Stunde fertig sein.",
         "Das ist in den nächsten zwei Tagen erledigt.",
@@ -458,30 +373,24 @@ def test_a_deadline_given_as_a_window_is_an_agreement() -> None:
 
 
 def test_a_place_is_no_deadline() -> None:
-    """The window above requires a unit of time. "Innerhalb unserer Abteilung"
-    says where something happens, not by when."""
     closing = _closing_of("Das klären wir innerhalb unserer Abteilung.", "Tschüss.")
 
     assert closing.detail["agreement"] is False
 
 
 def test_a_greeting_is_no_farewell() -> None:
-    """"Schönen guten Tag" is how a call starts, not how it ends."""
     closing = _closing_of("Schönen guten Tag nochmal.", "Ja.")
 
     assert closing.detail["farewell"] is False
 
 
 def test_the_closing_is_the_same_whoever_rang() -> None:
-    """Unlike the opening, whose third part depends on who rang, a good close
-    asks the same of both sides."""
     said = ("Ich melde mich bis Montag bei Ihnen.", "Einen schönen Tag noch.")
 
     assert _parts(_closing_of(*said)) == _parts(_closing_of(*said, reverse=True))
 
 
 def test_the_closing_follows_the_language_of_the_call() -> None:
-    """The patterns come from the Persona's language pack."""
     closing = _closing_of(
         "Just to recap, I'll send you the new contract by Friday.",
         "Thanks for your time, goodbye.",
@@ -492,22 +401,14 @@ def test_the_closing_follows_the_language_of_the_call() -> None:
 
 
 def test_the_closing_needs_a_vocabulary() -> None:
-    """No pack means no patterns: absent rather than three misses."""
     assert _closing_of("Auf Wiederhören.", "Tschüss.", language_id=None) is None
 
 
 def test_an_unmeasured_turn_contributes_no_reaction_time() -> None:
-    """F-53/ADR 0048. Its offset is the end of the utterance, not the start, so
-    reading it as a reaction time would report the utterance as hesitation. The
-    measured Turn's 500 ms survives; nothing is invented for the other."""
     assert [r.gap_ms for r in conversation(_call_with_one_unmeasured_turn()).reactions] == [500]
 
 
 def test_incomplete_acoustics_suppress_the_metrics_that_depend_on_them() -> None:
-    """ADR 0048/0051. The failed Turn's words count while its milliseconds do
-    not, so a share and a rate across the call would both come out low -- and a
-    figure indistinguishable from a measured one is what ADR 0051 refuses to
-    print. Transcript-only metrics never needed the audio."""
     keys = set(_by_key(_call_with_one_unmeasured_turn()))
 
     assert "talk_share" not in keys
@@ -516,14 +417,10 @@ def test_incomplete_acoustics_suppress_the_metrics_that_depend_on_them() -> None
 
 
 def test_the_opening_turn_does_not_count_as_a_failed_measurement() -> None:
-    """The Persona speaks first, so the opening Turn has no user audio. Counting
-    it as unmeasured would suppress the acoustic metrics of every call."""
     assert conversation(_measured_call()).user_acoustics_complete is True
 
 
 def test_words_without_measured_speech_still_suppress_the_share() -> None:
-    """A call whose Turns claim to be measured but carry no milliseconds is a
-    measurement that failed without saying so, not a user who never spoke."""
     turns = [
         Turn(seq=1, persona_text="Guten Tag.", persona_offset_ms=0, persona_end_ms=1_000),
         Turn(seq=2, user_text="Ich habe gesprochen", user_offset_ms=1_500, user_end_ms=3_000),
@@ -533,8 +430,6 @@ def test_words_without_measured_speech_still_suppress_the_share() -> None:
 
 
 def test_pauses_come_from_the_same_segmentation_as_phonation() -> None:
-    """F-51. One Praat pass yields both, so the time by which phonation falls
-    short of the recording is accounted for as pauses."""
     turns = _measured_call()
     turns[1].pauses = [Pause(offset_ms=2_000, duration_ms=1_000)]
 
@@ -543,22 +438,17 @@ def test_pauses_come_from_the_same_segmentation_as_phonation() -> None:
     assert values["pauses"] == 1.0
 
 
-# --- F-53: how long the user speaks before breaking off ---------------------
 # Mean length of runs; runs = pauses inside utterances + utterances. The tests
 # pin that arithmetic, which is off by one either way if boundaries are miscounted.
 
 
 def test_an_uninterrupted_utterance_is_one_run() -> None:
-    """No pause inside it, so the whole speaking time is a single stretch and
-    the figure is that stretch."""
     values = _by_key(_measured_call())
 
     assert values["run_length"] == _PHONATION_MS / 1_000
 
 
 def test_a_pause_inside_an_utterance_splits_it_into_two_runs() -> None:
-    """The point of the metric. The speaking time has not changed; what changed
-    is that it came out in two pieces instead of one."""
     turns = _measured_call()
     turns[1].pauses = [Pause(offset_ms=2_000, duration_ms=500)]
 
@@ -570,9 +460,6 @@ def test_a_pause_inside_an_utterance_splits_it_into_two_runs() -> None:
 
 
 def test_the_detail_carries_both_terms_of_the_denominator() -> None:
-    """A call of many short utterances and one of few interrupted ones reach
-    the same run count by different routes, and the figure alone cannot be read
-    back into either."""
     turns = _measured_call()
     turns[1].pauses = [Pause(offset_ms=2_000, duration_ms=500)]
 
@@ -585,41 +472,24 @@ def test_the_detail_carries_both_terms_of_the_denominator() -> None:
 
 
 def test_an_unmeasured_turn_suppresses_the_run_length() -> None:
-    """Phonation short by an unknown amount over a run count that is not,
-    which is a figure nobody can interpret. Withheld for the whole call, the
-    same trade ADR 0051 makes for the other acoustic statistics."""
     assert "run_length" not in set(_by_key(_call_with_one_unmeasured_turn()))
 
 
 def test_a_call_the_user_never_spoke_in_has_no_run_length() -> None:
-    """The opening Turn carries no user audio. Dividing by zero utterances
-    would be an exception; reporting nothing is the answer."""
     turns = [Turn(seq=1, persona_text="Guten Tag.", persona_offset_ms=0, persona_end_ms=1_000)]
 
     assert "run_length" not in set(_by_key(turns))
 
 
 def test_the_run_length_carries_no_step_and_no_colour() -> None:
-    """It correlates with what listeners hear (Hincks 2005, r = 0.72, ahead of
-    the pitch variation quotient F-35's reading rests on) and that is still not
-    a boundary. Nothing published says where a short run stops being
-    conversational, so ADR 0078's first condition is unmet and this stays a
-    bare figure."""
     detail = {m.key: m.detail for m in measure(conversation(_measured_call()))}["run_length"]
 
     assert "light" not in detail
     assert "step" not in detail
 
 
-# --- F-51: cutting in on the Persona (ADR 0035) ----------------------------
-
-
 def _call_with_a_barge_in() -> list[Turn]:
-    """A call where the user genuinely cut in, with the reply trimmed to the heard part.
-
-    Carries both ends a real trimmed Turn has (`persona_end_ms` heard,
-    `persona_dispatched_end_ms` sent); a one-end fixture let a regression through.
-    """
+    """Carries both ends a real trimmed Turn has; a one-end fixture let a regression through."""
     return [
         Turn(seq=1, persona_text="Guten Tag, ich rufe an wegen der offenen Rechnung ...",
              persona_offset_ms=0, persona_end_ms=3_200, persona_dispatched_end_ms=10_000,
@@ -639,17 +509,12 @@ def _call_with_a_barge_in() -> list[Turn]:
 
 
 def test_an_interruption_needs_both_the_overlap_and_the_lost_words() -> None:
-    """The event is "the Persona had more to say and did not get to say it".
-    Read off the timeline plus the trim flag, never off the transcript's
-    "[unterbrochen]" marker, which is a rendering decision."""
     values = _by_key(_call_with_a_barge_in())
 
     assert values["interruptions"] == 1.0
 
 
 def test_a_trimmed_reply_the_user_did_not_overlap_is_not_an_interruption() -> None:
-    """Same flag, no overlapping start: whatever cut that reply short, it was
-    not somebody talking over it."""
     turns = _measured_call()
     turns[1].persona_interrupted = True
 
@@ -657,20 +522,12 @@ def test_a_trimmed_reply_the_user_did_not_overlap_is_not_an_interruption() -> No
 
 
 def test_a_call_nobody_interrupted_reports_zero_rather_than_nothing() -> None:
-    """Zero is a measurement here, unlike elsewhere in this module. The user
-    let every reply finish, which is a fact about the call; a missing row would
-    read as "not measured" and hide it."""
     values = _by_key(_measured_call())
 
     assert values["interruptions"] == 0.0
 
 
 def test_the_count_carries_its_context_without_dividing_by_it() -> None:
-    """A count, with the number of Persona replies beside it rather than dividing it.
-
-    A rate put a single interruption on the top step. The offsets travel too, so the
-    interface can point at them in the transcript.
-    """
     detail = next(
         m.detail for m in measure(conversation(_call_with_a_barge_in()))
         if m.key == "interruptions"
@@ -683,19 +540,12 @@ def test_the_count_carries_its_context_without_dividing_by_it() -> None:
 
 
 def test_a_call_with_no_persona_reply_yields_no_interruption_figure() -> None:
-    """Nothing was there to cut into, so there is nothing to report. Zero would
-    claim the user restrained themselves."""
     turns = [Turn(seq=1, user_text="Hallo?", user_speech_ms=500, user_phonation_ms=400)]
 
     assert "interruptions" not in _by_key(turns)
 
 
-# --- F-35: the pitch range, in an interval rather than in Hertz ------------
-
-
 def test_intonation_is_reported_in_semitones() -> None:
-    """A fifth is seven semitones. In Hertz the same figure would describe the
-    voice rather than what was done with it."""
     turns = _measured_call()
     turns[1].pitch_hz = [120.0] * 30 + [180.0] * 30
 
@@ -705,8 +555,6 @@ def test_intonation_is_reported_in_semitones() -> None:
 
 
 def test_an_unvoiced_call_has_no_pitch_figure() -> None:
-    """Whispering, or a Turn Praat found no voicing in. A span over nothing
-    would be a number with no measurement behind it."""
     turns = _measured_call()
     turns[1].pitch_hz = [None] * 60
 
@@ -714,8 +562,6 @@ def test_an_unvoiced_call_has_no_pitch_figure() -> None:
 
 
 def test_a_handful_of_voiced_frames_is_not_a_range() -> None:
-    """Below the floor the percentiles are picking single frames, and one
-    octave error would then decide the value for the whole call."""
     turns = _measured_call()
     turns[1].pitch_hz = [120.0, 240.0, 130.0]
 
@@ -723,11 +569,6 @@ def test_a_handful_of_voiced_frames_is_not_a_range() -> None:
 
 
 def test_the_curve_carries_the_seams_between_the_users_turns() -> None:
-    """The curve carries the seams between the user's turns.
-
-    Persona turns are cut out of the curve, so without seams a boundary reads as a
-    voice movement. No step is stored: it is derived on read.
-    """
     turns = _measured_call()
     turns[1].pitch_hz = [120.0] * 60
     turns.append(
@@ -751,8 +592,6 @@ def test_the_curve_carries_the_seams_between_the_users_turns() -> None:
     assert "liveliness" not in detail
 
 
-# --- F-37: the loudness course, described rather than scored ---------------
-
 # Steady without being constant: real Praat output jitters a few dB per frame,
 # and a spread of exactly zero is what would make the band degenerate.
 def _steady(points: int, level: float = 65.0) -> list[float | None]:
@@ -770,14 +609,10 @@ def _with_stretch(shift: float, length: int, at: int) -> list[float | None]:
 
 
 def test_an_even_call_is_described_as_even() -> None:
-    """The band comes from the call's own samples, so a speaker who held one
-    level never leaves it. A flat call must not be given a variation."""
     assert "even" in describe_loudness_course(_steady(600))
 
 
 def test_a_sustained_shift_is_named_with_where_it_happened() -> None:
-    """What F-37 is for -- and the most that can be said without the norms
-    ADR 0051 declined to invent."""
     described = describe_loudness_course(_with_stretch(shift=10.0, length=60, at=450))
 
     assert "louder stretch" in described
@@ -785,22 +620,16 @@ def test_a_sustained_shift_is_named_with_where_it_happened() -> None:
 
 
 def test_a_brief_change_is_not_a_stretch() -> None:
-    """One second outside the band is a stressed word. Marking it would bury
-    the sustained shifts."""
     assert "even" in describe_loudness_course(_with_stretch(shift=10.0, length=10, at=450))
 
 
 def test_a_shift_covering_a_third_of_the_call_is_still_found() -> None:
-    """The regression the band exists to avoid: a stretch that long *is* the
-    tenth percentile. The median absolute deviation survives it."""
     described = describe_loudness_course(_with_stretch(shift=-9.0, length=200, at=380))
 
     assert "quieter stretch" in described
 
 
 def test_both_directions_are_reported_when_both_happened() -> None:
-    """A call that rose and later fell is two observations, which is why the
-    stretches are kept per direction."""
     curve = _with_stretch(shift=10.0, length=60, at=60)
     for index in range(430, 490):
         value = curve[index]
@@ -814,9 +643,6 @@ def test_both_directions_are_reported_when_both_happened() -> None:
 
 
 def test_the_description_carries_no_figure_and_no_timestamp() -> None:
-    """ADR 0051: a dB reading in the prompt comes back out as one in the
-    wrap-up, over a chart that shows none. A timestamp would be read against the
-    transcript's clock, which this curve is not on."""
     described = describe_loudness_course(_with_stretch(shift=10.0, length=60, at=450))
 
     assert not any(character.isdigit() for character in described)
@@ -824,7 +650,6 @@ def test_the_description_carries_no_figure_and_no_timestamp() -> None:
 
 
 def test_a_call_with_almost_no_audible_speech_says_so() -> None:
-    """Saying "even" about two samples reports a steadiness never measured."""
     assert "too little" in describe_loudness_course([None] * 40 + [65.0, 66.0])
 
 
@@ -834,10 +659,7 @@ CATALOGUE_TS = (
 
 
 def _catalogue_entries() -> dict[str, str]:
-    """The frontend's private metric catalogue: key to the body of its entry.
-
-    Read from the source as text: there is no Node in the pytest run.
-    """
+    """Read from the frontend source as text: there is no Node in the pytest run."""
     text = CATALOGUE_TS.read_text(encoding="utf-8")
     body = text.split("const CATALOGUE: Record<MetricKey, MetricDescriptor> = {", 1)[1]
     body = body.split("\n};", 1)[0]
@@ -852,25 +674,13 @@ def _catalogue_entries() -> dict[str, str]:
 
 
 def _measured_catalogue_keys() -> set[str]:
-    """The catalogue keys that stand for a metric the backend measures.
-
-    `derived` entries are left out -- the call length is the one today. It needs
-    the display facts every other key has, so an entry saying what it is beats
-    an absence, which is what let it inherit them from the unknown-key fallback.
-    """
+    """Catalogue keys of measured metrics; `derived` entries are left out."""
     return {
         key for key, body in _catalogue_entries().items() if "derived: true" not in body
     }
 
 
 def test_frontend_catalogue_covers_every_metric():
-    """Every active metric is described on the frontend, and nothing else is.
-
-    A new metric otherwise renders as "4.0" or never reaches a focus goal, silently.
-    Inactive metrics are absent: they never produce a Measurement. So are
-    `derived` entries, the other direction -- a series the browser works out with
-    no backend metric behind it (see `_measured_catalogue_keys`).
-    """
     active = {m.key for m in METRICS if m.active}
     described = _measured_catalogue_keys()
 

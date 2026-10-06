@@ -1,13 +1,6 @@
-"""The HTTP surface of a stored Session: status codes and response shape (ADR 0050).
+"""A stored Session over HTTP: status codes, ownership and shape (F-12, ADR 0034, 0050, 0057)."""
 
-Round trip of F-12 / ADR 0034: write through `persist_session`, read back through
-`GET /api/sessions/{extern_id}`. Keys are the ORM's column names verbatim, as
-frontend/src/protocol.ts declares them (ADR 0057)."""
-
-# pylint: disable=duplicate-code
-# Fixture data is repeated per test module on purpose: a test carrying its own
-# Turns shows what it ran against when it fails, and sharing them would let a
-# change made for one test quietly alter another.
+# pylint: disable=duplicate-code  # each module carries its own fixture Turns on purpose
 
 import uuid
 from datetime import datetime
@@ -44,8 +37,6 @@ def _store(extern_id: uuid.UUID) -> None:
 
 
 async def test_liveness_needs_no_database(api_client: httpx.AsyncClient) -> None:
-    """/health must not depend on anything, or a brief database outage would
-    look like a dead process and trigger a restart loop."""
     response = await api_client.get("/health")
 
     assert response.status_code == 200
@@ -53,8 +44,6 @@ async def test_liveness_needs_no_database(api_client: httpx.AsyncClient) -> None
 
 
 async def test_readiness_reports_the_database(api_client: httpx.AsyncClient) -> None:
-    """/health/ready is what the compose healthcheck asks, so it has to
-    actually reach Postgres rather than answer from memory."""
     response = await api_client.get("/health/ready")
 
     assert response.status_code == 200
@@ -62,9 +51,6 @@ async def test_readiness_reports_the_database(api_client: httpx.AsyncClient) -> 
 
 
 async def test_personas_come_from_the_database(api_client: httpx.AsyncClient) -> None:
-    """The endpoint reads the persona table, not backend/personas.py (ADR 0041)
-    — here it returns the Persona the fixture inserted, and the seed never
-    ran, so a module-backed endpoint would answer differently."""
     response = await api_client.get("/api/personas")
 
     assert response.status_code == 200
@@ -75,8 +61,6 @@ async def test_personas_come_from_the_database(api_client: httpx.AsyncClient) ->
 
 
 async def test_scenarios_come_from_the_database(api_client: httpx.AsyncClient) -> None:
-    """Same for Scenarios; the shape is the one App.tsx destructures, and `id`
-    is the natural key the client sends back in session.start."""
     response = await api_client.get("/api/scenarios")
 
     assert response.status_code == 200
@@ -97,8 +81,6 @@ async def test_scenarios_come_from_the_database(api_client: httpx.AsyncClient) -
 async def test_deactivated_persona_is_not_offered_for_a_new_call(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """A retired Persona stays in the table for the Sessions that reference it,
-    but must not appear in the selection."""
     db_session.query(DbPersona).update({"active": False})
     db_session.commit()
 
@@ -109,7 +91,6 @@ async def test_deactivated_persona_is_not_offered_for_a_new_call(
 
 
 async def test_unknown_session_is_a_clean_404(api_client: httpx.AsyncClient) -> None:
-    """A stale id in a client's sessionStorage is expected, not exceptional."""
     response = await api_client.get(f"/api/sessions/{uuid.uuid4()}")
 
     assert response.status_code == 404
@@ -117,7 +98,6 @@ async def test_unknown_session_is_a_clean_404(api_client: httpx.AsyncClient) -> 
 
 
 async def test_malformed_session_id_is_rejected(api_client: httpx.AsyncClient) -> None:
-    """Anything that is not a UUID fails validation before a query runs."""
     response = await api_client.get("/api/sessions/not-a-uuid")
 
     assert response.status_code == 422
@@ -126,8 +106,6 @@ async def test_malformed_session_id_is_rejected(api_client: httpx.AsyncClient) -
 async def test_a_session_cannot_be_reached_through_its_primary_key(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """Only the public id opens a Session — the sequential primary key must not
-    be usable as a lookup, or Sessions could be enumerated (ADR 0050)."""
     _store(uuid.uuid4())
 
     # The first Session has primary key 1; that value as a UUID finds nothing.
@@ -137,11 +115,6 @@ async def test_a_session_cannot_be_reached_through_its_primary_key(
 
 
 async def test_another_users_session_is_not_readable(api_client: httpx.AsyncClient) -> None:
-    """Someone else's Session is indistinguishable from one that does not exist.
-
-    A 403 would confirm the id, which is what ADR 0050's unguessable id exists
-    to withhold, so the ownership check (ADR 0031) answers 404 as well.
-    """
     extern_id = persist(subject="somebody-else")
 
     response = await api_client.get(f"/api/sessions/{extern_id}")
@@ -153,8 +126,6 @@ async def test_another_users_session_is_not_readable(api_client: httpx.AsyncClie
 async def test_stored_session_is_returned_in_the_transcript_shape(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """The payload has to carry the keys protocol.ts declares, so one view can
-    render both a live and a reloaded Session."""
     extern_id = uuid.uuid4()
     _store(extern_id)
 
@@ -165,10 +136,7 @@ async def test_stored_session_is_returned_in_the_transcript_shape(
     assert body["session_id"] == str(extern_id)
     assert body["persona"] == "Thomas Brandt"
     assert body["scenario"] == "Kündigungsabsicht"
-    # The exact key set, so anything added here is a decision rather than
-    # drift. `interrupted` and `unheard_text` were added for F-51's
-    # interruption drill-down: the second is what the Persona had been about to
-    # say, kept beside the transcript and never inside it (ADR 0035).
+    # The exact key set, so an addition is a decision rather than drift.
     assert set(body["turns"][0]) == {
         "turn_id", "speaker", "start_offset_ms", "duration_ms", "transcript",
         "interrupted", "unheard_text",
@@ -178,7 +146,6 @@ async def test_stored_session_is_returned_in_the_transcript_shape(
 async def test_transcript_comes_back_in_speaking_order(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """seq_index carries the ordering, so the read path has to sort by it."""
     extern_id = uuid.uuid4()
     _store(extern_id)
 
@@ -195,9 +162,6 @@ async def test_transcript_comes_back_in_speaking_order(
 async def test_speaker_matches_the_schema_vocabulary(
     api_client: httpx.AsyncClient, db_session: DbSession
 ) -> None:
-    """The column is `speaker` in ('user', 'persona'); the wire uses the same
-    key and the same values (ADR 0057), which TranscriptView.tsx compares
-    against. The two must not be allowed to drift apart."""
     extern_id = uuid.uuid4()
     _store(extern_id)
 
@@ -211,8 +175,6 @@ async def test_speaker_matches_the_schema_vocabulary(
 async def test_measurements_reach_the_wire_with_the_schema_vocabulary(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """`messungen`/`schluessel`/`bezeichnung`/`einheit`/`wert` are gone (ADR
-    0057); the metric_type/measurement columns pass straight through."""
     extern_id = uuid.uuid4()
     _store(extern_id)
 
@@ -242,10 +204,6 @@ async def test_phase_block_reaches_the_wire_as_phase_language(
     stored: str | None,
     expected: str | None,
 ) -> None:
-    """F-42: `feedback.phase_language` is served under the same key (ADR 0057).
-
-    NULL stays null, not "": the frontend drops the block on falsiness, and older
-    wrap-ups genuinely have no phase analysis."""
     extern_id = uuid.uuid4()
     _store(extern_id)
     session_id = db_session.query(Session).one().session_id
@@ -279,10 +237,6 @@ async def test_tone_fit_reaches_the_wire_under_its_own_key(
     stored: str | None,
     expected: str | None,
 ) -> None:
-    """`feedback.tone_fit` is served under the same key (ADR 0057), for IntonationReading.
-
-    NULL stays null, not "": a wrap-up written before it was never given the occasion,
-    so the frontend leaves the block out."""
     extern_id = uuid.uuid4()
     _store(extern_id)
     session_id = db_session.query(Session).one().session_id
@@ -305,8 +259,6 @@ async def test_feedback_points_reach_the_wire_with_the_schema_vocabulary(
     api_client: httpx.AsyncClient,
     db_session: DbSession,
 ) -> None:
-    """`punkte`/`art`/`staerke`/`verbesserung` are gone (ADR 0057); a point's
-    `kind` is `feedback_point.kind`'s own value, unmapped."""
     extern_id = uuid.uuid4()
     _store(extern_id)
     session_id = db_session.query(Session).one().session_id
@@ -331,8 +283,6 @@ async def test_feedback_points_reach_the_wire_with_the_schema_vocabulary(
 async def test_feedback_is_absent_until_the_worker_has_run(
     api_client: httpx.AsyncClient,
 ) -> None:
-    """The Session becomes readable before its wrap-up exists (ADR 0019), and
-    the client polls on `status` until it settles."""
     extern_id = uuid.uuid4()
     _store(extern_id)
 

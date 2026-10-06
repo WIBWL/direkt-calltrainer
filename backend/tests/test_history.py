@@ -1,8 +1,4 @@
-"""The call's record as the model has been told it (`backend/session/history.py`).
-
-Covers ADR 0035 (trim/drop to what was heard), ADR 0038 (repetition guards read
-earlier replies) and ADR 0071 (system prompt plus latest messages). The named
-operations are pinned without a pipeline, a model or an event loop."""
+"""The call's message record (ADR 0035, 0038, 0071)."""
 from backend.session.history import History
 
 # pylint: disable=missing-function-docstring

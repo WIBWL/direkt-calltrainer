@@ -1,8 +1,4 @@
-"""What the user heard of a reply streamed ahead of playback (ADR 0035).
-
-`SpokenReply.cut` answers both barge-in paths (still generating, already committed); pinned
-here directly with chunks and a played position (`test_barge_in.py` covers the Turn).
-"""
+"""`SpokenReply.cut`: what was heard of a streamed reply (ADR 0035)."""
 
 # pylint: disable=missing-function-docstring
 
@@ -35,8 +31,6 @@ def test_the_chunk_cut_into_is_heard_up_to_a_whole_word():
 
 
 def test_the_opening_sentence_still_being_synthesized_counts():
-    """ADR 0035's amendment: audio goes out before the chunk's checkpoint is
-    written, and a barge-in there used to find nothing heard at all."""
     reply = SpokenReply()
     reply.voice("Guten Tag, hier ist die Stadtwerke-Hotline.")
     reply.add_audio(2000)
@@ -60,7 +54,5 @@ def test_no_played_position_counts_everything_dispatched():
 
 
 def test_the_grace_is_the_benefit_of_the_doubt_on_the_next_sentence():
-    """Two independent clocks: a position reported at a chunk's end reaches a
-    word into the next one rather than stopping short of it."""
     reply = _reply(("Guten Tag.", 1000), ("Wie kann ich helfen?", 1500))
     assert reply.cut(1000).heard == "Guten Tag. Wie"

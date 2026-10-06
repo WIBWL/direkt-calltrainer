@@ -1,8 +1,4 @@
-"""What the boot check reports when a backend does not answer (ADR 0011/0103).
-
-The check only logs, so its sentence is its whole value. Pins two ways it got lost: a bare
-TimeoutError has no message, and client retries on a 429 inside the check's deadline turned
-a rate limit into a timeout. Backends are faked (`conftest.py`)."""
+"""What the boot check logs when a backend does not answer (ADR 0103)."""
 import asyncio
 import logging
 
@@ -51,8 +47,6 @@ def recording_client(monkeypatch):
 
 
 async def test_the_llm_check_asks_for_a_single_attempt(recording_client):
-    """Retrying is right for a Turn and wrong for a probe: the retries run
-    inside the probe's deadline and turn a 429 into a timeout."""
     with pytest.raises(RateLimitError):
         await health._check_llm()
     assert recording_client == {"max_retries": 0}
@@ -67,8 +61,6 @@ async def test_a_rate_limited_model_reports_its_own_429(recording_client, caplog
 
 
 async def test_a_timeout_says_so_instead_of_trailing_off(monkeypatch, caplog):
-    """`str(TimeoutError())` is "", which is how this line came to end in a
-    dash and nothing — indistinguishable from an answer that was empty."""
     monkeypatch.setattr(health, "_CHECK_TIMEOUT", 0.01)
     caplog.set_level(logging.ERROR, logger="backend.clients.health")
 
@@ -82,7 +74,6 @@ async def test_a_timeout_says_so_instead_of_trailing_off(monkeypatch, caplog):
 
 
 async def test_an_error_with_no_message_falls_back_to_its_class(caplog):
-    """OSError() stringifies to "" as well; a class name beats a blank."""
     caplog.set_level(logging.ERROR, logger="backend.clients.health")
 
     async def blank():
@@ -103,8 +94,6 @@ async def test_a_backend_that_answers_passes(caplog):
 
 
 async def test_a_reported_failure_is_counted_not_raised(monkeypatch, caplog):
-    """`check_backends` never raises — it runs from `lifespan`, which logs a
-    dead dependency rather than failing the boot."""
     caplog.set_level(logging.ERROR, logger="backend.clients.health")
 
     async def down():

@@ -1,8 +1,4 @@
-"""Dialogue generation: the persona's reply, streamed token by token.
-
-One backend, no fallback (ADR 0011, ADR 0103); streaming lets audio start before
-the reply finishes (ADR 0033). Sampling is Qwen3-on-vLLM specific and lives in
-`_sampling_kwargs` (docs/research/model-parameters.md)."""
+"""The LLM client: the streamed live reply and the off-path completions (ADR 0103)."""
 
 import logging
 import re
@@ -16,32 +12,22 @@ from shared.clients.config import LLM_CLIENT, LLM_MODEL
 
 logger = logging.getLogger(__name__)
 
-# What `complete_json` parses into: any pydantic model the caller names, handed
-# back as that type rather than as a dict, so the caller keeps its own fields.
 _Model = TypeVar("_Model", bound=BaseModel)
 
-# In thinking mode the reasoning trace is delivered out-of-band as
-# `reasoning_content` when the gateway runs a reasoning parser, and inline as a
-# <think>...</think> block when it does not. Strip the inline form so a caller
-# never has to know which deployment it is talking to.
+# The inline form of a reasoning trace, for gateways without a reasoning parser.
 _THINK_BLOCK_RE = re.compile(r"\s*<think>.*?</think>\s*", re.DOTALL)
 
-# Upper bound on worst-case latency and cost per reply, not a target length:
-# the system prompt already constrains replies to short, realistic sentences,
-# and observed completion-token usage stays well within double digits. Kept
-# tight-ish because every extra token the model rambles is extra TTS work on
-# the critical path -- a runaway reply is the main way a Turn gets slow.
+# A bound on a runaway reply, not a target: every extra token is TTS work on the
+# critical path.
 _MAX_REPLY_TOKENS = 180
 
 
 def _sampling_kwargs(
     *, think: bool, qwen_sampling: bool, presence_penalty: float | None
 ) -> dict[str, object]:
-    """The parts of a request that belong to the model rather than to the call.
-
-    Thinking must be off for a spoken reply (Qwen3's `chat_template_kwargs`): left on,
-    `max_tokens` goes into a trace `delta.content` never surfaces. The rest is Qwen3
-    tuning (ADR 0038); re-measure on a model change (docs/research/model-parameters.md)."""
+    """Model-specific request parts. Thinking must be off for a spoken reply, or
+    `max_tokens` is spent in a trace `delta.content` never shows. The rest is
+    Qwen3 tuning (ADR 0038): re-measure on a model change."""
     return {
         **({"presence_penalty": presence_penalty} if presence_penalty is not None else {}),
         "extra_body": {
@@ -54,10 +40,7 @@ def _sampling_kwargs(
 async def stream_reply(
     messages: list[dict[str, str]], *, retries: int | None = None
 ) -> AsyncIterator[str]:
-    """Stream the persona's reply as it's generated, one token delta at a time.
-
-    `retries` overrides the client's retry count; the boot check passes 0 so a
-    rate-limited model reports as a 429, not as its probe's deadline expiring."""
+    """`retries=0` lets the boot check report a 429 instead of a timeout."""
     started = time.monotonic()
     client = LLM_CLIENT if retries is None else LLM_CLIENT.with_options(max_retries=retries)
     stream = await client.chat.completions.create(
@@ -65,19 +48,12 @@ async def stream_reply(
         messages=messages,
         stream=True,
         max_tokens=_MAX_REPLY_TOKENS,
-        # Qwen3's documented non-thinking sampling. Unset, the vLLM default is
-        # temperature/top_p 1.0, which measurably drifts off-persona and
-        # off-task and rambles longer (slower). See docs/model-parameters.md.
+        # Qwen3's non-thinking sampling; the vLLM default (1.0) drifts and rambles.
         temperature=0.7,
         top_p=0.8,
-        # Thinking off, and presence_penalty 1.5 -- Qwen3's recommended
-        # anti-repetition knob, which beat frequency_penalty 0.5 in cross-Turn
-        # tests. See `_sampling_kwargs`; the in-code guard (ADR 0038) backstops
-        # it either way.
+        # presence_penalty, not frequency_penalty: it beat 0.5 freq. in cross-Turn tests.
         **_sampling_kwargs(think=False, qwen_sampling=True, presence_penalty=1.5),
     )
-# Time to first token, logged per Turn: it moves with the model or its thinking
-# level, and a reply that thinks before speaking looks just like a slow network.
     first = True
     async for chunk in stream:
         delta = chunk.choices[0].delta.content if chunk.choices else None
@@ -88,19 +64,12 @@ async def stream_reply(
             yield delta
 
 
-# The wrap-up is a whole document; a measured one is about 500 tokens. Capped
-# rather than None so a repetition loop cannot run to the RQ job timeout. The
-# number dates from when the wrap-up ran in thinking mode and the budget had to
-# cover the trace as well: on gemma-4-26B-A4B-it the trace alone took 9-10k
-# tokens, every wrap-up came back empty at exactly this cap, and no cap fits --
-# the model's context is 16k and the prompt takes 5k of it. So nothing off the
-# live path thinks any more (ADR 0103's amendment).
+# A cap so a repetition loop cannot run to the job timeout. Nothing off the live
+# path thinks: the trace alone overran any budget that fits the context (ADR 0103).
 _MAX_FEEDBACK_TOKENS = 4000
 
-# Its own read timeout: the client-wide TIMEOUT bounds the gap between streamed
-# chunks, but this call is not streamed, and a full 4000 tokens takes over a
-# minute. Kept below `queue.JOB_TIMEOUT_S` (300 s, not imported: no
-# dependency on the queue) so the request fails inside the job and is recorded.
+# Not streamed, so it needs its own read timeout; below the job's 300 s so the
+# failure is recorded inside the job.
 _FEEDBACK_TIMEOUT_S = 240.0
 
 
@@ -111,27 +80,16 @@ async def complete(
     think: bool = False,
     retries: int | None = None,
 ) -> str:
-    """One non-streamed completion off the live path: wrap-up (ADR 0049), document
-    summary (F-58), follow-up draft (F-60). `max_tokens=None` leaves only the context
-    window as a bound; `retries` as in `stream_reply`. Same model as the reply (ADR 0103).
-
-    `think=True` asks for a reasoning trace first. No caller passes it on the current
-    model: the trace is 6-10k tokens there, minutes per call and more than the wrap-up's
-    budget (ADR 0103's amendment, docs/research/model-parameters.md). It stays for a
-    model that needs the revision pass, as Qwen3-4B's German did -- measure before use."""
-    # This path is reached only from the worker, so the log line is the one
-    # place its parameters are ever visible. `stream_reply` logs its own.
+    """One non-streamed completion off the live path. `think=True` is unused on
+    the current model (ADR 0103); measure before using it."""
     logger.info("LLM completion (%s, max_tokens=%s, think=%s)...", LLM_MODEL, max_tokens, think)
     client = LLM_CLIENT if retries is None else LLM_CLIENT.with_options(max_retries=retries)
     completion = await client.chat.completions.create(
         model=LLM_MODEL,
         messages=messages,
-        # Per request, overriding the client's own: see _FEEDBACK_TIMEOUT_S.
         timeout=_FEEDBACK_TIMEOUT_S,
         **({"max_tokens": max_tokens} if max_tokens is not None else {}),
-        # Thinking mode: Qwen3's documented sampling for it (a low temperature
-        # there degrades into repetition). Non-thinking: low but not zero, so the
-        # output reads naturally while staying close to its input.
+        # Thinking mode needs its documented sampling; a low temperature degrades it.
         temperature=0.6 if think else 0.3,
         **({"top_p": 0.95} if think else {}),
         **_sampling_kwargs(think=think, qwen_sampling=think, presence_penalty=None),
@@ -141,11 +99,8 @@ async def complete(
 
 
 def _strip_reasoning(text: str) -> str:
-    """The answer out of a thinking-mode reply, or "" if there is no answer yet.
-
-    An unclosed `<think>` means the budget ran out mid-reasoning. Never return the
-    trace: it is full of `{`, and a JSON-scraping caller would take it as the answer.
-    """
+    """The answer out of a thinking-mode reply, or "" while the trace is unclosed:
+    the trace is full of `{` and would be taken for the JSON answer."""
     stripped = _THINK_BLOCK_RE.sub("", text)
     if "<think>" in stripped:
         logger.warning("Reasoning trace did not close — the token budget ran out inside it")
@@ -153,19 +108,13 @@ def _strip_reasoning(text: str) -> str:
     return stripped.strip()
 
 
-# --- Reading a structured reply -------------------------------------------
-#
-# JSON callers off the live path (wrap-up, follow-up draft, reverse briefing):
-# a small model (ADR 0011) fences its output however plainly told not to.
+# A small model fences its JSON however plainly told not to.
 
 _FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
 
 
-# What a prompt asking for a JSON object has to forbid, word for word the same
-# wherever one does: the follow-up draft (F-60) and the reverse briefing (F-61)
-# carried two copies until they were found to be identical. Kept beside the
-# parser whose failures each rule prevents -- N2 above all, since one unescaped
-# double quote makes the whole answer unreadable to `json_object`.
+# One copy for every prompt asking for JSON (ADR 0100); one unescaped quote makes
+# the answer unparseable.
 JSON_ANSWER_NEVER = (
     "# Never\n"
     "N1. No markdown, no headings, no bullet characters, no line breaks "
@@ -178,9 +127,7 @@ JSON_ANSWER_NEVER = (
 
 
 def json_object(raw: str) -> str:
-    """The JSON object out of whatever the model wrapped it in. ValueError if
-    there is none — a cue to retry or fall back, not an error worth a
-    traceback."""
+    """The JSON object out of whatever wraps it; ValueError if there is none."""
     fenced = _FENCE_RE.search(raw)
     candidate = fenced.group(1) if fenced else raw
     start, end = candidate.find("{"), candidate.rfind("}")
@@ -190,21 +137,14 @@ def json_object(raw: str) -> str:
 
 
 def without_fenced_blocks(raw: str) -> str:
-    """`raw` with every fenced block removed, content and all — the prose, for a
-    caller that has given up on parsing the reply."""
     return _FENCE_RE.sub("", raw)
 
 
 async def complete_json(
     messages: list[dict[str, str]], model: type[_Model], what: str
 ) -> _Model | None:
-    """One structured answer off the live path, retried once; None if neither parsed.
-
-    No thinking: the User is waiting on a button, and the trace made that three
-    minutes where the answer alone takes ten seconds (ADR 0103's amendment). No token
-    cap either, the fields being bounded by their own limits. Returns None rather
-    than raising: what an unusable answer means is the caller's to decide (the
-    reverse briefing: a 503)."""
+    """One structured answer, retried once; None if neither parsed. The caller
+    decides what an unusable answer means."""
     for attempt in range(2):  # initial attempt + one retry
         raw = await complete(messages, max_tokens=None)
         try:

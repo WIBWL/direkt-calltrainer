@@ -1,115 +1,73 @@
-"""The parts of the prompt frame that cannot be English (ADR 0043), keyed by `language_id`.
-
-Examples that demonstrate register, patterns matched against speech in the
-Persona's language (ADR 0037, ADR 0038) and lines spoken aloud. Adding a language
-means one pack here plus a Persona row with that `language_code`."""
+"""What the prompt frame cannot say in English, per language (ADR 0043): register
+examples, patterns matched against speech, and lines spoken aloud."""
 
 import re
 from dataclasses import dataclass
 
-# Clause boundaries. The veto below only looks back to the nearest one, because
-# a negation belongs to its own clause: "Ich kann nicht länger warten, auf
-# Wiederhören" really is a goodbye, while "sagen Sie nicht einfach tschüss" is
-# not, and the comma is what separates the two.
+# The closing veto looks back only to the nearest clause boundary: "Ich kann
+# nicht länger warten, auf Wiederhören" is a goodbye; "sagen Sie nicht einfach
+# tschüss" is not.
 _CLAUSE_END_RE = re.compile(r"[,;.!?]")
 
 
 @dataclass(frozen=True)
-# A configuration record, not an object with behaviour: one field per thing
-# about a language that cannot be English. Splitting it to satisfy the limit
-# would scatter what belongs together.
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes  # a configuration record
 class LanguagePack:
-    """Everything about one supported conversation language."""
-
-    # The language's English name, interpolated into the English prompt frame.
     name_en: str
-    # Two short exchanges demonstrating register, sentence length and pacing,
-    # never how a call unfolds. Mid-call with no opening and no names (the model
-    # drew names from them), in a domain no Scenario uses (else reused as
-    # content), and concrete with a date and a number, as the frame asks.
+    # Register and pacing only: mid-call, nameless (the model drew names from
+    # them), in a domain no Scenario uses (else reused as content).
     example_exchange: str
-    # Several structurally different openers in the target language: a single
-    # anchor gets copied verbatim into every opening (once English into German calls).
+    # Several shapes: a single anchor gets copied verbatim into every opening.
     opening_examples: str
-    # For a reverse (ADR 0070): ways to answer a phone. A separate pool because
-    # the model copies the shape of its examples. They name no case: a callee who
-    # names one has invented the caller's reason.
+    # For a reverse. They name no case: a callee naming one invents the caller's reason.
     answering_examples: str
-    # Quoted user phrases the English frame points at, in the target language.
     user_closing_examples: str
     vague_reassurance_examples: str
     farewell_re: re.Pattern[str]
     postpone_re: re.Pattern[str]
-    # Matched against the start of the Persona's own reply: the small model
-    # tends to restart the call from the top -- greeting again, name again --
-    # when it has run low on new things to say (ADR 0038). Anchored, because it
-    # is only a re-introduction when it is the *opening* of the reply.
+    # Anchored: a greeting at the start of the Persona's reply is a restart (ADR 0038).
     regreeting_re: re.Pattern[str]
-    # Matched against the user's speech: an explicit "say that again" / "who
-    # are you?" makes repeating the correct move, so the turn is exempt from
-    # the repetition guards (ADR 0038).
+    # Exempts the turn from the repetition guards (ADR 0038).
     repeat_request_re: re.Pattern[str]
-    # Words that, in the same clause as a matched farewell or postponement, mean
-    # the phrase is talked about rather than used: a negation ("sagen Sie nicht
-    # einfach tschüss") or a future marker ("bevor wir auf Wiederhören sagen").
-    # A false closing cuts the call off, the expensive direction of error.
+    # Same-clause words that mean the farewell is mentioned, not said. A false
+    # closing cuts the call off, the expensive error.
     closing_veto_re: re.Pattern[str]
-    # Matched against the *persona's* last sentence when it carries an
-    # unprompted [CALL_END] (ADR 0037): a demand or an open question there
-    # means the model lost the thread, not that the call is over. Narrow, like
-    # the user-side patterns, and a farewell in the same sentence overrides it.
+    # Vetoes an unprompted [CALL_END] when the Persona's last sentence still
+    # presses (ADR 0037).
     still_pressing_re: re.Pattern[str]
-    # Whisper does not return an empty transcript on near-silence; it invents
-    # a fixed phrase in the audio's language ("Vielen Dank.", "Amen.", a
-    # subtitle credit). A whole transcript matching one of these is not a
-    # Turn (docs/research/model-parameters.md; ADR 0071). Whole-message
-    # patterns only: "Nein, danke, das passt" is a real answer.
+    # Whisper invents these on near-silence (ADR 0071). Whole-message only:
+    # "Nein, danke, das passt" is a real answer.
     stt_phantom_re: re.Pattern[str]
-    # A question word at the start makes an open question, anything else a
-    # closed one. Anchored, and deliberately shallow: a question word buried
-    # further in counts as closed rather than being guessed at.
+    # Anchored and shallow: a question word further in counts as closed.
     open_question_re: re.Pattern[str]
-    # Lexical fillers only: real words, so they survive transcription. Hesitation
-    # sounds ("äh") do not -- Whisper drops them -- and so are not listed.
+    # Lexical only; Whisper drops "äh".
     filler_re: re.Pattern[str]
-    # The three parts of an opening turn (F-63). The name is unknown, so
-    # self_intro_re looks for the frames it is said in, followed by a capital.
+    # The name is unknown, so `self_intro_re` matches its frame plus a capital (F-63).
     greeting_re: re.Pattern[str]
     self_intro_re: re.Pattern[str]
-    # The third part depends on who rang: the called side offers help, the
-    # caller states the concern (a reverse, ADR 0070).
+    # Called side offers help; the caller (a reverse) states the concern.
     offer_re: re.Pattern[str]
     concern_re: re.Pattern[str]
-    # The three parts of a closing (ADR 0089), read in the user's last two turns,
-    # the same whoever rang. `sign_off_re` is wider than `farewell_re` on purpose:
-    # that one decides live whether to hang up, where a false match cuts the call.
+    # ADR 0089. `sign_off_re` is wider than `farewell_re`, which hangs up live.
     recap_re: re.Pattern[str]
     agreement_re: re.Pattern[str]
     sign_off_re: re.Pattern[str]
     fallback_closing_line: str
-    # What the Persona says when it has rung and nobody speaks after the pick
-    # up (ADR 0110), one line per silence, in order; spoken as written, not
-    # generated, because a caller checking the line is there says the same
-    # two words everywhere and a model round trip would only delay them.
+    # Fixed, not generated: a model round trip would only delay them (ADR 0110).
     pickup_prompts: tuple[str, ...]
 
 
-# Whisper's non-speech annotations -- "*Titelm*", "[Musik]", "(Applaus)" -- are
-# language-independent; the phantom phrases are per pack.
+# Whisper's non-speech annotations ("*Titelm*", "[Musik]") in any language.
 _ANNOTATION_RE = re.compile(r"^\s*[*\[(][^*\]\)]*[*\])]\s*[.!?]*\s*$")
 
 
 def is_phantom(pack: LanguagePack, user_text: str) -> bool:
-    """True if the transcript is Whisper inventing speech on near-silence -- a
-    VAD misfire, not a Turn (ADR 0071)."""
     stripped = user_text.strip()
     return not stripped or bool(_ANNOTATION_RE.match(stripped)) or bool(pack.stt_phantom_re.match(stripped))
 
 
 def signals_closing(pack: LanguagePack, user_text: str) -> bool:
-    """True if the user really signalled the call is over: a match counts only
-    when its own clause does not veto it ("sagen Sie nicht einfach tschüss")."""
+    """A match counts only when its own clause does not veto it."""
     for pattern in (pack.farewell_re, pack.postpone_re):
         match = pattern.search(user_text)
         if match is None:
@@ -161,23 +119,17 @@ _GERMAN = LanguagePack(
     ),
     user_closing_examples='"das reicht mir"/"das wär\'s"',
     vague_reassurance_examples='"ich kümmere mich darum", "ich stelle das klar"',
-    # Explicit farewell or request to postpone, the signals the persona's own
-    # judgment missed. Narrow regex, not an LLM classifier (whose reasoning went
-    # astray in testing): a missed signal costs one turn, a false one cuts the call.
     farewell_re=re.compile(
         r"\b(tschüss|auf wiederhören|auf wiedersehen|wiederhören|ciao)\b", re.IGNORECASE
     ),
     postpone_re=re.compile(
         r"(ein andere[rs]? mal|andermal|anders (fortsetzen|weiterführen|weitermachen)|"
         r"später (nochmal|weiter|zurückrufen)|melde mich (nochmal|später|wieder)|"
-        # "keine Zeit mehr *für* X" is a complaint about X, not a request to
-        # hang up -- and complaint Scenarios are exactly where it turns up.
+        # Not "keine Zeit mehr für X": that is a complaint, common in complaint Scenarios.
         r"rufe? (sie |dich )?(nochmal|später|zurück)|keine zeit (mehr|gerade)\b(?!\s*f(ü|ue)r)|"
         r"muss (jetzt |gleich )?(auflegen|los|schluss machen)|gespräch (beenden|abbrechen)|"
-        # The inflected forms -- "ich beende das Gespräch jetzt", "ich lege
-        # jetzt auf" -- were said to the persona and missed. The look-ahead
-        # keeps "ich beende das Gespräch nicht" out, since the veto only reads
-        # the clause *before* a match.
+        # The look-ahead keeps "ich beende das Gespräch nicht" out; the veto
+        # only reads the clause before a match.
         r"beende\w*(?:\s+\w+){0,3}\s+(gespräch|telefonat)(?!\s+(noch\s+)?nicht\b)|"
         r"lege?\s+(jetzt\s+|dann\s+|gleich\s+)?auf\b)",
         re.IGNORECASE,
@@ -193,9 +145,7 @@ _GERMAN = LanguagePack(
         r"(nochmal|noch mal|noch einmal)\b.*(sagen|wiederhol|langsam)|"
         r"(sag|sagen sie( mir)?|sprechen sie)\b.*(nochmal|noch mal|noch einmal|langsamer)|"
         r"wiederholen sie|können sie das (bitte )?(nochmal |noch mal )?wiederhol|"
-        # Not followed by a reason clause: "das habe ich nicht verstanden" asks
-        # for a repeat, "ich kann nicht verstehen, warum ..." is an objection to
-        # the substance and must not put the persona into repeat mode.
+        # Not before a reason clause: "ich kann nicht verstehen, warum" is an objection.
         r"nicht (ganz |richtig |gut |so )?(verstanden|verstehen|mitbekommen|gehört|mitgekriegt)"
         r"\b(?!\s*,?\s*(warum|wieso|weshalb|dass))|"
         r"schlecht (zu )?(verstehen|verstanden|hören))",
@@ -204,8 +154,6 @@ _GERMAN = LanguagePack(
     closing_veto_re=re.compile(
         r"\b(nicht|kein\w*|nie|niemals|bevor|ehe)\b", re.IGNORECASE
     ),
-    # "Ich will wissen, wann ..." / "Ich muss wissen ..." / "Wann wird ..." --
-    # the shapes the persona's demands took in the calls that ended on them.
     still_pressing_re=re.compile(
         r"\b(ich (will|möchte|muss|brauche|erwarte)\b|wann (wird|ist|kommt|funktioniert|bekomme)\b|"
         r"ich warte (auf|noch)\b)",
@@ -216,8 +164,7 @@ _GERMAN = LanguagePack(
         r"copyright [\w\s,.-]+)\W*$",
         re.IGNORECASE,
     ),
-    # Longest alternatives first, so "womit" is not shadowed by "wo"; leading
-    # fillers are skipped ("Und was brauchen Sie?").
+    # Longest alternatives first, so "womit" is not shadowed by "wo".
     open_question_re=re.compile(
         r"^(?:(?:und|aber|also|okay|gut|ja|nun|jetzt)[\s,]+){0,2}"
         r"(wieso|weshalb|warum|wofür|womit|worauf|worum|wohin|woher|welche[rnsm]?|"
@@ -234,11 +181,9 @@ _GERMAN = LanguagePack(
         r"\b(guten\s+(tag|morgen|abend)|hallo|grüß\s+gott|moin|servus|herzlich\s+willkommen)\b",
         re.IGNORECASE,
     ),
-    # "hier ist Schmidt", not "hier ist alles". The name is unknown, so the frame
-    # is matched, with an optional article/title before the capital ("hier ist die
-    # Anna", "Sie sprechen mit ...", bare "hier Schmidt"). Cost: "hier ist die
-    # Rechnung" counts, harmless since only the first utterance is read. A bare
-    # "Schmidt, guten Tag" is structurally unrecognisable (ADR 0086: "nicht erkannt").
+    # "hier ist Schmidt", not "hier ist alles". "hier ist die Rechnung" also
+    # counts, harmless for a first utterance. A bare "Schmidt, guten Tag" goes
+    # unrecognised (ADR 0086).
     self_intro_re=re.compile(
         r"\bmein\s+name(?:\s+ist|:)\s+(?:(?:die|der|frau|herrn?)\s+)?(?-i:[A-ZÄÖÜ])"
         r"|\bsie\s+sprechen\s+mit\s+(?:(?:die|der|frau|herrn?)\s+)?(?-i:[A-ZÄÖÜ])"
@@ -259,8 +204,6 @@ _GERMAN = LanguagePack(
         r"|ich\s+melde\s+mich\s+wegen|(grund|anlass)\s+meines\s+anrufs)",
         re.IGNORECASE,
     ),
-    # "Ich fasse das noch einmal kurz zusammen", "wir haben also vereinbart",
-    # "halten wir fest". A few words may sit between the verb and its particle.
     recap_re=re.compile(
         r"\b(zusammen(gefasst|fassend)|zusammenzufassen|fasse\s+(\w+\s+){0,4}zusammen"
         r"|halten\s+wir\s+(\w+\s+){0,2}fest"
@@ -268,16 +211,14 @@ _GERMAN = LanguagePack(
         r"|(ich\s+)?wiederhole\s+(\w+\s+){0,2}(kurz|noch\s*(ein)?mal))",
         re.IGNORECASE,
     ),
-    # A next step with something concrete in it: a first-person action, what the
-    # other side will get, or a deadline (also as a window: "innerhalb der nächsten
-    # halben Stunde"; a time noun is required, so "innerhalb unserer Abteilung" is
-    # no promise). Deliberately not "ich kümmere mich darum", the vague reassurance.
+    # Something concrete: an action, what the other side gets, or a deadline
+    # (a time noun is required). Never "ich kümmere mich darum".
     agreement_re=re.compile(
         r"\b(ich\s+(schicke|sende|maile|leite|buche|trage|reserviere|bestätige)\w*\b"
         r"|ich\s+(melde|rufe)\s+(\w+\s+){0,3}(zurück|an|bei\s+ihnen|bis)"
         r"|sie\s+(bekommen|erhalten|hören)\s+(\w+\s+){0,3}(von\s+mir|bis|morgen|heute)"
         r"|(nächste[nr]?|weitere[nr]?)\s+schritt|(so\s+)?verbleiben\s+wir|wir\s+verbleiben"
-        # "so" is required: "wie machen wir das?" is a question, not a deal.
+        # "so" required: "wie machen wir das?" is a question.
         r"|so\s+machen\s+wir\s+(es|das)|machen\s+wir\s+(es|das)\s+so|abgemacht"
         r"|bis\s+(spätestens\s+)?(montag|dienstag|mittwoch|donnerstag|freitag|morgen|übermorgen"
         r"|ende\s+der\s+woche|nächste[nr]?\s+woche|zum\s+\d|\d)"
@@ -339,8 +280,6 @@ _ENGLISH = LanguagePack(
     ),
     user_closing_examples='"that\'s all I needed"/"that\'ll do"',
     vague_reassurance_examples='"I\'ll look into it", "I\'ll get that sorted"',
-    # Same rationale as the German patterns above: narrow, regex-based, and
-    # matched against the user's own transcribed speech.
     farewell_re=re.compile(
         r"\b(goodbye|good bye|bye|take care|have a (good|nice) (day|one)|"
         r"speak (to you )?soon|talk to you later)\b",
@@ -390,12 +329,10 @@ _ENGLISH = LanguagePack(
         re.IGNORECASE,
     ),
     greeting_re=re.compile(r"\b(hello|hi|good\s+(morning|afternoon|evening))\b", re.IGNORECASE),
-    # "I'm Alice" is the commonest of them. German has no safe equivalent:
-    # nouns are capitalised, so "ich bin Kunde" would pass for a name.
+    # German has no safe "ich bin X": nouns are capitalised ("ich bin Kunde").
     self_intro_re=re.compile(
         r"\bmy\s+name\s+is\s+(?-i:[A-Z])|\bthis\s+is\s+(?-i:[A-Z])|\b(?-i:[A-Z])\w+\s+speaking\b"
         r"|\bi(?:'m|\s+am)\s+(?-i:[A-Z])"
-        # The counterpart of the German "Sie sprechen mit", added with it.
         r"|\byou(?:'re|\s+are)\s+speaking\s+(?:with|to)\s+(?-i:[A-Z])",
         re.IGNORECASE,
     ),
@@ -437,6 +374,5 @@ LANGUAGE_PACKS: dict[str, LanguagePack] = {"de": _GERMAN, "en": _ENGLISH}
 
 
 def get_pack(language_id: str) -> LanguagePack:
-    """The pack for this language. KeyError for a Persona whose `language_code`
-    has no pack: a configuration error worth failing loudly on."""
+    """KeyError for a Persona without a pack: a configuration error."""
     return LANGUAGE_PACKS[language_id]

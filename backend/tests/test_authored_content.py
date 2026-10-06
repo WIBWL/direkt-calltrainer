@@ -1,8 +1,4 @@
-"""User-authored Scenarios: ownership, visibility and the write path.
-
-Covers F-34, F-59/R-58 (tenant-shared library), ADR 0058 (owner-scoped CRUD), ADR 0060 (tenant/visibility),
-ADR 0059 (sanitising), ADR 0063 (field limits), ADR 0072 (category), ADR 0050 (extern_id).
-Needs a seeded Postgres (skips without); callers resolve via their `organization` claim."""
+"""Authored Scenarios: ownership, visibility, write path (F-34, F-59, ADR 0058-0060, 0063, 0072)."""
 import httpx
 import pytest
 
@@ -79,10 +75,7 @@ async def test_another_user_never_sees_my_private_scenario(client, as_user):
     as_user(BOB)
     listed = (await client.get("/api/scenarios")).json()
     assert new_id not in {s["id"] for s in listed}
-    # ... and cannot reach it directly either, not even to read. ADR 0062
-    # opened the detail route to everything the caller may *select*; a
-    # stranger's private row is not that, and the 404 is the same answer an
-    # unknown id gets (ADR 0031/0050).
+    # A stranger's private row is not selectable, so it is a 404 like an unknown id.
     assert (await client.get(f"/api/scenarios/{new_id}")).status_code == 404
 
 
@@ -110,9 +103,6 @@ async def test_deleting_a_scenario_drops_it_from_the_list(client, as_user):
 
 
 async def test_a_built_in_is_readable_but_not_editable(client, as_user):
-    """ADR 0062: the info panel reads any Scenario the caller may select.
-    A built-in is not theirs to write, and `editable` is what says so --
-    the route no longer answers 404 to make the point."""
     as_user(ALICE)
     built_in_id = (await client.get("/api/scenarios")).json()[0]["id"]
 
@@ -127,11 +117,6 @@ async def test_a_built_in_is_readable_but_not_editable(client, as_user):
 
 
 async def test_a_built_in_withholds_the_callers_intent(client, as_user):
-    """ADR 0062: `description` and `case_facts` are the situation and come
-    up in the call anyway; `call_goal` is what the caller wants and the bar
-    that ends the exercise. Reading that in advance would hand the trainee the
-    answer, so a built-in serves it as None -- None rather than "", so
-    "withheld" stays distinguishable from "empty"."""
     as_user(ALICE)
     built_in_id = (await client.get("/api/scenarios")).json()[0]["id"]
     detail = (await client.get(f"/api/scenarios/{built_in_id}")).json()
@@ -146,8 +131,6 @@ async def test_a_built_in_withholds_the_callers_intent(client, as_user):
 
 
 async def test_my_own_scenario_withholds_nothing(client, as_user):
-    """The counterpart: the author wrote the whole thing, so the read view
-    is the editor's view and `editable` is true."""
     as_user(ALICE)
     new_id = (await client.post("/api/scenarios", json=_NEW)).json()["id"]
 
@@ -163,9 +146,6 @@ async def test_an_oversize_field_is_rejected(client, as_user):
 
 
 async def test_field_limits_endpoint_reports_the_api_caps(client, as_user):
-    """ADR 0063: the editor caps its inputs from this endpoint, not a bundled
-    mirror. It is keyed by the draft field names, so `title` is reported as the
-    card field `name`."""
     as_user(ALICE)
     limits = (await client.get("/api/scenarios/field-limits")).json()
 
@@ -200,9 +180,6 @@ async def test_a_malformed_id_is_a_clean_404(client, as_user):
     assert (await client.get("/api/scenarios/not-a-uuid")).status_code == 404
 
 
-# --- F-59 / R-58: sharing with the company -------------------------------
-
-
 async def test_sharing_makes_it_visible_to_a_colleague_not_to_other_companies(
     client, as_user,
 ):
@@ -225,10 +202,7 @@ async def test_sharing_makes_it_visible_to_a_colleague_not_to_other_companies(
     assert mine["origin"] == "own"
     assert mine["shared"] is True
 
-    # The colleague now sees it, badged as a company Scenario, and can start a
-    # call with it. Since ADR 0062 they can read it in full as well -- sharing
-    # a case with the company while making it illegible to the company is not
-    # a policy anyone chose -- but they still cannot edit it.
+    # The colleague sees and reads it, badged as a company Scenario, but cannot edit it.
     as_user(BOB_A)
     card = {s["id"]: s for s in (await client.get("/api/scenarios")).json()}[new_id]
     assert card["origin"] == "tenant"
@@ -274,9 +248,6 @@ async def test_a_user_cannot_promote_to_public(client, as_user):
 
 
 async def test_a_user_with_no_company_cannot_share(client, as_user):
-    """"Share" means "with my colleagues" (ADR 0060); a caller in the `default`
-    tenant has none, so the endpoint refuses rather than exposing the row to
-    every other company-less account."""
     as_user(ALICE)  # no tenant claim -> default tenant
     new_id = (await client.post("/api/scenarios", json=_NEW)).json()["id"]
 
@@ -289,8 +260,6 @@ async def test_a_user_with_no_company_cannot_share(client, as_user):
 
 
 async def test_tenant_endpoint_names_the_company_or_null(client, as_user):
-    """The setup screen shows a `<company>` filter chip; `null` for a caller in
-    the `default` tenant means no chip."""
     as_user(ALICE_A)
     assert (await client.get("/api/tenant")).json() == {"name": "company-a"}
 
@@ -302,8 +271,6 @@ async def test_tenant_endpoint_names_the_company_or_null(client, as_user):
 
 
 async def test_a_new_organization_gets_its_tenant_on_first_sight(client):  # pylint: disable=unused-argument
-    """Only `default` is seeded (ADR 0060): a company exists once its alias
-    first arrives, and every later request lands in that same row."""
     first = tenants.resolve_tenant(ALICE_A)
     assert (first.ref, first.name, first.is_default) == ("company-a", "company-a", False)
     assert tenants.resolve_tenant(BOB_A).id == first.id
@@ -313,9 +280,6 @@ async def test_a_new_organization_gets_its_tenant_on_first_sight(client):  # pyl
 async def test_an_overlong_alias_lands_in_the_default_tenant(client):  # pylint: disable=unused-argument
     ctx = auth.AuthContext(sub="dave", roles=[], token="t", tenant="x" * 65)
     assert tenants.resolve_tenant(ctx).is_default
-
-
-# --- ADR 0072: the category an author may set -------------------------------
 
 
 async def test_an_authored_scenario_keeps_the_category_it_was_given(client, as_user):
@@ -329,9 +293,6 @@ async def test_an_authored_scenario_keeps_the_category_it_was_given(client, as_u
 
 
 async def test_a_category_left_out_is_no_category(client, as_user):
-    """Optional on purpose: a Scenario that fits none of the three contexts is
-    better uncategorised than filed under one nobody chose. It reaches the
-    column as NULL and the card as null."""
     as_user(ALICE)
     created = (await client.post("/api/scenarios", json=_NEW)).json()
     assert created["category"] == ""
@@ -342,8 +303,6 @@ async def test_a_category_left_out_is_no_category(client, as_user):
 
 
 async def test_a_category_can_be_changed_and_cleared_again(client, as_user):
-    """An edit is a full PATCH, so clearing the select has to reach the row --
-    the empty choice is a value, not an omission."""
     as_user(ALICE)
     created = (await client.post("/api/scenarios", json={**_NEW, "category": "operations"})).json()
     edited = await client.patch(
@@ -357,9 +316,6 @@ async def test_a_category_can_be_changed_and_cleared_again(client, as_user):
 
 
 async def test_a_category_outside_the_vocabulary_is_rejected(client, as_user):
-    """The API validates against the same list the CHECK constraint holds, so a
-    value the database would refuse never reaches it -- the free-text field of
-    the free-text field it replaces is not coming back."""
     as_user(ALICE)
     resp = await client.post("/api/scenarios", json={**_NEW, "category": "vertrieb"})
     assert resp.status_code == 422

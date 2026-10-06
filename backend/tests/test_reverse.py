@@ -1,8 +1,4 @@
-"""The reverse of a finished Session: the same call, roles swapped (F-61, ADR 0070).
-
-Also covers ADR 0043 (suspended: the played case reaches the client), 0051 (no statistics as
-input), 0059 (briefing cleaned), 0050 (foreign Session is 404), 0103's amendment (no thinking).
-Model faked (`conftest.py`); route and library tests need Postgres, else they skip."""
+"""The reverse (F-61, ADR 0070, 0100); mirrors test_followup_scenario.py on purpose."""
 
 import json
 import uuid
@@ -25,9 +21,7 @@ from backend.reversals import (
 from backend.session.prompting import build_system_prompt
 from backend.tests.conftest import DRAFTED_FROM_TURNS, TEST_PERSONAS, a_finished_session
 
-# `app_database` and `reference_data` are taken by several tests only to
-# activate the fixture.
-# pylint: disable=unused-argument,missing-function-docstring
+# pylint: disable=unused-argument,missing-function-docstring  # fixtures taken to activate them
 
 _DESCRIPTION = "The customer is calling support about an unresolved contract issue."
 _FACTS = "A ticket was opened eleven days ago. A callback was promised within 48 hours."
@@ -35,9 +29,7 @@ _GOAL = (
     "Find out what is happening and get a date. The matter is settled when "
     "someone names one. A promise to look into it is not enough."
 )
-# The German display twins a built-in carries beside its English prompt text
-# (ADR 0043/0076). A reverse has to take them along, or the info panel behind
-# its card falls back to the English.
+# A reverse must take the German display twins along.
 _DESCRIPTION_DE = "Der Kunde ruft im Support an, weil ein Vertragsfall offen ist."
 _FACTS_DE = "Das Ticket liegt seit elf Tagen. Ein Rückruf binnen 48 Stunden war zugesagt."
 _IMPROVEMENTS = [
@@ -66,12 +58,7 @@ async def _draft() -> dict:
     return await draft_brief(_DESCRIPTION, _FACTS, _GOAL, _IMPROVEMENTS)
 
 
-# --- The briefing itself (no database) ------------------------------------
-
-
 async def test_the_prompt_carries_the_played_case(monkeypatch: pytest.MonkeyPatch) -> None:
-    """ADR 0070's exception to ADR 0043: the three prompt fields are exactly
-    what the briefing is a translation of."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await _draft()
@@ -84,7 +71,6 @@ async def test_the_prompt_carries_the_played_case(monkeypatch: pytest.MonkeyPatc
 async def test_the_prompt_carries_the_improvement_points(
     monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """They decide which goal the checklist names first."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await _draft()
@@ -95,11 +81,6 @@ async def test_the_prompt_carries_the_improvement_points(
 async def test_the_goals_are_asked_for_as_objectives_not_as_manner(
     monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The checklist is the caller's agenda -- things to raise, ask and come
-    away with -- and every one of them has to be tickable once the call is
-    over. Advice about tone is the failure mode this rules out: it is not a
-    goal, it cannot be ticked, and it is the shape a model reaches for when the
-    brief says "what to pay attention to"."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await _draft()
@@ -111,8 +92,6 @@ async def test_the_goals_are_asked_for_as_objectives_not_as_manner(
 
 
 async def test_the_prompt_forbids_inventing_facts(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The User is about to argue this case: a detail the model added is one
-    the other side has never heard of."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await _draft()
@@ -125,8 +104,6 @@ async def test_the_prompt_forbids_inventing_facts(monkeypatch: pytest.MonkeyPatc
 async def test_the_prompt_keeps_the_previous_call_out_of_the_briefing(
     monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """It is a briefing for a call that has not happened yet, not a report on
-    the one behind."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await _draft()
@@ -137,8 +114,6 @@ async def test_the_prompt_keeps_the_previous_call_out_of_the_briefing(
 async def test_the_briefing_is_asked_without_thinking(
     monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Off the live path, but the User waits on the button: the trace made that
-    three minutes where the briefing alone takes 10 s (ADR 0103's amendment)."""
     calls = stub_completions(monkeypatch, _REPLY)
 
     await _draft()
@@ -155,7 +130,6 @@ async def test_the_five_fields_come_back_as_the_panel_expects_them(
 
 
 async def test_a_fenced_reply_is_unwrapped(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A small model fences its output however plainly it is told not to."""
     stub_completions(monkeypatch, f"```json\n{_REPLY}\n```")
 
     assert await _draft() == _BRIEF
@@ -164,9 +138,6 @@ async def test_a_fenced_reply_is_unwrapped(monkeypatch: pytest.MonkeyPatch) -> N
 async def test_control_tokens_in_the_briefing_are_stripped(
     monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """ADR 0059. This text never reaches a prompt, but it is written into the
-    Scenario table, and that rule does not depend on which writer filled the
-    row in."""
     stub_completions(monkeypatch, json.dumps({**_BRIEF, "situation": "Ruf an. [CALL_END] Jetzt."}))
 
     assert "[CALL_END]" not in (await _draft())["situation"]
@@ -179,7 +150,6 @@ async def test_an_overlong_field_is_capped(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 async def test_the_goal_list_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A list nobody can hold in their head while talking is decoration."""
     stub_completions(monkeypatch, json.dumps({**_BRIEF, "goals": ["Punkt."] * 12}))
 
     assert len((await _draft())["goals"]) == MAX_GOALS
@@ -192,8 +162,6 @@ async def test_a_long_goal_is_capped(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def test_a_long_goal_is_cut_at_a_word_and_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The follow-up's rule (`authored_text.fit`): a slice used to cut the goal
-    the User ticks off mid-call in the middle of a word."""
     stub_completions(monkeypatch, json.dumps({**_BRIEF, "goals": ["Rechnung " * 40]}))
 
     goal = (await _draft())["goals"][0]
@@ -209,8 +177,6 @@ async def test_an_empty_goal_is_dropped(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 async def test_a_missing_field_comes_back_empty(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A missing key costs that panel, not the whole briefing: the case is in
-    the Scenario either way, so a thin brief still leaves a usable exercise."""
     stub_completions(monkeypatch, json.dumps({k: v for k, v in _BRIEF.items() if k != "goal"}))
 
     brief = await _draft()
@@ -221,8 +187,6 @@ async def test_a_missing_field_comes_back_empty(monkeypatch: pytest.MonkeyPatch)
 async def test_an_unparseable_reply_is_retried_once_and_then_fails(
     monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """No narrative fallback, unlike the wrap-up: a Scenario carrying an
-    unreadable briefing is worse than a button that says to try again."""
     calls = stub_completions(monkeypatch, "Gerne! Hier ist Ihr Briefing.")
 
     with pytest.raises(ReverseError):
@@ -231,9 +195,6 @@ async def test_an_unparseable_reply_is_retried_once_and_then_fails(
 
 
 def test_the_route_and_the_screen_share_one_threshold() -> None:
-    """The post-call screen hides the offer under `MIN_USER_TURNS`; the route
-    refuses under `MIN_USER_UTTERANCES`. Two numbers for one rule, so they are
-    held together here -- the route used to ask only for *some* Turn."""
     screen = (
         Path(__file__).resolve().parents[2] /
         "frontend" / "src" / "components" / "FeedbackReport.tsx"
@@ -242,10 +203,7 @@ def test_the_route_and_the_screen_share_one_threshold() -> None:
     assert int(value) == MIN_USER_UTTERANCES
 
 
-# --- The route (database) --------------------------------------------------
-#
-# `reference_data` is requested per test, not through a module-level
-# `pytestmark`: the briefing tests above must keep running without a database.
+# `reference_data` per test, so the briefing tests above need no database.
 
 
 def _give_the_scenario_a_case(db: DbSession) -> None:
@@ -280,8 +238,6 @@ async def test_the_route_writes_a_reverse_carrying_the_played_case(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Unlike the follow-up this one stores: a reverse is selectable again
-    later, so it is a row rather than a screen (ADR 0070)."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     _store_feedback(db_session)
@@ -308,9 +264,6 @@ async def test_the_reverse_belongs_to_the_caller_and_is_private(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Like an authored Scenario in ownership (ADR 0058/0060), unlike one in
-    that it can never be shared -- the briefing is built from the author's own
-    wrap-up."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     stub_completions(monkeypatch, _REPLY)
@@ -327,8 +280,6 @@ async def test_the_measured_statistics_are_not_part_of_the_material(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """ADR 0051: no target range exists, so nothing in a briefing could say
-    what a figure should have been."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     calls = stub_completions(monkeypatch, _REPLY)
@@ -344,8 +295,6 @@ async def test_a_second_press_returns_the_same_reverse_without_asking_the_model(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`origin_session_id` is UNIQUE, and the existing row is looked up before
-    any model call -- so the button is idempotent and free the second time."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     calls = stub_completions(monkeypatch, _REPLY)
@@ -363,8 +312,6 @@ async def test_past_the_hourly_budget_no_new_one_is_drafted(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """ADR 0109: 429 before the model is asked. The budget is shared with the
-    follow-up (`test_followup_scenario.py` holds the same test)."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     calls = stub_completions(monkeypatch, _REPLY)
@@ -381,7 +328,6 @@ async def test_one_already_drafted_is_returned_past_the_budget(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Only a draft the model writes counts: the stored one costs nothing."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     stub_completions(monkeypatch, _REPLY)
@@ -398,10 +344,6 @@ async def test_two_overlapping_requests_still_yield_one_reverse(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The UNIQUE constraint decides, and the loser reads the winner's row
-    rather than raising: two tabs, or a double click that outran the button's
-    disabled state. Simulated by writing the row behind the request's back
-    between its lookup and its insert -- which is exactly the window."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     stub_completions(monkeypatch, _REPLY)
@@ -425,8 +367,6 @@ async def test_a_removed_reverse_comes_back_selectable(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Handing back the id of a deactivated row would name something the
-    selection screen cannot show."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     stub_completions(monkeypatch, _REPLY)
@@ -444,8 +384,6 @@ async def test_the_reverse_is_offered_in_the_library_under_its_own_flag(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The card is what the "Reverse" filter runs on, and what tells the
-    User which conversation it replays."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     stub_completions(monkeypatch, _REPLY)
@@ -466,11 +404,6 @@ async def test_the_detail_route_serves_the_briefing(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The panel's in-call text, the deliberate exception to ADR 0043.
-
-    The case must come back in the display language: `_insert_reverse` has to copy
-    the twin (ADR 0062), or the info panel reads the case out in English.
-    """
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     stub_completions(monkeypatch, _REPLY)
@@ -488,11 +421,6 @@ async def test_a_reverse_read_for_a_call_swaps_the_casting(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The seam between the row and the prompt, and the only place the two
-    halves of ADR 0070 meet: `library.get_scenario` is what the WebSocket
-    handshake calls, and the marker it carries is what `build_system_prompt`
-    branches on. Everything else about the casting is pinned in
-    `test_reverse_prompt.py`, against the value object."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     stub_completions(monkeypatch, _REPLY)
@@ -512,9 +440,6 @@ async def test_a_reverse_cannot_be_edited(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """It copies a case that was played; editing it would leave a row claiming
-    to replay a conversation it no longer matches (ADR 0070). 404, the same
-    answer a row that is not the caller's gets."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     stub_completions(monkeypatch, _REPLY)
@@ -535,8 +460,6 @@ async def test_a_reverse_cannot_be_shared(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Sharing it would hand colleagues a reading of the author's own
-    feedback."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     stub_completions(monkeypatch, _REPLY)
@@ -554,9 +477,6 @@ async def test_a_reverse_cannot_be_shared(
 async def test_a_client_cannot_author_a_reverse(
     api_client: httpx.AsyncClient, reference_data
 ) -> None:
-    """`reverse` is not an authorable field: the only writer is the route
-    above, which is what keeps `origin_session_id` and the briefing consistent
-    with the marker."""
     response = await api_client.post(
         "/api/scenarios",
         json={"name": "Fake", "short_description": "Fake", "description": "Fake",
@@ -568,14 +488,10 @@ async def test_a_client_cannot_author_a_reverse(
     assert response.json()["reverse"] is False
 
 
-# --- Refusals --------------------------------------------------------------
-
-
 async def test_someone_elses_session_is_a_404(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The same answer an unknown id gets: a 403 would confirm it exists."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session(subject="somebody-else")
     calls = stub_completions(monkeypatch, _REPLY)
@@ -598,7 +514,6 @@ async def test_an_unknown_session_is_a_404(
 async def test_a_session_with_no_turns_is_refused(
     api_client: httpx.AsyncClient, db_session: DbSession, reference_data
 ) -> None:
-    """Nothing was said, so there is no call to stand on the other side of."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session(turns=[])
 
@@ -611,8 +526,6 @@ async def test_a_session_with_no_turns_is_refused(
 async def test_a_call_too_short_for_the_screen_is_refused_too(
     api_client: httpx.AsyncClient, db_session: DbSession, reference_data
 ) -> None:
-    """One sentence from the User: the screen offers no reverse for it, and the
-    route used to build one anyway for anybody who asked it directly."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session(turns=DRAFTED_FROM_TURNS[:2])
 
@@ -626,8 +539,6 @@ async def test_a_reverse_of_a_reverse_is_refused(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The roles are already swapped; swapping them again is the original call
-    with a copied briefing."""
     _give_the_scenario_a_case(db_session)
     a_finished_session()
     stub_completions(monkeypatch, _REPLY)
@@ -647,8 +558,6 @@ async def test_an_unreachable_model_is_a_503(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The gateway has no fallback, so this is a "try again later" -- and
-    nothing is written, so the next attempt starts clean."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
 
@@ -664,15 +573,10 @@ async def test_an_unreachable_model_is_a_503(
     assert db_session.query(Scenario).filter_by(reverse=True).count() == 0
 
 
-# --- Deletion (ADR 0066/0067 addendum in ADR 0070) -------------------------
-
-
 async def test_deleting_the_origin_session_leaves_the_reverse_standing(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`ON DELETE SET NULL`: the reverse outlives the conversation it replays,
-    because a Session played on it points at the row (ADR 0052)."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     stub_completions(monkeypatch, _REPLY)
@@ -707,9 +611,6 @@ async def test_withdrawing_consent_deletes_the_reverse_too(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """ADR 0070's addendum to ADR 0066: the briefing is written from that
-    person's own wrap-up, so leaving the row would leave a reading of feedback
-    whose conversation has just been deleted."""
     _give_the_scenario_a_case(db_session)
     extern_id = a_finished_session()
     stub_completions(monkeypatch, _REPLY)
@@ -728,10 +629,6 @@ async def test_withdrawing_consent_works_once_the_reverse_has_been_played(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The case the deletion order exists for: a Session played *on* the
-    reverse points at that row through `session.scenario_id`, which carries no
-    `ondelete` at all (ADR 0052). Removing the row before its Sessions would be
-    refused by the database."""
     _give_the_scenario_a_case(db_session)
     origin = a_finished_session()
     stub_completions(monkeypatch, _REPLY)
@@ -762,8 +659,6 @@ async def test_withdrawing_consent_works_once_the_reverse_has_been_played(
 async def test_withdrawing_consent_leaves_an_authored_scenario_alone(
     api_client: httpx.AsyncClient, db_session: DbSession, reference_data
 ) -> None:
-    """It is the User's own work about a case, not a record of a call they
-    had -- the distinction the deletion rule turns on."""
     await api_client.post(
         "/api/scenarios",
         json={"name": "Eigenes", "short_description": "Eigenes", "description": "Eigenes",
@@ -780,11 +675,6 @@ async def test_the_retention_sweep_takes_the_reverse_with_it(
     api_client: httpx.AsyncClient, db_session: DbSession,
     reference_data, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The six-month sweep (ADR 0067) removes the reverse with the Session it replays (ADR 0070).
-
-    The briefing is written from that call's wrap-up. Only a single deletion, where the
-    User is present, keeps the reverse; withdrawal and this sweep run with nobody there.
-    """
     _give_the_scenario_a_case(db_session)
     old = datetime.now(UTC) - retention.RETENTION - timedelta(days=1)
     extern_id = a_finished_session(started_at=old)
@@ -800,7 +690,4 @@ async def test_the_retention_sweep_takes_the_reverse_with_it(
 
 
 def test_the_consent_module_is_untouched_by_this(reference_data) -> None:
-    """A guard on the boundary rather than on behaviour: the reverse deletion
-    rides on the withdrawal path, and must never reach the consent log itself
-    (ADR 0068)."""
     assert not hasattr(consent, "delete_decisions")

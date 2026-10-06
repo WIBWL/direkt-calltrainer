@@ -1,8 +1,5 @@
-"""Spoken content stays out of the log, with no way to put it back (ADR 0066).
-
-The log is outside every deletion path, so these pin that the text has nowhere to go.
-Captured by a handler on the module's own logger, not `caplog`: `configure_logging()` clears
-the root handlers at import, so under the full suite `caplog` saw nothing and "absent" passed."""
+"""Spoken content never reaches the log (ADR 0066). Uses its own handler: `caplog` misses
+records once `configure_logging()` has cleared the root handlers."""
 import logging
 
 import pytest
@@ -71,8 +68,6 @@ def stt_client(monkeypatch):
 async def test_the_transcript_does_not_reach_the_log(
     stt_client, logged  # pylint: disable=unused-argument
 ) -> None:
-    """Silence about content, at every level. Anything else means the pilot
-    writes what people said into a file nobody can delete from."""
     result = await stt.transcribe(b"audio", "turn.wav", "audio/wav", "de")
 
     assert result == SPOKEN, "the caller still gets the text; only the log does not"
@@ -85,18 +80,12 @@ async def test_the_transcript_does_not_reach_the_log(
 async def test_the_length_is_still_logged(
     stt_client, logged  # pylint: disable=unused-argument
 ) -> None:
-    """Suppressing the content must not cost the signal that made the line
-    worth having: an empty or absurdly short transcript is how a VAD misfire
-    and a silent hallucination show up."""
     await stt.transcribe(b"audio", "turn.wav", "audio/wav", "de")
 
     assert str(len(SPOKEN)) in logged.text
 
 
-# --- The other half of the pipeline -----------------------------------------
-#
-# The TTS leg follows the same rule: the Persona's line carries back the name and
-# facts the user just said, and the log is outside every deletion path.
+# The TTS leg too: the Persona's line repeats what the user said.
 
 SPOKEN_BY_PERSONA = "Guten Tag Frau Example, es geht um Vertrag 4711."
 _VOICE = PersonaVoice(kugelaudio_voice_id=1)
@@ -144,9 +133,6 @@ def tts_logged(monkeypatch):
 
 
 async def test_the_persona_line_does_not_reach_the_log(tts_logged) -> None:
-    """One synthesized chunk says how much was spoken and not a word of it —
-    including at DEBUG, which is where that line now sits, because it fires per
-    chunk rather than per Turn."""
     _tts, logged = tts_logged
 
     async for _piece in _tts.synthesize_stream(SPOKEN_BY_PERSONA, _VOICE, "de"):
@@ -159,9 +145,6 @@ async def test_the_persona_line_does_not_reach_the_log(tts_logged) -> None:
 
 
 def test_there_is_no_switch_to_turn_it_back_on() -> None:
-    """The point of removing `LOG_TRANSCRIPTS` was that a default is not a
-    guarantee. A reader who puts it back in `.env` must get nothing, and a
-    module that grows the name again should fail here rather than quietly."""
     from backend.clients import config, tts  # pylint: disable=import-outside-toplevel
     from backend.session import orchestrator  # pylint: disable=import-outside-toplevel
 
