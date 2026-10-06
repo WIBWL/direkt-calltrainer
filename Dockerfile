@@ -1,25 +1,15 @@
 # syntax=docker/dockerfile:1.7
-# Three images from one Dockerfile: frontend, backend, worker (ADR 0104).
-#   docker build --target <name> -t <tag> .
-# scripts/build-and-push.sh builds and pushes all three. amd64 only:
+# Three images, one per target: frontend, backend, worker (ADR 0108). amd64 only:
 # praat-parselmouth ships no Linux aarch64 wheel.
 
-
-# --- Python ------------------------------------------------------------------
-
-# Pinned, not "python:3-slim": that floating tag had already moved to 3.14, where
-# SQLAlchemy 2.0.36 cannot resolve the `Mapped[int | None]` annotations in
-# shared/db/models.py and every database import dies. Raise it together with
-# .python-version and requires-python.
+# Pinned with .python-version: on 3.14 SQLAlchemy 2.0.36 cannot resolve the models.
 FROM python:3.12-slim AS python
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 WORKDIR /app
 
 
-# Each image's dependencies, and nothing else: `--package` installs one
-# workspace member's closure from the one lockfile. Only the pyproject files are
-# copied, so this layer caches across source edits.
+# One workspace member's closure each; only the pyproject files, so the layer caches.
 FROM python AS python-deps
 COPY --from=ghcr.io/astral-sh/uv:0.12.18 /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
@@ -40,9 +30,7 @@ RUN --mount=type=cache,id=uv,target=/root/.cache/uv \
     uv sync --locked --no-dev --package calltrainer-worker
 
 
-# What both Python images run as. The packages are imported from /app, not
-# installed (they are virtual workspace members), hence PYTHONPATH. JSON logs
-# for the host's log shipper (ADR 0105).
+# The packages are imported from /app, not installed, hence PYTHONPATH.
 FROM python AS python-runtime
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONPATH=/app \
@@ -50,12 +38,7 @@ ENV PATH=/opt/venv/bin:$PATH \
 RUN adduser --uid 5678 --disabled-password --gecos "" appuser
 
 
-# Env: every setting in .env.example (ADR 0106), any as NAME_FILE; CORS_ORIGINS
-# optional. No ENTRYPOINT: migrations and seeding run in the app's lifespan
-# handler (backend/db/provision.py). The scripts come along for
-# `docker compose exec ... python -m backend.scripts.<name>`. One worker process
-# on purpose: the per-User caps (backend/limits.py) are counted in it, and a
-# second would double them. The worker class lowers the WebSocket frame ceiling.
+# One gunicorn worker: the per-account caps are counted in it (ADR 0109).
 FROM python-runtime AS backend
 COPY --from=backend-deps /opt/venv /opt/venv
 COPY shared  ./shared
@@ -65,9 +48,6 @@ EXPOSE 8000
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "-k", "backend.gunicorn_worker.Worker", "--timeout", "120", "backend.app:app"]
 
 
-# Env: DIREKT_URL, DIREKT_API_KEY, LLM_MODEL, POSTGRES_URL, REDIS_URL, and
-# POSTGRES_PASSWORD if the URL carries none -- any as NAME_FILE. No port.
-# RQ forks per job (ADR 0018/0019).
 FROM python-runtime AS worker
 COPY --from=worker-deps /opt/venv /opt/venv
 COPY shared ./shared
@@ -76,28 +56,18 @@ USER appuser
 CMD ["python", "-m", "worker"]
 
 
-# --- Frontend ----------------------------------------------------------------
-
-# Dependencies first so this layer caches across source edits. `npm run build`
-# lints, type-checks (specs included) and copies the VAD runtime into public/.
 FROM node:22-slim AS frontend-build
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
 RUN --mount=type=cache,id=npm,target=/root/.npm \
     npm ci
 COPY frontend/ ./
-# Before the build and a step of its own, so a failure names itself. `npm run
-# build` runs eslint and tsc but never vitest, which is the suite behind what the
-# dashboard claims out loud ("Ihr üblicher Bereich 118 bis 141") — pure functions
-# whose every failure renders perfectly, so nothing else catches them. Two
-# seconds, and no settings: vitest reads the same vite.config.ts as the build.
+# `npm run build` runs eslint and tsc but not vitest.
 RUN npm test
 RUN npm run build
 
 
-# Env (read by render-config.sh at start):
-#   OIDC_ISSUER   required, the realm the backend checks tokens against
-#   API_URL       the backend's origin; unset means the SPA's own
+# render-config.sh reads OIDC_ISSUER (required) and API_URL at start.
 FROM nginx:1-alpine AS frontend
 COPY --from=frontend-build /app/dist /usr/share/nginx/html
 COPY frontend/docker/default.conf /etc/nginx/conf.d/default.conf

@@ -1,5 +1,4 @@
-# What the backend and the worker both import: the database (models, session,
-# seed data, migrations), the LLM client, the measuring code and the job queue.
+# What the backend and the worker both import.
 [project]
 name = "calltrainer-shared"
 version = "0"

@@ -1,8 +1,4 @@
-// Copies @ricky0123/vad-web's worklet+model and onnxruntime-web's WASM
-// runtime into public/vad/, so Vite serves them as static files (dev) and
-// bundles them into dist/ as-is (build) — these are large binary assets
-// (~15-20MB) fetched by the browser at runtime, not meant to be bundled by
-// the JS bundler or committed to git (see .gitignore).
+// Copies the VAD worklet, model and onnxruntime WASM into public/vad/ (gitignored, ~15MB).
 import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,9 +13,7 @@ const ortWebDist = join(root, "node_modules", "onnxruntime-web", "dist");
 const files = [
   [vadWebDist, "vad.worklet.bundle.min.js"],
   [vadWebDist, "silero_vad_legacy.onnx"], // default model (see real-time-vad.js DEFAULT_MODEL)
-  // All wasm variants, so the runtime's own feature detection (SIMD/threads/
-  // JSEP/JSPI) can pick whichever this browser needs — a browser only
-  // downloads the specific file(s) it actually requests.
+  // Every wasm variant: the runtime picks what the browser needs.
   [ortWebDist, "ort-wasm-simd-threaded.wasm"],
   [ortWebDist, "ort-wasm-simd-threaded.mjs"],
   [ortWebDist, "ort-wasm-simd-threaded.asyncify.wasm"],

@@ -1,29 +1,18 @@
 #!/usr/bin/env bash
+# Builds and pushes the images, tagged with the v* tag on HEAD and :latest (what WUD watches;
+# PUSH_LATEST=0 skips it). HEAD must carry a pushed v* tag.
 #
-# Builds the frontend, backend and worker images and pushes them to the internal
-# registry, where WUD (What's Up Docker) picks them up. Background on buildx and
-# provenance: ../direkt-infrastructure/public/README.md.
-#
-# Each image gets two tags: the v* git tag on HEAD (traceability) and :latest
-# (what WUD watches; disable with PUSH_LATEST=0). HEAD must carry a v* tag that
-# has been pushed.
-#
-#   scripts/build-and-push.sh                 # all three
-#   scripts/build-and-push.sh frontend worker # some
-#   PUSH_LATEST=0 scripts/build-and-push.sh
-#   REGISTRY=registry.example.de scripts/build-and-push.sh
-#   REMOTE=upstream scripts/build-and-push.sh
-#
+#   scripts/build-and-push.sh [frontend backend worker]
+#   REGISTRY=... REMOTE=upstream PUSH_LATEST=0 scripts/build-and-push.sh
 set -euo pipefail
 
-# --- config (override via env) ---------------------------------------------
 REGISTRY="${REGISTRY:-registry.internal.efre-direkt.de}"
 BUILDER="${BUILDER:-wud}"
 PLATFORM="${PLATFORM:-linux/amd64}"
 REMOTE="${REMOTE:-origin}"
 PUSH_LATEST="${PUSH_LATEST:-1}"
 
-# The three images of ADR 0104, one Dockerfile target each.
+# One Dockerfile target each (ADR 0108).
 declare -A IMAGES=(
   [frontend]="calltrainer-frontend"
   [backend]="calltrainer-backend"
@@ -36,11 +25,9 @@ else
   TARGETS=(frontend backend worker)
 fi
 
-# Run from the repo root so the build context is right.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-# --- resolve the release version from the git tag on HEAD ------------------
 mapfile -t HEAD_TAGS < <(git tag --points-at HEAD --list 'v*' --sort=-version:refname)
 
 if [ "${#HEAD_TAGS[@]}" -eq 0 ]; then
@@ -58,7 +45,6 @@ if [ "${#HEAD_TAGS[@]}" -gt 1 ]; then
   echo ">> note: multiple v* tags on HEAD (${HEAD_TAGS[*]}); using highest: $VERSION" >&2
 fi
 
-# --- verify the tag has been pushed to the remote --------------------------
 local_sha="$(git rev-parse "${VERSION}^{commit}")"
 remote_out="$(git ls-remote "$REMOTE" "refs/tags/${VERSION}" "refs/tags/${VERSION}^{}" 2>/dev/null || true)"
 
@@ -87,13 +73,12 @@ fi
 
 echo ">> building version $VERSION (commit $local_sha)"
 
-# --- ensure the docker-container builder exists (one-time, idempotent) ------
+# A docker-container builder: WUD follows only a digest that is an OCI index.
 if ! docker buildx inspect "$BUILDER" >/dev/null 2>&1; then
   echo ">> creating buildx builder '$BUILDER' (driver: docker-container)"
   docker buildx create --name "$BUILDER" --driver docker-container
 fi
 
-# --- build & push each target ----------------------------------------------
 for target in "${TARGETS[@]}"; do
   image="${IMAGES[$target]:-}"
   if [ -z "$image" ]; then

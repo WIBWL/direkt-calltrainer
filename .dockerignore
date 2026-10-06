@@ -1,5 +1,4 @@
-# One build context (the repository root) for all three images; each target
-# copies only what it runs (Dockerfile).
+# One build context for all three images.
 **/node_modules
 **/dist
 **/__pycache__
