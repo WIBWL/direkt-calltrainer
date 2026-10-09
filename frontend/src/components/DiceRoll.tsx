@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-/** The die before a random Scenario's call (F-62). Theatre: the Scenario was drawn at commit (ADR 0042). */
+/** The die before a random Scenario's call (F-66). Theatre: the Scenario was drawn at commit (ADR 0042). */
 
 /** Pips by slot, 1-9 across a 3x3 grid. Front first: the throw lands on it. */
 const FACES: number[][] = [

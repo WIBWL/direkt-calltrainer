@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-/** The incoming-call ringtone (F-63), synthesised and quiet. The phone animation
+/** The incoming-call ringtone (F-67), synthesised and quiet. The phone animation
  * shares `RINGTONE_CYCLE_MS`. */
 
 interface Strike {

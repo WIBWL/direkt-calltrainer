@@ -65,7 +65,7 @@ export interface ScenarioCard {
   recommendation: ScenarioRecommendation | null;
 }
 
-/** Draw one and do not say which (F-62); cannot collide with a UUID. */
+/** Draw one and do not say which (F-66); cannot collide with a UUID. */
 export const RANDOM_SCENARIO_ID = "__random__";
 
 /** Reverses and follow-ups do not survive being walked into unprepared. */

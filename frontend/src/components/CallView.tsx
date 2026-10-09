@@ -63,7 +63,7 @@ export default function CallView({
 
   return (
     <>
-      {/* No Scenario name anywhere, so a random Scenario cannot leak (F-62). */}
+      {/* No Scenario name anywhere, so a random Scenario cannot leak (F-66). */}
       <div
         className={cx(
           "call-layout",

@@ -1,6 +1,6 @@
 import ScenarioBriefing, { StructuredText } from "./ScenarioBriefing";
 
-/** The Wissensstand (ADR 0054) and, for an authored Scenario, the case facts; `call_goal` stays withheld. Not for a random Scenario (F-62). */
+/** The Wissensstand (ADR 0054) and, for an authored Scenario, the case facts; `call_goal` stays withheld. Not for a random Scenario (F-66). */
 export default function CaseBriefPanel({
   briefing,
   caseFacts,

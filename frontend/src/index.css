@@ -674,7 +674,7 @@ h2 {
   --origin-ink: #5b3a9c;
 }
 
-/* Random (F-62): not the company's purple, which would look like a colleague's case. */
+/* Random (F-66): not the company's purple, which would look like a colleague's case. */
 .card-origin-random {
   --origin-tint: #fce7ef;
   --origin-ink: #9c3a63;
@@ -7779,7 +7779,7 @@ a.recurring-item:focus-visible {
   box-shadow: 0 0 0 1px rgba(3, 37, 62, 0.22);
 }
 
-/* --- The transcript (F-64) --- */
+/* --- The transcript (F-68) --- */
 
 .transcript-download-error {
   margin: 0.6rem 0 0;
@@ -7909,7 +7909,7 @@ a.recurring-item:focus-visible {
   }
 }
 
-/* --- The die before a random Scenario (F-62) --- */
+/* --- The die before a random Scenario (F-66) --- */
 
 .rolling-page {
   max-width: 640px;
@@ -8181,7 +8181,7 @@ a.recurring-item:focus-visible {
   }
 }
 
-/* --- The phone ringing before an ordinary call (F-63) --- */
+/* --- The phone ringing before an ordinary call (F-67) --- */
 
 .incoming-page {
   max-width: 640px;

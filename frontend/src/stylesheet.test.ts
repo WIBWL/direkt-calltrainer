@@ -11,7 +11,7 @@ const SRC = join(process.cwd(), "src");
 const BUILT_AT_RUNTIME: ReadonlyArray<readonly [RegExp, string]> = [
   [/^card-origin-/, "LibraryPicker.badgeClass — builtin/own/shared/tenant/reverse/follow-up"],
   [/^call-animation-/, "CallView — the three states of the call animation"],
-  [/^dice-face-/, "DiceRoll — the six faces of the die (F-62)"],
+  [/^dice-face-/, "DiceRoll — the six faces of the die (F-66)"],
   [/^calendar-step-/, "ActivityCalendar — the three-step shade of the activity hue"],
   [/^metric-(value|step)-(green|yellow|red)$/, "the traffic light's colour (ADR 0078)"],
   [/^screen-transition-(cover|reveal)$/, "ScreenTransition — the phase of the cut"],

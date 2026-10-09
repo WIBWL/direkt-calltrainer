@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import AppLayout from "./AppLayout";
 
-/** The last screen before a call (F-61, F-63); its way out drops the Session. */
+/** The last screen before a call (F-61, F-67); its way out drops the Session. */
 export default function BriefScreen({
   onContinue,
   onLeave,

@@ -51,7 +51,7 @@ interface LibraryPickerProps {
   onNew: () => void;
   /** Editing is reached from the info panel (ADR 0062). */
   onInfo: (id: string) => void;
-  /** F-62; the caller builds the drawable pool. */
+  /** F-66; the caller builds the drawable pool. */
   offerRandom?: boolean;
 }
 

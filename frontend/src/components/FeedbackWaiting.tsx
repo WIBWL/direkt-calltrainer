@@ -97,7 +97,7 @@ export default function FeedbackWaiting({
         automatisch weiter.
       </p>
 
-      {/* Never locked: for an unstored call the transcript is the only copy (F-64). */}
+      {/* Never locked: for an unstored call the transcript is the only copy (F-68). */}
       <button type="button" className="feedback-wait-skip" onClick={onDone}>
         Ohne Feedback weiter zum Protokoll
       </button>

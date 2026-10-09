@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { FocusGoal, Measurement, SessionFeedback, SessionTurn } from "../protocol";
 import { callMeta, metricGroups, reportOutline } from "./reportOutline";
 
-/** F-64: the report outline shared by page and PDF. */
+/** F-68: the report outline shared by page and PDF. */
 
 function turn(turn_id: number, start_offset_ms: number): SessionTurn {
   return {

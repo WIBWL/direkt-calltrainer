@@ -8,7 +8,7 @@ import type {
 } from "../protocol";
 import { ASPECT_LABELS, ASPECT_LEADS, METRIC_ASPECTS, metricAspect, withDerived } from "./metrics";
 
-/** What the feedback report says, for the page and the PDF alike (F-64, ADR 0102). */
+/** What the feedback report says, for the page and the PDF alike (F-68, ADR 0102). */
 
 export interface OutlinePoint {
   text: string;

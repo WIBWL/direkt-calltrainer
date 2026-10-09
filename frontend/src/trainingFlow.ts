@@ -21,7 +21,7 @@ export type Cut = "none" | "fade";
 export interface FlowContext {
   /** ADR 0070: to its own briefing, not the phone. */
   reverse: boolean;
-  /** F-62: thrown for, its case not read beforehand. */
+  /** F-66: thrown for, its case not read beforehand. */
   drawn: boolean;
   /** Null while in flight routes to the briefing: an empty case moves on by itself, a skipped one cannot be undone. */
   committedCase: { briefing: string | null; facts: string | null } | null;

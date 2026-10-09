@@ -31,7 +31,7 @@ export function startingFilters(scenarios: ScenarioCard[]): Filters {
     : DEFAULT_FILTERS;
 }
 
-/** The random tile (F-62), else the first card the starting filters show. */
+/** The random tile (F-66), else the first card the starting filters show. */
 export function firstSelectable(scenarios: ScenarioCard[]): string | null {
   if (scenarios.some(isDrawable)) return RANDOM_SCENARIO_ID;
   const filters = startingFilters(scenarios);
@@ -45,7 +45,7 @@ export function visibleScenarios(scenarios: ScenarioCard[], filters: Filters): S
     .sort((a, b) => a.name.localeCompare(b.name, "de"));
 }
 
-/** F-62. Empty means no tile: a draw from nothing is a dead button. */
+/** F-66. Empty means no tile: a draw from nothing is a dead button. */
 export function drawPool(scenarios: ScenarioCard[], filters: Filters): ScenarioCard[] {
   return scenarios.filter((s) => isDrawable(s) && shows(s, filters));
 }

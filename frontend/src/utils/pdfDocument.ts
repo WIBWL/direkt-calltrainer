@@ -4,7 +4,7 @@ import hankenRegular from "../assets/fonts/HankenGrotesk-Regular.ttf";
 import hankenSemiBold from "../assets/fonts/HankenGrotesk-SemiBold.ttf";
 import schibstedBold from "../assets/fonts/SchibstedGrotesk-Bold.ttf";
 
-/** The chrome shared by `feedbackPdf.ts` (F-64) and `progressPdf.ts` (F-13), palette from `index.css`. */
+/** The chrome shared by `feedbackPdf.ts` (F-68) and `progressPdf.ts` (F-13), palette from `index.css`. */
 
 /** A4, in millimetres. */
 export const PAGE = { width: 210, height: 297 };

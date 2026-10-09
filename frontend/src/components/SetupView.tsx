@@ -20,7 +20,7 @@ import SetupSection from "./SetupSection";
 
 const NOT_SELECTED = "Noch nicht ausgewählt";
 
-/** F-62: the choice, plus the category it will be drawn from. */
+/** F-66: the choice, plus the category it will be drawn from. */
 function randomSelectedLabel(category: CategoryFilter): string {
   return category === "all"
     ? "Zufallsszenario"
@@ -40,7 +40,7 @@ interface SetupViewProps {
   showRecommended: boolean;
   tenantName: string | null;
   onNewScenario: () => void;
-  /** F-62. */
+  /** F-66. */
   offerRandom: boolean;
   /** Editing starts there (ADR 0062). */
   onShowScenarioInfo: (id: string) => void;
@@ -81,7 +81,7 @@ export default function SetupView({
   onStart,
 }: SetupViewProps) {
   const { consent } = useConsentContext();
-  // Drawn on the way into the call (F-62).
+  // Drawn on the way into the call (F-66).
   const randomPicked = scenarioId === RANDOM_SCENARIO_ID;
 
   return (

@@ -14,7 +14,7 @@ export interface CommittedCase {
 
 export interface CommitOptions {
   reverse?: boolean;
-  /** F-62: walked into unread, so its case is never fetched or shown. */
+  /** F-66: walked into unread, so its case is never fetched or shown. */
   drawnName?: string | null;
   /** Seeded from the answer that created the reverse. */
   brief?: ReverseBrief | null;
@@ -42,7 +42,7 @@ export function useTrainingRun() {
     scenarioId: string;
     personaId: string;
   } | null>(null);
-  // Only for a drawn Scenario (F-62).
+  // Only for a drawn Scenario (F-66).
   const [secretScenario, setSecretScenario] = useState<string | null>(null);
   const [committedCase, setCommittedCase] = useState<CommittedCase | null>(null);
   // Fetched once per committed Session (ADR 0070).

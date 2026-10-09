@@ -2,7 +2,7 @@
 
 ## 1.1 Aufgabenstellung
 
-Der Calltrainer ist ein KI-gestütztes Telefontraining. Eine KI-Persona simuliert den Gesprächspartner in Support-, Beratungs- und Preisgesprächen (F-03). Im Fokus stehen Kommunikation, Klarheit und Wirkung des Sprechenden, nicht Abschlussquoten oder kundenspezifisches Fachwissen (C-05).
+Der Calltrainer ist ein KI-gestütztes Telefontraining. Eine KI-Persona simuliert den Gesprächspartner in Support-, Beratungs-, Preis- und Abschlussgesprächen (F-03). Im Fokus stehen Kommunikation, Klarheit und Wirkung des Sprechenden, nicht Abschlussquoten oder kundenspezifisches Fachwissen (C-05).
 
 Nach jedem Gespräch erhält der Nutzer ein qualitatives Wrap-up und gemessene Kennzahlen. Es gibt keinen Score. Jede Kennzahl führt zu ihren Belegen (ADR 0098). Dazu kommen:
 
@@ -38,7 +38,7 @@ Datenschutz ist kein Qualitätsziel. Er ist eine nicht verhandelbare Randbedingu
 | C-03 | Nutzung am Smartphone (nicht unterstützt, ADR 0007). | R-37 |
 | C-04 | Datenschutz nach DSGVO, begrenzt alle übrigen Ziele (Kapitel 8.1). | rechtlich |
 | C-05 | Kein kundenspezifisches Fachwissen (ADR 0005). | R-40, R-41 |
-| C-06 | Gespräche von kurzen Rückfragen bis zu einer Stunde. | R-03 |
+| C-06 | Gespräche von kurzen Rückfragen bis zu einer Stunde. Umgesetzt endet ein Gespräch nach 30 Minuten (ADR 0109). | R-03 |
 | C-07 | Zielgruppe: Support- und Beratungsrollen, technische Nutzer ohne Vertriebserfahrung. | R-01, R-02 |
 | C-08 | Anforderungen werden mit beiden Pilotunternehmen abgestimmt. | R-48 |
 | C-09 | Priorisierung nach MoSCoW. | Konvention |
@@ -110,8 +110,8 @@ Die Begründungen stehen in den ADRs.
                     ▼                ▼          OIDC ┌──────────┐
             ┌────────────────────────────────┐ ◄──── │ Keycloak │
             │        Backend (FastAPI)       │       └──────────┘
-            │ API · Live-Gespräch · Löschung │ ── STT/LLM ──► DiReKT-Gateway
-            └──┬──────────────┬──────────────┘ ── TTS ──────► KugelAudio
+            │ API · Live-Gespräch · Löschung │ ── TTS ──────► KugelAudio
+            └──┬──────────────┬──────────────┘ ── STT/LLM ──► DiReKT-Gateway
                │ Job          │ SQL                               ▲
                ▼              ▼                                   │ LLM
           ┌─────────┐   ┌────────────┐                            │

@@ -43,7 +43,7 @@ import {
 } from "./scenarioLibrary";
 import { prefersReducedMotion } from "./utils/motion";
 
-/** How long the die shows (F-62); the Session is already connecting behind it. */
+/** How long the die shows (F-66); the Session is already connecting behind it. */
 const ROLL_MS = 2000;
 
 /** null = closed; { id: null } = new; { id } = editing that row. */
@@ -81,7 +81,7 @@ export default function App() {
   } = run;
   const [screen, setScreen] = useState<Screen>(restored ? "transcript" : "setup");
   // Polled once for the waiting screen, the post-call screen and the report
-  // (F-64), so the file carries what the page shows.
+  // (F-68), so the file carries what the page shows.
   const {
     detail: endedSessionDetail,
     state: feedbackState,
@@ -221,7 +221,7 @@ export default function App() {
   const handleStartSession = useCallback(() => {
     if (personaId === null || scenarioId === null) return;
 
-    // Drawn here, not on selection, or each change of Persona would redraw (F-62).
+    // Drawn here, not on selection, or each change of Persona would redraw (F-66).
     if (scenarioId === RANDOM_SCENARIO_ID) {
       const drawn = drawRandomScenario(drawPool);
       if (drawn === null) return; // nothing to draw from; the tile is not offered

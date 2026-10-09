@@ -13,7 +13,7 @@ import { TranscriptFocusProvider } from "./TranscriptFocus";
 interface FeedbackScreenProps {
   transcript: TranscriptEntry[];
   personaName: string;
-  /** Where a random Scenario (F-62) is revealed too. */
+  /** Where a random Scenario (F-66) is revealed too. */
   scenarioName?: string | null;
   /** Passed in: one screen polls for it, the other reads it once. */
   feedback?: ReactNode;

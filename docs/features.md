@@ -20,8 +20,8 @@ Funktionale Anforderungen. Code und Tests zitieren die IDs. *Herkunft*:
 | F-34 | Usergesteuertes Szenario | COULD | Systementwurf |
 | F-58 | Szenario aus hochgeladenem Dokument | SHOULD | R-42 |
 | F-60 | Folgeszenario aus dem Feedback | SHOULD | R-22, Systementwurf |
-| F-62 | Zufallsszenario | COULD | Systementwurf |
-| F-63 | Anruf annehmen statt starten | COULD | Systementwurf |
+| F-66 | Zufallsszenario | COULD | Systementwurf |
+| F-67 | Anruf annehmen statt starten | COULD | Systementwurf |
 | F-59 | Mandantenbezogene Szenario-Bibliothek | COULD | R-58 |
 
 ## Sprach- und Kommunikationsanalyse
@@ -57,7 +57,7 @@ Funktionale Anforderungen. Code und Tests zitieren die IDs. *Herkunft*:
 |---|---|---|---|
 | F-12 | Aufzeichnung des Gesprächs | MUST | R-28, R-52 |
 | F-13 | Aufzeichnung des Fortschritts | SHOULD | R-27, R-29, R-30 |
-| F-64 | Gesprächsfeedback als PDF | COULD | F-12, Systementwurf |
+| F-68 | Gesprächsfeedback als PDF | COULD | F-12, Systementwurf |
 | F-48 | Trainingshistorie | COULD | R-29 |
 | F-61 | Rollentausch eines Gesprächs | COULD | R-25, R-28, R-01 |
 | F-62 | Persönliche Fokusziele | SHOULD | R-30, Systementwurf |

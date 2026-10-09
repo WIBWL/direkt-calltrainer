@@ -28,7 +28,7 @@ import { formatMetricValue, METRIC_DISCLAIMER, metricParts, metricSubline } from
 import { reportOutline, type OutlinePoint } from "./reportOutline";
 import { formatLongDate, formatOffset } from "./time";
 
-/** The feedback page as a PDF (F-64). In the browser: an unconsented run is never
+/** The feedback page as a PDF (F-68). In the browser: an unconsented run is never
  * stored (ADR 0066), so this may be the only copy. Content from `reportOutline.ts`. */
 
 /** Shared with cited feedback points, so their timestamps line up with the transcript's. */

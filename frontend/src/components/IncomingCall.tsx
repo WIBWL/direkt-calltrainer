@@ -3,7 +3,7 @@ import { useState, type CSSProperties } from "react";
 import { RINGTONE_CYCLE_MS, useRingtone } from "../hooks/useRingtone";
 import PersonaAvatar from "./PersonaAvatar";
 
-/** The phone ringing before an ordinary call (F-63): accepting sends
+/** The phone ringing before an ordinary call (F-67): accepting sends
  * `session.activate` (ADR 0042) and the user speaks first (ADR 0110). The
  * ringtone is stoppable (WCAG 1.4.2) and remembered. */
 
