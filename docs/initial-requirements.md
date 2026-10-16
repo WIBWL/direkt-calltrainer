@@ -141,10 +141,10 @@ Die Gegenrichtung führt der Feature-Katalog in der Spalte *Herkunft*. Dort kön
 
 | ID   | Anforderung                                                                                                                                                                                                                     | Quelle         | Typ | Bezug   |
 | :--- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------- | :-- | :------ |
-| R-56 | Nutzer sollen die zu trainierende Gesprächssituation kurz beschreiben können, etwa Kunde, Projekt und Ausgangslage, woraus das System den passenden Gesprächspartner für die Sitzung ableitet. Das soll neben den vorgefertigten Szenarien stehen, nicht an deren Stelle. | SO-S 5, AP-S 5 | F   | *offen* |
+| R-56 | Nutzer sollen die zu trainierende Gesprächssituation kurz beschreiben können, etwa Kunde, Projekt und Ausgangslage, woraus das System den passenden Gesprächspartner für die Sitzung ableitet. Das soll neben den vorgefertigten Szenarien stehen, nicht an deren Stelle. | SO-S 5, AP-S 5 | F   | F-34    |
 | R-57 | Ein Beispiel soll zeigen, wie ein Szenario zu beschreiben ist, damit die Hürde gegenüber fertigen Szenarien nicht zu hoch ausfällt.                                                                                             | SO-S 5         | F   | *offen* |
 | R-58 | Selbst erstellte Szenarien sollen nicht nur sitzungsbezogen, sondern mandantenbezogen gespeichert werden, sodass Kollegen ohne erneute Erfassung damit trainieren können.                                                        | SO-S 5         | F   | F-59    |
-| R-59 | Ein hinterlegtes Szenario soll nachträglich bearbeitbar sein, um es nach- und feinjustieren zu können.                                                                                                                          | SO-S 5         | F   | *offen* |
+| R-59 | Ein hinterlegtes Szenario soll nachträglich bearbeitbar sein, um es nach- und feinjustieren zu können.                                                                                                                          | SO-S 5         | F   | F-34    |
 
 ### Erweiterung über die Simulation hinaus
 
